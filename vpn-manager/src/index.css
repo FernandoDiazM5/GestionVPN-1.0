@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-900 font-sans antialiased overflow-x-hidden min-h-screen relative;
+  }
+}
+
+@layer utilities {
+  .glassmorphism {
+    @apply bg-white/90 backdrop-blur-lg border border-slate-200/80 shadow-[0_8px_30px_rgb(0,0,0,0.06)];
+  }
+  .glassmorphism-dark {
+    @apply bg-slate-900/80 backdrop-blur-lg border border-slate-800/80 shadow-[0_8px_30px_rgb(0,0,0,0.12)];
+  }
+  .console-text {
+    @apply font-mono text-xs md:text-sm tracking-tight leading-relaxed;
+  }
+}
