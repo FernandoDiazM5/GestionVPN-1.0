@@ -14,7 +14,7 @@ export default function ControlPanel() {
 
   // "Latest ref" pattern: siempre ejecuta la versión más reciente de performSync
   // sin provocar que el setInterval se reinicie con cada re-render.
-  const performSyncRef = useRef<(isInitial: boolean) => Promise<void>>();
+  const performSyncRef = useRef<(isInitial: boolean) => Promise<void>>(undefined);
 
   useEffect(() => {
     performSyncRef.current = async (isInitial: boolean) => {

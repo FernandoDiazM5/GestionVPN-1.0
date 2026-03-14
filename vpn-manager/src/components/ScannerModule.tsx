@@ -166,9 +166,9 @@ export default function ScannerModule() {
                     <td className="p-4 text-center">
                       <div className="flex justify-center">
                         {secret.disabled ? (
-                          <ShieldOff className="w-5 h-5 text-rose-500" title="Secreto deshabilitado en RouterOS" />
+                          <ShieldOff className="w-5 h-5 text-rose-500" aria-label="Secreto deshabilitado en RouterOS" />
                         ) : (
-                          <ShieldCheck className="w-5 h-5 text-emerald-500 opacity-70" title="Secreto habilitado" />
+                          <ShieldCheck className="w-5 h-5 text-emerald-500 opacity-70" aria-label="Secreto habilitado" />
                         )}
                       </div>
                     </td>
