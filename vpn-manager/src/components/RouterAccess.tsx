@@ -80,36 +80,38 @@ export default function RouterAccess() {
 
           {/* Formulario */}
           <div className="px-8 py-8 -mt-4 relative">
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-1 mb-6">
-              {syncStatus === 'handshake' && (
-                <div className="flex items-center space-x-3 px-4 py-3 bg-indigo-50 rounded-xl border border-indigo-100">
-                  <Loader2 className="w-4 h-4 text-indigo-500 animate-spin shrink-0" />
-                  <div>
-                    <p className="text-sm font-semibold text-indigo-700">Conectando al router...</p>
-                    <p className="text-xs text-indigo-500">Estableciendo sesión API RouterOS</p>
+            {syncStatus !== 'idle' && (
+              <div className="mb-6">
+                {syncStatus === 'handshake' && (
+                  <div className="flex items-center space-x-3 px-4 py-3 bg-indigo-50 rounded-xl border border-indigo-100">
+                    <Loader2 className="w-4 h-4 text-indigo-500 animate-spin shrink-0" />
+                    <div>
+                      <p className="text-sm font-semibold text-indigo-700">Conectando al router...</p>
+                      <p className="text-xs text-indigo-500">Estableciendo sesión API RouterOS</p>
+                    </div>
                   </div>
-                </div>
-              )}
-              {syncStatus === 'success' && (
-                <div className="flex items-center space-x-3 px-4 py-3 bg-emerald-50 rounded-xl border border-emerald-100">
-                  <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
-                  <p className="text-sm font-semibold text-emerald-700">¡Conexión exitosa! Redirigiendo...</p>
-                </div>
-              )}
-              {syncStatus === 'error' && (
-                <div className="flex items-start space-x-3 px-4 py-3 bg-red-50 rounded-xl border border-red-100">
-                  <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-semibold text-red-700">Error de conexión</p>
-                    <p className="text-xs text-red-500 mt-0.5">{errorDetail}</p>
+                )}
+                {syncStatus === 'success' && (
+                  <div className="flex items-center space-x-3 px-4 py-3 bg-emerald-50 rounded-xl border border-emerald-100">
+                    <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <p className="text-sm font-semibold text-emerald-700">¡Conexión exitosa! Redirigiendo...</p>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+                {syncStatus === 'error' && (
+                  <div className="flex items-start space-x-3 px-4 py-3 bg-red-50 rounded-xl border border-red-100">
+                    <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-semibold text-red-700">Error de conexión</p>
+                      <p className="text-xs text-red-500 mt-0.5">{errorDetail}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
                   IP / Host del Router
                 </label>
                 <div className="relative">
@@ -126,7 +128,7 @@ export default function RouterAccess() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
                   Usuario API
                 </label>
                 <div className="relative">
@@ -143,7 +145,7 @@ export default function RouterAccess() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
                   Contraseña <span className="text-slate-400 normal-case font-normal">(opcional)</span>
                 </label>
                 <div className="relative">
@@ -161,7 +163,7 @@ export default function RouterAccess() {
               <button
                 type="submit"
                 disabled={isConnecting}
-                className="btn-primary w-full py-3.5 flex items-center justify-center space-x-2 mt-2"
+                className="btn-primary w-full py-3.5 flex items-center justify-center space-x-2 mt-4"
               >
                 {isConnecting ? (
                   <>
