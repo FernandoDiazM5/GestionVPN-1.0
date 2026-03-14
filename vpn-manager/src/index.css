@@ -4,18 +4,53 @@
 
 @layer base {
   body {
-    @apply bg-slate-50 text-slate-900 font-sans antialiased overflow-x-hidden min-h-screen relative;
+    @apply bg-slate-50 text-slate-900 font-sans antialiased overflow-x-hidden min-h-screen;
   }
 }
 
 @layer utilities {
-  .glassmorphism {
-    @apply bg-white/90 backdrop-blur-lg border border-slate-200/80 shadow-[0_8px_30px_rgb(0,0,0,0.06)];
+  .card {
+    @apply bg-white border border-slate-200 shadow-sm rounded-2xl;
   }
-  .glassmorphism-dark {
-    @apply bg-slate-900/80 backdrop-blur-lg border border-slate-800/80 shadow-[0_8px_30px_rgb(0,0,0,0.12)];
+  .card-hover {
+    @apply hover:shadow-md hover:border-slate-300 transition-all duration-200;
+  }
+  .glass-nav {
+    @apply bg-white/95 backdrop-blur-xl border-b border-slate-200 shadow-sm;
   }
   .console-text {
-    @apply font-mono text-xs md:text-sm tracking-tight leading-relaxed;
+    @apply font-mono text-xs tracking-tight leading-relaxed;
+  }
+  .btn-primary {
+    @apply bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl
+           shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40
+           transition-all duration-200 active:scale-[0.98];
+  }
+  .btn-ghost {
+    @apply text-slate-500 hover:text-slate-800 hover:bg-slate-100
+           rounded-xl transition-all duration-200;
+  }
+  .input-field {
+    @apply w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm
+           text-slate-800 placeholder-slate-400
+           focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400
+           transition-all duration-200;
+  }
+  .status-online {
+    @apply flex items-center space-x-1.5 px-3 py-1.5 rounded-full
+           bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold;
+  }
+  .tab-btn {
+    @apply px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200
+           flex items-center space-x-2;
+  }
+  .tab-active {
+    @apply bg-indigo-600 text-white shadow-sm shadow-indigo-500/30;
+  }
+  .tab-inactive {
+    @apply text-slate-500 hover:text-slate-700 hover:bg-slate-100;
+  }
+  .page-bg {
+    @apply min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40;
   }
 }

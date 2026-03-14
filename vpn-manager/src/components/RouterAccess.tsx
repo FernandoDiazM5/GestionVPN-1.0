@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Router, Lock, User, Server, Cpu, Activity, Globe } from 'lucide-react';
+import { Radio, Lock, User, Server, Globe, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { useVpn } from '../context/VpnContext';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import type { ConnectResponse } from '../types/api';
@@ -28,7 +28,7 @@ export default function RouterAccess() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ip: targetIp, user, pass: password }),
         },
-        15_000, // 15s para handshake inicial
+        15_000,
       );
       const data: ConnectResponse = await response.json();
       if (response.ok && data.success) {
@@ -48,131 +48,139 @@ export default function RouterAccess() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center relative overflow-hidden">
-      {/* Fondo ambiental */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-600/20 blur-[120px] rounded-full mix-blend-screen" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-600/10 blur-[120px] rounded-full mix-blend-screen" />
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_10%,transparent_100%)]" />
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-blue-50 flex items-center justify-center p-4">
 
-      <div className="w-full max-w-md p-8 relative z-10">
-        {/* Logo / Header */}
-        <div className="flex flex-col items-center justify-center mb-10">
-          <div className="relative">
-            <div className="absolute inset-0 bg-indigo-500 blur-xl opacity-30 rounded-full animate-pulse" />
-            <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/50 p-4 rounded-2xl relative shadow-2xl">
-              <Router className="w-10 h-10 text-indigo-400" />
+      {/* Círculos decorativos de fondo */}
+      <div className="absolute top-0 left-0 w-96 h-96 bg-indigo-100 rounded-full -translate-x-1/2 -translate-y-1/2 opacity-60 blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 right-0 w-96 h-96 bg-blue-100 rounded-full translate-x-1/2 translate-y-1/2 opacity-60 blur-3xl pointer-events-none" />
+
+      <div className="w-full max-w-md relative z-10">
+        {/* Card principal */}
+        <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/80 border border-slate-200 overflow-hidden">
+
+          {/* Header del card */}
+          <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 px-8 pt-10 pb-12 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+            <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
+            <div className="relative z-10">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="bg-white/20 p-2.5 rounded-xl backdrop-blur-sm">
+                  <Radio className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-white">MikroTikVPN</h1>
+                  <p className="text-indigo-200 text-sm">Remote Core Manager</p>
+                </div>
+              </div>
+              <p className="text-indigo-100 text-sm mt-2">
+                Conecta tu router MikroTik para gestionar túneles VPN en tiempo real.
+              </p>
             </div>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-white mt-6">
-            MikroTik<span className="text-indigo-400">Core</span>
-          </h1>
-          <p className="text-slate-400 mt-2 font-medium flex items-center space-x-2">
-            <Activity className="w-4 h-4 text-emerald-400" />
-            <span>VPN Tunnel Manager</span>
-          </p>
-        </div>
 
-        {/* Formulario */}
-        <div className="relative glassmorphism-dark rounded-3xl p-8 transition-all duration-500 hover:shadow-indigo-500/10 hover:border-indigo-500/30">
-          {/* Overlay handshake */}
-          {syncStatus === 'handshake' && (
-            <div className="absolute inset-0 z-20 bg-slate-900/90 backdrop-blur-sm rounded-3xl flex flex-col items-center justify-center animate-in fade-in duration-300">
-              <div className="relative">
-                <div className="w-16 h-16 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
-                <Globe className="w-6 h-6 text-indigo-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-              </div>
-              <h3 className="text-white font-bold tracking-widest mt-6 animate-pulse">
-                ESTABLECIENDO HANDSHAKE
-              </h3>
-              <p className="console-text text-indigo-400 mt-2">Petición Real REST API v7.x</p>
-            </div>
-          )}
-
-          {/* Overlay éxito */}
-          {syncStatus === 'success' && (
-            <div className="absolute inset-0 z-20 bg-emerald-950/90 backdrop-blur-sm rounded-3xl border border-emerald-500/30 flex flex-col items-center justify-center animate-in zoom-in-95 duration-300">
-              <div className="bg-emerald-500/20 p-4 rounded-full">
-                <Server className="w-12 h-12 text-emerald-400" />
-              </div>
-              <h3 className="text-emerald-400 font-bold text-xl tracking-widest mt-6">
-                SINCRONIZACIÓN EXITOSA
-              </h3>
-              <p className="console-text text-emerald-500/70 mt-2">Conectado a {ip}</p>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Error banner */}
-            {syncStatus === 'error' && (
-              <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-4 flex items-start space-x-3">
-                <Cpu className="w-5 h-5 text-rose-500 flex-shrink-0 mt-0.5" />
-                <div>
-                  <h4 className="text-rose-400 font-semibold text-sm">Error de Conexión</h4>
-                  <p className="text-rose-400 text-xs mt-1">
-                    {errorDetail || 'Verifica credenciales y que el backend en localhost:3001 esté activo.'}
-                  </p>
+          {/* Formulario */}
+          <div className="px-8 py-8 -mt-4 relative">
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-1 mb-6">
+              {syncStatus === 'handshake' && (
+                <div className="flex items-center space-x-3 px-4 py-3 bg-indigo-50 rounded-xl border border-indigo-100">
+                  <Loader2 className="w-4 h-4 text-indigo-500 animate-spin shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-indigo-700">Conectando al router...</p>
+                    <p className="text-xs text-indigo-500">Estableciendo sesión API RouterOS</p>
+                  </div>
                 </div>
-              </div>
-            )}
-
-            <div className="space-y-4">
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Server className="h-5 w-5 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
+              )}
+              {syncStatus === 'success' && (
+                <div className="flex items-center space-x-3 px-4 py-3 bg-emerald-50 rounded-xl border border-emerald-100">
+                  <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
+                  <p className="text-sm font-semibold text-emerald-700">¡Conexión exitosa! Redirigiendo...</p>
                 </div>
-                <input
-                  type="text"
-                  required
-                  placeholder="Router IP/Host (ej. 192.168.88.1)"
-                  value={ip}
-                  onChange={(e) => setIp(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3.5 bg-slate-900/50 border border-slate-700/50 rounded-2xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-mono text-sm"
-                />
-              </div>
-
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <User className="h-5 w-5 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
+              )}
+              {syncStatus === 'error' && (
+                <div className="flex items-start space-x-3 px-4 py-3 bg-red-50 rounded-xl border border-red-100">
+                  <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-red-700">Error de conexión</p>
+                    <p className="text-xs text-red-500 mt-0.5">{errorDetail}</p>
+                  </div>
                 </div>
-                <input
-                  type="text"
-                  required
-                  placeholder="API Username"
-                  value={user}
-                  onChange={(e) => setUser(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3.5 bg-slate-900/50 border border-slate-700/50 rounded-2xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-mono text-sm"
-                />
-              </div>
-
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
-                </div>
-                <input
-                  type="password"
-                  placeholder="API Password (opcional)"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3.5 bg-slate-900/50 border border-slate-700/50 rounded-2xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-mono text-sm"
-                />
-              </div>
+              )}
             </div>
 
-            <button
-              type="submit"
-              disabled={isConnecting}
-              className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 rounded-2xl shadow-[0_0_20px_rgba(79,70,229,0.3)] transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed group flex items-center justify-center space-x-2"
-            >
-              <span>INICIAR CONEXIÓN REAL</span>
-              <Activity className="w-5 h-5 group-hover:animate-pulse" />
-            </button>
-          </form>
-        </div>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                  IP / Host del Router
+                </label>
+                <div className="relative">
+                  <Globe className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    required
+                    placeholder="192.168.88.1"
+                    value={ip}
+                    onChange={(e) => setIp(e.target.value)}
+                    className="input-field pl-10 font-mono"
+                  />
+                </div>
+              </div>
 
-        <div className="text-center mt-8">
-          <p className="console-text text-slate-600">v1.3.0 · MikroTik REST API (v7.1+)</p>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                  Usuario API
+                </label>
+                <div className="relative">
+                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    required
+                    placeholder="admin"
+                    value={user}
+                    onChange={(e) => setUser(e.target.value)}
+                    className="input-field pl-10"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                  Contraseña <span className="text-slate-400 normal-case font-normal">(opcional)</span>
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="input-field pl-10"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isConnecting}
+                className="btn-primary w-full py-3.5 flex items-center justify-center space-x-2 mt-2"
+              >
+                {isConnecting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Conectando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Server className="w-4 h-4" />
+                    <span>Conectar al Router</span>
+                  </>
+                )}
+              </button>
+            </form>
+
+            <p className="text-center text-xs text-slate-400 mt-6 font-mono">
+              RouterOS API · Puerto 8728 / 8729
+            </p>
+          </div>
         </div>
       </div>
     </div>

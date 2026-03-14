@@ -43,7 +43,7 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
   // Dark mode — persiste en localStorage, oscuro por defecto (entorno de red)
   const [darkMode, setDarkMode] = useState(() => {
     const stored = localStorage.getItem('vpn_dark_mode');
-    return stored !== null ? stored === 'true' : true;
+    return stored !== null ? stored === 'true' : false;
   });
 
   useEffect(() => {

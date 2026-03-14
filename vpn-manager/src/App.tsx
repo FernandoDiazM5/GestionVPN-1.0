@@ -1,4 +1,4 @@
-import { Network, Server, Radio, Moon, Sun } from 'lucide-react';
+import { Network, Server, Radio, LogOut, Wifi } from 'lucide-react';
 import { VpnProvider, useVpn } from './context/VpnContext';
 import RouterAccess from './components/RouterAccess';
 import ScannerModule from './components/ScannerModule';
@@ -12,14 +12,17 @@ function AppContent() {
     activeModule,
     setActiveModule,
     handleLogout,
-    darkMode,
-    toggleDarkMode,
   } = useVpn();
 
   if (!isReady) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950">
-        <Server className="w-12 h-12 text-indigo-500 animate-pulse" />
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-blue-50">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="p-4 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-500/30 animate-pulse">
+            <Server className="w-8 h-8 text-white" />
+          </div>
+          <p className="text-sm text-slate-500 font-medium">Iniciando sistema...</p>
+        </div>
       </div>
     );
   }
@@ -29,77 +32,64 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-50">
+    <div className="page-bg text-slate-900">
       {/* Navbar */}
-      <nav className="sticky top-0 z-50 glassmorphism dark:glassmorphism-dark px-6 py-4 flex items-center justify-between gap-4">
-        {/* Logo */}
-        <div className="flex items-center space-x-3 shrink-0">
-          <div className="bg-indigo-600 p-2 rounded-xl shadow-lg shadow-indigo-500/30">
-            <Radio className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold tracking-tight">
-              MikroTik<span className="text-indigo-600 dark:text-indigo-400">VPN</span>
-            </h1>
-            <p className="text-xs text-slate-500 font-medium">Remote Core Manager</p>
-          </div>
-        </div>
+      <nav className="sticky top-0 z-50 glass-nav">
+        <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between gap-4">
 
-        {/* Tabs de navegación */}
-        <div className="flex items-center space-x-2 bg-slate-100 dark:bg-slate-900 p-1 rounded-2xl border border-slate-200 dark:border-slate-800">
-          <button
-            onClick={() => setActiveModule('control')}
-            className={`px-4 py-2 rounded-xl font-semibold text-sm transition-all duration-300 flex items-center space-x-2 ${
-              activeModule === 'control'
-                ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-600 dark:text-indigo-400'
-                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-            }`}
-          >
-            <Server className="w-4 h-4" />
-            <span>Gestión</span>
-          </button>
-          <button
-            onClick={() => setActiveModule('scanner')}
-            className={`px-4 py-2 rounded-xl font-semibold text-sm transition-all duration-300 flex items-center space-x-2 ${
-              activeModule === 'scanner'
-                ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-600 dark:text-indigo-400'
-                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-            }`}
-          >
-            <Network className="w-4 h-4" />
-            <span>Escáner PPP</span>
-          </button>
-        </div>
-
-        {/* Acciones derecha */}
-        <div className="flex items-center space-x-3 shrink-0">
-          <div className="flex items-center space-x-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 tracking-wide">
-              SYSTEM ONLINE
-            </span>
+          {/* Logo */}
+          <div className="flex items-center space-x-3 shrink-0">
+            <div className="bg-gradient-to-br from-indigo-500 to-indigo-700 p-2.5 rounded-xl shadow-md shadow-indigo-500/25">
+              <Radio className="w-5 h-5 text-white" />
+            </div>
+            <div className="hidden sm:block">
+              <h1 className="text-base font-bold text-slate-800 leading-none">
+                MikroTik<span className="text-indigo-600">VPN</span>
+              </h1>
+              <p className="text-[11px] text-slate-400 font-medium mt-0.5">Remote Manager</p>
+            </div>
           </div>
 
-          {/* Toggle dark mode */}
-          <button
-            onClick={toggleDarkMode}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-            title={darkMode ? 'Modo claro' : 'Modo oscuro'}
-          >
-            {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-          </button>
+          {/* Tabs */}
+          <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
+            <button
+              onClick={() => setActiveModule('control')}
+              className={`tab-btn ${activeModule === 'control' ? 'tab-active' : 'tab-inactive'}`}
+            >
+              <Server className="w-4 h-4" />
+              <span>Gestión</span>
+            </button>
+            <button
+              onClick={() => setActiveModule('scanner')}
+              className={`tab-btn ${activeModule === 'scanner' ? 'tab-active' : 'tab-inactive'}`}
+            >
+              <Network className="w-4 h-4" />
+              <span>Escáner</span>
+            </button>
+          </div>
 
-          <button
-            onClick={handleLogout}
-            className="text-xs font-bold text-slate-400 hover:text-rose-500 transition-colors uppercase tracking-wider"
-          >
-            Desconectar
-          </button>
+          {/* Derecha */}
+          <div className="flex items-center space-x-3 shrink-0">
+            <div className="status-online">
+              <Wifi className="w-3.5 h-3.5" />
+              <span>{credentials.ip}</span>
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse ml-1" />
+            </div>
+
+            <button
+              onClick={handleLogout}
+              className="btn-ghost p-2 flex items-center space-x-1.5 text-sm"
+              title="Desconectar"
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="hidden sm:inline text-xs font-semibold">Salir</span>
+            </button>
+          </div>
         </div>
       </nav>
 
-      {/* Contenido principal */}
-      <main className="max-w-7xl mx-auto p-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* Contenido */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 animate-in fade-in slide-in-from-bottom-3 duration-400">
         {activeModule === 'scanner' ? <ScannerModule /> : <ControlPanel />}
       </main>
     </div>
