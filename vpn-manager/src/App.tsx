@@ -3,6 +3,7 @@ import { VpnProvider, useVpn } from './context/VpnContext';
 import RouterAccess from './components/RouterAccess';
 import ScannerModule from './components/ScannerModule';
 import ControlPanel from './components/ControlPanel';
+import NodeAccessPanel from './components/NodeAccessPanel';
 
 function AppContent() {
   const {
@@ -53,6 +54,13 @@ function AppContent() {
           {/* Tabs */}
           <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
             <button
+              onClick={() => setActiveModule('nodes')}
+              className={`tab-btn ${activeModule === 'nodes' ? 'tab-active' : 'tab-inactive'}`}
+            >
+              <Radio className="w-4 h-4" />
+              <span>Nodos</span>
+            </button>
+            <button
               onClick={() => setActiveModule('control')}
               className={`tab-btn ${activeModule === 'control' ? 'tab-active' : 'tab-inactive'}`}
             >
@@ -90,7 +98,9 @@ function AppContent() {
 
       {/* Contenido */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 animate-in fade-in slide-in-from-bottom-3 duration-400">
-        {activeModule === 'scanner' ? <ScannerModule /> : <ControlPanel />}
+        {activeModule === 'nodes' && <NodeAccessPanel />}
+        {activeModule === 'scanner' && <ScannerModule />}
+        {activeModule === 'control' && <ControlPanel />}
       </main>
     </div>
   );

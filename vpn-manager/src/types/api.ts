@@ -42,3 +42,29 @@ export interface DeactivateResponse {
   success: boolean;
   message?: string;
 }
+
+/** Nodo remoto enriquecido devuelto por /api/nodes */
+export interface NodeInfo {
+  id: string;
+  nombre_nodo: string;
+  ppp_user: string;
+  segmento_lan: string;
+  nombre_vrf: string;
+  service: string;
+  disabled: boolean;
+  running: boolean;
+  ip_tunnel: string;
+  uptime: string;
+}
+
+/** Respuesta de /api/tunnel/activate */
+export interface TunnelActivateResponse {
+  success: boolean;
+  message?: string;
+}
+
+/** Respuesta de /api/tunnel/deactivate */
+export interface TunnelDeactivateResponse {
+  success: boolean;
+  message?: string;
+}

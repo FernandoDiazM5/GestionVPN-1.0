@@ -83,6 +83,7 @@ export default function VpnCard({ vpn, onUpdate, onRemove }: VpnCardProps) {
     try {
       addLog('Enviando Enable → RouterOS API...');
       setProgress(30);
+      // 20s: connect (hasta 8s) + 5 escrituras secuenciales en RouterOS sobre WireGuard
       const response = await fetchWithTimeout('http://localhost:3001/api/interface/activate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -94,7 +95,7 @@ export default function VpnCard({ vpn, onUpdate, onRemove }: VpnCardProps) {
           vpnName: vpn.name,
           vpnService: vpn.service,
         }),
-      });
+      }, 20_000);
       setProgress(70);
       const data: ActivateResponse = await response.json();
       if (!response.ok || !data.success) {
@@ -129,7 +130,7 @@ export default function VpnCard({ vpn, onUpdate, onRemove }: VpnCardProps) {
           vpnName: vpn.name,
           vpnService: vpn.service,
         }),
-      });
+      }, 20_000);
       const data: DeactivateResponse = await response.json();
       if (!response.ok || !data.success) {
         throw new Error(data.message ?? 'Error desactivando interfaz');
