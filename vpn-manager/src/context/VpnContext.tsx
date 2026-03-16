@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { dbService, type VpnSecret, type RouterCredentials } from '../store/db';
 import type { NodeInfo } from '../types/api';
+import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
 interface VpnContextType {
   // Auth
@@ -32,8 +33,8 @@ interface VpnContextType {
   deactivateAllNodes: () => Promise<void>;
 
   // Navegación
-  activeModule: 'scanner' | 'control' | 'nodes';
-  setActiveModule: React.Dispatch<React.SetStateAction<'scanner' | 'control' | 'nodes'>>;
+  activeModule: 'scanner' | 'control' | 'nodes' | 'devices';
+  setActiveModule: React.Dispatch<React.SetStateAction<'scanner' | 'control' | 'nodes' | 'devices'>>;
 
   // Tema
   darkMode: boolean;
@@ -48,7 +49,7 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [credentials, setCredentials] = useState<RouterCredentials | undefined>();
   const [managedVpns, setManagedVpns] = useState<VpnSecret[]>([]);
-  const [activeModule, setActiveModule] = useState<'scanner' | 'control' | 'nodes'>('scanner');
+  const [activeModule, setActiveModule] = useState<'scanner' | 'control' | 'nodes' | 'devices'>('scanner');
   const [isReady, setIsReady] = useState(false);
   const [scannedSecrets, setScannedSecrets] = useState<VpnSecret[]>([]);
   const [hasScanned, setHasScanned] = useState(false);
@@ -78,7 +79,8 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
   const deactivateAllNodes = useCallback(async () => {
     if (!credentials) return;
     try {
-      await fetch('http://localhost:3001/api/tunnel/deactivate', {
+      // fetchWithTimeout evita que la llamada cuelgue si el router no responde
+      await fetchWithTimeout('http://localhost:3001/api/tunnel/deactivate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -86,7 +88,7 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
           user: credentials.user,
           pass: credentials.pass,
         }),
-      });
+      }, 15_000);
     } catch (err) {
       console.error('Error desactivando tunnels:', err);
     }

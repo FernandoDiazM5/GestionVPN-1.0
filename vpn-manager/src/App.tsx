@@ -1,9 +1,10 @@
-import { Network, Server, Radio, LogOut, Wifi } from 'lucide-react';
+import { Network, Server, Radio, LogOut, Wifi, Cpu } from 'lucide-react';
 import { VpnProvider, useVpn } from './context/VpnContext';
 import RouterAccess from './components/RouterAccess';
 import ScannerModule from './components/ScannerModule';
 import ControlPanel from './components/ControlPanel';
 import NodeAccessPanel from './components/NodeAccessPanel';
+import NetworkDevicesModule from './components/NetworkDevicesModule';
 
 function AppContent() {
   const {
@@ -74,6 +75,13 @@ function AppContent() {
               <Network className="w-4 h-4" />
               <span>Escáner</span>
             </button>
+            <button
+              onClick={() => setActiveModule('devices')}
+              className={`tab-btn ${activeModule === 'devices' ? 'tab-active' : 'tab-inactive'}`}
+            >
+              <Cpu className="w-4 h-4" />
+              <span>Equipos</span>
+            </button>
           </div>
 
           {/* Derecha */}
@@ -98,9 +106,10 @@ function AppContent() {
 
       {/* Contenido */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 animate-in fade-in slide-in-from-bottom-3 duration-400">
-        {activeModule === 'nodes' && <NodeAccessPanel />}
+        {activeModule === 'nodes'   && <NodeAccessPanel />}
         {activeModule === 'scanner' && <ScannerModule />}
         {activeModule === 'control' && <ControlPanel />}
+        {activeModule === 'devices' && <NetworkDevicesModule />}
       </main>
     </div>
   );

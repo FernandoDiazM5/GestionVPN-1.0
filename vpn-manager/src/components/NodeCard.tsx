@@ -140,8 +140,8 @@ export default function NodeCard({ node }: NodeCardProps) {
       <div className="h-1 w-full bg-slate-100">
         <div
           className={`h-full transition-all duration-500 ease-out rounded-full
-            ${isThisNodeActive ? 'bg-emerald-500' : isPending ? 'bg-indigo-500' : 'bg-transparent'}`}
-          style={{ width: isThisNodeActive ? '100%' : isPending ? '60%' : '0%' }}
+            ${isThisNodeActive ? 'bg-emerald-500' : isPending ? 'bg-indigo-500 animate-pulse' : 'bg-transparent'}`}
+          style={{ width: isThisNodeActive ? '100%' : isPending ? '75%' : '0%' }}
         />
       </div>
 

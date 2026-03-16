@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
+const http  = require('http');
 const { RouterOSAPI } = require('node-routeros');
+const { Client: SSH2Client } = require('ssh2');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -76,6 +78,145 @@ const connectToMikrotik = async (host, user, password) => {
 
 // Regex de validación IPv4 básica (cuatro octetos 0-255)
 const IPV4_REGEX = /^(25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)(\.(25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)){3}$/;
+
+// Regex de validación CIDR (IPv4/prefijo 0-32)
+const CIDR_REGEX = /^(25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)(\.(25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)){3}\/(3[0-2]|[1-2]\d|\d)$/;
+
+// ─────────────────────────────────────────────
+// Helpers para el módulo de dispositivos de red
+// ─────────────────────────────────────────────
+
+/** Verifica si una dirección IP pertenece a una subred CIDR. */
+const isInSubnet = (ip, cidr) => {
+    try {
+        const [network, bits] = cidr.split('/');
+        const maskBits = parseInt(bits, 10);
+        if (isNaN(maskBits) || maskBits < 0 || maskBits > 32) return false;
+        const toNum = addr => addr.split('.').reduce((acc, oct) => ((acc << 8) | parseInt(oct, 10)) >>> 0, 0);
+        const mask = maskBits > 0 ? (~0 << (32 - maskBits)) >>> 0 : 0;
+        return (toNum(ip) & mask) === (toNum(network) & mask);
+    } catch { return false; }
+};
+
+/**
+ * Sondea una IP buscando la página de estado de airOS Ubiquiti (/status.cgi).
+ * Usa http.request nativo para evitar problemas con TLS, AbortController y versiones de Node.
+ * Puerto 80 (HTTP) — más confiable que HTTPS con cert autofirmado en airOS.
+ * @returns {Promise<Object|null>} Datos del dispositivo o null si no es Ubiquiti / no responde
+ */
+const probeUbiquiti = (deviceIP) => {
+    return new Promise((resolve) => {
+        const req = http.request({
+            hostname: deviceIP,
+            port:     80,
+            path:     '/status.cgi',
+            method:   'GET',
+            timeout:  4000,
+            headers:  { Accept: 'application/json, */*', Connection: 'close' },
+        }, (res) => {
+            let body = '';
+            res.on('data', chunk => { body += chunk; });
+            res.on('end', () => {
+                try {
+                    const data = JSON.parse(body);
+                    if (!data || !data.host || !data.host.devmodel) return resolve(null);
+                    const h = data.host;
+                    const w = data.wireless || {};
+                    resolve({
+                        ip:        deviceIP,
+                        mac:       (h.macaddr  || '').toUpperCase(),
+                        name:      h.hostname  || deviceIP,
+                        model:     h.devmodel  || 'Unknown',
+                        firmware:  h.fwversion || 'Unknown',
+                        role:      (w.mode === 'master' || w.mode === 'ap') ? 'ap' : 'sta',
+                        parent_ap: (w.remote && w.remote.hostname) || w.essid || '',
+                        essid:     w.essid || '',
+                        frequency: parseInt(w.frequency) || 0,
+                    });
+                } catch { resolve(null); }
+            });
+        });
+        req.on('error',   () => resolve(null)); // conexión rechazada / sin ruta
+        req.on('timeout', () => { req.destroy(); resolve(null); }); // timeout de socket
+        req.end();
+    });
+};
+
+/**
+ * Ejecuta un comando en un dispositivo remoto via SSH.
+ * Incluye algoritmos legacy para compatibilidad con Ubiquiti airOS (XW/XM firmware).
+ */
+const sshExec = (host, port, username, password, command) => {
+    return new Promise((resolve, reject) => {
+        const conn = new SSH2Client();
+        let output = '';
+        const globalTimer = setTimeout(() => {
+            conn.destroy();
+            reject(new Error('Tiempo de espera SSH agotado (10s)'));
+        }, 10000);
+
+        conn.on('ready', () => {
+            conn.exec(command, (err, stream) => {
+                if (err) { clearTimeout(globalTimer); conn.end(); return reject(err); }
+                stream.on('data', data => { output += data.toString(); });
+                stream.stderr.on('data', () => {});
+                stream.on('close', () => { clearTimeout(globalTimer); conn.end(); resolve(output.trim()); });
+            });
+        });
+        conn.on('error', err => { clearTimeout(globalTimer); reject(err); });
+        conn.connect({
+            host, port: port || 22, username, password, readyTimeout: 8000,
+            algorithms: {
+                kex:           ['ecdh-sha2-nistp256', 'diffie-hellman-group14-sha1', 'diffie-hellman-group1-sha1'],
+                serverHostKey: ['ssh-rsa', 'ssh-dss', 'ecdsa-sha2-nistp256'],
+                cipher:        ['aes128-ctr', 'aes256-ctr', 'aes128-cbc', '3des-cbc'],
+                hmac:          ['hmac-sha1', 'hmac-sha2-256', 'hmac-md5'],
+            },
+        });
+    });
+};
+
+/**
+ * Parsea la salida JSON de 'mca-status' (Ubiquiti AirOS).
+ * Normaliza tasas (bps → Mbps) y CCQ (0-1000 → 0-100%).
+ */
+const parseAirOSStats = (output) => {
+    try {
+        const data = JSON.parse(output);
+        const w  = data.wireless || {};
+        const am = data.airmax   || {};
+        const toMbps = bps => bps ? Math.round(bps / 1_000_000) : null;
+        const toCCQ  = raw => raw ? Math.round(raw / 10)         : null;
+        return {
+            signal:          w.signal      || w.rssi        || null,
+            noiseFloor:      w.noisefloor  || w.noise_floor || null,
+            ccq:             toCCQ(w.ccq),
+            txRate:          toMbps(w.txrate  || w.tx_rate),
+            rxRate:          toMbps(w.rxrate  || w.rx_rate),
+            frequency:       parseInt(w.frequency) || null,
+            distance:        w.ackdistance  || w.ack_distance || null,
+            txPower:         w.txpower      || w.tx_power    || null,
+            uptime:          data.uptime    || null,
+            essid:           w.essid        || null,
+            mode:            w.mode         || null,
+            airmaxEnabled:   !!am.enabled,
+            airmaxCapacity:  am.capacity    || null,
+            airmaxQuality:   am.quality     || null,
+            stations: (data.sta || []).map(s => ({
+                mac:        (s.mac || '').toUpperCase(),
+                signal:     s.signal     || s.rssi  || null,
+                noiseFloor: s.noisefloor || null,
+                ccq:        toCCQ(s.ccq),
+                txRate:     toMbps(s.txrate || s.tx_rate),
+                rxRate:     toMbps(s.rxrate || s.rx_rate),
+                distance:   s.ackdistance || null,
+                uptime:     s.uptime      || null,
+            })),
+        };
+    } catch {
+        return { raw: output.slice(0, 500) };
+    }
+};
 
 /**
  * Wrapper seguro sobre api.write() con timeout por operación.
@@ -438,7 +579,7 @@ const cleanTunnelRules = async (api) => {
             .map(e => safeWrite(api, ['/ip/firewall/mangle/remove', `=.id=${e['.id']}`])),
     ];
 
-    if (removeOps.length > 0) await Promise.all(removeOps);
+    if (removeOps.length > 0) await Promise.allSettled(removeOps); // allSettled: tolerancia a fallo individual
 };
 
 // ─────────────────────────────────────────────
@@ -568,7 +709,22 @@ app.post('/api/node/provision', async (req, res) => {
     // Nombres derivados
     const ifaceName = `VPN-SSTP-ND${nodeNumber}-${nodeName.toUpperCase()}`;
     const vrfName   = `VRF-ND${nodeNumber}-${nodeName.toUpperCase()}`;
-    const comment   = `ND${nodeNumber}`;
+    // "Torre{nodeName}" permite que /api/nodes extraiga el nombre amigable con el regex existente
+    const comment   = `Torre${nodeName}`;
+
+    // Validar formato de subred LAN y dirección remota del túnel
+    if (!CIDR_REGEX.test(lanSubnet)) {
+        return res.status(400).json({
+            success: false,
+            message: `lanSubnet no es un CIDR válido: "${lanSubnet}" (ej: 10.5.5.0/24)`,
+        });
+    }
+    if (!IPV4_REGEX.test(remoteAddress)) {
+        return res.status(400).json({
+            success: false,
+            message: `remoteAddress no es una IPv4 válida: "${remoteAddress}" (ej: 10.10.250.212)`,
+        });
+    }
 
     const steps = [];
     let api;
@@ -668,12 +824,21 @@ app.post('/api/node/script', async (req, res) => {
         });
     }
 
-    // Extraer gateway (primer IP de la subred, ej: 10.1.1.0/24 → 10.1.1.1)
+    // Calcular gateway (primera IP usable) y pool DHCP de forma correcta para cualquier prefijo.
+    // Ej: 10.1.1.0/24 → gw 10.1.1.1, pool 10.1.1.100-10.1.1.254
+    // Ej: 192.168.1.128/25 → gw 192.168.1.129, pool 192.168.1.228-192.168.1.254 (no .100 que cae en otra subred)
     const [netAddr, mask] = lanSubnet.split('/');
-    const octets = netAddr.split('.').map(Number);
-    octets[3] = 1;
-    const gatewayIP = octets.join('.');
-    const lanCIDR = `${gatewayIP}/${mask}`;
+    const maskBits = parseInt(mask, 10);
+    const ipParts  = netAddr.split('.').map(Number);
+    const ipNum    = ((ipParts[0] << 24) | (ipParts[1] << 16) | (ipParts[2] << 8) | ipParts[3]) >>> 0;
+    const maskNum  = maskBits > 0 ? (~0 << (32 - maskBits)) >>> 0 : 0;
+    const netBase  = (ipNum & maskNum) >>> 0;
+    const gwNum    = (netBase + 1) >>> 0;
+    const toOctets = n => [(n >>> 24) & 0xFF, (n >>> 16) & 0xFF, (n >>> 8) & 0xFF, n & 0xFF].join('.');
+    const gatewayIP = toOctets(gwNum);
+    const lanCIDR   = `${gatewayIP}/${mask}`;
+    const poolStart = toOctets((netBase + 100) >>> 0);
+    const poolEnd   = toOctets((netBase + 254) >>> 0);
 
     const script = `# ============================================
 # Script de configuración para nodo: ${nodeName}
@@ -698,7 +863,7 @@ add address=${lanCIDR} interface=BR-LAN network=${netAddr}
 
 # 4. DHCP Server para la LAN (opcional)
 /ip pool
-add name=pool-lan ranges=${octets[0]}.${octets[1]}.${octets[2]}.100-${octets[0]}.${octets[1]}.${octets[2]}.254
+add name=pool-lan ranges=${poolStart}-${poolEnd}
 /ip dhcp-server
 add address-pool=pool-lan interface=BR-LAN name=dhcp-lan disabled=no
 /ip dhcp-server network
@@ -730,6 +895,202 @@ set servers=8.8.8.8,8.8.4.4 allow-remote-requests=yes
 `;
 
     res.json({ success: true, script });
+});
+
+// ─────────────────────────────────────────────
+// POST /api/node/scan-devices
+// Descubre dispositivos Ubiquiti en la LAN del nodo:
+//   1. RouterOS API → /ip/arp/print (IPs activas en la subred)
+//   2. HTTP probe de cada IP → /status.cgi (airOS, sin credenciales)
+// Solo funciona con el túnel VRF del nodo activo (admin IP alcanza la LAN remota).
+// ─────────────────────────────────────────────
+app.post('/api/node/scan-devices', async (req, res) => {
+    const { ip, user, pass, nodeLan } = req.body;
+
+    if (!nodeLan) {
+        return res.status(400).json({ success: false, message: 'Falta nodeLan (subred CIDR del nodo, ej: 10.5.5.0/24)' });
+    }
+
+    let api;
+    try {
+        api = await connectToMikrotik(ip, user, pass);
+        const arpEntries = await safeWrite(api, ['/ip/arp/print']);
+        await api.close();
+
+        // Filtrar ARP a la subred del nodo.
+        // Incluir entradas completas (con MAC) e incompletas (sin MAC pero con IP) para debug.
+        const allSubnetIPs = arpEntries.filter(e => e.address && isInSubnet(e.address, nodeLan));
+        const targetIPs    = allSubnetIPs
+            .filter(e => e['mac-address'] || e.macAddress) // aceptar ambos formatos
+            .map(e => ({ ip: e.address, mac: (e['mac-address'] || e.macAddress || '').toUpperCase() }));
+
+        console.log(`[SCAN] LAN ${nodeLan}: ${allSubnetIPs.length} entradas ARP totales, ${targetIPs.length} con MAC`);
+
+        if (targetIPs.length === 0) {
+            return res.json({
+                success: true,
+                devices: [],
+                allIPs:  allSubnetIPs.map(e => e.address),
+                scanned: 0,
+                debug:   `ARP table tiene ${arpEntries.length} entradas totales, 0 en subred ${nodeLan}`,
+            });
+        }
+
+        // Sondear todas en paralelo (tolerante a fallos, 4s por IP)
+        const probeResults = await Promise.allSettled(
+            targetIPs.map(({ ip: devIP, mac }) =>
+                probeUbiquiti(devIP).then(info => info ? { ...info, mac_arp: mac } : null)
+            )
+        );
+
+        const devices = probeResults
+            .filter(r => r.status === 'fulfilled' && r.value !== null)
+            .map(r => r.value);
+
+        console.log(`[SCAN] ${devices.length} Ubiquiti identificados de ${targetIPs.length} IPs sondeadas`);
+        res.json({
+            success: true,
+            devices,
+            allIPs:  targetIPs.map(e => e.ip),
+            scanned: targetIPs.length,
+            debug:   `${targetIPs.length} IPs en ARP de ${nodeLan} → ${devices.length} Ubiquiti respondieron`,
+        });
+
+    } catch (error) {
+        console.error('Error [scan-devices]:', error.message);
+        if (api) try { await api.close(); } catch (_) {}
+        res.status(500).json({ success: false, message: getErrorMessage(error, ip, user) });
+    }
+});
+
+// ─────────────────────────────────────────────
+// POST /api/device/antenna
+// Estadísticas RF de un dispositivo Ubiquiti airOS via SSH.
+// Ejecuta 'mca-status' (binario AirOS que devuelve JSON con signal, CCQ, tasas, AirMax).
+// ─────────────────────────────────────────────
+app.post('/api/device/antenna', async (req, res) => {
+    const { deviceIP, deviceUser, devicePass, devicePort } = req.body;
+
+    if (!deviceIP || !deviceUser || !devicePass) {
+        return res.status(400).json({ success: false, message: 'Faltan parámetros: deviceIP, deviceUser y devicePass son requeridos' });
+    }
+    if (!IPV4_REGEX.test(deviceIP)) {
+        return res.status(400).json({ success: false, message: `deviceIP no es una IPv4 válida: "${deviceIP}"` });
+    }
+
+    try {
+        const port = parseInt(devicePort) || 22;
+        console.log(`[ANTENNA] SSH → ${deviceIP}:${port} (${deviceUser})`);
+        const output = await sshExec(deviceIP, port, deviceUser, devicePass, 'mca-status');
+        const stats  = parseAirOSStats(output);
+        res.json({ success: true, stats });
+    } catch (error) {
+        console.error('[ANTENNA] Error SSH:', error.message);
+        const msg = /[Aa]uth|handshake/.test(error.message)
+            ? `Credenciales SSH incorrectas para ${deviceIP}`
+            : /timeout|timed/.test(error.message)
+                ? `Tiempo de espera agotado conectando a ${deviceIP}`
+                : /ECONNREFUSED/.test(error.message)
+                    ? `SSH rechazado en ${deviceIP}:${devicePort || 22} — verifica que SSH esté habilitado`
+                    : error.message || 'Error de conexión SSH';
+        res.status(500).json({ success: false, message: msg });
+    }
+});
+
+// ─────────────────────────────────────────────
+// POST /api/device/wifi/get
+// Obtiene configuración WiFi del router detrás de la antena via RouterOS API.
+// Devuelve interfaces wireless, SSIDs y PSK de los perfiles de seguridad.
+// ─────────────────────────────────────────────
+app.post('/api/device/wifi/get', async (req, res) => {
+    const { routerIP, routerUser, routerPass } = req.body;
+
+    if (!routerIP || !routerUser) {
+        return res.status(400).json({ success: false, message: 'Faltan parámetros: routerIP y routerUser son requeridos' });
+    }
+
+    let api;
+    try {
+        api = await connectToMikrotik(routerIP, routerUser, routerPass || '');
+
+        const [ifaces, profiles] = await Promise.allSettled([
+            safeWrite(api, ['/interface/wireless/print']),
+            safeWrite(api, ['/interface/wireless/security-profiles/print']),
+        ]);
+
+        await api.close();
+
+        const wifiIfaces = ifaces.status === 'fulfilled'
+            ? ifaces.value.map(i => ({
+                id:              i['.id'],
+                name:            i.name       || '',
+                ssid:            i.ssid       || '',
+                mode:            i.mode       || '',
+                band:            i.band       || '',
+                frequency:       i.frequency  || '',
+                txPower:         i['tx-power-mode'] || '',
+                securityProfile: i['security-profile'] || 'default',
+                disabled:        i.disabled === 'true' || i.disabled === true,
+            }))
+            : [];
+
+        const secProfiles = profiles.status === 'fulfilled'
+            ? profiles.value.map(p => ({
+                id:      p['.id'],
+                name:    p.name || 'default',
+                wpa2Key: p['wpa2-pre-shared-key'] || '',
+                mode:    p.mode || '',
+            }))
+            : [];
+
+        console.log(`[WIFI/GET] ${routerIP}: ${wifiIfaces.length} interfaces, ${secProfiles.length} perfiles`);
+        res.json({ success: true, interfaces: wifiIfaces, profiles: secProfiles });
+
+    } catch (error) {
+        console.error('Error [wifi/get]:', error.message);
+        if (api) try { await api.close(); } catch (_) {}
+        res.status(500).json({ success: false, message: getErrorMessage(error, routerIP, routerUser) });
+    }
+});
+
+// ─────────────────────────────────────────────
+// POST /api/device/wifi/set
+// Modifica el SSID y/o la clave WPA2 de una interfaz wireless via RouterOS API.
+// ─────────────────────────────────────────────
+app.post('/api/device/wifi/set', async (req, res) => {
+    const { routerIP, routerUser, routerPass, ifaceId, ssid, profileId, wpa2Key } = req.body;
+
+    if (!routerIP || !routerUser || !ifaceId) {
+        return res.status(400).json({ success: false, message: 'Faltan parámetros: routerIP, routerUser e ifaceId son requeridos' });
+    }
+
+    let api;
+    try {
+        api = await connectToMikrotik(routerIP, routerUser, routerPass || '');
+
+        // Cambiar SSID si se proporcionó
+        if (ssid !== undefined && ssid !== '') {
+            await safeWrite(api, ['/interface/wireless/set', `=.id=${ifaceId}`, `=ssid=${ssid}`]);
+        }
+
+        // Cambiar clave WPA2 si se proporcionó
+        if (profileId && wpa2Key !== undefined && wpa2Key !== '') {
+            await safeWrite(api, [
+                '/interface/wireless/security-profiles/set',
+                `=.id=${profileId}`,
+                `=wpa2-pre-shared-key=${wpa2Key}`,
+            ]);
+        }
+
+        await api.close();
+        console.log(`[WIFI/SET] ${routerIP}: iface=${ifaceId} ssid="${ssid}"`);
+        res.json({ success: true, message: 'Configuración WiFi actualizada correctamente' });
+
+    } catch (error) {
+        console.error('Error [wifi/set]:', error.message);
+        if (api) try { await api.close(); } catch (_) {}
+        res.status(500).json({ success: false, message: getErrorMessage(error, routerIP, routerUser) });
+    }
 });
 
 // Levanta el servidor Express

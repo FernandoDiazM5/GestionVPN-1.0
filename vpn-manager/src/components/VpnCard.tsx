@@ -60,7 +60,8 @@ export default function VpnCard({ vpn, onUpdate, onRemove }: VpnCardProps) {
       setLogs(['Interfaz desactivada externamente']);
       setUptime(0);
     }
-  }, [vpn.running, vpn.ip, vpn.uptime]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vpn.running, vpn.ip, vpn.uptime, status]); // status incluido: evita stale closure durante activating
 
   useEffect(() => {
     logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
