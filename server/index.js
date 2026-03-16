@@ -99,6 +99,25 @@ const isInSubnet = (ip, cidr) => {
 };
 
 /**
+ * Genera todas las IPs de host en una subred CIDR (excluye dirección de red y broadcast).
+ * Ej: 10.5.5.0/24 → ['10.5.5.1', '10.5.5.2', ..., '10.5.5.254']
+ */
+const getSubnetHosts = (cidr) => {
+    const [network, bits] = cidr.split('/');
+    const prefixLen = parseInt(bits, 10);
+    const toNum = addr => addr.split('.').reduce((acc, oct) => ((acc << 8) | parseInt(oct, 10)) >>> 0, 0);
+    const toIP  = num  => [24, 16, 8, 0].map(b => (num >>> b) & 0xff).join('.');
+    const mask    = prefixLen > 0 ? (~0 << (32 - prefixLen)) >>> 0 : 0;
+    const netBase = (toNum(network) & mask) >>> 0;
+    const total   = 1 << (32 - prefixLen);
+    const ips = [];
+    for (let i = 1; i < total - 1; i++) {
+        ips.push(toIP((netBase + i) >>> 0));
+    }
+    return ips;
+};
+
+/**
  * Sondea una IP buscando la página de estado de airOS Ubiquiti (/status.cgi).
  * Usa http.request nativo para evitar problemas con TLS, AbortController y versiones de Node.
  * Puerto 80 (HTTP) — más confiable que HTTPS con cert autofirmado en airOS.
@@ -899,67 +918,49 @@ set servers=8.8.8.8,8.8.4.4 allow-remote-requests=yes
 
 // ─────────────────────────────────────────────
 // POST /api/node/scan-devices
-// Descubre dispositivos Ubiquiti en la LAN del nodo:
-//   1. RouterOS API → /ip/arp/print (IPs activas en la subred)
-//   2. HTTP probe de cada IP → /status.cgi (airOS, sin credenciales)
-// Solo funciona con el túnel VRF del nodo activo (admin IP alcanza la LAN remota).
+// Descubre dispositivos Ubiquiti en una subred CIDR:
+//   Genera todas las IPs de host y las sondea en paralelo vía HTTP → /status.cgi (airOS, sin auth).
+//   El backend corre en la misma máquina con acceso local a la LAN (sin necesidad de túnel VRF).
 // ─────────────────────────────────────────────
 app.post('/api/node/scan-devices', async (req, res) => {
-    const { ip, user, pass, nodeLan } = req.body;
+    const { nodeLan } = req.body;
 
-    if (!nodeLan) {
-        return res.status(400).json({ success: false, message: 'Falta nodeLan (subred CIDR del nodo, ej: 10.5.5.0/24)' });
+    if (!nodeLan || !CIDR_REGEX.test(nodeLan)) {
+        return res.status(400).json({ success: false, message: 'Falta nodeLan o formato CIDR inválido (ej: 10.5.5.0/24)' });
     }
 
-    let api;
+    const prefixLen = parseInt(nodeLan.split('/')[1], 10);
+    if (prefixLen < 16) {
+        return res.status(400).json({ success: false, message: 'Subred demasiado grande. Usa /16 o más específico (ej: /24).' });
+    }
+
+    // Genera todas las IPs de host de la subred y las sondea DIRECTAMENTE desde el backend.
+    // Esto funciona porque el backend corre en la misma máquina que tiene el túnel VPN activo,
+    // por lo que Node.js usa las mismas rutas que el navegador del usuario.
+    // NOTA: La tabla ARP del MikroTik hub NO contiene dispositivos de LANs remotas porque
+    // están detrás de un túnel PPP (punto a punto, sin ARP). El método anterior era incorrecto.
+    const hostIPs = getSubnetHosts(nodeLan);
+    console.log(`[SCAN] Sondeando ${hostIPs.length} IPs en ${nodeLan} directo desde backend (sin RouterOS ARP)...`);
+
     try {
-        api = await connectToMikrotik(ip, user, pass);
-        const arpEntries = await safeWrite(api, ['/ip/arp/print']);
-        await api.close();
-
-        // Filtrar ARP a la subred del nodo.
-        // Incluir entradas completas (con MAC) e incompletas (sin MAC pero con IP) para debug.
-        const allSubnetIPs = arpEntries.filter(e => e.address && isInSubnet(e.address, nodeLan));
-        const targetIPs    = allSubnetIPs
-            .filter(e => e['mac-address'] || e.macAddress) // aceptar ambos formatos
-            .map(e => ({ ip: e.address, mac: (e['mac-address'] || e.macAddress || '').toUpperCase() }));
-
-        console.log(`[SCAN] LAN ${nodeLan}: ${allSubnetIPs.length} entradas ARP totales, ${targetIPs.length} con MAC`);
-
-        if (targetIPs.length === 0) {
-            return res.json({
-                success: true,
-                devices: [],
-                allIPs:  allSubnetIPs.map(e => e.address),
-                scanned: 0,
-                debug:   `ARP table tiene ${arpEntries.length} entradas totales, 0 en subred ${nodeLan}`,
-            });
-        }
-
-        // Sondear todas en paralelo (tolerante a fallos, 4s por IP)
-        const probeResults = await Promise.allSettled(
-            targetIPs.map(({ ip: devIP, mac }) =>
-                probeUbiquiti(devIP).then(info => info ? { ...info, mac_arp: mac } : null)
-            )
-        );
+        // Sondear todas en paralelo — 4s timeout por IP via http.request
+        const probeResults = await Promise.allSettled(hostIPs.map(devIP => probeUbiquiti(devIP)));
 
         const devices = probeResults
             .filter(r => r.status === 'fulfilled' && r.value !== null)
             .map(r => r.value);
 
-        console.log(`[SCAN] ${devices.length} Ubiquiti identificados de ${targetIPs.length} IPs sondeadas`);
+        console.log(`[SCAN] ${devices.length} Ubiquiti encontrados en ${nodeLan} (${hostIPs.length} IPs sondeadas)`);
         res.json({
             success: true,
             devices,
-            allIPs:  targetIPs.map(e => e.ip),
-            scanned: targetIPs.length,
-            debug:   `${targetIPs.length} IPs en ARP de ${nodeLan} → ${devices.length} Ubiquiti respondieron`,
+            allIPs:  devices.map(d => d.ip),
+            scanned: hostIPs.length,
+            debug:   `Escaneadas ${hostIPs.length} IPs en ${nodeLan} — ${devices.length} Ubiquiti airOS encontrados`,
         });
-
     } catch (error) {
         console.error('Error [scan-devices]:', error.message);
-        if (api) try { await api.close(); } catch (_) {}
-        res.status(500).json({ success: false, message: getErrorMessage(error, ip, user) });
+        res.status(500).json({ success: false, message: error.message || 'Error en el escaneo' });
     }
 });
 

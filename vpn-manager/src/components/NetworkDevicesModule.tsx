@@ -145,6 +145,7 @@ export default function NetworkDevicesModule() {
   const [savedDevices,  setSavedDevices]  = useState<SavedDevice[]>([]);
   const [scanResults,   setScanResults]   = useState<ScannedDevice[]>([]);
   const [allScannedIPs, setAllScannedIPs] = useState<string[]>([]);
+  const [scannedCount,  setScannedCount]  = useState(0);
   const [debugMsg,      setDebugMsg]      = useState('');
   const [isScanning,    setIsScanning]    = useState(false);
   const [scanError,     setScanError]     = useState('');
@@ -210,23 +211,19 @@ export default function NetworkDevicesModule() {
   const effectiveLan = manualLan.trim() || selectedNode?.segmento_lan || '';
 
   const handleScan = async () => {
-    if (!credentials || !effectiveLan) return;
+    if (!effectiveLan) return;
     setIsScanning(true);
     setScanError('');
     setScanResults([]);
     setAllScannedIPs([]);
+    setScannedCount(0);
     setDebugMsg('');
 
     try {
       const res = await fetchWithTimeout('http://localhost:3001/api/node/scan-devices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ip:      credentials.ip,
-          user:    credentials.user,
-          pass:    credentials.pass,
-          nodeLan: effectiveLan,
-        }),
+        body: JSON.stringify({ nodeLan: effectiveLan }),
       }, 40_000);
 
       const data = await res.json();
@@ -234,6 +231,7 @@ export default function NetworkDevicesModule() {
 
       setScanResults(data.devices ?? []);
       setAllScannedIPs(data.allIPs ?? []);
+      setScannedCount(data.scanned ?? 0);
       setDebugMsg(data.debug ?? '');
     } catch (err: unknown) {
       setScanError(err instanceof Error ? err.message : 'Error desconocido');
@@ -392,17 +390,14 @@ export default function NetworkDevicesModule() {
           </div>
         )}
 
-        {/* IPs found but no Ubiquiti identified */}
-        {!isScanning && allScannedIPs.length > 0 && scanResults.length === 0 && !scanError && (
+        {/* No Ubiquiti found after scan */}
+        {!isScanning && scannedCount > 0 && scanResults.length === 0 && !scanError && (
           <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1.5">
             <p className="text-xs font-semibold text-amber-700">
-              Se encontraron {allScannedIPs.length} hosts en ARP pero ninguno respondió como Ubiquiti airOS
-            </p>
-            <p className="text-[10px] text-amber-600">
-              IPs: {allScannedIPs.join(' · ')}
+              Se escanearon {scannedCount} IPs en {effectiveLan} pero ninguna respondió como Ubiquiti airOS
             </p>
             <p className="text-[10px] text-amber-500">
-              Verifica que el túnel VRF esté activo y que los equipos sean Ubiquiti airOS con HTTP habilitado en puerto 80
+              Verifica que el túnel VRF esté activo en la pestaña "Nodos" y que los equipos tengan HTTP habilitado en puerto 80
             </p>
           </div>
         )}
