@@ -4,6 +4,7 @@ import { useVpn } from '../context/VpnContext';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import type { ActiveSession } from '../types/api';
 import VpnCard from './VpnCard';
+import NodeProvisionForm from './NodeProvisionForm';
 
 const POLL_INTERVAL_MS = 30_000;
 
@@ -60,15 +61,18 @@ export default function ControlPanel() {
 
   if (managedVpns.length === 0) {
     return (
-      <div className="card py-20 flex flex-col items-center text-center space-y-4">
-        <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center">
-          <LayoutGrid className="w-8 h-8 text-slate-400" />
-        </div>
-        <div>
-          <h2 className="text-lg font-bold text-slate-700">Sin túneles en gestión</h2>
-          <p className="text-slate-400 text-sm mt-1 max-w-xs">
-            Ve al Escáner PPP, selecciona los secretos que quieres gestionar y aparecerán aquí.
-          </p>
+      <div className="space-y-5">
+        <NodeProvisionForm />
+        <div className="card py-20 flex flex-col items-center text-center space-y-4">
+          <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center">
+            <LayoutGrid className="w-8 h-8 text-slate-400" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-slate-700">Sin túneles en gestión</h2>
+            <p className="text-slate-400 text-sm mt-1 max-w-xs">
+              Ve al Escáner PPP, selecciona los secretos que quieres gestionar y aparecerán aquí.
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -76,6 +80,9 @@ export default function ControlPanel() {
 
   return (
     <div className="space-y-5">
+
+      {/* Provisionar nuevo nodo */}
+      <NodeProvisionForm />
 
       {/* Stats bar */}
       <div className="card p-4 flex items-center justify-between gap-4">
