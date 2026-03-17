@@ -49,11 +49,15 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [credentials, setCredentials] = useState<RouterCredentials | undefined>();
   const [managedVpns, setManagedVpns] = useState<VpnSecret[]>([]);
-  const [activeModule, setActiveModule] = useState<'scanner' | 'control' | 'nodes' | 'devices'>('scanner');
+  const [activeModule, setActiveModule] = useState<'scanner' | 'control' | 'nodes' | 'devices'>(() => {
+    const stored = localStorage.getItem('vpn_active_module');
+    return (['scanner', 'control', 'nodes', 'devices'].includes(stored ?? '') ? stored : 'scanner') as 'scanner' | 'control' | 'nodes' | 'devices';
+  });
   const [isReady, setIsReady] = useState(false);
   const [scannedSecrets, setScannedSecrets] = useState<VpnSecret[]>([]);
   const [hasScanned, setHasScanned] = useState(false);
-  const isLoggingOutRef = useRef(false);
+  const isLoggingOutRef    = useRef(false);
+  const deactivateOnReady  = useRef(false); // túnel expirado mientras página cerrada
 
   // Estado de nodos VRF
   const [nodes, setNodes] = useState<NodeInfo[]>([]);
@@ -62,7 +66,7 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
   const [adminIP, setAdminIP] = useState('192.168.21.20');
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Dark mode — persiste en localStorage, oscuro por defecto (entorno de red)
+  // Dark mode y módulo activo — persisten en localStorage
   const [darkMode, setDarkMode] = useState(() => {
     const stored = localStorage.getItem('vpn_dark_mode');
     return stored !== null ? stored === 'true' : false;
@@ -72,6 +76,10 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.classList.toggle('dark', darkMode);
     localStorage.setItem('vpn_dark_mode', String(darkMode));
   }, [darkMode]);
+
+  useEffect(() => {
+    localStorage.setItem('vpn_active_module', activeModule);
+  }, [activeModule]);
 
   const toggleDarkMode = () => setDarkMode((prev) => !prev);
 
@@ -131,9 +139,24 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
           setCredentials(store.credentials);
         }
         if (store.managedVpns?.length) {
-          // Filtrar entradas corruptas (id: undefined de sesiones anteriores con bug)
           const validVpns = store.managedVpns.filter((v) => !!v.id);
           setManagedVpns(validVpns);
+        }
+        if (store.adminIP) {
+          setAdminIP(store.adminIP);
+        }
+        if (store.nodes?.length) {
+          setNodes(store.nodes);
+        }
+        if (store.activeNodeVrf && store.tunnelExpiry) {
+          if (store.tunnelExpiry > Date.now()) {
+            // Túnel aún válido — restaurar estado, el auto-timeout lo tomará
+            setActiveNodeVrf(store.activeNodeVrf);
+            setTunnelExpiry(store.tunnelExpiry);
+          } else {
+            // Túnel expiró mientras la página estaba cerrada → limpiar RouterOS al arrancar
+            deactivateOnReady.current = true;
+          }
         }
       } catch (err) {
         console.error('Error cargando DB', err);
@@ -144,12 +167,23 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
     initApp();
   }, []);
 
+  // Si el túnel expiró con la página cerrada, limpiar RouterOS al estar listo
+  useEffect(() => {
+    if (isReady && deactivateOnReady.current) {
+      deactivateOnReady.current = false;
+      deactivateAllNodes();
+    }
+  }, [isReady, deactivateAllNodes]);
+
   // Persistir en DB cuando el estado cambie (omitir durante logout)
   useEffect(() => {
     if (isReady && !isLoggingOutRef.current) {
-      dbService.saveStore({ isAuthenticated, credentials, managedVpns });
+      dbService.saveStore({
+        isAuthenticated, credentials, managedVpns,
+        activeNodeVrf, tunnelExpiry, adminIP, nodes,
+      });
     }
-  }, [managedVpns, isAuthenticated, credentials, isReady]);
+  }, [managedVpns, isAuthenticated, credentials, isReady, activeNodeVrf, tunnelExpiry, adminIP, nodes]);
 
   const handleLoginSuccess = (creds: RouterCredentials) => {
     setCredentials(creds);
@@ -171,6 +205,8 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
     setNodes([]);
     setActiveNodeVrf(null);
     setTunnelExpiry(null);
+    setAdminIP('192.168.21.20');
+    localStorage.removeItem('vpn_active_module');
     await dbService.clearStore();
     isLoggingOutRef.current = false;
   };

@@ -1,5 +1,6 @@
 import localforage from 'localforage';
 import { encryptText, decryptText, clearEncryptionKey } from '../utils/crypto';
+import type { NodeInfo } from '../types/api';
 
 export interface RouterCredentials {
   ip: string;
@@ -23,6 +24,10 @@ export interface VpnStoreData {
   isAuthenticated: boolean;
   credentials?: RouterCredentials;
   managedVpns: VpnSecret[];
+  activeNodeVrf?: string | null;
+  tunnelExpiry?: number | null;
+  adminIP?: string;
+  nodes?: NodeInfo[];
 }
 
 /** Formato serializado en disco — la contraseña se almacena cifrada */
@@ -35,6 +40,10 @@ interface StoredData {
     encPass: string; // AES-GCM encrypted + base64
   };
   managedVpns: VpnSecret[];
+  activeNodeVrf?: string | null;
+  tunnelExpiry?: number | null;
+  adminIP?: string;
+  nodes?: NodeInfo[];
 }
 
 const STORAGE_KEY = 'mikrotik_vpn_store_v2';
@@ -60,7 +69,11 @@ export const dbService = {
       return {
         isAuthenticated: raw.isAuthenticated,
         credentials,
-        managedVpns: raw.managedVpns ?? [],
+        managedVpns:   raw.managedVpns   ?? [],
+        activeNodeVrf: raw.activeNodeVrf ?? null,
+        tunnelExpiry:  raw.tunnelExpiry  ?? null,
+        adminIP:       raw.adminIP,
+        nodes:         raw.nodes         ?? [],
       };
     } catch {
       // Fallo de descifrado (llave perdida u otro error): estado limpio
@@ -81,8 +94,12 @@ export const dbService = {
     const stored: StoredData = {
       version: 2,
       isAuthenticated: data.isAuthenticated,
-      credentials: storedCredentials,
-      managedVpns: data.managedVpns,
+      credentials:    storedCredentials,
+      managedVpns:    data.managedVpns,
+      activeNodeVrf:  data.activeNodeVrf,
+      tunnelExpiry:   data.tunnelExpiry,
+      adminIP:        data.adminIP,
+      nodes:          data.nodes,
     };
     await localforage.setItem(STORAGE_KEY, stored);
   },

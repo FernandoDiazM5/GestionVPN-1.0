@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const http  = require('http');
+const https = require('https');
+const net   = require('net');
 const { RouterOSAPI } = require('node-routeros');
 const { Client: SSH2Client } = require('ssh2');
 
@@ -123,16 +125,25 @@ const getSubnetHosts = (cidr) => {
  * Puerto 80 (HTTP) — más confiable que HTTPS con cert autofirmado en airOS.
  * @returns {Promise<Object|null>} Datos del dispositivo o null si no es Ubiquiti / no responde
  */
-const probeUbiquiti = (deviceIP) => {
+/**
+ * Sondea /status.cgi en un puerto/protocolo dado y resuelve con los datos del dispositivo o null.
+ */
+const probeStatusCgi = (deviceIP, port, useHttps) => {
     return new Promise((resolve) => {
-        const req = http.request({
-            hostname: deviceIP,
-            port:     80,
-            path:     '/status.cgi',
-            method:   'GET',
-            timeout:  4000,
-            headers:  { Accept: 'application/json, */*', Connection: 'close' },
+        const lib = useHttps ? https : http;
+        const req = lib.request({
+            hostname:           deviceIP,
+            port,
+            path:               '/status.cgi',
+            method:             'GET',
+            timeout:            2000,
+            headers:            { Accept: 'application/json, */*', Connection: 'close' },
+            rejectUnauthorized: false, // cert autofirmado en Ubiquiti
         }, (res) => {
+            // Seguir redirecciones simples (ej: HTTP → HTTPS)
+            if ((res.statusCode === 301 || res.statusCode === 302) && res.headers.location) {
+                return resolve(null); // la redirección la maneja probeUbiquiti intentando HTTPS
+            }
             let body = '';
             res.on('data', chunk => { body += chunk; });
             res.on('end', () => {
@@ -148,17 +159,70 @@ const probeUbiquiti = (deviceIP) => {
                         model:     h.devmodel  || 'Unknown',
                         firmware:  h.fwversion || 'Unknown',
                         role:      (w.mode === 'master' || w.mode === 'ap') ? 'ap' : 'sta',
-                        parent_ap: (w.remote && w.remote.hostname) || w.essid || '',
+                        parentAp:  (w.remote && w.remote.hostname) || w.essid || '',
                         essid:     w.essid || '',
                         frequency: parseInt(w.frequency) || 0,
                     });
                 } catch { resolve(null); }
             });
         });
-        req.on('error',   () => resolve(null)); // conexión rechazada / sin ruta
-        req.on('timeout', () => { req.destroy(); resolve(null); }); // timeout de socket
+        req.on('error',   () => resolve(null));
+        req.on('timeout', () => { req.destroy(); resolve(null); });
         req.end();
     });
+};
+
+/**
+ * Intenta detectar un Ubiquiti airOS en una IP.
+ * Prueba HTTP:80 y HTTPS:443 en paralelo (firmware antiguo y nuevo).
+ * Resuelve con los datos del primer puerto que responda, o null si ninguno.
+ */
+
+/**
+ * Lee el banner SSH de una IP:puerto sin autenticarse.
+ * Ubiquiti airOS usa dropbear — el banner contiene "dropbear".
+ * @returns {Promise<string|null>}
+ */
+const getSSHBanner = (host, port = 22, timeout = 2000) => new Promise((resolve) => {
+    const sock = new net.Socket();
+    let banner = '';
+    const timer = setTimeout(() => { sock.destroy(); resolve(null); }, timeout);
+    sock.connect(port, host, () => {});
+    sock.on('data', (data) => {
+        banner += data.toString();
+        clearTimeout(timer);
+        sock.destroy();
+        resolve(banner);
+    });
+    sock.on('error',   () => { clearTimeout(timer); resolve(null); });
+    sock.on('timeout', () => { sock.destroy(); clearTimeout(timer); resolve(null); });
+});
+
+const probeUbiquiti = async (deviceIP) => {
+    // Intento 1: HTTP:80 y HTTPS:443 en paralelo (/status.cgi sin auth)
+    const [http80, https443] = await Promise.all([
+        probeStatusCgi(deviceIP, 80,  false),
+        probeStatusCgi(deviceIP, 443, true),
+    ]);
+    if (http80 || https443) return http80 || https443;
+
+    // Intento 2: SSH banner — Ubiquiti airOS usa dropbear
+    const banner = await getSSHBanner(deviceIP, 22, 2000);
+    if (banner && banner.toLowerCase().includes('dropbear')) {
+        return {
+            ip:        deviceIP,
+            mac:       '',
+            name:      deviceIP,
+            model:     'Ubiquiti airOS (SSH)',
+            firmware:  'desconocido',
+            role:      'sta',
+            parent_ap: '',
+            essid:     '',
+            frequency: 0,
+        };
+    }
+
+    return null;
 };
 
 /**
@@ -233,7 +297,33 @@ const parseAirOSStats = (output) => {
             })),
         };
     } catch {
-        return { raw: output.slice(0, 500) };
+        // Fallback: intentar parsear formato key=value (airOS firmware antiguo)
+        try {
+            const kv = {};
+            output.split('\n').forEach(line => {
+                const eq = line.indexOf('=');
+                if (eq > 0) kv[line.slice(0, eq).trim()] = line.slice(eq + 1).trim();
+            });
+            if (Object.keys(kv).length > 0) {
+                const toMbps = v => v ? Math.round(parseInt(v) / 1_000_000) : null;
+                const toCCQ  = v => v ? Math.round(parseInt(v) / 10)        : null;
+                return {
+                    signal:         parseInt(kv.signal     || kv.rssi)        || null,
+                    noiseFloor:     parseInt(kv.noisefloor || kv.noise_floor) || null,
+                    ccq:            toCCQ(kv.ccq),
+                    txRate:         toMbps(kv.txrate  || kv.tx_rate),
+                    rxRate:         toMbps(kv.rxrate  || kv.rx_rate),
+                    frequency:      parseInt(kv.frequency) || null,
+                    distance:       parseInt(kv.ackdistance || kv.ack_distance) || null,
+                    txPower:        parseInt(kv.txpower || kv.tx_power) || null,
+                    essid:          kv.essid || null,
+                    mode:           kv.mode  || null,
+                    airmaxEnabled:  kv['airmax.status'] === 'enabled' || undefined,
+                    stations:       [],
+                };
+            }
+        } catch { /* si también falla, caer al raw */ }
+        return { raw: output.slice(0, 2000) };
     }
 };
 
@@ -943,8 +1033,15 @@ app.post('/api/node/scan-devices', async (req, res) => {
     console.log(`[SCAN] Sondeando ${hostIPs.length} IPs en ${nodeLan} directo desde backend (sin RouterOS ARP)...`);
 
     try {
-        // Sondear todas en paralelo — 4s timeout por IP via http.request
-        const probeResults = await Promise.allSettled(hostIPs.map(devIP => probeUbiquiti(devIP)));
+        // Sondear en lotes de 40 IPs — timeout 2s por sondeo, total ~14s para /24
+        const BATCH = 40;
+        const allResults = [];
+        for (let i = 0; i < hostIPs.length; i += BATCH) {
+            const batch = hostIPs.slice(i, i + BATCH);
+            const batchResults = await Promise.allSettled(batch.map(devIP => probeUbiquiti(devIP)));
+            allResults.push(...batchResults);
+        }
+        const probeResults = allResults;
 
         const devices = probeResults
             .filter(r => r.status === 'fulfilled' && r.value !== null)

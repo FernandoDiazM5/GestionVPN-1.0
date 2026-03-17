@@ -11,6 +11,7 @@ function AppContent() {
     isAuthenticated,
     credentials,
     isReady,
+
     activeModule,
     setActiveModule,
     handleLogout,
@@ -106,7 +107,7 @@ function AppContent() {
 
       {/* Contenido */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 animate-in fade-in slide-in-from-bottom-3 duration-400">
-        {activeModule === 'nodes'   && <NodeAccessPanel />}
+        {activeModule === 'nodes' && <NodeAccessPanel />}
         {activeModule === 'scanner' && <ScannerModule />}
         {activeModule === 'control' && <ControlPanel />}
         {activeModule === 'devices' && <NetworkDevicesModule />}
