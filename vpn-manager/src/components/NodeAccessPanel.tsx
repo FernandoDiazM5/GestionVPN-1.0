@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   RefreshCw, Search, Laptop, Smartphone, Monitor,
-  ShieldCheck, ShieldOff, AlertCircle, Radio, Clock,
+  ShieldCheck, ShieldOff, AlertCircle, Radio, Clock, X,
 } from 'lucide-react';
 import { useVpn } from '../context/VpnContext';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
@@ -9,8 +9,8 @@ import type { NodeInfo } from '../types/api';
 import NodeCard from './NodeCard';
 
 const ADMIN_IPS = [
-  { value: '192.168.21.20', label: 'Laptop', icon: Laptop },
-  { value: '192.168.21.30', label: 'Celular', icon: Smartphone },
+  { value: '192.168.21.20', label: 'Laptop',   icon: Laptop },
+  { value: '192.168.21.30', label: 'Celular',  icon: Smartphone },
   { value: '192.168.21.50', label: 'PC FiWis', icon: Monitor },
 ];
 
@@ -32,36 +32,34 @@ export default function NodeAccessPanel() {
     deactivateAllNodes,
   } = useVpn();
 
-  const [isLoading, setIsLoading] = useState(false);
-  const [hasLoaded, setHasLoaded] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
+  // Si ya hay nodos en contexto (persistidos) mostramos directo sin necesidad de recargar
+  const [isLoading,  setIsLoading]  = useState(false);
+  const [hasLoaded,  setHasLoaded]  = useState(nodes.length > 0);
+  const [errorMsg,   setErrorMsg]   = useState('');
   const [isRevoking, setIsRevoking] = useState(false);
+  const [search,     setSearch]     = useState('');
 
   const handleLoadNodes = async () => {
     if (!credentials) return;
     setIsLoading(true);
     setErrorMsg('');
     try {
-      // Timeout 20s: el backend puede tardar hasta 16s si intenta 8728 y reintenta en 8729
       const res = await fetchWithTimeout('http://localhost:3001/api/nodes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ip: credentials.ip,
+          ip:   credentials.ip,
           user: credentials.user,
           pass: credentials.pass,
         }),
       }, 20_000);
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error((data as { message?: string }).message ?? `HTTP ${res.status}`);
-      }
+      if (!res.ok) throw new Error((data as { message?: string }).message ?? `HTTP ${res.status}`);
       const nodeList: NodeInfo[] = Array.isArray(data) ? data : [];
       setNodes(nodeList);
       setHasLoaded(true);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error desconocido';
-      setErrorMsg(`Error: ${msg}`);
+      setErrorMsg(`Error: ${err instanceof Error ? err.message : 'Error desconocido'}`);
     } finally {
       setIsLoading(false);
     }
@@ -73,17 +71,27 @@ export default function NodeAccessPanel() {
     setIsRevoking(false);
   };
 
-  const connectedNodes = nodes.filter((n) => n.running);
-  const disconnectedNodes = nodes.filter((n) => !n.running);
-  const nodesWithVrf = nodes.filter((n) => !!n.nombre_vrf);
-  const activeNodeName = activeNodeVrf
-    ? nodes.find((n) => n.nombre_vrf === activeNodeVrf)?.nombre_nodo ?? activeNodeVrf
+  const connectedNodes    = nodes.filter(n => n.running);
+  const disconnectedNodes = nodes.filter(n => !n.running);
+  const nodesWithVrf      = nodes.filter(n => !!n.nombre_vrf);
+  const activeNodeName    = activeNodeVrf
+    ? nodes.find(n => n.nombre_vrf === activeNodeVrf)?.nombre_nodo ?? activeNodeVrf
     : null;
+
+  const q             = search.trim().toLowerCase();
+  const filteredNodes = q
+    ? nodes.filter(n =>
+        n.nombre_nodo?.toLowerCase().includes(q) ||
+        n.nombre_vrf?.toLowerCase().includes(q)  ||
+        n.segmento_lan?.toLowerCase().includes(q) ||
+        n.ppp_user?.toLowerCase().includes(q)
+      )
+    : nodes;
 
   return (
     <div className="space-y-5">
 
-      {/* Header */}
+      {/* ── Header ── */}
       <div className="card p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-bold text-slate-800 flex items-center space-x-2">
@@ -104,7 +112,7 @@ export default function NodeAccessPanel() {
         </button>
       </div>
 
-      {/* Error */}
+      {/* ── Error ── */}
       {errorMsg && (
         <div className="card p-4 flex items-start space-x-3 border-red-200 bg-red-50">
           <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
@@ -112,7 +120,7 @@ export default function NodeAccessPanel() {
         </div>
       )}
 
-      {/* Global status bar when a tunnel is active */}
+      {/* ── Túnel activo ── */}
       {activeNodeVrf && (
         <div className="card p-4 border-emerald-200 bg-gradient-to-r from-emerald-50 to-sky-50 flex items-center justify-between gap-4">
           <div className="flex items-center space-x-3">
@@ -146,11 +154,11 @@ export default function NodeAccessPanel() {
         </div>
       )}
 
-      {/* Admin IP selector */}
+      {/* ── Admin IP ── */}
       {hasLoaded && (
         <div className="card p-4 flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          <span className="text-sm font-semibold text-slate-600">IP Administrador:</span>
-          <div className="flex items-center space-x-2 flex-wrap gap-y-2">
+          <span className="text-sm font-semibold text-slate-600 shrink-0">IP Administrador:</span>
+          <div className="flex items-center flex-wrap gap-2">
             {ADMIN_IPS.map(({ value, label, icon: Icon }) => (
               <button
                 key={value}
@@ -169,41 +177,86 @@ export default function NodeAccessPanel() {
         </div>
       )}
 
-      {/* Stats */}
+      {/* ── Tabla de nodos ── */}
       {hasLoaded && nodes.length > 0 && (
-        <div className="card p-4 flex items-center gap-6 bg-slate-50/50 flex-wrap">
-          <div className="flex items-center space-x-2 text-sm">
-            <span className="font-bold text-indigo-600">{nodes.length}</span>
-            <span className="text-slate-500">nodos totales</span>
+        <div className="card overflow-hidden">
+
+          {/* Barra superior: stats + búsqueda */}
+          <div className="px-5 py-3.5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/60">
+            {/* Stats inline */}
+            <div className="flex items-center gap-4 text-xs flex-wrap">
+              <span className="text-slate-400 font-medium">
+                <span className="font-bold text-slate-700">{nodes.length}</span> nodos
+              </span>
+              <span className="text-slate-200">|</span>
+              <span className="text-emerald-600 font-semibold">
+                <span className="font-bold">{connectedNodes.length}</span> conectados
+              </span>
+              <span className="text-slate-200">|</span>
+              <span className="text-sky-600 font-semibold">
+                <span className="font-bold">{nodesWithVrf.length}</span> con VRF
+              </span>
+              <span className="text-slate-200">|</span>
+              <span className="text-rose-500 font-semibold">
+                <span className="font-bold">{disconnectedNodes.length}</span> desconectados
+              </span>
+            </div>
+
+            {/* Búsqueda */}
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Buscar nodo, VRF, red, usuario…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full pl-8 pr-8 py-2 text-xs rounded-xl border border-slate-200
+                           bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400
+                           placeholder:text-slate-400 text-slate-700"
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
           </div>
-          <span className="text-slate-200">|</span>
-          <div className="flex items-center space-x-2 text-sm">
-            <span className="font-bold text-emerald-600">{connectedNodes.length}</span>
-            <span className="text-slate-500">conectados</span>
-          </div>
-          <span className="text-slate-200">|</span>
-          <div className="flex items-center space-x-2 text-sm">
-            <span className="font-bold text-sky-600">{nodesWithVrf.length}</span>
-            <span className="text-slate-500">con VRF</span>
-          </div>
-          <span className="text-slate-200">|</span>
-          <div className="flex items-center space-x-2 text-sm">
-            <span className="font-bold text-rose-500">{disconnectedNodes.length}</span>
-            <span className="text-slate-500">desconectados</span>
+
+          {/* Tabla */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50/40">
+                  <th className="px-4 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider w-8">#</th>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider">Nodo</th>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider">VRF</th>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider">Red LAN</th>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider">IP Túnel</th>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider">Usuario PPP</th>
+                  <th className="px-4 py-3 text-right font-semibold text-slate-500 uppercase tracking-wider">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredNodes.map((node, idx) => (
+                  <NodeCard key={node.id} node={node} rowIndex={idx} />
+                ))}
+                {filteredNodes.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-10 text-center text-slate-400">
+                      Sin resultados para <span className="font-mono font-bold">"{search}"</span>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
 
-      {/* Node cards grid */}
-      {hasLoaded && nodes.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {nodes.map((node) => (
-            <NodeCard key={node.id} node={node} />
-          ))}
-        </div>
-      )}
-
-      {/* Empty state */}
+      {/* ── Empty state ── */}
       {hasLoaded && nodes.length === 0 && !errorMsg && (
         <div className="card border-dashed border-2 border-slate-200 py-16 flex flex-col items-center text-center space-y-3">
           <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center">
@@ -214,7 +267,7 @@ export default function NodeAccessPanel() {
         </div>
       )}
 
-      {/* Initial state */}
+      {/* ── Estado inicial ── */}
       {!hasLoaded && !isLoading && (
         <div className="card border-dashed border-2 border-slate-200 py-16 flex flex-col items-center text-center space-y-3">
           <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center">
@@ -228,16 +281,13 @@ export default function NodeAccessPanel() {
   );
 }
 
-/** Helper — live countdown display */
 function CountdownDisplay({ expiry }: { expiry: number }) {
   const [text, setText] = useState(() => formatCountdown(expiry - Date.now()));
-
   useEffect(() => {
     const tick = () => setText(formatCountdown(expiry - Date.now()));
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [expiry]);
-
   return <span>{text || '—'}</span>;
 }

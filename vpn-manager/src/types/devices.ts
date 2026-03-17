@@ -44,6 +44,8 @@ export interface SavedDevice {
   apMac?:        string;   // MAC del AP al que conecta (modo STA)
   addedAt:   number;
   lastSeen?: number;
+  // Stats completas cacheadas desde la última lectura SSH
+  cachedStats?: AntennaStats;
 }
 
 /** Estadísticas RF devueltas por mca-status (Ubiquiti AirOS) */

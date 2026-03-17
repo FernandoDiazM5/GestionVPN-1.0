@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import {
-  Radio, Router, Signal, Trash2, RefreshCw, Loader2,
-  ExternalLink, Activity, ArrowUp, ArrowDown, Zap, Waves,
-  MonitorSpeaker, Cpu, MemoryStick, Clock, Wifi, Lock,
-  Network, Info,
+  Radio, Signal, Trash2, RefreshCw, Loader2,
+  Activity, ArrowUp, ArrowDown, Waves,
+  MonitorSpeaker, Cpu, Clock, Wifi,
+  Info,
 } from 'lucide-react';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import type { SavedDevice, AntennaStats } from '../types/devices';
@@ -98,10 +98,16 @@ function fmtNetRole(r?: string | null) {
   return r === 'router' ? 'Enrutador' : r === 'bridge' ? 'Puente' : r;
 }
 
+/** Extrae solo el nombre legible si el campo tiene datos key=value embebidos */
+function cleanDeviceName(name?: string | null): string | null {
+  if (!name) return null;
+  const idx = name.search(/,[a-zA-Z]+=\S/);
+  return idx > 0 ? name.slice(0, idx).trim() : name;
+}
+
 // ───────────────────────────────────────────────────────────────────────
 export default function DeviceCard({ device, onRemove, onUpdate }: DeviceCardProps) {
-  const [activeTab,        setActiveTab]        = useState<'antenna' | 'router'>('antenna');
-  const [antennaStats,     setAntennaStats]     = useState<AntennaStats | null>(null);
+  const [antennaStats,     setAntennaStats]     = useState<AntennaStats | null>(device.cachedStats ?? null);
   const [isLoadingAntenna, setIsLoadingAntenna] = useState(false);
   const [antennaError,     setAntennaError]     = useState('');
 
@@ -127,21 +133,22 @@ export default function DeviceCard({ device, onRemove, onUpdate }: DeviceCardPro
       if (!res.ok || !data.success) throw new Error(data.message ?? 'Error obteniendo stats');
       const s: AntennaStats = data.stats;
       setAntennaStats(s);
-      // Guardar campos estáticos en SavedDevice (solo sobreescribe si tienen valor)
+      // Persistir stats completas + campos estáticos en SavedDevice
       onUpdate({
         ...device,
-        lastSeen:    Date.now(),
-        name:        s.deviceName    || device.name,
-        model:       s.deviceModel   || device.model,
-        firmware:    s.firmwareVersion || device.firmware,
-        mac:         s.wlanMac       || device.mac,
-        deviceName:  s.deviceName    ?? device.deviceName,
-        lanMac:      s.lanMac        ?? device.lanMac,
-        security:    s.security      ?? device.security,
-        channelWidth: s.channelWidth ?? device.channelWidth,
-        networkMode: s.networkMode   ?? device.networkMode,
-        chains:      s.chains        ?? device.chains,
-        apMac:       s.apMac         ?? device.apMac,
+        lastSeen:     Date.now(),
+        name:         s.deviceName    || device.name,
+        model:        s.deviceModel   || device.model,
+        firmware:     s.firmwareVersion || device.firmware,
+        mac:          s.wlanMac       || device.mac,
+        deviceName:   s.deviceName    ?? device.deviceName,
+        lanMac:       s.lanMac        ?? device.lanMac,
+        security:     s.security      ?? device.security,
+        channelWidth: s.channelWidth  ?? device.channelWidth,
+        networkMode:  s.networkMode   ?? device.networkMode,
+        chains:       s.chains        ?? device.chains,
+        apMac:        s.apMac         ?? device.apMac,
+        cachedStats:  s,
       });
     } catch (err: unknown) {
       setAntennaError(err instanceof Error ? err.message : 'Error desconocido');
@@ -154,8 +161,8 @@ export default function DeviceCard({ device, onRemove, onUpdate }: DeviceCardPro
   const roleGrad  = device.role === 'ap' ? 'from-indigo-500 to-indigo-600' : 'from-violet-500 to-violet-600';
   const sig       = signalMeta(antennaStats?.signal);
 
-  // Nombre a mostrar: deviceName cacheado, o el de la tarjeta
-  const displayName = device.deviceName || device.name;
+  // Nombre a mostrar: deviceName cacheado limpio, o el de la tarjeta
+  const displayName = cleanDeviceName(device.deviceName) || device.name;
 
   return (
     <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm flex flex-col bg-white">
@@ -189,30 +196,29 @@ export default function DeviceCard({ device, onRemove, onUpdate }: DeviceCardPro
               {(device.frequency / 1000).toFixed(1)} GHz
             </span>
           : null}
+        {/* Modo inalámbrico badge */}
+        {(() => {
+          const m = antennaStats?.mode || (device.role !== 'unknown' ? device.role : null);
+          if (!m) return null;
+          const isAp = m === 'ap' || m === 'master';
+          return (
+            <span className={`font-bold px-1.5 py-0.5 rounded-md ${isAp ? 'bg-indigo-100 text-indigo-700' : 'bg-violet-100 text-violet-700'}`}>
+              {isAp ? 'Punto de Acceso' : 'Estación'}
+            </span>
+          );
+        })()}
       </div>
 
-      {/* ── Tabs ────────────────────────────────────────────────────── */}
-      <div className="flex border-b border-slate-100">
-        {(['antenna', 'router'] as const).map(tab => (
-          <button key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`flex-1 py-2.5 text-xs font-bold flex items-center justify-center space-x-1.5 transition-colors
-              ${activeTab === tab
-                ? 'text-indigo-600 border-b-2 border-indigo-500 bg-indigo-50/60'
-                : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
-          >
-            {tab === 'antenna'
-              ? <><MonitorSpeaker className="w-3.5 h-3.5" /><span>Antena</span></>
-              : <><Router className="w-3.5 h-3.5" /><span>Router</span></>}
-          </button>
-        ))}
-      </div>
-
-      {/* ── ANTENA TAB ──────────────────────────────────────────────── */}
-      {activeTab === 'antenna' && (
-        <div className="flex-1 bg-slate-900">
+      {/* ── ANTENA (sin tabs) ───────────────────────────────────────── */}
+      <div className="flex-1 bg-slate-900">
           {/* Botón */}
-          <div className="p-4 pb-3">
+          <div className="p-4 pb-3 space-y-2">
+            {device.cachedStats && device.lastSeen && (
+              <p className="text-[10px] text-slate-500 text-center font-mono">
+                <Clock className="w-3 h-3 inline mr-1 opacity-60" />
+                {new Date(device.lastSeen).toLocaleString('es-VE', { dateStyle: 'short', timeStyle: 'short' })}
+              </p>
+            )}
             <button
               onClick={handleLoadAntenna}
               disabled={isLoadingAntenna}
@@ -221,7 +227,7 @@ export default function DeviceCard({ device, onRemove, onUpdate }: DeviceCardPro
             >
               {isLoadingAntenna
                 ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Conectando SSH...</span></>
-                : <><RefreshCw className="w-3.5 h-3.5" /><span>{antennaStats ? 'Actualizar' : 'Leer stats'}</span></>}
+                : <><RefreshCw className="w-3.5 h-3.5" /><span>{(antennaStats || device.cachedStats) ? 'Actualizar' : 'Leer stats'}</span></>}
             </button>
           </div>
 
@@ -370,7 +376,7 @@ export default function DeviceCard({ device, onRemove, onUpdate }: DeviceCardPro
                 </p>
                 <div>
                   <ParamRow label="Modelo"         value={antennaStats.deviceModel} />
-                  <ParamRow label="Nombre"         value={antennaStats.deviceName} />
+                  <ParamRow label="Nombre"         value={cleanDeviceName(antennaStats.deviceName)} />
                   <ParamRow label="Modo de red"    value={fmtNetRole(antennaStats.networkMode)} />
                   <ParamRow label="Versión"        value={antennaStats.firmwareVersion} />
                   <ParamRow label="Tiempo activo"  value={antennaStats.uptimeStr} />
@@ -460,39 +466,6 @@ export default function DeviceCard({ device, onRemove, onUpdate }: DeviceCardPro
             </div>
           )}
         </div>
-      )}
-
-      {/* ── ROUTER TAB ──────────────────────────────────────────────── */}
-      {activeTab === 'router' && (
-        <div className="p-4 space-y-3 flex-1">
-          <a
-            href={`http://${device.routerIp || device.ip}:${device.routerPort ?? 8075}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full flex items-center justify-center space-x-2 py-2.5 px-3 rounded-xl text-xs font-bold
-              bg-slate-800 text-white hover:bg-slate-700 transition-all active:scale-[0.98]"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            <span>Abrir interfaz web :{device.routerPort ?? 8075}</span>
-          </a>
-          <div className="space-y-1 text-[11px] px-1">
-            <div className="flex justify-between">
-              <span className="text-slate-400">IP</span>
-              <span className="font-mono text-slate-600">{device.routerIp || device.ip}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400">Puerto</span>
-              <span className="font-mono text-slate-600">{device.routerPort ?? 8075}</span>
-            </div>
-            {device.routerUser && (
-              <div className="flex justify-between">
-                <span className="text-slate-400">Usuario</span>
-                <span className="font-mono text-slate-600">{device.routerUser}</span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

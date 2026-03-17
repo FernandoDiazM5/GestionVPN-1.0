@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Activity, Loader2, LayoutGrid, RefreshCw } from 'lucide-react';
+import { Activity, Loader2, LayoutGrid, RefreshCw, Search, X } from 'lucide-react';
 import { useVpn } from '../context/VpnContext';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import type { ActiveSession } from '../types/api';
@@ -12,7 +12,8 @@ export default function ControlPanel() {
   const { credentials, managedVpns, setManagedVpns } = useVpn();
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState('');
-  const [lastSync, setLastSync] = useState<Date | null>(null);
+  const [lastSync,  setLastSync]  = useState<Date | null>(null);
+  const [search,    setSearch]    = useState('');
 
   const performSyncRef = useRef<(isInitial: boolean) => Promise<void>>(undefined);
 
@@ -29,17 +30,11 @@ export default function ControlPanel() {
         });
         if (!res.ok) throw new Error(`Backend respondió ${res.status}`);
         const activeList: ActiveSession[] = await res.json();
-
-        setManagedVpns((prev) =>
-          prev.map((vpn) => {
-            const session = Array.isArray(activeList) && activeList.find((a) => a.name === vpn.name);
-            return {
-              ...vpn,
-              running: !!session,
-              ip: session ? session.address : undefined,
-              uptime: session ? session.uptime : undefined,
-            };
-          }),
+        setManagedVpns(prev =>
+          prev.map(vpn => {
+            const session = Array.isArray(activeList) && activeList.find(a => a.name === vpn.name);
+            return { ...vpn, running: !!session, ip: session ? session.address : undefined, uptime: session ? session.uptime : undefined };
+          })
         );
         setLastSync(new Date());
       } catch (err: unknown) {
@@ -57,7 +52,16 @@ export default function ControlPanel() {
     return () => clearInterval(id);
   }, []);
 
-  const activeCount = managedVpns.filter((v) => v.running).length;
+  const activeCount   = managedVpns.filter(v => v.running).length;
+  const q             = search.trim().toLowerCase();
+  const filteredVpns  = q
+    ? managedVpns.filter(v =>
+        v.name?.toLowerCase().includes(q)    ||
+        v.service?.toLowerCase().includes(q) ||
+        v.profile?.toLowerCase().includes(q) ||
+        v.ip?.toLowerCase().includes(q)
+      )
+    : managedVpns;
 
   if (managedVpns.length === 0) {
     return (
@@ -84,42 +88,6 @@ export default function ControlPanel() {
       {/* Provisionar nuevo nodo */}
       <NodeProvisionForm />
 
-      {/* Stats bar */}
-      <div className="card p-4 flex items-center justify-between gap-4">
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-sm font-semibold text-slate-700">
-              <span className="text-emerald-600">{activeCount}</span>
-              <span className="text-slate-400"> / </span>
-              <span>{managedVpns.length}</span>
-              <span className="text-slate-500 font-normal ml-1">túneles activos</span>
-            </span>
-          </div>
-          {lastSync && (
-            <span className="text-xs text-slate-400 hidden sm:block">
-              Sync {lastSync.toLocaleTimeString()}
-            </span>
-          )}
-        </div>
-
-        {isSyncing ? (
-          <div className="flex items-center space-x-2 text-indigo-500">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            <span className="text-xs font-medium">Sincronizando...</span>
-          </div>
-        ) : (
-          <button
-            onClick={() => performSyncRef.current?.(true)}
-            className="btn-ghost p-2 flex items-center space-x-1.5 text-xs font-semibold"
-            title="Sincronizar ahora"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Actualizar</span>
-          </button>
-        )}
-      </div>
-
       {/* Error */}
       {syncError && !isSyncing && (
         <div className="card p-4 border-amber-200 bg-amber-50 flex items-center space-x-3">
@@ -128,18 +96,102 @@ export default function ControlPanel() {
         </div>
       )}
 
-      {/* Grid de cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {managedVpns.map((vpn) => (
-          <VpnCard
-            key={vpn.id}
-            vpn={vpn}
-            onUpdate={(updated) =>
-              setManagedVpns((prev) => prev.map((v) => (v.id === updated.id ? updated : v)))
-            }
-            onRemove={() => setManagedVpns((prev) => prev.filter((v) => v.id !== vpn.id))}
-          />
-        ))}
+      {/* Tabla */}
+      <div className="card overflow-hidden">
+
+        {/* Barra superior: stats + búsqueda + sync */}
+        <div className="px-5 py-3.5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/60">
+
+          {/* Stats + sync */}
+          <div className="flex items-center gap-4 text-xs flex-wrap">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="font-semibold text-slate-700">
+                <span className="text-emerald-600">{activeCount}</span>
+                <span className="text-slate-400"> / </span>
+                <span>{managedVpns.length}</span>
+                <span className="text-slate-500 font-normal ml-1">túneles activos</span>
+              </span>
+            </div>
+            {lastSync && (
+              <span className="text-slate-400 hidden sm:block font-mono">
+                sync {lastSync.toLocaleTimeString()}
+              </span>
+            )}
+            {isSyncing ? (
+              <div className="flex items-center gap-1.5 text-indigo-500">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span className="font-medium">Sincronizando...</span>
+              </div>
+            ) : (
+              <button
+                onClick={() => performSyncRef.current?.(true)}
+                className="flex items-center gap-1.5 text-slate-500 hover:text-indigo-600 font-semibold transition-colors"
+                title="Sincronizar ahora"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Actualizar</span>
+              </button>
+            )}
+          </div>
+
+          {/* Búsqueda */}
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Buscar nombre, servicio, IP…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-8 pr-8 py-2 text-xs rounded-xl border border-slate-200
+                         bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400
+                         placeholder:text-slate-400 text-slate-700"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Tabla */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-slate-100 bg-slate-50/40">
+                <th className="px-4 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider w-8">#</th>
+                <th className="px-4 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider">Nombre</th>
+                <th className="px-4 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider">Servicio</th>
+                <th className="px-4 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider">Perfil</th>
+                <th className="px-4 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider">IP Asignada</th>
+                <th className="px-4 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider">Uptime</th>
+                <th className="px-4 py-3 text-right font-semibold text-slate-500 uppercase tracking-wider">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredVpns.map((vpn, idx) => (
+                <VpnCard
+                  key={vpn.id}
+                  vpn={vpn}
+                  rowIndex={idx}
+                  onUpdate={updated => setManagedVpns(prev => prev.map(v => v.id === updated.id ? updated : v))}
+                  onRemove={() => setManagedVpns(prev => prev.filter(v => v.id !== vpn.id))}
+                />
+              ))}
+              {filteredVpns.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-4 py-10 text-center text-slate-400">
+                    Sin resultados para <span className="font-mono font-bold">"{search}"</span>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

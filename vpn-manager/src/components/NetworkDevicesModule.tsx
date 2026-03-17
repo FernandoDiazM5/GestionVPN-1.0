@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Cpu, RefreshCw, Loader2, Radio, AlertCircle, Signal,
   ShieldCheck, ShieldOff, PlusCircle, Check, X, Wifi, Info,
-  Eye, Pencil, Trash2, CheckCircle2,
+  Eye, Pencil, Trash2, CheckCircle2, ExternalLink, Router,
 } from 'lucide-react';
 import { useVpn } from '../context/VpnContext';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
@@ -337,6 +337,7 @@ export default function NetworkDevicesModule() {
             networkMode:  s.networkMode     ?? merged.networkMode,
             chains:       s.chains          ?? merged.chains,
             apMac:        s.apMac           ?? merged.apMac,
+            cachedStats:  s,
           };
           current = current.map(d => d.id === enriched.id ? enriched : d);
           await persistDevices(current);
@@ -607,24 +608,31 @@ export default function NetworkDevicesModule() {
                 <span className="text-xs text-slate-400">· {devices.length} equipo{devices.length !== 1 ? 's' : ''}</span>
               </div>
               {/* Table header */}
-              <div className="grid grid-cols-[52px_1fr_1fr_1fr_96px]
+              <div className="grid grid-cols-[56px_56px_1fr_1fr_1fr_auto]
                 px-5 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider
                 border-b border-slate-100 bg-white">
                 <span>Rol</span>
+                <span>Modo</span>
                 <span>Nombre / MAC</span>
-                <span>IP</span>
+                <span>IP / Frec.</span>
                 <span>SSID / AP</span>
                 <span className="text-right">Acciones</span>
               </div>
               {/* Rows */}
               {devices.map(dev => {
                 const isAp = dev.role === 'ap';
+                // Modo inalámbrico desde cachedStats o rol escaneado
+                const wmode = dev.cachedStats?.mode || dev.role;
+                const isModeAp = wmode === 'ap' || wmode === 'master';
                 const displayName = dev.deviceName || dev.name;
                 const displayMac  = dev.mac || '—';
+                const antennaUrl  = `http://${dev.ip}`;
+                const routerUrl   = `http://${dev.routerIp || dev.ip}:${dev.routerPort ?? 8075}`;
                 return (
                   <div key={dev.id}
-                    className="grid grid-cols-[52px_1fr_1fr_1fr_96px]
+                    className="grid grid-cols-[56px_56px_1fr_1fr_1fr_auto]
                       items-center px-5 py-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
+                    {/* Rol (escaneado) */}
                     <div>
                       <span className={`inline-flex text-[10px] font-bold px-1.5 py-0.5 rounded-md
                         ${isAp ? 'bg-indigo-100 text-indigo-700'
@@ -632,6 +640,15 @@ export default function NetworkDevicesModule() {
                           : 'bg-violet-100 text-violet-700'}`}>
                         {isAp ? 'AP' : dev.role === 'unknown' ? '?' : 'CPE'}
                       </span>
+                    </div>
+                    {/* Modo inalámbrico RF */}
+                    <div>
+                      {wmode && wmode !== 'unknown' ? (
+                        <span className={`inline-flex text-[10px] font-bold px-1.5 py-0.5 rounded-md
+                          ${isModeAp ? 'bg-sky-100 text-sky-700' : 'bg-fuchsia-100 text-fuchsia-700'}`}>
+                          {isModeAp ? 'AP' : 'STA'}
+                        </span>
+                      ) : <span className="text-[10px] text-slate-300">—</span>}
                     </div>
                     {/* Nombre + MAC */}
                     <div className="min-w-0 pr-2">
@@ -666,8 +683,22 @@ export default function NetworkDevicesModule() {
                         </>
                       )}
                     </div>
-                    <div className="flex items-center justify-end space-x-0.5">
-                      <button onClick={() => setViewingDevice(dev)} title="Ver detalles"
+                    {/* Acciones */}
+                    <div className="flex items-center justify-end gap-0.5">
+                      {/* Abrir antena en web */}
+                      <a href={antennaUrl} target="_blank" rel="noopener noreferrer"
+                        title={`Abrir antena: ${antennaUrl}`}
+                        className="p-1.5 text-sky-600 hover:bg-sky-50 rounded-lg transition-colors flex items-center">
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                      {/* Abrir router en web */}
+                      <a href={routerUrl} target="_blank" rel="noopener noreferrer"
+                        title={`Abrir router: ${routerUrl}`}
+                        className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors flex items-center">
+                        <Router className="w-3.5 h-3.5" />
+                      </a>
+                      {/* Ver detalles antena (SSH stats) */}
+                      <button onClick={() => setViewingDevice(dev)} title="Ver stats antena"
                         className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors">
                         <Eye className="w-3.5 h-3.5" />
                       </button>
