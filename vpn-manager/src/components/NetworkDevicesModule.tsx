@@ -662,7 +662,7 @@ export default function NetworkDevicesModule() {
                     </div>
                     {/* SSID (AP) o AP MAC (CPE) */}
                     <div className="min-w-0 pr-2">
-                      {isAp ? (
+                      {isApMode ? (
                         <>
                           {dev.essid && <p className="font-mono text-[11px] text-slate-600 truncate" title={dev.essid}>{dev.essid}</p>}
                           {dev.security && <p className="text-[9px] text-slate-400">{dev.security}</p>}
