@@ -90,6 +90,7 @@ export interface AntennaStats {
   chains?:        string;   // "1X1"
   airmaxEnabled?: boolean;
   airmaxPriority?: string;
+  lanSpeed?:      number;   // Mbps (velocidad del puerto LAN)
 
   raw?: string; // fallback si no es JSON ni key=value válido
 }

@@ -373,6 +373,7 @@ export default function DeviceCard({ device, onRemove, onUpdate }: DeviceCardPro
                   <ParamRow label="Modelo"        value={antennaStats.deviceModel} />
                   <ParamRow label="Firmware"      value={antennaStats.firmwareVersion} />
                   <ParamRow label="Modo de red"   value={fmtNetRole(antennaStats.networkMode)} />
+                  <ParamRow label="Velocidad LAN" value={antennaStats.lanSpeed ? `${antennaStats.lanSpeed} Mbps` : null} />
                   <ParamRow label="Tiempo activo" value={antennaStats.uptimeStr} />
                   <ParamRow label="Fecha"         value={antennaStats.deviceDate} />
                   <ParamRow label="WLAN MAC"      value={antennaStats.wlanMac} />
@@ -385,21 +386,32 @@ export default function DeviceCard({ device, onRemove, onUpdate }: DeviceCardPro
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center space-x-1.5">
                   <Wifi className="w-3 h-3" /><span>Inalámbrico</span>
                 </p>
-                <div>
-                  <ParamRow label="Modo"          value={fmtMode(antennaStats.mode)} />
-                  <ParamRow label="SSID"          value={antennaStats.essid} />
-                  <ParamRow label="Seguridad"     value={fmtSecurity(antennaStats.security)} />
-                  <ParamRow label="Canal / Frec." value={
-                    antennaStats.channelNumber && antennaStats.frequency
-                      ? `${antennaStats.channelNumber} / ${antennaStats.frequency} MHz`
-                      : antennaStats.frequency ? `${antennaStats.frequency} MHz` : null
-                  } />
-                  <ParamRow label="Ancho de canal" value={antennaStats.channelWidth ? `${antennaStats.channelWidth} MHz` : null} />
-                  <ParamRow label="AP MAC"        value={antennaStats.apMac} />
-                  <ParamRow label="Cadenas TX/RX" value={antennaStats.chains} />
-                  <ParamRow label="Potencia TX"   value={antennaStats.txPower != null ? `${antennaStats.txPower} dBm` : null} />
-                  <ParamRow label="Distancia"     value={antennaStats.distance != null ? `${antennaStats.distance} m` : null} />
-                </div>
+                {(() => {
+                  const freqBand = antennaStats.frequency
+                    ? antennaStats.frequency < 3000 ? '2.4 GHz' : antennaStats.frequency < 6000 ? '5 GHz' : '6 GHz'
+                    : null;
+                  const distVal = antennaStats.distance != null
+                    ? `${antennaStats.distance} m (${(antennaStats.distance / 1000).toFixed(2)} km / ${(antennaStats.distance * 0.000621371).toFixed(2)} mi)`
+                    : null;
+                  return (
+                    <div>
+                      <ParamRow label="Modo"          value={fmtMode(antennaStats.mode)} />
+                      <ParamRow label="Banda"         value={freqBand} />
+                      <ParamRow label="SSID"          value={antennaStats.essid} />
+                      <ParamRow label="Seguridad"     value={fmtSecurity(antennaStats.security)} />
+                      <ParamRow label="Canal / Frec." value={
+                        antennaStats.channelNumber && antennaStats.frequency
+                          ? `${antennaStats.channelNumber} / ${antennaStats.frequency} MHz`
+                          : antennaStats.frequency ? `${antennaStats.frequency} MHz` : null
+                      } />
+                      <ParamRow label="Ancho de canal" value={antennaStats.channelWidth ? `${antennaStats.channelWidth} MHz` : null} />
+                      <ParamRow label="AP MAC"        value={antennaStats.apMac} />
+                      <ParamRow label="Cadenas TX/RX" value={antennaStats.chains} />
+                      <ParamRow label="Potencia TX"   value={antennaStats.txPower != null ? `${antennaStats.txPower} dBm` : null} />
+                      <ParamRow label="Distancia"     value={distVal} />
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* ── Estaciones (modo AP) ── */}

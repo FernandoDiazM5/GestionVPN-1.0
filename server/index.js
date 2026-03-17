@@ -158,7 +158,7 @@ const probeStatusCgi = (deviceIP, port, useHttps) => {
                         name:      h.hostname  || deviceIP,
                         model:     h.devmodel  || 'Unknown',
                         firmware:  h.fwversion || 'Unknown',
-                        role:      (w.mode === 'master' || w.mode === 'ap') ? 'ap' : 'sta',
+                        role:      (['master','ap','apauto','ap-ptp','ap-ptmp'].includes(w.mode)) ? 'ap' : (w.mode ? 'sta' : 'unknown'),
                         parentAp:  (w.remote && w.remote.hostname) || w.essid || '',
                         essid:     w.essid || '',
                         frequency: parseInt(w.frequency) || 0,
@@ -215,8 +215,8 @@ const probeUbiquiti = async (deviceIP) => {
             name:      deviceIP,
             model:     'Ubiquiti airOS (SSH)',
             firmware:  'desconocido',
-            role:      'sta',
-            parent_ap: '',
+            role:      'unknown',
+            parentAp:  '',
             essid:     '',
             frequency: 0,
         };
@@ -297,11 +297,14 @@ const parseAirOSStats = (output) => {
         const freq = parseInt(w.frequency) || null;
         const channelNumber = freq && freq >= 5000 ? Math.round((freq - 5000) / 5) : null;
 
-        // MACs de interfaces
+        // MACs e info de interfaces
         const wlanIface = ifaces.find(i => /^(wlan|ath)/i.test(i.ifname));
         const lanIface  = ifaces.find(i => /^(eth|br)/i.test(i.ifname));
         const wlanMac   = ((wlanIface?.hwaddr || h.macaddr || w.macaddr || '')).toUpperCase();
         const lanMac    = (lanIface?.hwaddr || '').toUpperCase();
+        // Velocidad del puerto LAN (Mbps). ether.speed puede venir en Mbps o bps.
+        const rawLanSpeed = lanIface?.ether?.speed ?? lanIface?.speed ?? null;
+        const lanSpeed = rawLanSpeed ? (rawLanSpeed > 10000 ? Math.round(rawLanSpeed / 1_000_000) : parseInt(rawLanSpeed)) : null;
 
         // Cadenas TX/RX
         const chainsNum = parseInt(w.chains);
@@ -349,6 +352,7 @@ const parseAirOSStats = (output) => {
             chains,
             airmaxEnabled:   am.enabled != null ? !!am.enabled : undefined,
             airmaxPriority:  am.priority  || null,
+            lanSpeed,
         };
     } catch {
         // Fallback: intentar parsear formato key=value (airOS firmware antiguo)
