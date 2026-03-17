@@ -90,7 +90,11 @@ export interface AntennaStats {
   chains?:        string;   // "1X1"
   airmaxEnabled?: boolean;
   airmaxPriority?: string;
-  lanSpeed?:      number;   // Mbps (velocidad del puerto LAN)
+  channelWidthExt?: string;  // "Inferior" | "Superior" (extensión HT40-/HT40+)
+  freqRange?:       string;  // "5320 - 5360 MHz" (rango de la banda)
+  antenna?:         string;  // "Feed only - 3 dBi"
+  lanSpeed?:        number;  // Mbps
+  lanInfo?:         string;  // "100Mbps-Completo"
 
   raw?: string; // fallback si no es JSON ni key=value válido
 }

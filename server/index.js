@@ -264,6 +264,30 @@ const sshExec = (host, port, username, password, command) => {
  * Normaliza tasas (bps → Mbps) y CCQ (0-1000 → 0-100%).
  */
 const parseAirOSStats = (output) => {
+    // ── helper: busca un valor no-vacío en múltiples objetos y múltiples nombres de campo ──
+    // Necesario porque distintas versiones de firmware airOS usan nombres de campo diferentes.
+    const pick = (sources, ...keys) => {
+        for (const src of sources) {
+            if (!src || typeof src !== 'object') continue;
+            for (const key of keys) {
+                const v = src[key];
+                if (v != null && v !== '' && v !== 0) return v;
+            }
+        }
+        return null;
+    };
+    // Versión que acepta 0 como valor válido (para valores numéricos que pueden ser 0)
+    const pickNum = (sources, ...keys) => {
+        for (const src of sources) {
+            if (!src || typeof src !== 'object') continue;
+            for (const key of keys) {
+                const v = src[key];
+                if (v != null && v !== '') return v;
+            }
+        }
+        return null;
+    };
+
     try {
         const data = JSON.parse(output);
         const h  = data.host     || {};
@@ -271,117 +295,195 @@ const parseAirOSStats = (output) => {
         const am = data.airmax   || {};
         const ifaces = Array.isArray(data.interfaces) ? data.interfaces : [];
 
-        const toMbps = bps => bps ? Math.round(parseInt(bps)  / 1_000_000) : null;
-        const toCCQ  = raw => raw ? Math.round(parseInt(raw)  / 10)         : null;
+        // Log de diagnóstico: muestra las claves de primer nivel del JSON
+        const topKeys = Object.keys(data);
+        const wKeys   = Object.keys(w);
+        const hKeys   = Object.keys(h);
+        console.log(`[ANTENNA] JSON top-level keys: [${topKeys.join(', ')}]`);
+        console.log(`[ANTENNA] host keys: [${hKeys.join(', ')}]`);
+        console.log(`[ANTENNA] wireless keys: [${wKeys.join(', ')}]`);
 
-        // Memoria %
+        const toMbps = bps => bps ? Math.round(parseInt(bps) / 1_000_000) : null;
+        // CCQ: escala 0-1000 → 0-100.0 con un decimal (976 → 97.6)
+        const toCCQ = raw => raw != null ? parseFloat((parseInt(raw) / 10).toFixed(1)) : null;
+
+        // ── Memoria % ────────────────────────────────────────────────
         let memoryPercent = null;
-        if (h.memory && h.memory.total > 0) {
-            memoryPercent = Math.round(((h.memory.total - h.memory.free) / h.memory.total) * 100);
+        const memObj = h.memory || data.memory || {};
+        if (memObj.total > 0) {
+            memoryPercent = Math.round(((memObj.total - memObj.free) / memObj.total) * 100);
+        } else if (h.memfree != null && h.memtotal != null && h.memtotal > 0) {
+            memoryPercent = Math.round(((h.memtotal - h.memfree) / h.memtotal) * 100);
+        } else if (data.memfree != null && data.memtotal != null && data.memtotal > 0) {
+            memoryPercent = Math.round(((data.memtotal - data.memfree) / data.memtotal) * 100);
         }
 
-        // Uptime formateado
+        // ── Uptime ───────────────────────────────────────────────────
         let uptimeStr = null;
-        const uptimeSec = h.uptime || data.uptime;
+        const uptimeSec = pick([h, data], 'uptime');
         if (uptimeSec) {
             const d  = Math.floor(uptimeSec / 86400);
             const hh = Math.floor((uptimeSec % 86400) / 3600);
             const mm = Math.floor((uptimeSec % 3600)  / 60);
             const ss = uptimeSec % 60;
             uptimeStr = d > 0
-                ? `${d}d ${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`
+                ? `${d} días ${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`
                 : `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
         }
 
-        // Canal 5 GHz: (freq - 5000) / 5 = número de canal
-        const freq = parseInt(w.frequency) || null;
+        // ── Frecuencia y canal ────────────────────────────────────────
+        // Distintos firmwares usan: frequency, freq, cf (center frequency), chan
+        const rawFreq = pick([w, data], 'frequency', 'freq', 'cf', 'center_freq', 'chan_freq');
+        const freq = rawFreq ? parseInt(rawFreq) : null;
         const channelNumber = freq && freq >= 5000 ? Math.round((freq - 5000) / 5) : null;
 
-        // MACs e info de interfaces
+        // ── Extensión de canal (HT40-/HT40+) ─────────────────────────
+        const rawExt = (pick([w, data], 'chanbw_cfg', 'chanbwcfg', 'channel_ext', 'ht_mode', 'htmode', 'chanExt') || '').toString().toUpperCase();
+        const isLower = rawExt.includes('LOWER') || rawExt === 'HT40-' || rawExt === 'BELOW';
+        const isUpper = rawExt.includes('UPPER') || rawExt === 'HT40+' || rawExt === 'ABOVE';
+        const channelWidthExt = isLower ? 'Inferior' : isUpper ? 'Superior' : null;
+
+        // ── Ancho de canal y rango de frecuencia ──────────────────────
+        const rawChanbw = pick([w, data], 'chanbw', 'bw', 'cbw', 'channel_width', 'bandwidth');
+        const chanbw = rawChanbw ? parseInt(rawChanbw) : null;
+        let freqRange = null;
+        if (freq && chanbw) {
+            if      (chanbw === 20) freqRange = `${freq - 10} - ${freq + 10} MHz`;
+            else if (chanbw === 40) {
+                if (isLower)      freqRange = `${freq - 30} - ${freq + 10} MHz`;
+                else if (isUpper) freqRange = `${freq - 10} - ${freq + 30} MHz`;
+                else              freqRange = `${freq - 20} - ${freq + 20} MHz`;
+            }
+            else if (chanbw === 80) freqRange = `${freq - 40} - ${freq + 40} MHz`;
+            else                    freqRange = `${freq - Math.round(chanbw / 2)} - ${freq + Math.round(chanbw / 2)} MHz`;
+        }
+
+        // ── MACs e info de interfaces ──────────────────────────────────
         const wlanIface = ifaces.find(i => /^(wlan|ath)/i.test(i.ifname));
         const lanIface  = ifaces.find(i => /^(eth|br)/i.test(i.ifname));
-        const wlanMac   = ((wlanIface?.hwaddr || h.macaddr || w.macaddr || '')).toUpperCase();
-        const lanMac    = (lanIface?.hwaddr || '').toUpperCase();
-        // Velocidad del puerto LAN (Mbps). ether.speed puede venir en Mbps o bps.
-        const rawLanSpeed = lanIface?.ether?.speed ?? lanIface?.speed ?? null;
-        const lanSpeed = rawLanSpeed ? (rawLanSpeed > 10000 ? Math.round(rawLanSpeed / 1_000_000) : parseInt(rawLanSpeed)) : null;
+        const wlanMac   = (pick([wlanIface, h, w, data], 'hwaddr', 'macaddr', 'mac', 'wlanmac') || '').toUpperCase();
+        const lanMac    = ((lanIface?.hwaddr || pick([h, data], 'lanmac', 'lan_mac')) || '').toUpperCase();
 
-        // Cadenas TX/RX
-        const chainsNum = parseInt(w.chains);
+        // ── Velocidad + dúplex del puerto LAN ─────────────────────────
+        const rawLanSpeed = lanIface?.ether?.speed ?? lanIface?.speed ?? pickNum([h, data], 'lan_speed', 'lanspeed') ?? null;
+        const lanSpeed    = rawLanSpeed
+            ? (rawLanSpeed > 10000 ? Math.round(rawLanSpeed / 1_000_000) : parseInt(rawLanSpeed))
+            : null;
+        const lanDuplex = lanIface?.ether?.duplex || pick([h, data], 'lan_duplex') || null;
+        const lanInfo   = lanSpeed
+            ? `${lanSpeed}Mbps${lanDuplex ? '-' + (lanDuplex.toLowerCase() === 'full' ? 'Completo' : 'Mitad') : ''}`
+            : null;
+
+        // ── Cadenas TX/RX ─────────────────────────────────────────────
+        const rawChains = pick([w, data], 'chains', 'txchains', 'tx_chains', 'rxchains', 'rx_chains');
+        const chainsNum = parseInt(rawChains);
         const chains    = !isNaN(chainsNum) && chainsNum > 0 ? `${chainsNum}X${chainsNum}` : null;
 
+        // ── AP MAC ────────────────────────────────────────────────────
+        const rawApMac = pick([w.remote, w, data], 'mac', 'apmac', 'ap_mac', 'bssid');
+        // Evitar que la propia wlan MAC sea confundida como AP MAC
+        const apMac = rawApMac && rawApMac.toUpperCase() !== wlanMac ? rawApMac.toUpperCase() : null;
+
+        // ── Señal, CCQ y tasas ────────────────────────────────────────
+        const signalVal     = pickNum([w, data], 'signal', 'rssi', 'rx_signal');
+        const noiseFloorVal = pickNum([w, data], 'noisefloor', 'noise_floor', 'noise');
+        const ccqVal        = pickNum([w, data], 'ccq', 'txccq', 'tx_ccq');
+        const txRateVal     = pick([w, data],    'txrate',  'tx_rate',  'txbytes');
+        const rxRateVal     = pick([w, data],    'rxrate',  'rx_rate',  'rxbytes');
+
+        // ── CPU load ──────────────────────────────────────────────────
+        const cpuLoad = parseInt(pick([h, data], 'cpuload', 'cpu_load', 'cpu', 'loadavg')) || null;
+
         return {
-            // ── Variable ────────────────────────────────────────────
-            signal:          parseInt(w.signal)     || parseInt(w.rssi) || null,
-            noiseFloor:      parseInt(w.noisefloor) || parseInt(w.noise_floor) || null,
-            ccq:             toCCQ(w.ccq),
-            txRate:          toMbps(w.txrate  || w.tx_rate),
-            rxRate:          toMbps(w.rxrate  || w.rx_rate),
-            cpuLoad:         parseInt(h.cpuload) || null,
+            // ── Variable (mostrar, no guardar) ───────────────────────
+            signal:         signalVal != null ? parseInt(signalVal) : null,
+            noiseFloor:     noiseFloorVal != null ? parseInt(noiseFloorVal) : null,
+            ccq:            toCCQ(ccqVal),
+            txRate:         toMbps(txRateVal),
+            rxRate:         toMbps(rxRateVal),
+            cpuLoad,
             memoryPercent,
-            airmaxQuality:   parseInt(am.quality)  || null,
-            airmaxCapacity:  parseInt(am.capacity) || null,
+            airmaxQuality:  parseInt(am.quality  || data.airmax_quality)  || null,
+            airmaxCapacity: parseInt(am.capacity || data.airmax_capacity) || null,
             uptimeStr,
-            deviceDate:      h.time || h.date || null,
-            stations: (data.sta || []).map(s => ({
+            deviceDate:     pick([h, data], 'time', 'date', 'datetime', 'localtime') || null,
+            stations: (data.sta || data.stations || []).map(s => ({
                 mac:        (s.mac || '').toUpperCase(),
                 signal:     parseInt(s.signal)     || parseInt(s.rssi)  || null,
                 noiseFloor: parseInt(s.noisefloor) || null,
-                ccq:        toCCQ(s.ccq),
+                ccq:        toCCQ(s.ccq || s.txccq),
                 txRate:     toMbps(s.txrate || s.tx_rate),
                 rxRate:     toMbps(s.rxrate || s.rx_rate),
                 distance:   s.ackdistance || null,
                 uptime:     s.uptime      || null,
             })),
-            // ── Estático ────────────────────────────────────────────
-            deviceName:      h.hostname    || null,
-            deviceModel:     h.devmodel    || null,
-            firmwareVersion: h.fwversion   || null,
-            wlanMac:         wlanMac       || null,
-            lanMac:          lanMac        || null,
-            apMac:           w.remote?.mac ? w.remote.mac.toUpperCase() : null,
-            essid:           w.essid       || null,
-            security:        w.security    || null,
-            mode:            w.mode        || null,
-            networkMode:     h.netrole     || null,
+            // ── Estático (guardar en SavedDevice) ───────────────────
+            deviceName:      pick([h, data], 'hostname', 'name', 'devname', 'deviceName', 'host_name') || null,
+            deviceModel:     pick([h, data], 'devmodel', 'product', 'model', 'platform', 'devtype', 'device_model') || null,
+            firmwareVersion: pick([h, data], 'fwversion', 'version', 'fw_version', 'fwVersion', 'firmware', 'fw') || null,
+            wlanMac:         wlanMac || null,
+            lanMac:          lanMac  || null,
+            apMac,
+            essid:           pick([w, data], 'essid', 'ssid', 'ap_ssid') || null,
+            security:        pick([w, data], 'security', 'auth', 'auth_mode', 'encrypt') || null,
+            mode:            pick([w, data], 'mode', 'wmode', 'opermode', 'wireless_mode', 'radio_mode') || null,
+            networkMode:     pick([h, data], 'netrole', 'net_role', 'network_mode', 'role') || null,
             frequency:       freq,
             channelNumber,
-            channelWidth:    parseInt(w.chanbw) || null,
-            txPower:         parseInt(w.txpower || w.tx_power) || null,
-            distance:        w.ackdistance || w.ack_distance   || null,
+            channelWidth:    chanbw,
+            channelWidthExt,
+            freqRange,
+            txPower:         parseInt(pick([w, data], 'txpower', 'tx_power', 'txpwr', 'pwr')) || null,
+            distance:        pick([w, data], 'ackdistance', 'ack_distance', 'distance', 'link_distance') || null,
             chains,
-            airmaxEnabled:   am.enabled != null ? !!am.enabled : undefined,
-            airmaxPriority:  am.priority  || null,
+            antenna:         pick([h, data], 'antenna', 'antenna_gain', 'antennaGain', 'ant') || null,
+            airmaxEnabled:   am.enabled != null ? !!am.enabled : (data.airmax_enabled != null ? !!data.airmax_enabled : undefined),
+            airmaxPriority:  pick([am, data], 'priority', 'airmax_priority') || null,
             lanSpeed,
+            lanInfo,
         };
     } catch {
-        // Fallback: intentar parsear formato key=value (airOS firmware antiguo)
+        // ── Fallback: formato key=value (airOS firmware antiguo) ──────
         try {
             const kv = {};
             output.split('\n').forEach(line => {
                 const eq = line.indexOf('=');
-                if (eq > 0) kv[line.slice(0, eq).trim()] = line.slice(eq + 1).trim();
+                if (eq > 0) kv[line.slice(0, eq).trim().toLowerCase()] = line.slice(eq + 1).trim();
             });
             if (Object.keys(kv).length > 0) {
+                console.log(`[ANTENNA] key=value format detected, keys: [${Object.keys(kv).slice(0, 20).join(', ')}]`);
                 const toMbps = v => v ? Math.round(parseInt(v) / 1_000_000) : null;
-                const toCCQ  = v => v ? Math.round(parseInt(v) / 10)        : null;
+                const toCCQ  = v => v != null ? parseFloat((parseInt(v) / 10).toFixed(1)) : null;
+                const kget   = (...keys) => { for (const k of keys) { const v = kv[k]; if (v != null && v !== '') return v; } return null; };
+                const rawChains = kget('chains', 'txchains', 'rx.chains', 'tx.chains');
+                const chainsNum = parseInt(rawChains);
+                const chains    = !isNaN(chainsNum) && chainsNum > 0 ? `${chainsNum}X${chainsNum}` : null;
                 return {
-                    signal:         parseInt(kv.signal     || kv.rssi)        || null,
-                    noiseFloor:     parseInt(kv.noisefloor || kv.noise_floor) || null,
-                    ccq:            toCCQ(kv.ccq),
-                    txRate:         toMbps(kv.txrate  || kv.tx_rate),
-                    rxRate:         toMbps(kv.rxrate  || kv.rx_rate),
-                    frequency:      parseInt(kv.frequency) || null,
-                    distance:       parseInt(kv.ackdistance || kv.ack_distance) || null,
-                    txPower:        parseInt(kv.txpower || kv.tx_power) || null,
-                    essid:          kv.essid || null,
-                    mode:           kv.mode  || null,
-                    airmaxEnabled:  kv['airmax.status'] === 'enabled' || undefined,
+                    signal:         parseInt(kget('signal', 'rssi'))           || null,
+                    noiseFloor:     parseInt(kget('noisefloor', 'noise_floor')) || null,
+                    ccq:            toCCQ(kget('ccq', 'txccq', 'tx.ccq')),
+                    txRate:         toMbps(kget('txrate', 'tx.rate', 'tx_rate')),
+                    rxRate:         toMbps(kget('rxrate', 'rx.rate', 'rx_rate')),
+                    frequency:      parseInt(kget('frequency', 'freq')) || null,
+                    distance:       parseInt(kget('ackdistance', 'ack.distance')) || null,
+                    txPower:        parseInt(kget('txpower', 'tx.power', 'tx_power')) || null,
+                    essid:          kget('essid', 'ssid') || null,
+                    mode:           kget('mode', 'wmode') || null,
+                    security:       kget('security', 'auth', 'auth.mode') || null,
+                    deviceName:     kget('hostname', 'name', 'devicename') || null,
+                    deviceModel:    kget('devmodel', 'product', 'model', 'platform') || null,
+                    firmwareVersion:kget('fwversion', 'version', 'fw.version') || null,
+                    networkMode:    kget('netrole', 'net.role', 'network.mode') || null,
+                    wlanMac:        (kget('wlan.mac', 'wlanmac', 'macaddr', 'mac') || '').toUpperCase() || null,
+                    lanMac:         (kget('lan.mac', 'lanmac', 'eth0.mac') || '').toUpperCase() || null,
+                    apMac:          (kget('apmac', 'ap.mac', 'bssid') || '').toUpperCase() || null,
+                    chains,
+                    airmaxEnabled:  kget('airmax.status', 'airmax') === 'enabled' || undefined,
                     stations:       [],
                 };
             }
         } catch { /* si también falla, caer al raw */ }
-        return { raw: output.slice(0, 2000) };
+        return { raw: output.slice(0, 3000) };
     }
 };
 
@@ -919,9 +1021,12 @@ app.post('/api/node/provision', async (req, res) => {
         steps.push({ step: 2, obj: 'SSTP Binding', name: ifaceName, status: 'ok' });
 
         // ── 3. VRF (sin interfaces — mangle-only) ──
+        // RouterOS requiere =interfaces= aunque esté vacío; el enrutamiento se
+        // dirige exclusivamente vía marks de firewall, no por membresía de interfaz.
         await safeWrite(api, [
             '/ip/vrf/add',
             `=name=${vrfName}`,
+            '=interfaces=',
         ]);
         steps.push({ step: 3, obj: 'VRF', name: vrfName, status: 'ok' });
 
@@ -1150,6 +1255,25 @@ app.post('/api/device/antenna', async (req, res) => {
                     ? `SSH rechazado en ${deviceIP}:${devicePort || 22} — verifica que SSH esté habilitado`
                     : error.message || 'Error de conexión SSH';
         res.status(500).json({ success: false, message: msg });
+    }
+});
+
+// ─────────────────────────────────────────────
+// POST /api/device/antenna-raw
+// Devuelve el output CRUDO de mca-status sin parsear (diagnóstico de estructura JSON).
+// ─────────────────────────────────────────────
+app.post('/api/device/antenna-raw', async (req, res) => {
+    const { deviceIP, deviceUser, devicePass, devicePort } = req.body;
+    if (!deviceIP || !deviceUser || !devicePass) {
+        return res.status(400).json({ success: false, message: 'Faltan parámetros' });
+    }
+    try {
+        const output = await sshExec(deviceIP, parseInt(devicePort) || 22, deviceUser, devicePass, 'mca-status');
+        let parsed = null;
+        try { parsed = JSON.parse(output); } catch { /* not JSON */ }
+        res.json({ success: true, raw: output, parsed, length: output.length });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
     }
 });
 

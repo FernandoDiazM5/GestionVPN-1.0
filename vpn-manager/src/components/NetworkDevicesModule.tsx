@@ -188,24 +188,26 @@ export default function NetworkDevicesModule() {
     toastTimer.current = setTimeout(() => setToast(''), 4000);
   };
 
-  // Carga inicial: dispositivos guardados + scan previo desde sessionStorage
+  // Carga inicial: primero DB (savedIds), luego sessionStorage en el mismo batch React
+  // para evitar que scan results se muestren antes de que savedIds esté listo (flash).
   useEffect(() => {
     deviceDb.load().then(devices => {
       setSavedDevices(devices);
       setSavedIds(new Set(devices.map(d => d.id)));
-    });
-    try {
-      const cached = sessionStorage.getItem(SESSION_SCAN_KEY);
-      if (cached) {
-        const { results, allIPs, count, debug } = JSON.parse(cached);
-        if (Array.isArray(results) && results.length > 0) {
-          setScanResults(results);
-          setAllScannedIPs(allIPs ?? []);
-          setScannedCount(count ?? 0);
-          setDebugMsg(debug ?? '');
+      // Restaurar scan previo DENTRO del then() → React 18 batchea ambos setState
+      try {
+        const cached = sessionStorage.getItem(SESSION_SCAN_KEY);
+        if (cached) {
+          const { results, allIPs, count, debug } = JSON.parse(cached);
+          if (Array.isArray(results) && results.length > 0) {
+            setScanResults(results);
+            setAllScannedIPs(allIPs ?? []);
+            setScannedCount(count ?? 0);
+            setDebugMsg(debug ?? '');
+          }
         }
-      }
-    } catch { /* silent */ }
+      } catch { /* silent */ }
+    });
   }, []);
 
   // Persistir scan en sessionStorage cuando cambia
@@ -605,22 +607,23 @@ export default function NetworkDevicesModule() {
                 <span className="text-xs text-slate-400">· {devices.length} equipo{devices.length !== 1 ? 's' : ''}</span>
               </div>
               {/* Table header */}
-              <div className="grid grid-cols-[52px_1fr_100px_1fr_96px]
+              <div className="grid grid-cols-[52px_1fr_1fr_1fr_96px]
                 px-5 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider
                 border-b border-slate-100 bg-white">
                 <span>Rol</span>
-                <span>Nombre / Modelo</span>
+                <span>Nombre / MAC</span>
                 <span>IP</span>
-                <span>SSID / Info</span>
+                <span>SSID / AP</span>
                 <span className="text-right">Acciones</span>
               </div>
               {/* Rows */}
               {devices.map(dev => {
                 const isAp = dev.role === 'ap';
                 const displayName = dev.deviceName || dev.name;
+                const displayMac  = dev.mac || '—';
                 return (
                   <div key={dev.id}
-                    className="grid grid-cols-[52px_1fr_100px_1fr_96px]
+                    className="grid grid-cols-[52px_1fr_1fr_1fr_96px]
                       items-center px-5 py-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
                     <div>
                       <span className={`inline-flex text-[10px] font-bold px-1.5 py-0.5 rounded-md
@@ -630,10 +633,12 @@ export default function NetworkDevicesModule() {
                         {isAp ? 'AP' : dev.role === 'unknown' ? '?' : 'CPE'}
                       </span>
                     </div>
+                    {/* Nombre + MAC */}
                     <div className="min-w-0 pr-2">
-                      <p className="text-xs font-semibold text-slate-800 truncate">{displayName}</p>
-                      <p className="text-[10px] text-slate-400 truncate">{dev.model}</p>
+                      <p className="text-xs font-semibold text-slate-800 truncate" title={displayName}>{displayName}</p>
+                      <p className="font-mono text-[9px] text-slate-400 truncate">{displayMac}</p>
                     </div>
+                    {/* IP + GHz */}
                     <div className="min-w-0 pr-2">
                       <p className="font-mono text-xs text-slate-600 truncate">{dev.ip}</p>
                       {dev.frequency ? (
@@ -642,11 +647,23 @@ export default function NetworkDevicesModule() {
                         </p>
                       ) : null}
                     </div>
+                    {/* SSID (AP) o AP MAC (CPE) */}
                     <div className="min-w-0 pr-2">
-                      {dev.essid && <p className="font-mono text-[11px] text-slate-600 truncate">{dev.essid}</p>}
-                      {dev.security && <p className="text-[9px] text-slate-400">{dev.security}</p>}
-                      {dev.lastSeen && (
-                        <p className="text-[9px] text-slate-300">{new Date(dev.lastSeen).toLocaleDateString()}</p>
+                      {isAp ? (
+                        <>
+                          {dev.essid && <p className="font-mono text-[11px] text-slate-600 truncate" title={dev.essid}>{dev.essid}</p>}
+                          {dev.security && <p className="text-[9px] text-slate-400">{dev.security}</p>}
+                        </>
+                      ) : (
+                        <>
+                          {dev.apMac
+                            ? <p className="font-mono text-[10px] text-violet-600 truncate" title={`AP: ${dev.apMac}`}>{dev.apMac}</p>
+                            : dev.essid && <p className="font-mono text-[10px] text-slate-500 truncate">{dev.essid}</p>
+                          }
+                          {dev.lastSeen && (
+                            <p className="text-[9px] text-slate-300">{new Date(dev.lastSeen).toLocaleDateString()}</p>
+                          )}
+                        </>
                       )}
                     </div>
                     <div className="flex items-center justify-end space-x-0.5">
