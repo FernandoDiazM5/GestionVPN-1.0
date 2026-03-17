@@ -31,8 +31,22 @@ jobs:
         run: npm run build
         working-directory: vpn-manager
 
+      - name: Report build status
+        run: |
+          echo "✅ Build completado exitosamente"
+          echo "📦 Archivos generados en vpn-manager/dist:"
+          ls vpn-manager/dist
+
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: vpn-manager/dist
+
+      - name: Report deploy URL
+        run: |
+          REPO="${{ github.repository }}"
+          OWNER=$(echo "$REPO" | cut -d'/' -f1)
+          NAME=$(echo "$REPO" | cut -d'/' -f2)
+          echo "🚀 Deploy completado"
+          echo "🌐 URL: https://${OWNER}.github.io/${NAME}/"
