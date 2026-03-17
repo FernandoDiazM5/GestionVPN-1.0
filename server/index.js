@@ -266,35 +266,89 @@ const sshExec = (host, port, username, password, command) => {
 const parseAirOSStats = (output) => {
     try {
         const data = JSON.parse(output);
+        const h  = data.host     || {};
         const w  = data.wireless || {};
         const am = data.airmax   || {};
-        const toMbps = bps => bps ? Math.round(bps / 1_000_000) : null;
-        const toCCQ  = raw => raw ? Math.round(raw / 10)         : null;
+        const ifaces = Array.isArray(data.interfaces) ? data.interfaces : [];
+
+        const toMbps = bps => bps ? Math.round(parseInt(bps)  / 1_000_000) : null;
+        const toCCQ  = raw => raw ? Math.round(parseInt(raw)  / 10)         : null;
+
+        // Memoria %
+        let memoryPercent = null;
+        if (h.memory && h.memory.total > 0) {
+            memoryPercent = Math.round(((h.memory.total - h.memory.free) / h.memory.total) * 100);
+        }
+
+        // Uptime formateado
+        let uptimeStr = null;
+        const uptimeSec = h.uptime || data.uptime;
+        if (uptimeSec) {
+            const d  = Math.floor(uptimeSec / 86400);
+            const hh = Math.floor((uptimeSec % 86400) / 3600);
+            const mm = Math.floor((uptimeSec % 3600)  / 60);
+            const ss = uptimeSec % 60;
+            uptimeStr = d > 0
+                ? `${d}d ${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`
+                : `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+        }
+
+        // Canal 5 GHz: (freq - 5000) / 5 = número de canal
+        const freq = parseInt(w.frequency) || null;
+        const channelNumber = freq && freq >= 5000 ? Math.round((freq - 5000) / 5) : null;
+
+        // MACs de interfaces
+        const wlanIface = ifaces.find(i => /^(wlan|ath)/i.test(i.ifname));
+        const lanIface  = ifaces.find(i => /^(eth|br)/i.test(i.ifname));
+        const wlanMac   = ((wlanIface?.hwaddr || h.macaddr || w.macaddr || '')).toUpperCase();
+        const lanMac    = (lanIface?.hwaddr || '').toUpperCase();
+
+        // Cadenas TX/RX
+        const chainsNum = parseInt(w.chains);
+        const chains    = !isNaN(chainsNum) && chainsNum > 0 ? `${chainsNum}X${chainsNum}` : null;
+
         return {
-            signal:          w.signal      || w.rssi        || null,
-            noiseFloor:      w.noisefloor  || w.noise_floor || null,
+            // ── Variable ────────────────────────────────────────────
+            signal:          parseInt(w.signal)     || parseInt(w.rssi) || null,
+            noiseFloor:      parseInt(w.noisefloor) || parseInt(w.noise_floor) || null,
             ccq:             toCCQ(w.ccq),
             txRate:          toMbps(w.txrate  || w.tx_rate),
             rxRate:          toMbps(w.rxrate  || w.rx_rate),
-            frequency:       parseInt(w.frequency) || null,
-            distance:        w.ackdistance  || w.ack_distance || null,
-            txPower:         w.txpower      || w.tx_power    || null,
-            uptime:          data.uptime    || null,
-            essid:           w.essid        || null,
-            mode:            w.mode         || null,
-            airmaxEnabled:   !!am.enabled,
-            airmaxCapacity:  am.capacity    || null,
-            airmaxQuality:   am.quality     || null,
+            cpuLoad:         parseInt(h.cpuload) || null,
+            memoryPercent,
+            airmaxQuality:   parseInt(am.quality)  || null,
+            airmaxCapacity:  parseInt(am.capacity) || null,
+            uptimeStr,
+            deviceDate:      h.time || h.date || null,
             stations: (data.sta || []).map(s => ({
                 mac:        (s.mac || '').toUpperCase(),
-                signal:     s.signal     || s.rssi  || null,
-                noiseFloor: s.noisefloor || null,
+                signal:     parseInt(s.signal)     || parseInt(s.rssi)  || null,
+                noiseFloor: parseInt(s.noisefloor) || null,
                 ccq:        toCCQ(s.ccq),
                 txRate:     toMbps(s.txrate || s.tx_rate),
                 rxRate:     toMbps(s.rxrate || s.rx_rate),
                 distance:   s.ackdistance || null,
                 uptime:     s.uptime      || null,
             })),
+            // ── Estático ────────────────────────────────────────────
+            deviceName:      h.hostname    || null,
+            deviceModel:     h.devmodel    || null,
+            firmwareVersion: h.fwversion   || null,
+            wlanMac:         wlanMac       || null,
+            lanMac:          lanMac        || null,
+            apMac:           w.remote?.mac ? w.remote.mac.toUpperCase() : null,
+            essid:           w.essid       || null,
+            security:        w.security    || null,
+            mode:            w.mode        || null,
+            networkMode:     h.netrole     || null,
+            frequency:       freq,
+            channelNumber,
+            channelWidth:    parseInt(w.chanbw) || null,
+            txPower:         parseInt(w.txpower || w.tx_power) || null,
+            distance:        w.ackdistance || w.ack_distance   || null,
+            chains,
+            airmaxEnabled:   am.enabled != null ? !!am.enabled : undefined,
+            airmaxPriority:  am.priority  || null,
         };
     } catch {
         // Fallback: intentar parsear formato key=value (airOS firmware antiguo)

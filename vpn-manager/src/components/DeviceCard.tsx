@@ -2,7 +2,8 @@ import { useState } from 'react';
 import {
   Radio, Router, Signal, Trash2, RefreshCw, Loader2,
   ExternalLink, Activity, ArrowUp, ArrowDown, Zap, Waves,
-  Gauge, MonitorSpeaker,
+  MonitorSpeaker, Cpu, MemoryStick, Clock, Wifi, Lock,
+  Network, Info,
 } from 'lucide-react';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import type { SavedDevice, AntennaStats } from '../types/devices';
@@ -13,54 +14,93 @@ interface DeviceCardProps {
   onUpdate: (updated: SavedDevice) => void;
 }
 
-// ── Barra de progreso genérica ──────────────────────────────────────────
-function ProgressBar({ pct, color }: { pct: number; color: string }) {
+// ── Gauge circular SVG ───────────────────────────────────────────────────
+function GaugeChart({ value, label, color }: { value: number | null | undefined; label: string; color: string }) {
+  const pct  = Math.max(0, Math.min(100, value ?? 0));
+  const r    = 26;
+  const circ = 2 * Math.PI * r;
+  const dash = (pct / 100) * circ;
+  const warn = pct > 80 ? '#f87171' : pct > 60 ? '#fbbf24' : color;
+
   return (
-    <div className="w-full h-1.5 bg-white/30 rounded-full overflow-hidden">
-      <div className={`h-full rounded-full transition-all duration-700 ${color}`} style={{ width: `${pct}%` }} />
+    <div className="flex flex-col items-center space-y-1">
+      <svg width="72" height="72" viewBox="0 0 72 72">
+        <circle cx="36" cy="36" r={r} fill="none" stroke="#1e293b" strokeWidth="7" />
+        <circle
+          cx="36" cy="36" r={r} fill="none"
+          stroke={value != null ? warn : '#334155'}
+          strokeWidth="7"
+          strokeDasharray={`${dash} ${circ - dash}`}
+          strokeLinecap="round"
+          transform="rotate(-90 36 36)"
+          style={{ transition: 'stroke-dasharray 0.7s ease' }}
+        />
+        <text x="36" y="41" textAnchor="middle"
+          style={{ fill: 'white', fontSize: '13px', fontWeight: 'bold', fontFamily: 'monospace' }}>
+          {value != null ? `${pct}%` : '—'}
+        </text>
+      </svg>
+      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{label}</p>
     </div>
   );
 }
 
-// ── Stat box pequeño ────────────────────────────────────────────────────
-function StatBox({ label, value, unit = '', icon }: {
-  label: string; value?: number | string | null; unit?: string; icon?: React.ReactNode;
-}) {
-  const hasValue = value !== undefined && value !== null && value !== '';
+// ── Barra de progreso ────────────────────────────────────────────────────
+function Bar({ pct, color }: { pct: number; color: string }) {
   return (
-    <div className="bg-slate-800/60 rounded-xl p-3 space-y-1">
-      <div className="flex items-center space-x-1.5">
-        {icon && <span className="text-slate-400">{icon}</span>}
-        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{label}</p>
-      </div>
-      <p className={`font-mono text-sm font-bold ${hasValue ? 'text-white' : 'text-slate-600'}`}>
-        {hasValue ? `${value}${unit}` : '—'}
-      </p>
+    <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden">
+      <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%`, transition: 'width 0.7s ease' }} />
+    </div>
+  );
+}
+
+// ── Fila de parámetro ────────────────────────────────────────────────────
+function ParamRow({ label, value }: { label: string; value?: string | number | null }) {
+  if (value == null || value === '') return null;
+  return (
+    <div className="flex items-start justify-between gap-2 py-1.5 border-b border-slate-800/60 last:border-0">
+      <span className="text-[10px] text-slate-500 shrink-0">{label}</span>
+      <span className="text-[11px] font-mono text-slate-300 text-right break-all">{value}</span>
     </div>
   );
 }
 
 // ── Calidad de señal ─────────────────────────────────────────────────────
-function signalQuality(dbm: number | null | undefined): { label: string; color: string; bg: string; pct: number } {
-  if (dbm === null || dbm === undefined) return { label: '—', color: 'bg-slate-500', bg: 'from-slate-700 to-slate-800', pct: 0 };
+function signalMeta(dbm: number | null | undefined) {
+  if (dbm == null) return { label: '—', color: 'bg-slate-500', grad: 'from-slate-800 to-slate-900', pct: 0 };
   const pct = Math.max(0, Math.min(100, ((dbm - (-95)) / ((-40) - (-95))) * 100));
-  if (dbm >= -65) return { label: 'Excelente', color: 'bg-emerald-400',  bg: 'from-emerald-900 to-emerald-800', pct };
-  if (dbm >= -75) return { label: 'Buena',     color: 'bg-sky-400',      bg: 'from-sky-900 to-sky-800',        pct };
-  if (dbm >= -85) return { label: 'Regular',   color: 'bg-amber-400',    bg: 'from-amber-900 to-amber-800',    pct };
-  return             { label: 'Mala',       color: 'bg-rose-400',     bg: 'from-rose-900 to-rose-800',      pct };
+  if (dbm >= -65) return { label: 'Excelente', color: 'bg-emerald-400', grad: 'from-emerald-950 to-emerald-900', pct };
+  if (dbm >= -75) return { label: 'Buena',     color: 'bg-sky-400',     grad: 'from-sky-950 to-sky-900',       pct };
+  if (dbm >= -85) return { label: 'Regular',   color: 'bg-amber-400',   grad: 'from-amber-950 to-amber-900',   pct };
+  return             { label: 'Mala',       color: 'bg-rose-400',    grad: 'from-rose-950 to-rose-900',     pct };
 }
 
-function ccqColor(ccq: number | null | undefined) {
-  if (!ccq) return 'bg-slate-500';
-  if (ccq >= 80) return 'bg-emerald-400';
-  if (ccq >= 50) return 'bg-amber-400';
-  return 'bg-rose-400';
+function ccqColor(v?: number | null) {
+  if (!v) return 'bg-slate-500';
+  return v >= 80 ? 'bg-emerald-400' : v >= 50 ? 'bg-amber-400' : 'bg-rose-400';
+}
+
+function fmtSecurity(s?: string | null) {
+  if (!s) return null;
+  const map: Record<string, string> = {
+    wpa2aes: 'WPA2-AES', wpa2: 'WPA2', wpa: 'WPA', none: 'Abierta', open: 'Abierta',
+  };
+  return map[s.toLowerCase()] ?? s.toUpperCase();
+}
+
+function fmtMode(m?: string | null) {
+  if (!m) return null;
+  return m === 'sta' ? 'Estación' : m === 'ap' || m === 'master' ? 'Punto de Acceso' : m;
+}
+
+function fmtNetRole(r?: string | null) {
+  if (!r) return null;
+  return r === 'router' ? 'Enrutador' : r === 'bridge' ? 'Puente' : r;
 }
 
 // ───────────────────────────────────────────────────────────────────────
 export default function DeviceCard({ device, onRemove, onUpdate }: DeviceCardProps) {
-  const [activeTab, setActiveTab] = useState<'antenna' | 'router'>('antenna');
-
+  const [activeTab,        setActiveTab]        = useState<'antenna' | 'router'>('antenna');
   const [antennaStats,     setAntennaStats]     = useState<AntennaStats | null>(null);
   const [isLoadingAntenna, setIsLoadingAntenna] = useState(false);
   const [antennaError,     setAntennaError]     = useState('');
@@ -85,8 +125,24 @@ export default function DeviceCard({ device, onRemove, onUpdate }: DeviceCardPro
       }, 20_000);
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message ?? 'Error obteniendo stats');
-      setAntennaStats(data.stats);
-      onUpdate({ ...device, lastSeen: Date.now() });
+      const s: AntennaStats = data.stats;
+      setAntennaStats(s);
+      // Guardar campos estáticos en SavedDevice (solo sobreescribe si tienen valor)
+      onUpdate({
+        ...device,
+        lastSeen:    Date.now(),
+        name:        s.deviceName    || device.name,
+        model:       s.deviceModel   || device.model,
+        firmware:    s.firmwareVersion || device.firmware,
+        mac:         s.wlanMac       || device.mac,
+        deviceName:  s.deviceName    ?? device.deviceName,
+        lanMac:      s.lanMac        ?? device.lanMac,
+        security:    s.security      ?? device.security,
+        channelWidth: s.channelWidth ?? device.channelWidth,
+        networkMode: s.networkMode   ?? device.networkMode,
+        chains:      s.chains        ?? device.chains,
+        apMac:       s.apMac         ?? device.apMac,
+      });
     } catch (err: unknown) {
       setAntennaError(err instanceof Error ? err.message : 'Error desconocido');
     } finally {
@@ -95,11 +151,11 @@ export default function DeviceCard({ device, onRemove, onUpdate }: DeviceCardPro
   };
 
   const roleLabel = device.role === 'ap' ? 'AP' : device.role === 'sta' ? 'CPE' : '?';
-  const roleGrad  = device.role === 'ap'
-    ? 'from-indigo-500 to-indigo-600'
-    : 'from-violet-500 to-violet-600';
+  const roleGrad  = device.role === 'ap' ? 'from-indigo-500 to-indigo-600' : 'from-violet-500 to-violet-600';
+  const sig       = signalMeta(antennaStats?.signal);
 
-  const sig = signalQuality(antennaStats?.signal);
+  // Nombre a mostrar: deviceName cacheado, o el de la tarjeta
+  const displayName = device.deviceName || device.name;
 
   return (
     <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm flex flex-col bg-white">
@@ -107,25 +163,18 @@ export default function DeviceCard({ device, onRemove, onUpdate }: DeviceCardPro
       {/* ── Header ──────────────────────────────────────────────────── */}
       <div className={`bg-gradient-to-r ${roleGrad} px-4 py-3 flex items-center justify-between`}>
         <div className="flex items-center space-x-3 min-w-0">
-          <div className="w-9 h-9 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center shrink-0">
-            {device.role === 'ap'
-              ? <Radio  className="w-4.5 h-4.5 text-white" />
-              : <Signal className="w-4.5 h-4.5 text-white" />}
+          <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center shrink-0">
+            {device.role === 'ap' ? <Radio className="w-4.5 h-4.5 text-white" /> : <Signal className="w-4.5 h-4.5 text-white" />}
           </div>
           <div className="min-w-0">
             <div className="flex items-center space-x-2">
-              <h3 className="font-bold text-white text-sm truncate">{device.name}</h3>
-              <span className="text-[9px] font-bold bg-white/20 text-white px-1.5 py-0.5 rounded-md shrink-0">
-                {roleLabel}
-              </span>
+              <h3 className="font-bold text-white text-sm truncate">{displayName}</h3>
+              <span className="text-[9px] font-bold bg-white/20 text-white px-1.5 py-0.5 rounded-md shrink-0">{roleLabel}</span>
             </div>
             <p className="text-[10px] text-white/70 font-mono truncate">{device.model} · {device.firmware}</p>
           </div>
         </div>
-        <button
-          onClick={onRemove}
-          className="p-1.5 text-white/50 hover:text-white hover:bg-white/20 rounded-lg transition-colors shrink-0"
-        >
+        <button onClick={onRemove} className="p-1.5 text-white/50 hover:text-white hover:bg-white/20 rounded-lg transition-colors shrink-0">
           <Trash2 className="w-3.5 h-3.5" />
         </button>
       </div>
@@ -162,9 +211,8 @@ export default function DeviceCard({ device, onRemove, onUpdate }: DeviceCardPro
       {/* ── ANTENA TAB ──────────────────────────────────────────────── */}
       {activeTab === 'antenna' && (
         <div className="flex-1 bg-slate-900">
-
-          {/* Botón actualizar */}
-          <div className="p-4 pb-2">
+          {/* Botón */}
+          <div className="p-4 pb-3">
             <button
               onClick={handleLoadAntenna}
               disabled={isLoadingAntenna}
@@ -183,7 +231,6 @@ export default function DeviceCard({ device, onRemove, onUpdate }: DeviceCardPro
             </div>
           )}
 
-          {/* Estado vacío */}
           {!antennaStats && !isLoadingAntenna && !antennaError && (
             <div className="px-4 pb-6 pt-2 flex flex-col items-center text-center space-y-2">
               <Waves className="w-8 h-8 text-slate-700 mt-2" />
@@ -191,13 +238,12 @@ export default function DeviceCard({ device, onRemove, onUpdate }: DeviceCardPro
             </div>
           )}
 
-          {/* ── Stats ── */}
           {antennaStats && !antennaStats.raw && (
-            <div className="px-4 pb-4 space-y-3">
+            <div className="px-4 pb-5 space-y-4">
 
-              {/* Señal — bloque principal */}
-              {antennaStats.signal !== null && antennaStats.signal !== undefined && (
-                <div className={`bg-gradient-to-br ${sig.bg} rounded-2xl p-4`}>
+              {/* ── Señal principal ── */}
+              {antennaStats.signal != null && (
+                <div className={`bg-gradient-to-br ${sig.grad} rounded-2xl p-4`}>
                   <div className="flex items-start justify-between mb-3">
                     <div>
                       <p className="text-[10px] font-bold text-white/50 uppercase tracking-wider mb-0.5">Señal RF</p>
@@ -210,37 +256,32 @@ export default function DeviceCard({ device, onRemove, onUpdate }: DeviceCardPro
                       {sig.label}
                     </span>
                   </div>
-                  <ProgressBar pct={sig.pct} color="bg-white/70" />
-                  {antennaStats.noiseFloor !== null && antennaStats.noiseFloor !== undefined && (
+                  <Bar pct={sig.pct} color="bg-white/70" />
+                  {antennaStats.noiseFloor != null && (
                     <p className="text-[10px] text-white/40 mt-1.5 font-mono">
-                      Piso de ruido: {antennaStats.noiseFloor} dBm
+                      Ruido: {antennaStats.noiseFloor} dBm
                       {' · '}SNR: {(antennaStats.signal - antennaStats.noiseFloor).toFixed(0)} dB
                     </p>
                   )}
                 </div>
               )}
 
-              {/* CCQ */}
-              {antennaStats.ccq !== null && antennaStats.ccq !== undefined && (
+              {/* ── CCQ ── */}
+              {antennaStats.ccq != null && (
                 <div className="bg-slate-800/60 rounded-xl p-3">
                   <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center space-x-1.5">
-                      <Gauge className="w-3.5 h-3.5 text-slate-400" />
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">CCQ</span>
-                    </div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">CCQ</span>
                     <span className="font-mono text-lg font-black text-white">{antennaStats.ccq}%</span>
                   </div>
                   <div className="w-full h-2 bg-slate-700 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all duration-700 ${ccqColor(antennaStats.ccq)}`}
-                      style={{ width: `${antennaStats.ccq}%` }}
-                    />
+                    <div className={`h-full rounded-full ${ccqColor(antennaStats.ccq)}`}
+                      style={{ width: `${antennaStats.ccq}%`, transition: 'width 0.7s ease' }} />
                   </div>
                 </div>
               )}
 
-              {/* TX / RX */}
-              {(antennaStats.txRate || antennaStats.rxRate) && (
+              {/* ── TX / RX ── */}
+              {(antennaStats.txRate != null || antennaStats.rxRate != null) && (
                 <div className="grid grid-cols-2 gap-2">
                   <div className="bg-slate-800/60 rounded-xl p-3">
                     <div className="flex items-center space-x-1.5 mb-1">
@@ -248,8 +289,7 @@ export default function DeviceCard({ device, onRemove, onUpdate }: DeviceCardPro
                       <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">TX Rate</span>
                     </div>
                     <p className="font-mono text-xl font-black text-emerald-400">
-                      {antennaStats.txRate ?? '—'}
-                      <span className="text-xs text-slate-500 ml-1">Mbps</span>
+                      {antennaStats.txRate ?? '—'}<span className="text-xs text-slate-500 ml-1">Mbps</span>
                     </p>
                   </div>
                   <div className="bg-slate-800/60 rounded-xl p-3">
@@ -258,66 +298,121 @@ export default function DeviceCard({ device, onRemove, onUpdate }: DeviceCardPro
                       <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">RX Rate</span>
                     </div>
                     <p className="font-mono text-xl font-black text-sky-400">
-                      {antennaStats.rxRate ?? '—'}
-                      <span className="text-xs text-slate-500 ml-1">Mbps</span>
+                      {antennaStats.rxRate ?? '—'}<span className="text-xs text-slate-500 ml-1">Mbps</span>
                     </p>
                   </div>
                 </div>
               )}
 
-              {/* Grid de parámetros */}
-              <div className="grid grid-cols-3 gap-2">
-                <StatBox label="TX Power" value={antennaStats.txPower}   unit=" dBm" icon={<Zap className="w-3 h-3" />} />
-                <StatBox label="Frec."    value={antennaStats.frequency} unit=" MHz" icon={<Waves className="w-3 h-3" />} />
-                <StatBox label="Distancia" value={antennaStats.distance} unit=" m"  icon={<Signal className="w-3 h-3" />} />
-              </div>
-
-              {/* ESSID / modo */}
-              {(antennaStats.essid || antennaStats.mode) && (
-                <div className="bg-slate-800/60 rounded-xl px-3 py-2 flex items-center justify-between text-[11px]">
-                  {antennaStats.essid && (
-                    <span className="font-mono text-indigo-300 font-semibold truncate">{antennaStats.essid}</span>
-                  )}
-                  {antennaStats.mode && (
-                    <span className="text-slate-400 shrink-0 ml-2 uppercase text-[10px] font-bold">
-                      {antennaStats.mode}
-                    </span>
+              {/* ── AirMAX ── */}
+              {antennaStats.airmaxEnabled != null && (
+                <div className="bg-slate-800/60 rounded-xl p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">airMAX</span>
+                    <div className="flex items-center space-x-2">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md
+                        ${antennaStats.airmaxEnabled ? 'bg-emerald-900 text-emerald-400' : 'bg-slate-700 text-slate-500'}`}>
+                        {antennaStats.airmaxEnabled ? 'Activado' : 'Desactivado'}
+                      </span>
+                      {antennaStats.airmaxPriority && (
+                        <span className="text-[10px] font-mono text-slate-400 capitalize">{antennaStats.airmaxPriority}</span>
+                      )}
+                    </div>
+                  </div>
+                  {antennaStats.airmaxEnabled && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <p className="text-[9px] text-slate-500 mb-1">Calidad</p>
+                        <div className="flex items-center space-x-2">
+                          <span className="font-mono text-sm font-bold text-white">{antennaStats.airmaxQuality ?? '—'}%</span>
+                          {antennaStats.airmaxQuality != null && (
+                            <div className="flex-1 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                              <div className="h-full bg-violet-400 rounded-full"
+                                style={{ width: `${antennaStats.airmaxQuality}%` }} />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-[9px] text-slate-500 mb-1">Capacidad</p>
+                        <div className="flex items-center space-x-2">
+                          <span className="font-mono text-sm font-bold text-white">{antennaStats.airmaxCapacity ?? '—'}%</span>
+                          {antennaStats.airmaxCapacity != null && (
+                            <div className="flex-1 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                              <div className="h-full bg-fuchsia-400 rounded-full"
+                                style={{ width: `${antennaStats.airmaxCapacity}%` }} />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
               )}
 
-              {/* AirMax */}
-              {antennaStats.airmaxEnabled !== undefined && (
-                <div className="bg-slate-800/60 rounded-xl px-3 py-2 flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">AirMax</span>
-                  <div className="flex items-center space-x-3">
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md
-                      ${antennaStats.airmaxEnabled ? 'bg-emerald-900 text-emerald-400' : 'bg-slate-700 text-slate-500'}`}>
-                      {antennaStats.airmaxEnabled ? 'Activo' : 'Inactivo'}
-                    </span>
-                    {antennaStats.airmaxCapacity != null && (
-                      <span className="text-[10px] font-mono text-slate-400">Cap {antennaStats.airmaxCapacity}%</span>
-                    )}
-                    {antennaStats.airmaxQuality != null && (
-                      <span className="text-[10px] font-mono text-slate-400">Q {antennaStats.airmaxQuality}%</span>
-                    )}
+              {/* ── CPU y Memoria (gauges) ── */}
+              {(antennaStats.cpuLoad != null || antennaStats.memoryPercent != null) && (
+                <div className="bg-slate-800/60 rounded-xl p-3">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center space-x-1.5">
+                    <Cpu className="w-3 h-3" /><span>Recursos del sistema</span>
+                  </p>
+                  <div className="flex justify-around">
+                    <GaugeChart value={antennaStats.cpuLoad}       label="CPU"    color="#6366f1" />
+                    <GaugeChart value={antennaStats.memoryPercent} label="Memoria" color="#0ea5e9" />
                   </div>
                 </div>
               )}
 
-              {/* Estaciones (modo AP) */}
+              {/* ── Parámetros del dispositivo ── */}
+              <div className="bg-slate-800/60 rounded-xl p-3">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center space-x-1.5">
+                  <Info className="w-3 h-3" /><span>Dispositivo</span>
+                </p>
+                <div>
+                  <ParamRow label="Nombre"        value={antennaStats.deviceName} />
+                  <ParamRow label="Modelo"        value={antennaStats.deviceModel} />
+                  <ParamRow label="Firmware"      value={antennaStats.firmwareVersion} />
+                  <ParamRow label="Modo de red"   value={fmtNetRole(antennaStats.networkMode)} />
+                  <ParamRow label="Tiempo activo" value={antennaStats.uptimeStr} />
+                  <ParamRow label="Fecha"         value={antennaStats.deviceDate} />
+                  <ParamRow label="WLAN MAC"      value={antennaStats.wlanMac} />
+                  <ParamRow label="LAN MAC"       value={antennaStats.lanMac} />
+                </div>
+              </div>
+
+              {/* ── Parámetros inalámbricos ── */}
+              <div className="bg-slate-800/60 rounded-xl p-3">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center space-x-1.5">
+                  <Wifi className="w-3 h-3" /><span>Inalámbrico</span>
+                </p>
+                <div>
+                  <ParamRow label="Modo"          value={fmtMode(antennaStats.mode)} />
+                  <ParamRow label="SSID"          value={antennaStats.essid} />
+                  <ParamRow label="Seguridad"     value={fmtSecurity(antennaStats.security)} />
+                  <ParamRow label="Canal / Frec." value={
+                    antennaStats.channelNumber && antennaStats.frequency
+                      ? `${antennaStats.channelNumber} / ${antennaStats.frequency} MHz`
+                      : antennaStats.frequency ? `${antennaStats.frequency} MHz` : null
+                  } />
+                  <ParamRow label="Ancho de canal" value={antennaStats.channelWidth ? `${antennaStats.channelWidth} MHz` : null} />
+                  <ParamRow label="AP MAC"        value={antennaStats.apMac} />
+                  <ParamRow label="Cadenas TX/RX" value={antennaStats.chains} />
+                  <ParamRow label="Potencia TX"   value={antennaStats.txPower != null ? `${antennaStats.txPower} dBm` : null} />
+                  <ParamRow label="Distancia"     value={antennaStats.distance != null ? `${antennaStats.distance} m` : null} />
+                </div>
+              </div>
+
+              {/* ── Estaciones (modo AP) ── */}
               {antennaStats.stations && antennaStats.stations.length > 0 && (
                 <div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center space-x-1.5">
-                    <Activity className="w-3 h-3" />
-                    <span>Estaciones conectadas ({antennaStats.stations.length})</span>
+                    <Activity className="w-3 h-3" /><span>Estaciones ({antennaStats.stations.length})</span>
                   </p>
                   <div className="rounded-xl overflow-hidden border border-slate-700">
                     {antennaStats.stations.map((sta, i) => (
                       <div key={i}
                         className={`flex items-center justify-between px-3 py-2.5 text-[11px]
-                          ${i % 2 === 0 ? 'bg-slate-800/80' : 'bg-slate-800/40'}`}
-                      >
+                          ${i % 2 === 0 ? 'bg-slate-800/80' : 'bg-slate-800/40'}`}>
                         <span className="font-mono text-emerald-400 text-[10px]">{sta.mac}</span>
                         <div className="flex items-center space-x-3 text-slate-300 font-mono">
                           <span>{sta.signal ?? '—'} dBm</span>
@@ -333,21 +428,20 @@ export default function DeviceCard({ device, onRemove, onUpdate }: DeviceCardPro
             </div>
           )}
 
-          {/* Fallback raw — texto formateado */}
+          {/* Fallback raw */}
           {antennaStats?.raw && (
             <div className="mx-4 mb-4">
-              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                Output SSH (formato no reconocido)
-              </p>
+              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Output SSH</p>
               <div className="bg-slate-800 rounded-xl overflow-hidden border border-slate-700">
                 {antennaStats.raw.split('\n').filter(Boolean).map((line, i) => {
-                  const [k, ...vs] = line.split('=');
-                  const v = vs.join('=');
+                  const eq = line.indexOf('=');
+                  const k = eq > 0 ? line.slice(0, eq).trim() : line;
+                  const v = eq > 0 ? line.slice(eq + 1).trim() : '';
                   return (
                     <div key={i} className={`flex items-center justify-between px-3 py-1.5 text-[11px]
                       ${i % 2 === 0 ? 'bg-slate-800/80' : 'bg-slate-800/40'}`}>
-                      <span className="font-mono text-slate-400">{k.trim()}</span>
-                      <span className="font-mono text-emerald-400 font-semibold">{v?.trim() ?? ''}</span>
+                      <span className="font-mono text-slate-400">{k}</span>
+                      <span className="font-mono text-emerald-400 font-semibold">{v}</span>
                     </div>
                   );
                 })}

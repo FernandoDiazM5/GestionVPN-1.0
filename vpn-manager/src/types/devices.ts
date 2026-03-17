@@ -29,42 +29,69 @@ export interface SavedDevice {
   sshUser?:  string;
   sshPass?:  string;
   sshPort?:  number;
-  // RouterOS API al router detrás de la antena (para WiFi)
-  routerIp?: string;   // IP del router (por defecto = misma que la antena)
+  // Router detrás de la antena (WebUI)
+  routerIp?:   string;
   routerUser?: string;
   routerPass?: string;
-  routerPort?: number; // Puerto WebUI (ej: 8075)
+  routerPort?: number;
+  // Info estática cacheada desde mca-status (se actualiza al leer stats)
+  deviceName?:   string;   // hostname del dispositivo airOS
+  lanMac?:       string;   // MAC de la interfaz LAN (eth0)
+  security?:     string;   // tipo de seguridad WiFi (wpa2aes, etc.)
+  channelWidth?: number;   // ancho de canal MHz
+  networkMode?:  string;   // netrole: "router" | "bridge"
+  chains?:       string;   // cadenas TX/RX: "1X1", "2X2"
+  apMac?:        string;   // MAC del AP al que conecta (modo STA)
   addedAt:   number;
   lastSeen?: number;
 }
 
 /** Estadísticas RF devueltas por mca-status (Ubiquiti AirOS) */
 export interface AntennaStats {
+  // ── Variable — solo se muestra, NO se guarda historial ──────────────
   signal?:         number;   // dBm
   noiseFloor?:     number;   // dBm
   ccq?:            number;   // 0-100 %
   txRate?:         number;   // Mbps
   rxRate?:         number;   // Mbps
-  frequency?:      number;   // MHz
-  distance?:       number;   // metros
-  txPower?:        number;   // dBm
-  uptime?:         number;   // segundos
-  essid?:          string;
-  mode?:           string;
-  airmaxEnabled?:  boolean;
-  airmaxCapacity?: number;
-  airmaxQuality?:  number;
+  cpuLoad?:        number;   // 0-100 %
+  memoryPercent?:  number;   // 0-100 %
+  airmaxQuality?:  number;   // %
+  airmaxCapacity?: number;   // %
+  uptimeStr?:      string;   // "15d 03:35:19"
+  deviceDate?:     string;   // fecha del dispositivo
   stations?: Array<{
-    mac:        string;
-    signal?:    number;
+    mac:         string;
+    signal?:     number;
     noiseFloor?: number;
-    ccq?:       number;
-    txRate?:    number;
-    rxRate?:    number;
-    distance?:  number;
-    uptime?:    number;
+    ccq?:        number;
+    txRate?:     number;
+    rxRate?:     number;
+    distance?:   number;
+    uptime?:     number;
   }>;
-  raw?: string; // fallback si no es JSON válido
+
+  // ── Estático — se guarda en SavedDevice al cargar ───────────────────
+  deviceName?:    string;   // hostname airOS
+  deviceModel?:   string;   // modelo (LiteBeam M5, etc.)
+  firmwareVersion?: string; // versión firmware (v6.1.7 XW)
+  wlanMac?:       string;   // MAC WLAN
+  lanMac?:        string;   // MAC LAN (eth0)
+  apMac?:         string;   // MAC del AP remoto (modo STA)
+  essid?:         string;   // SSID
+  security?:      string;   // wpa2aes, etc.
+  mode?:          string;   // sta / ap
+  networkMode?:   string;   // router / bridge
+  frequency?:     number;   // MHz
+  channelNumber?: number;   // número de canal
+  channelWidth?:  number;   // MHz
+  txPower?:       number;   // dBm
+  distance?:      number;   // metros
+  chains?:        string;   // "1X1"
+  airmaxEnabled?: boolean;
+  airmaxPriority?: string;
+
+  raw?: string; // fallback si no es JSON ni key=value válido
 }
 
 /** Interfaz wireless devuelta por /api/device/wifi/get */

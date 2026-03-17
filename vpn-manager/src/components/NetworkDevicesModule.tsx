@@ -19,43 +19,40 @@ interface AddDeviceModalProps {
 }
 
 function AddDeviceModal({ device, node, onSave, onClose }: AddDeviceModalProps) {
-  const [sshUser,    setSshUser]    = useState('ubnt');
-  const [sshPass,    setSshPass]    = useState('');
-  const [sshPort,    setSshPort]    = useState(22);
-  const [routerIp,   setRouterIp]   = useState(device.ip);
-  const [routerUser, setRouterUser] = useState('admin');
-  const [routerPass, setRouterPass] = useState('');
+  const [sshUser, setSshUser] = useState('ubnt');
+  const [sshPass, setSshPass] = useState('');
+  const [sshPort, setSshPort] = useState(22);
   const [routerPort, setRouterPort] = useState(8075);
+
+  // ID único: MAC sin separadores o IP sin puntos como fallback
+  const deviceId = device.mac ? device.mac.replace(/:/g, '') : device.ip.replace(/\./g, '');
 
   const handleSave = () => {
     const saved: SavedDevice = {
-      id:         device.mac.replace(/:/g, ''),
-      mac:        device.mac,
-      ip:         device.ip,
-      name:       device.name,
-      model:      device.model,
-      firmware:   device.firmware,
-      role:       device.role,
-      parentAp:   device.parentAp,
-      essid:      device.essid,
-      frequency:  device.frequency,
-      nodeId:     node.id,
-      nodeName:   node.nombre_nodo,
-      sshUser:    sshUser || undefined,
-      sshPass:    sshPass || undefined,
-      sshPort:    sshPort !== 22 ? sshPort : undefined,
-      routerIp:   routerIp !== device.ip ? routerIp : undefined,
-      routerUser: routerUser || undefined,
-      routerPass: routerPass || undefined,
+      id:        deviceId,
+      mac:       device.mac,
+      ip:        device.ip,
+      name:      device.name,
+      model:     device.model,
+      firmware:  device.firmware,
+      role:      device.role,
+      parentAp:  device.parentAp,
+      essid:     device.essid,
+      frequency: device.frequency,
+      nodeId:    node.id,
+      nodeName:  node.nombre_nodo,
+      sshUser:   sshUser   || undefined,
+      sshPass:   sshPass   || undefined,
+      sshPort:   sshPort !== 22 ? sshPort : undefined,
       routerPort: routerPort !== 8075 ? routerPort : undefined,
-      addedAt:    Date.now(),
+      addedAt:   Date.now(),
     };
     onSave(saved);
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-5 max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-5 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="font-bold text-slate-800">Guardar dispositivo</h3>
@@ -66,6 +63,7 @@ function AddDeviceModal({ device, node, onSave, onClose }: AddDeviceModalProps) 
           </button>
         </div>
 
+        {/* SSH */}
         <div className="space-y-2">
           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center space-x-1">
             <Cpu className="w-3 h-3" /><span>SSH — Antena Ubiquiti</span>
@@ -86,32 +84,20 @@ function AddDeviceModal({ device, node, onSave, onClose }: AddDeviceModalProps) 
           </div>
         </div>
 
+        {/* Puerto WebUI router */}
         <div className="space-y-2">
           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center space-x-1">
-            <Wifi className="w-3 h-3" /><span>Router (detrás de la antena)</span>
+            <Wifi className="w-3 h-3" /><span>Router del cliente</span>
           </p>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">IP router</label>
-              <input value={routerIp} onChange={e => setRouterIp(e.target.value)} className="input-field w-full text-xs" />
-            </div>
-            <div>
-              <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Puerto WebUI</label>
-              <input type="number" value={routerPort} onChange={e => setRouterPort(+e.target.value)} className="input-field w-full text-xs" />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Usuario RouterOS</label>
-              <input value={routerUser} onChange={e => setRouterUser(e.target.value)} className="input-field w-full text-xs" placeholder="admin" />
-            </div>
-            <div>
-              <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Clave RouterOS</label>
-              <input type="password" value={routerPass} onChange={e => setRouterPass(e.target.value)} className="input-field w-full text-xs" placeholder="contraseña" />
-            </div>
+          <div>
+            <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+              Puerto WebUI <span className="normal-case font-normal text-slate-300">(acceso en {device.ip}:puerto)</span>
+            </label>
+            <input type="number" value={routerPort} onChange={e => setRouterPort(+e.target.value)} className="input-field w-full text-xs" />
           </div>
         </div>
 
+        {/* Nodo */}
         <div className="bg-slate-50 rounded-xl p-3 flex items-center space-x-2">
           <Radio className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
           <div>
@@ -410,7 +396,7 @@ export default function NetworkDevicesModule() {
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {scanResults.map((dev) => {
-                const id  = dev.mac ? dev.mac.replace(/:/g, '') : dev.ip.replace(/\./g, '_');
+                const id  = dev.mac ? dev.mac.replace(/:/g, '') : dev.ip.replace(/\./g, '');
                 const already = savedIds.has(id);
                 const isAp    = dev.role === 'ap';
                 const freqGhz = dev.frequency ? (dev.frequency / 1000).toFixed(1) : null;
