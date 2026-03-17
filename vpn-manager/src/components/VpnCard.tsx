@@ -39,7 +39,6 @@ export default function VpnCard({ vpn, rowIndex, onUpdate, onRemove }: VpnCardPr
   const [status,      setStatus]      = useState<'disabled' | 'activating' | 'running' | 'deleting'>(
     vpn.running ? 'running' : 'disabled',
   );
-  const [progress,    setProgress]    = useState(vpn.running ? 100 : 0);
   const [logs,        setLogs]        = useState<string[]>(
     vpn.running ? [`Sincronizado · IP ${vpn.ip ?? 'en resolución'}`] : [],
   );
@@ -52,12 +51,12 @@ export default function VpnCard({ vpn, rowIndex, onUpdate, onRemove }: VpnCardPr
   useEffect(() => {
     if (vpn.running && status !== 'running' && status !== 'activating') {
       setStatus('running');
-      setProgress(100);
+
       setLogs([`Sincronizado · IP ${vpn.ip ?? 'en resolución'}`]);
       setUptime(vpn.uptime ? parseRouterUptime(vpn.uptime) : 0);
     } else if (!vpn.running && status === 'running') {
       setStatus('disabled');
-      setProgress(0);
+
       setLogs(['Interfaz desactivada externamente']);
       setUptime(0);
     }
@@ -79,11 +78,10 @@ export default function VpnCard({ vpn, rowIndex, onUpdate, onRemove }: VpnCardPr
   const handleActivate = async () => {
     if (!credentials) return;
     setStatus('activating');
-    setProgress(0);
     setLogs([]);
     try {
       addLog('Enviando Enable → RouterOS API...');
-      setProgress(30);
+
       const response = await fetchWithTimeout('http://localhost:3001/api/interface/activate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -92,10 +90,10 @@ export default function VpnCard({ vpn, rowIndex, onUpdate, onRemove }: VpnCardPr
           vpnId: vpn.id, vpnName: vpn.name, vpnService: vpn.service,
         }),
       }, 20_000);
-      setProgress(70);
+
       const data: ActivateResponse = await response.json();
       if (!response.ok || !data.success) throw new Error(data.message ?? 'Error activando interfaz');
-      setProgress(100);
+
       setStatus('running');
       addLog(`✓ Activo · IP ${data.ip ?? 'en negociación'}`);
       onUpdate({ ...vpn, disabled: false, running: true, ip: data.ip, uptime: undefined });
@@ -103,14 +101,13 @@ export default function VpnCard({ vpn, rowIndex, onUpdate, onRemove }: VpnCardPr
       const msg = err instanceof Error ? err.message : 'Error desconocido';
       addLog(`✗ Error: ${msg}`);
       setStatus('disabled');
-      setProgress(0);
+
     }
   };
 
   const handleDeactivate = async () => {
     if (!credentials) return;
     setStatus('deleting');
-    setProgress(50);
     try {
       addLog('Enviando Disable → RouterOS API...');
       const response = await fetchWithTimeout('http://localhost:3001/api/interface/deactivate', {
@@ -123,7 +120,7 @@ export default function VpnCard({ vpn, rowIndex, onUpdate, onRemove }: VpnCardPr
       }, 20_000);
       const data: DeactivateResponse = await response.json();
       if (!response.ok || !data.success) throw new Error(data.message ?? 'Error desactivando interfaz');
-      setProgress(0);
+
       setStatus('disabled');
       addLog('✓ Secret deshabilitado');
       onUpdate({ ...vpn, disabled: true, running: false, ip: undefined, uptime: undefined });
@@ -131,7 +128,7 @@ export default function VpnCard({ vpn, rowIndex, onUpdate, onRemove }: VpnCardPr
       const msg = err instanceof Error ? err.message : 'Error desconocido';
       addLog(`✗ Error: ${msg}`);
       setStatus('running');
-      setProgress(100);
+
     }
   };
 

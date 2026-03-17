@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Cpu, RefreshCw, Loader2, Radio, AlertCircle, Signal,
+  Cpu, RefreshCw, Loader2, Radio, AlertCircle,
   ShieldCheck, ShieldOff, PlusCircle, Check, X, Wifi, Info,
   Eye, Pencil, Trash2, CheckCircle2, ExternalLink, Router,
 } from 'lucide-react';
@@ -180,7 +180,7 @@ export default function NetworkDevicesModule() {
   const [savedIds,       setSavedIds]       = useState<Set<string>>(new Set());
   const [isLoadingNodes, setIsLoadingNodes] = useState(false);
   const [toast,          setToast]          = useState('');
-  const toastTimer = useRef<ReturnType<typeof setTimeout>>();
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -608,10 +608,9 @@ export default function NetworkDevicesModule() {
                 <span className="text-xs text-slate-400">· {devices.length} equipo{devices.length !== 1 ? 's' : ''}</span>
               </div>
               {/* Table header */}
-              <div className="grid grid-cols-[56px_56px_1fr_1fr_1fr_auto]
+              <div className="grid grid-cols-[72px_1fr_1fr_1fr_auto]
                 px-5 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider
                 border-b border-slate-100 bg-white">
-                <span>Rol</span>
                 <span>Modo</span>
                 <span>Nombre / MAC</span>
                 <span>IP / Frec.</span>
@@ -620,35 +619,32 @@ export default function NetworkDevicesModule() {
               </div>
               {/* Rows */}
               {devices.map(dev => {
-                const isAp = dev.role === 'ap';
-                // Modo inalámbrico desde cachedStats o rol escaneado
-                const wmode = dev.cachedStats?.mode || dev.role;
-                const isModeAp = wmode === 'ap' || wmode === 'master';
+                // Prioridad: cachedStats.mode > role escaneado > unknown
+                const rawMode = dev.cachedStats?.mode || (dev.role !== 'unknown' ? dev.role : null);
+                const isApMode = rawMode === 'ap' || rawMode === 'master';
+                const isCpe    = rawMode === 'sta';
                 const displayName = dev.deviceName || dev.name;
                 const displayMac  = dev.mac || '—';
                 const antennaUrl  = `http://${dev.ip}`;
                 const routerUrl   = `http://${dev.routerIp || dev.ip}:${dev.routerPort ?? 8075}`;
                 return (
                   <div key={dev.id}
-                    className="grid grid-cols-[56px_56px_1fr_1fr_1fr_auto]
+                    className="grid grid-cols-[72px_1fr_1fr_1fr_auto]
                       items-center px-5 py-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
-                    {/* Rol (escaneado) */}
+                    {/* Modo combinado */}
                     <div>
-                      <span className={`inline-flex text-[10px] font-bold px-1.5 py-0.5 rounded-md
-                        ${isAp ? 'bg-indigo-100 text-indigo-700'
-                          : dev.role === 'unknown' ? 'bg-slate-100 text-slate-500'
-                          : 'bg-violet-100 text-violet-700'}`}>
-                        {isAp ? 'AP' : dev.role === 'unknown' ? '?' : 'CPE'}
-                      </span>
-                    </div>
-                    {/* Modo inalámbrico RF */}
-                    <div>
-                      {wmode && wmode !== 'unknown' ? (
+                      {rawMode ? (
                         <span className={`inline-flex text-[10px] font-bold px-1.5 py-0.5 rounded-md
-                          ${isModeAp ? 'bg-sky-100 text-sky-700' : 'bg-fuchsia-100 text-fuchsia-700'}`}>
-                          {isModeAp ? 'AP' : 'STA'}
+                          ${isApMode
+                            ? 'bg-indigo-100 text-indigo-700'
+                            : isCpe
+                              ? 'bg-violet-100 text-violet-700'
+                              : 'bg-slate-100 text-slate-500'}`}>
+                          {isApMode ? 'AP' : isCpe ? 'CPE' : rawMode.toUpperCase()}
                         </span>
-                      ) : <span className="text-[10px] text-slate-300">—</span>}
+                      ) : (
+                        <span className="text-[10px] text-slate-300" title="Abre el detalle y presiona Actualizar">—</span>
+                      )}
                     </div>
                     {/* Nombre + MAC */}
                     <div className="min-w-0 pr-2">

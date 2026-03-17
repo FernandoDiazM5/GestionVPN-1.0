@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   Radio, Signal, Trash2, RefreshCw, Loader2,
   Activity, ArrowUp, ArrowDown, Waves,
-  MonitorSpeaker, Cpu, Clock, Wifi,
+  Cpu, Clock, Wifi,
   Info,
 } from 'lucide-react';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
@@ -198,12 +198,14 @@ export default function DeviceCard({ device, onRemove, onUpdate }: DeviceCardPro
           : null}
         {/* Modo inalámbrico badge */}
         {(() => {
-          const m = antennaStats?.mode || (device.role !== 'unknown' ? device.role : null);
+          const m = antennaStats?.mode || device.cachedStats?.mode || (device.role !== 'unknown' ? device.role : null);
           if (!m) return null;
           const isAp = m === 'ap' || m === 'master';
+          const isSta = m === 'sta';
           return (
-            <span className={`font-bold px-1.5 py-0.5 rounded-md ${isAp ? 'bg-indigo-100 text-indigo-700' : 'bg-violet-100 text-violet-700'}`}>
-              {isAp ? 'Punto de Acceso' : 'Estación'}
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md
+              ${isAp ? 'bg-indigo-100 text-indigo-700' : isSta ? 'bg-violet-100 text-violet-700' : 'bg-slate-100 text-slate-500'}`}>
+              {isAp ? 'Punto de Acceso' : isSta ? 'Estación' : m.toUpperCase()}
             </span>
           );
         })()}
