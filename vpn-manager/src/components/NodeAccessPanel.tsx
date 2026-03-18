@@ -7,10 +7,11 @@ import { useVpn } from '../context/VpnContext';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import type { NodeInfo } from '../types/api';
 import NodeCard from './NodeCard';
+import { API_BASE_URL } from '../config';
 
 const ADMIN_IPS = [
-  { value: '192.168.21.20', label: 'Laptop',   icon: Laptop },
-  { value: '192.168.21.30', label: 'Celular',  icon: Smartphone },
+  { value: '192.168.21.20', label: 'Laptop', icon: Laptop },
+  { value: '192.168.21.30', label: 'Celular', icon: Smartphone },
   { value: '192.168.21.50', label: 'PC FiWis', icon: Monitor },
 ];
 
@@ -33,22 +34,22 @@ export default function NodeAccessPanel() {
   } = useVpn();
 
   // Si ya hay nodos en contexto (persistidos) mostramos directo sin necesidad de recargar
-  const [isLoading,  setIsLoading]  = useState(false);
-  const [hasLoaded,  setHasLoaded]  = useState(nodes.length > 0);
-  const [errorMsg,   setErrorMsg]   = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(nodes.length > 0);
+  const [errorMsg, setErrorMsg] = useState('');
   const [isRevoking, setIsRevoking] = useState(false);
-  const [search,     setSearch]     = useState('');
+  const [search, setSearch] = useState('');
 
   const handleLoadNodes = async () => {
     if (!credentials) return;
     setIsLoading(true);
     setErrorMsg('');
     try {
-      const res = await fetchWithTimeout('http://localhost:3001/api/nodes', {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/api/nodes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ip:   credentials.ip,
+          ip: credentials.ip,
           user: credentials.user,
           pass: credentials.pass,
         }),
@@ -71,21 +72,21 @@ export default function NodeAccessPanel() {
     setIsRevoking(false);
   };
 
-  const connectedNodes    = nodes.filter(n => n.running);
+  const connectedNodes = nodes.filter(n => n.running);
   const disconnectedNodes = nodes.filter(n => !n.running);
-  const nodesWithVrf      = nodes.filter(n => !!n.nombre_vrf);
-  const activeNodeName    = activeNodeVrf
+  const nodesWithVrf = nodes.filter(n => !!n.nombre_vrf);
+  const activeNodeName = activeNodeVrf
     ? nodes.find(n => n.nombre_vrf === activeNodeVrf)?.nombre_nodo ?? activeNodeVrf
     : null;
 
-  const q             = search.trim().toLowerCase();
+  const q = search.trim().toLowerCase();
   const filteredNodes = q
     ? nodes.filter(n =>
-        n.nombre_nodo?.toLowerCase().includes(q) ||
-        n.nombre_vrf?.toLowerCase().includes(q)  ||
-        n.segmento_lan?.toLowerCase().includes(q) ||
-        n.ppp_user?.toLowerCase().includes(q)
-      )
+      n.nombre_nodo?.toLowerCase().includes(q) ||
+      n.nombre_vrf?.toLowerCase().includes(q) ||
+      n.segmento_lan?.toLowerCase().includes(q) ||
+      n.ppp_user?.toLowerCase().includes(q)
+    )
     : nodes;
 
   return (

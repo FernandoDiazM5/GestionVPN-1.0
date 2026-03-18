@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import { dbService, type VpnSecret, type RouterCredentials } from '../store/db';
 import type { NodeInfo } from '../types/api';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { API_BASE_URL } from '../config';
 
 interface VpnContextType {
   // Auth
@@ -56,8 +57,8 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
   const [isReady, setIsReady] = useState(false);
   const [scannedSecrets, setScannedSecrets] = useState<VpnSecret[]>([]);
   const [hasScanned, setHasScanned] = useState(false);
-  const isLoggingOutRef    = useRef(false);
-  const deactivateOnReady  = useRef(false); // túnel expirado mientras página cerrada
+  const isLoggingOutRef = useRef(false);
+  const deactivateOnReady = useRef(false); // túnel expirado mientras página cerrada
 
   // Estado de nodos VRF
   const [nodes, setNodes] = useState<NodeInfo[]>([]);
@@ -88,7 +89,7 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
     if (!credentials) return;
     try {
       // fetchWithTimeout evita que la llamada cuelgue si el router no responde
-      await fetchWithTimeout('http://localhost:3001/api/tunnel/deactivate', {
+      await fetchWithTimeout(`${API_BASE_URL}/api/tunnel/deactivate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

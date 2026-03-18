@@ -3,6 +3,7 @@ import { Play, ShieldOff, Wifi, WifiOff, Clock, Loader2, Radio } from 'lucide-re
 import { useVpn, TUNNEL_TIMEOUT_MS } from '../context/VpnContext';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import type { NodeInfo, TunnelActivateResponse } from '../types/api';
+import { API_BASE_URL } from '../config';
 
 interface NodeCardProps {
   node: NodeInfo;
@@ -28,14 +29,14 @@ export default function NodeCard({ node, rowIndex }: NodeCardProps) {
     deactivateAllNodes,
   } = useVpn();
 
-  const [isActivating,   setIsActivating]   = useState(false);
+  const [isActivating, setIsActivating] = useState(false);
   const [isDeactivating, setIsDeactivating] = useState(false);
-  const [logs,           setLogs]           = useState<string[]>([]);
-  const [countdown,      setCountdown]      = useState('');
+  const [logs, setLogs] = useState<string[]>([]);
+  const [countdown, setCountdown] = useState('');
   const logsEndRef = useRef<HTMLDivElement>(null);
 
   const isThisNodeActive = activeNodeVrf === node.nombre_vrf && !!node.nombre_vrf;
-  const isAnyNodeActive  = !!activeNodeVrf;
+  const isAnyNodeActive = !!activeNodeVrf;
 
   // Countdown timer
   useEffect(() => {
@@ -66,14 +67,14 @@ export default function NodeCard({ node, rowIndex }: NodeCardProps) {
       }
       addLog(`Configurando VRF: ${node.nombre_vrf}`);
       addLog(`IP Admin: ${adminIP}`);
-      const res = await fetchWithTimeout('http://localhost:3001/api/tunnel/activate', {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/api/tunnel/activate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ip:        credentials.ip,
-          user:      credentials.user,
-          pass:      credentials.pass,
-          tunnelIP:  adminIP,
+          ip: credentials.ip,
+          user: credentials.user,
+          pass: credentials.pass,
+          tunnelIP: adminIP,
           targetVRF: node.nombre_vrf,
         }),
       }, 20_000);
@@ -103,7 +104,7 @@ export default function NodeCard({ node, rowIndex }: NodeCardProps) {
     }
   };
 
-  const isPending  = isActivating || isDeactivating;
+  const isPending = isActivating || isDeactivating;
   const canActivate = !isPending && !!node.nombre_vrf && !node.disabled && node.running;
   const accessBlockReason = !node.nombre_vrf
     ? 'Sin VRF asignado'

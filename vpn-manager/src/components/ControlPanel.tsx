@@ -5,6 +5,7 @@ import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import type { ActiveSession } from '../types/api';
 import VpnCard from './VpnCard';
 import NodeProvisionForm from './NodeProvisionForm';
+import { API_BASE_URL } from '../config';
 
 const POLL_INTERVAL_MS = 30_000;
 
@@ -12,8 +13,8 @@ export default function ControlPanel() {
   const { credentials, managedVpns, setManagedVpns } = useVpn();
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState('');
-  const [lastSync,  setLastSync]  = useState<Date | null>(null);
-  const [search,    setSearch]    = useState('');
+  const [lastSync, setLastSync] = useState<Date | null>(null);
+  const [search, setSearch] = useState('');
 
   const performSyncRef = useRef<(isInitial: boolean) => Promise<void>>(undefined);
 
@@ -23,7 +24,7 @@ export default function ControlPanel() {
       if (isInitial) setIsSyncing(true);
       setSyncError('');
       try {
-        const res = await fetchWithTimeout('http://localhost:3001/api/active', {
+        const res = await fetchWithTimeout(`${API_BASE_URL}/api/active`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ip: credentials.ip, user: credentials.user, pass: credentials.pass }),
@@ -52,15 +53,15 @@ export default function ControlPanel() {
     return () => clearInterval(id);
   }, []);
 
-  const activeCount   = managedVpns.filter(v => v.running).length;
-  const q             = search.trim().toLowerCase();
-  const filteredVpns  = q
+  const activeCount = managedVpns.filter(v => v.running).length;
+  const q = search.trim().toLowerCase();
+  const filteredVpns = q
     ? managedVpns.filter(v =>
-        v.name?.toLowerCase().includes(q)    ||
-        v.service?.toLowerCase().includes(q) ||
-        v.profile?.toLowerCase().includes(q) ||
-        v.ip?.toLowerCase().includes(q)
-      )
+      v.name?.toLowerCase().includes(q) ||
+      v.service?.toLowerCase().includes(q) ||
+      v.profile?.toLowerCase().includes(q) ||
+      v.ip?.toLowerCase().includes(q)
+    )
     : managedVpns;
 
   if (managedVpns.length === 0) {

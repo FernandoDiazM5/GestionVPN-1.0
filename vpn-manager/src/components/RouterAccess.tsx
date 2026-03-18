@@ -3,6 +3,7 @@ import { Radio, Lock, User, Server, Globe, CheckCircle, AlertCircle, Loader2 } f
 import { useVpn } from '../context/VpnContext';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import type { ConnectResponse } from '../types/api';
+import { API_BASE_URL } from '../config';
 
 export default function RouterAccess() {
   const { handleLoginSuccess } = useVpn();
@@ -22,7 +23,7 @@ export default function RouterAccess() {
     setErrorDetail('');
     try {
       const response = await fetchWithTimeout(
-        'http://localhost:3001/api/connect',
+        `${API_BASE_URL}/api/connect`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
