@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { PlusCircle, Copy, Check, Loader2, Terminal, Cpu, ChevronDown, ChevronUp } from 'lucide-react';
 import { useVpn } from '../context/VpnContext';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { API_BASE_URL } from '../config';
 
 interface ProvisionStep {
   step: number;
@@ -53,7 +54,7 @@ export default function NodeProvisionForm() {
     addLog(`Provisionando ND${nodeNumber}-${nodeName.toUpperCase()}...`);
 
     try {
-      const res = await fetchWithTimeout('http://localhost:3001/api/node/provision', {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/api/node/provision`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -98,7 +99,7 @@ export default function NodeProvisionForm() {
     setGeneratedScript('');
 
     try {
-      const res = await fetchWithTimeout('http://localhost:3001/api/node/script', {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/api/node/script`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nodeName, pppUser, pppPassword, lanSubnet, serverPublicIP }),

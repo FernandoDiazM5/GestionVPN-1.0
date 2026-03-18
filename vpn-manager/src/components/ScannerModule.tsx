@@ -6,6 +6,7 @@ import {
 import { useVpn } from '../context/VpnContext';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import type { VpnSecret } from '../store/db';
+import { API_BASE_URL } from '../config';
 
 const PAGE_SIZE = 20;
 
@@ -27,7 +28,7 @@ export default function ScannerModule() {
     setErrorMsg('');
     setPage(1);
     try {
-      const response = await fetchWithTimeout('http://localhost:3001/api/secrets', {
+      const response = await fetchWithTimeout(`${API_BASE_URL}/api/secrets`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

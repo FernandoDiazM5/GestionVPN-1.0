@@ -5,6 +5,7 @@ import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import type { VpnSecret } from '../store/db';
 import type { ActivateResponse, DeactivateResponse } from '../types/api';
 import ConfirmModal from './ConfirmModal';
+import { API_BASE_URL } from '../config';
 
 function parseRouterUptime(uptime: string): number {
   let total = 0;
@@ -36,13 +37,13 @@ interface VpnCardProps {
 export default function VpnCard({ vpn, rowIndex, onUpdate, onRemove }: VpnCardProps) {
   const { credentials } = useVpn();
 
-  const [status,      setStatus]      = useState<'disabled' | 'activating' | 'running' | 'deleting'>(
+  const [status, setStatus] = useState<'disabled' | 'activating' | 'running' | 'deleting'>(
     vpn.running ? 'running' : 'disabled',
   );
-  const [logs,        setLogs]        = useState<string[]>(
+  const [logs, setLogs] = useState<string[]>(
     vpn.running ? [`Sincronizado · IP ${vpn.ip ?? 'en resolución'}`] : [],
   );
-  const [uptime,      setUptime]      = useState(() =>
+  const [uptime, setUptime] = useState(() =>
     vpn.running && vpn.uptime ? parseRouterUptime(vpn.uptime) : 0,
   );
   const [showConfirm, setShowConfirm] = useState(false);
@@ -60,7 +61,7 @@ export default function VpnCard({ vpn, rowIndex, onUpdate, onRemove }: VpnCardPr
       setLogs(['Interfaz desactivada externamente']);
       setUptime(0);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vpn.running, vpn.ip, vpn.uptime, status]);
 
   useEffect(() => {
@@ -82,7 +83,7 @@ export default function VpnCard({ vpn, rowIndex, onUpdate, onRemove }: VpnCardPr
     try {
       addLog('Enviando Enable → RouterOS API...');
 
-      const response = await fetchWithTimeout('http://localhost:3001/api/interface/activate', {
+      const response = await fetchWithTimeout(`${API_BASE_URL}/api/interface/activate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -110,7 +111,7 @@ export default function VpnCard({ vpn, rowIndex, onUpdate, onRemove }: VpnCardPr
     setStatus('deleting');
     try {
       addLog('Enviando Disable → RouterOS API...');
-      const response = await fetchWithTimeout('http://localhost:3001/api/interface/deactivate', {
+      const response = await fetchWithTimeout(`${API_BASE_URL}/api/interface/deactivate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -132,9 +133,9 @@ export default function VpnCard({ vpn, rowIndex, onUpdate, onRemove }: VpnCardPr
     }
   };
 
-  const isRunning  = status === 'running';
-  const isPending  = status === 'activating' || status === 'deleting';
-  const showLogs   = logs.length > 0 || isPending;
+  const isRunning = status === 'running';
+  const isPending = status === 'activating' || status === 'deleting';
+  const showLogs = logs.length > 0 || isPending;
 
   const rowBg = isRunning
     ? 'bg-emerald-50/60'
