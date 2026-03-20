@@ -1,10 +1,11 @@
-import { Network, Server, Radio, LogOut, Wifi, Cpu } from 'lucide-react';
+import { Network, Server, Radio, LogOut, Wifi, Cpu, Activity } from 'lucide-react';
 import { VpnProvider, useVpn } from './context/VpnContext';
 import RouterAccess from './components/RouterAccess';
 import ScannerModule from './components/ScannerModule';
 import ControlPanel from './components/ControlPanel';
 import NodeAccessPanel from './components/NodeAccessPanel';
 import NetworkDevicesModule from './components/NetworkDevicesModule';
+import ApMonitorModule from './components/ApMonitorModule';
 
 function AppContent() {
   const {
@@ -67,7 +68,7 @@ function AppContent() {
               className={`tab-btn ${activeModule === 'control' ? 'tab-active' : 'tab-inactive'}`}
             >
               <Server className="w-4 h-4" />
-              <span>Gestión</span>
+              <span>Gestión VPN</span>
             </button>
             <button
               onClick={() => setActiveModule('scanner')}
@@ -82,6 +83,13 @@ function AppContent() {
             >
               <Cpu className="w-4 h-4" />
               <span>Equipos</span>
+            </button>
+            <button
+              onClick={() => setActiveModule('monitor')}
+              className={`tab-btn ${activeModule === 'monitor' ? 'tab-active' : 'tab-inactive'}`}
+            >
+              <Activity className="w-4 h-4" />
+              <span>Monitor AP</span>
             </button>
           </div>
 
@@ -111,6 +119,7 @@ function AppContent() {
         {activeModule === 'scanner' && <ScannerModule />}
         {activeModule === 'control' && <ControlPanel />}
         {activeModule === 'devices' && <NetworkDevicesModule />}
+        {activeModule === 'monitor' && <ApMonitorModule />}
       </main>
     </div>
   );

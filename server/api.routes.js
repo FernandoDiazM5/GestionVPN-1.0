@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { connectToMikrotik, safeWrite, getErrorMessage, cleanTunnelRules } = require('./routeros.service');
-const { IPV4_REGEX, CIDR_REGEX, getSubnetHosts, probeUbiquiti, sshExec, parseAirOSStats, trySshCredentials } = require('./ubiquiti.service');
+const { IPV4_REGEX, CIDR_REGEX, getSubnetHosts, probeUbiquiti, sshExec, parseAirOSStats, parseFullOutput, ANTENNA_CMD, trySshCredentials } = require('./ubiquiti.service');
 const { getDb, encryptDevice, decryptDevice } = require('./db.service');
 
 router.post('/connect', async (req, res) => {
@@ -232,8 +232,9 @@ router.post('/device/auto-login', async (req, res) => {
 router.post('/device/antenna', async (req, res) => {
     const { deviceIP, deviceUser, devicePass, devicePort } = req.body;
     try {
-        const output = await sshExec(deviceIP, parseInt(devicePort) || 22, deviceUser, devicePass, 'mca-status');
-        res.json({ success: true, stats: parseAirOSStats(output) });
+        // Comando combinado: mca-status + system.cfg + hostname + version + ifconfig
+        const output = await sshExec(deviceIP, parseInt(devicePort) || 22, deviceUser, devicePass, ANTENNA_CMD, 20000, 8000);
+        res.json({ success: true, stats: parseFullOutput(output) });
     } catch (error) { res.status(500).json({ success: false, message: /[Aa]uth|handshake/.test(error.message) ? 'Credenciales incorrectas' : error.message }); }
 });
 
