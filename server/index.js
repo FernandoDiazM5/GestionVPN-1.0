@@ -1,7 +1,8 @@
 const express = require('express');
 const cors = require('cors');
-const apiRoutes = require('./api.routes');
-const { initDb } = require('./db.service');
+const apiRoutes   = require('./api.routes');
+const apRoutes    = require('./ap.routes');
+const { initDb }  = require('./db.service');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -23,6 +24,7 @@ app.use(cors({
 app.use(express.json());
 
 app.use('/api', apiRoutes);
+app.use('/api/ap-monitor', apRoutes);
 
 // Inicializar Base de Datos y levantar servidor
 initDb().then(() => {

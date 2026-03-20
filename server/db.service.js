@@ -33,6 +33,66 @@ async function initDb() {
             id TEXT PRIMARY KEY,
             data TEXT
         );
+        CREATE TABLE IF NOT EXISTS ap_nodos (
+            id TEXT PRIMARY KEY,
+            nombre TEXT NOT NULL,
+            descripcion TEXT DEFAULT '',
+            ubicacion TEXT DEFAULT '',
+            creado_en INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS aps (
+            id TEXT PRIMARY KEY,
+            nodo_id TEXT NOT NULL,
+            hostname TEXT DEFAULT '',
+            modelo TEXT DEFAULT '',
+            firmware TEXT DEFAULT '',
+            mac_lan TEXT DEFAULT '',
+            mac_wlan TEXT DEFAULT '',
+            ip TEXT NOT NULL,
+            frecuencia_ghz REAL,
+            ssid TEXT DEFAULT '',
+            canal_mhz INTEGER,
+            tx_power INTEGER,
+            modo_red TEXT DEFAULT '',
+            usuario_ssh TEXT DEFAULT '',
+            clave_ssh TEXT,
+            puerto_ssh INTEGER DEFAULT 22,
+            activo INTEGER DEFAULT 1,
+            registrado_en INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS cpes_conocidos (
+            mac TEXT PRIMARY KEY,
+            ap_id TEXT,
+            hostname TEXT DEFAULT '',
+            modelo TEXT DEFAULT '',
+            firmware TEXT DEFAULT '',
+            ip_lan TEXT DEFAULT '',
+            mac_lan TEXT DEFAULT '',
+            mac_wlan TEXT DEFAULT '',
+            mac_ap TEXT DEFAULT '',
+            modo_red TEXT DEFAULT '',
+            frecuencia_mhz INTEGER,
+            canal_mhz INTEGER,
+            tx_power INTEGER,
+            ssid_ap TEXT DEFAULT '',
+            ultima_vez_visto INTEGER
+        );
+        CREATE TABLE IF NOT EXISTS historial_senal (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            cpe_mac TEXT NOT NULL,
+            ap_id TEXT NOT NULL,
+            timestamp INTEGER NOT NULL,
+            signal_dbm INTEGER,
+            remote_signal_dbm INTEGER,
+            noisefloor_dbm INTEGER,
+            cinr_db REAL,
+            ccq_pct REAL,
+            distancia_km REAL,
+            downlink_mbps REAL,
+            uplink_mbps REAL,
+            airtime_tx REAL,
+            airtime_rx REAL
+        );
     `);
     console.log('[DB] Base de datos SQLite conectada y tablas validadas.');
 }
@@ -74,4 +134,32 @@ function decryptDevice(device) {
     }
 }
 
-module.exports = { initDb, getDb, encryptDevice, decryptDevice };
+function encryptPass(plaintext) {
+    if (!plaintext) return null;
+    try {
+        const iv = crypto.randomBytes(12);
+        const cipher = crypto.createCipheriv('aes-256-gcm', ENCRYPTION_KEY, iv);
+        let enc = cipher.update(plaintext, 'utf8', 'hex');
+        enc += cipher.final('hex');
+        return JSON.stringify({ iv: iv.toString('hex'), data: enc, tag: cipher.getAuthTag().toString('hex') });
+    } catch (e) {
+        console.error('[DB] encryptPass error', e);
+        return null;
+    }
+}
+
+function decryptPass(stored) {
+    if (!stored) return '';
+    try {
+        const { iv, data, tag } = JSON.parse(stored);
+        const decipher = crypto.createDecipheriv('aes-256-gcm', ENCRYPTION_KEY, Buffer.from(iv, 'hex'));
+        decipher.setAuthTag(Buffer.from(tag, 'hex'));
+        let dec = decipher.update(data, 'hex', 'utf8');
+        dec += decipher.final('utf8');
+        return dec;
+    } catch {
+        return '';
+    }
+}
+
+module.exports = { initDb, getDb, encryptDevice, decryptDevice, encryptPass, decryptPass };

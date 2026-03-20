@@ -5,6 +5,7 @@ import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import type { ActiveSession } from '../types/api';
 import VpnCard from './VpnCard';
 import NodeProvisionForm from './NodeProvisionForm';
+import ScannerModule from './ScannerModule';
 import { API_BASE_URL } from '../config';
 
 const POLL_INTERVAL_MS = 30_000;
@@ -68,6 +69,7 @@ export default function ControlPanel() {
     return (
       <div className="space-y-5">
         <NodeProvisionForm />
+        <ScannerModule />
         <div className="card py-20 flex flex-col items-center text-center space-y-4">
           <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center">
             <LayoutGrid className="w-8 h-8 text-slate-400" />
@@ -88,6 +90,9 @@ export default function ControlPanel() {
 
       {/* Provisionar nuevo nodo */}
       <NodeProvisionForm />
+
+      {/* Escáner PPP */}
+      <ScannerModule />
 
       {/* Error */}
       {syncError && !isSyncing && (

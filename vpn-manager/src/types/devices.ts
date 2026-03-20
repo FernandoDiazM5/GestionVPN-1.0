@@ -103,7 +103,28 @@ export interface AntennaStats {
   lanSpeed?: number;  // Mbps
   lanInfo?: string;  // "100Mbps-Completo"
 
+  // ── Tráfico TX/RX por interfaz (/proc/net/dev) ──────────────────────────
+  ifaceTraffic?: Record<string, {
+    rxBytes: number; rxPackets: number;
+    txBytes: number; txPackets: number;
+  }>;
+
+  // ── Memoria detallada (/proc/meminfo) ────────────────────────────────────
+  memTotalKb?:   number;
+  memFreeKb?:    number;
+  memBuffersKb?: number;
+  memCachedKb?:  number;
+
   raw?: string; // fallback si no es JSON ni key=value válido
+  _rawJson?: string;     // JSON crudo de mca-status
+  // Secciones raw — solo sesión, NO se persisten en DB
+  _rawUname?:    string;
+  _rawRoutes?:   string;
+  _rawIwconfig?: string;
+  _rawWstalist?: string;
+  _rawMcaCli?:   string;
+  _rawNetDev?:   string;
+  _rawMeminfo?:  string;
 }
 
 /** Interfaz wireless devuelta por /api/device/wifi/get */

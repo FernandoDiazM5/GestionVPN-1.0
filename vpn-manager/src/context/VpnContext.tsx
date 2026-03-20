@@ -34,8 +34,8 @@ interface VpnContextType {
   deactivateAllNodes: () => Promise<void>;
 
   // Navegación
-  activeModule: 'scanner' | 'control' | 'nodes' | 'devices';
-  setActiveModule: React.Dispatch<React.SetStateAction<'scanner' | 'control' | 'nodes' | 'devices'>>;
+  activeModule: 'scanner' | 'control' | 'nodes' | 'devices' | 'monitor';
+  setActiveModule: React.Dispatch<React.SetStateAction<'scanner' | 'control' | 'nodes' | 'devices' | 'monitor'>>;
 
   // Tema
   darkMode: boolean;
@@ -50,9 +50,9 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [credentials, setCredentials] = useState<RouterCredentials | undefined>();
   const [managedVpns, setManagedVpns] = useState<VpnSecret[]>([]);
-  const [activeModule, setActiveModule] = useState<'scanner' | 'control' | 'nodes' | 'devices'>(() => {
+  const [activeModule, setActiveModule] = useState<'scanner' | 'control' | 'nodes' | 'devices' | 'monitor'>(() => {
     const stored = localStorage.getItem('vpn_active_module');
-    return (['scanner', 'control', 'nodes', 'devices'].includes(stored ?? '') ? stored : 'scanner') as 'scanner' | 'control' | 'nodes' | 'devices';
+    return (['scanner', 'control', 'nodes', 'devices', 'monitor'].includes(stored ?? '') ? stored : 'scanner') as 'scanner' | 'control' | 'nodes' | 'devices' | 'monitor';
   });
   const [isReady, setIsReady] = useState(false);
   const [scannedSecrets, setScannedSecrets] = useState<VpnSecret[]>([]);
@@ -143,6 +143,10 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
           const validVpns = store.managedVpns.filter((v) => !!v.id);
           setManagedVpns(validVpns);
         }
+        if (store.scannedSecrets?.length) {
+          setScannedSecrets(store.scannedSecrets);
+          setHasScanned(true);
+        }
         if (store.adminIP) {
           setAdminIP(store.adminIP);
         }
@@ -180,11 +184,11 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isReady && !isLoggingOutRef.current) {
       dbService.saveStore({
-        isAuthenticated, credentials, managedVpns,
+        isAuthenticated, credentials, managedVpns, scannedSecrets,
         activeNodeVrf, tunnelExpiry, adminIP, nodes,
       });
     }
-  }, [managedVpns, isAuthenticated, credentials, isReady, activeNodeVrf, tunnelExpiry, adminIP, nodes]);
+  }, [managedVpns, scannedSecrets, isAuthenticated, credentials, isReady, activeNodeVrf, tunnelExpiry, adminIP, nodes]);
 
   const handleLoginSuccess = (creds: RouterCredentials) => {
     setCredentials(creds);
