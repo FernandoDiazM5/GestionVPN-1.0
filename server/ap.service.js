@@ -1,4 +1,4 @@
-const { sshExec, parseFullOutput } = require('./ubiquiti.service');
+const { sshExec, parseFullOutput, ANTENNA_CMD } = require('./ubiquiti.service');
 
 // In-memory throughput delta cache: { apId: { mac: { rxBytes, txBytes, ts } } }
 const bytesCache = {};
@@ -17,22 +17,32 @@ const parseWstalist = (output) => {
             const g = (...keys) => { for (const k of keys) { if (sta[k] != null) return sta[k]; } return null; };
             const mac = (g('mac') || '').toUpperCase();
             if (!mac) return null;
+
+            // CCQ: some firmware stores as tenths (820 = 82%), others as percent (82)
+            const rawCcq = g('ccq', 'txccq', 'tx_ccq');
+            const ccq = rawCcq != null
+                ? (parseInt(rawCcq) > 100 ? parseFloat((parseInt(rawCcq) / 10).toFixed(1)) : parseFloat(rawCcq))
+                : null;
+
             return {
                 mac,
                 signal:          g('signal') != null ? parseInt(g('signal')) : null,
-                rssi:            g('rssi', 'remote_rssi') != null ? parseInt(g('rssi', 'remote_rssi')) : null,
-                noisefloor:      g('noisefloor', 'noise_floor') != null ? parseInt(g('noisefloor', 'noise_floor')) : null,
-                cinr:            g('cinr') != null ? parseFloat(g('cinr')) : null,
-                ccq:             g('ccq', 'txccq') != null ? parseFloat((parseInt(g('ccq', 'txccq')) / 10).toFixed(1)) : null,
-                tx_rate:         g('tx_rate', 'txrate') != null ? parseInt(g('tx_rate', 'txrate')) : null,
-                rx_rate:         g('rx_rate', 'rxrate') != null ? parseInt(g('rx_rate', 'rxrate')) : null,
-                airtime_tx:      g('airtime_tx', 'tx_airtime') != null ? parseFloat(g('airtime_tx', 'tx_airtime')) : null,
-                airtime_rx:      g('airtime_rx', 'rx_airtime') != null ? parseFloat(g('airtime_rx', 'rx_airtime')) : null,
+                rssi:            g('rssi', 'remote_rssi', 'remote_signal') != null ? parseInt(g('rssi', 'remote_rssi', 'remote_signal')) : null,
+                noisefloor:      g('noisefloor', 'noise_floor', 'noise') != null ? parseInt(g('noisefloor', 'noise_floor', 'noise')) : null,
+                cinr:            g('cinr', 'snr') != null ? parseFloat(g('cinr', 'snr')) : null,
+                ccq,
+                tx_rate:         g('tx_rate', 'txrate', 'downlink_rate') != null ? parseInt(g('tx_rate', 'txrate', 'downlink_rate')) : null,
+                rx_rate:         g('rx_rate', 'rxrate', 'uplink_rate') != null ? parseInt(g('rx_rate', 'rxrate', 'uplink_rate')) : null,
+                airtime_tx:      g('airtime_tx', 'tx_airtime', 'txAirtime') != null ? parseFloat(g('airtime_tx', 'tx_airtime', 'txAirtime')) : null,
+                airtime_rx:      g('airtime_rx', 'rx_airtime', 'rxAirtime') != null ? parseFloat(g('airtime_rx', 'rx_airtime', 'rxAirtime')) : null,
                 uptime:          g('uptime') != null ? parseInt(g('uptime')) : null,
-                distance:        g('ackdistance') != null ? parseFloat((parseInt(g('ackdistance')) / 1000).toFixed(3)) : null,
-                lastip:          g('lastip', 'last_ip') || null,
+                distance:        g('ackdistance', 'distance') != null ? parseFloat((parseInt(g('ackdistance', 'distance')) / 1000).toFixed(3)) : null,
+                lastip:          g('lastip', 'last_ip', 'ip') || null,
                 tx_bytes:        g('tx_bytes', 'txbytes') != null ? parseInt(g('tx_bytes', 'txbytes')) : null,
                 rx_bytes:        g('rx_bytes', 'rxbytes') != null ? parseInt(g('rx_bytes', 'rxbytes')) : null,
+                // Device identity — available in some AirOS versions or via UBNT discovery
+                cpe_name:        g('name', 'hostname', 'devname') || null,
+                cpe_product:     g('product', 'devmodel', 'model') || null,
             };
         }).filter(Boolean);
     } catch (e) {
@@ -79,7 +89,7 @@ const pollAp = async (apId, ip, port, user, pass) => {
     });
 };
 
-// ── Get AP or CPE static config via multi-section SSH ────────────────────
+// ── Get AP or CPE static config (lightweight — 5 sections) ───────────────
 const DETAIL_CMD = [
     'echo __MCA__',  'mca-status 2>/dev/null',
     'echo __CFG__',  'cat /tmp/system.cfg 2>/dev/null',
@@ -93,6 +103,12 @@ const getDetail = async (ip, port, user, pass) => {
     return parseFullOutput(output);
 };
 
+// ── Full AP detail — uses ANTENNA_CMD (12 sections, more data) ────────────
+const getFullDetail = async (ip, port, user, pass) => {
+    const output = await sshExec(ip, port || 22, user, pass, ANTENNA_CMD, 30000, 10000);
+    return parseFullOutput(output);
+};
+
 const clearApCache = (apId) => { delete bytesCache[apId]; };
 
-module.exports = { parseWstalist, pollAp, getDetail, formatUptime, clearApCache };
+module.exports = { parseWstalist, pollAp, getDetail, getFullDetail, formatUptime, clearApCache };

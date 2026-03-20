@@ -1447,7 +1447,7 @@ export default function NetworkDevicesModule() {
   }, [filteredRows, sortConfig]);
 
   const devicesByNode = savedDevices.reduce<Record<string, { nodeName: string; devices: SavedDevice[] }>>((acc, d) => {
-    if (!acc[d.nodeId]) acc[d.nodeId] = { nodeName: d.nodeName, devices: [] };
+    if (!acc[d.nodeId]) acc[d.nodeId] = { nodeName: nodes.find(n => n.id === d.nodeId)?.nombre_nodo || d.nodeName, devices: [] };
     acc[d.nodeId].devices.push(d);
     return acc;
   }, {});

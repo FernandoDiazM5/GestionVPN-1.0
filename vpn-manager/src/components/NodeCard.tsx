@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Play, ShieldOff, Wifi, WifiOff, Clock, Loader2, Radio } from 'lucide-react';
+import { Play, ShieldOff, Wifi, WifiOff, Clock, Loader2, Radio, Pencil, Trash2, FileCode, History, Tag } from 'lucide-react';
 import { useVpn, TUNNEL_TIMEOUT_MS } from '../context/VpnContext';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import type { NodeInfo, TunnelActivateResponse } from '../types/api';
@@ -8,6 +8,13 @@ import { API_BASE_URL } from '../config';
 interface NodeCardProps {
   node: NodeInfo;
   rowIndex: number;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  onScript?: () => void;
+  onRename?: (newName: string) => void;
+  onHistory?: () => void;
+  tags?: string[];
+  onTagClick?: () => void;
 }
 
 function formatCountdown(ms: number): string {
@@ -18,7 +25,17 @@ function formatCountdown(ms: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-export default function NodeCard({ node, rowIndex }: NodeCardProps) {
+const TAG_COLORS: Record<string, string> = {};
+const TAG_PALETTE = ['#6366f1','#10b981','#0ea5e9','#f59e0b','#f43f5e','#8b5cf6','#f97316','#14b8a6','#ec4899','#64748b'];
+function tagColor(tag: string) {
+  if (!TAG_COLORS[tag]) {
+    const idx = tag.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % TAG_PALETTE.length;
+    TAG_COLORS[tag] = TAG_PALETTE[idx];
+  }
+  return TAG_COLORS[tag];
+}
+
+export default function NodeCard({ node, rowIndex, onEdit, onDelete, onScript, onRename, onHistory, tags = [], onTagClick }: NodeCardProps) {
   const {
     credentials,
     activeNodeVrf,
@@ -33,7 +50,11 @@ export default function NodeCard({ node, rowIndex }: NodeCardProps) {
   const [isDeactivating, setIsDeactivating] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const [countdown, setCountdown] = useState('');
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState('');
+  const [savingName, setSavingName] = useState(false);
   const logsEndRef = useRef<HTMLDivElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   const isThisNodeActive = activeNodeVrf === node.nombre_vrf && !!node.nombre_vrf;
   const isAnyNodeActive = !!activeNodeVrf;
@@ -55,6 +76,38 @@ export default function NodeCard({ node, rowIndex }: NodeCardProps) {
   }, [logs]);
 
   const addLog = (msg: string) => setLogs(prev => [...prev.slice(-8), msg]);
+
+  useEffect(() => {
+    if (editingName) nameInputRef.current?.focus();
+  }, [editingName]);
+
+  const startEditName = () => {
+    setNameInput(node.nombre_nodo || '');
+    setEditingName(true);
+  };
+
+  const cancelEditName = () => setEditingName(false);
+
+  const saveNodeName = async () => {
+    if (!nameInput.trim() || nameInput.trim() === node.nombre_nodo || savingName) return;
+    const newName = nameInput.trim();
+    const originalName = node.nombre_nodo;
+    // Actualización optimista: cerrar input y mostrar nuevo nombre inmediatamente
+    onRename?.(newName);
+    setEditingName(false);
+    setSavingName(true);
+    try {
+      const r = await fetchWithTimeout(`${API_BASE_URL}/api/node/label/save`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pppUser: node.ppp_user, label: newName }),
+      }, 5_000);
+      const d = await r.json();
+      if (!d.success) onRename?.(originalName);
+    } catch (_) {
+      onRename?.(originalName);
+    }
+    setSavingName(false);
+  };
 
   const handleActivate = async () => {
     if (!credentials || !node.nombre_vrf) return;
@@ -163,10 +216,35 @@ export default function NodeCard({ node, rowIndex }: NodeCardProps) {
         {/* Nombre del nodo */}
         <td className="px-4 py-3 min-w-[160px]">
           <div className="space-y-1">
-            <p className="font-semibold text-slate-800 text-xs leading-tight truncate max-w-[200px]" title={node.nombre_nodo}>
-              {node.nombre_nodo}
-            </p>
-            <div className="flex items-center gap-1.5">
+            {editingName ? (
+              <div className="flex items-center gap-1.5">
+                <input
+                  ref={nameInputRef}
+                  value={nameInput}
+                  onChange={e => setNameInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') saveNodeName(); if (e.key === 'Escape') cancelEditName(); }}
+                  className="flex-1 px-2 py-1 text-xs border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300 font-semibold min-w-0 max-w-[150px]"
+                />
+                <button onClick={saveNodeName} disabled={savingName || !nameInput.trim() || nameInput.trim() === node.nombre_nodo}
+                  className="p-1 rounded text-emerald-600 hover:bg-emerald-50 disabled:opacity-40">
+                  {savingName ? <Loader2 className="w-3 h-3 animate-spin" /> : <span className="text-[11px] font-bold">✓</span>}
+                </button>
+                <button onClick={cancelEditName} className="p-1 rounded text-slate-400 hover:bg-slate-100">
+                  <span className="text-[11px] font-bold">✕</span>
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 group/name">
+                <p className="font-semibold text-slate-800 text-xs leading-tight truncate max-w-[180px]" title={node.nombre_nodo}>
+                  {node.nombre_nodo}
+                </p>
+                <button onClick={startEditName} title="Editar nombre"
+                  className="opacity-0 group-hover/name:opacity-100 p-0.5 rounded text-slate-400 hover:text-indigo-600 transition-opacity shrink-0">
+                  <Pencil className="w-2.5 h-2.5" />
+                </button>
+              </div>
+            )}
+            <div className="flex items-center gap-1.5 flex-wrap">
               <span
                 className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-md leading-none
                   ${node.running && !node.disabled
@@ -184,6 +262,17 @@ export default function NodeCard({ node, rowIndex }: NodeCardProps) {
                 </span>
               )}
             </div>
+            {/* Tags */}
+            {tags.length > 0 && (
+              <div className="flex items-center gap-1 flex-wrap mt-0.5">
+                {tags.map(t => (
+                  <span key={t} className="text-[9px] font-bold px-1.5 py-0.5 rounded-full text-white leading-none"
+                    style={{ backgroundColor: tagColor(t) }}>
+                    {t}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </td>
 
@@ -200,9 +289,17 @@ export default function NodeCard({ node, rowIndex }: NodeCardProps) {
 
         {/* Red LAN */}
         <td className="px-4 py-3">
-          <span className={`font-mono text-xs font-semibold ${node.segmento_lan ? 'text-sky-600' : 'text-slate-300'}`}>
-            {node.segmento_lan || '—'}
-          </span>
+          {node.lan_subnets && node.lan_subnets.length > 1 ? (
+            <div className="flex flex-col gap-0.5">
+              {node.lan_subnets.map(s => (
+                <span key={s} className="font-mono text-xs font-semibold text-sky-600">{s}</span>
+              ))}
+            </div>
+          ) : (
+            <span className={`font-mono text-xs font-semibold ${node.segmento_lan ? 'text-sky-600' : 'text-slate-300'}`}>
+              {node.segmento_lan || '—'}
+            </span>
+          )}
         </td>
 
         {/* IP Túnel */}
@@ -250,6 +347,45 @@ export default function NodeCard({ node, rowIndex }: NodeCardProps) {
                 ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 : <ShieldOff className="w-3.5 h-3.5" />}
               <span>{isDeactivating ? 'Revocando...' : 'Revocar'}</span>
+            </button>
+
+            {/* Separator */}
+            <div className="w-px h-5 bg-slate-200" />
+
+            <button
+              onClick={onEdit}
+              title="Editar nodo"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={onDelete}
+              title="Eliminar nodo"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={onScript}
+              title="Copiar script de configuración para el equipo remoto"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+            >
+              <FileCode className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={onTagClick}
+              title="Gestionar etiquetas"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+            >
+              <Tag className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={onHistory}
+              title="Historial de conexión"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition-colors"
+            >
+              <History className="w-3.5 h-3.5" />
             </button>
           </div>
         </td>
