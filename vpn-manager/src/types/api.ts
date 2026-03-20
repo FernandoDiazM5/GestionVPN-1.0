@@ -49,12 +49,23 @@ export interface NodeInfo {
   nombre_nodo: string;
   ppp_user: string;
   segmento_lan: string;
+  lan_subnets?: string[];
   nombre_vrf: string;
   service: string;
   disabled: boolean;
   running: boolean;
   ip_tunnel: string;
   uptime: string;
+}
+
+/** Peer WireGuard devuelto por /api/wireguard/peers */
+export interface WgPeer {
+  id: string;
+  name: string;
+  allowedAddress: string;
+  publicKey: string;
+  lastHandshakeSecs: number | null;
+  active: boolean;
 }
 
 /** Respuesta de /api/tunnel/activate */

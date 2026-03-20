@@ -50,7 +50,10 @@ export interface LiveCpe {
   rx_bytes?: number | null;
   throughputRxKbps?: number | null;
   throughputTxKbps?: number | null;
-  // Enriched from cpes_conocidos
+  // From wstalist (some firmware versions include device identity)
+  cpe_name?: string | null;
+  cpe_product?: string | null;
+  // Enriched from cpes_conocidos DB
   hostname?: string | null;
   modelo?: string | null;
   isKnown?: boolean;

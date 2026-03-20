@@ -2,7 +2,7 @@ const express = require('express');
 const crypto  = require('crypto');
 const router  = express.Router();
 const { getDb, encryptPass, decryptPass } = require('./db.service');
-const { pollAp, getDetail, clearApCache }  = require('./ap.service');
+const { pollAp, getDetail, getFullDetail, clearApCache }  = require('./ap.service');
 
 const genId = () => crypto.randomBytes(8).toString('hex');
 
@@ -194,10 +194,40 @@ router.post('/aps/:id/poll', async (req, res) => {
 
         const enriched = stations.map(sta => ({
             ...sta,
-            hostname: km[sta.mac]?.hostname || null,
-            modelo:   km[sta.mac]?.modelo   || null,
-            isKnown:  !!(km[sta.mac]?.hostname),
+            hostname: km[sta.mac]?.hostname || sta.cpe_name || null,
+            modelo:   km[sta.mac]?.modelo   || sta.cpe_product || null,
+            isKnown:  !!(km[sta.mac]?.hostname || sta.cpe_name),
         }));
+
+        // Auto-enrich new CPEs without hostname (fire-and-forget, non-blocking)
+        const toEnrich = stations.filter(sta =>
+            sta.lastip && sta.mac && !(km[sta.mac]?.hostname) && !sta.cpe_name && user && pass
+        );
+        if (toEnrich.length > 0) {
+            (async () => {
+                for (const sta of toEnrich) {
+                    try {
+                        const s = await getDetail(sta.lastip, parseInt(port) || 22, user, pass);
+                        if (s.deviceName || s.deviceModel) {
+                            await db.run(
+                                `INSERT INTO cpes_conocidos (mac,ap_id,hostname,modelo,firmware,ip_lan,mac_lan,mac_wlan,ultima_vez_visto)
+                                 VALUES (?,?,?,?,?,?,?,?,?)
+                                 ON CONFLICT(mac) DO UPDATE SET
+                                   hostname=COALESCE(excluded.hostname, hostname),
+                                   modelo=COALESCE(excluded.modelo, modelo),
+                                   firmware=COALESCE(excluded.firmware, firmware),
+                                   ip_lan=excluded.ip_lan,
+                                   mac_lan=COALESCE(excluded.mac_lan, mac_lan),
+                                   mac_wlan=COALESCE(excluded.mac_wlan, mac_wlan),
+                                   ultima_vez_visto=excluded.ultima_vez_visto`,
+                                [sta.mac, apId || null, s.deviceName || '', s.deviceModel || '', s.firmwareVersion || '',
+                                 sta.lastip, s.lanMac || '', s.wlanMac || '', Date.now()]
+                            );
+                        }
+                    } catch { /* ignore individual failures */ }
+                }
+            })();
+        }
 
         res.json({ success: true, stations: enriched, polledAt: Date.now() });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
@@ -311,6 +341,52 @@ router.post('/poll-direct', async (req, res) => {
         }));
 
         res.json({ success: true, stations: enriched, polledAt: Date.now() });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// ── Full AP detail direct — all 12 SSH sections (ANTENNA_CMD) ────────────
+router.post('/ap-detail-direct', async (req, res) => {
+    try {
+        const { ip, port, user, pass } = req.body;
+        if (!ip || !user || !pass) return res.status(400).json({ success: false, message: 'ip, user y pass requeridos' });
+        const s = await getFullDetail(ip, parseInt(port) || 22, user, pass);
+        res.json({ success: true, stats: s });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// ── Batch CPE enrich — SSH to multiple CPEs to get hostname/model ─────────
+router.post('/cpes/enrich-batch', async (req, res) => {
+    try {
+        const { cpes, port, user, pass } = req.body;
+        // cpes: [{ mac, ip }]
+        if (!Array.isArray(cpes) || !user || !pass) return res.status(400).json({ success: false, message: 'cpes[], user, pass requeridos' });
+        const db = await getDb();
+        const results = [];
+        for (const { mac, ip } of cpes) {
+            if (!mac || !ip) continue;
+            try {
+                const s = await getDetail(ip, parseInt(port) || 22, user, pass);
+                const MAC = mac.toUpperCase();
+                await db.run(
+                    `INSERT INTO cpes_conocidos (mac,hostname,modelo,firmware,ip_lan,mac_lan,mac_wlan,ultima_vez_visto)
+                     VALUES (?,?,?,?,?,?,?,?)
+                     ON CONFLICT(mac) DO UPDATE SET
+                       hostname=COALESCE(excluded.hostname, hostname),
+                       modelo=COALESCE(excluded.modelo, modelo),
+                       firmware=COALESCE(excluded.firmware, firmware),
+                       ip_lan=excluded.ip_lan,
+                       mac_lan=COALESCE(excluded.mac_lan, mac_lan),
+                       mac_wlan=COALESCE(excluded.mac_wlan, mac_wlan),
+                       ultima_vez_visto=excluded.ultima_vez_visto`,
+                    [MAC, s.deviceName || '', s.deviceModel || '', s.firmwareVersion || '',
+                     ip, s.lanMac || '', s.wlanMac || '', Date.now()]
+                );
+                results.push({ mac: MAC, ok: true, hostname: s.deviceName, modelo: s.deviceModel });
+            } catch (err) {
+                results.push({ mac, ok: false, error: err.message });
+            }
+        }
+        res.json({ success: true, results });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 

@@ -33,6 +33,14 @@ async function initDb() {
             id TEXT PRIMARY KEY,
             data TEXT
         );
+        CREATE TABLE IF NOT EXISTS node_creds (
+            ppp_user TEXT PRIMARY KEY,
+            ppp_password TEXT
+        );
+        CREATE TABLE IF NOT EXISTS peer_colors (
+            peer_address TEXT PRIMARY KEY,
+            color TEXT NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS ap_nodos (
             id TEXT PRIMARY KEY,
             nombre TEXT NOT NULL,
@@ -92,6 +100,20 @@ async function initDb() {
             uplink_mbps REAL,
             airtime_tx REAL,
             airtime_rx REAL
+        );
+        CREATE TABLE IF NOT EXISTS node_tags (
+            ppp_user TEXT PRIMARY KEY,
+            tags TEXT DEFAULT '[]'
+        );
+        CREATE TABLE IF NOT EXISTS node_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ppp_user TEXT NOT NULL,
+            event TEXT NOT NULL,
+            timestamp INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS node_labels (
+            ppp_user TEXT PRIMARY KEY,
+            label TEXT NOT NULL DEFAULT ''
         );
     `);
     console.log('[DB] Base de datos SQLite conectada y tablas validadas.');
