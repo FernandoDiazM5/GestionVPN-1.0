@@ -15,12 +15,12 @@ import type { SavedDevice, AntennaStats } from '../types/devices';
 import type { LiveCpe, PollResult, CpeDetail, KnownCpe } from '../types/apMonitor';
 
 const POLL_MS = 30_000;
-const BASE    = `${API_BASE_URL}/api/ap-monitor`;
-const LS_KEY  = 'ap_monitor_cpe_cols';
+const BASE = `${API_BASE_URL}/api/ap-monitor`;
+const LS_KEY = 'ap_monitor_cpe_cols';
 
 // ── Helpers ───────────────────────────────────────────────────────────────
-const fmtDbm  = (v?: number | null) => v != null ? `${v} dBm` : '—';
-const fmtPct  = (v?: number | null) => v != null ? `${v}%`   : '—';
+const fmtDbm = (v?: number | null) => v != null ? `${v} dBm` : '—';
+const fmtPct = (v?: number | null) => v != null ? `${v}%` : '—';
 const fmtKbps = (v?: number | null) => {
   if (v == null) return '—';
   return v >= 1000 ? `${(v / 1000).toFixed(1)} Mbps` : `${v} kbps`;
@@ -39,7 +39,7 @@ const fmtFw = (fw?: string) => {
   return m ? `${m[2]} (${m[1]})` : fw;
 };
 const fmtUptime = (s?: string | null) => s || '—';
-const fmtCpu    = (v?: number | null) =>
+const fmtCpu = (v?: number | null) =>
   v == null ? '—' : `${v}%`;
 const fmtMem = (totalKb?: number | null, freeKb?: number | null, pct?: number | null) => {
   if (pct != null) return `${pct}%`;
@@ -53,26 +53,26 @@ const fmtMem = (totalKb?: number | null, freeKb?: number | null, pct?: number | 
 // ── CPE column definitions ────────────────────────────────────────────────
 interface ColDef { key: string; label: string; always?: boolean; width: string; right?: boolean; }
 const CPE_COL_DEFS: ColDef[] = [
-  { key: 'status',   label: 'Estado',      always: true,  width: '28px' },
-  { key: 'mac',      label: 'MAC / Host',  always: true,  width: '130px' },
-  { key: 'modelo',   label: 'Modelo',                     width: '110px' },
-  { key: 'nombre',   label: 'Nombre Dispositivo',         width: '140px' },
-  { key: 'signal',   label: 'Señal',                      width: '72px',  right: true },
-  { key: 'rssi',     label: 'Remote Sig.',                width: '72px',  right: true },
-  { key: 'noise',    label: 'Noise',                      width: '72px',  right: true },
-  { key: 'cinr',     label: 'CINR',                       width: '64px',  right: true },
-  { key: 'ccq',      label: 'CCQ',                        width: '64px',  right: true },
-  { key: 'link_pot', label: 'Link Pot.',                  width: '60px',  right: true },
-  { key: 'tx_rate',  label: '↓ Cap.',                     width: '60px',  right: true },
-  { key: 'rx_rate',  label: '↑ Cap.',                     width: '62px',  right: true },
-  { key: 'air_tx',   label: 'Air TX',                     width: '62px',  right: true },
-  { key: 'air_rx',   label: 'Air RX',                     width: '62px',  right: true },
-  { key: 'thr_rx',   label: 'Thr RX',                     width: '76px',  right: true },
-  { key: 'thr_tx',   label: 'Thr TX',                     width: '76px',  right: true },
-  { key: 'uptime',   label: 'Uptime',                     width: '100px' },
-  { key: 'distance', label: 'Distancia',                  width: '66px',  right: true },
-  { key: 'lastip',   label: 'Última IP',                  width: '100px' },
-  { key: 'actions',  label: 'Acciones',    always: true,  width: '72px' },
+  { key: 'status', label: 'Estado', always: true, width: '28px' },
+  { key: 'mac', label: 'MAC / Host', always: true, width: '130px' },
+  { key: 'modelo', label: 'Modelo', width: '110px' },
+  { key: 'nombre', label: 'Nombre Dispositivo', width: '140px' },
+  { key: 'signal', label: 'Señal', width: '72px', right: true },
+  { key: 'rssi', label: 'Remote Sig.', width: '72px', right: true },
+  { key: 'noise', label: 'Noise', width: '72px', right: true },
+  { key: 'cinr', label: 'CINR', width: '64px', right: true },
+  { key: 'ccq', label: 'CCQ', width: '64px', right: true },
+  { key: 'link_pot', label: 'Link Pot.', width: '60px', right: true },
+  { key: 'tx_rate', label: '↓ Cap.', width: '60px', right: true },
+  { key: 'rx_rate', label: '↑ Cap.', width: '62px', right: true },
+  { key: 'air_tx', label: 'Air TX', width: '62px', right: true },
+  { key: 'air_rx', label: 'Air RX', width: '62px', right: true },
+  { key: 'thr_rx', label: 'Thr RX', width: '76px', right: true },
+  { key: 'thr_tx', label: 'Thr TX', width: '76px', right: true },
+  { key: 'uptime', label: 'Uptime', width: '100px' },
+  { key: 'distance', label: 'Distancia', width: '66px', right: true },
+  { key: 'lastip', label: 'Última IP', width: '100px' },
+  { key: 'actions', label: 'Acciones', always: true, width: '72px' },
 ];
 const DEFAULT_HIDDEN = new Set<string>(['noise', 'cinr', 'link_pot', 'thr_rx', 'thr_tx']);
 
@@ -146,9 +146,9 @@ function CpeDetailModal({
   sshPort: number; sshUser: string; sshPass: string;
   onClose: () => void;
 }) {
-  const [detail, setDetail]   = useState<CpeDetail | null>(null);
+  const [detail, setDetail] = useState<CpeDetail | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState('');
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (!cpeIp) { setError('IP del CPE no disponible — esperando próximo poll'); return; }
@@ -164,31 +164,31 @@ function CpeDetailModal({
   }, [mac, apId, cpeIp, sshPort, sshUser, sshPass]);
 
   const rows: Array<{ l: string; v: string | null | undefined; mono?: boolean; color?: string }> = detail ? [
-    { l: 'Hostname',   v: detail.deviceName },
-    { l: 'Modelo',     v: detail.deviceModel },
-    { l: 'Firmware',   v: fmtFw(detail.firmwareVersion) },
-    { l: 'IP LAN',     v: detail.ip, mono: true },
-    { l: 'Modo',       v: detail.mode },
-    { l: 'Modo Red',   v: detail.networkMode },
-    { l: 'SSID AP',    v: detail.essid },
-    { l: 'Señal',      v: fmtDbm(detail.signal), color: sigColor(detail.signal), mono: true },
-    { l: 'Noise',      v: fmtDbm(detail.noiseFloor), mono: true },
-    { l: 'CCQ',        v: fmtPct(detail.ccq), color: ccqColor(detail.ccq), mono: true },
-    { l: 'TX Rate',    v: fmtRate(detail.txRate ? detail.txRate * 1000 : null), mono: true },
-    { l: 'TX Power',   v: detail.txPower != null ? `${detail.txPower} dBm` : null, mono: true },
-    { l: 'Canal',      v: detail.channelWidth != null ? `${detail.channelWidth} MHz` : null, mono: true },
+    { l: 'Hostname', v: detail.deviceName },
+    { l: 'Modelo', v: detail.deviceModel },
+    { l: 'Firmware', v: fmtFw(detail.firmwareVersion) },
+    { l: 'IP LAN', v: detail.ip, mono: true },
+    { l: 'Modo', v: detail.mode },
+    { l: 'Modo Red', v: detail.networkMode },
+    { l: 'SSID AP', v: detail.essid },
+    { l: 'Señal', v: fmtDbm(detail.signal), color: sigColor(detail.signal), mono: true },
+    { l: 'Noise', v: fmtDbm(detail.noiseFloor), mono: true },
+    { l: 'CCQ', v: fmtPct(detail.ccq), color: ccqColor(detail.ccq), mono: true },
+    { l: 'TX Rate', v: fmtRate(detail.txRate ? detail.txRate * 1000 : null), mono: true },
+    { l: 'TX Power', v: detail.txPower != null ? `${detail.txPower} dBm` : null, mono: true },
+    { l: 'Canal', v: detail.channelWidth != null ? `${detail.channelWidth} MHz` : null, mono: true },
     { l: 'Frecuencia', v: detail.frequency != null ? `${detail.frequency} MHz` : null, mono: true },
-    { l: 'WLAN MAC',   v: detail.wlanMac, mono: true },
-    { l: 'LAN MAC',    v: detail.lanMac, mono: true },
-    { l: 'AP MAC',     v: detail.apMac, mono: true },
-    { l: 'Seguridad',  v: detail.security },
-    { l: 'Uptime',     v: detail.uptimeStr, mono: true },
+    { l: 'WLAN MAC', v: detail.wlanMac, mono: true },
+    { l: 'LAN MAC', v: detail.lanMac, mono: true },
+    { l: 'AP MAC', v: detail.apMac, mono: true },
+    { l: 'Seguridad', v: detail.security },
+    { l: 'Uptime', v: detail.uptimeStr, mono: true },
   ].filter(r => r.v) as typeof rows : [];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between bg-slate-800 rounded-t-2xl px-5 py-3 shrink-0">
           <div>
             <p className="text-xs font-bold text-white font-mono">{mac}</p>
@@ -212,9 +212,9 @@ function CpeDetailModal({
           {detail && !loading && (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
               {rows.map(row => (
-                <div key={row.l} className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">
-                  <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">{row.l}</p>
-                  <p className={`text-xs font-bold truncate ${row.color ?? 'text-slate-700'} ${row.mono ? 'font-mono' : ''}`}>{row.v}</p>
+                <div key={row.l} className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{row.l}</p>
+                  <p className={`text-sm font-bold truncate ${row.color ?? 'text-slate-800'} ${row.mono ? 'font-mono tracking-tight' : ''}`}>{row.v}</p>
                 </div>
               ))}
             </div>
@@ -233,10 +233,10 @@ function ApDetailModal({
   onClose: () => void;
   onSave: (stats: AntennaStats) => void;
 }) {
-  const [stats,   setStats]   = useState<AntennaStats | null>(dev.cachedStats ?? null);
+  const [stats, setStats] = useState<AntennaStats | null>(dev.cachedStats ?? null);
   const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState('');
-  const [saved,   setSaved]   = useState(false);
+  const [error, setError] = useState('');
+  const [saved, setSaved] = useState(false);
 
   const refresh = useCallback(() => {
     if (!dev.sshUser || !dev.sshPass) { setError('Sin credenciales SSH'); return; }
@@ -268,17 +268,17 @@ function ApDetailModal({
     : [];
 
   const StatCard = ({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) => (
-    <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">
-      <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">{label}</p>
-      <p className={`text-xs font-bold truncate font-mono ${color ?? 'text-slate-700'}`}>{value}</p>
-      {sub && <p className="text-[9px] text-slate-400 truncate">{sub}</p>}
+    <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+      <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</p>
+      <p className={`text-sm font-bold truncate font-mono tracking-tight ${color ?? 'text-slate-800'}`}>{value}</p>
+      {sub && <p className="text-[10px] text-slate-500 truncate mt-0.5">{sub}</p>}
     </div>
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col animate-in zoom-in-95 duration-200">
         {/* Header */}
         <div className="flex items-center justify-between bg-slate-800 rounded-t-2xl px-5 py-3 shrink-0">
           <div>
@@ -315,18 +315,18 @@ function ApDetailModal({
               <div>
                 <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">Sistema</p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-                  {s.deviceName    && <StatCard label="Hostname"   value={s.deviceName} />}
-                  {s.deviceModel   && <StatCard label="Modelo"     value={s.deviceModel} />}
-                  {s.firmwareVersion && <StatCard label="Firmware"  value={fmtFw(s.firmwareVersion) ?? s.firmwareVersion} />}
-                  {s.uptimeStr     && <StatCard label="Uptime"     value={s.uptimeStr} color="text-emerald-700" />}
+                  {s.deviceName && <StatCard label="Hostname" value={s.deviceName} />}
+                  {s.deviceModel && <StatCard label="Modelo" value={s.deviceModel} />}
+                  {s.firmwareVersion && <StatCard label="Firmware" value={fmtFw(s.firmwareVersion) ?? s.firmwareVersion} />}
+                  {s.uptimeStr && <StatCard label="Uptime" value={s.uptimeStr} color="text-emerald-700" />}
                   {s.cpuLoad != null && <StatCard label="CPU" value={fmtCpu(s.cpuLoad)}
                     color={s.cpuLoad > 80 ? 'text-rose-600' : s.cpuLoad > 60 ? 'text-amber-600' : 'text-slate-700'} />}
                   {(s.memoryPercent != null || (s.memTotalKb && s.memFreeKb != null)) &&
                     <StatCard label="Memoria" value={memLabel}
                       sub={s.memTotalKb ? `${Math.round(s.memTotalKb / 1024)} MB total` : undefined}
                       color={parseInt(memLabel) > 85 ? 'text-rose-600' : parseInt(memLabel) > 70 ? 'text-amber-600' : 'text-slate-700'} />}
-                  {s.lanMac   && <StatCard label="MAC LAN"  value={s.lanMac} />}
-                  {s.wlanMac  && <StatCard label="MAC WLAN" value={s.wlanMac} />}
+                  {s.lanMac && <StatCard label="MAC LAN" value={s.lanMac} />}
+                  {s.wlanMac && <StatCard label="MAC WLAN" value={s.wlanMac} />}
                 </div>
               </div>
 
@@ -334,18 +334,18 @@ function ApDetailModal({
               <div>
                 <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">Radio / Wireless</p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-                  {s.essid         && <StatCard label="SSID"       value={s.essid} />}
-                  {s.frequency     && <StatCard label="Frecuencia" value={`${s.frequency} MHz`} sub={`${(s.frequency/1000).toFixed(2)} GHz`} />}
-                  {s.channelWidth  && <StatCard label="Canal"      value={`${s.channelWidth} MHz`} />}
+                  {s.essid && <StatCard label="SSID" value={s.essid} />}
+                  {s.frequency && <StatCard label="Frecuencia" value={`${s.frequency} MHz`} sub={`${(s.frequency / 1000).toFixed(2)} GHz`} />}
+                  {s.channelWidth && <StatCard label="Canal" value={`${s.channelWidth} MHz`} />}
                   {s.txPower != null && <StatCard label="TX Power" value={`${s.txPower} dBm`} />}
-                  {s.mode          && <StatCard label="Modo"       value={s.mode} />}
-                  {s.networkMode   && <StatCard label="Modo Red"   value={s.networkMode} />}
-                  {s.security      && <StatCard label="Seguridad"  value={s.security} />}
-                  {s.chains        && <StatCard label="Cadenas"    value={s.chains} />}
+                  {s.mode && <StatCard label="Modo" value={s.mode} />}
+                  {s.networkMode && <StatCard label="Modo Red" value={s.networkMode} />}
+                  {s.security && <StatCard label="Seguridad" value={s.security} />}
+                  {s.chains && <StatCard label="Cadenas" value={s.chains} />}
                   {s.airmaxEnabled != null && <StatCard label="AirMax"
                     value={s.airmaxEnabled ? 'Habilitado' : 'Deshabilitado'}
                     color={s.airmaxEnabled ? 'text-emerald-600' : 'text-slate-400'} />}
-                  {s.airmaxQuality  != null && <StatCard label="AM Quality"  value={`${s.airmaxQuality}%`} />}
+                  {s.airmaxQuality != null && <StatCard label="AM Quality" value={`${s.airmaxQuality}%`} />}
                   {s.airmaxCapacity != null && <StatCard label="AM Capacity" value={`${s.airmaxCapacity}%`} />}
                 </div>
               </div>
@@ -355,11 +355,11 @@ function ApDetailModal({
                 <div>
                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">Señal RF</p>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-                    {s.signal     != null && <StatCard label="Señal"   value={fmtDbm(s.signal)}   color={sigColor(s.signal)} />}
-                    {s.noiseFloor != null && <StatCard label="Noise"   value={fmtDbm(s.noiseFloor)} />}
-                    {s.ccq        != null && <StatCard label="CCQ"     value={fmtPct(s.ccq)}      color={ccqColor(s.ccq)} />}
-                    {s.txRate     != null && <StatCard label="TX Rate" value={`${s.txRate} Mbps`} />}
-                    {s.rxRate     != null && <StatCard label="RX Rate" value={`${s.rxRate} Mbps`} />}
+                    {s.signal != null && <StatCard label="Señal" value={fmtDbm(s.signal)} color={sigColor(s.signal)} />}
+                    {s.noiseFloor != null && <StatCard label="Noise" value={fmtDbm(s.noiseFloor)} />}
+                    {s.ccq != null && <StatCard label="CCQ" value={fmtPct(s.ccq)} color={ccqColor(s.ccq)} />}
+                    {s.txRate != null && <StatCard label="TX Rate" value={`${s.txRate} Mbps`} />}
+                    {s.rxRate != null && <StatCard label="RX Rate" value={`${s.rxRate} Mbps`} />}
                   </div>
                 </div>
               )}
@@ -406,21 +406,21 @@ function ApDetailModal({
 
 // ── Known CPEs Modal ──────────────────────────────────────────────────────
 function KnownCpesModal({ apId, onClose }: { apId: string; onClose: () => void }) {
-  const [cpes, setCpes]     = useState<KnownCpe[]>([]);
+  const [cpes, setCpes] = useState<KnownCpe[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchWithTimeout(`${BASE}/cpes`, {}, 10_000)
       .then(r => r.json())
       .then(d => { if (d.success) setCpes(d.cpes.filter((c: KnownCpe) => c.ap_id === apId)); })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoading(false));
   }, [apId]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col animate-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between bg-slate-800 rounded-t-2xl px-5 py-3 shrink-0">
           <p className="text-xs font-bold text-white">CPEs conocidos del AP</p>
           <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg"><X className="w-4 h-4" /></button>
@@ -464,35 +464,35 @@ function CpeRow({ cpe, idx, onDetail, visibleCols }: {
 
   return (
     <div
-      className={`grid items-center text-[11px] border-b border-slate-100 last:border-0 transition-colors
+      className={`grid items-center text-xs border-b border-slate-100 last:border-0 transition-colors
         ${idx % 2 === 0 ? 'bg-white hover:bg-slate-50/80' : 'bg-slate-50/50 hover:bg-slate-50'}`}
       style={{ gridTemplateColumns: gridCols }}>
       {/* status */}
-      <div className="px-1.5 py-2 flex items-center justify-center">
+      <div className="px-1.5 py-3 flex items-center justify-center">
         <span className="w-2 h-2 rounded-full bg-emerald-500" title="Conectado" />
       </div>
       {/* mac */}
-      <div className="px-2 py-2 min-w-0">
-        <p className="font-mono font-semibold text-slate-700 truncate text-[10px]">{cpe.mac}</p>
+      <div className="px-2 py-3 min-w-0">
+        <p className="font-mono font-semibold text-slate-700 truncate text-xs">{cpe.mac}</p>
         {cpe.hostname && <p className="text-[9px] text-indigo-600 truncate font-medium">{cpe.hostname}</p>}
       </div>
       {/* modelo */}
       {show('modelo') && (
-        <div className="px-2 py-2 min-w-0">
+        <div className="px-2 py-3 min-w-0">
           <p className="text-slate-500 truncate">{cpe.modelo || <span className="text-slate-300">—</span>}</p>
         </div>
       )}
       {/* nombre */}
       {show('nombre') && (
-        <div className="px-2 py-2 min-w-0">
-          <p className={`truncate font-semibold ${cpe.isKnown ? 'text-slate-700' : 'text-slate-300 italic text-[10px]'}`}>
+        <div className="px-2 py-3 min-w-0">
+          <p className={`truncate font-semibold ${cpe.isKnown ? 'text-slate-800' : 'text-slate-400 italic text-[10px]'}`}>
             {cpe.hostname || 'Sin nombre'}
           </p>
         </div>
       )}
       {/* signal */}
       {show('signal') && (
-        <div className="px-2 py-2 text-right">
+        <div className="px-2 py-3 text-right">
           <span className={`font-mono font-bold ${sigColor(cpe.signal)}`}>{fmtDbm(cpe.signal)}</span>
         </div>
       )}
@@ -584,10 +584,10 @@ function StationTable({ apId, poll, onCpeDetail, dev }: {
   onCpeDetail: (mac: string, ip: string | null) => void;
   dev: SavedDevice;
 }) {
-  const [hiddenCols,  setHiddenCols]  = useState<Set<string>>(loadColPrefs);
-  const [cpeSearch,   setCpeSearch]   = useState('');
-  const [enriching,   setEnriching]   = useState(false);
-  const [enrichMsg,   setEnrichMsg]   = useState('');
+  const [hiddenCols, setHiddenCols] = useState<Set<string>>(loadColPrefs);
+  const [cpeSearch, setCpeSearch] = useState('');
+  const [enriching, setEnriching] = useState(false);
+  const [enrichMsg, setEnrichMsg] = useState('');
 
   const handleColChange = (h: Set<string>) => { setHiddenCols(h); saveColPrefs(h); };
 
@@ -597,8 +597,8 @@ function StationTable({ apId, poll, onCpeDetail, dev }: {
     return poll.stations.filter(s =>
       s.mac.toLowerCase().includes(q) ||
       (s.hostname ?? '').toLowerCase().includes(q) ||
-      (s.modelo   ?? '').toLowerCase().includes(q) ||
-      (s.lastip   ?? '').includes(q)
+      (s.modelo ?? '').toLowerCase().includes(q) ||
+      (s.lastip ?? '').includes(q)
     );
   }, [poll.stations, cpeSearch]);
 
@@ -684,10 +684,10 @@ function StationTable({ apId, poll, onCpeDetail, dev }: {
         <div className="overflow-x-auto">
           <div style={{ minWidth: `${minW}px` }}>
             {/* Headers */}
-            <div className="grid bg-slate-100/80 border-b border-slate-200 text-[8px] font-bold text-slate-400 uppercase tracking-wider"
+            <div className="grid bg-slate-100 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider"
               style={{ gridTemplateColumns: gridCols }}>
               {visibleColDefs.map(col => (
-                <div key={col.key} className={`px-2 py-1.5 ${col.right ? 'text-right' : ''}`}>{col.label}</div>
+                <div key={col.key} className={`px-2 py-2.5 ${col.right ? 'text-right' : ''}`}>{col.label}</div>
               ))}
             </div>
             {filtered.map((cpe, idx) => (
@@ -713,20 +713,20 @@ function ApRow({ dev, pollResult, expanded, onToggle, onKnownCpes, onCpeDetail, 
   onCpeDetail: (mac: string, ip: string | null) => void;
   onDetail: () => void;
 }) {
-  const stats    = dev.cachedStats;
-  const name     = stats?.deviceName ?? dev.deviceName ?? dev.name;
-  const ssid     = stats?.essid      ?? dev.essid;
-  const freq     = stats?.frequency  ?? dev.frequency;
-  const freqGhz  = freq ? `${(freq / 1000).toFixed(1)} GHz` : null;
-  const model    = stats?.deviceModel    ?? dev.model;
+  const stats = dev.cachedStats;
+  const name = stats?.deviceName ?? dev.deviceName ?? dev.name;
+  const ssid = stats?.essid ?? dev.essid;
+  const freq = stats?.frequency ?? dev.frequency;
+  const freqGhz = freq ? `${(freq / 1000).toFixed(1)} GHz` : null;
+  const model = stats?.deviceModel ?? dev.model;
   const firmware = stats?.firmwareVersion ?? dev.firmware;
-  const channel  = stats?.channelWidth   ?? dev.channelWidth;
-  const txPower  = stats?.txPower;
-  const netMode  = stats?.networkMode    ?? dev.networkMode;
-  const noSsh    = !dev.sshUser || !dev.sshPass;
+  const channel = stats?.channelWidth ?? dev.channelWidth;
+  const txPower = stats?.txPower;
+  const netMode = stats?.networkMode ?? dev.networkMode;
+  const noSsh = !dev.sshUser || !dev.sshPass;
   const isPolling = pollResult?.loading ?? false;
-  const cpeCount  = pollResult?.stations.length ?? null;
-  const hasError  = !!pollResult?.error;
+  const cpeCount = pollResult?.stations.length ?? null;
+  const hasError = !!pollResult?.error;
 
   return (
     <Fragment>
@@ -833,8 +833,8 @@ function ApRow({ dev, pollResult, expanded, onToggle, onKnownCpes, onCpeDetail, 
   );
 }
 
-// ── Node Card ─────────────────────────────────────────────────────────────
-function NodeCard({ group, expandedAps, pollResults, onToggleAp, onKnownCpes, onCpeDetail, onApDetail }: {
+// ── AP Group Card ─────────────────────────────────────────────────────────
+function ApGroupCard({ group, expandedAps, pollResults, onToggleAp, onKnownCpes, onCpeDetail, onApDetail }: {
   group: NodeGroup;
   expandedAps: Set<string>;
   pollResults: Record<string, PollResult>;
@@ -845,19 +845,19 @@ function NodeCard({ group, expandedAps, pollResults, onToggleAp, onKnownCpes, on
 }) {
   const [expanded, setExpanded] = useState(true);
 
-  const anyPolled   = group.aps.some(ap => (pollResults[ap.id]?.polledAt ?? 0) > 0);
-  const anyError    = group.aps.some(ap => !!pollResults[ap.id]?.error);
-  const anyPolling  = group.aps.some(ap => pollResults[ap.id]?.loading);
+  const anyPolled = group.aps.some(ap => (pollResults[ap.id]?.polledAt ?? 0) > 0);
+  const anyError = group.aps.some(ap => !!pollResults[ap.id]?.error);
+  const anyPolling = group.aps.some(ap => pollResults[ap.id]?.loading);
   const statusColor = group.aps.length === 0 ? 'bg-slate-300'
     : anyPolled && !anyError ? 'bg-emerald-500'
-    : anyError ? 'bg-amber-400'
-    : anyPolling ? 'bg-sky-400 animate-pulse'
-    : 'bg-slate-300';
+      : anyError ? 'bg-amber-400'
+        : anyPolling ? 'bg-sky-400 animate-pulse'
+          : 'bg-slate-300';
   const statusLabel = group.aps.length === 0 ? 'Sin APs'
     : anyPolled && !anyError ? 'Online'
-    : anyError ? 'Parcial'
-    : anyPolling ? 'Conectando…'
-    : 'Sin datos';
+      : anyError ? 'Parcial'
+        : anyPolling ? 'Conectando…'
+          : 'Sin datos';
   const totalCpes = group.aps.reduce((s, ap) => s + (pollResults[ap.id]?.stations.length ?? 0), 0);
 
   return (
@@ -925,12 +925,12 @@ function NodeCard({ group, expandedAps, pollResults, onToggleAp, onKnownCpes, on
 // ── Main Module ───────────────────────────────────────────────────────────
 export default function ApMonitorModule() {
   const { nodes } = useVpn();
-  const [devices,      setDevices]      = useState<SavedDevice[]>([]);
-  const [loading,      setLoading]      = useState(true);
-  const [expandedAps,  setExpandedAps]  = useState<Set<string>>(new Set());
-  const [pollResults,  setPollResults]  = useState<Record<string, PollResult>>({});
-  const [toast,        setToast]        = useState('');
-  const [apSearch,     setApSearch]     = useState('');
+  const [devices, setDevices] = useState<SavedDevice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expandedAps, setExpandedAps] = useState<Set<string>>(new Set());
+  const [pollResults, setPollResults] = useState<Record<string, PollResult>>({});
+  const [toast, setToast] = useState('');
+  const [apSearch, setApSearch] = useState('');
 
   // Modals
   const [cpeDetailTarget, setCpeDetailTarget] = useState<{
@@ -938,13 +938,13 @@ export default function ApMonitorModule() {
     sshPort: number; sshUser: string; sshPass: string;
   } | null>(null);
   const [knownCpesApId, setKnownCpesApId] = useState<string | null>(null);
-  const [apDetailDev,   setApDetailDev]   = useState<SavedDevice | null>(null);
+  const [apDetailDev, setApDetailDev] = useState<SavedDevice | null>(null);
 
-  const pollTimers     = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const pollTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const expandedApsRef = useRef(expandedAps);
-  const devicesRef     = useRef(devices);
-  const toastTimer     = useRef<ReturnType<typeof setTimeout>>();
-  const autoPolledRef  = useRef(false);
+  const devicesRef = useRef(devices);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const autoPolledRef = useRef(false);
 
   useEffect(() => { expandedApsRef.current = expandedAps; }, [expandedAps]);
   useEffect(() => { devicesRef.current = devices; }, [devices]);
@@ -974,7 +974,7 @@ export default function ApMonitorModule() {
       ...g,
       aps: g.aps.filter(d =>
         (d.cachedStats?.deviceName ?? d.name ?? '').toLowerCase().includes(q) ||
-        d.ip.includes(q) ||
+        (d.ip || '').toLowerCase().includes(q) ||
         (d.model ?? '').toLowerCase().includes(q) ||
         (d.cachedStats?.essid ?? d.essid ?? '').toLowerCase().includes(q)
       ),
@@ -1003,11 +1003,11 @@ export default function ApMonitorModule() {
     }));
 
     try {
-      const res  = await fetchWithTimeout(`${BASE}/poll-direct`, {
+      const res = await fetchWithTimeout(`${BASE}/poll-direct`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           apId,
-          ip:   dev.ip,
+          ip: dev.ip,
           port: dev.sshPort ?? 22,
           user: dev.sshUser ?? '',
           pass: dev.sshPass ?? '',
@@ -1016,7 +1016,7 @@ export default function ApMonitorModule() {
       }, 20_000);
       const data = await res.json();
       if (data.success) {
-        setPollResults(prev => ({ ...prev, [apId]: { stations: data.stations, polledAt: data.polledAt, loading: false } }));
+        setPollResults(prev => ({ ...prev, [apId]: { stations: data.stations || [], polledAt: data.polledAt, loading: false } }));
       } else {
         setPollResults(prev => ({ ...prev, [apId]: { ...(prev[apId] ?? { stations: [] }), loading: false, error: data.message } }));
       }
@@ -1077,7 +1077,7 @@ export default function ApMonitorModule() {
     showToast('Datos del AP guardados');
   };
 
-  const totalAps  = nodeGroups.reduce((s, g) => s + g.aps.length, 0);
+  const totalAps = nodeGroups.reduce((s, g) => s + g.aps.length, 0);
   const totalCpes = Object.values(pollResults).reduce((s, r) => s + r.stations.length, 0);
 
   return (
@@ -1151,7 +1151,7 @@ export default function ApMonitorModule() {
           <div>
             <p className="text-slate-500 font-medium">Sin APs guardados</p>
             <p className="text-slate-400 text-sm mt-1">
-              Ve a la pestaña <strong>Equipos</strong>, agrega dispositivos con rol "AP" y vuelve aquí para monitorearlos.
+              Ve a la pestaña <strong>Escanear</strong>, agrega dispositivos con rol "AP" y vuelve aquí para monitorearlos.
             </p>
           </div>
         </div>
@@ -1159,19 +1159,24 @@ export default function ApMonitorModule() {
 
       {/* Node groups */}
       {!loading && filteredGroups.map(group => (
-        <NodeCard
+        <ApGroupCard
           key={group.nodeId}
           group={group}
           expandedAps={expandedAps}
           pollResults={pollResults}
           onToggleAp={toggleAp}
           onKnownCpes={apId => setKnownCpesApId(apId)}
-          onCpeDetail={(mac, ip, dev) => setCpeDetailTarget({
-            mac, apId: dev.id, ip,
-            sshPort: dev.sshPort ?? 22,
-            sshUser: dev.sshUser ?? '',
-            sshPass: dev.sshPass ?? '',
-          })}
+          onCpeDetail={(mac, ip, dev) => {
+            if (!dev) return;
+            setCpeDetailTarget({
+              mac,
+              apId: dev.id,
+              ip,
+              sshPort: dev.sshPort ?? 22,
+              sshUser: dev.sshUser ?? '',
+              sshPass: dev.sshPass ?? '',
+            });
+          }}
           onApDetail={dev => setApDetailDev(dev)}
         />
       ))}
@@ -1197,7 +1202,12 @@ export default function ApMonitorModule() {
         <ApDetailModal
           dev={apDetailDev}
           onClose={() => setApDetailDev(null)}
-          onSave={stats => { handleSaveApDetail(apDetailDev, stats); setApDetailDev(null); }}
+          onSave={stats => {
+            if (apDetailDev) {
+              handleSaveApDetail(apDetailDev, stats);
+              setApDetailDev(null);
+            }
+          }}
         />
       )}
     </div>

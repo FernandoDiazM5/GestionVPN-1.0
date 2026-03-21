@@ -15,8 +15,39 @@ router.post('/connect', async (req, res) => {
         res.json({ success: true, message: 'Conectado exitosamente', data: resource });
     } catch (error) {
         if (api) try { await api.close(); } catch (_) { }
-        res.status(500).json({ success: false, message: getErrorMessage(error, ip, user) });
+        const msg = getErrorMessage(error, ip, user);
+        console.error(`[CONNECT] Fallo → IP:${ip} usuario:${user} | errno:${JSON.stringify(error?.errno)} code:${error?.code} msg:${error?.message}`);
+        res.status(500).json({ success: false, message: msg });
     }
+});
+
+// ── Diagnóstico de conectividad (no requiere conexión previa) ────────────────
+router.post('/diagnose', async (req, res) => {
+    const net = require('net');
+    const { ip, user, pass } = req.body;
+    if (!ip) return res.status(400).json({ success: false });
+    const steps = [];
+    const probe = (port) => new Promise((resolve) => {
+        const s = net.createConnection({ host: ip, port, timeout: 5000 });
+        s.once('connect', () => { s.destroy(); resolve({ port, open: true }); });
+        s.once('timeout', () => { s.destroy(); resolve({ port, open: false, reason: 'timeout' }); });
+        s.once('error',   (e) => { resolve({ port, open: false, reason: e.code || e.message }); });
+    });
+    const [r8728, r8729] = await Promise.all([probe(8728), probe(8729)]);
+    steps.push(r8728);
+    steps.push(r8729);
+    let authOk = false, authMsg = '';
+    if ((r8728.open || r8729.open) && user) {
+        let api;
+        try {
+            api = await connectToMikrotik(ip, user, pass);
+            await api.close();
+            authOk = true; authMsg = 'Credenciales correctas';
+        } catch (e) {
+            authMsg = getErrorMessage(e, ip, user);
+        }
+    }
+    res.json({ steps, authOk, authMsg, apiReachable: r8728.open || r8729.open });
 });
 
 router.post('/secrets', async (req, res) => {
@@ -147,7 +178,9 @@ router.post('/tunnel/activate', async (req, res) => {
         res.json({ success: true, message: `Acceso abierto a ${targetVRF}` });
     } catch (error) {
         if (api) try { await api.close(); } catch (_) { }
-        res.status(500).json({ success: false, message: getErrorMessage(error, ip, user) });
+        const msg = getErrorMessage(error, ip, user);
+        console.error('[TUNNEL-ACTIVATE] Error:', error?.message || error, '| Detalles:', error?.code, error?.errno);
+        res.status(500).json({ success: false, message: msg });
     }
 });
 
@@ -218,10 +251,10 @@ router.post('/node/provision', async (req, res) => {
         return res.status(400).json({ success: false, message: 'IPs o CIDR inválidos' });
 
     const steps = []; let api;
-    const nameUpper  = nodeName.toUpperCase().replace(/[^A-Z0-9]/g, '');
-    const ifaceName  = `VPN-SSTP-ND${nodeNumber}-${nameUpper}`;
-    const vrfName    = `VRF-ND${nodeNumber}-${nameUpper}`;
-    const ndComment  = `ND${nodeNumber}`;
+    const nameUpper = nodeName.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const ifaceName = `VPN-SSTP-ND${nodeNumber}-${nameUpper}`;
+    const vrfName = `VRF-ND${nodeNumber}-${nameUpper}`;
+    const ndComment = `ND${nodeNumber}`;
 
     try {
         api = await connectToMikrotik(ip, user, pass);
@@ -293,9 +326,9 @@ router.post('/node/deprovision', async (req, res) => {
     if (!pppUser)
         return res.status(400).json({ success: false, message: 'pppUser es requerido' });
 
-    const hasVrf    = !!vrfName;
+    const hasVrf = !!vrfName;
     const ifaceName = hasVrf ? vrfName.replace(/^VRF-/, 'VPN-SSTP-') : '';
-    const subnets   = Array.isArray(lanSubnets) ? lanSubnets : [];
+    const subnets = Array.isArray(lanSubnets) ? lanSubnets : [];
     const steps = []; let api;
     try {
         api = await connectToMikrotik(ip, user, pass);
@@ -316,9 +349,15 @@ router.post('/node/deprovision', async (req, res) => {
 
             // Paso 3: Rutas en la routing-table del VRF
             const routes = await safeWrite(api, ['/ip/route/print']);
-            const vrfRoutes = routes.filter(r => r['routing-table'] === vrfName);
-            for (const r of vrfRoutes) await safeWrite(api, ['/ip/route/remove', `=.id=${r['.id']}`]);
-            steps.push({ step: 3, obj: 'Rutas VRF', name: `${vrfRoutes.length} rutas eliminadas`, status: 'ok' });
+            const vrfRoutes = routes.filter(r => r['routing-table'] === vrfName && r.dynamic !== 'true');
+            let removedCount = 0;
+            for (const r of vrfRoutes) {
+                try {
+                    await safeWrite(api, ['/ip/route/remove', `=.id=${r['.id']}`]);
+                    removedCount++;
+                } catch(e) { console.error('Error ignorado en delete de ruta:', e.message); }
+            }
+            steps.push({ step: 3, obj: 'Rutas VRF', name: `${removedCount} rutas eliminadas`, status: 'ok' });
 
             // Paso 4: VRF
             const vrfs = await safeWrite(api, ['/ip/vrf/print']);
@@ -396,9 +435,9 @@ router.post('/node/details', async (req, res) => {
 router.post('/node/edit', async (req, res) => {
     const { ip, user, pass, pppUser, newPppUser, newPassword, newRemoteAddress, newComment, vrfName, addSubnets, removeSubnets } = req.body;
     if (!pppUser) return res.status(400).json({ success: false, message: 'pppUser requerido' });
-    const hasVrf    = !!vrfName;
+    const hasVrf = !!vrfName;
     const ifaceName = hasVrf ? vrfName.replace(/^VRF-/, 'VPN-SSTP-') : '';
-    const ndMatch   = vrfName?.match(/ND(\d+)/);
+    const ndMatch = vrfName?.match(/ND(\d+)/);
     const ndComment = ndMatch ? `ND${ndMatch[1]}` : (vrfName || '');
     const nameMatch = vrfName?.match(/VRF-ND\d+-(.+)/);
     const nameUpper = nameMatch ? nameMatch[1] : '';
@@ -409,7 +448,7 @@ router.post('/node/edit', async (req, res) => {
 
         // Cambios en el PPP Secret (user, password, remote-address, comment)
         const secretChanges = [];
-        if (newPassword)       secretChanges.push(`=password=${newPassword}`);
+        if (newPassword) secretChanges.push(`=password=${newPassword}`);
         if (newRemoteAddress && IPV4_REGEX.test(newRemoteAddress)) secretChanges.push(`=remote-address=${newRemoteAddress}`);
         if (newPppUser && newPppUser !== pppUser) secretChanges.push(`=name=${newPppUser}`);
         if (newComment !== undefined && newComment !== null) secretChanges.push(`=comment=${newComment}`);
@@ -418,6 +457,17 @@ router.post('/node/edit', async (req, res) => {
             const secrets = await safeWrite(api, ['/ppp/secret/print']);
             const secret = secrets.find(s => s.name === pppUser);
             if (secret) await safeWrite(api, ['/ppp/secret/set', `=.id=${secret['.id']}`, ...secretChanges]);
+
+            // Además de actualizar el comentario en MikroTik, actualizamos el label en SQLite para que lo tome la UI
+            if (newComment !== undefined && newComment !== null) {
+                try {
+                    const db = await getDb();
+                    await db.run('INSERT INTO node_labels (ppp_user, label) VALUES (?, ?) ON CONFLICT(ppp_user) DO UPDATE SET label = excluded.label', [pppUser, newComment]);
+                } catch (e) {
+                    console.error('[DB] Error merging labels during edit:', e.message);
+                }
+            }
+
             const desc = [
                 newPppUser && newPppUser !== pppUser ? `usuario: ${pppUser}→${newPppUser}` : null,
                 newPassword ? 'contraseña actualizada' : null,
@@ -476,7 +526,14 @@ router.post('/node/script', async (req, res) => {
     const { pppUser, pppPassword, serverPublicIP } = req.body;
     if (!pppUser || !pppPassword || !serverPublicIP)
         return res.status(400).json({ success: false, message: 'pppUser, pppPassword y serverPublicIP son requeridos' });
-    const script = `/interface sstp-client\nadd authentication=mschap2 connect-to=${serverPublicIP} disabled=no http-proxy=0.0.0.0 name=sstp-out1 profile=default-encryption tls-version=only-1.2 user=${pppUser} password=${pppPassword}`;
+    // Si sstp-out1 ya existe, solo actualiza sus parámetros (evita crear interfaz dinámica duplicada DR).
+    // Si no existe, la crea desde cero.
+    const script = `/interface sstp-client
+:if ([find name=sstp-out1] = "") do={
+  add authentication=mschap2 connect-to=${serverPublicIP} disabled=no http-proxy=0.0.0.0 name=sstp-out1 profile=default-encryption tls-version=only-1.2 user=${pppUser} password=${pppPassword}
+} else={
+  set [find name=sstp-out1] connect-to=${serverPublicIP} disabled=no user=${pppUser} password=${pppPassword}
+}`;
     res.json({ success: true, script });
 });
 
@@ -487,6 +544,28 @@ router.post('/node/label/save', async (req, res) => {
         const db = await getDb();
         await db.run('INSERT INTO node_labels (ppp_user, label) VALUES (?, ?) ON CONFLICT(ppp_user) DO UPDATE SET label = excluded.label',
             [pppUser, label || '']);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// ── Configuración global de la app ──────────────────────────────────────────
+router.get('/settings/get', async (req, res) => {
+    try {
+        const db = await getDb();
+        const rows = await db.all('SELECT key, value FROM app_settings');
+        const settings = {};
+        rows.forEach(r => { settings[r.key] = r.value; });
+        res.json({ success: true, settings });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+router.post('/settings/save', async (req, res) => {
+    const { key, value } = req.body;
+    if (!key) return res.status(400).json({ success: false, message: 'key requerido' });
+    try {
+        const db = await getDb();
+        await db.run('INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+            [key, value ?? '']);
         res.json({ success: true });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
@@ -523,7 +602,21 @@ router.post('/device/antenna', async (req, res) => {
         // Comando combinado: mca-status + system.cfg + hostname + version + ifconfig
         const output = await sshExec(deviceIP, parseInt(devicePort) || 22, deviceUser, devicePass, ANTENNA_CMD, 20000, 8000);
         res.json({ success: true, stats: parseFullOutput(output) });
-    } catch (error) { res.status(500).json({ success: false, message: /[Aa]uth|handshake/.test(error.message) ? 'Credenciales incorrectas' : error.message }); }
+    } catch (error) {
+        const msg = error.message || '';
+        const isAuth    = /[Aa]uth|handshake|All configured|incorrect|denied/i.test(msg);
+        const isRefused = /ECONNREFUSED|connection refused/i.test(msg);
+        const isTimeout = /timeout|agotado|ETIMEDOUT|ESOCKETTIMEDOUT/i.test(msg);
+        const isUnreach = /EHOSTUNREACH|ENETUNREACH|ENOTFOUND/i.test(msg);
+        const friendly  = isAuth    ? 'Credenciales incorrectas'
+                        : isRefused ? 'SSH no disponible (puerto cerrado)'
+                        : isTimeout ? 'Tiempo de espera SSH agotado'
+                        : isUnreach ? 'Host no alcanzable'
+                        : msg;
+        console.log(`[SSH] ${deviceIP} → ${friendly}`);
+        // 200 para errores esperados (auth, red) — 500 solo para errores inesperados del servidor
+        res.json({ success: false, message: friendly });
+    }
 });
 
 // Helper: parse RouterOS duration like "2m10s" → seconds (Infinity if never)
@@ -692,6 +785,45 @@ router.post('/node/creds/get', async (req, res) => {
         const row = await db.get('SELECT ppp_password FROM node_creds WHERE ppp_user = ?', [pppUser]);
         if (!row) return res.json({ success: false, message: 'Sin credenciales guardadas' });
         res.json({ success: true, pppPassword: decryptPass(row.ppp_password) });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+// ── Credenciales SSH por nodo (array de {user, pass}) ─────────────────────
+router.post('/node/ssh-creds/save', async (req, res) => {
+    const { pppUser, creds } = req.body;
+    if (!pppUser || !Array.isArray(creds)) return res.status(400).json({ success: false, message: 'pppUser y creds[] requeridos' });
+    try {
+        const db = await getDb();
+        // Cifrar cada contraseña individualmente
+        const encrypted = JSON.stringify(creds.map(c => ({ user: c.user || '', encPass: encryptPass(c.pass || '') })));
+        await db.run(
+            'INSERT INTO node_ssh_creds (ppp_user, ssh_creds) VALUES (?, ?) ON CONFLICT(ppp_user) DO UPDATE SET ssh_creds=excluded.ssh_creds',
+            [pppUser, encrypted]
+        );
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+router.post('/node/ssh-creds/get', async (req, res) => {
+    const { pppUser } = req.body;
+    if (!pppUser) return res.status(400).json({ success: false, message: 'pppUser requerido' });
+    try {
+        const db = await getDb();
+        const row = await db.get('SELECT ssh_creds, ssh_user, ssh_pass FROM node_ssh_creds WHERE ppp_user = ?', [pppUser]);
+        if (!row) return res.json({ success: true, creds: [] });
+        // Leer desde ssh_creds (nuevo) o migrar desde ssh_user/ssh_pass (legado)
+        let creds = [];
+        if (row.ssh_creds && row.ssh_creds !== '[]') {
+            const parsed = JSON.parse(row.ssh_creds);
+            creds = parsed.map(c => ({ user: c.user, pass: decryptPass(c.encPass) }));
+        } else if (row.ssh_user) {
+            creds = [{ user: row.ssh_user, pass: decryptPass(row.ssh_pass) }];
+        }
+        res.json({ success: true, creds });
     } catch (e) {
         res.status(500).json({ success: false, message: e.message });
     }

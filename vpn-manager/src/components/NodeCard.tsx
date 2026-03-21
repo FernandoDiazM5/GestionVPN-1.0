@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Play, ShieldOff, Wifi, WifiOff, Clock, Loader2, Radio, Pencil, Trash2, FileCode, History, Tag } from 'lucide-react';
+import { Play, ShieldOff, Wifi, WifiOff, Clock, Loader2, Radio, Pencil, Trash2, FileCode, History, Tag, KeyRound, Check, X, PlusCircle, Eye, EyeOff } from 'lucide-react';
 import { useVpn, TUNNEL_TIMEOUT_MS } from '../context/VpnContext';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import type { NodeInfo, TunnelActivateResponse } from '../types/api';
@@ -53,6 +53,11 @@ export default function NodeCard({ node, rowIndex, onEdit, onDelete, onScript, o
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
   const [savingName, setSavingName] = useState(false);
+  const [showSshForm, setShowSshForm] = useState(false);
+  const [sshCredsArr, setSshCredsArr] = useState<Array<{ user: string; pass: string }>>([{ user: '', pass: '' }]);
+  const [sshLoading, setSshLoading] = useState(false);
+  const [sshSaved, setSshSaved] = useState(false);
+  const [showPasswords, setShowPasswords] = useState(false);
   const logsEndRef = useRef<HTMLDivElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
@@ -120,6 +125,8 @@ export default function NodeCard({ node, rowIndex, onEdit, onDelete, onScript, o
       }
       addLog(`Configurando VRF: ${node.nombre_vrf}`);
       addLog(`IP Admin: ${adminIP}`);
+      if (!adminIP) throw new Error('IP Admin no configurada — revisa la sección de WireGuard');
+      if (!node.nombre_vrf) throw new Error('Este nodo no tiene VRF asignado');
       const res = await fetchWithTimeout(`${API_BASE_URL}/api/tunnel/activate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -131,8 +138,9 @@ export default function NodeCard({ node, rowIndex, onEdit, onDelete, onScript, o
           targetVRF: node.nombre_vrf,
         }),
       }, 20_000);
-      const data: TunnelActivateResponse = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message ?? 'Error activando tunnel');
+      let data: TunnelActivateResponse;
+      try { data = await res.json(); } catch { throw new Error(`Error del servidor (HTTP ${res.status})`); }
+      if (!res.ok || !data.success) throw new Error(data.message ?? `Error HTTP ${res.status}`);
       addLog(`✓ Acceso abierto a ${node.nombre_vrf}`);
       addLog(`Red remota: ${node.segmento_lan || 'N/A'}`);
       setActiveNodeVrf(node.nombre_vrf);
@@ -156,6 +164,46 @@ export default function NodeCard({ node, rowIndex, onEdit, onDelete, onScript, o
       setIsDeactivating(false);
     }
   };
+
+  const openSshForm = async () => {
+    setShowSshForm(v => !v);
+    if (!showSshForm) {
+      try {
+        const r = await fetchWithTimeout(`${API_BASE_URL}/api/node/ssh-creds/get`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pppUser: node.ppp_user }),
+        }, 5_000);
+        const d = await r.json();
+        if (d.success && Array.isArray(d.creds) && d.creds.length > 0) {
+          setSshCredsArr(d.creds);
+        } else {
+          setSshCredsArr([{ user: '', pass: '' }]);
+        }
+      } catch { /* sin creds previas */ }
+    }
+  };
+
+  const saveSshCreds = async () => {
+    const valid = sshCredsArr.filter(c => c.user.trim());
+    setSshLoading(true);
+    try {
+      await fetchWithTimeout(`${API_BASE_URL}/api/node/ssh-creds/save`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pppUser: node.ppp_user, creds: valid }),
+      }, 5_000);
+      setSshSaved(true);
+      setTimeout(() => setSshSaved(false), 2000);
+    } catch { /* ignorar */ }
+    setSshLoading(false);
+  };
+
+  const updateCred = (i: number, field: 'user' | 'pass', value: string) => {
+    const next = [...sshCredsArr];
+    next[i] = { ...next[i], [field]: value };
+    setSshCredsArr(next);
+  };
+
+  const removeCred = (i: number) => setSshCredsArr(sshCredsArr.filter((_, idx) => idx !== i));
 
   const isPending = isActivating || isDeactivating;
   const canActivate = !isPending && !!node.nombre_vrf && !node.disabled && node.running;
@@ -387,6 +435,13 @@ export default function NodeCard({ node, rowIndex, onEdit, onDelete, onScript, o
             >
               <History className="w-3.5 h-3.5" />
             </button>
+            <button
+              onClick={openSshForm}
+              title="Credenciales SSH para escaneo de equipos"
+              className={`p-1.5 rounded-lg transition-colors ${showSshForm ? 'text-amber-600 bg-amber-50' : 'text-slate-400 hover:text-amber-600 hover:bg-amber-50'}`}
+            >
+              <KeyRound className="w-3.5 h-3.5" />
+            </button>
           </div>
         </td>
       </tr>
@@ -404,6 +459,84 @@ export default function NodeCard({ node, rowIndex, onEdit, onDelete, onScript, o
                 ))}
                 <div ref={logsEndRef} />
               </div>
+            </div>
+          </td>
+        </tr>
+      )}
+
+      {/* ── Fila expandida: credenciales SSH ── */}
+      {showSshForm && (
+        <tr className={rowBg}>
+          <td colSpan={7} className="px-4 pb-3 pt-0">
+            <div className="ml-10 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider flex items-center gap-1.5">
+                  <KeyRound className="w-3 h-3" />
+                  Credenciales SSH — {node.nombre_nodo}
+                </p>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setShowPasswords(v => !v)} title={showPasswords ? 'Ocultar contraseñas' : 'Mostrar contraseñas'}
+                    className="p-1 text-slate-400 hover:text-amber-600 rounded transition-colors">
+                    {showPasswords ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                  <button onClick={() => setShowSshForm(false)} className="p-1 text-slate-400 hover:text-slate-600 rounded transition-colors">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Lista de pares user/pass */}
+              <div className="space-y-2">
+                {sshCredsArr.map((cred, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <span className="text-[10px] font-black text-amber-400 w-4 text-center shrink-0">{i + 1}º</span>
+                    <input
+                      type="text"
+                      placeholder="Usuario (ej: ubnt)"
+                      value={cred.user}
+                      onChange={e => updateCred(i, 'user', e.target.value)}
+                      className="px-3 py-1.5 text-xs border border-amber-200 bg-white rounded-lg outline-none focus:border-amber-400 font-semibold text-slate-700 w-32 flex-1"
+                    />
+                    <input
+                      type={showPasswords ? 'text' : 'password'}
+                      placeholder="Contraseña"
+                      value={cred.pass}
+                      onChange={e => updateCred(i, 'pass', e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && saveSshCreds()}
+                      className="px-3 py-1.5 text-xs border border-amber-200 bg-white rounded-lg outline-none focus:border-amber-400 font-mono text-slate-700 w-36 flex-1"
+                    />
+                    {sshCredsArr.length > 1 && (
+                      <button onClick={() => removeCred(i)} className="p-1 text-slate-300 hover:text-rose-500 rounded transition-colors shrink-0">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Acciones */}
+              <div className="flex items-center gap-3 pt-1">
+                <button
+                  onClick={() => { if (sshCredsArr.length < 5) setSshCredsArr([...sshCredsArr, { user: '', pass: '' }]); }}
+                  disabled={sshCredsArr.length >= 5}
+                  className="flex items-center gap-1 text-[11px] font-bold text-amber-600 hover:text-amber-800 disabled:opacity-40 transition-colors"
+                >
+                  <PlusCircle className="w-3.5 h-3.5" />
+                  <span>Añadir ({sshCredsArr.length}/5)</span>
+                </button>
+                <button
+                  onClick={saveSshCreds}
+                  disabled={sshLoading}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white transition-colors disabled:opacity-50 ml-auto"
+                >
+                  {sshLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : sshSaved ? <Check className="w-3 h-3" /> : <KeyRound className="w-3 h-3" />}
+                  {sshSaved ? 'Guardado' : 'Guardar'}
+                </button>
+              </div>
+
+              <p className="text-[10px] text-amber-500">
+                Se probarán en orden al escanear equipos en este nodo.
+              </p>
             </div>
           </td>
         </tr>

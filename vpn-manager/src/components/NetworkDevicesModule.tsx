@@ -2,21 +2,21 @@ import { useState, useEffect, useCallback, useRef, Fragment, useMemo } from 'rea
 import type { ReactNode } from 'react';
 import {
   Cpu, RefreshCw, Loader2, Radio, AlertCircle,
-  ShieldCheck, ShieldOff, PlusCircle, Check, X, Wifi, Info,
+  ShieldCheck, ShieldOff, Check, X, Wifi, Info,
   Eye, Pencil, Trash2, CheckCircle2, ExternalLink, Router,
-  Settings2, User, Lock, ChevronUp, ChevronDown, ChevronRight,
-  SlidersHorizontal, Database, Search,
+  ChevronUp, ChevronDown, ChevronRight, PlusCircle,
+  SlidersHorizontal, Database, Search, KeyRound,
 } from 'lucide-react';
 import { useVpn } from '../context/VpnContext';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { deviceDb } from '../store/deviceDb';
 import DeviceCard from './DeviceCard';
 import { API_BASE_URL } from '../config';
-import type { ScannedDevice, SavedDevice } from '../types/devices';
+import type { ScannedDevice, SavedDevice, AntennaStats } from '../types/devices';
 import type { NodeInfo } from '../types/api';
 
 const SESSION_SCAN_KEY = 'vpn_scan_results_v1';
-const COLS_STORAGE_KEY  = 'vpn_diag_cols_v1';
+const COLS_STORAGE_KEY = 'vpn_diag_cols_v1';
 
 // Estima el número de hosts en un CIDR (ej: 192.168.1.0/24 → 254)
 const estimateIpCount = (cidr: string): number => {
@@ -257,9 +257,9 @@ function AddDeviceModal({ device, node, existing, onSave, onClose }: AddDeviceMo
   const isEdit = !!existing;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 animate-in fade-in duration-200"
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-5 max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-5 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="font-bold text-slate-800">{isEdit ? 'Editar dispositivo' : 'Guardar dispositivo'}</h3>
@@ -272,32 +272,32 @@ function AddDeviceModal({ device, node, existing, onSave, onClose }: AddDeviceMo
 
         {/* SSH */}
         <div className="space-y-2">
-          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center space-x-1">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center space-x-1">
             <Cpu className="w-3 h-3" /><span>SSH — Antena Ubiquiti</span>
           </p>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Usuario</label>
+              <label className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Usuario</label>
               <input value={sshUser} onChange={e => setSshUser(e.target.value)} className="input-field w-full text-xs" placeholder="ubnt" />
             </div>
             <div>
-              <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Puerto SSH</label>
+              <label className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Puerto SSH</label>
               <input type="number" value={sshPort} onChange={e => setSshPort(+e.target.value)} className="input-field w-full text-xs" />
             </div>
           </div>
           <div>
-            <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Clave SSH</label>
+            <label className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Clave SSH</label>
             <input type="password" value={sshPass} onChange={e => setSshPass(e.target.value)} className="input-field w-full text-xs" placeholder="contraseña SSH" />
           </div>
         </div>
 
         {/* Puerto WebUI router */}
         <div className="space-y-2">
-          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center space-x-1">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center space-x-1">
             <Wifi className="w-3 h-3" /><span>Router del cliente</span>
           </p>
           <div>
-            <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+            <label className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">
               Puerto WebUI <span className="normal-case font-normal text-slate-300">(acceso en {device.ip}:puerto)</span>
             </label>
             <input type="number" value={routerPort} onChange={e => setRouterPort(+e.target.value)} className="input-field w-full text-xs" />
@@ -308,7 +308,7 @@ function AddDeviceModal({ device, node, existing, onSave, onClose }: AddDeviceMo
         <div className="bg-slate-50 rounded-xl p-3 flex items-center space-x-2">
           <Radio className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
           <div>
-            <p className="text-[10px] text-slate-400">Nodo asociado</p>
+            <p className="text-xs text-slate-500">Nodo asociado</p>
             <p className="text-xs font-bold text-slate-700">
               {node.nombre_nodo}
               {node.segmento_lan && <span className="font-mono font-normal text-slate-400 ml-1">({node.segmento_lan})</span>}
@@ -343,9 +343,9 @@ interface DeviceCardModalProps {
 
 function DeviceCardModal({ device, onClose, onRemove, onUpdate, isPreview }: DeviceCardModalProps) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl">
+      <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl animate-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between bg-slate-800 rounded-t-2xl px-4 py-2.5">
           <span className="text-xs font-bold text-slate-300">
             {isPreview ? 'Vista previa del dispositivo' : 'Detalle del dispositivo'}
@@ -423,8 +423,8 @@ function ExpandedStats({ dev }: { dev: ScannedDevice }) {
       color: s.ccq != null ? (s.ccq >= 80 ? 'text-emerald-600' : s.ccq >= 60 ? 'text-sky-600' : 'text-amber-500') : undefined,
       mono: true,
     },
-    { label: 'TX Rate',    value: s.txRate       != null ? `${s.txRate} Mbps`       : null, mono: true },
-    { label: 'RX Rate',    value: s.rxRate       != null ? `${s.rxRate} Mbps`       : null, mono: true },
+    { label: 'TX Rate', value: s.txRate != null ? `${s.txRate} Mbps` : null, mono: true },
+    { label: 'RX Rate', value: s.rxRate != null ? `${s.rxRate} Mbps` : null, mono: true },
     {
       label: 'CPU',
       value: s.cpuLoad != null ? `${s.cpuLoad}%` : null,
@@ -449,20 +449,20 @@ function ExpandedStats({ dev }: { dev: ScannedDevice }) {
       color: s.airmaxCapacity != null ? (s.airmaxCapacity >= 80 ? 'text-emerald-600' : s.airmaxCapacity >= 60 ? 'text-sky-600' : 'text-amber-500') : undefined,
       mono: true,
     },
-    { label: 'Uptime',     value: s.uptimeStr    || null,                                    mono: true },
-    { label: 'TX Power',   value: s.txPower      != null ? `${s.txPower} dBm`      : null,  mono: true },
-    { label: 'Canal',      value: s.channelWidth != null ? `${s.channelWidth} MHz` : null,  mono: true },
-    { label: 'Frecuencia', value: s.frequency    != null ? `${s.frequency} MHz`    : null,  mono: true },
-    { label: 'Modo',       value: s.mode         || null },
-    { label: 'Modo Red',   value: s.networkMode  || null },
-    { label: 'Seguridad',  value: s.security     || null },
-    { label: 'Chains',     value: s.chains       || null,                                    mono: true },
-    { label: 'WLAN MAC',   value: s.wlanMac      || null,                                    mono: true },
-    { label: 'LAN MAC',    value: s.lanMac       || null,                                    mono: true },
-    { label: 'AP MAC',     value: s.apMac        || null,                                    mono: true },
-    { label: 'Firmware',   value: fmtFirmware(s.firmwareVersion || dev.firmware) },
-    { label: 'Modelo',     value: s.deviceModel  || dev.model   || null },
-    { label: 'Hostname',   value: s.deviceName   || dev.name    || null },
+    { label: 'Uptime', value: s.uptimeStr || null, mono: true },
+    { label: 'TX Power', value: s.txPower != null ? `${s.txPower} dBm` : null, mono: true },
+    { label: 'Canal', value: s.channelWidth != null ? `${s.channelWidth} MHz` : null, mono: true },
+    { label: 'Frecuencia', value: s.frequency != null ? `${s.frequency} MHz` : null, mono: true },
+    { label: 'Modo', value: s.mode || null },
+    { label: 'Modo Red', value: s.networkMode || null },
+    { label: 'Seguridad', value: s.security || null },
+    { label: 'Chains', value: s.chains || null, mono: true },
+    { label: 'WLAN MAC', value: s.wlanMac || null, mono: true },
+    { label: 'LAN MAC', value: s.lanMac || null, mono: true },
+    { label: 'AP MAC', value: s.apMac || null, mono: true },
+    { label: 'Firmware', value: fmtFirmware(s.firmwareVersion || dev.firmware) },
+    { label: 'Modelo', value: s.deviceModel || dev.model || null },
+    { label: 'Hostname', value: s.deviceName || dev.name || null },
     { label: 'Estaciones', value: s.stations?.length != null ? String(s.stations.length) : null },
   ].filter(i => i.value != null && i.value !== '') as (StatItem & { value: string })[];
 
@@ -472,11 +472,11 @@ function ExpandedStats({ dev }: { dev: ScannedDevice }) {
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center space-x-2">
           <div className="w-1 h-4 bg-indigo-400 rounded-full" />
-          <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">
+          <span className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-widest">
             Estadísticas completas · {dev.ip}
           </span>
           {dev.sshUser && (
-            <span className="text-[9px] font-mono text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-200">
+            <span className="text-[10px] sm:text-xs font-mono text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-200">
               {dev.sshUser}
             </span>
           )}
@@ -485,7 +485,7 @@ function ExpandedStats({ dev }: { dev: ScannedDevice }) {
         {s._rawJson && (
           <button
             onClick={() => setShowRaw(r => !r)}
-            className="flex items-center space-x-1 text-[9px] font-bold text-slate-400 hover:text-indigo-600 transition-colors px-2 py-1 rounded-md hover:bg-indigo-50"
+            className="flex items-center space-x-1 text-xs font-bold text-slate-500 hover:text-indigo-600 transition-colors px-2 py-1 rounded-md hover:bg-indigo-50"
           >
             <Info className="w-3 h-3" />
             <span>{showRaw ? 'Ocultar JSON' : 'Ver JSON crudo'}</span>
@@ -496,9 +496,9 @@ function ExpandedStats({ dev }: { dev: ScannedDevice }) {
       {/* Grid de stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-1.5">
         {items.map(item => (
-          <div key={item.label} className="bg-white rounded-lg px-2.5 py-2 border border-slate-100 shadow-sm">
-            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">{item.label}</p>
-            <p className={`text-xs font-bold truncate ${item.color ?? 'text-slate-700'} ${item.mono ? 'font-mono' : ''}`}>
+          <div key={item.label} className="bg-white rounded-lg px-3 py-2 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+            <p className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">{item.label}</p>
+            <p className={`text-sm font-bold truncate ${item.color ?? 'text-slate-800'} ${item.mono ? 'font-mono tracking-tight' : ''}`}>
               {item.value}
             </p>
           </div>
@@ -508,21 +508,21 @@ function ExpandedStats({ dev }: { dev: ScannedDevice }) {
       {/* Estaciones del AP */}
       {s.stations && s.stations.length > 0 && (
         <div className="mt-3">
-          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
             Estaciones conectadas ({s.stations.length})
           </p>
           <div className="flex flex-wrap gap-1.5">
             {s.stations.map((sta, i) => (
-              <div key={i} className="bg-white border border-slate-100 rounded-lg px-2.5 py-1.5 flex items-center space-x-2 shadow-sm">
-                <span className="font-mono text-[10px] text-slate-600">{sta.mac}</span>
+              <div key={i} className="bg-white border border-slate-200 rounded-lg px-3 py-2 flex items-center space-x-3 shadow-sm hover:shadow-md transition-shadow">
+                <span className="font-mono text-xs font-semibold text-slate-700">{sta.mac}</span>
                 {sta.signal != null && (
-                  <span className={`text-[10px] font-bold ${sta.signal >= -65 ? 'text-emerald-500' : sta.signal >= -75 ? 'text-sky-500' : 'text-amber-500'}`}>
+                  <span className={`text-xs font-bold ${sta.signal >= -65 ? 'text-emerald-600' : sta.signal >= -75 ? 'text-sky-600' : 'text-amber-500'}`}>
                     {sta.signal} dBm
                   </span>
                 )}
-                {sta.ccq    != null && <span className="text-[10px] text-slate-400">{sta.ccq}%</span>}
-                {sta.txRate != null && <span className="font-mono text-[10px] text-slate-400">{sta.txRate}↑</span>}
-                {sta.rxRate != null && <span className="font-mono text-[10px] text-slate-400">{sta.rxRate}↓</span>}
+                {sta.ccq != null && <span className="text-xs text-slate-500">CCQ {sta.ccq}%</span>}
+                {sta.txRate != null && <span className="font-mono text-xs text-slate-500">TX {sta.txRate}↑</span>}
+                {sta.rxRate != null && <span className="font-mono text-xs text-slate-500">RX {sta.rxRate}↓</span>}
               </div>
             ))}
           </div>
@@ -554,14 +554,14 @@ function ExpandedStats({ dev }: { dev: ScannedDevice }) {
 
 // ── Utilidades de formato ────────────────────────────────────────────────
 const fmtBytes = (b: number): string => {
-  if (b < 1024)        return `${b} B`;
-  if (b < 1_048_576)   return `${(b / 1024).toFixed(1)} KB`;
+  if (b < 1024) return `${b} B`;
+  if (b < 1_048_576) return `${(b / 1024).toFixed(1)} KB`;
   if (b < 1_073_741_824) return `${(b / 1_048_576).toFixed(1)} MB`;
   return `${(b / 1_073_741_824).toFixed(2)} GB`;
 };
 const fmtPkts = (n: number): string =>
   n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` :
-  n >= 1_000     ? `${(n / 1_000).toFixed(1)}K` : String(n);
+    n >= 1_000 ? `${(n / 1_000).toFixed(1)}K` : String(n);
 
 // Bloque raw colapsable — reutilizable en el modal
 function RawBlock({ title, content, icon }: { title: string; content: string | null | undefined; icon?: React.ReactNode }) {
@@ -595,7 +595,6 @@ function RawBlock({ title, content, icon }: { title: string; content: string | n
 }
 
 // ── Strips raw diagnostic fields before saving to IndexedDB ──────────────
-import type { AntennaStats } from '../types/devices';
 const stripRawStats = (stats?: AntennaStats): AntennaStats | undefined => {
   if (!stats) return stats;
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -622,50 +621,60 @@ function SshDataModal({ dev, onClose }: SshDataModalProps) {
     v != null ? (v < lo ? 'text-emerald-600' : v < mid ? 'text-amber-500' : 'text-rose-500') : '';
 
   const groups = [
-    { title: 'Señal RF', items: [
-      { l: 'Señal',       v: s.signal      != null ? `${s.signal} dBm`      : null, c: col(s.signal, -65, -75),     mono: true },
-      { l: 'Noise Floor', v: s.noiseFloor  != null ? `${s.noiseFloor} dBm`  : null,                                 mono: true },
-      { l: 'SNR',         v: snr           != null ? `${snr} dB`             : null, c: col(snr, 30, 15),            mono: true },
-      { l: 'CCQ',         v: s.ccq         != null ? `${s.ccq}%`             : null, c: col(s.ccq, 80, 60),          mono: true },
-      { l: 'TX Rate',     v: s.txRate      != null ? `${s.txRate} Mbps`      : null,                                 mono: true },
-      { l: 'RX Rate',     v: s.rxRate      != null ? `${s.rxRate} Mbps`      : null,                                 mono: true },
-    ]},
-    { title: 'AirMax', items: [
-      { l: 'AM Quality',  v: s.airmaxQuality  != null ? `${s.airmaxQuality}%`  : null, c: col(s.airmaxQuality, 80, 60),  mono: true },
-      { l: 'AM Capacity', v: s.airmaxCapacity != null ? `${s.airmaxCapacity}%` : null, c: col(s.airmaxCapacity, 80, 60), mono: true },
-      { l: 'AirMax',      v: s.airmaxEnabled  != null ? (s.airmaxEnabled ? 'Habilitado' : 'Deshabilitado') : null },
-    ]},
-    { title: 'Canal / RF', items: [
-      { l: 'Frecuencia',  v: s.frequency    != null ? `${s.frequency} MHz`    : null, mono: true },
-      { l: 'Ancho Canal', v: s.channelWidth != null ? `${s.channelWidth} MHz` : null, mono: true },
-      { l: 'TX Power',    v: s.txPower      != null ? `${s.txPower} dBm`      : null, mono: true },
-      { l: 'Distancia',   v: s.distance     != null ? `${s.distance} m`       : null, mono: true },
-      { l: 'Chains',      v: s.chains                                          || null, mono: true },
-    ]},
-    { title: 'Sistema', items: [
-      { l: 'CPU',         v: s.cpuLoad       != null ? `${s.cpuLoad}%`        : null, c: colLow(s.cpuLoad, 50, 80),       mono: true },
-      { l: 'RAM',         v: s.memoryPercent != null ? `${s.memoryPercent}%`  : null, c: colLow(s.memoryPercent, 60, 80), mono: true },
-      { l: 'Uptime',      v: s.uptimeStr                                       || null, mono: true },
-      { l: 'Fecha',       v: s.deviceDate                                      || null },
-      { l: 'Firmware',    v: fmtFw(s.firmwareVersion || dev.firmware) },
-      { l: 'Modelo',      v: s.deviceModel  || dev.model                      || null },
-      { l: 'Hostname',    v: s.deviceName   || dev.name                       || null },
-    ]},
-    { title: 'Red', items: [
-      { l: 'Modo',        v: s.mode                                            || null },
-      { l: 'Modo Red',    v: s.networkMode                                     || null },
-      { l: 'SSID',        v: s.essid                                           || null },
-      { l: 'Seguridad',   v: s.security                                        || null },
-      { l: 'WLAN MAC',    v: s.wlanMac                                         || null, mono: true },
-      { l: 'LAN MAC',     v: s.lanMac                                          || null, mono: true },
-      { l: 'AP MAC',      v: s.apMac                                           || null, mono: true },
-    ]},
+    {
+      title: 'Señal RF', items: [
+        { l: 'Señal', v: s.signal != null ? `${s.signal} dBm` : null, c: col(s.signal, -65, -75), mono: true },
+        { l: 'Noise Floor', v: s.noiseFloor != null ? `${s.noiseFloor} dBm` : null, mono: true },
+        { l: 'SNR', v: snr != null ? `${snr} dB` : null, c: col(snr, 30, 15), mono: true },
+        { l: 'CCQ', v: s.ccq != null ? `${s.ccq}%` : null, c: col(s.ccq, 80, 60), mono: true },
+        { l: 'TX Rate', v: s.txRate != null ? `${s.txRate} Mbps` : null, mono: true },
+        { l: 'RX Rate', v: s.rxRate != null ? `${s.rxRate} Mbps` : null, mono: true },
+      ]
+    },
+    {
+      title: 'AirMax', items: [
+        { l: 'AM Quality', v: s.airmaxQuality != null ? `${s.airmaxQuality}%` : null, c: col(s.airmaxQuality, 80, 60), mono: true },
+        { l: 'AM Capacity', v: s.airmaxCapacity != null ? `${s.airmaxCapacity}%` : null, c: col(s.airmaxCapacity, 80, 60), mono: true },
+        { l: 'AirMax', v: s.airmaxEnabled != null ? (s.airmaxEnabled ? 'Habilitado' : 'Deshabilitado') : null },
+      ]
+    },
+    {
+      title: 'Canal / RF', items: [
+        { l: 'Frecuencia', v: s.frequency != null ? `${s.frequency} MHz` : null, mono: true },
+        { l: 'Ancho Canal', v: s.channelWidth != null ? `${s.channelWidth} MHz` : null, mono: true },
+        { l: 'TX Power', v: s.txPower != null ? `${s.txPower} dBm` : null, mono: true },
+        { l: 'Distancia', v: s.distance != null ? `${s.distance} m` : null, mono: true },
+        { l: 'Chains', v: s.chains || null, mono: true },
+      ]
+    },
+    {
+      title: 'Sistema', items: [
+        { l: 'CPU', v: s.cpuLoad != null ? `${s.cpuLoad}%` : null, c: colLow(s.cpuLoad, 50, 80), mono: true },
+        { l: 'RAM', v: s.memoryPercent != null ? `${s.memoryPercent}%` : null, c: colLow(s.memoryPercent, 60, 80), mono: true },
+        { l: 'Uptime', v: s.uptimeStr || null, mono: true },
+        { l: 'Fecha', v: s.deviceDate || null },
+        { l: 'Firmware', v: fmtFw(s.firmwareVersion || dev.firmware) },
+        { l: 'Modelo', v: s.deviceModel || dev.model || null },
+        { l: 'Hostname', v: s.deviceName || dev.name || null },
+      ]
+    },
+    {
+      title: 'Red', items: [
+        { l: 'Modo', v: s.mode || null },
+        { l: 'Modo Red', v: s.networkMode || null },
+        { l: 'SSID', v: s.essid || null },
+        { l: 'Seguridad', v: s.security || null },
+        { l: 'WLAN MAC', v: s.wlanMac || null, mono: true },
+        { l: 'LAN MAC', v: s.lanMac || null, mono: true },
+        { l: 'AP MAC', v: s.apMac || null, mono: true },
+      ]
+    },
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
         {/* Header */}
         <div className="flex items-center justify-between bg-slate-800 rounded-t-2xl px-5 py-3 shrink-0">
           <div>
@@ -687,14 +696,14 @@ function SshDataModal({ dev, onClose }: SshDataModalProps) {
             return (
               <div key={group.title}>
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">{group.title}</span>
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-widest whitespace-nowrap">{group.title}</span>
                   <div className="flex-1 border-t border-slate-100" />
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                   {items.map(item => (
-                    <div key={item.l} className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">
-                      <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">{item.l}</p>
-                      <p className={`text-xs font-bold truncate ${item.c ?? 'text-slate-700'} ${item.mono ? 'font-mono' : ''}`}>{item.v}</p>
+                    <div key={item.l} className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 shadow-sm">
+                      <p className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">{item.l}</p>
+                      <p className={`text-sm font-bold truncate ${item.c ?? 'text-slate-800'} ${item.mono ? 'font-mono tracking-tight' : ''}`}>{item.v}</p>
                     </div>
                   ))}
                 </div>
@@ -706,17 +715,17 @@ function SshDataModal({ dev, onClose }: SshDataModalProps) {
           {s.stations && s.stations.length > 0 && (
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Estaciones ({s.stations.length})</span>
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Estaciones ({s.stations.length})</span>
                 <div className="flex-1 border-t border-slate-100" />
               </div>
               <div className="space-y-1">
                 {s.stations.map((sta, i) => (
-                  <div key={i} className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-100 flex flex-wrap gap-x-3 gap-y-0.5 items-center">
-                    <span className="font-mono text-[10px] text-slate-600">{sta.mac}</span>
-                    {sta.signal != null && <span className={`text-[10px] font-bold ${sta.signal >= -65 ? 'text-emerald-600' : sta.signal >= -75 ? 'text-sky-600' : 'text-amber-500'}`}>{sta.signal} dBm</span>}
-                    {sta.ccq    != null && <span className="text-[10px] text-slate-500">CCQ {sta.ccq}%</span>}
-                    {sta.txRate != null && <span className="font-mono text-[10px] text-slate-500">TX {sta.txRate} Mbps</span>}
-                    {sta.rxRate != null && <span className="font-mono text-[10px] text-slate-500">RX {sta.rxRate} Mbps</span>}
+                  <div key={i} className="bg-slate-50 rounded-lg px-3 py-3 border border-slate-200 flex flex-wrap gap-x-4 gap-y-1 items-center shadow-sm">
+                    <span className="font-mono text-xs font-semibold text-slate-700">{sta.mac}</span>
+                    {sta.signal != null && <span className={`text-xs font-bold ${sta.signal >= -65 ? 'text-emerald-600' : sta.signal >= -75 ? 'text-sky-600' : 'text-amber-500'}`}>{sta.signal} dBm</span>}
+                    {sta.ccq != null && <span className="text-xs text-slate-600">CCQ <span className="font-semibold">{sta.ccq}%</span></span>}
+                    {sta.txRate != null && <span className="font-mono text-xs text-slate-600">TX <span className="font-semibold">{sta.txRate}</span> Mbps</span>}
+                    {sta.rxRate != null && <span className="font-mono text-xs text-slate-600">RX <span className="font-semibold">{sta.rxRate}</span> Mbps</span>}
                   </div>
                 ))}
               </div>
@@ -727,12 +736,12 @@ function SshDataModal({ dev, onClose }: SshDataModalProps) {
           {s.ifaceTraffic && Object.keys(s.ifaceTraffic).length > 0 && (
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Tráfico por interfaz</span>
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Tráfico por interfaz</span>
                 <div className="flex-1 border-t border-slate-100" />
               </div>
               <div className="rounded-xl border border-slate-200 overflow-hidden">
-                <div className="grid grid-cols-[80px_1fr_1fr_1fr_1fr] bg-slate-50 border-b border-slate-200 px-3 py-1.5
-                  text-[8px] font-bold text-slate-400 uppercase tracking-wider">
+                <div className="grid grid-cols-[80px_1fr_1fr_1fr_1fr] bg-slate-100 border-b border-slate-200 px-4 py-2.5
+                  text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                   <span>Interfaz</span>
                   <span className="text-right">RX Bytes</span>
                   <span className="text-right">RX Paq.</span>
@@ -741,8 +750,8 @@ function SshDataModal({ dev, onClose }: SshDataModalProps) {
                 </div>
                 {Object.entries(s.ifaceTraffic).map(([iface, t], idx) => (
                   <div key={iface}
-                    className={`grid grid-cols-[80px_1fr_1fr_1fr_1fr] px-3 py-2 border-b border-slate-100 last:border-0 text-[10px]
-                      ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}>
+                    className={`grid grid-cols-[80px_1fr_1fr_1fr_1fr] px-4 py-3 border-b border-slate-100 last:border-0 text-xs items-center
+                      ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
                     <span className="font-mono font-bold text-slate-700">{iface}</span>
                     <span className="font-mono text-right text-sky-700 font-semibold">{fmtBytes(t.rxBytes)}</span>
                     <span className="font-mono text-right text-slate-500">{fmtPkts(t.rxPackets)}</span>
@@ -763,30 +772,30 @@ function SshDataModal({ dev, onClose }: SshDataModalProps) {
               </div>
               {(() => {
                 const total = s.memTotalKb!;
-                const free  = s.memFreeKb  ?? 0;
-                const buf   = s.memBuffersKb ?? 0;
-                const cache = s.memCachedKb  ?? 0;
-                const used  = total - free - buf - cache;
-                const pct   = (v: number) => Math.round((v / total) * 100);
-                const bar   = (v: number, cls: string) => (
+                const free = s.memFreeKb ?? 0;
+                const buf = s.memBuffersKb ?? 0;
+                const cache = s.memCachedKb ?? 0;
+                const used = total - free - buf - cache;
+                const pct = (v: number) => Math.round((v / total) * 100);
+                const bar = (v: number, cls: string) => (
                   <div className={`h-full ${cls}`} style={{ width: `${pct(v)}%` }} title={`${fmtBytes(v * 1024)} (${pct(v)}%)`} />
                 );
                 return (
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <div className="flex-1 h-4 bg-slate-100 rounded-full overflow-hidden flex">
-                        {bar(Math.max(0, used),  'bg-rose-400')}
-                        {bar(buf,   'bg-amber-400')}
+                        {bar(Math.max(0, used), 'bg-rose-400')}
+                        {bar(buf, 'bg-amber-400')}
                         {bar(cache, 'bg-sky-400')}
-                        {bar(free,  'bg-emerald-400')}
+                        {bar(free, 'bg-emerald-400')}
                       </div>
                       <span className="text-[9px] font-bold text-slate-500 shrink-0">{fmtBytes(total * 1024)}</span>
                     </div>
                     <div className="flex flex-wrap gap-3 text-[9px]">
-                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-rose-400 shrink-0" />Usada {pct(Math.max(0,used))}% · {fmtBytes(Math.max(0,used)*1024)}</span>
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-rose-400 shrink-0" />Usada {pct(Math.max(0, used))}% · {fmtBytes(Math.max(0, used) * 1024)}</span>
                       <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-amber-400 shrink-0" />Buffers {pct(buf)}%</span>
                       <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-sky-400 shrink-0" />Caché {pct(cache)}%</span>
-                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-emerald-400 shrink-0" />Libre {pct(free)}% · {fmtBytes(free*1024)}</span>
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-emerald-400 shrink-0" />Libre {pct(free)}% · {fmtBytes(free * 1024)}</span>
                     </div>
                   </div>
                 );
@@ -795,12 +804,12 @@ function SshDataModal({ dev, onClose }: SshDataModalProps) {
           )}
 
           {/* ── Secciones raw colapsables ── */}
-          <RawBlock title="Parámetros inalámbricos (iwconfig ath0)"  content={s._rawIwconfig} />
-          <RawBlock title="Estaciones conectadas (wstalist)"         content={s._rawWstalist} />
-          <RawBlock title="Estado del enlace (mca-cli-op info)"      content={s._rawMcaCli}   />
-          <RawBlock title="Tabla de rutas (route -n)"                content={s._rawRoutes}   />
-          <RawBlock title="Sistema / Kernel (uname + uptime)"        content={s._rawUname}    />
-          <RawBlock title="Memoria raw (/proc/meminfo)"              content={s._rawMeminfo}  />
+          <RawBlock title="Parámetros inalámbricos (iwconfig ath0)" content={s._rawIwconfig} />
+          <RawBlock title="Estaciones conectadas (wstalist)" content={s._rawWstalist} />
+          <RawBlock title="Estado del enlace (mca-cli-op info)" content={s._rawMcaCli} />
+          <RawBlock title="Tabla de rutas (route -n)" content={s._rawRoutes} />
+          <RawBlock title="Sistema / Kernel (uname + uptime)" content={s._rawUname} />
+          <RawBlock title="Memoria raw (/proc/meminfo)" content={s._rawMeminfo} />
 
           {/* Raw JSON mca-status */}
           {s._rawJson && (
@@ -848,17 +857,17 @@ function ColumnPicker({ visibleCols, onChange }: ColumnPickerProps) {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const visibleSet  = new Set(visibleCols);
-  const hiddenCols  = COLUMN_DEFS.filter(c => !visibleSet.has(c.key));
-  const remove      = (key: string) => onChange(visibleCols.filter(k => k !== key));
-  const addCol      = (key: string) => onChange([...visibleCols, key]);
-  const moveUp      = (idx: number) => {
+  const visibleSet = new Set(visibleCols);
+  const hiddenCols = COLUMN_DEFS.filter(c => !visibleSet.has(c.key));
+  const remove = (key: string) => onChange(visibleCols.filter(k => k !== key));
+  const addCol = (key: string) => onChange([...visibleCols, key]);
+  const moveUp = (idx: number) => {
     if (idx === 0) return;
-    const next = [...visibleCols]; [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]]; onChange(next);
+    const next = [...visibleCols];[next[idx - 1], next[idx]] = [next[idx], next[idx - 1]]; onChange(next);
   };
-  const moveDown    = (idx: number) => {
+  const moveDown = (idx: number) => {
     if (idx === visibleCols.length - 1) return;
-    const next = [...visibleCols]; [next[idx + 1], next[idx]] = [next[idx], next[idx + 1]]; onChange(next);
+    const next = [...visibleCols];[next[idx + 1], next[idx]] = [next[idx], next[idx + 1]]; onChange(next);
   };
 
   return (
@@ -951,17 +960,17 @@ function ColumnPicker({ visibleCols, onChange }: ColumnPickerProps) {
 export default function NetworkDevicesModule() {
   const { credentials, activeNodeVrf, nodes, setNodes } = useVpn();
 
-  const [savedDevices, setSavedDevices]     = useState<SavedDevice[]>([]);
-  const [scanResults,  setScanResults]      = useState<ScannedDevice[]>([]);
-  const [allScannedIPs, setAllScannedIPs]   = useState<string[]>([]);
-  const [scannedCount, setScannedCount]     = useState(0);
-  const [debugMsg,     setDebugMsg]         = useState('');
-  const [scanError,    setScanError]        = useState('');
-  const [selectedNode, setSelectedNode]     = useState<NodeInfo | null>(null);
-  const [manualLan,    setManualLan]        = useState('');
-  const [addingDevice, setAddingDevice]       = useState<ScannedDevice | null>(null);
-  const [editingDevice, setEditingDevice]     = useState<SavedDevice | null>(null);
-  const [viewingDevice, setViewingDevice]     = useState<SavedDevice | null>(null);
+  const [savedDevices, setSavedDevices] = useState<SavedDevice[]>([]);
+  const [scanResults, setScanResults] = useState<ScannedDevice[]>([]);
+  const [allScannedIPs, setAllScannedIPs] = useState<string[]>([]);
+  const [scannedCount, setScannedCount] = useState(0);
+  const [debugMsg, setDebugMsg] = useState('');
+  const [scanError, setScanError] = useState('');
+  const [selectedNode, setSelectedNode] = useState<NodeInfo | null>(null);
+  const [manualLan, setManualLan] = useState('');
+  const [addingDevice, setAddingDevice] = useState<ScannedDevice | null>(null);
+  const [editingDevice, setEditingDevice] = useState<SavedDevice | null>(null);
+  const [viewingDevice, setViewingDevice] = useState<SavedDevice | null>(null);
   const [viewingRawDevice, setViewingRawDevice] = useState<ScannedDevice | null>(null);
 
   // Estado de fases del escaneo
@@ -989,43 +998,21 @@ export default function NetworkDevicesModule() {
     return COLUMN_DEFS.filter(c => c.defaultVisible).map(c => c.key);
   });
 
-  const [savedIds,        setSavedIds]        = useState<Set<string>>(new Set());
-  const [isLoadingNodes,  setIsLoadingNodes]   = useState(false);
-  const [toast,             setToast]            = useState('');
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [isLoadingNodes, setIsLoadingNodes] = useState(false);
+  const [toast, setToast] = useState('');
   const [discoveryProgress, setDiscoveryProgress] = useState(0);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const [sortConfig, setSortConfig] = useState<{ key: string; dir: 'asc' | 'desc' } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterSSID,  setFilterSSID]  = useState('');
+  const [filterSSID, setFilterSSID] = useState('');
 
-  const [showCredsConfig, setShowCredsConfig] = useState(false);
-  const [scanCreds, setScanCreds] = useState<ScanCred[]>(() => {
-    const saved = localStorage.getItem('vpn_scan_creds_v1');
-    return saved ? JSON.parse(saved) : [{ user: 'ubnt', pass: 'ubnt' }];
-  });
-
-  useEffect(() => {
-    localStorage.setItem('vpn_scan_creds_v1', JSON.stringify(scanCreds));
-  }, [scanCreds]);
+  const [nodeSshCreds, setNodeSshCreds] = useState<ScanCred[]>([]);
 
   const saveVisibleCols = (cols: string[]) => {
     setVisibleCols(cols);
     try { localStorage.setItem(COLS_STORAGE_KEY, JSON.stringify(cols)); } catch { /* silent */ }
-  };
-
-  const moveCredUp = (index: number) => {
-    if (index === 0) return;
-    const newCreds = [...scanCreds];
-    [newCreds[index - 1], newCreds[index]] = [newCreds[index], newCreds[index - 1]];
-    setScanCreds(newCreds);
-  };
-
-  const moveCredDown = (index: number) => {
-    if (index === scanCreds.length - 1) return;
-    const newCreds = [...scanCreds];
-    [newCreds[index + 1], newCreds[index]] = [newCreds[index], newCreds[index + 1]];
-    setScanCreds(newCreds);
   };
 
   const showToast = (msg: string) => {
@@ -1100,10 +1087,16 @@ export default function NetworkDevicesModule() {
       const active = nodes.find(n => n.nombre_vrf === activeNodeVrf);
       if (active) {
         setSelectedNode(active);
-        if (active.segmento_lan) setManualLan(active.segmento_lan);
+        const subnets = active.lan_subnets?.length > 0 ? active.lan_subnets : active.segmento_lan ? [active.segmento_lan] : [];
+        if (subnets.length > 0) setManualLan(subnets[0]);
       }
     }
   }, [activeNodeVrf, nodes]);
+
+  const activeNode = activeNodeVrf ? nodes.find(n => n.nombre_vrf === activeNodeVrf) ?? null : null;
+  const availableSubnets: string[] = activeNode
+    ? (activeNode.lan_subnets?.length > 0 ? activeNode.lan_subnets : activeNode.segmento_lan ? [activeNode.segmento_lan] : [])
+    : [];
 
   const effectiveLan = manualLan.trim() || selectedNode?.segmento_lan || '';
 
@@ -1140,9 +1133,9 @@ export default function NetworkDevicesModule() {
 
   // ── Fase 2 reutilizable: autenticación SSH vía /device/antenna (igual que "Guardar") ──
   // Usa el mismo endpoint que funciona al guardar manualmente, sin persistir en DB.
-  // Prueba las claves en orden: primero las del dispositivo guardado (si existe),
-  // luego las del panel de Auto-Login.
-  const runAuthPhase = async (devices: ScannedDevice[]) => {
+  // Prueba las claves del nodo activo en orden: primero las del dispositivo guardado (si existe),
+  // luego las del nodo activo.
+  const runAuthPhase = async (devices: ScannedDevice[], baseCreds: ScanCred[]) => {
     if (devices.length === 0) return;
 
     // Marcar todos como pendientes
@@ -1150,9 +1143,6 @@ export default function NetworkDevicesModule() {
     devices.forEach(d => { initialStatus[d.ip] = 'pending'; });
     setSshStatus(initialStatus);
     setScanState({ phase: 'authenticating', current: 0, total: devices.length });
-
-    // Claves del panel — snapshot en el momento de llamada
-    const baseCreds = scanCreds.filter(c => c.user && c.pass);
     let completed = 0;
     const batchSize = 3; // 3 dispositivos en paralelo
 
@@ -1175,13 +1165,15 @@ export default function NetworkDevicesModule() {
           }
 
           if (effectiveCreds.length === 0) {
-            setSshStatus(prev => ({ ...prev, [dev.ip]: 'failed' }));
+            // Sin credenciales → no marcar como error, simplemente continuar sin SSH
+            completed++;
+            setScanState(s => ({ ...s, current: completed }));
             return;
           }
 
           // Probar cada clave con /device/antenna — exactamente igual que al guardar
-          let foundUser  = '';
-          let foundPass  = '';
+          let foundUser = '';
+          let foundPass = '';
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           let foundStats: any = null;
 
@@ -1191,7 +1183,7 @@ export default function NetworkDevicesModule() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                  deviceIP:   dev.ip,
+                  deviceIP: dev.ip,
                   deviceUser: cred.user,
                   devicePass: cred.pass,
                   devicePort: 22,
@@ -1200,14 +1192,14 @@ export default function NetworkDevicesModule() {
               const d = await res.json();
               // Verificar que stats tiene datos reales (no solo el fallback { raw: "..." })
               if (d.success && d.stats && (d.stats.signal != null || d.stats.txRate != null || d.stats.deviceName != null || d.stats.firmwareVersion != null)) {
-                foundUser  = cred.user;
-                foundPass  = cred.pass;
+                foundUser = cred.user;
+                foundPass = cred.pass;
                 foundStats = d.stats;
                 break; // Clave correcta encontrada → detener el loop
               } else if (d.success && d.stats?.raw) {
                 // SSH funcionó pero mca-status no devolvió datos parseables — marcar igual como éxito parcial
-                foundUser  = cred.user;
-                foundPass  = cred.pass;
+                foundUser = cred.user;
+                foundPass = cred.pass;
                 foundStats = d.stats;
                 break;
               }
@@ -1221,21 +1213,21 @@ export default function NetworkDevicesModule() {
             setSshStatus(prev => ({ ...prev, [dev.ip]: 'success' }));
             setScanResults(prev => {
               const next = [...prev];
-              const idx  = next.findIndex(d => d.ip === dev.ip);
+              const idx = next.findIndex(d => d.ip === dev.ip);
               if (idx !== -1) {
                 next[idx] = {
                   ...next[idx],
-                  sshUser:     foundUser,
-                  sshPass:     foundPass,
-                  sshPort:     22,
+                  sshUser: foundUser,
+                  sshPass: foundPass,
+                  sshPort: 22,
                   cachedStats: s,
-                  name:        s.deviceName      || next[idx].name,
-                  model:       s.deviceModel     || next[idx].model,
-                  firmware:    s.firmwareVersion  || next[idx].firmware,
-                  mac:         s.wlanMac          || next[idx].mac,
-                  essid:       s.essid            || next[idx].essid,
-                  frequency:   s.frequency        || next[idx].frequency,
-                  role:        s.mode             || next[idx].role,
+                  name: s.deviceName || next[idx].name,
+                  model: s.deviceModel || next[idx].model,
+                  firmware: s.firmwareVersion || next[idx].firmware,
+                  mac: s.wlanMac || next[idx].mac,
+                  essid: s.essid || next[idx].essid,
+                  frequency: s.frequency || next[idx].frequency,
+                  role: s.mode || next[idx].role,
                 };
               }
               return next;
@@ -1284,7 +1276,24 @@ export default function NetworkDevicesModule() {
       setScannedCount(data.scanned ?? 0);
       setDebugMsg(data.debug ?? '');
 
-      await runAuthPhase(discoveredDevices);
+      // Cargar credenciales SSH del nodo activo
+      let creds: ScanCred[] = nodeSshCreds;
+      const activeNode2 = activeNodeVrf ? nodes.find(n => n.nombre_vrf === activeNodeVrf) : null;
+      if (activeNode2?.ppp_user) {
+        try {
+          const cr = await fetchWithTimeout(`${API_BASE_URL}/api/node/ssh-creds/get`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pppUser: activeNode2.ppp_user }),
+          }, 5_000);
+          const cd = await cr.json();
+          if (cd.success && Array.isArray(cd.creds) && cd.creds.length > 0) {
+            creds = cd.creds.filter((c: ScanCred) => c.user);
+            setNodeSshCreds(creds);
+          }
+        } catch { /* sin creds, continuar sin SSH */ }
+      }
+
+      await runAuthPhase(discoveredDevices, creds);
     } catch (err: unknown) {
       setScanError(err instanceof Error ? err.message : 'Error desconocido');
       setScanState({ phase: 'idle', current: 0, total: 0 });
@@ -1339,21 +1348,21 @@ export default function NetworkDevicesModule() {
           // Reflejar stats en la fila del escáner: actualiza cachedStats y marca como exitoso
           setScanResults(prev => {
             const next = [...prev];
-            const idx  = next.findIndex(r => r.ip === merged.ip);
+            const idx = next.findIndex(r => r.ip === merged.ip);
             if (idx !== -1) {
               next[idx] = {
                 ...next[idx],
-                sshUser:     merged.sshUser,
-                sshPass:     merged.sshPass,
-                sshPort:     merged.sshPort,
+                sshUser: merged.sshUser,
+                sshPass: merged.sshPass,
+                sshPort: merged.sshPort,
                 cachedStats: s,
-                name:        s.deviceName      || next[idx].name,
-                model:       s.deviceModel     || next[idx].model,
-                firmware:    s.firmwareVersion  || next[idx].firmware,
-                mac:         s.wlanMac          || next[idx].mac,
-                essid:       s.essid            ?? next[idx].essid,
-                frequency:   s.frequency        ?? next[idx].frequency,
-                role:        s.mode             || next[idx].role,
+                name: s.deviceName || next[idx].name,
+                model: s.deviceModel || next[idx].model,
+                firmware: s.firmwareVersion || next[idx].firmware,
+                mac: s.wlanMac || next[idx].mac,
+                essid: s.essid ?? next[idx].essid,
+                frequency: s.frequency ?? next[idx].frequency,
+                role: s.mode || next[idx].role,
               };
             }
             return next;
@@ -1392,7 +1401,7 @@ export default function NetworkDevicesModule() {
   const activeNodeName = activeNodeVrf
     ? nodes.find(n => n.nombre_vrf === activeNodeVrf)?.nombre_nodo ?? activeNodeVrf
     : null;
-  const canScan  = (scanState.phase === 'idle' || scanState.phase === 'done') && !!effectiveLan;
+  const canScan = (scanState.phase === 'idle' || scanState.phase === 'done') && !!effectiveLan;
   const isScanning = scanState.phase === 'discovering' || scanState.phase === 'authenticating';
 
   // Todos los dispositivos escaneados, marcando cuáles están guardados
@@ -1410,11 +1419,11 @@ export default function NetworkDevicesModule() {
     return scanRows.filter(({ dev }) => {
       const ssid = (dev.cachedStats?.essid ?? dev.essid ?? '').toLowerCase();
       const name = (dev.cachedStats?.deviceName ?? dev.name ?? '').toLowerCase();
-      const ip   = (dev.ip ?? '').toLowerCase();
-      const mac  = (dev.cachedStats?.wlanMac ?? dev.mac ?? '').toLowerCase();
-      const q    = searchQuery.toLowerCase().trim();
+      const ip = (dev.ip || '').toLowerCase();
+      const mac = (dev.cachedStats?.wlanMac ?? dev.mac ?? '').toLowerCase();
+      const q = searchQuery.toLowerCase().trim();
       const matchesSearch = !q || ip.includes(q) || name.includes(q) || ssid.includes(q) || mac.includes(q);
-      const matchesSSID   = !filterSSID || ssid === filterSSID.toLowerCase();
+      const matchesSSID = !filterSSID || ssid === filterSSID.toLowerCase();
       return matchesSearch && matchesSSID;
     });
   }, [scanRows, searchQuery, filterSSID]);
@@ -1425,23 +1434,23 @@ export default function NetworkDevicesModule() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let va: any, vb: any;
       switch (sortConfig.key) {
-        case 'ip':      va = a.dev.ip;  vb = b.dev.ip; break;
-        case 'name':    va = a.dev.cachedStats?.deviceName ?? a.dev.name;
-                        vb = b.dev.cachedStats?.deviceName ?? b.dev.name; break;
-        case 'essid':   va = a.dev.cachedStats?.essid ?? a.dev.essid ?? '';
-                        vb = b.dev.cachedStats?.essid ?? b.dev.essid ?? ''; break;
-        case 'signal':  va = a.dev.cachedStats?.signal   ?? -999;
-                        vb = b.dev.cachedStats?.signal   ?? -999; break;
-        case 'ccq':     va = a.dev.cachedStats?.ccq      ?? -1;
-                        vb = b.dev.cachedStats?.ccq      ?? -1; break;
-        case 'txPower': va = a.dev.cachedStats?.txPower  ?? 0;
-                        vb = b.dev.cachedStats?.txPower  ?? 0; break;
-        case 'uptime':  va = a.dev.cachedStats?.uptimeStr ?? '';
-                        vb = b.dev.cachedStats?.uptimeStr ?? ''; break;
-        default:        return 0;
+        case 'ip': va = a.dev.ip; vb = b.dev.ip; break;
+        case 'name': va = a.dev.cachedStats?.deviceName ?? a.dev.name;
+          vb = b.dev.cachedStats?.deviceName ?? b.dev.name; break;
+        case 'essid': va = a.dev.cachedStats?.essid ?? a.dev.essid ?? '';
+          vb = b.dev.cachedStats?.essid ?? b.dev.essid ?? ''; break;
+        case 'signal': va = a.dev.cachedStats?.signal ?? -999;
+          vb = b.dev.cachedStats?.signal ?? -999; break;
+        case 'ccq': va = a.dev.cachedStats?.ccq ?? -1;
+          vb = b.dev.cachedStats?.ccq ?? -1; break;
+        case 'txPower': va = a.dev.cachedStats?.txPower ?? 0;
+          vb = b.dev.cachedStats?.txPower ?? 0; break;
+        case 'uptime': va = a.dev.cachedStats?.uptimeStr ?? '';
+          vb = b.dev.cachedStats?.uptimeStr ?? ''; break;
+        default: return 0;
       }
       if (va < vb) return sortConfig.dir === 'asc' ? -1 : 1;
-      if (va > vb) return sortConfig.dir === 'asc' ?  1 : -1;
+      if (va > vb) return sortConfig.dir === 'asc' ? 1 : -1;
       return 0;
     });
   }, [filteredRows, sortConfig]);
@@ -1557,41 +1566,58 @@ export default function NetworkDevicesModule() {
 
       {/* Scanner section */}
       <div className="card p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-slate-700 flex items-center space-x-2">
-            <RefreshCw className="w-4 h-4 text-indigo-500" />
-            <span>Escanear LAN del nodo</span>
-          </h3>
-          <button onClick={loadNodes} disabled={isLoadingNodes}
-            className="flex items-center space-x-1.5 text-xs font-semibold text-slate-500 hover:text-indigo-600 transition-colors disabled:opacity-50">
-            {isLoadingNodes ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-            <span>{isLoadingNodes ? 'Cargando...' : `Recargar nodos (${nodes.length})`}</span>
-          </button>
-        </div>
+        <h3 className="text-sm font-bold text-slate-700 flex items-center space-x-2">
+          <RefreshCw className="w-4 h-4 text-indigo-500" />
+          <span>Escanear LAN del nodo</span>
+        </h3>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Nodo</label>
-            <select
-              value={selectedNode?.id ?? ''}
-              onChange={e => {
-                const n = nodes.find(x => x.id === e.target.value) ?? null;
-                setSelectedNode(n);
-                if (n?.segmento_lan) setManualLan(n.segmento_lan);
-              }}
-              className="input-field w-full text-sm"
-            >
-              <option value="">{nodes.length === 0 ? 'Cargando nodos...' : 'Seleccionar nodo...'}</option>
-              {nodes.map(n => (
-                <option key={n.id} value={n.id}>
-                  {n.nombre_nodo}{n.segmento_lan ? ` — ${n.segmento_lan}` : ''}{!n.running ? ' (offline)' : ''}
-                </option>
-              ))}
-            </select>
+        {isTunnelActive && activeNode ? (
+          <div className="space-y-3">
+            {/* Nodo activo — solo lectura */}
+            <div className="flex items-center gap-3 px-4 py-3 bg-emerald-50 border border-emerald-100 rounded-xl">
+              <Radio className="w-4 h-4 text-emerald-500 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-slate-800 truncate">{activeNode.nombre_nodo}</p>
+                <p className="text-[10px] font-mono text-slate-400 truncate">{activeNode.nombre_vrf}</p>
+              </div>
+            </div>
+
+            {/* Selector de subred */}
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                Subred LAN a escanear
+                {availableSubnets.length > 1 && (
+                  <span className="ml-1.5 normal-case font-normal text-slate-300">({availableSubnets.length} disponibles)</span>
+                )}
+              </label>
+              {availableSubnets.length > 1 ? (
+                <select
+                  value={manualLan}
+                  onChange={e => setManualLan(e.target.value)}
+                  className="input-field w-full text-sm font-mono"
+                >
+                  {availableSubnets.map(s => (
+                    <option key={s} value={s}>{s} ({estimateIpCount(s)} hosts)</option>
+                  ))}
+                </select>
+              ) : availableSubnets.length === 1 ? (
+                <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl">
+                  <span className="font-mono text-sm font-bold text-sky-600">{availableSubnets[0]}</span>
+                  <span className="text-[10px] text-slate-400 ml-1">· {estimateIpCount(availableSubnets[0])} hosts</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-100 rounded-xl">
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                  <span className="text-xs text-amber-600">No hay subredes configuradas en este nodo</span>
+                </div>
+              )}
+            </div>
           </div>
+        ) : (
+          /* Sin túnel activo: input manual */
           <div>
             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
-              Subred LAN (CIDR)
+              Subred LAN (CIDR) — manual
             </label>
             <input
               value={manualLan}
@@ -1599,81 +1625,22 @@ export default function NetworkDevicesModule() {
               placeholder="ej: 10.5.5.0/24"
               className="input-field w-full text-sm font-mono"
             />
+            <p className="text-[10px] text-slate-400 mt-1">Activa un túnel en la pestaña Nodos para autocompletar la subred.</p>
           </div>
-        </div>
+        )}
 
-        {/* Configuración Auto-Login Desplegable */}
-        <div className="border-t border-slate-100 pt-3 mt-1">
-          <button
-            onClick={() => setShowCredsConfig(!showCredsConfig)}
-            title="Configurar usuarios y contraseñas SSH para el auto-login durante el escaneo"
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors
-              ${showCredsConfig
-                ? 'bg-indigo-100 text-indigo-700 border-indigo-300'
-                : 'bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100'}`}
-          >
-            <Settings2 className="w-3.5 h-3.5" />
-            <span>Auto-Login SSH</span>
-            {scanCreds.length > 0 && (
-              <span className="bg-indigo-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-md min-w-[18px] text-center">
-                {scanCreds.length}
-              </span>
-            )}
-            <ChevronDown className={`w-3 h-3 transition-transform ${showCredsConfig ? 'rotate-180' : ''}`} />
-          </button>
-
-          {showCredsConfig && (
-            <div className="mt-3 bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
-              <p className="text-[10px] text-slate-500 max-w-xl leading-relaxed">
-                Agrega los usuarios y contraseñas comunes de tus antenas. El sistema las probará en orden (de arriba hacia abajo). Pon tu clave más común en el 1º lugar.
-                <strong className="text-amber-600 block mt-1">Nota: Más contraseñas aumentarán el tiempo de escaneo.</strong>
-              </p>
-              <div className="space-y-2.5">
-                {scanCreds.map((cred, i) => (
-                  <div key={i} className="flex items-center gap-2 bg-white p-2 rounded-xl border border-slate-200 shadow-sm transition-all hover:border-indigo-300">
-                    <span className="text-[10px] font-black text-slate-400 w-4 text-center">{i + 1}º</span>
-                    <div className="relative flex-1">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                      <input
-                        type="text" placeholder="Usuario (ej: ubnt)" value={cred.user}
-                        onChange={e => { const c = [...scanCreds]; c[i].user = e.target.value; setScanCreds(c); }}
-                        className="w-full pl-8 pr-2 py-1.5 bg-slate-50 border border-transparent focus:bg-white focus:border-indigo-300 rounded-lg text-xs outline-none transition-all text-slate-700 font-semibold"
-                      />
-                    </div>
-                    <div className="relative flex-1">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                      <input
-                        type="password" placeholder="Contraseña" value={cred.pass}
-                        onChange={e => { const c = [...scanCreds]; c[i].pass = e.target.value; setScanCreds(c); }}
-                        className="w-full pl-8 pr-2 py-1.5 bg-slate-50 border border-transparent focus:bg-white focus:border-indigo-300 rounded-lg text-xs outline-none transition-all text-slate-700 font-mono"
-                      />
-                    </div>
-                    <div className="flex flex-col items-center gap-0.5 border-l border-slate-100 pl-1.5 ml-0.5">
-                      <button onClick={() => moveCredUp(i)} disabled={i === 0} title="Subir prioridad"
-                        className="p-0.5 text-slate-300 hover:text-indigo-600 disabled:opacity-30 transition-colors">
-                        <ChevronUp className="w-3.5 h-3.5" />
-                      </button>
-                      <button onClick={() => moveCredDown(i)} disabled={i === scanCreds.length - 1} title="Bajar prioridad"
-                        className="p-0.5 text-slate-300 hover:text-indigo-600 disabled:opacity-30 transition-colors">
-                        <ChevronDown className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                    <button onClick={() => setScanCreds(scanCreds.filter((_, idx) => idx !== i))}
-                      title="Eliminar credencial"
-                      className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors shrink-0 ml-0.5">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <button onClick={() => { if (scanCreds.length < 5) setScanCreds([...scanCreds, { user: 'ubnt', pass: '' }]) }}
-                disabled={scanCreds.length >= 5}
-                className="flex items-center space-x-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 disabled:opacity-50">
-                <PlusCircle className="w-3.5 h-3.5" /> <span>Añadir Credencial ({scanCreds.length}/5)</span>
-              </button>
+        {/* Info de credenciales SSH del nodo activo */}
+        {isTunnelActive && activeNode && (
+          <div className="border-t border-slate-100 pt-3 mt-1 flex items-center gap-2">
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs border ${nodeSshCreds.length > 0 ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>
+              <KeyRound className="w-3.5 h-3.5 shrink-0" />
+              {nodeSshCreds.length > 0
+                ? <span>SSH: <strong>{nodeSshCreds.map(c => c.user).join(', ')}</strong> · {nodeSshCreds.length} credencial{nodeSshCreds.length > 1 ? 'es' : ''}</span>
+                : <span>Sin credenciales SSH — configúralas en el nodo (ícono <KeyRound className="w-3 h-3 inline" />)</span>
+              }
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         <div className="flex flex-wrap gap-2">
           {/* Botón principal: escanear red completa */}
@@ -1700,9 +1667,9 @@ export default function NetworkDevicesModule() {
                   <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
                 )}
                 <span>
-                  {scanState.phase === 'discovering'   ? 'Buscando dispositivos en la red...' :
-                   scanState.phase === 'authenticating' ? 'Probando accesos SSH y extrayendo datos...' :
-                                                          'Escaneo finalizado exitosamente'}
+                  {scanState.phase === 'discovering' ? 'Buscando dispositivos en la red...' :
+                    scanState.phase === 'authenticating' ? 'Probando accesos SSH y extrayendo datos...' :
+                      'Escaneo finalizado exitosamente'}
                 </span>
               </span>
               {scanState.phase === 'discovering' && (
@@ -1828,254 +1795,254 @@ export default function NetworkDevicesModule() {
             <div className="rounded-xl border border-slate-200 overflow-x-auto">
               <div style={{ minWidth: `${minTableWidth}px` }}>
 
-              {/* Fila de cabecera */}
-              <div
-                className="bg-slate-50 border-b border-slate-200 text-[9px] font-bold text-slate-400 uppercase tracking-wider rounded-tl-xl rounded-tr-xl"
-                style={{ display: 'grid', gridTemplateColumns: gridTemplate }}
-              >
-                <div className="px-2 py-2 text-center">SSH</div>
-                <div className="px-2 py-2">Rol</div>
+                {/* Fila de cabecera */}
                 <div
-                  className="px-2 py-2 cursor-pointer select-none flex items-center gap-1 hover:text-slate-600"
-                  onClick={() => toggleSort('ip')}
+                  className="bg-slate-100 border-b border-slate-200 text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider rounded-tl-xl rounded-tr-xl"
+                  style={{ display: 'grid', gridTemplateColumns: gridTemplate }}
                 >
-                  IP / MAC
-                  {sortConfig?.key === 'ip' && <span className="text-indigo-500">{sortConfig.dir === 'asc' ? '↑' : '↓'}</span>}
-                </div>
-                <div
-                  className="px-2 py-2 cursor-pointer select-none flex items-center gap-1 hover:text-slate-600"
-                  onClick={() => toggleSort('name')}
-                >
-                  Nombre / Modelo
-                  {sortConfig?.key === 'name' && <span className="text-indigo-500">{sortConfig.dir === 'asc' ? '↑' : '↓'}</span>}
-                </div>
-                {activeConfigCols.map(col => (
+                  <div className="px-3 py-3 text-center">SSH</div>
+                  <div className="px-3 py-3">Rol</div>
                   <div
-                    key={col.key}
-                    className="px-2 py-2 min-w-0 overflow-hidden cursor-pointer select-none flex items-center gap-1 hover:text-slate-600"
-                    onClick={() => toggleSort(col.key)}
+                    className="px-3 py-3 cursor-pointer select-none flex items-center gap-1 hover:text-slate-700"
+                    onClick={() => toggleSort('ip')}
                   >
-                    {col.label}
-                    {sortConfig?.key === col.key && <span className="text-indigo-500">{sortConfig.dir === 'asc' ? '↑' : '↓'}</span>}
+                    IP / MAC
+                    {sortConfig?.key === 'ip' && <span className="text-indigo-600">{sortConfig.dir === 'asc' ? '↑' : '↓'}</span>}
                   </div>
-                ))}
-                <div className="px-2 py-2" />
-                <div className="px-2 py-2 text-right">Acción</div>
-              </div>
-
-              {/* Filas de datos */}
-              {sortedRows.map(({ dev, isSaved, devId }, rowIdx) => {
-                const hasStats  = !!dev.cachedStats;
-                const isExpanded = expandedRows.has(dev.ip);
-                const rawMode   = dev.cachedStats?.mode || dev.role;
-                const isAp      = rawMode === 'ap' || rawMode === 'master';
-                const isSta     = rawMode === 'sta';
-                const freq      = dev.cachedStats?.frequency ?? dev.frequency;
-                const freqGhz   = freq ? (freq / 1000).toFixed(1) : null;
-                const displayName  = dev.cachedStats?.deviceName ?? (dev.name && dev.name !== dev.ip ? dev.name : null);
-                const displayModel = dev.cachedStats?.deviceModel || dev.model;
-                const displayMac   = dev.cachedStats?.wlanMac || dev.mac;
-
-                return (
-                  <Fragment key={dev.ip}>
-                    {/* Fila principal */}
+                  <div
+                    className="px-3 py-3 cursor-pointer select-none flex items-center gap-1 hover:text-slate-700"
+                    onClick={() => toggleSort('name')}
+                  >
+                    Nombre / Modelo
+                    {sortConfig?.key === 'name' && <span className="text-indigo-600">{sortConfig.dir === 'asc' ? '↑' : '↓'}</span>}
+                  </div>
+                  {activeConfigCols.map(col => (
                     <div
-                      style={{ display: 'grid', gridTemplateColumns: gridTemplate }}
-                      className={`items-center border-b transition-colors
-                        ${isSaved
-                          ? `${rowIdx % 2 === 0 ? 'bg-indigo-50/20' : 'bg-indigo-50/40'} hover:bg-indigo-50/70 border-indigo-100`
-                          : hasStats
-                            ? `${rowIdx % 2 === 0 ? 'bg-emerald-50/25' : 'bg-emerald-50/50'} hover:bg-emerald-50/70 border-emerald-100`
-                            : `${rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'} hover:bg-slate-50/80 border-slate-100`}
-                        ${isExpanded ? 'border-b-indigo-200' : ''}`}
+                      key={col.key}
+                      className="px-3 py-3 min-w-0 overflow-hidden cursor-pointer select-none flex items-center gap-1 hover:text-slate-700"
+                      onClick={() => toggleSort(col.key)}
                     >
-                      {/* SSH Status */}
-                      <div className="px-2 py-2.5 flex items-center justify-center">
-                        {sshStatus[dev.ip] === 'pending' && (
-                          <Loader2 className="w-3.5 h-3.5 text-slate-300 animate-spin" />
-                        )}
-                        {sshStatus[dev.ip] === 'success' && (
-                          <div
-                            title={`SSH exitoso: ${dev.sshUser}`}
-                            className="w-5 h-5 rounded-md bg-emerald-100 flex items-center justify-center border border-emerald-200"
-                          >
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                          </div>
-                        )}
-                        {sshStatus[dev.ip] === 'failed' && (
-                          <div
-                            title="Sin acceso SSH"
-                            className="w-5 h-5 rounded-md bg-rose-50 flex items-center justify-center border border-rose-100"
-                          >
-                            <X className="w-3 h-3 text-rose-400" />
-                          </div>
-                        )}
-                        {!sshStatus[dev.ip] && <div className="w-5 h-5" />}
-                      </div>
+                      {col.label}
+                      {sortConfig?.key === col.key && <span className="text-indigo-600">{sortConfig.dir === 'asc' ? '↑' : '↓'}</span>}
+                    </div>
+                  ))}
+                  <div className="px-3 py-3" />
+                  <div className="px-3 py-3 text-right">Acción</div>
+                </div>
 
-                      {/* Rol + Frecuencia */}
-                      <div className="px-2 py-2.5">
-                        {(isAp || isSta) ? (
-                          <span className={`inline-flex text-[10px] font-bold px-1.5 py-0.5 rounded-md
-                            ${isAp ? 'bg-indigo-100 text-indigo-700' : 'bg-violet-100 text-violet-700'}`}>
-                            {isAp ? 'AP' : 'CPE'}
-                          </span>
-                        ) : rawMode && rawMode !== 'unknown' ? (
-                          <span className="inline-flex text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500">
-                            {String(rawMode).toUpperCase()}
-                          </span>
-                        ) : (
-                          <span
-                            className="text-[10px] text-slate-300"
-                            title={sshStatus[dev.ip] === 'failed' ? 'SSH sin acceso — modo no detectado' : 'Pendiente datos SSH'}
-                          >—</span>
-                        )}
-                        {freqGhz && (
-                          <p className={`text-[9px] font-bold mt-0.5 ${freq! >= 5000 ? 'text-sky-600' : 'text-amber-600'}`}>
-                            {freqGhz}G
-                          </p>
-                        )}
-                      </div>
+                {/* Filas de datos */}
+                {sortedRows.map(({ dev, isSaved, devId }, rowIdx) => {
+                  const hasStats = !!dev.cachedStats;
+                  const isExpanded = expandedRows.has(dev.ip);
+                  const rawMode = dev.cachedStats?.mode || dev.role;
+                  const isAp = rawMode === 'ap' || rawMode === 'master';
+                  const isSta = rawMode === 'sta';
+                  const freq = dev.cachedStats?.frequency ?? dev.frequency;
+                  const freqGhz = freq ? (freq / 1000).toFixed(1) : null;
+                  const displayName = dev.cachedStats?.deviceName ?? (dev.name && dev.name !== dev.ip ? dev.name : null);
+                  const displayModel = dev.cachedStats?.deviceModel || dev.model;
+                  const displayMac = dev.cachedStats?.wlanMac || dev.mac;
 
-                      {/* IP / MAC */}
-                      <div className="px-2 py-2.5 min-w-0 pr-3">
-                        <p className="font-mono text-xs text-slate-700 truncate">{dev.ip}</p>
-                        {displayMac
-                          ? <p className="font-mono text-[9px] text-slate-400 truncate">{displayMac}</p>
-                          : <p className="text-[9px] text-amber-500">SSH-only</p>
-                        }
-                      </div>
-
-                      {/* Nombre / Modelo */}
-                      <div className="px-2 py-2.5 min-w-0 pr-3">
-                        {displayName && displayName !== dev.ip
-                          ? <p className="text-xs font-semibold text-slate-700 truncate" title={displayName}>{displayName}</p>
-                          : <p className="text-xs font-semibold text-slate-400 truncate font-mono" title={dev.ip}>{dev.ip}</p>
-                        }
-                        <p className="text-[10px] text-slate-400 truncate" title={displayModel}>{displayModel || '—'}</p>
-                      </div>
-
-                      {/* Columnas configurables */}
-                      {activeConfigCols.map(col => (
-                        <div key={col.key} className="px-2 py-2.5 flex items-center">
-                          {col.render(dev)}
+                  return (
+                    <Fragment key={dev.ip}>
+                      {/* Fila principal */}
+                      <div
+                        style={{ display: 'grid', gridTemplateColumns: gridTemplate }}
+                        className={`items-center border-b transition-colors
+                        ${isSaved
+                            ? `${rowIdx % 2 === 0 ? 'bg-indigo-50/20' : 'bg-indigo-50/40'} hover:bg-indigo-50/70 border-indigo-100`
+                            : hasStats
+                              ? `${rowIdx % 2 === 0 ? 'bg-emerald-50/25' : 'bg-emerald-50/50'} hover:bg-emerald-50/70 border-emerald-100`
+                              : `${rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'} hover:bg-slate-50/80 border-slate-100`}
+                        ${isExpanded ? 'border-b-indigo-200' : ''}`}
+                      >
+                        {/* SSH Status */}
+                        <div className="px-2 py-2.5 flex items-center justify-center">
+                          {sshStatus[dev.ip] === 'pending' && (
+                            <Loader2 className="w-3.5 h-3.5 text-slate-300 animate-spin" />
+                          )}
+                          {sshStatus[dev.ip] === 'success' && (
+                            <div
+                              title={`SSH exitoso: ${dev.sshUser}`}
+                              className="w-5 h-5 rounded-md bg-emerald-100 flex items-center justify-center border border-emerald-200"
+                            >
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            </div>
+                          )}
+                          {sshStatus[dev.ip] === 'failed' && (
+                            <div
+                              title="Sin acceso SSH"
+                              className="w-5 h-5 rounded-md bg-slate-100 flex items-center justify-center border border-slate-200"
+                            >
+                              <X className="w-3 h-3 text-slate-300" />
+                            </div>
+                          )}
+                          {!sshStatus[dev.ip] && <div className="w-5 h-5" />}
                         </div>
-                      ))}
 
-                      {/* Expand toggle */}
-                      <div className="px-1 py-2.5 flex items-center justify-center">
-                        {hasStats && (
-                          <button
-                            onClick={() => setExpandedRows(prev => {
-                              const next = new Set(prev);
-                              if (next.has(dev.ip)) next.delete(dev.ip);
-                              else next.add(dev.ip);
-                              return next;
-                            })}
-                            title={isExpanded ? 'Ocultar detalle' : 'Ver estadísticas completas'}
-                            className={`p-1 rounded-md transition-colors
+                        {/* Rol + Frecuencia */}
+                        <div className="px-3 py-2.5">
+                          {(isAp || isSta) ? (
+                            <span className={`inline-flex text-[10px] font-bold px-1.5 py-0.5 rounded-md
+                            ${isAp ? 'bg-indigo-100 text-indigo-700' : 'bg-violet-100 text-violet-700'}`}>
+                              {isAp ? 'AP' : 'CPE'}
+                            </span>
+                          ) : rawMode && rawMode !== 'unknown' ? (
+                            <span className="inline-flex text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500">
+                              {String(rawMode).toUpperCase()}
+                            </span>
+                          ) : (
+                            <span
+                              className="text-[10px] text-slate-300"
+                              title="Modo no detectado"
+                            >—</span>
+                          )}
+                          {freqGhz && (
+                            <p className={`text-[9px] font-bold mt-0.5 ${freq! >= 5000 ? 'text-sky-600' : 'text-amber-600'}`}>
+                              {freqGhz}G
+                            </p>
+                          )}
+                        </div>
+
+                        {/* IP / MAC */}
+                        <div className="px-3 py-3 min-w-0 pr-3">
+                          <p className="font-mono text-sm font-semibold text-slate-700 truncate">{dev.ip}</p>
+                          {displayMac
+                            ? <p className="font-mono text-[9px] text-slate-400 truncate">{displayMac}</p>
+                            : <p className="text-[9px] text-amber-500">SSH-only</p>
+                          }
+                        </div>
+
+                        {/* Nombre / Modelo */}
+                        <div className="px-3 py-3 min-w-0 pr-3">
+                          {displayName && displayName !== dev.ip
+                            ? <p className="text-sm font-bold text-slate-700 truncate" title={displayName}>{displayName}</p>
+                            : <p className="text-sm font-semibold text-slate-400 truncate font-mono" title={dev.ip}>{dev.ip}</p>
+                          }
+                          <p className="text-[10px] text-slate-400 truncate" title={displayModel}>{displayModel || '—'}</p>
+                        </div>
+
+                        {/* Columnas configurables */}
+                        {activeConfigCols.map(col => (
+                          <div key={col.key} className="px-3 py-3 flex items-center text-sm">
+                            {col.render(dev)}
+                          </div>
+                        ))}
+
+                        {/* Expand toggle */}
+                        <div className="px-1 py-2.5 flex items-center justify-center">
+                          {hasStats && (
+                            <button
+                              onClick={() => setExpandedRows(prev => {
+                                const next = new Set(prev);
+                                if (next.has(dev.ip)) next.delete(dev.ip);
+                                else next.add(dev.ip);
+                                return next;
+                              })}
+                              title={isExpanded ? 'Ocultar detalle' : 'Ver estadísticas completas'}
+                              className={`p-1 rounded-md transition-colors
                               ${isExpanded
-                                ? 'text-indigo-600 bg-indigo-100 hover:bg-indigo-200'
-                                : 'text-slate-300 hover:text-slate-500 hover:bg-slate-100'}`}
-                          >
-                            {isExpanded
-                              ? <ChevronDown  className="w-3.5 h-3.5" />
-                              : <ChevronRight className="w-3.5 h-3.5" />
-                            }
-                          </button>
-                        )}
-                      </div>
+                                  ? 'text-indigo-600 bg-indigo-100 hover:bg-indigo-200'
+                                  : 'text-slate-300 hover:text-slate-500 hover:bg-slate-100'}`}
+                            >
+                              {isExpanded
+                                ? <ChevronDown className="w-3.5 h-3.5" />
+                                : <ChevronRight className="w-3.5 h-3.5" />
+                              }
+                            </button>
+                          )}
+                        </div>
 
-                      {/* Acciones */}
-                      <div className="px-2 py-2.5 flex items-center justify-end gap-1">
-                        {/* Botón de datos SSH — siempre visible si hay stats */}
-                        {hasStats && (
-                          <button
-                            onClick={() => setViewingRawDevice(dev)}
-                            title="Ver todos los datos obtenidos por SSH"
-                            className="flex items-center space-x-1 px-2 py-1.5 rounded-lg text-[11px] font-bold bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200 transition-all"
-                          >
-                            <Database className="w-2.5 h-2.5" />
-                            <span>SSH</span>
-                          </button>
-                        )}
+                        {/* Acciones */}
+                        <div className="px-3 py-3 flex items-center justify-end gap-1.5">
+                          {/* Botón de datos SSH — siempre visible si hay stats */}
+                          {hasStats && (
+                            <button
+                              onClick={() => setViewingRawDevice(dev)}
+                              title="Ver todos los datos obtenidos por SSH"
+                              className="flex items-center space-x-1 px-2 py-1.5 rounded-lg text-[11px] font-bold bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200 transition-all"
+                            >
+                              <Database className="w-2.5 h-2.5" />
+                              <span>SSH</span>
+                            </button>
+                          )}
 
-                        {isSaved ? (
-                          <>
-                            {/* Sincronizar stats frescas al dispositivo guardado */}
-                            {hasStats && (
+                          {isSaved ? (
+                            <>
+                              {/* Sincronizar stats frescas al dispositivo guardado */}
+                              {hasStats && (
+                                <button
+                                  onClick={() => {
+                                    const savedDev = savedDevices.find(s => s.id === devId);
+                                    if (savedDev) {
+                                      const updated: SavedDevice = {
+                                        ...savedDev,
+                                        cachedStats: dev.cachedStats,
+                                        name: dev.cachedStats?.deviceName || savedDev.name,
+                                        model: dev.cachedStats?.deviceModel || savedDev.model,
+                                        firmware: dev.cachedStats?.firmwareVersion || savedDev.firmware,
+                                        mac: dev.cachedStats?.wlanMac || savedDev.mac,
+                                        essid: dev.cachedStats?.essid ?? savedDev.essid,
+                                        frequency: dev.cachedStats?.frequency ?? savedDev.frequency,
+                                        lastSeen: Date.now(),
+                                      };
+                                      handleUpdateDevice(updated);
+                                      showToast('Stats actualizadas en el dispositivo guardado');
+                                    }
+                                  }}
+                                  title="Sincronizar estadísticas frescas al dispositivo guardado"
+                                  className="flex items-center space-x-1 px-2 py-1.5 rounded-lg text-[11px] font-bold bg-sky-50 text-sky-600 hover:bg-sky-100 border border-sky-200 transition-all"
+                                >
+                                  <RefreshCw className="w-2.5 h-2.5" />
+                                  <span>Sync</span>
+                                </button>
+                              )}
+                              {/* Abrir ficha guardada */}
                               <button
                                 onClick={() => {
                                   const savedDev = savedDevices.find(s => s.id === devId);
-                                  if (savedDev) {
-                                    const updated: SavedDevice = {
-                                      ...savedDev,
-                                      cachedStats:  dev.cachedStats,
-                                      name:         dev.cachedStats?.deviceName     || savedDev.name,
-                                      model:        dev.cachedStats?.deviceModel    || savedDev.model,
-                                      firmware:     dev.cachedStats?.firmwareVersion || savedDev.firmware,
-                                      mac:          dev.cachedStats?.wlanMac        || savedDev.mac,
-                                      essid:        dev.cachedStats?.essid          ?? savedDev.essid,
-                                      frequency:    dev.cachedStats?.frequency      ?? savedDev.frequency,
-                                      lastSeen:     Date.now(),
-                                    };
-                                    handleUpdateDevice(updated);
-                                    showToast('Stats actualizadas en el dispositivo guardado');
-                                  }
+                                  if (savedDev) setViewingDevice(savedDev);
                                 }}
-                                title="Sincronizar estadísticas frescas al dispositivo guardado"
-                                className="flex items-center space-x-1 px-2 py-1.5 rounded-lg text-[11px] font-bold bg-sky-50 text-sky-600 hover:bg-sky-100 border border-sky-200 transition-all"
+                                title="Ver ficha guardada"
+                                className="flex items-center space-x-1 px-2 py-1.5 rounded-lg text-[11px] font-bold bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 transition-all"
                               >
-                                <RefreshCw className="w-2.5 h-2.5" />
-                                <span>Sync</span>
+                                <Eye className="w-2.5 h-2.5" />
+                                <span>Ficha</span>
                               </button>
-                            )}
-                            {/* Abrir ficha guardada */}
-                            <button
-                              onClick={() => {
-                                const savedDev = savedDevices.find(s => s.id === devId);
-                                if (savedDev) setViewingDevice(savedDev);
-                              }}
-                              title="Ver ficha guardada"
-                              className="flex items-center space-x-1 px-2 py-1.5 rounded-lg text-[11px] font-bold bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 transition-all"
-                            >
-                              <Eye className="w-2.5 h-2.5" />
-                              <span>Ficha</span>
-                            </button>
-                          </>
-                        ) : selectedNode ? (
-                          // SSH verde con credenciales → guardar directo, sin modal
-                          sshStatus[dev.ip] === 'success' && dev.sshUser ? (
-                            <button
-                              onClick={() => handleDirectSave(dev, selectedNode)}
-                              title="Guardar con las credenciales SSH ya validadas"
-                              className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm shadow-emerald-500/20 transition-all active:scale-[0.97] whitespace-nowrap"
-                            >
-                              <Check className="w-3 h-3" />
-                              <span>Guardar</span>
-                            </button>
+                            </>
+                          ) : selectedNode ? (
+                            // SSH verde con credenciales → guardar directo, sin modal
+                            sshStatus[dev.ip] === 'success' && dev.sshUser ? (
+                              <button
+                                onClick={() => handleDirectSave(dev, selectedNode)}
+                                title="Guardar con las credenciales SSH ya validadas"
+                                className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm shadow-emerald-500/20 transition-all active:scale-[0.97] whitespace-nowrap"
+                              >
+                                <Check className="w-3 h-3" />
+                                <span>Guardar</span>
+                              </button>
+                            ) : (
+                              // Sin SSH o falló → pedir credenciales manualmente
+                              <button
+                                onClick={() => setAddingDevice(dev)}
+                                title="Guardar dispositivo — ingresar credenciales SSH manualmente"
+                                className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm shadow-indigo-500/20 transition-all active:scale-[0.97] whitespace-nowrap"
+                              >
+                                <PlusCircle className="w-3 h-3" />
+                                <span>Guardar</span>
+                              </button>
+                            )
                           ) : (
-                            // Sin SSH o falló → pedir credenciales manualmente
-                            <button
-                              onClick={() => setAddingDevice(dev)}
-                              title="Guardar dispositivo — ingresar credenciales SSH manualmente"
-                              className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm shadow-indigo-500/20 transition-all active:scale-[0.97] whitespace-nowrap"
-                            >
-                              <PlusCircle className="w-3 h-3" />
-                              <span>Guardar</span>
-                            </button>
-                          )
-                        ) : (
-                          <span className="text-[10px] text-slate-400 whitespace-nowrap">Sin nodo</span>
-                        )}
+                            <span className="text-[10px] text-slate-400 whitespace-nowrap">Sin nodo</span>
+                          )}
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Panel de estadísticas expandido */}
-                    {isExpanded && <ExpandedStats dev={dev} />}
-                  </Fragment>
-                );
-              })}
+                      {/* Panel de estadísticas expandido */}
+                      {isExpanded && <ExpandedStats dev={dev} />}
+                    </Fragment>
+                  );
+                })}
               </div>{/* fin minWidth wrapper */}
             </div>
           </div>
@@ -2105,13 +2072,13 @@ export default function NetworkDevicesModule() {
               </div>
               {/* Rows */}
               {devices.map((dev, devIdx) => {
-                const rawMode  = dev.cachedStats?.mode || (dev.role !== 'unknown' ? dev.role : null);
+                const rawMode = dev.cachedStats?.mode || (dev.role !== 'unknown' ? dev.role : null);
                 const isApMode = rawMode === 'ap' || rawMode === 'master';
-                const isCpe    = rawMode === 'sta';
+                const isCpe = rawMode === 'sta';
                 const displayName = dev.deviceName || dev.name;
-                const displayMac  = dev.mac || '—';
-                const antennaUrl  = `http://${dev.ip}`;
-                const routerUrl   = `http://${dev.routerIp || dev.ip}:${dev.routerPort ?? 8075}`;
+                const displayMac = dev.mac || '—';
+                const antennaUrl = `http://${dev.ip}`;
+                const routerUrl = `http://${dev.routerIp || dev.ip}:${dev.routerPort ?? 8075}`;
                 return (
                   <div key={dev.id}
                     className={`grid grid-cols-[72px_1fr_1fr_1fr_auto]
@@ -2152,7 +2119,7 @@ export default function NetworkDevicesModule() {
                     <div className="min-w-0 pr-2">
                       {isApMode ? (
                         <>
-                          {dev.essid   && <p className="font-mono text-[11px] text-slate-600 truncate" title={dev.essid}>{dev.essid}</p>}
+                          {dev.essid && <p className="font-mono text-[11px] text-slate-600 truncate" title={dev.essid}>{dev.essid}</p>}
                           {dev.security && <p className="text-[9px] text-slate-400">{dev.security}</p>}
                         </>
                       ) : (
@@ -2245,9 +2212,9 @@ export default function NetworkDevicesModule() {
             ip_tunnel: '', uptime: '',
           }}
           existing={{
-            sshUser:    editingDevice.sshUser,
-            sshPass:    editingDevice.sshPass,
-            sshPort:    editingDevice.sshPort,
+            sshUser: editingDevice.sshUser,
+            sshPass: editingDevice.sshPass,
+            sshPort: editingDevice.sshPort,
             routerPort: editingDevice.routerPort,
           }}
           onSave={handleAddDevice}

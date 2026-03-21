@@ -115,7 +115,19 @@ async function initDb() {
             ppp_user TEXT PRIMARY KEY,
             label TEXT NOT NULL DEFAULT ''
         );
+        CREATE TABLE IF NOT EXISTS node_ssh_creds (
+            ppp_user TEXT PRIMARY KEY,
+            ssh_user TEXT DEFAULT '',
+            ssh_pass TEXT DEFAULT '',
+            ssh_creds TEXT DEFAULT '[]'
+        );
+        CREATE TABLE IF NOT EXISTS app_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL DEFAULT ''
+        );
     `);
+    // Migración: añadir ssh_creds si la tabla ya existía sin esa columna
+    try { await db.run("ALTER TABLE node_ssh_creds ADD COLUMN ssh_creds TEXT DEFAULT '[]'"); } catch { /* ya existe */ }
     console.log('[DB] Base de datos SQLite conectada y tablas validadas.');
 }
 
