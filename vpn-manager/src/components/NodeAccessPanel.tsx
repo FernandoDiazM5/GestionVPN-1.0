@@ -4,7 +4,7 @@ import {
   ShieldCheck, ShieldOff, AlertCircle, Radio, Clock, X,
   Plus, CheckCircle2, Loader2, Eye, EyeOff, Info, Trash2, Pencil, Minus,
   Wifi, Copy, Check, FileCode, UserPlus, Download, History,
-  ArrowUpDown, Tag, SortAsc, SortDesc, Bell,
+  ArrowUpDown, Tag, SortAsc, SortDesc, Bell, Globe,
 } from 'lucide-react';
 import { useVpn, TUNNEL_TIMEOUT_MS } from '../context/VpnContext';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
@@ -28,6 +28,42 @@ interface ProvisionResult {
   remoteAddress?: string;
   steps: ProvisionStep[];
   failedAt?: number;
+}
+
+// ── Helper: detección de solapamiento de subnets ─────────────────────────
+// Redes reservadas que no deben usarse como LAN remota de un nodo
+const PROTECTED_NETS = [
+  { cidr: '192.168.21.0/24', label: 'WireGuard gestión (192.168.21.0/24)' },
+  { cidr: '10.10.250.0/24',  label: 'Pool PPP túnel (10.10.250.0/24)' },
+];
+
+function ipToInt(ip: string): number {
+  return ip.split('.').reduce((acc, oct) => ((acc << 8) | parseInt(oct)) >>> 0, 0) >>> 0;
+}
+
+function cidrOverlaps(a: string, b: string): boolean {
+  const [ipA, prefA] = a.split('/');
+  const [ipB, prefB] = b.split('/');
+  const maskA = prefA ? (0xFFFFFFFF << (32 - parseInt(prefA))) >>> 0 : 0xFFFFFFFF;
+  const maskB = prefB ? (0xFFFFFFFF << (32 - parseInt(prefB))) >>> 0 : 0xFFFFFFFF;
+  const netA = (ipToInt(ipA) & maskA) >>> 0;
+  const netB = (ipToInt(ipB) & maskB) >>> 0;
+  return (netA & maskB) === netB || (netB & maskA) === netA;
+}
+
+function getSubnetConflicts(subnets: string[]): string[] {
+  const conflicts: string[] = [];
+  for (const s of subnets) {
+    if (!/^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}$/.test(s.trim())) continue;
+    for (const p of PROTECTED_NETS) {
+      try {
+        if (cidrOverlaps(s.trim(), p.cidr)) {
+          conflicts.push(`${s.trim()} se solapa con ${p.label}`);
+        }
+      } catch { /* ignorar CIDRs malformados */ }
+    }
+  }
+  return conflicts;
 }
 
 // ── Helper: resultado de pasos con animación ──────────────────────────────
@@ -72,34 +108,35 @@ function NuevoNodoModal({
 }) {
   const { credentials } = useVpn();
 
-  const [nextNode,    setNextNode]    = useState<number | null>(null);
-  const [nextRemote,  setNextRemote]  = useState<string>('');
+  const [nextNode, setNextNode] = useState<number | null>(null);
+  const [nextRemote, setNextRemote] = useState<string>('');
   const [loadingNext, setLoadingNext] = useState(true);
   const [loadNextErr, setLoadNextErr] = useState('');
 
-  const [nombre,     setNombre]    = useState('');
-  const [pppUser,    setPppUser]   = useState('');
-  const [pppPass,    setPppPass]   = useState('');
-  const [showPass,   setShowPass]  = useState(false);
+  const [nombre, setNombre] = useState('');
+  const [pppUser, setPppUser] = useState('');
+  const [pppPass, setPppPass] = useState('');
+  const [showPass, setShowPass] = useState(false);
   const [lanSubnets, setLanSubnets] = useState<string[]>(['']);
 
   const [provisioning, setProvisioning] = useState(false);
-  const [result,       setResult]       = useState<ProvisionResult | null>(null);
+  const [result, setResult] = useState<ProvisionResult | null>(null);
   const [visibleSteps, setVisibleSteps] = useState(0);
-  const [provStep,     setProvStep]     = useState(0); // animación mientras provisionando
+  const [provStep, setProvStep] = useState(0); // animación mientras provisionando
 
-  const nameClean   = nombre.toUpperCase().replace(/[^A-Z0-9]/g, '');
-  const ndNum       = nextNode ?? '?';
-  const ifaceName   = nameClean ? `VPN-SSTP-ND${ndNum}-${nameClean}` : '';
-  const vrfName     = nameClean ? `VRF-ND${ndNum}-${nameClean}` : '';
+  const nameClean = nombre.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const ndNum = nextNode ?? '?';
+  const ifaceName = nameClean ? `VPN-SSTP-ND${ndNum}-${nameClean}` : '';
+  const vrfName = nameClean ? `VRF-ND${ndNum}-${nameClean}` : '';
   const suggestUser = nombre ? `Torre${nombre.charAt(0).toUpperCase()}${nombre.slice(1).toLowerCase()}` : '';
 
   const CIDR_RE = /^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}$/;
   const validSubnets = lanSubnets.filter(s => CIDR_RE.test(s.trim()));
+  const subnetConflicts = getSubnetConflicts(validSubnets);
 
   useEffect(() => {
     if (!pppUser || pppUser === suggestUser.slice(0, -1)) setPppUser(suggestUser);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [suggestUser]);
 
   const loadNext = useCallback(async () => {
@@ -146,7 +183,7 @@ function NuevoNodoModal({
   }, [result]);
 
   const canSubmit = nameClean.length >= 2 && pppUser.trim() && pppPass.trim()
-    && validSubnets.length > 0 && nextNode != null && !provisioning;
+    && validSubnets.length > 0 && nextNode != null && !provisioning && subnetConflicts.length === 0;
 
   const PASOS_LABELS = [
     'PPP Secret',
@@ -179,7 +216,13 @@ function NuevoNodoModal({
         fetchWithTimeout(`${API_BASE_URL}/api/node/creds/save`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ pppUser: pppUser.trim(), pppPassword: pppPass }),
-        }, 5_000).catch(() => {});
+        }, 5_000).catch(() => { });
+
+        // Guardar la etiqueta personalizada original (con espacios/tildes) en la base de datos local
+        fetchWithTimeout(`${API_BASE_URL}/api/node/label/save`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pppUser: pppUser.trim(), label: nombre.trim() }),
+        }, 5_000).catch(() => { });
       }
     } catch (e) {
       setResult({ success: false, message: e instanceof Error ? e.message : 'Error', steps: [], failedAt: 0 });
@@ -188,9 +231,9 @@ function NuevoNodoModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"
       onClick={e => e.target === e.currentTarget && !provisioning && !result && onClose()}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] flex flex-col">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] flex flex-col animate-in zoom-in-95 duration-200">
 
         <div className="flex items-center justify-between bg-indigo-700 rounded-t-2xl px-5 py-4 shrink-0">
           <div className="flex items-center gap-3">
@@ -305,11 +348,11 @@ function NuevoNodoModal({
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">
                     Nombre del nodo <span className="text-rose-500">*</span>
-                    <span className="text-[10px] font-normal text-slate-400 ml-1">(solo letras/números)</span>
+                    <span className="text-[10px] font-normal text-slate-400 ml-1">(cualquier nombre)</span>
                   </label>
-                  <input value={nombre} onChange={e => setNombre(e.target.value.replace(/[^a-zA-Z0-9]/g, ''))}
+                  <input value={nombre} onChange={e => setNombre(e.target.value)}
                     placeholder="Ej: ROSMERY, FIWIS, MILAGROS"
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300 uppercase" />
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                   {nameClean && <p className="text-[10px] text-slate-400 mt-0.5">Se usará: <span className="font-mono font-bold text-indigo-600">{nameClean}</span></p>}
                 </div>
 
@@ -367,6 +410,20 @@ function NuevoNodoModal({
                     })}
                   </div>
                   {validSubnets.length > 0 && <p className="text-[10px] text-slate-400 mt-1">{validSubnets.length} subred(es) válida(s)</p>}
+                  {subnetConflicts.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {subnetConflicts.map((msg, i) => (
+                        <div key={i} className="flex items-start gap-2 px-3 py-2 rounded-lg bg-rose-50 border border-rose-200 text-xs">
+                          <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="font-bold text-rose-700">Conflicto de red detectado</p>
+                            <p className="text-rose-600 mt-0.5">{msg}</p>
+                            <p className="text-rose-500 mt-0.5">Esta subred se solapa con la red de gestión y puede causar pérdida de conectividad con el router.</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -419,13 +476,13 @@ function EliminarNodoModal({
   onSuccess: () => void;
 }) {
   const { credentials } = useVpn();
-  const [confirmed,    setConfirmed]    = useState(false);
-  const [deleting,     setDeleting]     = useState(false);
-  const [result,       setResult]       = useState<ProvisionResult | null>(null);
+  const [confirmed, setConfirmed] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [result, setResult] = useState<ProvisionResult | null>(null);
   const [visibleSteps, setVisibleSteps] = useState(0);
-  const [delStep,      setDelStep]      = useState(0);
+  const [delStep, setDelStep] = useState(0);
 
-  const ifaceName  = node.nombre_vrf?.replace(/^VRF-/, 'VPN-SSTP-') ?? '';
+  const ifaceName = node.nombre_vrf?.replace(/^VRF-/, 'VPN-SSTP-') ?? '';
   const lanSubnets = node.lan_subnets && node.lan_subnets.length > 0
     ? node.lan_subnets
     : node.segmento_lan ? node.segmento_lan.split(',').map(s => s.trim()) : [];
@@ -450,7 +507,7 @@ function EliminarNodoModal({
       setDelStep(i);
     }, 1400);
     return () => clearInterval(id);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deleting]);
 
   useEffect(() => {
@@ -480,9 +537,9 @@ function EliminarNodoModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"
       onClick={e => e.target === e.currentTarget && !deleting && !result && onClose()}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
 
         <div className="flex items-center justify-between bg-rose-600 rounded-t-2xl px-5 py-4 shrink-0">
           <div className="flex items-center gap-3">
@@ -605,26 +662,27 @@ function EditarNodoModal({
   onSuccess: (newLabel?: string) => void;
 }) {
   const { credentials } = useVpn();
-  const [currentSubnets,  setCurrentSubnets]  = useState<string[]>([]);
+  const [currentSubnets, setCurrentSubnets] = useState<string[]>([]);
   const [currentRemoteIP, setCurrentRemoteIP] = useState('');
-  const [loadingDetails,  setLoadingDetails]  = useState(true);
+  const [loadingDetails, setLoadingDetails] = useState(true);
 
   // Campos editables
-  const [newLabel,    setNewLabel]    = useState(node.nombre_nodo || '');
-  const [newPppUser,  setNewPppUser]  = useState('');
-  const [newPass,     setNewPass]     = useState('');
-  const [showPass,    setShowPass]    = useState(false);
-  const [newRemote,   setNewRemote]   = useState('');
-  const [addSubnets,  setAddSubnets]  = useState<string[]>(['']);
-  const [removeSet,   setRemoveSet]   = useState<Set<string>>(new Set());
+  const [newLabel, setNewLabel] = useState(node.nombre_nodo || '');
+  const [newPppUser, setNewPppUser] = useState('');
+  const [newPass, setNewPass] = useState('');
+  const [showPass, setShowPass] = useState(false);
+  const [newRemote, setNewRemote] = useState('');
+  const [addSubnets, setAddSubnets] = useState<string[]>(['']);
+  const [removeSet, setRemoveSet] = useState<Set<string>>(new Set());
 
-  const [saving,       setSaving]       = useState(false);
-  const [result,       setResult]       = useState<ProvisionResult | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [result, setResult] = useState<ProvisionResult | null>(null);
   const [visibleSteps, setVisibleSteps] = useState(0);
 
   const CIDR_RE = /^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}$/;
   const IPV4_RE = /^(\d{1,3}\.){3}\d{1,3}$/;
   const validAdd = addSubnets.filter(s => CIDR_RE.test(s.trim()));
+  const addSubnetConflicts = getSubnetConflicts(validAdd);
 
   useEffect(() => {
     if (!credentials) return;
@@ -645,7 +703,7 @@ function EditarNodoModal({
           setNewRemote(d.remoteAddress || '');
         }
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoadingDetails(false));
   }, [credentials, node.nombre_vrf, node.ppp_user]);
 
@@ -659,10 +717,10 @@ function EditarNodoModal({
   const toggleRemove = (s: string) =>
     setRemoveSet(prev => { const n = new Set(prev); n.has(s) ? n.delete(s) : n.add(s); return n; });
 
-  const labelChanged   = newLabel.trim() !== (node.nombre_nodo || '').trim();
+  const labelChanged = newLabel.trim() !== (node.nombre_nodo || '').trim();
   const pppUserChanged = newPppUser.trim() && newPppUser.trim() !== (node.ppp_user || '');
-  const remoteChanged  = newRemote.trim() && IPV4_RE.test(newRemote.trim()) && newRemote.trim() !== currentRemoteIP;
-  const hasChanges = newPass.trim() || labelChanged || pppUserChanged || remoteChanged || validAdd.length > 0 || removeSet.size > 0;
+  const remoteChanged = newRemote.trim() && IPV4_RE.test(newRemote.trim()) && newRemote.trim() !== currentRemoteIP;
+  const hasChanges = (newPass.trim() || labelChanged || pppUserChanged || remoteChanged || validAdd.length > 0 || removeSet.size > 0) && addSubnetConflicts.length === 0;
 
   const handleSave = async () => {
     if (!credentials || !node.ppp_user || !hasChanges) return;
@@ -690,9 +748,9 @@ function EditarNodoModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"
       onClick={e => e.target === e.currentTarget && !saving && !result && onClose()}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
 
         <div className="flex items-center justify-between bg-indigo-600 rounded-t-2xl px-5 py-4 shrink-0">
           <div className="flex items-center gap-3">
@@ -839,12 +897,13 @@ function EditarNodoModal({
                     <div className="space-y-1.5">
                       {addSubnets.map((s, i) => {
                         const valid = CIDR_RE.test(s.trim());
+                        const conflict = valid && getSubnetConflicts([s.trim()]).length > 0;
                         return (
                           <div key={i} className="flex items-center gap-2">
                             <input value={s} onChange={e => setAddSubnets(p => p.map((x, j) => j === i ? e.target.value : x))}
                               placeholder="10.5.0.0/24"
                               className={`flex-1 px-3 py-2 text-sm border rounded-xl focus:outline-none focus:ring-2 font-mono
-                                ${s && !valid ? 'border-rose-300 focus:ring-rose-300' : 'border-slate-200 focus:ring-indigo-300'}`} />
+                                ${conflict ? 'border-rose-400 focus:ring-rose-300 bg-rose-50' : s && !valid ? 'border-rose-300 focus:ring-rose-300' : 'border-slate-200 focus:ring-indigo-300'}`} />
                             {addSubnets.length > 1 && (
                               <button onClick={() => setAddSubnets(p => p.filter((_, j) => j !== i))}
                                 className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg">
@@ -855,6 +914,19 @@ function EditarNodoModal({
                         );
                       })}
                     </div>
+                    {addSubnetConflicts.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        {addSubnetConflicts.map((msg, i) => (
+                          <div key={i} className="flex items-start gap-2 px-3 py-2 rounded-lg bg-rose-50 border border-rose-200 text-xs">
+                            <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />
+                            <div>
+                              <p className="font-bold text-rose-700">Conflicto de red</p>
+                              <p className="text-rose-600">{msg}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </>
               )}
@@ -898,18 +970,18 @@ function NuevoAdminModal({
   onSuccess: (newPeer: WgPeer) => void;
 }) {
   const { credentials } = useVpn();
-  const [name,      setName]      = useState('');
-  const [pubKey,    setPubKey]    = useState('');
-  const [saving,    setSaving]    = useState(false);
-  const [error,     setError]     = useState('');
-  const [result,    setResult]    = useState<{ assignedIP: string; message: string } | null>(null);
+  const [name, setName] = useState('');
+  const [pubKey, setPubKey] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [result, setResult] = useState<{ assignedIP: string; message: string } | null>(null);
 
   const usedIPs = peers
     .map(p => p.allowedAddress)
     .filter(a => a.startsWith('192.168.21.'))
     .map(a => parseInt(a.split('.')[3]))
     .filter(n => !isNaN(n));
-  const maxIP  = usedIPs.length > 0 ? Math.max(...usedIPs) : 19;
+  const maxIP = usedIPs.length > 0 ? Math.max(...usedIPs) : 19;
   const nextIP = `192.168.21.${maxIP + 1}`;
 
   const handleCreate = async () => {
@@ -932,9 +1004,9 @@ function NuevoAdminModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"
       onClick={e => e.target === e.currentTarget && !saving && onClose()}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col animate-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between bg-indigo-600 rounded-t-2xl px-5 py-4 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center">
@@ -1009,13 +1081,13 @@ function NuevoAdminModal({
 // ── Modal Script de Configuración ─────────────────────────────────────────
 function ScriptModal({ node, onClose }: { node: NodeInfo; onClose: () => void }) {
   const { credentials } = useVpn();
-  const [serverIP,   setServerIP]   = useState(() => localStorage.getItem('wg_endpoint_ip') || credentials?.ip || '');
-  const [pppPass,    setPppPass]    = useState('');
-  const [showPass,   setShowPass]   = useState(false);
-  const [script,     setScript]     = useState('');
-  const [loading,    setLoading]    = useState(false);
-  const [error,      setError]      = useState('');
-  const [copied,     setCopied]     = useState(false);
+  const [serverIP, setServerIP] = useState(() => localStorage.getItem('server_public_ip') || localStorage.getItem('wg_endpoint_ip') || credentials?.ip || '');
+  const [pppPass, setPppPass] = useState('');
+  const [showPass, setShowPass] = useState(false);
+  const [script, setScript] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [copied, setCopied] = useState(false);
   const [loadingPass, setLoadingPass] = useState(true);
 
   // Intentar recuperar la contraseña guardada al abrir
@@ -1027,9 +1099,9 @@ function ScriptModal({ node, onClose }: { node: NodeInfo; onClose: () => void })
     }, 5_000)
       .then(r => r.json())
       .then(d => { if (d.success && d.pppPassword) setPppPass(d.pppPassword); })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoadingPass(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node.ppp_user]);
 
   const IPV4_RE = /^(\d{1,3}\.){3}\d{1,3}$/;
@@ -1065,9 +1137,9 @@ function ScriptModal({ node, onClose }: { node: NodeInfo; onClose: () => void })
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between bg-emerald-600 rounded-t-2xl px-5 py-4 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center">
@@ -1102,9 +1174,14 @@ function ScriptModal({ node, onClose }: { node: NodeInfo; onClose: () => void })
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">
                 IP pública del servidor VPN <span className="text-rose-500">*</span>
-                <span className="ml-1 text-[10px] font-normal text-slate-400">(pre-llenada desde la conexión actual)</span>
+                <span className="ml-1 text-[10px] font-normal text-slate-400">(guardada globalmente para todos los nodos)</span>
               </label>
-              <input value={serverIP} onChange={e => setServerIP(e.target.value)} placeholder="Ej: 181.45.100.x"
+              <input value={serverIP} onChange={e => {
+                setServerIP(e.target.value);
+                localStorage.setItem('server_public_ip', e.target.value.trim());
+                fetch(`${API_BASE_URL}/api/settings/save`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'server_public_ip', value: e.target.value.trim() }) }).catch(() => { });
+              }}
+                placeholder="Ej: 213.173.36.232"
                 className={`w-full px-3 py-2 text-sm border rounded-xl focus:outline-none focus:ring-2 font-mono
                   ${serverIP && !IPV4_RE.test(serverIP.trim()) ? 'border-rose-300 focus:ring-rose-300' : 'border-slate-200 focus:ring-emerald-300'}`} />
             </div>
@@ -1186,15 +1263,15 @@ function HistoryModal({ node, onClose }: { node: NodeInfo; onClose: () => void }
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pppUser: node.ppp_user }),
     }).then(r => r.json()).then(d => { if (d.success) setHistory(d.history || []); })
-      .catch(() => {}).finally(() => setLoading(false));
+      .catch(() => { }).finally(() => setLoading(false));
   }, [node.ppp_user]);
 
   const fmt = (ts: number) => new Date(ts).toLocaleString('es', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col animate-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between bg-sky-600 rounded-t-2xl px-5 py-4 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center">
@@ -1248,7 +1325,7 @@ function TagModal({ node, currentTags, onSave, onClose }: {
 }) {
   const [tags, setTags] = useState<string[]>(currentTags);
   const [input, setInput] = useState('');
-  const TAG_PALETTE = ['#6366f1','#10b981','#0ea5e9','#f59e0b','#f43f5e','#8b5cf6','#f97316','#14b8a6','#ec4899','#64748b'];
+  const TAG_PALETTE = ['#6366f1', '#10b981', '#0ea5e9', '#f59e0b', '#f43f5e', '#8b5cf6', '#f97316', '#14b8a6', '#ec4899', '#64748b'];
   const getColor = (tag: string) => TAG_PALETTE[tag.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % TAG_PALETTE.length];
 
   const addTag = () => {
@@ -1258,9 +1335,9 @@ function TagModal({ node, currentTags, onSave, onClose }: {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm flex flex-col">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm flex flex-col animate-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between bg-amber-500 rounded-t-2xl px-5 py-4 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center">
@@ -1381,7 +1458,7 @@ function BatchCsvModal({ onClose, onSuccess, nodes }: { onClose: () => void; onS
           fetch(`${API_BASE_URL}/api/node/creds/save`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ pppUser: row.usuario, pppPassword: row.pass }),
-          }).catch(() => {});
+          }).catch(() => { });
         } else {
           setResults(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'error', message: provRes.message } : r));
         }
@@ -1394,9 +1471,9 @@ function BatchCsvModal({ onClose, onSuccess, nodes }: { onClose: () => void; onS
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"
       onClick={e => e.target === e.currentTarget && !processing && onClose()}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between bg-violet-600 rounded-t-2xl px-5 py-4 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center">
@@ -1533,37 +1610,39 @@ export default function NodeAccessPanel() {
   const [isRevoking, setIsRevoking] = useState(false);
   const [search, setSearch] = useState('');
   const [sortMode, setSortMode] = useState<'default' | 'connected' | 'disconnected'>('default');
+  const [globalServerIP, setGlobalServerIP] = useState(() => localStorage.getItem('server_public_ip') || '');
+  const [editingGlobalIP, setEditingGlobalIP] = useState(false);
   const [showNuevoNodo, setShowNuevoNodo] = useState(false);
   const [showBatchCsv, setShowBatchCsv] = useState(false);
-  const [editNode,    setEditNode]    = useState<NodeInfo | null>(null);
-  const [deleteNode,  setDeleteNode]  = useState<NodeInfo | null>(null);
-  const [scriptNode,  setScriptNode]  = useState<NodeInfo | null>(null);
+  const [editNode, setEditNode] = useState<NodeInfo | null>(null);
+  const [deleteNode, setDeleteNode] = useState<NodeInfo | null>(null);
+  const [scriptNode, setScriptNode] = useState<NodeInfo | null>(null);
   const [historyNode, setHistoryNode] = useState<NodeInfo | null>(null);
-  const [tagNode,     setTagNode]     = useState<NodeInfo | null>(null);
-  const [nodeTags,    setNodeTags]    = useState<Record<string, string[]>>({});
-  const [toasts,      setToasts]      = useState<Toast[]>([]);
+  const [tagNode, setTagNode] = useState<NodeInfo | null>(null);
+  const [nodeTags, setNodeTags] = useState<Record<string, string[]>>({});
+  const [toasts, setToasts] = useState<Toast[]>([]);
   const [showRenewalWarn, setShowRenewalWarn] = useState(false);
-  const prevRunningRef   = useRef<Record<string, boolean>>({});
-  const pollingRef       = useRef<ReturnType<typeof setInterval> | null>(null);
-  const tagsLoadedRef    = useRef(false);
+  const prevRunningRef = useRef<Record<string, boolean>>({});
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const tagsLoadedRef = useRef(false);
 
   // WireGuard admin peers
-  const [wgPeers,           setWgPeers]           = useState<WgPeer[]>([]);
-  const [loadingWg,         setLoadingWg]         = useState(false);
-  const [showNuevoAdmin,    setShowNuevoAdmin]     = useState(false);
-  const [peersExpanded,     setPeersExpanded]      = useState(false);
-  const [serverPublicKey,   setServerPublicKey]    = useState('');
-  const [serverListenPort,  setServerListenPort]   = useState('');
-  const [serverEndpointIP,  setServerEndpointIP]   = useState(() => localStorage.getItem('wg_endpoint_ip') || '');
-  const [copiedPeerId,      setCopiedPeerId]       = useState<string | null>(null);
-  const [peerColors,        setPeerColors]         = useState<Record<string, string>>({});
-  const [colorPickerAddr,   setColorPickerAddr]    = useState<string | null>(null);
-  const [editingPeerId,     setEditingPeerId]      = useState<string | null>(null);
-  const [editingPeerName,   setEditingPeerName]    = useState('');
-  const [savingPeerName,    setSavingPeerName]     = useState(false);
+  const [wgPeers, setWgPeers] = useState<WgPeer[]>([]);
+  const [loadingWg, setLoadingWg] = useState(false);
+  const [showNuevoAdmin, setShowNuevoAdmin] = useState(false);
+  const [peersExpanded, setPeersExpanded] = useState(false);
+  const [serverPublicKey, setServerPublicKey] = useState('');
+  const [serverListenPort, setServerListenPort] = useState('');
+  const [serverEndpointIP, setServerEndpointIP] = useState(() => localStorage.getItem('wg_endpoint_ip') || '');
+  const [copiedPeerId, setCopiedPeerId] = useState<string | null>(null);
+  const [peerColors, setPeerColors] = useState<Record<string, string>>({});
+  const [colorPickerAddr, setColorPickerAddr] = useState<string | null>(null);
+  const [editingPeerId, setEditingPeerId] = useState<string | null>(null);
+  const [editingPeerName, setEditingPeerName] = useState('');
+  const [savingPeerName, setSavingPeerName] = useState(false);
   const wgLoadedRef = useRef(false);
 
-  const PEER_COLOR_PALETTE = ['#6366f1','#10b981','#0ea5e9','#f59e0b','#f43f5e','#8b5cf6','#f97316','#14b8a6','#ec4899','#64748b'];
+  const PEER_COLOR_PALETTE = ['#6366f1', '#10b981', '#0ea5e9', '#f59e0b', '#f43f5e', '#8b5cf6', '#f97316', '#14b8a6', '#ec4899', '#64748b'];
 
   const addToast = useCallback((text: string, type: Toast['type'] = 'warn') => {
     const id = Date.now() + Math.random();
@@ -1601,12 +1680,14 @@ export default function NodeAccessPanel() {
   };
 
   // Polling silencioso cada 60s — detecta desconexiones
+  const pollErrorCountRef = useRef(0);
   const silentPoll = useCallback(async () => {
     try {
       const nodeList = await fetchNodes();
       if (!nodeList) return;
+      pollErrorCountRef.current = 0; // reset contador de errores al tener éxito
       const disconnected = nodeList.filter(n => prevRunningRef.current[n.ppp_user] === true && !n.running);
-      const reconnected  = nodeList.filter(n => prevRunningRef.current[n.ppp_user] === false && n.running);
+      const reconnected = nodeList.filter(n => prevRunningRef.current[n.ppp_user] === false && n.running);
       nodeList.forEach(n => { prevRunningRef.current[n.ppp_user] = n.running; });
       setNodes(nodeList);
       disconnected.forEach(n => {
@@ -1614,15 +1695,21 @@ export default function NodeAccessPanel() {
         fetch(`${API_BASE_URL}/api/node/history/add`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ pppUser: n.ppp_user, event: 'disconnected' }),
-        }).catch(() => {});
+        }).catch(() => { });
       });
       reconnected.forEach(n => {
         fetch(`${API_BASE_URL}/api/node/history/add`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ pppUser: n.ppp_user, event: 'connected' }),
-        }).catch(() => {});
+        }).catch(() => { });
       });
-    } catch { /* silencioso */ }
+    } catch {
+      pollErrorCountRef.current += 1;
+      // Avisar al usuario después de 2 fallos consecutivos (2 min sin respuesta)
+      if (pollErrorCountRef.current === 2) {
+        addToast('Sin respuesta del router — verifica que WireGuard esté activo', 'warn');
+      }
+    }
   }, [fetchNodes, setNodes, addToast]);
 
   // Iniciar polling cuando hay nodos cargados
@@ -1652,8 +1739,22 @@ export default function NodeAccessPanel() {
       fetch(`${API_BASE_URL}/api/node/tags`)
         .then(r => r.json())
         .then(d => { if (d.success) setNodeTags(d.tags || {}); })
-        .catch(() => {});
+        .catch(() => { });
     }
+  }, []);
+
+  // Cargar IP del servidor SSTP desde la base de datos al iniciar
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/api/settings/get`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.success && d.settings?.server_public_ip) {
+          const ip = d.settings.server_public_ip;
+          setGlobalServerIP(ip);
+          localStorage.setItem('server_public_ip', ip);
+        }
+      })
+      .catch(() => { });
   }, []);
 
   const saveNodeTags = (pppUser: string, tags: string[]) => {
@@ -1661,7 +1762,7 @@ export default function NodeAccessPanel() {
     fetch(`${API_BASE_URL}/api/node/tag/save`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pppUser, tags }),
-    }).catch(() => {});
+    }).catch(() => { });
   };
 
   const exportCsv = () => {
@@ -1710,7 +1811,7 @@ export default function NodeAccessPanel() {
       }
     } catch (_) { /* silencioso */ }
     setLoadingWg(false);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [credentials]);
 
   // Cargar peers WireGuard y colores al montar o cuando se obtienen credenciales
@@ -1721,7 +1822,7 @@ export default function NodeAccessPanel() {
       fetch(`${API_BASE_URL}/api/wireguard/peer/colors`)
         .then(r => r.json())
         .then(d => { if (d.success) setPeerColors(d.colors || {}); })
-        .catch(() => {});
+        .catch(() => { });
     }
   }, [credentials, loadWgPeers]);
 
@@ -1731,7 +1832,7 @@ export default function NodeAccessPanel() {
     fetch(`${API_BASE_URL}/api/wireguard/peer/color/save`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ peerAddress, color }),
-    }).catch(() => {});
+    }).catch(() => { });
   };
 
   const savePeerName = async (peer: WgPeer) => {
@@ -1754,7 +1855,7 @@ export default function NodeAccessPanel() {
     if (active.length === 1 && !active.find(p => p.allowedAddress === adminIP)) {
       setAdminIP(active[0].allowedAddress);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wgPeers]);
 
   const copyWgConfig = (peer: WgPeer) => {
@@ -1813,6 +1914,42 @@ export default function NodeAccessPanel() {
           <p className="text-slate-400 text-sm mt-1">
             Abre acceso a APs y CPEs remotos mediante enrutamiento VRF
           </p>
+          {/* IP global del servidor SSTP */}
+          <div className="flex items-center gap-1.5 mt-2">
+            <Globe className="w-3 h-3 text-slate-400" />
+            <span className="text-[11px] text-slate-400 font-medium">Servidor SSTP:</span>
+            {editingGlobalIP ? (
+              <input
+                value={globalServerIP}
+                onChange={e => setGlobalServerIP(e.target.value)}
+                onBlur={() => {
+                  const ip = globalServerIP.trim();
+                  localStorage.setItem('server_public_ip', ip);
+                  fetch(`${API_BASE_URL}/api/settings/save`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'server_public_ip', value: ip }) }).catch(() => { });
+                  setEditingGlobalIP(false);
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    const ip = globalServerIP.trim();
+                    localStorage.setItem('server_public_ip', ip);
+                    fetch(`${API_BASE_URL}/api/settings/save`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'server_public_ip', value: ip }) }).catch(() => { });
+                    setEditingGlobalIP(false);
+                  }
+                  if (e.key === 'Escape') { setGlobalServerIP(localStorage.getItem('server_public_ip') || ''); setEditingGlobalIP(false); }
+                }}
+                placeholder="Ej: 213.173.36.232"
+                className="px-2 py-0.5 text-[11px] font-mono border border-indigo-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 w-36"
+                autoFocus
+              />
+            ) : (
+              <button onClick={() => setEditingGlobalIP(true)} className="flex items-center gap-1 group">
+                <span className={`text-[11px] font-mono font-semibold ${globalServerIP ? 'text-slate-700' : 'text-slate-400 italic'}`}>
+                  {globalServerIP || 'Sin configurar'}
+                </span>
+                <Pencil className="w-2.5 h-2.5 text-slate-300 group-hover:text-indigo-500 transition-colors" />
+              </button>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button
@@ -2105,9 +2242,15 @@ export default function NodeAccessPanel() {
 
             {/* Búsqueda */}
             <div className="relative w-full sm:w-64">
+              {/* Dummy inputs para atrapar el autofill agresivo de Chrome/Edge */}
+              <input type="text" name="dummy-user" style={{display: 'none'}} />
+              <input type="password" name="dummy-pass" style={{display: 'none'}} />
+              
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
               <input
                 type="text"
+                name="node-search-filter-off"
+                autoComplete="new-password"
                 placeholder="Buscar nodo, VRF, red, usuario…"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
@@ -2130,14 +2273,14 @@ export default function NodeAccessPanel() {
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/40">
-                  <th className="px-4 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider w-8">#</th>
-                  <th className="px-4 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider">Nodo</th>
-                  <th className="px-4 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider">VRF</th>
-                  <th className="px-4 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider">Red LAN</th>
-                  <th className="px-4 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider">IP Túnel</th>
-                  <th className="px-4 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider">Usuario PPP</th>
-                  <th className="px-4 py-3 text-right font-semibold text-slate-500 uppercase tracking-wider">Acciones</th>
+                <tr className="border-b border-slate-200 bg-slate-100">
+                  <th className="px-4 py-4 text-left font-bold text-slate-500 uppercase tracking-wider w-8">#</th>
+                  <th className="px-4 py-4 text-left font-bold text-slate-500 uppercase tracking-wider">Nodo</th>
+                  <th className="px-4 py-4 text-left font-bold text-slate-500 uppercase tracking-wider">VRF</th>
+                  <th className="px-4 py-4 text-left font-bold text-slate-500 uppercase tracking-wider">Red LAN</th>
+                  <th className="px-4 py-4 text-left font-bold text-slate-500 uppercase tracking-wider">IP Túnel</th>
+                  <th className="px-4 py-4 text-left font-bold text-slate-500 uppercase tracking-wider">Usuario PPP</th>
+                  <th className="px-4 py-4 text-right font-bold text-slate-500 uppercase tracking-wider">Acciones</th>
                 </tr>
               </thead>
               <tbody>

@@ -4,7 +4,7 @@
     {
       "name": "Backend (Express API)",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["--watch", "index.js"],
+      "runtimeArgs": ["--watch-path=.", "--watch-preserve-output", "index.js"],
       "port": 3001,
       "autoPort": false,
       "cwd": "server"

@@ -34,8 +34,8 @@ interface VpnContextType {
   deactivateAllNodes: () => Promise<void>;
 
   // Navegación
-  activeModule: 'scanner' | 'control' | 'nodes' | 'devices' | 'monitor';
-  setActiveModule: React.Dispatch<React.SetStateAction<'scanner' | 'control' | 'nodes' | 'devices' | 'monitor'>>;
+  activeModule: 'nodes' | 'devices' | 'monitor';
+  setActiveModule: React.Dispatch<React.SetStateAction<'nodes' | 'devices' | 'monitor'>>;
 
   // Tema
   darkMode: boolean;
@@ -50,9 +50,9 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [credentials, setCredentials] = useState<RouterCredentials | undefined>();
   const [managedVpns, setManagedVpns] = useState<VpnSecret[]>([]);
-  const [activeModule, setActiveModule] = useState<'scanner' | 'control' | 'nodes' | 'devices' | 'monitor'>(() => {
+  const [activeModule, setActiveModule] = useState<'nodes' | 'devices' | 'monitor'>(() => {
     const stored = localStorage.getItem('vpn_active_module');
-    return (['scanner', 'control', 'nodes', 'devices', 'monitor'].includes(stored ?? '') ? stored : 'scanner') as 'scanner' | 'control' | 'nodes' | 'devices' | 'monitor';
+    return (['nodes', 'devices', 'monitor'].includes(stored ?? '') ? stored : 'nodes') as 'nodes' | 'devices' | 'monitor';
   });
   const [isReady, setIsReady] = useState(false);
   const [scannedSecrets, setScannedSecrets] = useState<VpnSecret[]>([]);
@@ -193,7 +193,7 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
   const handleLoginSuccess = (creds: RouterCredentials) => {
     setCredentials(creds);
     setIsAuthenticated(true);
-    setActiveModule('scanner');
+    setActiveModule('nodes');
   };
 
   const handleLogout = async () => {

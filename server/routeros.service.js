@@ -1,19 +1,30 @@
 const { RouterOSAPI } = require('node-routeros');
 
 const connectToMikrotik = async (host, user, password) => {
+    // ── Intento 1: puerto 8728 (plain API) ──────────────────────────────────
     try {
         const api = new RouterOSAPI({ host, user, password, port: 8728, timeout: 8, keepalive: false });
         await api.connect();
         console.log(`[CONN] Conectado a ${host}:8728 (plain)`);
         return api;
     } catch (err) {
-        if (err?.errno !== -4078 && err?.code !== 'ECONNREFUSED') throw err;
-        console.log(`[CONN] 8728 rechazado, reintentando con SSL en 8729...`);
+        const errno = err?.errno;
+        const code  = err?.code;
+        // Solo reintentamos en ECONNREFUSED (puerto cerrado activamente).
+        // Si el puerto está filtrado/firewall (SOCKTMOUT/ETIMEDOUT), ambos puertos
+        // tendrán el mismo problema y no tiene sentido esperar 8s extra en 8729.
+        if (errno !== -4078 && code !== 'ECONNREFUSED') throw err;
+        console.log(`[CONN] 8728 rechazado (ECONNREFUSED), reintentando con SSL 8729...`);
     }
-    const api = new RouterOSAPI({ host, user, password, port: 8729, tls: { rejectUnauthorized: false }, timeout: 8, keepalive: false });
-    await api.connect();
-    console.log(`[CONN] Conectado a ${host}:8729 (SSL)`);
-    return api;
+    // ── Intento 2: puerto 8729 (SSL API) — solo si 8728 fue rechazado activamente ─
+    try {
+        const api = new RouterOSAPI({ host, user, password, port: 8729, tls: { rejectUnauthorized: false }, timeout: 8, keepalive: false });
+        await api.connect();
+        console.log(`[CONN] Conectado a ${host}:8729 (SSL)`);
+        return api;
+    } catch (err) {
+        throw err;
+    }
 };
 
 const safeWrite = (api, commands, timeoutMs = 6000) =>
@@ -29,11 +40,31 @@ const safeWrite = (api, commands, timeoutMs = 6000) =>
 
 const getErrorMessage = (error, ip, user = '') => {
     const errno = error?.errno;
-    const code = error?.code;
-    const msg = error?.message || '';
-    if (errno === -4078 || code === 'ECONNREFUSED') return `Puerto API rechazado en ${ip} — verifica que la API esté habilitada en el MikroTik (IP Services > api)`;
-    if (errno === -4039 || code === 'ETIMEDOUT' || error?.name === 'TimeoutError') return `Tiempo de espera agotado conectando a ${ip} — verifica que la IP sea correcta y el router sea accesible`;
-    if (msg.toLowerCase().includes('cannot log in') || msg.includes('CANTLOGIN') || msg.includes('invalid user name or password')) return `Credenciales incorrectas para el usuario "${user}" en ${ip}`;
+    const code  = error?.code;
+    const msg   = error?.message || '';
+    const msgLc = msg.toLowerCase();
+
+    // ── Conectividad rechazada ───────────────────────────────────────────────
+    if (errno === -4078 || code === 'ECONNREFUSED' || msgLc.includes('connection refused'))
+        return `Puerto API rechazado en ${ip} — verifica que la API esté habilitada en MikroTik (IP Services > api / api-ssl)`;
+
+    // ── Timeout (OS o librería) ──────────────────────────────────────────────
+    if (errno === -4039 || errno === 'SOCKTMOUT' || code === 'ETIMEDOUT' ||
+        error?.name === 'TimeoutError' || msgLc.includes('timed out'))
+        return `Tiempo de espera agotado conectando a ${ip} — verifica que la IP sea correcta y el router sea accesible`;
+
+    // ── Host no encontrado ───────────────────────────────────────────────────
+    if (code === 'ENOTFOUND' || code === 'EHOSTUNREACH' || code === 'ENETUNREACH')
+        return `No se puede alcanzar ${ip} — verifica la IP y la conectividad de red (WireGuard activo?)`;
+
+    // ── Credenciales incorrectas (BUG FIX: strings corregidos según la librería) ──
+    if (errno === 'CANTLOGIN' ||
+        msgLc.includes('username or password is invalid') ||
+        msgLc.includes('cannot log in') ||
+        msgLc.includes('cantlogin') ||
+        msgLc.includes('invalid user name or password'))
+        return `Credenciales incorrectas para el usuario "${user}" en ${ip}`;
+
     return msg || `Error de conexión al router (${error?.name || 'desconocido'})`;
 };
 
@@ -42,7 +73,7 @@ const cleanTunnelRules = async (api) => {
         safeWrite(api, ['/ip/firewall/address-list/print'], 3000),
         safeWrite(api, ['/ip/firewall/mangle/print'], 3000),
     ]);
-    const allAddrs = addrsResult.status === 'fulfilled' ? addrsResult.value : [];
+    const allAddrs  = addrsResult.status  === 'fulfilled' ? addrsResult.value  : [];
     const allMangle = mangleResult.status === 'fulfilled' ? mangleResult.value : [];
 
     const removeOps = [

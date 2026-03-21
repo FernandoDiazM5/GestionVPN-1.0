@@ -30,10 +30,10 @@ function GaugeChart({ value, label, color }: { value: number | null | undefined;
   return (
     <div className="flex flex-col items-center space-y-1">
       <svg width="76" height="76" viewBox="0 0 76 76" className="overflow-visible">
-        <circle cx="38" cy="38" r={r} fill="none" stroke="#1e293b" strokeWidth="6" />
+        <circle cx="38" cy="38" r={r} fill="none" className="stroke-slate-200 dark:stroke-slate-800" strokeWidth="6" />
         <circle
           cx="38" cy="38" r={r} fill="none"
-          stroke={value != null ? strokeColor : '#334155'}
+          stroke={value != null ? strokeColor : 'transparent'}
           strokeWidth="6"
           strokeDasharray={`${dash} ${circ - dash}`}
           strokeLinecap="round"
@@ -41,11 +41,11 @@ function GaugeChart({ value, label, color }: { value: number | null | undefined;
           style={{ transition: 'stroke-dasharray 1s cubic-bezier(0.4, 0, 0.2, 1)', filter: value != null ? dropShadow : 'none' }}
         />
         <text x="38" y="43" textAnchor="middle"
-          style={{ fill: '#f8fafc', fontSize: '14px', fontWeight: '700', fontFamily: 'monospace', letterSpacing: '-0.5px' }}>
+          className="fill-slate-800 dark:fill-slate-100 text-[14px] font-bold font-mono tracking-tight">
           {value != null ? `${pct}%` : '—'}
         </text>
       </svg>
-      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{label}</p>
+      <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1">{label}</p>
     </div>
   );
 }
@@ -64,9 +64,9 @@ function Bar({ pct, color }: { pct: number; color: string }) {
 function ParamRow({ label, value }: { label: string; value?: string | number | null }) {
   if (value == null || value === '') return null;
   return (
-    <div className="flex items-start justify-between gap-2 py-2 px-1 border-b border-slate-700/30 last:border-0 hover:bg-slate-800/40 transition-colors rounded-sm">
-      <span className="text-[11px] text-slate-400 font-medium shrink-0">{label}</span>
-      <span className="text-xs font-mono font-semibold text-slate-200 text-right break-all">{value}</span>
+    <div className="flex items-start justify-between gap-2 py-2.5 px-2 border-b border-slate-200 dark:border-slate-700/30 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors rounded-sm">
+      <span className="text-xs text-slate-500 dark:text-slate-400 font-medium shrink-0">{label}</span>
+      <span className="text-xs font-mono font-semibold text-slate-800 dark:text-slate-200 text-right break-all">{value}</span>
     </div>
   );
 }
@@ -221,14 +221,14 @@ export default function DeviceCard({ device, onRemove, onUpdate, isPreview }: De
       </div>
 
       {/* ── ANTENA (sin tabs) ───────────────────────────────────────── */}
-      <div className="flex-1 bg-slate-900 relative">
+      <div className="flex-1 bg-white dark:bg-slate-900 relative transition-colors">
 
         {/* Capa de atenuación cuando está cargando (Skeleton UX) */}
         {isLoadingAntenna && (
-          <div className="absolute inset-0 z-10 bg-slate-900/60 backdrop-blur-[1px] flex items-center justify-center transition-all duration-300">
-            <div className="bg-slate-800 px-5 py-3 rounded-2xl flex items-center space-x-3 shadow-2xl border border-slate-700">
-              <Loader2 className="w-5 h-5 animate-spin text-indigo-400" />
-              <span className="text-sm font-bold text-slate-200">Consultando equipo...</span>
+          <div className="absolute inset-0 z-10 bg-white/60 dark:bg-slate-900/60 backdrop-blur-sm flex items-center justify-center transition-all duration-300">
+            <div className="bg-white dark:bg-slate-800 px-5 py-3 rounded-2xl flex items-center space-x-3 shadow-2xl border border-slate-200 dark:border-slate-700">
+              <Loader2 className="w-5 h-5 animate-spin text-indigo-600 dark:text-indigo-400" />
+              <span className="text-sm font-bold text-slate-800 dark:text-slate-200">Consultando equipo...</span>
             </div>
           </div>
         )}
@@ -236,7 +236,7 @@ export default function DeviceCard({ device, onRemove, onUpdate, isPreview }: De
         {/* Botón */}
         <div className="p-4 pb-3 space-y-2">
           {device.cachedStats && device.lastSeen && (
-            <p className="text-[11px] text-slate-400 text-center font-mono font-medium tracking-wide">
+            <p className="text-xs text-slate-500 dark:text-slate-400 text-center font-mono font-medium tracking-wide">
               <Clock className="w-3 h-3 inline mr-1 opacity-60" />
               {new Date(device.lastSeen).toLocaleString('es-VE', { dateStyle: 'short', timeStyle: 'short' })}
             </p>
@@ -246,7 +246,7 @@ export default function DeviceCard({ device, onRemove, onUpdate, isPreview }: De
             disabled={isLoadingAntenna || isPreview}
             title={isPreview ? "Modo vista previa" : ""}
             className="w-full flex items-center justify-center space-x-2 py-3 rounded-xl text-xs font-bold uppercase tracking-wider
-                bg-slate-800 hover:bg-indigo-600 border border-slate-700 hover:border-indigo-500 text-white transition-all active:scale-[0.98]"
+                bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-600 border border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-500 text-indigo-700 dark:text-white transition-all active:scale-[0.98]"
           >
             <RefreshCw className={`w-4 h-4 ${isLoadingAntenna ? 'animate-spin opacity-50' : ''}`} />
             <span>{(antennaStats || device.cachedStats) ? 'Actualizar Datos' : 'Obtener Telemetría'}</span>
@@ -254,15 +254,15 @@ export default function DeviceCard({ device, onRemove, onUpdate, isPreview }: De
         </div>
 
         {antennaError && (
-          <div className="mx-4 mb-3 px-3 py-2 bg-rose-900/50 border border-rose-700 rounded-xl">
-            <p className="text-[11px] text-rose-300">{antennaError}</p>
+          <div className="mx-4 mb-3 px-3 py-2 bg-rose-50 dark:bg-rose-900/50 border border-rose-200 dark:border-rose-700 rounded-xl">
+            <p className="text-xs text-rose-600 dark:text-rose-300">{antennaError}</p>
           </div>
         )}
 
         {!antennaStats && !isLoadingAntenna && !antennaError && (
           <div className="px-4 pb-6 pt-2 flex flex-col items-center text-center space-y-2">
-            <Waves className="w-8 h-8 text-slate-700 mt-2" />
-            <p className="text-slate-500 text-xs">Presiona "Leer stats" para conectar via SSH</p>
+            <Waves className="w-8 h-8 text-slate-300 dark:text-slate-700 mt-2" />
+            <p className="text-slate-500 text-xs">Presiona "Obtener Telemetría" para conectar via SSH</p>
           </div>
         )}
 
@@ -296,10 +296,10 @@ export default function DeviceCard({ device, onRemove, onUpdate, isPreview }: De
 
             {/* ── CCQ ── */}
             {antennaStats.ccq != null && (
-              <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4">
+              <div className="bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50 rounded-xl p-4 shadow-sm">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Calidad CCQ</span>
-                  <span className="font-mono text-lg font-black text-white">{antennaStats.ccq}%</span>
+                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Calidad CCQ</span>
+                  <span className="font-mono text-lg font-black text-slate-800 dark:text-white">{antennaStats.ccq}%</span>
                 </div>
                 <Bar pct={antennaStats.ccq} color={ccqColor(antennaStats.ccq)} />
               </div>
@@ -308,21 +308,21 @@ export default function DeviceCard({ device, onRemove, onUpdate, isPreview }: De
             {/* ── TX / RX ── */}
             {(antennaStats.txRate != null || antennaStats.rxRate != null) && (
               <div className="grid grid-cols-2 gap-3">
-                <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4 flex flex-col items-center text-center">
+                <div className="bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50 rounded-xl p-4 flex flex-col items-center text-center shadow-sm">
                   <div className="flex items-center space-x-1.5 mb-1">
                     <ArrowUp className="w-3.5 h-3.5 text-emerald-400" />
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">TX Rate</span>
+                    <span className="text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">TX Rate</span>
                   </div>
-                  <p className="font-mono text-2xl font-black text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.3)]">
+                  <p className="font-mono text-2xl font-black text-emerald-600 dark:text-emerald-400 dark:drop-shadow-[0_0_8px_rgba(52,211,153,0.3)]">
                     {antennaStats.txRate ?? '—'}<span className="text-xs text-slate-500 ml-1">Mbps</span>
                   </p>
                 </div>
-                <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4 flex flex-col items-center text-center">
+                <div className="bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50 rounded-xl p-4 flex flex-col items-center text-center shadow-sm">
                   <div className="flex items-center space-x-1.5 mb-1">
                     <ArrowDown className="w-3.5 h-3.5 text-sky-400" />
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">RX Rate</span>
+                    <span className="text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">RX Rate</span>
                   </div>
-                  <p className="font-mono text-2xl font-black text-sky-400 drop-shadow-[0_0_8px_rgba(56,189,248,0.3)]">
+                  <p className="font-mono text-2xl font-black text-sky-600 dark:text-sky-400 dark:drop-shadow-[0_0_8px_rgba(56,189,248,0.3)]">
                     {antennaStats.rxRate ?? '—'}<span className="text-xs text-slate-500 ml-1">Mbps</span>
                   </p>
                 </div>
@@ -331,27 +331,27 @@ export default function DeviceCard({ device, onRemove, onUpdate, isPreview }: De
 
             {/* ── AirMAX ── */}
             {antennaStats.airmaxEnabled != null && (
-              <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4 space-y-3">
+              <div className="bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50 rounded-xl p-4 space-y-3 shadow-sm">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Protocolo airMAX</span>
+                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Protocolo airMAX</span>
                   <div className="flex items-center space-x-2">
                     <span className={`text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider
-                        ${antennaStats.airmaxEnabled ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-800 text-slate-500'}`}>
+                        ${antennaStats.airmaxEnabled ? 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
                       {antennaStats.airmaxEnabled ? 'Activado' : 'Desactivado'}
                     </span>
                     {antennaStats.airmaxPriority && (
-                      <span className="text-[11px] font-mono text-slate-400 bg-slate-800 px-2 py-1 rounded-md capitalize border border-slate-700">{antennaStats.airmaxPriority}</span>
+                      <span className="text-xs font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md capitalize border border-slate-200 dark:border-slate-700">{antennaStats.airmaxPriority}</span>
                     )}
                   </div>
                 </div>
                 {antennaStats.airmaxEnabled && (
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Calidad AMC</p>
+                      <p className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Calidad AMC</p>
                       <div className="flex items-center space-x-2">
-                        <span className="font-mono text-sm font-bold text-white">{antennaStats.airmaxQuality ?? '—'}%</span>
+                        <span className="font-mono text-sm font-bold text-slate-800 dark:text-white">{antennaStats.airmaxQuality ?? '—'}%</span>
                         {antennaStats.airmaxQuality != null && (
-                          <div className="flex-1 h-2 bg-black/30 rounded-full overflow-hidden">
+                          <div className="flex-1 h-2 bg-slate-200 dark:bg-black/30 rounded-full overflow-hidden">
                             <div className="h-full bg-violet-500 rounded-full shadow-[0_0_6px_#8b5cf6]"
                               style={{ width: `${antennaStats.airmaxQuality}%`, transition: 'width 1s ease' }} />
                           </div>
@@ -359,11 +359,11 @@ export default function DeviceCard({ device, onRemove, onUpdate, isPreview }: De
                       </div>
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Capacidad AMQ</p>
+                      <p className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Capacidad AMQ</p>
                       <div className="flex items-center space-x-2">
-                        <span className="font-mono text-sm font-bold text-white">{antennaStats.airmaxCapacity ?? '—'}%</span>
+                        <span className="font-mono text-sm font-bold text-slate-800 dark:text-white">{antennaStats.airmaxCapacity ?? '—'}%</span>
                         {antennaStats.airmaxCapacity != null && (
-                          <div className="flex-1 h-2 bg-black/30 rounded-full overflow-hidden">
+                          <div className="flex-1 h-2 bg-slate-200 dark:bg-black/30 rounded-full overflow-hidden">
                             <div className="h-full bg-fuchsia-500 rounded-full shadow-[0_0_6px_#d946ef]"
                               style={{ width: `${antennaStats.airmaxCapacity}%`, transition: 'width 1s ease' }} />
                           </div>
@@ -377,8 +377,8 @@ export default function DeviceCard({ device, onRemove, onUpdate, isPreview }: De
 
             {/* ── CPU y Memoria (gauges) ── */}
             {(antennaStats.cpuLoad != null || antennaStats.memoryPercent != null) && (
-              <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4">
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center space-x-2">
+              <div className="bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50 rounded-xl p-4 shadow-sm">
+                <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-4 flex items-center space-x-2">
                   <Cpu className="w-3 h-3" /><span>Recursos del sistema</span>
                 </p>
                 <div className="flex justify-evenly">
@@ -389,8 +389,8 @@ export default function DeviceCard({ device, onRemove, onUpdate, isPreview }: De
             )}
 
             {/* ── Parámetros del dispositivo ── */}
-            <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4">
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center space-x-2">
+            <div className="bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50 rounded-xl p-4 shadow-sm">
+              <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3 flex items-center space-x-2">
                 <Info className="w-3 h-3" /><span>Dispositivo</span>
               </p>
               <div className="flex flex-col">
@@ -407,8 +407,8 @@ export default function DeviceCard({ device, onRemove, onUpdate, isPreview }: De
             </div>
 
             {/* ── Parámetros inalámbricos ── */}
-            <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4">
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center space-x-2">
+            <div className="bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50 rounded-xl p-4 shadow-sm">
+              <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3 flex items-center space-x-2">
                 <Wifi className="w-3 h-3" /><span>Inalámbrico</span>
               </p>
               <div className="flex flex-col">
@@ -441,16 +441,16 @@ export default function DeviceCard({ device, onRemove, onUpdate, isPreview }: De
             {/* ── Estaciones (modo AP) ── */}
             {antennaStats.stations && antennaStats.stations.length > 0 && (
               <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center space-x-1.5">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center space-x-1.5">
                   <Activity className="w-3 h-3" /><span>Estaciones ({antennaStats.stations.length})</span>
                 </p>
-                <div className="rounded-xl overflow-hidden border border-slate-700">
+                <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700">
                   {antennaStats.stations.map((sta, i) => (
                     <div key={i}
-                      className={`flex items-center justify-between px-3 py-2.5 text-[11px]
-                          ${i % 2 === 0 ? 'bg-slate-800/80' : 'bg-slate-800/40'}`}>
+                      className={`flex items-center justify-between px-3 py-3 text-xs
+                          ${i % 2 === 0 ? 'bg-slate-50 dark:bg-slate-800/80' : 'bg-white dark:bg-slate-800/40'}`}>
                       <span className="font-mono text-emerald-400 text-[10px]">{sta.mac}</span>
-                      <div className="flex items-center space-x-3 text-slate-300 font-mono">
+                      <div className="flex items-center space-x-3 text-slate-600 dark:text-slate-300 font-mono">
                         <span>{sta.signal ?? '—'} dBm</span>
                         <span>{sta.ccq ?? '—'}%</span>
                         <span className="text-emerald-400">{sta.txRate ?? '—'}↑</span>
