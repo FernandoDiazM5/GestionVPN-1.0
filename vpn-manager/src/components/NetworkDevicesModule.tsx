@@ -999,7 +999,6 @@ export default function NetworkDevicesModule() {
   });
 
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
-  const [isLoadingNodes, setIsLoadingNodes] = useState(false);
   const [toast, setToast] = useState('');
   const [discoveryProgress, setDiscoveryProgress] = useState(0);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -1061,7 +1060,6 @@ export default function NetworkDevicesModule() {
 
   const loadNodes = useCallback(async () => {
     if (!credentials) return;
-    setIsLoadingNodes(true);
     try {
       const res = await fetchWithTimeout(`${API_BASE_URL}/api/nodes`, {
         method: 'POST',
@@ -1073,8 +1071,6 @@ export default function NetworkDevicesModule() {
       setNodes(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Error cargando nodos:', err);
-    } finally {
-      setIsLoadingNodes(false);
     }
   }, [credentials, setNodes]);
 
@@ -1087,7 +1083,7 @@ export default function NetworkDevicesModule() {
       const active = nodes.find(n => n.nombre_vrf === activeNodeVrf);
       if (active) {
         setSelectedNode(active);
-        const subnets = active.lan_subnets?.length > 0 ? active.lan_subnets : active.segmento_lan ? [active.segmento_lan] : [];
+        const subnets = (active.lan_subnets && active.lan_subnets.length > 0) ? active.lan_subnets : (active.segmento_lan ? [active.segmento_lan] : []);
         if (subnets.length > 0) setManualLan(subnets[0]);
       }
     }
@@ -1095,7 +1091,7 @@ export default function NetworkDevicesModule() {
 
   const activeNode = activeNodeVrf ? nodes.find(n => n.nombre_vrf === activeNodeVrf) ?? null : null;
   const availableSubnets: string[] = activeNode
-    ? (activeNode.lan_subnets?.length > 0 ? activeNode.lan_subnets : activeNode.segmento_lan ? [activeNode.segmento_lan] : [])
+    ? ((activeNode.lan_subnets && activeNode.lan_subnets.length > 0) ? activeNode.lan_subnets : (activeNode.segmento_lan ? [activeNode.segmento_lan] : []))
     : [];
 
   const effectiveLan = manualLan.trim() || selectedNode?.segmento_lan || '';
