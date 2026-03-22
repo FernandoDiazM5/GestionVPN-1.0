@@ -579,8 +579,8 @@ function CpeRow({ cpe, idx, onDetail, visibleCols }: {
 }
 
 // ── Station Table ─────────────────────────────────────────────────────────
-function StationTable({ apId, poll, onCpeDetail, dev }: {
-  apId: string; poll: PollResult;
+function StationTable({ poll, onCpeDetail, dev }: {
+  poll: PollResult;
   onCpeDetail: (mac: string, ip: string | null) => void;
   dev: SavedDevice;
 }) {
@@ -827,7 +827,7 @@ function ApRow({ dev, pollResult, expanded, onToggle, onKnownCpes, onCpeDetail, 
       </div>
 
       {expanded && pollResult && (
-        <StationTable apId={dev.id} poll={pollResult} onCpeDetail={onCpeDetail} dev={dev} />
+        <StationTable poll={pollResult} onCpeDetail={onCpeDetail} dev={dev} />
       )}
     </Fragment>
   );
