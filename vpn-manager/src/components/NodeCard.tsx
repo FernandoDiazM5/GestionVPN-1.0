@@ -145,6 +145,10 @@ export default function NodeCard({ node, rowIndex, onEdit, onDelete, onScript, o
       addLog(`Red remota: ${node.segmento_lan || 'N/A'}`);
       setActiveNodeVrf(node.nombre_vrf);
       setTunnelExpiry(Date.now() + TUNNEL_TIMEOUT_MS);
+      fetch(`${API_BASE_URL}/api/node/history/add`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pppUser: node.ppp_user, event: 'tunnel_activated' }),
+      }).catch(() => {});
     } catch (err: unknown) {
       addLog(`✗ Error: ${err instanceof Error ? err.message : 'Error desconocido'}`);
     } finally {
@@ -158,6 +162,11 @@ export default function NodeCard({ node, rowIndex, onEdit, onDelete, onScript, o
     try {
       await deactivateAllNodes();
       addLog('✓ Acceso revocado correctamente');
+      fetch(`${API_BASE_URL}/api/node/history/add`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pppUser: node.ppp_user, event: 'tunnel_deactivated' }),
+      }).catch(() => {});
+      setTimeout(() => setLogs([]), 1500);
     } catch (err: unknown) {
       addLog(`✗ Error: ${err instanceof Error ? err.message : 'Error desconocido'}`);
     } finally {

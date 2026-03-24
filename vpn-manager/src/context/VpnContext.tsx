@@ -44,7 +44,8 @@ interface VpnContextType {
 
 const VpnContext = createContext<VpnContextType | null>(null);
 
-const TUNNEL_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutos
+const TUNNEL_TIMEOUT_MS   = 30 * 60 * 1000; // 30 minutos
+const TUNNEL_KEEPALIVE_MS =  5 * 60 * 1000; // heartbeat cada 5 minutos
 
 export function VpnProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -65,7 +66,13 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
   const [activeNodeVrf, setActiveNodeVrf] = useState<string | null>(null);
   const [tunnelExpiry, setTunnelExpiry] = useState<number | null>(null);
   const [adminIP, setAdminIP] = useState('192.168.21.20');
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timeoutRef   = useRef<ReturnType<typeof setTimeout>  | null>(null);
+  const keepaliveRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Ref para leer activeNodeVrf / adminIP sin capturarlos en el closure del intervalo
+  const activeNodeVrfRef = useRef<string | null>(null);
+  const adminIPRef       = useRef<string>('192.168.21.20');
+  useEffect(() => { activeNodeVrfRef.current = activeNodeVrf; }, [activeNodeVrf]);
+  useEffect(() => { adminIPRef.current = adminIP; }, [adminIP]);
 
   // Dark mode y módulo activo — persisten en localStorage
   const [darkMode, setDarkMode] = useState(() => {
@@ -107,6 +114,10 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
     }
+    if (keepaliveRef.current) {
+      clearInterval(keepaliveRef.current);
+      keepaliveRef.current = null;
+    }
   }, [credentials]);
 
   // Auto-timeout: cuando se activa un tunnel, programar desactivación a los 30 min
@@ -129,6 +140,50 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, [tunnelExpiry, deactivateAllNodes]);
+
+  // Heartbeat: cada 5 minutos verifica que las reglas mangle siguen en MikroTik
+  // y las restaura si las eliminaron externamente (scheduler, reboot, etc.)
+  useEffect(() => {
+    if (keepaliveRef.current) {
+      clearInterval(keepaliveRef.current);
+      keepaliveRef.current = null;
+    }
+    if (!tunnelExpiry || !credentials) return;
+
+    const sendKeepalive = async () => {
+      const vrf    = activeNodeVrfRef.current;
+      const hostIP = adminIPRef.current;
+      if (!vrf || !hostIP) return;
+      // No enviar si el túnel ya expiró
+      if (Date.now() >= (tunnelExpiry)) return;
+      try {
+        const res = await fetchWithTimeout(`${API_BASE_URL}/api/tunnel/keepalive`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ip: credentials.ip, user: credentials.user, pass: credentials.pass,
+            tunnelIP: hostIP, targetVRF: vrf,
+          }),
+        }, 12_000);
+        const data = await res.json();
+        if (data.restored) {
+          console.warn('[KEEPALIVE] Reglas mangle restauradas automáticamente:', data.restoredItems);
+        }
+      } catch (err) {
+        // Error silencioso — la red puede estar momentáneamente caída
+        console.warn('[KEEPALIVE] Sin respuesta del router:', err);
+      }
+    };
+
+    keepaliveRef.current = setInterval(sendKeepalive, TUNNEL_KEEPALIVE_MS);
+
+    return () => {
+      if (keepaliveRef.current) {
+        clearInterval(keepaliveRef.current);
+        keepaliveRef.current = null;
+      }
+    };
+  }, [tunnelExpiry, credentials]);
 
   // Cargar estado desde DB al montar
   useEffect(() => {

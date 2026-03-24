@@ -6,6 +6,7 @@ import {
   Eye, Pencil, Trash2, CheckCircle2, ExternalLink, Router,
   ChevronUp, ChevronDown, ChevronRight, PlusCircle,
   SlidersHorizontal, Database, Search, KeyRound,
+  Activity, Shield, Network, GripVertical, Copy,
 } from 'lucide-react';
 import { useVpn } from '../context/VpnContext';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
@@ -16,7 +17,7 @@ import type { ScannedDevice, SavedDevice, AntennaStats } from '../types/devices'
 import type { NodeInfo } from '../types/api';
 
 const SESSION_SCAN_KEY = 'vpn_scan_results_v1';
-const COLS_STORAGE_KEY = 'vpn_diag_cols_v1';
+const COLS_STORAGE_KEY = 'vpn_diag_cols_v2';
 
 // Estima el número de hosts en un CIDR (ej: 192.168.1.0/24 → 254)
 const estimateIpCount = (cidr: string): number => {
@@ -90,7 +91,7 @@ const COLUMN_DEFS: ColumnDef[] = [
   },
   {
     key: 'txRate',
-    label: 'TX',
+    label: 'TX Rate',
     width: '66px',
     defaultVisible: true,
     requiresStats: true,
@@ -102,7 +103,7 @@ const COLUMN_DEFS: ColumnDef[] = [
   },
   {
     key: 'rxRate',
-    label: 'RX',
+    label: 'RX Rate',
     width: '66px',
     defaultVisible: true,
     requiresStats: true,
@@ -114,9 +115,9 @@ const COLUMN_DEFS: ColumnDef[] = [
   },
   {
     key: 'noise',
-    label: 'Noise',
+    label: 'Piso Ruido',
     width: '76px',
-    defaultVisible: false,
+    defaultVisible: true,
     requiresStats: true,
     render: (dev) => {
       const v = dev.cachedStats?.noiseFloor;
@@ -128,7 +129,7 @@ const COLUMN_DEFS: ColumnDef[] = [
     key: 'cpu',
     label: 'CPU',
     width: '60px',
-    defaultVisible: false,
+    defaultVisible: true,
     requiresStats: true,
     render: (dev) => {
       const v = dev.cachedStats?.cpuLoad;
@@ -141,7 +142,7 @@ const COLUMN_DEFS: ColumnDef[] = [
     key: 'mem',
     label: 'RAM',
     width: '60px',
-    defaultVisible: false,
+    defaultVisible: true,
     requiresStats: true,
     render: (dev) => {
       const v = dev.cachedStats?.memoryPercent;
@@ -152,7 +153,7 @@ const COLUMN_DEFS: ColumnDef[] = [
   },
   {
     key: 'amq',
-    label: 'AM Quality',
+    label: 'Calidad AM',
     width: '80px',
     defaultVisible: false,
     requiresStats: true,
@@ -165,8 +166,8 @@ const COLUMN_DEFS: ColumnDef[] = [
   },
   {
     key: 'amc',
-    label: 'AM Cap.',
-    width: '72px',
+    label: 'Capacidad AM',
+    width: '80px',
     defaultVisible: false,
     requiresStats: true,
     render: (dev) => {
@@ -178,7 +179,7 @@ const COLUMN_DEFS: ColumnDef[] = [
   },
   {
     key: 'uptime',
-    label: 'Uptime',
+    label: 'Tiempo Activo',
     width: '110px',
     defaultVisible: false,
     requiresStats: true,
@@ -190,7 +191,7 @@ const COLUMN_DEFS: ColumnDef[] = [
   },
   {
     key: 'txPower',
-    label: 'TX Power',
+    label: 'Potencia TX',
     width: '72px',
     defaultVisible: false,
     requiresStats: true,
@@ -202,14 +203,137 @@ const COLUMN_DEFS: ColumnDef[] = [
   },
   {
     key: 'chanbw',
-    label: 'Canal',
-    width: '66px',
+    label: 'Ancho Canal',
+    width: '76px',
     defaultVisible: false,
     requiresStats: true,
     render: (dev) => {
       const v = dev.cachedStats?.channelWidth;
       if (v == null) return <span className="text-[10px] text-slate-300">—</span>;
       return <span className="font-mono text-xs text-slate-500">{v} MHz</span>;
+    },
+  },
+  {
+    key: 'rssi',
+    label: 'RSSI bruto',
+    width: '76px',
+    defaultVisible: false,
+    requiresStats: true,
+    render: (dev) => {
+      const v = dev.cachedStats?.rssi ?? dev.cachedStats?.signal;
+      if (v == null) return <span className="text-[10px] text-slate-300">—</span>;
+      const c = v >= -65 ? 'text-emerald-600' : v >= -75 ? 'text-sky-600' : 'text-amber-500';
+      return <span className={`font-mono font-bold text-xs ${c}`}>{v} dBm</span>;
+    },
+  },
+  {
+    key: 'distance',
+    label: 'Distancia',
+    width: '84px',
+    defaultVisible: false,
+    requiresStats: true,
+    render: (dev) => {
+      const v = dev.cachedStats?.distance;
+      if (v == null) return <span className="text-[10px] text-slate-300">—</span>;
+      const m = parseInt(String(v));
+      return <span className="font-mono text-xs text-slate-500">{m >= 1000 ? `${(m/1000).toFixed(2)} km` : `${m} m`}</span>;
+    },
+  },
+  {
+    key: 'frequency',
+    label: 'Frecuencia',
+    width: '80px',
+    defaultVisible: false,
+    requiresStats: false,
+    render: (dev) => {
+      const v = dev.cachedStats?.frequency ?? dev.frequency;
+      if (!v) return <span className="text-[10px] text-slate-300">—</span>;
+      return <span className="font-mono text-xs text-slate-500">{v} MHz</span>;
+    },
+  },
+  {
+    key: 'hostname',
+    label: 'Nombre Dispositivo',
+    width: 'minmax(100px,1fr)',
+    defaultVisible: false,
+    requiresStats: true,
+    render: (dev) => {
+      const v = dev.cachedStats?.deviceName ?? dev.name;
+      if (!v) return <span className="text-[10px] text-slate-300">—</span>;
+      return <span className="font-mono text-[10px] text-slate-600 truncate block" title={v}>{v}</span>;
+    },
+  },
+  {
+    key: 'firmware',
+    label: 'Versión FW',
+    width: '90px',
+    defaultVisible: false,
+    requiresStats: true,
+    render: (dev) => {
+      const v = dev.cachedStats?.firmwareVersion ?? dev.firmware;
+      if (!v) return <span className="text-[10px] text-slate-300">—</span>;
+      return <span className="font-mono text-[10px] text-slate-500 truncate block" title={v}>{v}</span>;
+    },
+  },
+  {
+    key: 'chains',
+    label: 'Cadenas TX/RX',
+    width: '80px',
+    defaultVisible: false,
+    requiresStats: true,
+    render: (dev) => {
+      const v = dev.cachedStats?.chains;
+      if (!v) return <span className="text-[10px] text-slate-300">—</span>;
+      return <span className="font-mono text-xs text-slate-500">{v}</span>;
+    },
+  },
+  {
+    key: 'security',
+    label: 'Seguridad',
+    width: '80px',
+    defaultVisible: false,
+    requiresStats: true,
+    render: (dev) => {
+      const v = dev.cachedStats?.security;
+      if (!v) return <span className="text-[10px] text-slate-300">—</span>;
+      return <span className="font-mono text-[10px] text-slate-500 uppercase">{v}</span>;
+    },
+  },
+  {
+    key: 'txretries',
+    label: 'Reintentos TX',
+    width: '80px',
+    defaultVisible: false,
+    requiresStats: true,
+    render: (dev) => {
+      const v = dev.cachedStats?.txRetries;
+      if (v == null) return <span className="text-[10px] text-slate-300">—</span>;
+      const c = v < 100 ? 'text-emerald-600' : v < 500 ? 'text-amber-500' : 'text-rose-500';
+      return <span className={`font-mono text-xs ${c}`}>{v}</span>;
+    },
+  },
+  {
+    key: 'opmode',
+    label: 'Modo WiFi HT',
+    width: '84px',
+    defaultVisible: false,
+    requiresStats: true,
+    render: (dev) => {
+      const v = dev.cachedStats?.opmode;
+      if (!v) return <span className="text-[10px] text-slate-300">—</span>;
+      return <span className="font-mono text-[10px] text-slate-500">{v}</span>;
+    },
+  },
+  {
+    key: 'country',
+    label: 'País/Región',
+    width: '72px',
+    defaultVisible: false,
+    requiresStats: true,
+    render: (dev) => {
+      const v = dev.cachedStats?.countryCode;
+      if (!v) return <span className="text-[10px] text-slate-300">—</span>;
+      return <span className="font-mono text-[10px] text-slate-500">{v}</span>;
     },
   },
 ];
@@ -372,178 +496,390 @@ interface ScanCred {
   pass: string;
 }
 
-// ── Panel de estadísticas expandido (diagnóstico sin guardar) ────────────
-function ExpandedStats({ dev }: { dev: ScannedDevice }) {
-  const s = dev.cachedStats;
+// ── Panel de estadísticas estilo airOS ───────────────────────────────────
+function DeviceStatusPanel({ dev, onRefresh }: { dev: ScannedDevice; onRefresh?: (stats: AntennaStats) => void }) {
+  const [stats, setStats] = useState<AntennaStats | undefined>(dev.cachedStats);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<number | null>(dev.cachedStats ? Date.now() : null);
   const [showRaw, setShowRaw] = useState(false);
+
+  // Refs para no reiniciar el intervalo en cada render
+  const devRef = useRef(dev);
+  devRef.current = dev;
+  const onRefreshRef = useRef(onRefresh);
+  onRefreshRef.current = onRefresh;
+  const isFetchingRef = useRef(false);
+
+  // Sincronizar si el padre actualiza cachedStats
+  useEffect(() => { setStats(dev.cachedStats); }, [dev.cachedStats]);
+
+  const fmtFirmware = (fw?: string) => {
+    if (!fw) return null;
+    const m = fw.match(/^([A-Z]+)\.?(v[\d.]+)/);
+    return m ? `${m[2]} (${m[1]})` : fw;
+  };
+
+  const fmtAge = (ts: number | null) => {
+    if (!ts) return null;
+    const sec = Math.floor((Date.now() - ts) / 1000);
+    if (sec < 10) return 'Ahora';
+    if (sec < 60) return `Hace ${sec}s`;
+    if (sec < 3600) return `Hace ${Math.floor(sec / 60)} min`;
+    if (sec < 86400) return `Hace ${Math.floor(sec / 3600)} h`;
+    return `Hace ${Math.floor(sec / 86400)} días`;
+  };
+
+  const doFetch = async () => {
+    const d = devRef.current;
+    if (!d.sshUser || !d.sshPass || isFetchingRef.current) return;
+    isFetchingRef.current = true;
+    setRefreshing(true);
+    try {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/api/device/antenna`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deviceIP: d.ip, deviceUser: d.sshUser, devicePass: d.sshPass, devicePort: d.sshPort ?? 22 }),
+      }, 15_000);
+      const data = await res.json();
+      if (data.success && data.stats) {
+        setStats(data.stats);
+        setLastUpdated(Date.now());
+        onRefreshRef.current?.(data.stats);
+      }
+    } catch { /* silencioso */ }
+    isFetchingRef.current = false;
+    setRefreshing(false);
+  };
+
+  // Auto-refresh cada 5 segundos mientras el panel está montado (visible)
+  useEffect(() => {
+    if (!dev.sshUser || !dev.sshPass) return;
+    const id = setInterval(doFetch, 5000);
+    return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dev.sshUser, dev.sshPass]);
+
+  const handleRefresh = () => doFetch();
+
+  // Barra de señal estilo airOS: -40 dBm = 100%, -90 dBm = 0%
+  const signalPct = (sig: number) => Math.min(100, Math.max(0, Math.round((sig + 90) / 50 * 100)));
+  const signalColor = (sig: number) => sig >= -65 ? '#22c55e' : sig >= -75 ? '#f59e0b' : '#ef4444';
+
+  // Barra genérica de porcentaje
+  const Bar = ({ value, colorClass }: { value: number; colorClass: string }) => (
+    <div className="flex-1 h-2.5 bg-slate-100 rounded-full overflow-hidden">
+      <div className={`h-full rounded-full transition-all ${colorClass}`} style={{ width: `${Math.min(100, value)}%` }} />
+    </div>
+  );
+
+  const s = stats;
 
   if (!s) {
     return (
-      <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 text-xs text-slate-400 italic">
-        Sin estadísticas SSH disponibles para este dispositivo.
+      <div className="px-5 py-5 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-4">
+        <span className="text-xs text-slate-400 italic">Sin estadísticas SSH disponibles.</span>
+        {dev.sshUser && (
+          <button onClick={handleRefresh} disabled={refreshing}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-50 transition-colors">
+            {refreshing ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+            <span>Obtener datos</span>
+          </button>
+        )}
       </div>
     );
   }
 
-  type StatItem = { label: string; value: string | null; color?: string; mono?: boolean };
-
   const snr = s.signal != null && s.noiseFloor != null ? s.signal - s.noiseFloor : null;
-
-  // Formatea firmware: "XM.v5.6.15.33787.180511.1652" → "v5.6.15 (XM)"
-  const fmtFirmware = (fw: string | undefined) => {
-    if (!fw) return null;
-    const m = fw.match(/^([A-Z]+)\.?(v[\d.]+)/);
-    if (m) return `${m[2]} (${m[1]})`;
-    return fw;
-  };
-
-  const items: StatItem[] = [
-    {
-      label: 'Señal',
-      value: s.signal != null ? `${s.signal} dBm` : null,
-      color: s.signal != null
-        ? (s.signal >= -65 ? 'text-emerald-600' : s.signal >= -75 ? 'text-sky-600' : 'text-amber-500')
-        : undefined,
-      mono: true,
-    },
-    {
-      label: 'Noise Floor',
-      value: s.noiseFloor != null ? `${s.noiseFloor} dBm` : null,
-      mono: true,
-    },
-    {
-      label: 'SNR',
-      value: snr != null ? `${snr} dB` : null,
-      color: snr != null ? (snr >= 30 ? 'text-emerald-600' : snr >= 15 ? 'text-sky-600' : 'text-amber-500') : undefined,
-      mono: true,
-    },
-    {
-      label: 'CCQ',
-      value: s.ccq != null ? `${s.ccq}%` : null,
-      color: s.ccq != null ? (s.ccq >= 80 ? 'text-emerald-600' : s.ccq >= 60 ? 'text-sky-600' : 'text-amber-500') : undefined,
-      mono: true,
-    },
-    { label: 'TX Rate', value: s.txRate != null ? `${s.txRate} Mbps` : null, mono: true },
-    { label: 'RX Rate', value: s.rxRate != null ? `${s.rxRate} Mbps` : null, mono: true },
-    {
-      label: 'CPU',
-      value: s.cpuLoad != null ? `${s.cpuLoad}%` : null,
-      color: s.cpuLoad != null ? (s.cpuLoad < 50 ? 'text-emerald-600' : s.cpuLoad < 80 ? 'text-amber-500' : 'text-rose-500') : undefined,
-      mono: true,
-    },
-    {
-      label: 'RAM',
-      value: s.memoryPercent != null ? `${s.memoryPercent}%` : null,
-      color: s.memoryPercent != null ? (s.memoryPercent < 60 ? 'text-emerald-600' : s.memoryPercent < 80 ? 'text-amber-500' : 'text-rose-500') : undefined,
-      mono: true,
-    },
-    {
-      label: 'AM Quality',
-      value: s.airmaxQuality != null ? `${s.airmaxQuality}%` : null,
-      color: s.airmaxQuality != null ? (s.airmaxQuality >= 80 ? 'text-emerald-600' : s.airmaxQuality >= 60 ? 'text-sky-600' : 'text-amber-500') : undefined,
-      mono: true,
-    },
-    {
-      label: 'AM Capacity',
-      value: s.airmaxCapacity != null ? `${s.airmaxCapacity}%` : null,
-      color: s.airmaxCapacity != null ? (s.airmaxCapacity >= 80 ? 'text-emerald-600' : s.airmaxCapacity >= 60 ? 'text-sky-600' : 'text-amber-500') : undefined,
-      mono: true,
-    },
-    { label: 'Uptime', value: s.uptimeStr || null, mono: true },
-    { label: 'TX Power', value: s.txPower != null ? `${s.txPower} dBm` : null, mono: true },
-    { label: 'Canal', value: s.channelWidth != null ? `${s.channelWidth} MHz` : null, mono: true },
-    { label: 'Frecuencia', value: s.frequency != null ? `${s.frequency} MHz` : null, mono: true },
-    { label: 'Modo', value: s.mode || null },
-    { label: 'Modo Red', value: s.networkMode || null },
-    { label: 'Seguridad', value: s.security || null },
-    { label: 'Chains', value: s.chains || null, mono: true },
-    { label: 'WLAN MAC', value: s.wlanMac || null, mono: true },
-    { label: 'LAN MAC', value: s.lanMac || null, mono: true },
-    { label: 'AP MAC', value: s.apMac || null, mono: true },
-    { label: 'Firmware', value: fmtFirmware(s.firmwareVersion || dev.firmware) },
-    { label: 'Modelo', value: s.deviceModel || dev.model || null },
-    { label: 'Hostname', value: s.deviceName || dev.name || null },
-    { label: 'Estaciones', value: s.stations?.length != null ? String(s.stations.length) : null },
-  ].filter(i => i.value != null && i.value !== '') as (StatItem & { value: string })[];
+  const isLive = !!(dev.sshUser && dev.sshPass);
 
   return (
-    <div className="px-5 py-4 bg-gradient-to-r from-slate-50 to-indigo-50/30 border-t border-slate-200">
-      {/* Header del panel */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center space-x-2">
-          <div className="w-1 h-4 bg-indigo-400 rounded-full" />
-          <span className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-widest">
-            Estadísticas completas · {dev.ip}
-          </span>
+    <div className="border-t border-slate-200 bg-white">
+      {/* ── Cabecera ── */}
+      <div className="flex items-center justify-between px-4 py-2.5 bg-slate-700 text-white">
+        <div className="flex items-center gap-2">
+          <div className="w-1 h-4 bg-sky-400 rounded-full" />
+          <span className="text-xs font-bold tracking-wide uppercase">Estado · {dev.ip}</span>
           {dev.sshUser && (
-            <span className="text-[10px] sm:text-xs font-mono text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-200">
-              {dev.sshUser}
+            <span className="text-[10px] font-mono bg-white/10 px-1.5 py-0.5 rounded">{dev.sshUser}</span>
+          )}
+          {/* Badge En vivo con punto pulsante */}
+          {isLive && (
+            <span className="flex items-center gap-1 text-[10px] text-emerald-400">
+              <span className={`w-1.5 h-1.5 rounded-full ${refreshing ? 'bg-emerald-400 animate-ping' : 'bg-emerald-400 animate-pulse'}`} />
+              {refreshing ? 'Actualizando…' : lastUpdated ? fmtAge(lastUpdated) : 'En vivo'}
             </span>
           )}
         </div>
-        {/* Toggle raw JSON */}
-        {s._rawJson && (
-          <button
-            onClick={() => setShowRaw(r => !r)}
-            className="flex items-center space-x-1 text-xs font-bold text-slate-500 hover:text-indigo-600 transition-colors px-2 py-1 rounded-md hover:bg-indigo-50"
-          >
-            <Info className="w-3 h-3" />
-            <span>{showRaw ? 'Ocultar JSON' : 'Ver JSON crudo'}</span>
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {s._rawJson && (
+            <button onClick={() => setShowRaw(r => !r)}
+              className="flex items-center gap-1 text-[10px] text-slate-300 hover:text-white px-2 py-1 rounded hover:bg-white/10 transition-colors">
+              <Info className="w-3 h-3" /><span>JSON</span>
+            </button>
+          )}
+          {dev.sshUser && (
+            <button onClick={handleRefresh} disabled={refreshing}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-bold bg-sky-500 hover:bg-sky-400 text-white disabled:opacity-50 transition-colors">
+              {refreshing ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+              <span>Ahora</span>
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Grid de stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-1.5">
-        {items.map(item => (
-          <div key={item.label} className="bg-white rounded-lg px-3 py-2 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-            <p className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">{item.label}</p>
-            <p className={`text-sm font-bold truncate ${item.color ?? 'text-slate-800'} ${item.mono ? 'font-mono tracking-tight' : ''}`}>
-              {item.value}
-            </p>
+      {/* ── Cuerpo: dos columnas en pantallas medianas, una en móvil ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+
+        {/* Columna izquierda — Info de configuración */}
+        <div className="px-4 py-3">
+          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest pb-1.5 border-b border-slate-100 mb-2">Configuración</p>
+          {([
+            ['Modelo de Dispositivo', s.deviceModel || dev.model],
+            ['Nombre de dispositivo', s.deviceName || dev.name],
+            ['Modo de máscara de red', (() => {
+              const m = s.networkMode || '';
+              if (m === 'router') return 'Enrutador';
+              if (m === 'bridge') return 'Puente';
+              return m || null;
+            })()],
+            ['Modo inalámbrico', (() => {
+              const m = s.mode || dev.role || '';
+              if (m === 'sta') return 'Estación';
+              if (m === 'ap' || m === 'master') return 'Punto de Acceso';
+              return m || null;
+            })()],
+            ['SSID', s.essid || dev.essid || dev.parentAp],
+            ['Seguridad', s.security],
+            ['Versión', fmtFirmware(s.firmwareVersion || dev.firmware)],
+            ['Tiempo activo', s.uptimeStr],
+            ['Fecha dispositivo', s.deviceDate],
+            ['Canal/Frecuencia', (() => {
+              const freq = s.frequency ?? dev.frequency;
+              if (s.channelNumber != null && freq != null) return `${s.channelNumber} / ${freq} MHz`;
+              if (freq != null) return `${freq} MHz`;
+              return null;
+            })()],
+            ['Ancho de canal', s.channelWidth != null ? `${s.channelWidth} MHz` : null],
+            ['Banda de frecuencia', s.freqRange],
+            ['Distancia', s.distance != null ? `${s.distance} m (${(s.distance / 1609).toFixed(2)} mi)` : null],
+            ['Cadenas de TX/RX', s.chains],
+            ['Potencia de TX', s.txPower != null ? `${s.txPower} dBm` : null],
+            ['Antena', s.antenna],
+            ['Modo HT/WiFi', s.opmode],
+            ['País/Región', s.countryCode],
+            ['Familia FW', s.fwPrefix],
+            ['WLAN MAC', s.wlanMac || dev.mac],
+            ['LAN MAC', s.lanMac],
+            ['LAN0', s.lanInfo],
+            // AC-específicos
+            ['Temperatura', s.temperature != null ? `${s.temperature} °C` : null],
+            ['CINR', s.cinr != null ? `${s.cinr} dB` : null],
+            ['Flujos TX/RX (NSS)', (s.txNss != null || s.rxNss != null) ? `${s.txNss ?? '—'} / ${s.rxNss ?? '—'}` : null],
+            ['Índice MCS TX/RX', (s.txIdx != null || s.rxIdx != null) ? `${s.txIdx ?? '—'} / ${s.rxIdx ?? '—'}` : null],
+            ['Airtime total', s.airtime != null ? `${s.airtime}%` : null],
+            ['Capac. DL/UL polling', (s.dcap != null || s.ucap != null) ? `${s.dcap ?? '—'}% / ${s.ucap ?? '—'}%` : null],
+            ['GPS Sync', s.gpsSync != null ? (s.gpsSync ? 'Sí' : 'No') : null],
+            // M-series avanzado
+            ['Reintentos TX', s.txRetries != null ? String(s.txRetries) : null],
+            ['Balizas perdidas', s.missedBeacons != null ? String(s.missedBeacons) : null],
+            ['RSSI por cadena', s.chainRssi && s.chainRssi.length > 0 ? s.chainRssi.map(v => `${v} dBm`).join(' / ') : null],
+            ['ATPC', s.atpcStatus],
+            ['Airsync', s.airsyncMode],
+            ['Estaciones', s.stations != null ? String(s.stations.length) : null],
+          ] as [string, string | null | undefined][]).filter(([, v]) => v).map(([label, value]) => (
+            <div key={label} className="flex items-baseline justify-between py-1 border-b border-slate-50 gap-2">
+              <span className="text-[11px] text-slate-500 shrink-0">{label}:</span>
+              <span className="text-[11px] font-semibold text-slate-800 font-mono text-right truncate max-w-[58%]">{value}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Columna derecha — Métricas con barras */}
+        <div className="px-4 py-3 space-y-3">
+          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest pb-1.5 border-b border-slate-100">Métricas en tiempo real</p>
+
+          {/* CPU */}
+          {s.cpuLoad != null && (
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[11px] text-slate-500">CPU:</span>
+                <span className={`text-[11px] font-bold font-mono ${s.cpuLoad < 50 ? 'text-sky-600' : s.cpuLoad < 80 ? 'text-amber-500' : 'text-rose-500'}`}>{s.cpuLoad} %</span>
+              </div>
+              <Bar value={s.cpuLoad} colorClass={s.cpuLoad < 50 ? 'bg-sky-400' : s.cpuLoad < 80 ? 'bg-amber-400' : 'bg-rose-500'} />
+            </div>
+          )}
+
+          {/* Memoria */}
+          {s.memoryPercent != null && (
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[11px] text-slate-500">Memory:</span>
+                <span className={`text-[11px] font-bold font-mono ${s.memoryPercent < 60 ? 'text-emerald-600' : s.memoryPercent < 80 ? 'text-amber-500' : 'text-rose-500'}`}>{s.memoryPercent} %</span>
+              </div>
+              <Bar value={s.memoryPercent} colorClass={s.memoryPercent < 60 ? 'bg-emerald-400' : s.memoryPercent < 80 ? 'bg-amber-400' : 'bg-rose-500'} />
+            </div>
+          )}
+
+          {/* AP MAC */}
+          {s.apMac && (
+            <div className="flex items-center justify-between py-1 border-t border-slate-50">
+              <span className="text-[11px] text-slate-500">AP MAC:</span>
+              <span className="text-[11px] font-bold font-mono text-slate-700">{s.apMac}</span>
+            </div>
+          )}
+
+          {/* Señal — barra estilo airOS */}
+          {s.signal != null && (
+            <div className="border-t border-slate-100 pt-2">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[11px] text-slate-500">Intensidad de la señal:</span>
+                <span className="text-[11px] font-bold font-mono" style={{ color: signalColor(s.signal) }}>{s.signal} dBm</span>
+              </div>
+              {/* Barra de colores degradada estilo airOS */}
+              <div className="relative h-2.5 rounded-full overflow-hidden"
+                style={{ background: 'linear-gradient(to right, #ef4444 0%, #f59e0b 40%, #22c55e 80%)' }}>
+                <div className="absolute right-0 top-0 h-full bg-slate-100 rounded-r-full"
+                  style={{ width: `${100 - signalPct(s.signal)}%` }} />
+              </div>
+            </div>
+          )}
+
+          {/* Noise / SNR / CCQ */}
+          <div className="space-y-1 border-t border-slate-100 pt-2">
+            {s.noiseFloor != null && (
+              <div className="flex justify-between">
+                <span className="text-[11px] text-slate-500">Umbral mínimo de ruido:</span>
+                <span className="text-[11px] font-mono font-semibold text-slate-700">{s.noiseFloor} dBm</span>
+              </div>
+            )}
+            {snr != null && (
+              <div className="flex justify-between">
+                <span className="text-[11px] text-slate-500">SNR:</span>
+                <span className={`text-[11px] font-mono font-bold ${snr >= 30 ? 'text-emerald-600' : snr >= 15 ? 'text-sky-600' : 'text-amber-500'}`}>{snr} dB</span>
+              </div>
+            )}
+            {s.ccq != null && (
+              <div className="flex justify-between">
+                <span className="text-[11px] text-slate-500">Transmitir CCQ:</span>
+                <span className={`text-[11px] font-mono font-bold ${s.ccq >= 80 ? 'text-emerald-600' : s.ccq >= 60 ? 'text-sky-600' : 'text-amber-500'}`}>{s.ccq} %</span>
+              </div>
+            )}
+            {(s.txRate != null || s.rxRate != null) && (
+              <div className="flex justify-between">
+                <span className="text-[11px] text-slate-500">Velocidad de TX/RX:</span>
+                <span className="text-[11px] font-mono font-semibold text-slate-700">{s.txRate ?? '—'} Mbps / {s.rxRate ?? '—'} Mbps</span>
+              </div>
+            )}
           </div>
-        ))}
+
+          {/* AirMAX */}
+          {(s.airmaxEnabled != null || s.airmaxQuality != null || s.airmaxCapacity != null) && (
+            <div className="border-t border-slate-100 pt-2 space-y-2">
+              {s.airmaxEnabled != null && (
+                <div className="flex justify-between items-center">
+                  <span className="text-[11px] text-slate-500">airMAX:</span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${s.airmaxEnabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                    {s.airmaxEnabled ? 'Activado' : 'Desactivado'}
+                  </span>
+                </div>
+              )}
+              {s.airmaxPriority && (
+                <div className="flex justify-between">
+                  <span className="text-[11px] text-slate-500">Prioridad airMAX:</span>
+                  <span className="text-[11px] font-semibold text-slate-700 capitalize">{s.airmaxPriority}</span>
+                </div>
+              )}
+              {s.airmaxQuality != null && (
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[11px] text-slate-500">Calidad airMAX:</span>
+                    <span className={`text-[11px] font-bold font-mono ${s.airmaxQuality >= 80 ? 'text-emerald-600' : s.airmaxQuality >= 60 ? 'text-sky-600' : 'text-amber-500'}`}>{s.airmaxQuality} %</span>
+                  </div>
+                  <Bar value={s.airmaxQuality} colorClass={s.airmaxQuality >= 80 ? 'bg-emerald-400' : s.airmaxQuality >= 60 ? 'bg-sky-400' : 'bg-amber-400'} />
+                </div>
+              )}
+              {s.airmaxCapacity != null && (
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[11px] text-slate-500">Capacidad airMAX:</span>
+                    <span className={`text-[11px] font-bold font-mono ${s.airmaxCapacity >= 80 ? 'text-emerald-600' : s.airmaxCapacity >= 60 ? 'text-sky-600' : 'text-amber-500'}`}>{s.airmaxCapacity} %</span>
+                  </div>
+                  <Bar value={s.airmaxCapacity} colorClass={s.airmaxCapacity >= 80 ? 'bg-emerald-400' : s.airmaxCapacity >= 60 ? 'bg-sky-400' : 'bg-amber-400'} />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Temperatura (AC) */}
+          {s.temperature != null && (
+            <div className="border-t border-slate-100 pt-2">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[11px] text-slate-500">Temperatura:</span>
+                <span className={`text-[11px] font-bold font-mono ${s.temperature < 60 ? 'text-emerald-600' : s.temperature < 80 ? 'text-amber-500' : 'text-rose-500'}`}>{s.temperature} °C</span>
+              </div>
+              <Bar value={Math.round((s.temperature / 100) * 100)} colorClass={s.temperature < 60 ? 'bg-emerald-400' : s.temperature < 80 ? 'bg-amber-400' : 'bg-rose-500'} />
+            </div>
+          )}
+
+          {/* CINR (AC) */}
+          {s.cinr != null && (
+            <div className="flex justify-between border-t border-slate-100 pt-2">
+              <span className="text-[11px] text-slate-500">CINR:</span>
+              <span className={`text-[11px] font-mono font-bold ${s.cinr >= 20 ? 'text-emerald-600' : s.cinr >= 10 ? 'text-sky-600' : 'text-amber-500'}`}>{s.cinr} dB</span>
+            </div>
+          )}
+
+          {/* Airtime (AC) */}
+          {s.airtime != null && (
+            <div className="border-t border-slate-100 pt-2">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[11px] text-slate-500">Airtime:</span>
+                <span className={`text-[11px] font-bold font-mono ${s.airtime < 50 ? 'text-emerald-600' : s.airtime < 80 ? 'text-amber-500' : 'text-rose-500'}`}>{s.airtime}%</span>
+              </div>
+              <Bar value={s.airtime} colorClass={s.airtime < 50 ? 'bg-emerald-400' : s.airtime < 80 ? 'bg-amber-400' : 'bg-rose-500'} />
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Estaciones del AP */}
+      {/* ── Estaciones del AP ── */}
       {s.stations && s.stations.length > 0 && (
-        <div className="mt-3">
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+        <div className="px-4 py-3 border-t border-slate-100">
+          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">
             Estaciones conectadas ({s.stations.length})
           </p>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="space-y-1">
             {s.stations.map((sta, i) => (
-              <div key={i} className="bg-white border border-slate-200 rounded-lg px-3 py-2 flex items-center space-x-3 shadow-sm hover:shadow-md transition-shadow">
-                <span className="font-mono text-xs font-semibold text-slate-700">{sta.mac}</span>
+              <div key={i} className="flex items-center gap-4 px-3 py-1.5 bg-slate-50 rounded-lg border border-slate-100 text-[11px]">
+                <span className="font-mono font-semibold text-slate-700 w-36 shrink-0">{sta.mac}</span>
                 {sta.signal != null && (
-                  <span className={`text-xs font-bold ${sta.signal >= -65 ? 'text-emerald-600' : sta.signal >= -75 ? 'text-sky-600' : 'text-amber-500'}`}>
+                  <span className={`font-bold font-mono w-16 ${sta.signal >= -65 ? 'text-emerald-600' : sta.signal >= -75 ? 'text-sky-600' : 'text-amber-500'}`}>
                     {sta.signal} dBm
                   </span>
                 )}
-                {sta.ccq != null && <span className="text-xs text-slate-500">CCQ {sta.ccq}%</span>}
-                {sta.txRate != null && <span className="font-mono text-xs text-slate-500">TX {sta.txRate}↑</span>}
-                {sta.rxRate != null && <span className="font-mono text-xs text-slate-500">RX {sta.rxRate}↓</span>}
+                {sta.ccq != null && <span className="text-slate-500 w-16">CCQ {sta.ccq}%</span>}
+                {sta.txRate != null && <span className="font-mono text-slate-500">↑ {sta.txRate} Mbps</span>}
+                {sta.rxRate != null && <span className="font-mono text-slate-500">↓ {sta.rxRate} Mbps</span>}
+                {sta.distance != null && <span className="text-slate-400 ml-auto">{sta.distance} m</span>}
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Raw JSON del mca-status — para diagnóstico de modelos */}
+      {/* ── Raw JSON ── */}
       {showRaw && s._rawJson && (
-        <div className="mt-3 border border-slate-200 rounded-xl overflow-hidden">
-          <div className="flex items-center justify-between px-3 py-1.5 bg-slate-100 border-b border-slate-200">
+        <div className="border-t border-slate-200">
+          <div className="flex items-center justify-between px-4 py-1.5 bg-slate-100">
             <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
-              Raw · mca-status · {s.deviceModel || dev.model}
+              mca-status JSON · {s.deviceModel || dev.model}
             </span>
-            <button
-              onClick={() => { navigator.clipboard?.writeText(s._rawJson!); }}
-              className="text-[9px] font-bold text-indigo-500 hover:text-indigo-700 transition-colors"
-            >
+            <button onClick={() => { navigator.clipboard?.writeText(s._rawJson!); }}
+              className="text-[9px] font-bold text-indigo-500 hover:text-indigo-700 transition-colors">
               Copiar
             </button>
           </div>
-          <pre className="p-3 text-[9px] font-mono text-slate-600 bg-slate-50 overflow-x-auto max-h-64 leading-relaxed">
+          <pre className="p-3 text-[9px] font-mono text-slate-600 bg-slate-50 overflow-x-auto max-h-48 leading-relaxed">
             {s._rawJson}
           </pre>
         </div>
@@ -598,7 +934,7 @@ function RawBlock({ title, content, icon }: { title: string; content: string | n
 const stripRawStats = (stats?: AntennaStats): AntennaStats | undefined => {
   if (!stats) return stats;
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { _rawUname, _rawRoutes, _rawIwconfig, _rawWstalist, _rawMcaCli, _rawNetDev, _rawMeminfo, ...rest } = stats;
+  const { _rawUname, _rawRoutes, _rawIwconfig, _rawWstalist, _rawMcaCli, _rawNetDev, _rawMeminfo, _rawBoard, ...rest } = stats;
   return rest;
 };
 
@@ -956,6 +1292,294 @@ function ColumnPicker({ visibleCols, onChange }: ColumnPickerProps) {
   );
 }
 
+// ── M5 Detail Modal helpers ────────────────────────────────────────────────
+function M5Row({ label, value }: { label: string; value?: string | number | null }) {
+  if (value == null || value === '') return null;
+  return (
+    <>
+      <span className="text-[11px] text-slate-500 truncate">{label}:</span>
+      <span className="text-[11px] font-mono font-semibold text-slate-800 truncate">{String(value)}</span>
+    </>
+  );
+}
+
+function M5Section({ title, icon, colorClass, children }: {
+  title: string; icon: ReactNode; colorClass: string; children: ReactNode;
+}) {
+  return (
+    <div className={`rounded-xl border p-4 ${colorClass}`}>
+      <div className="flex items-center gap-2 mb-3">
+        {icon}
+        <p className="text-xs font-bold uppercase tracking-widest">{title}</p>
+      </div>
+      <div className="grid grid-cols-2 gap-x-6 gap-y-0.5">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// Detecta familia del dispositivo: AC (airOS v8+) vs M5 (airOS v6)
+function detectFamily(dev: ScannedDevice): 'ac' | 'm5' | 'unknown' {
+  const model = (dev.cachedStats?.deviceModel ?? dev.model ?? '').toUpperCase();
+  const fw    = (dev.cachedStats?.fwPrefix ?? '').toUpperCase();
+  if (/\bAC\b|5AC|AC\d|ACGEN/.test(model) || fw === 'XC') return 'ac';
+  if (/M[235679]\b|M900/.test(model) || fw === 'XW' || fw === 'XM') return 'm5';
+  return 'unknown';
+}
+
+// Bloque de interfaz compartido M5 y AC
+function IfaceBlock({ ifc }: { ifc: NonNullable<AntennaStats['ifaceDetails']>[number] }) {
+  return (
+    <div className="col-span-2 border border-violet-100 rounded-lg p-3 mb-2 bg-white">
+      <div className="flex items-center gap-2 mb-2">
+        <p className="text-[10px] font-bold text-violet-600 uppercase font-mono">{ifc.ifname}</p>
+        {ifc.hwaddr && <p className="text-[10px] text-slate-400 font-mono">{ifc.hwaddr}</p>}
+        {ifc.ipaddr && <p className="text-[10px] font-mono font-bold text-sky-600 ml-auto">{ifc.ipaddr}</p>}
+      </div>
+      <div className="grid grid-cols-2 gap-x-6 gap-y-0.5">
+        {ifc.mtu      != null && <M5Row label="mtu"     value={String(ifc.mtu)} />}
+        {ifc.enabled  != null && <M5Row label="enabled" value={ifc.enabled ? 'Sí' : 'No'} />}
+        {ifc.plugged  != null && <M5Row label="plugged" value={ifc.plugged ? 'Cable conectado' : 'Sin cable'} />}
+        {ifc.speed    != null && <M5Row label="speed"   value={`${ifc.speed} Mbps`} />}
+        {ifc.duplex   != null && <M5Row label="duplex"  value={ifc.duplex ? 'Full' : 'Half'} />}
+        {ifc.dhcpc    != null && <M5Row label="dhcpc"   value={ifc.dhcpc ? 'Activo' : 'No'} />}
+        {ifc.dhcpd    != null && <M5Row label="dhcpd"   value={ifc.dhcpd ? 'Activo' : 'No'} />}
+        {ifc.snr      != null && <M5Row label="snr"     value={`${ifc.snr} dB`} />}
+        {ifc.cableLen != null && <M5Row label="cable_len" value={`${ifc.cableLen} m`} />}
+        {ifc.txBytesIfc != null && <M5Row label="tx_bytes" value={`${(ifc.txBytesIfc / 1024 / 1024).toFixed(1)} MB`} />}
+        {ifc.rxBytesIfc != null && <M5Row label="rx_bytes" value={`${(ifc.rxBytesIfc / 1024 / 1024).toFixed(1)} MB`} />}
+        {ifc.txErrors != null && <M5Row label="tx_errors" value={String(ifc.txErrors)} />}
+        {ifc.rxErrors != null && <M5Row label="rx_errors" value={String(ifc.rxErrors)} />}
+      </div>
+    </div>
+  );
+}
+
+function M5FullInfoModal({ dev, onClose }: { dev: ScannedDevice; onClose: () => void }) {
+  const s = dev.cachedStats;
+  const [copiedIp, setCopiedIp] = useState(false);
+  const family = detectFamily(dev);
+
+  const copyIp = () => {
+    navigator.clipboard.writeText(dev.ip).then(() => { setCopiedIp(true); setTimeout(() => setCopiedIp(false), 1500); });
+  };
+
+  const familyBadge = family === 'ac'
+    ? <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-sky-500/30 text-sky-200 uppercase tracking-wide">AC</span>
+    : family === 'm5'
+      ? <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/30 text-amber-200 uppercase tracking-wide">M5</span>
+      : null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"
+      onClick={e => e.target === e.currentTarget && onClose()}
+    >
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col animate-in zoom-in-95 duration-200">
+        {/* Header */}
+        <div className="flex items-center justify-between bg-slate-800 rounded-t-2xl px-5 py-4 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center">
+              <Activity className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-bold text-white">{s?.deviceName ?? dev.name}</p>
+                {familyBadge}
+              </div>
+              <div className="flex items-center gap-2 mt-0.5">
+                <p className="text-[10px] text-slate-300 font-mono">{dev.ip}</p>
+                <button onClick={copyIp} className="text-slate-400 hover:text-white transition-colors">
+                  {copiedIp ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                </button>
+                <span className="text-[10px] text-slate-400">·</span>
+                <p className="text-[10px] text-slate-300 font-mono truncate max-w-[200px]">{s?.deviceModel ?? dev.model ?? '—'}</p>
+              </div>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="overflow-y-auto flex-1 p-5 space-y-4">
+          {!s ? (
+            <div className="text-center py-8 text-slate-400 text-sm">
+              Sin datos disponibles — escanea la red para obtener información del dispositivo.
+            </div>
+          ) : (
+            <>
+              {/* ── SECCIÓN 1: Sistema / Host ── */}
+              <M5Section title="Sistema (host)" icon={<Cpu className="w-3.5 h-3.5" />} colorClass="bg-blue-50 border-blue-200 text-blue-700">
+                <M5Row label="hostname"   value={s.deviceName ?? dev.name} />
+                <M5Row label="devmodel"   value={s.deviceModel ?? dev.model} />
+                <M5Row label="fwversion"  value={s.firmwareVersion ?? dev.firmware} />
+                <M5Row label="fwprefix"   value={s.fwPrefix} />
+                <M5Row label="uptime"     value={s.uptimeStr} />
+                <M5Row label="time"       value={s.deviceDate} />
+                <M5Row label="cpuload"    value={s.cpuLoad != null ? `${s.cpuLoad}%` : null} />
+                <M5Row label="loadavg"    value={s.loadAvg} />
+                <M5Row label="netrole"    value={s.networkMode} />
+                <M5Row label="memory total"   value={s.memTotalKb   != null ? `${Math.round(s.memTotalKb / 1024)} MB` : null} />
+                <M5Row label="memory free"    value={s.memFreeKb    != null ? `${Math.round(s.memFreeKb  / 1024)} MB` : null} />
+                <M5Row label="memory buffers" value={s.memBuffersKb != null ? `${Math.round(s.memBuffersKb / 1024)} MB` : null} />
+                <M5Row label="memory cached"  value={s.memCachedKb  != null ? `${Math.round(s.memCachedKb  / 1024)} MB` : null} />
+                <M5Row label="memory uso %"   value={s.memoryPercent != null ? `${s.memoryPercent}%` : null} />
+                {/* AC extras */}
+                {family === 'ac' && <M5Row label="temperature" value={s.temperature  != null ? `${s.temperature} °C` : null} />}
+                {family === 'ac' && <M5Row label="height"      value={s.deviceHeight != null ? `${s.deviceHeight} m`  : null} />}
+              </M5Section>
+
+              {/* ── SECCIÓN 2: Inalámbrico ── */}
+              <M5Section title="Inalámbrico (wireless)" icon={<Wifi className="w-3.5 h-3.5" />} colorClass="bg-sky-50 border-sky-200 text-sky-700">
+                {/* Identificación */}
+                <M5Row label="mode"        value={s.mode} />
+                <M5Row label="essid"       value={s.essid ?? dev.essid} />
+                <M5Row label="hide_essid"  value={s.hideSsid != null ? (s.hideSsid ? 'Oculto' : 'Visible') : null} />
+                <M5Row label="security"    value={s.security} />
+                <M5Row label="countrycode" value={s.countryCode} />
+                <M5Row label="wlan mac"    value={s.wlanMac} />
+                <M5Row label="apmac"       value={s.apMac} />
+                {/* Señal RF */}
+                <M5Row label="signal"      value={s.signal     != null ? `${s.signal} dBm`     : null} />
+                <M5Row label="rssi"        value={s.rssi       != null ? `${s.rssi} dBm`       : null} />
+                <M5Row label="noisefloor"  value={s.noiseFloor != null ? `${s.noiseFloor} dBm` : null} />
+                <M5Row label="txpower"     value={s.txPower    != null ? `${s.txPower} dBm`    : null} />
+                <M5Row label="antenna_gain" value={s.antennaGain != null ? `${s.antennaGain} dBi` : null} />
+                <M5Row label="antenna"     value={s.antenna} />
+                <M5Row label="distance"    value={s.distance   != null ? `${s.distance} m`     : null} />
+                <M5Row label="ccq"         value={s.ccq        != null ? `${s.ccq}%`           : null} />
+                {/* Cadenas RSSI */}
+                {s.chainRssi && s.chainRssi.length > 0 && (
+                  <M5Row label="chainrssi" value={s.chainRssi.map((v, i) => `Ch${i}: ${v} dBm`).join(' | ')} />
+                )}
+                {/* Frecuencia / Canal */}
+                <M5Row label="frequency"   value={s.frequency     != null ? `${s.frequency} MHz`   : null} />
+                <M5Row label="channel"     value={s.channelNumber != null ? String(s.channelNumber) : null} />
+                <M5Row label="chanbw"      value={s.channelWidth  != null ? `${s.channelWidth} MHz` : null} />
+                <M5Row label="chanbw_ext"  value={s.channelWidthExt} />
+                <M5Row label="freq_range"  value={s.freqRange} />
+                <M5Row label="opmode"      value={s.opmode} />
+                {/* AC: frecuencia central, modulación, cadenas */}
+                {family === 'ac' && <M5Row label="center1_freq"  value={s.centerFreq1 != null ? `${s.centerFreq1} MHz` : null} />}
+                {family === 'ac' && <M5Row label="tx_idx"        value={s.txIdx       != null ? String(s.txIdx)        : null} />}
+                {family === 'ac' && <M5Row label="rx_idx"        value={s.rxIdx       != null ? String(s.rxIdx)        : null} />}
+                {family === 'ac' && <M5Row label="tx_nss"        value={s.txNss       != null ? String(s.txNss)        : null} />}
+                {family === 'ac' && <M5Row label="rx_nss"        value={s.rxNss       != null ? String(s.rxNss)        : null} />}
+                {family === 'ac' && <M5Row label="tx_chainmask"  value={s.txChainmask != null ? String(s.txChainmask)  : null} />}
+                {family === 'ac' && <M5Row label="rx_chainmask"  value={s.rxChainmask != null ? String(s.rxChainmask)  : null} />}
+                {family === 'ac' && s.chainNames && s.chainNames.length > 0 && (
+                  <M5Row label="chain_names" value={s.chainNames.join(', ')} />
+                )}
+                {/* Rendimiento TX/RX */}
+                <M5Row label="txrate"      value={s.txRate != null ? `${s.txRate} Mbps` : null} />
+                <M5Row label="rxrate"      value={s.rxRate != null ? `${s.rxRate} Mbps` : null} />
+                <M5Row label="chains"      value={s.chains} />
+                {/* AirMAX */}
+                <M5Row label="airMAX quality"    value={s.airmaxQuality  != null ? `${s.airmaxQuality}%`  : null} />
+                <M5Row label="airMAX capacity"   value={s.airmaxCapacity != null ? `${s.airmaxCapacity}%` : null} />
+                <M5Row label="airMAX priority"   value={s.airmaxPriority} />
+                {/* AC: Polling / Airtime */}
+                {family === 'ac' && <M5Row label="dcap"          value={s.dcap      != null ? `${s.dcap}%`      : null} />}
+                {family === 'ac' && <M5Row label="ucap"          value={s.ucap      != null ? `${s.ucap}%`      : null} />}
+                {family === 'ac' && <M5Row label="airtime total"  value={s.airtime   != null ? `${s.airtime}%`   : null} />}
+                {family === 'ac' && <M5Row label="tx_airtime"    value={s.txAirtime != null ? `${s.txAirtime}%` : null} />}
+                {family === 'ac' && <M5Row label="rx_airtime"    value={s.rxAirtime != null ? `${s.rxAirtime}%` : null} />}
+                {family === 'ac' && <M5Row label="cinr"          value={s.cinr      != null ? `${s.cinr} dB`    : null} />}
+                {family === 'ac' && <M5Row label="evm"           value={s.evm} />}
+                {family === 'ac' && <M5Row label="tx_latency"    value={s.txLatency != null ? `${s.txLatency} ms` : null} />}
+                {family === 'ac' && <M5Row label="fixed_frame"   value={s.fixedFrame != null ? (s.fixedFrame ? 'Sí' : 'No') : null} />}
+                {family === 'ac' && <M5Row label="gps_sync"      value={s.gpsSync    != null ? (s.gpsSync    ? 'Sincronizado' : 'No') : null} />}
+                {/* M5: extras de control */}
+                {family === 'm5' && <M5Row label="airsync_mode"    value={s.airsyncMode} />}
+                {family === 'm5' && <M5Row label="atpc_status"     value={s.atpcStatus} />}
+                {family === 'm5' && <M5Row label="tx_retries"      value={s.txRetries      != null ? String(s.txRetries)      : null} />}
+                {family === 'm5' && <M5Row label="missed_beacons"  value={s.missedBeacons  != null ? String(s.missedBeacons)  : null} />}
+                {family === 'm5' && <M5Row label="rx_crypts"       value={s.rxCrypts       != null ? String(s.rxCrypts)       : null} />}
+              </M5Section>
+
+              {/* ── SECCIÓN 3: Interfaces físicas y lógicas ── */}
+              <M5Section title="Interfaces físicas y lógicas" icon={<Network className="w-3.5 h-3.5" />} colorClass="bg-violet-50 border-violet-200 text-violet-700">
+                {s.ifaceDetails && s.ifaceDetails.length > 0 ? (
+                  s.ifaceDetails.map(ifc => <IfaceBlock key={ifc.ifname} ifc={ifc} />)
+                ) : (
+                  <>
+                    <M5Row label="wlan (ath0)" value={s.wlanMac  ?? null} />
+                    <M5Row label="eth0 (lan)"  value={s.lanMac   ?? null} />
+                    <M5Row label="lan speed"   value={s.lanSpeed != null ? `${s.lanSpeed} Mbps` : null} />
+                    <M5Row label="lan info"    value={s.lanInfo} />
+                  </>
+                )}
+                {/* Tráfico por interfaz desde /proc/net/dev (SSH) */}
+                {s.ifaceTraffic && Object.keys(s.ifaceTraffic).length > 0 && (
+                  <div className="col-span-2 mt-2">
+                    <p className="text-[9px] font-bold text-violet-600 uppercase mb-1">/proc/net/dev — Tráfico</p>
+                    <div className="grid grid-cols-1 gap-1">
+                      {Object.entries(s.ifaceTraffic).map(([iface, tr]) => (
+                        <div key={iface} className="text-[9px] font-mono bg-white rounded p-1.5 border border-violet-100">
+                          <span className="font-bold text-violet-700">{iface}:</span>{' '}
+                          RX {(tr.rxBytes / 1024 / 1024).toFixed(1)} MB ({tr.rxPackets} pkts){' '}
+                          | TX {(tr.txBytes / 1024 / 1024).toFixed(1)} MB ({tr.txPackets} pkts)
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Rutas desde SSH */}
+                {s._rawRoutes && (
+                  <div className="col-span-2 mt-2">
+                    <p className="text-[9px] font-bold text-violet-600 uppercase mb-1">route -n</p>
+                    <pre className="text-[9px] font-mono bg-white rounded-lg p-2 overflow-x-auto whitespace-pre-wrap max-h-24 border border-violet-100">{s._rawRoutes}</pre>
+                  </div>
+                )}
+              </M5Section>
+
+              {/* ── SECCIÓN 4: Servicios y Gestión ── */}
+              <M5Section title="Servicios y Gestión Remota" icon={<Shield className="w-3.5 h-3.5" />} colorClass="bg-emerald-50 border-emerald-200 text-emerald-700">
+                <M5Row label="airMAX"          value={s.airmaxEnabled != null ? (s.airmaxEnabled ? 'Activado' : 'Desactivado') : null} />
+                <M5Row label="airMAX priority" value={s.airmaxPriority} />
+                {/* Raw sections (SSH only) */}
+                {s._rawMcaCli && (
+                  <div className="col-span-2 mt-2">
+                    <p className="text-[9px] font-bold text-emerald-600 uppercase mb-1">mca-cli-op info</p>
+                    <pre className="text-[9px] font-mono bg-white rounded-lg p-2 overflow-x-auto whitespace-pre-wrap max-h-28 border border-emerald-100">{s._rawMcaCli}</pre>
+                  </div>
+                )}
+                {s._rawUname && (
+                  <div className="col-span-2 mt-2">
+                    <p className="text-[9px] font-bold text-emerald-600 uppercase mb-1">uname / uptime</p>
+                    <pre className="text-[9px] font-mono bg-white rounded-lg p-2 overflow-x-auto whitespace-pre-wrap max-h-16 border border-emerald-100">{s._rawUname}</pre>
+                  </div>
+                )}
+                {s._rawIwconfig && (
+                  <div className="col-span-2 mt-2">
+                    <p className="text-[9px] font-bold text-emerald-600 uppercase mb-1">iwconfig ath0</p>
+                    <pre className="text-[9px] font-mono bg-white rounded-lg p-2 overflow-x-auto whitespace-pre-wrap max-h-28 border border-emerald-100">{s._rawIwconfig}</pre>
+                  </div>
+                )}
+                {s._rawWstalist && (
+                  <div className="col-span-2 mt-2">
+                    <p className="text-[9px] font-bold text-emerald-600 uppercase mb-1">wstalist</p>
+                    <pre className="text-[9px] font-mono bg-white rounded-lg p-2 overflow-x-auto whitespace-pre-wrap max-h-28 border border-emerald-100">{s._rawWstalist}</pre>
+                  </div>
+                )}
+                {s._rawMeminfo && (
+                  <div className="col-span-2 mt-2">
+                    <p className="text-[9px] font-bold text-emerald-600 uppercase mb-1">/proc/meminfo</p>
+                    <pre className="text-[9px] font-mono bg-white rounded-lg p-2 overflow-x-auto whitespace-pre-wrap max-h-28 border border-emerald-100">{s._rawMeminfo}</pre>
+                  </div>
+                )}
+              </M5Section>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Módulo principal ─────────────────────────────────────────────────────
 export default function NetworkDevicesModule() {
   const { credentials, activeNodeVrf, nodes, setNodes } = useVpn();
@@ -972,6 +1596,7 @@ export default function NetworkDevicesModule() {
   const [editingDevice, setEditingDevice] = useState<SavedDevice | null>(null);
   const [viewingDevice, setViewingDevice] = useState<SavedDevice | null>(null);
   const [viewingRawDevice, setViewingRawDevice] = useState<ScannedDevice | null>(null);
+  const [m5DetailDevice, setM5DetailDevice] = useState<ScannedDevice | null>(null);
 
   // Estado de fases del escaneo
   const [scanState, setScanState] = useState<{
@@ -1008,6 +1633,23 @@ export default function NetworkDevicesModule() {
   const [filterSSID, setFilterSSID] = useState('');
 
   const [nodeSshCreds, setNodeSshCreds] = useState<ScanCred[]>([]);
+
+  // ── Resize de columnas ──────────────────────────────────────────────────
+  const [colWidths, setColWidths] = useState<Record<string, number>>({});
+  const resizingRef = useRef<{ key: string; startX: number; startW: number } | null>(null);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      const r = resizingRef.current;
+      if (!r) return;
+      const delta = e.clientX - r.startX;
+      setColWidths(prev => ({ ...prev, [r.key]: Math.max(50, r.startW + delta) }));
+    };
+    const onUp = () => { resizingRef.current = null; };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+  }, []);
 
   const saveVisibleCols = (cols: string[]) => {
     setVisibleCols(cols);
@@ -1470,9 +2112,9 @@ export default function NetworkDevicesModule() {
     '54px',   // Rol / freq
     '140px',  // IP / MAC
     'minmax(100px,1fr)', // Nombre / Modelo
-    ...activeConfigCols.map(c => c.width),
+    ...activeConfigCols.map(c => colWidths[c.key] != null ? `${colWidths[c.key]}px` : c.width),
     '32px',   // Expand toggle
-    '160px',  // Acciones
+    '180px',  // Acciones (ampliado para nuevo botón Estado)
   ].join(' ');
 
   // ── Guardar directamente (sin modal) cuando SSH ya validó credenciales ──
@@ -1815,11 +2457,23 @@ export default function NetworkDevicesModule() {
                   {activeConfigCols.map(col => (
                     <div
                       key={col.key}
-                      className="px-3 py-3 min-w-0 overflow-hidden cursor-pointer select-none flex items-center gap-1 hover:text-slate-700"
-                      onClick={() => toggleSort(col.key)}
+                      className="px-3 py-3 min-w-0 overflow-hidden select-none flex items-center gap-1 hover:text-slate-700 relative group"
                     >
-                      {col.label}
-                      {sortConfig?.key === col.key && <span className="text-indigo-600">{sortConfig.dir === 'asc' ? '↑' : '↓'}</span>}
+                      <span className="cursor-pointer flex items-center gap-1 flex-1 min-w-0 truncate" onClick={() => toggleSort(col.key)}>
+                        {col.label}
+                        {sortConfig?.key === col.key && <span className="text-indigo-600">{sortConfig.dir === 'asc' ? '↑' : '↓'}</span>}
+                      </span>
+                      <span
+                        title="Arrastra para redimensionar"
+                        className="cursor-col-resize opacity-0 group-hover:opacity-60 hover:!opacity-100 text-slate-400 shrink-0 select-none"
+                        onMouseDown={e => {
+                          e.preventDefault();
+                          const currentW = colWidths[col.key] ?? (parseInt(col.width) || 80);
+                          resizingRef.current = { key: col.key, startX: e.clientX, startW: currentW };
+                        }}
+                      >
+                        <GripVertical className="w-3 h-3" />
+                      </span>
                     </div>
                   ))}
                   <div className="px-3 py-3" />
@@ -1951,7 +2605,18 @@ export default function NetworkDevicesModule() {
 
                         {/* Acciones */}
                         <div className="px-3 py-3 flex items-center justify-end gap-1.5">
-                          {/* Botón de datos SSH — siempre visible si hay stats */}
+                          {/* Botón Estado M5 — completo, modelo específico */}
+                          {hasStats && (
+                            <button
+                              onClick={() => setM5DetailDevice(dev)}
+                              title="Ver estado completo del dispositivo (airOS)"
+                              className="flex items-center space-x-1 px-2 py-1.5 rounded-lg text-[11px] font-bold bg-violet-50 text-violet-600 hover:bg-violet-100 border border-violet-200 transition-all"
+                            >
+                              <Activity className="w-2.5 h-2.5" />
+                              <span>Estado</span>
+                            </button>
+                          )}
+                          {/* Botón de datos SSH raw */}
                           {hasStats && (
                             <button
                               onClick={() => setViewingRawDevice(dev)}
@@ -2035,7 +2700,16 @@ export default function NetworkDevicesModule() {
                       </div>
 
                       {/* Panel de estadísticas expandido */}
-                      {isExpanded && <ExpandedStats dev={dev} />}
+                      {isExpanded && (
+                        <DeviceStatusPanel
+                          dev={dev}
+                          onRefresh={(freshStats) => {
+                            setScanResults(prev => prev.map(r =>
+                              r.ip === dev.ip ? { ...r, cachedStats: freshStats } : r
+                            ));
+                          }}
+                        />
+                      )}
                     </Fragment>
                   );
                 })}
@@ -2227,6 +2901,11 @@ export default function NetworkDevicesModule() {
           onUpdate={handleUpdateDevice}
         />
       )}
+
+        {/* M5 Full Info Modal */}
+        {m5DetailDevice && (
+          <M5FullInfoModal dev={m5DetailDevice} onClose={() => setM5DetailDevice(null)} />
+        )}
     </div>
   );
 }
