@@ -41,8 +41,8 @@
            bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold;
   }
   .tab-btn {
-    @apply px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200
-           flex items-center space-x-2;
+    @apply px-2 py-1.5 sm:px-4 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm transition-all duration-200
+           flex items-center space-x-1 sm:space-x-2;
   }
   .tab-active {
     @apply bg-indigo-600 text-white shadow-sm shadow-indigo-500/30;

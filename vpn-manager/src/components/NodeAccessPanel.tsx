@@ -3,7 +3,7 @@ import {
   RefreshCw, Search,
   ShieldCheck, ShieldOff, AlertCircle, Radio, Clock, X,
   Plus, CheckCircle2, Loader2, Eye, EyeOff, Info, Trash2, Pencil, Minus,
-  Wifi, Copy, Check, FileCode, UserPlus, Download, History,
+  Wifi, Copy, Check, FileCode, UserPlus, Download, History, Upload,
   ArrowUpDown, Tag, SortAsc, SortDesc, Bell, Globe,
 } from 'lucide-react';
 import { useVpn, TUNNEL_TIMEOUT_MS } from '../context/VpnContext';
@@ -98,6 +98,29 @@ function StepResultList({ steps, failedAt, visible }: {
   );
 }
 
+// ── Generador de contraseña segura ────────────────────────────────────────
+function generateSecurePassword(): string {
+  const upper   = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const lower   = 'abcdefghjkmnpqrstuvwxyz';
+  const digits  = '23456789';
+  const symbols = '!@#$%*-_+=?';
+  const all = upper + lower + digits + symbols;
+  const mandatory = [
+    upper[Math.floor(Math.random() * upper.length)],
+    upper[Math.floor(Math.random() * upper.length)],
+    lower[Math.floor(Math.random() * lower.length)],
+    lower[Math.floor(Math.random() * lower.length)],
+    digits[Math.floor(Math.random() * digits.length)],
+    digits[Math.floor(Math.random() * digits.length)],
+    symbols[Math.floor(Math.random() * symbols.length)],
+    symbols[Math.floor(Math.random() * symbols.length)],
+  ];
+  const remaining = Array.from({ length: 14 }, () =>
+    all[Math.floor(Math.random() * all.length)]
+  );
+  return [...mandatory, ...remaining].sort(() => Math.random() - 0.5).join('');
+}
+
 // ── Modal Nuevo Nodo ───────────────────────────────────────────────────────
 function NuevoNodoModal({
   onClose,
@@ -116,8 +139,20 @@ function NuevoNodoModal({
   const [nombre, setNombre] = useState('');
   const [pppUser, setPppUser] = useState('');
   const [pppPass, setPppPass] = useState('');
-  const [showPass, setShowPass] = useState(false);
+  const [showPass, setShowPass] = useState(true);
+  const [showResPass, setShowResPass] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
   const [lanSubnets, setLanSubnets] = useState<string[]>(['']);
+
+  // Generar contraseña segura al abrir el modal
+  useEffect(() => { setPppPass(generateSecurePassword()); }, []);
+
+  const copyField = (text: string, key: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedField(key);
+      setTimeout(() => setCopiedField(null), 2000);
+    });
+  };
 
   const [provisioning, setProvisioning] = useState(false);
   const [result, setResult] = useState<ProvisionResult | null>(null);
@@ -128,16 +163,23 @@ function NuevoNodoModal({
   const ndNum = nextNode ?? '?';
   const ifaceName = nameClean ? `VPN-SSTP-ND${ndNum}-${nameClean}` : '';
   const vrfName = nameClean ? `VRF-ND${ndNum}-${nameClean}` : '';
-  const suggestUser = nombre ? `Torre${nombre.charAt(0).toUpperCase()}${nombre.slice(1).toLowerCase()}` : '';
+
+  // Auto-generar usuario PPP: ppp-pass-{nombreLimpio} (en minúsculas, único por nodo)
+  const suggestedPppUser = nameClean ? `ppp-pass-${nameClean.toLowerCase()}` : '';
+
+  // Sincronizar pppUser con el nombre solo si el usuario no lo ha modificado manualmente
+  useEffect(() => {
+    setPppUser(prev => {
+      // Si está vacío o coincide con la sugerencia anterior → actualizar
+      if (!prev || prev.startsWith('ppp-pass-')) return suggestedPppUser;
+      return prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suggestedPppUser]);
 
   const CIDR_RE = /^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}$/;
   const validSubnets = lanSubnets.filter(s => CIDR_RE.test(s.trim()));
   const subnetConflicts = getSubnetConflicts(validSubnets);
-
-  useEffect(() => {
-    if (!pppUser || pppUser === suggestUser.slice(0, -1)) setPppUser(suggestUser);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [suggestUser]);
 
   const loadNext = useCallback(async () => {
     if (!credentials) return;
@@ -211,14 +253,9 @@ function NuevoNodoModal({
       }, 90_000);
       const d: ProvisionResult = await r.json();
       setResult(d);
-      // Guardar credenciales PPP en DB para uso futuro (script, etc.)
+      // El backend ya guardó el nodo + contraseña en SQLite durante /node/provision.
+      // Aquí solo guardamos la etiqueta con el nombre original (puede tener tildes/espacios).
       if (d.success) {
-        fetchWithTimeout(`${API_BASE_URL}/api/node/creds/save`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pppUser: pppUser.trim(), pppPassword: pppPass }),
-        }, 5_000).catch(() => { });
-
-        // Guardar la etiqueta personalizada original (con espacios/tildes) en la base de datos local
         fetchWithTimeout(`${API_BASE_URL}/api/node/label/save`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ pppUser: pppUser.trim(), label: nombre.trim() }),
@@ -288,21 +325,63 @@ function NuevoNodoModal({
               </div>
 
               {result.success && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {[
-                    { l: 'Nodo', v: `ND${nextNode}` },
-                    { l: 'IP Túnel', v: result.remoteAddress },
-                    { l: 'Interfaz', v: result.ifaceName },
-                    { l: 'VRF', v: result.vrfName },
-                    { l: 'Usuario PPP', v: pppUser },
-                    { l: 'LAN(s)', v: validSubnets.join(', ') },
-                  ].filter(r => r.v).map(row => (
-                    <div key={row.l} className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">
-                      <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">{row.l}</p>
-                      <p className="text-xs font-mono font-bold text-slate-700 truncate">{row.v}</p>
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {[
+                      { l: 'Nodo', v: `ND${nextNode}` },
+                      { l: 'IP Túnel', v: result.remoteAddress },
+                      { l: 'Interfaz', v: result.ifaceName },
+                      { l: 'VRF', v: result.vrfName },
+                      { l: 'LAN(s)', v: validSubnets.join(', ') },
+                    ].filter(r => r.v).map(row => (
+                      <div key={row.l} className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">
+                        <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">{row.l}</p>
+                        <p className="text-xs font-mono font-bold text-slate-700 truncate">{row.v}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* ── Credenciales para MikroTik ── */}
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2">
+                    <div className="flex items-center gap-2 mb-3">
+                      <ShieldCheck className="w-4 h-4 text-amber-600" />
+                      <p className="text-xs font-bold text-amber-700 uppercase tracking-wider">Credenciales PPP — para ingresar en MikroTik</p>
                     </div>
-                  ))}
-                </div>
+                    {/* Usuario */}
+                    <div className="flex items-center justify-between bg-white border border-amber-100 rounded-lg px-3 py-2.5 gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[9px] font-bold text-amber-500 uppercase tracking-wider">Usuario PPP</p>
+                        <p className="text-sm font-mono font-bold text-slate-800">{pppUser}</p>
+                      </div>
+                      <button onClick={() => copyField(pppUser, 'res-user')}
+                        className="p-1.5 text-slate-400 hover:text-emerald-600 rounded-lg transition-colors shrink-0">
+                        {copiedField === 'res-user' ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    {/* Contraseña */}
+                    <div className="flex items-center justify-between bg-white border border-amber-100 rounded-lg px-3 py-2.5 gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[9px] font-bold text-amber-500 uppercase tracking-wider">Contraseña PPP</p>
+                        <p className={`text-sm font-mono font-bold text-slate-800 truncate transition-all ${showResPass ? '' : 'blur-sm select-none'}`}>
+                          {pppPass}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button onClick={() => setShowResPass(v => !v)}
+                          className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg transition-colors">
+                          {showResPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                        <button onClick={() => copyField(pppPass, 'res-pass')}
+                          className="p-1.5 text-slate-400 hover:text-emerald-600 rounded-lg transition-colors">
+                          {copiedField === 'res-pass' ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-amber-600 pt-1">
+                      Guarda estas credenciales — también las encontrarás en el botón de Script del nodo.
+                    </p>
+                  </div>
+                </>
               )}
 
               <div>
@@ -359,24 +438,52 @@ function NuevoNodoModal({
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">
                     Usuario PPP <span className="text-rose-500">*</span>
+                    <span className="text-[10px] font-normal text-slate-400 ml-1">— ingresar manualmente</span>
                   </label>
-                  <input value={pppUser} onChange={e => setPppUser(e.target.value)}
-                    placeholder="Ej: TorreRosmery"
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                  <div className="relative">
+                    <input value={pppUser} onChange={e => setPppUser(e.target.value)}
+                      placeholder="Ej: TorreVirginia-ND2"
+                      className="w-full px-3 py-2 pr-10 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300 font-mono" />
+                    {pppUser && (
+                      <button onClick={() => copyField(pppUser, 'form-user')}
+                        title="Copiar usuario"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600 transition-colors">
+                        {copiedField === 'form-user' ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
-                    Contraseña PPP <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <input type={showPass ? 'text' : 'password'} value={pppPass} onChange={e => setPppPass(e.target.value)}
-                      placeholder="Contraseña del túnel SSTP"
-                      className="w-full px-3 py-2 pr-10 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-                    <button onClick={() => setShowPass(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                      {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-semibold text-slate-600">
+                      Contraseña PPP <span className="text-rose-500">*</span>
+                    </label>
+                    <span className="flex items-center gap-1 text-[10px] text-emerald-600 font-medium">
+                      <ShieldCheck className="w-3 h-3" />
+                      Auto-generada · {pppPass.length} chars
+                    </span>
                   </div>
+                  <div className="relative">
+                    <input type={showPass ? 'text' : 'password'} value={pppPass}
+                      onChange={e => setPppPass(e.target.value)}
+                      className="w-full px-3 py-2 pr-24 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300 font-mono" />
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+                      <button onClick={() => setShowPass(v => !v)} title={showPass ? 'Ocultar' : 'Ver'}
+                        className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg transition-colors">
+                        {showPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                      <button onClick={() => setPppPass(generateSecurePassword())} title="Regenerar contraseña"
+                        className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg transition-colors">
+                        <RefreshCw className="w-3.5 h-3.5" />
+                      </button>
+                      <button onClick={() => copyField(pppPass, 'form-pass')} title="Copiar contraseña"
+                        className="p-1.5 text-slate-400 hover:text-emerald-600 rounded-lg transition-colors">
+                        {copiedField === 'form-pass' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Puedes editar o regenerar — se guardará en la base de datos local</p>
                 </div>
 
                 {/* Múltiples subnets */}
@@ -670,10 +777,21 @@ function EditarNodoModal({
   const [newLabel, setNewLabel] = useState(node.nombre_nodo || '');
   const [newPppUser, setNewPppUser] = useState('');
   const [newPass, setNewPass] = useState('');
+  const [loadedPass, setLoadedPass] = useState('');   // contraseña guardada en DB (referencia)
   const [showPass, setShowPass] = useState(false);
   const [newRemote, setNewRemote] = useState('');
   const [addSubnets, setAddSubnets] = useState<string[]>(['']);
   const [removeSet, setRemoveSet] = useState<Set<string>>(new Set());
+  const [copiedEditField, setCopiedEditField] = useState<string | null>(null);
+  const [savingPassDb, setSavingPassDb] = useState(false);
+  const [passDbSaved, setPassDbSaved] = useState(false);
+
+  const copyEditField = (text: string, key: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedEditField(key);
+      setTimeout(() => setCopiedEditField(null), 2000);
+    });
+  };
 
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<ProvisionResult | null>(null);
@@ -687,24 +805,60 @@ function EditarNodoModal({
   useEffect(() => {
     if (!credentials) return;
     setLoadingDetails(true);
-    fetchWithTimeout(`${API_BASE_URL}/api/node/details`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ip: credentials.ip, user: credentials.user, pass: credentials.pass,
-        vrfName: node.nombre_vrf || '', pppUser: node.ppp_user || '',
-      }),
-    }, 15_000)
-      .then(r => r.json())
-      .then(d => {
-        if (d.success) {
-          setCurrentSubnets(d.lanSubnets || []);
-          setCurrentRemoteIP(d.remoteAddress || '');
-          setNewPppUser(d.currentPppUser || node.ppp_user || '');
-          setNewRemote(d.remoteAddress || '');
-        }
-      })
-      .catch(() => { })
-      .finally(() => setLoadingDetails(false));
+
+    const pppUser = node.ppp_user;
+
+    (async () => {
+      // ── 1. Consultas en paralelo: detalles MikroTik + clave en DB local ──
+      const [detailsRes, credsRes] = await Promise.allSettled([
+        fetchWithTimeout(`${API_BASE_URL}/api/node/details`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ip: credentials.ip, user: credentials.user, pass: credentials.pass,
+            vrfName: node.nombre_vrf || '', pppUser,
+          }),
+        }, 15_000).then(r => r.json()),
+
+        fetchWithTimeout(`${API_BASE_URL}/api/node/creds/get`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pppUser }),
+        }, 5_000).then(r => r.json()),
+      ]);
+
+      // ── 2. Aplicar detalles de MikroTik ──
+      const details = detailsRes.status === 'fulfilled' ? detailsRes.value : null;
+      const mikrotikPass: string = (details?.success && details?.pppPassword) ? details.pppPassword : '';
+      if (details?.success) {
+        setCurrentSubnets(details.lanSubnets || []);
+        setCurrentRemoteIP(details.remoteAddress || '');
+        setNewPppUser(details.currentPppUser || pppUser);
+        setNewRemote(details.remoteAddress || '');
+      }
+
+      // ── 3. Aplicar contraseña: DB tiene prioridad, MikroTik es fallback ──
+      const creds = credsRes.status === 'fulfilled' ? credsRes.value : null;
+      const dbPass: string = (creds?.success && creds?.password) ? creds.password : '';
+
+      if (dbPass) {
+        // Caso A: clave ya guardada en DB → mostrarla
+        setLoadedPass(dbPass);
+        setNewPass(dbPass);
+      } else if (mikrotikPass) {
+        // Caso B: no está en DB pero MikroTik la tiene → mostrarla Y guardarla
+        setNewPass(mikrotikPass);
+        try {
+          const saveRes = await fetchWithTimeout(`${API_BASE_URL}/api/node/creds/save`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pppUser, pppPassword: mikrotikPass }),
+          }, 5_000).then(r => r.json());
+          if (saveRes.success) {
+            setLoadedPass(mikrotikPass);   // marcar como sincronizada
+          }
+        } catch { /* silencioso si falla el guardado */ }
+      }
+
+      setLoadingDetails(false);
+    })();
   }, [credentials, node.nombre_vrf, node.ppp_user]);
 
   useEffect(() => {
@@ -720,7 +874,27 @@ function EditarNodoModal({
   const labelChanged = newLabel.trim() !== (node.nombre_nodo || '').trim();
   const pppUserChanged = newPppUser.trim() && newPppUser.trim() !== (node.ppp_user || '');
   const remoteChanged = newRemote.trim() && IPV4_RE.test(newRemote.trim()) && newRemote.trim() !== currentRemoteIP;
-  const hasChanges = (newPass.trim() || labelChanged || pppUserChanged || remoteChanged || validAdd.length > 0 || removeSet.size > 0) && addSubnetConflicts.length === 0;
+  const passChanged = newPass.trim() !== '' && newPass.trim() !== loadedPass;
+  const hasChanges = (passChanged || labelChanged || pppUserChanged || remoteChanged || validAdd.length > 0 || removeSet.size > 0) && addSubnetConflicts.length === 0;
+
+  /** Guarda la contraseña SOLO en la base de datos local, sin tocar MikroTik */
+  const handleSavePassToDb = async () => {
+    if (!newPass.trim() || savingPassDb) return;
+    setSavingPassDb(true);
+    try {
+      const r = await fetchWithTimeout(`${API_BASE_URL}/api/node/creds/save`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pppUser: node.ppp_user, pppPassword: newPass.trim() }),
+      }, 5_000);
+      const d = await r.json();
+      if (d.success) {
+        setLoadedPass(newPass.trim());
+        setPassDbSaved(true);
+        setTimeout(() => setPassDbSaved(false), 3000);
+      }
+    } catch { /* silencioso */ }
+    setSavingPassDb(false);
+  };
 
   const handleSave = async () => {
     if (!credentials || !node.ppp_user || !hasChanges) return;
@@ -733,13 +907,20 @@ function EditarNodoModal({
           pppUser: node.ppp_user, vrfName: node.nombre_vrf || '',
           newComment: labelChanged ? newLabel.trim() : undefined,
           newPppUser: pppUserChanged ? newPppUser.trim() : undefined,
-          newPassword: newPass.trim() || undefined,
+          newPassword: passChanged ? newPass.trim() : undefined,
           newRemoteAddress: remoteChanged ? newRemote.trim() : undefined,
           addSubnets: validAdd,
           removeSubnets: Array.from(removeSet),
         }),
       }, 45_000);
       const d: ProvisionResult = await r.json();
+      // Si cambió la contraseña y el update fue exitoso, guardar en DB local
+      if (d.success && passChanged) {
+        fetchWithTimeout(`${API_BASE_URL}/api/node/creds/save`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pppUser: node.ppp_user, pppPassword: newPass.trim() }),
+        }, 5_000).catch(() => { });
+      }
       setResult(d);
     } catch (e) {
       setResult({ success: false, message: e instanceof Error ? e.message : 'Error', steps: [], failedAt: 0 });
@@ -832,6 +1013,7 @@ function EditarNodoModal({
                   <label className="block text-xs font-semibold text-slate-600 mb-1">Usuario PPP</label>
                   <input value={newPppUser} onChange={e => setNewPppUser(e.target.value)}
                     placeholder={node.ppp_user || ''}
+                    autoComplete="off"
                     className={`w-full px-3 py-2 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300
                       ${pppUserChanged ? 'border-amber-300 bg-amber-50' : 'border-slate-200'}`} />
                   {pppUserChanged && <p className="text-[10px] text-amber-600 mt-0.5">Cambiará de <span className="font-mono font-bold">{node.ppp_user}</span> a <span className="font-mono font-bold">{newPppUser}</span></p>}
@@ -839,15 +1021,70 @@ function EditarNodoModal({
 
                 {/* Contraseña */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Nueva contraseña PPP</label>
-                  <div className="relative">
-                    <input type={showPass ? 'text' : 'password'} value={newPass} onChange={e => setNewPass(e.target.value)}
-                      placeholder="Dejar vacío para no cambiar"
-                      className="w-full px-3 py-2 pr-10 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-                    <button onClick={() => setShowPass(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
-                      {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-semibold text-slate-600">Contraseña PPP</label>
+                    {passChanged && (
+                      <span className="text-[10px] text-amber-600 font-medium">Se actualizará en MikroTik al guardar</span>
+                    )}
                   </div>
+                  {/* Inputs trampa: evitan que Chrome/Edge autorrellene el campo real */}
+                  <input type="text"     style={{ display: 'none' }} aria-hidden="true" readOnly tabIndex={-1} />
+                  <input type="password" style={{ display: 'none' }} aria-hidden="true" readOnly tabIndex={-1} />
+                  <div className="relative">
+                    <input type={showPass ? 'text' : 'password'} value={newPass}
+                      onChange={e => setNewPass(e.target.value)}
+                      placeholder="Contraseña actual del nodo"
+                      autoComplete="new-password"
+                      name={`ppp-pass-${node.ppp_user}`}
+                      className={`w-full px-3 py-2 pr-24 text-sm border rounded-xl focus:outline-none focus:ring-2 font-mono
+                        ${newPass && newPass !== loadedPass ? 'border-amber-300 focus:ring-amber-300 bg-amber-50' : 'border-slate-200 focus:ring-indigo-300'}`} />
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+                      <button onClick={() => setShowPass(v => !v)} title={showPass ? 'Ocultar' : 'Ver'}
+                        className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg transition-colors">
+                        {showPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                      <button onClick={() => setNewPass(generateSecurePassword())} title="Generar nueva contraseña segura"
+                        className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg transition-colors">
+                        <RefreshCw className="w-3.5 h-3.5" />
+                      </button>
+                      {newPass && (
+                        <button onClick={() => copyEditField(newPass, 'edit-pass')} title="Copiar contraseña"
+                          className="p-1.5 text-slate-400 hover:text-emerald-600 rounded-lg transition-colors">
+                          {copiedEditField === 'edit-pass' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {/* Estado de la contraseña */}
+                  {!loadingDetails && (
+                    <div className="flex items-center justify-between mt-1.5 gap-2">
+                      {!loadedPass ? (
+                        <p className="text-[10px] text-slate-400">
+                          Sin contraseña en DB local — ingrésala y pulsa <span className="font-bold">Guardar en DB</span>
+                        </p>
+                      ) : newPass === loadedPass ? (
+                        <p className="text-[10px] text-emerald-600 flex items-center gap-1">
+                          <ShieldCheck className="w-3 h-3" /> Sincronizada con DB local
+                        </p>
+                      ) : (
+                        <p className="text-[10px] text-amber-600">Modificada — guarda para actualizar</p>
+                      )}
+
+                      {/* Botón guardar solo en DB (sin tocar MikroTik) */}
+                      {newPass.trim() && newPass !== loadedPass && (
+                        <button onClick={handleSavePassToDb} disabled={savingPassDb}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-colors shrink-0
+                            bg-sky-50 border-sky-200 text-sky-700 hover:bg-sky-100 disabled:opacity-50">
+                          {savingPassDb
+                            ? <Loader2 className="w-3 h-3 animate-spin" />
+                            : passDbSaved
+                              ? <Check className="w-3 h-3 text-emerald-500" />
+                              : <ShieldCheck className="w-3 h-3" />}
+                          {passDbSaved ? '¡Guardada!' : 'Guardar en DB'}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* IP Túnel remota */}
@@ -1293,16 +1530,22 @@ function HistoryModal({ node, onClose }: { node: NodeInfo; onClose: () => void }
           )}
           {!loading && history.length > 0 && (
             <div className="space-y-2">
-              {history.map((h, i) => (
-                <div key={i} className={`flex items-center gap-3 px-3 py-2 rounded-lg border text-xs
-                  ${h.event === 'connected' ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'}`}>
-                  <span className={`w-2 h-2 rounded-full shrink-0 ${h.event === 'connected' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                  <span className={`font-bold ${h.event === 'connected' ? 'text-emerald-700' : 'text-rose-700'}`}>
-                    {h.event === 'connected' ? 'Conectado' : 'Desconectado'}
-                  </span>
-                  <span className="text-slate-400 ml-auto font-mono">{fmt(h.timestamp)}</span>
-                </div>
-              ))}
+              {history.map((h, i) => {
+                const cfg: Record<string, { dot: string; label: string; row: string; text: string }> = {
+                  connected:          { dot: 'bg-emerald-500', label: 'Conectado VPN',       row: 'bg-emerald-50 border-emerald-100',  text: 'text-emerald-700' },
+                  disconnected:       { dot: 'bg-rose-500',    label: 'Desconectado VPN',    row: 'bg-rose-50 border-rose-100',        text: 'text-rose-700'    },
+                  tunnel_activated:   { dot: 'bg-sky-500',     label: 'Túnel activado',      row: 'bg-sky-50 border-sky-100',          text: 'text-sky-700'     },
+                  tunnel_deactivated: { dot: 'bg-amber-500',   label: 'Túnel desactivado',   row: 'bg-amber-50 border-amber-100',      text: 'text-amber-700'   },
+                };
+                const c = cfg[h.event] ?? { dot: 'bg-slate-400', label: h.event, row: 'bg-slate-50 border-slate-100', text: 'text-slate-600' };
+                return (
+                  <div key={i} className={`flex items-center gap-3 px-3 py-2 rounded-lg border text-xs ${c.row}`}>
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${c.dot}`} />
+                    <span className={`font-bold ${c.text}`}>{c.label}</span>
+                    <span className="text-slate-400 ml-auto font-mono">{fmt(h.timestamp)}</span>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -1528,8 +1771,26 @@ function BatchCsvModal({ onClose, onSuccess, nodes }: { onClose: () => void; onS
                 <p className="text-[10px] font-bold text-violet-600 uppercase tracking-wider mb-1">Ejemplo de formato CSV</p>
                 <pre className="text-[11px] text-slate-600 font-mono">ROSMERY,TorreRosmery,Pass123,10.3.0.0/24{'\n'}FIWIS,TorreFiwis,Pass456,10.4.0.0/24,10.5.0.0/24</pre>
               </div>
+              <div className="flex items-center gap-2">
+                <label className="flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-violet-300 bg-violet-50 hover:bg-violet-100 cursor-pointer transition-colors text-sm text-violet-600 font-medium flex-1 justify-center">
+                  <Upload className="w-4 h-4" />
+                  <span>Subir archivo CSV</span>
+                  <input type="file" accept=".csv,.txt" className="hidden" onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = ev => {
+                      const text = (ev.target?.result as string) ?? '';
+                      setCsvText(text);
+                      parseRows(text);
+                    };
+                    reader.readAsText(file);
+                    e.target.value = '';
+                  }} />
+                </label>
+              </div>
               <textarea value={csvText} onChange={e => { setCsvText(e.target.value); parseRows(e.target.value); }}
-                placeholder="Pega aquí el contenido CSV..." rows={6}
+                placeholder="…o pega aquí el contenido CSV" rows={5}
                 className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-300 font-mono resize-none" />
               {rows.length > 0 && (
                 <div className="space-y-2">
@@ -1951,7 +2212,7 @@ export default function NodeAccessPanel() {
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setShowNuevoNodo(true)}
             className="px-4 py-2.5 flex items-center space-x-2 rounded-xl text-sm font-bold
@@ -2196,6 +2457,25 @@ export default function NodeAccessPanel() {
           </div>
         )}
       </div>
+
+      {/* ── Banner caché local (MikroTik offline) ── */}
+      {hasLoaded && nodes.length > 0 && nodes.some(n => n.cached) && (
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs">
+          <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <span className="font-bold text-amber-700">MikroTik no disponible</span>
+            <span className="text-amber-600 ml-1.5">
+              Mostrando {nodes.length} nodo{nodes.length !== 1 ? 's' : ''} desde la base de datos local.
+              {nodes[0]?.last_seen ? ` Última sincronización: ${new Date(nodes[0].last_seen).toLocaleString('es', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })}` : ''}
+            </span>
+          </div>
+          <button onClick={fetchNodes}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-100 border border-amber-300 text-amber-700 font-bold hover:bg-amber-200 transition-colors shrink-0">
+            <RefreshCw className="w-3 h-3" />
+            Reintentar
+          </button>
+        </div>
+      )}
 
       {/* ── Tabla de nodos ── */}
       {hasLoaded && nodes.length > 0 && (

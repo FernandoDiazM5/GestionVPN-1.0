@@ -24,8 +24,20 @@ process.on('unhandledRejection', (reason) => {
     console.error('[WARN] Promesa rechazada:', reason?.code || reason?.errno, '-', reason?.message || String(reason));
 });
 
+// Orígenes permitidos: variables de entorno (Docker) o valores por defecto (dev local)
+const defaultOrigins = ['http://localhost:5173','http://localhost:5174','http://localhost:4173',
+                        'http://127.0.0.1:5173','http://127.0.0.1:5174','http://localhost:8080','http://127.0.0.1:8080'];
+const allowedOrigins = process.env.CORS_ORIGINS
+    ? [...new Set([...process.env.CORS_ORIGINS.split(',').map(s => s.trim()), ...defaultOrigins])]
+    : defaultOrigins;
+
 app.use(cors({
-    origin: ['http://localhost:5173','http://localhost:5174','http://localhost:4173','http://127.0.0.1:5173','http://127.0.0.1:5174'],
+    origin: (origin, callback) => {
+        // Permitir peticiones sin Origin (Postman, curl, nginx proxy interno)
+        if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+        console.warn(`[CORS] Origen bloqueado: ${origin}`);
+        callback(new Error(`CORS: origen no permitido (${origin})`));
+    },
     methods: ['GET','POST','PUT','DELETE'],
     allowedHeaders: ['Content-Type'],
 }));

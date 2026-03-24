@@ -69,13 +69,20 @@ export interface AntennaStats {
   deviceDate?: string;   // fecha del dispositivo
   stations?: Array<{
     mac: string;
-    signal?: number;
-    noiseFloor?: number;
-    ccq?: number;
-    txRate?: number;
-    rxRate?: number;
-    distance?: number;
-    uptime?: number;
+    signal?: number | null;
+    noiseFloor?: number | null;
+    ccq?: number | null;
+    txRate?: number | null;
+    rxRate?: number | null;
+    distance?: number | null;
+    uptime?: number | null;
+    txLatency?: number | null;    // ms — latencia TX reportada por la estación
+    txPower?: number | null;      // dBm — potencia TX de la estación remota
+    hostname?: string | null;     // nombre del equipo remoto
+    remoteModel?: string | null;  // modelo del equipo remoto (wstalist remote.platform)
+    lastIp?: string | null;       // última IP asignada (wstalist lastip)
+    airmaxQuality?: number | null;   // calidad airMAX de esta estación (0–100 %)
+    airmaxCapacity?: number | null;  // capacidad airMAX de esta estación (0–100 %)
   }>;
 
   // ── Estático — se guarda en SavedDevice al cargar ───────────────────
@@ -103,6 +110,63 @@ export interface AntennaStats {
   lanSpeed?: number;  // Mbps
   lanInfo?: string;  // "100Mbps-Completo"
 
+  // ── Campos M5-específicos (mca-status airOS M-series) ──────────────────
+  rssi?: number;              // RSSI raw (puede diferir de signal)
+  txRetries?: number;         // Reintentos de TX (wireless.stats.tx_retries)
+  missedBeacons?: number;     // Balizas perdidas
+  rxCrypts?: number;          // Errores de encriptación RX
+  chainRssi?: number[];       // RSSI por cadena de antena
+  airsyncMode?: string;       // wireless.airsync_mode
+  atpcStatus?: string;        // Control automático potencia TX
+  opmode?: string;            // ej: "11NAHT20"
+  countryCode?: string;       // Código de país
+  fwPrefix?: string;          // Familia del firmware (host.fwprefix)
+  ifaceDetails?: Array<{      // Interfaces físicas y lógicas
+    ifname: string;
+    hwaddr: string;
+    mtu?: number | null;
+    ipaddr?: string | null;
+    enabled?: boolean | null;
+    plugged?: boolean | null;
+    speed?: number | null;
+    duplex?: boolean | null;
+    dhcpc?: boolean | null;
+    dhcpd?: boolean | null;
+    pppoe?: boolean | null;
+    // AC-específicos
+    snr?: number | null;
+    cableLen?: number | null;
+    txBytesIfc?: number | null;
+    rxBytesIfc?: number | null;
+    txErrors?: number | null;
+    rxErrors?: number | null;
+  }>;
+
+  // ── Campos AC-específicos (airOS AC v8.x — LiteBeam 5AC, etc.) ─────────
+  temperature?: number;       // Temperatura de operación °C
+  deviceHeight?: number;      // Altura física configurada
+  loadAvg?: string;           // Promedio de carga (loadavg)
+  hideSsid?: boolean;         // SSID oculto
+  antennaGain?: number;       // Ganancia de antena dBi
+  centerFreq1?: number;       // Frecuencia central MHz
+  txIdx?: number;             // Índice modulación TX
+  rxIdx?: number;             // Índice modulación RX
+  txNss?: number;             // Flujos espaciales TX
+  rxNss?: number;             // Flujos espaciales RX
+  txChainmask?: number;       // Máscara cadenas TX
+  rxChainmask?: number;       // Máscara cadenas RX
+  chainNames?: string[];      // Nombres de cadenas (Chain 0, Chain 1…)
+  cinr?: number;              // CINR dB
+  evm?: string;               // EVM matrix
+  gpsSync?: boolean;          // Sincronización GPS
+  fixedFrame?: boolean;       // Tramas fijas
+  dcap?: number;              // Download capacity polling %
+  ucap?: number;              // Upload capacity polling %
+  airtime?: number;           // Uso tiempo aire total %
+  txAirtime?: number;         // TX airtime %
+  rxAirtime?: number;         // RX airtime %
+  txLatency?: number;         // Latencia TX ms
+
   // ── Tráfico TX/RX por interfaz (/proc/net/dev) ──────────────────────────
   ifaceTraffic?: Record<string, {
     rxBytes: number; rxPackets: number;
@@ -125,6 +189,7 @@ export interface AntennaStats {
   _rawMcaCli?:   string;
   _rawNetDev?:   string;
   _rawMeminfo?:  string;
+  _rawBoard?:    string;
 }
 
 /** Interfaz wireless devuelta por /api/device/wifi/get */

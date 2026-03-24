@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { connectToMikrotik, safeWrite, getErrorMessage, cleanTunnelRules } = require('./routeros.service');
 const { IPV4_REGEX, CIDR_REGEX, getSubnetHosts, probeUbiquiti, sshExec, parseAirOSStats, parseFullOutput, ANTENNA_CMD, trySshCredentials } = require('./ubiquiti.service');
-const { getDb, encryptDevice, decryptDevice, encryptPass, decryptPass } = require('./db.service');
+const { getDb, encryptDevice, decryptDevice, encryptPass, decryptPass, saveNode, getNodes, deleteNode } = require('./db.service');
 
 router.post('/connect', async (req, res) => {
     const { ip, user, pass } = req.body;
@@ -156,9 +156,46 @@ router.post('/nodes', async (req, res) => {
             console.error('[DB] Error merging labels:', dbErr.message);
         }
 
+        // --- Actualizar caché SQLite con el estado actual de MikroTik ---
+        try {
+            for (const n of nodes) {
+                await saveNode({
+                    ppp_user:    n.ppp_user,
+                    nombre_nodo: n.nombre_nodo,
+                    nombre_vrf:  n.nombre_vrf,
+                    iface_name:  n.nombre_vrf ? n.nombre_vrf.replace(/^VRF-/, 'VPN-SSTP-') : '',
+                    segmento_lan: n.segmento_lan,
+                    lan_subnets:  n.lan_subnets,
+                    ip_tunnel:    n.ip_tunnel,
+                    last_seen:    Date.now(),
+                });
+            }
+        } catch (dbErr) {
+            console.error('[DB] Error actualizando caché de nodos:', dbErr.message);
+        }
+
         res.json(nodes);
     } catch (error) {
         if (api) try { await api.close(); } catch (_) { }
+
+        // --- Fallback: retornar nodos desde caché SQLite si MikroTik no responde ---
+        try {
+            const cached = await getNodes();
+            if (cached.length > 0) {
+                console.warn('[DB] MikroTik no disponible — sirviendo nodos desde caché SQLite');
+                const offlineNodes = cached.map(n => ({
+                    ...n,
+                    running:   false,
+                    uptime:    '',
+                    ip_tunnel: n.ip_tunnel || '',
+                    cached:    true,   // flag para el frontend
+                }));
+                return res.json(offlineNodes);
+            }
+        } catch (dbErr) {
+            console.error('[DB] Error leyendo caché de nodos:', dbErr.message);
+        }
+
         res.status(500).json({ success: false, message: getErrorMessage(error, ip, user) });
     }
 });
@@ -195,6 +232,71 @@ router.post('/tunnel/deactivate', async (req, res) => {
     } catch (error) {
         if (api) try { await api.close(); } catch (_) { }
         res.status(500).json({ success: false, message: getErrorMessage(error, ip, user) });
+    }
+});
+
+// ── Keepalive del túnel activo ────────────────────────────────────────────────
+// Verifica cada N minutos que las reglas mangle/address-list siguen en MikroTik.
+// Si faltan (por reboot, scheduler externo, etc.) las restaura sin tocar otras reglas.
+router.post('/tunnel/keepalive', async (req, res) => {
+    const { ip, user, pass, tunnelIP, targetVRF } = req.body;
+    if (!IPV4_REGEX.test(tunnelIP)) return res.status(400).json({ success: false, message: `tunnelIP inválida: "${tunnelIP}"` });
+    if (!targetVRF) return res.status(400).json({ success: false, message: 'targetVRF requerido' });
+    let api;
+    try {
+        api = await connectToMikrotik(ip, user, pass);
+        const [addrsResult, mangleResult] = await Promise.allSettled([
+            safeWrite(api, ['/ip/firewall/address-list/print'], 3000),
+            safeWrite(api, ['/ip/firewall/mangle/print'], 3000),
+        ]);
+        const addrs  = addrsResult.status  === 'fulfilled' ? addrsResult.value  : [];
+        const mangle = mangleResult.status === 'fulfilled' ? mangleResult.value : [];
+
+        const restoredItems = [];
+
+        // Verificar address-list vpn-activa
+        const hasAddr = addrs.some(a => a.list === 'vpn-activa' && a.address === tunnelIP);
+        if (!hasAddr) {
+            await safeWrite(api, ['/ip/firewall/address-list/add', '=list=vpn-activa', `=address=${tunnelIP}`, '=comment=User Access']);
+            restoredItems.push('vpn-activa');
+        }
+
+        // Verificar mangle WEB-ACCESS para este VRF específico
+        const hasMangleForVRF = mangle.some(m =>
+            m.comment === 'WEB-ACCESS' &&
+            m['src-address'] === tunnelIP &&
+            m['new-routing-mark'] === targetVRF
+        );
+        if (!hasMangleForVRF) {
+            // Limpiar mangle obsoleto para este mismo VRF (si quedó huérfano con otra IP)
+            const staleMangleIds = mangle
+                .filter(m => m.comment === 'WEB-ACCESS' && m['new-routing-mark'] === targetVRF && m['.id'])
+                .map(m => m['.id']);
+            for (const id of staleMangleIds) {
+                await safeWrite(api, ['/ip/firewall/mangle/remove', `=.id=${id}`]);
+            }
+            await safeWrite(api, [
+                '/ip/firewall/mangle/add',
+                '=chain=prerouting',
+                `=src-address=${tunnelIP}`,
+                '=dst-address-list=LIST-NET-REMOTE-TOWERS',
+                '=action=mark-routing',
+                `=new-routing-mark=${targetVRF}`,
+                '=passthrough=yes',
+                '=comment=WEB-ACCESS',
+            ]);
+            restoredItems.push('mangle-WEB-ACCESS');
+        }
+
+        await api.close();
+        const restored = restoredItems.length > 0;
+        console.log(`[KEEPALIVE] VRF=${targetVRF} IP=${tunnelIP} — ${restored ? 'RESTAURADO: ' + restoredItems.join(', ') : 'OK (sin cambios)'}`);
+        res.json({ success: true, restored, restoredItems });
+    } catch (error) {
+        if (api) try { await api.close(); } catch (_) { }
+        const msg = getErrorMessage(error, ip, user);
+        console.error('[KEEPALIVE] Error:', error?.message);
+        res.status(500).json({ success: false, message: msg });
     }
 });
 
@@ -313,6 +415,35 @@ router.post('/node/provision', async (req, res) => {
         steps.push({ step: '6b', obj: 'Ruta retorno MGMT (192.168.21.0/24)', name: `VPN-WG-MGMT en ${vrfName}`, status: 'ok' });
 
         await api.close();
+
+        // --- Persistir nodo + credenciales en SQLite (fuente de verdad local) ---
+        try {
+            const db = await getDb();
+
+            // 1. Guardar configuración del nodo
+            await saveNode({
+                ppp_user:     pppUser,
+                nombre_nodo:  nameUpper,
+                nombre_vrf:   vrfName,
+                iface_name:   ifaceName,
+                node_number:  nodeNumber,
+                lan_subnets:  allSubnets,
+                segmento_lan: allSubnets[0] || '',
+                ip_tunnel:    remoteAddress,
+            });
+
+            // 2. Guardar contraseña PPP cifrada en node_creds
+            const encrypted = encryptPass(pppPassword);
+            await db.run(
+                'INSERT INTO node_creds (ppp_user, ppp_password) VALUES (?, ?) ON CONFLICT(ppp_user) DO UPDATE SET ppp_password = excluded.ppp_password',
+                [pppUser, encrypted]
+            );
+
+            console.log(`[DB] Nodo + credenciales guardados en SQLite: ${pppUser}`);
+        } catch (dbErr) {
+            console.error('[DB] Error guardando nodo en SQLite:', dbErr.message);
+        }
+
         res.json({ success: true, message: `Nodo ND${nodeNumber} provisionado correctamente`, ifaceName, vrfName, remoteAddress, steps });
     } catch (error) {
         if (api) try { await api.close(); } catch (_) { }
@@ -393,6 +524,14 @@ router.post('/node/deprovision', async (req, res) => {
         steps.push({ step: 8, obj: 'PPP Secret', name: pppUser, status: 'ok' });
 
         await api.close();
+
+        // --- Eliminar nodo de SQLite (cascade: labels, creds, tags, history, ssh_creds) ---
+        try {
+            await deleteNode(pppUser);
+        } catch (dbErr) {
+            console.error('[DB] Error eliminando nodo de SQLite:', dbErr.message);
+        }
+
         res.json({ success: true, message: `Nodo eliminado correctamente`, steps });
     } catch (error) {
         if (api) try { await api.close(); } catch (_) { }
@@ -422,8 +561,9 @@ router.post('/node/details', async (req, res) => {
         res.json({
             success: true,
             lanSubnets: lanSubnets.length > 0 ? lanSubnets : vrfSubnets,
-            remoteAddress: secret?.['remote-address'] || '',
+            remoteAddress:  secret?.['remote-address'] || '',
             currentPppUser: secret?.name || pppUser || '',
+            pppPassword:    secret?.password || '',   // RouterOS devuelve la clave en texto plano
         });
     } catch (error) {
         if (api) try { await api.close(); } catch (_) { }
@@ -515,6 +655,23 @@ router.post('/node/edit', async (req, res) => {
         await api.close();
         if (steps.length === 0)
             return res.json({ success: false, message: 'Sin cambios para aplicar', steps });
+
+        // --- Actualizar nodo en SQLite ---
+        try {
+            const effectiveUser = (newPppUser && newPppUser !== pppUser) ? newPppUser : pppUser;
+            const updates = { ppp_user: effectiveUser };
+            if (newComment !== undefined && newComment !== null) updates.nombre_nodo = newComment;
+            if (newRemoteAddress)                                updates.ip_tunnel   = newRemoteAddress;
+            if (newPppUser && newPppUser !== pppUser) {
+                // Usuario cambió: eliminar registro viejo y crear uno nuevo
+                await deleteNode(pppUser);
+            }
+            await saveNode(updates);
+            console.log(`[DB] Nodo actualizado en SQLite: ${effectiveUser}`);
+        } catch (dbErr) {
+            console.error('[DB] Error actualizando nodo en SQLite:', dbErr.message);
+        }
+
         res.json({ success: true, message: 'Nodo actualizado correctamente', steps });
     } catch (error) {
         if (api) try { await api.close(); } catch (_) { }

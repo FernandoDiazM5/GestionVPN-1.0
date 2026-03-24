@@ -6,20 +6,23 @@ const { Client: SSH2Client } = require('ssh2');
 const IPV4_REGEX = /^(25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)(\.(25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)){3}$/;
 const CIDR_REGEX = /^(25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)(\.(25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)){3}\/(3[0-2]|[1-2]\d|\d)$/;
 
-// Comando SSH combinado — 12 secciones, BusyBox compatible (cada ; es independiente)
+// Comando SSH combinado — 14 secciones, BusyBox compatible
+// NOTA: cada echo lleva \n previo para evitar que markers se peguen a la salida anterior
+// (BusyBox wstalist/mca-status pueden no emitir trailing newline)
 const ANTENNA_CMD = [
-    'echo __MCA__',     'mca-status 2>/dev/null',
-    'echo __CFG__',     'cat /tmp/system.cfg 2>/dev/null',
-    'echo __HN__',      'cat /proc/sys/kernel/hostname 2>/dev/null',
-    'echo __VER__',     'cat /etc/version 2>/dev/null',
-    'echo __IFC__',     'ifconfig 2>/dev/null',
-    'echo __UNAME__',   'uname -a 2>/dev/null; uptime 2>/dev/null',
-    'echo __MEMINFO__', 'cat /proc/meminfo 2>/dev/null',
-    'echo __ROUTES__',  'route -n 2>/dev/null',
-    'echo __IWCFG__',   'iwconfig ath0 2>/dev/null',
-    'echo __WSTA__',    'wstalist 2>/dev/null',
-    'echo __MCACLI__',  'mca-cli-op info 2>/dev/null',
-    'echo __NETDEV__',  'cat /proc/net/dev 2>/dev/null',
+    'echo __MCA__',     '/usr/www/status.cgi 2>/dev/null || mca-status 2>/dev/null',
+    'echo "";echo __CFG__',     'cat /tmp/system.cfg 2>/dev/null',
+    'echo "";echo __HN__',      'cat /proc/sys/kernel/hostname 2>/dev/null',
+    'echo "";echo __VER__',     'cat /etc/version 2>/dev/null',
+    'echo "";echo __IFC__',     'ifconfig 2>/dev/null',
+    'echo "";echo __UNAME__',   'uname -a 2>/dev/null; uptime 2>/dev/null',
+    'echo "";echo __MEMINFO__', 'cat /proc/meminfo 2>/dev/null',
+    'echo "";echo __ROUTES__',  'route -n 2>/dev/null',
+    'echo "";echo __IWCFG__',   'iwconfig ath0 2>/dev/null',
+    'echo "";echo __WSTA__',    'wstalist 2>/dev/null',
+    'echo "";echo __MCACLI__',  'mca-cli-op info 2>/dev/null',
+    'echo "";echo __NETDEV__',  'cat /proc/net/dev 2>/dev/null',
+    'echo "";echo __BOARD__',   'cat /etc/board.info 2>/dev/null || cat /tmp/board.info 2>/dev/null',
 ].join('; ');
 
 const getSubnetHosts = (cidr) => {
@@ -50,11 +53,15 @@ const probeStatusCgi = (deviceIP, port, useHttps) => {
                     const data = JSON.parse(body);
                     if (!data || !data.host || !data.host.devmodel) return resolve(null);
                     const h = data.host; const w = data.wireless || {};
+                    // Parsear JSON completo de /status.cgi con el mismo parser que mca-status via SSH.
+                    // Así el modal M5 muestra todos los campos desde el primer escaneo HTTP, sin SSH.
+                    const cachedStats = parseAirOSStats(body);
                     resolve({
                         ip: deviceIP, mac: (h.macaddr || '').toUpperCase(), name: h.hostname || deviceIP,
                         model: h.devmodel || 'Unknown', firmware: h.fwversion || 'Unknown',
                         role: (['master', 'ap', 'apauto', 'ap-ptp', 'ap-ptmp'].includes(w.mode)) ? 'ap' : (w.mode ? 'sta' : 'unknown'),
                         parentAp: (w.remote && w.remote.hostname) || w.essid || '', essid: w.essid || '', frequency: parseInt(w.frequency) || 0,
+                        cachedStats,
                     });
                 } catch { resolve(null); }
             });
@@ -127,8 +134,17 @@ const parseAirOSStats = (output) => {
     };
 
     try {
-        const data = JSON.parse(output);
-        const h = data.host || {}; const w = data.wireless || {}; const am = data.airmax || {};
+        // Extrae el bloque JSON aunque mca-status emita texto adicional antes/después
+        let jsonStr = output.trim();
+        if (!jsonStr.startsWith('{') && !jsonStr.startsWith('[')) {
+            const s = jsonStr.indexOf('{');
+            const e = jsonStr.lastIndexOf('}');
+            if (s !== -1 && e > s) jsonStr = jsonStr.slice(s, e + 1);
+        }
+        const data = JSON.parse(jsonStr);
+        const h = data.host || {}; const w = data.wireless || {};
+        // airOS M-series anida airmax dentro de wireless; AC-series lo pone en raíz
+        const am = data.airmax || w.airmax || {};
         const ifaces = Array.isArray(data.interfaces) ? data.interfaces : [];
 
         // Convierte tasa a Mbps. airOS M reporta txrate/rxrate en kbps (ej: 150000 = 150 Mbps).
@@ -194,14 +210,21 @@ const parseAirOSStats = (output) => {
             uptimeStr,
             deviceDate: pick([h, data], 'time', 'date', 'localtime') || null,
             stations: (data.sta || data.stations || []).map(s => ({
-                mac: (s.mac || '').toUpperCase(),
-                signal:     parseInt(s.signal) || parseInt(s.rssi) || null,
+                mac:        (s.mac || '').toUpperCase(),
+                signal:     s.signal != null ? parseInt(s.signal) : (s.rssi != null ? parseInt(s.rssi) : null),
                 noiseFloor: s.noisefloor != null ? parseInt(s.noisefloor) : null,
                 ccq:        toCCQ(s.ccq ?? s.txccq),
                 txRate:     toMbps(s.txrate ?? s.tx_rate),
                 rxRate:     toMbps(s.rxrate ?? s.rx_rate),
-                distance:   s.ackdistance ?? null,
+                distance:   s.ackdistance ?? (s.distance || null),
                 uptime:     s.uptime ?? null,
+                txLatency:  s.tx_latency ?? null,
+                txPower:    s.txpower != null ? parseInt(s.txpower) : null,
+                hostname:   s.hostname || s.name || s.remote?.hostname || null,
+                remoteModel: s.remote?.platform || null,
+                lastIp:     s.lastip || null,
+                airmaxQuality:  s.airmax?.quality ?? null,
+                airmaxCapacity: s.airmax?.capacity ?? null,
             })),
             deviceName:      pick([h, data], 'hostname', 'name', 'devname') || null,
             deviceModel:     pick([h, data], 'devmodel', 'product', 'model') || null,
@@ -215,8 +238,110 @@ const parseAirOSStats = (output) => {
             channelWidth:  isNaN(chanbw) ? null : chanbw,
             txPower:       txPowerRaw != null ? parseInt(txPowerRaw) : null,
             distance: pick([w, data], 'ackdistance', 'distance') || null,
-            chains: parseInt(pick([w, data], 'chains', 'txchains')) > 0 ? `${parseInt(pick([w, data], 'chains'))}X${parseInt(pick([w, data], 'chains'))}` : null,
+            chains: (() => { const c = parseInt(pick([w, data], 'chains', 'txchains', 'rxchains')); return c > 0 ? `${c}X${c}` : null; })(),
             airmaxEnabled: am.enabled != null ? !!am.enabled : undefined,
+            airmaxPriority:  am.priority ? String(am.priority) : null,
+            rssi:            pn(w, 'rssi') != null ? parseInt(pn(w, 'rssi')) : null,
+            txRetries:       (w.stats?.tx_retries != null) ? parseInt(w.stats.tx_retries) : null,
+            missedBeacons:   (w.stats?.missed_beacons != null) ? parseInt(w.stats.missed_beacons) : null,
+            rxCrypts:        (w.stats?.rx_crypts != null) ? parseInt(w.stats.rx_crypts) : null,
+            chainRssi:       Array.isArray(w.chainrssi) ? w.chainrssi.map(v => parseInt(v)).filter(v => !isNaN(v)) : null,
+            airsyncMode:     w.airsync_mode != null ? String(w.airsync_mode) : null,
+            atpcStatus:      w.atpc_status != null ? String(w.atpc_status) : null,
+            opmode:          pick([w, data], 'opmode', 'htmode', 'ieee_mode') || null,
+            countryCode:     w.countrycode != null ? String(w.countrycode) : null,
+            fwPrefix:        h.fwprefix || null,
+            // ── Campos M5/comunes no devueltos anteriormente ─────────────────
+            channelNumber:   pn(w, 'channel', 'chan', 'chnum', 'chindex') != null ? parseInt(pn(w, 'channel', 'chan', 'chnum', 'chindex')) : null,
+            channelWidthExt: (() => {
+                if (!rawExt) return null;
+                // Cubre: "HT40-", "HT40MINUS", "ht40minus", "BELOW", "LOWER"
+                if (/HT40[-_]?MINUS|HT40-|BELOW|LOWER/i.test(rawExt)) return 'Inferior (HT40-)';
+                // Cubre: "HT40+", "HT40PLUS", "ht40plus", "ABOVE", "UPPER"
+                if (/HT40[-_]?PLUS|HT40\+|ABOVE|UPPER/i.test(rawExt)) return 'Superior (HT40+)';
+                if (/HT20|NONE/i.test(rawExt)) return null;
+                return rawExt || null;
+            })(),
+            freqRange:       pick([w, data], 'freq_range', 'freqrange', 'channel_range') || null,
+            antenna:         pick([w, data], 'antenna', 'antenna_type', 'antennatype') || null,
+            lanSpeed: (() => {
+                const ethIfc = ifaces.find(i => /^(eth|br)/i.test(i.ifname));
+                return ethIfc?.status?.speed != null ? parseInt(ethIfc.status.speed) : null;
+            })(),
+            lanInfo: (() => {
+                const ethIfc = ifaces.find(i => /^(eth|br)/i.test(i.ifname));
+                if (!ethIfc?.status) return null;
+                const spd = ethIfc.status.speed; const dup = ethIfc.status.duplex;
+                if (spd != null && dup != null) return `${spd}Mbps-${dup ? 'Full' : 'Half'}`;
+                if (spd != null) return `${spd}Mbps`;
+                return null;
+            })(),
+            memTotalKb: (() => {
+                const m = h.memory || data.memory || {};
+                return m.total != null ? parseInt(m.total) : (h.memtotal != null ? parseInt(h.memtotal) : null);
+            })(),
+            memFreeKb: (() => {
+                const m = h.memory || data.memory || {};
+                return m.free != null ? parseInt(m.free) : (h.memfree != null ? parseInt(h.memfree) : null);
+            })(),
+            memBuffersKb: (() => {
+                const m = h.memory || data.memory || {};
+                return m.buffers != null ? parseInt(m.buffers) : null;
+            })(),
+            memCachedKb: (() => {
+                const m = h.memory || data.memory || {};
+                return m.cached != null ? parseInt(m.cached) : null;
+            })(),
+            // Campos AC-específicos ──────────────────────────────────────────
+            temperature:  h.temperature != null ? parseFloat(h.temperature) : null,
+            deviceHeight: h.height      != null ? parseFloat(h.height)      : null,
+            loadAvg:      h.loadavg != null ? String(h.loadavg) : null,
+            hideSsid:     w.hide_essid != null ? !!w.hide_essid : undefined,
+            antennaGain:  pn(w, 'antenna_gain') != null ? parseFloat(pn(w, 'antenna_gain')) : null,
+            centerFreq1:  pn(w, 'center1_freq', 'center_freq1', 'cf1') != null ? parseInt(pn(w, 'center1_freq', 'center_freq1', 'cf1')) : null,
+            txIdx:        pn(w, 'tx_idx')  != null ? parseInt(pn(w, 'tx_idx'))  : null,
+            rxIdx:        pn(w, 'rx_idx')  != null ? parseInt(pn(w, 'rx_idx'))  : null,
+            txNss:        pn(w, 'tx_nss')  != null ? parseInt(pn(w, 'tx_nss'))  : null,
+            rxNss:        pn(w, 'rx_nss')  != null ? parseInt(pn(w, 'rx_nss'))  : null,
+            txChainmask:  pn(w, 'tx_chainmask') != null ? parseInt(pn(w, 'tx_chainmask')) : null,
+            rxChainmask:  pn(w, 'rx_chainmask') != null ? parseInt(pn(w, 'rx_chainmask')) : null,
+            chainNames:   Array.isArray(w.chain_names) ? w.chain_names.map(String) : null,
+            cinr:         pn(w, 'cinr') != null ? parseFloat(pn(w, 'cinr')) : null,
+            evm:          w.evm != null ? String(w.evm) : null,
+            gpsSync:      w.gps_sync    != null ? !!w.gps_sync    : undefined,
+            fixedFrame:   w.fixed_frame != null ? !!w.fixed_frame : undefined,
+            // Polling AC (dcap/ucap/airtime)
+            dcap:      (() => { const v = pn(data.polling || am, 'dcap', 'dl_capacity'); return v != null ? parseFloat(v) : null; })(),
+            ucap:      (() => { const v = pn(data.polling || am, 'ucap', 'ul_capacity'); return v != null ? parseFloat(v) : null; })(),
+            airtime:   (() => { const v = pn(data.polling || am, 'use', 'airtime');    return v != null ? parseFloat(v) : null; })(),
+            txAirtime: (() => { const v = pn(data.polling || am, 'tx_use', 'tx_airtime'); return v != null ? parseFloat(v) : null; })(),
+            rxAirtime: (() => { const v = pn(data.polling || am, 'rx_use', 'rx_airtime'); return v != null ? parseFloat(v) : null; })(),
+            // TX latency desde sta remota
+            txLatency: (() => {
+                const staArr = Array.isArray(data.sta) ? data.sta : (data.sta ? [data.sta] : []);
+                const first = staArr[0];
+                return first?.tx_latency != null ? parseFloat(first.tx_latency) : null;
+            })(),
+            // Interfaces — extendidas con campos AC
+            ifaceDetails: ifaces.map(ifc => ({
+                ifname:     ifc.ifname || '',
+                hwaddr:     (ifc.hwaddr || '').toUpperCase(),
+                mtu:        ifc.mtu        != null ? parseInt(ifc.mtu)        : null,
+                ipaddr:     ifc.ipaddr     || ifc.status?.ipaddr || null,
+                enabled:    ifc.status?.enabled ?? null,
+                plugged:    ifc.status?.plugged ?? null,
+                speed:      ifc.status?.speed   ?? null,
+                duplex:     ifc.status?.duplex  ?? null,
+                dhcpc:      ifc.services?.dhcpc ?? ifc.dhcpc ?? null,
+                dhcpd:      ifc.services?.dhcpd ?? ifc.dhcpd ?? null,
+                pppoe:      ifc.services?.pppoe ?? ifc.pppoe ?? null,
+                snr:        ifc.status?.snr      != null ? parseFloat(ifc.status.snr)      : null,
+                cableLen:   ifc.status?.cable_len!= null ? parseFloat(ifc.status.cable_len): null,
+                txBytesIfc: ifc.stats?.tx_bytes  != null ? parseInt(ifc.stats.tx_bytes)   : null,
+                rxBytesIfc: ifc.stats?.rx_bytes  != null ? parseInt(ifc.stats.rx_bytes)   : null,
+                txErrors:   ifc.stats?.tx_errors != null ? parseInt(ifc.stats.tx_errors)  : null,
+                rxErrors:   ifc.stats?.rx_errors != null ? parseInt(ifc.stats.rx_errors)  : null,
+            })).filter(i => i.ifname),
             _rawJson: (() => { try { return JSON.stringify(JSON.parse(output), null, 2).slice(0, 8000); } catch { return null; } })(),
         };
     } catch {
@@ -258,9 +383,9 @@ const parseAirOSStats = (output) => {
                     uptimeStr,
                     frequency:   parseInt(kget('frequency', 'freq')) || null,
                     essid:       kget('essid', 'ssid') || null,
-                    mode:        kget('mode', 'wmode') || null,
+                    mode: (() => { const m = (kget('mode', 'wmode') || '').toLowerCase(); return ['master','ap','apauto','ap-ptp','ap-ptmp'].includes(m) ? 'ap' : ['station','sta','managed'].includes(m) ? 'sta' : m || null; })(),
                     deviceName:  kget('hostname', 'name') || null,
-                    deviceModel: kget('devmodel', 'product') || null,
+                    deviceModel: kget('devmodel', 'product', 'model') || null,
                     firmwareVersion: kget('fwversion', 'version') || null,
                     wlanMac: (kget('wlan.mac', 'wlanmac', 'mac') || '').toUpperCase() || null,
                     lanMac:  (kget('lan.mac', 'lanmac') || '').toUpperCase() || null,
@@ -390,24 +515,125 @@ const parseIwconfigData = (text) => {
     const bitRate = m(/Bit Rate[=:](\d+(?:\.\d+)?)\s*Mb/i);
     const txPwr   = m(/Tx-Power[=:](\d+)\s*dBm/i);
     const sig     = m(/Signal level[=:](-?\d+)\s*dBm/i);
-    if (essid)   result.essid     = essid;
-    if (freqGhz) result.frequency = Math.round(parseFloat(freqGhz) * 1000);
-    if (apMac)   result.apMac     = apMac.toUpperCase();
-    if (bitRate) result.txRate    = parseFloat(bitRate);
-    if (txPwr)   result.txPower   = parseInt(txPwr);
-    if (sig)     result.signal    = parseInt(sig);
+    const noise   = m(/Noise level[=:](-?\d+)\s*dBm/i);
+    if (essid)   result.essid      = essid;
+    if (freqGhz) result.frequency  = Math.round(parseFloat(freqGhz) * 1000);
+    if (apMac)   result.apMac      = apMac.toUpperCase();
+    if (bitRate) result.txRate     = parseFloat(bitRate);
+    if (txPwr)   result.txPower    = parseInt(txPwr);
+    if (sig)     result.signal     = parseInt(sig);
+    if (noise)   result.noiseFloor = parseInt(noise);
     return result;
 };
 
-// ── Parser principal: fusiona las 12 fuentes de datos ────────────────────
-const VALID_MARKERS = new Set(['MCA','CFG','HN','VER','IFC','UNAME','MEMINFO','ROUTES','IWCFG','WSTA','MCACLI','NETDEV']);
+// ── Parser para mca-cli-op info (modelo human-readable, versión, nombre) ──
+// Formato: "Model:                LiteBeam M5\nVersion:              WA.ar934x.v6.1.7..."
+const parseMcaCli = (text) => {
+    if (!text || typeof text !== 'string') return {};
+    const get = (key) => {
+        const m = text.match(new RegExp(`^${key}:\\s*(.+)$`, 'im'));
+        return m ? m[1].trim() : null;
+    };
+    // "Uptime:" (sin secs) tiene el string formateado "10d 04:28:25"
+    // "Uptime(secs):" tiene el número — excluir esa línea
+    const uptimeFormatted = (() => {
+        const m = text.match(/^Uptime:\s+([^\n]+)$/im);
+        if (!m) return null;
+        const v = m[1].trim();
+        // Si solo son dígitos, es el valor en segundos — no sirve como string
+        return /^\d+$/.test(v) ? null : v;
+    })();
+    // Extrae el primer número (incluye negativos) de un campo con unidades: "-50 dBm" → -50
+    const getNum = (key) => {
+        const v = get(key);
+        if (!v) return null;
+        const matched = v.match(/(-?\d+(?:\.\d+)?)/);
+        return matched ? parseFloat(matched[1]) : null;
+    };
+    return {
+        deviceModel:     get('Model') || get('Platform') || null,
+        firmwareVersion: get('Version') || null,
+        deviceName:      get('DevName') || get('Hostname') || null,
+        uptimeStr:       uptimeFormatted,
+        // Fallbacks RF — confiables cuando mca-status JSON está incompleto o ausente
+        signal:     getNum('Signal'),
+        noiseFloor: getNum('Noise floor') ?? getNum('Noise Floor') ?? null,
+        txRate:     getNum('TX rate')  ?? getNum('Tx Rate')  ?? getNum('Tx-Rate')  ?? null,
+        rxRate:     getNum('RX rate')  ?? getNum('Rx Rate')  ?? getNum('Rx-Rate')  ?? null,
+        ccq:        getNum('CCQ'),
+    };
+};
+
+// ── Parser para wstalist (estaciones conectadas en modo AP) ───────────────
+// Diferencias clave vs mca-status data.sta[]:
+//   • ccq  → ya es 0–100 % (NO ×10)
+//   • tx/rx → ya están en Mbps como float (NO en kbps)
+//   • name, remote.hostname → nombre de la estación
+//   • remote.platform → modelo de la estación remota
+//   • airmax.quality/capacity → airmax por estación
+const parseWstalist = (text) => {
+    if (!text || typeof text !== 'string') return [];
+    try {
+        let jsonStr = text.trim();
+        if (!jsonStr.startsWith('[')) {
+            const s = jsonStr.indexOf('[');
+            const e = jsonStr.lastIndexOf(']');
+            if (s === -1 || e <= s) return [];
+            jsonStr = jsonStr.slice(s, e + 1);
+        }
+        const arr = JSON.parse(jsonStr);
+        if (!Array.isArray(arr)) return [];
+        return arr.map(s => ({
+            mac:            (s.mac || '').toUpperCase(),
+            signal:         s.signal    != null ? parseInt(s.signal)    : null,
+            noiseFloor:     s.noisefloor != null ? parseInt(s.noisefloor) : null,
+            ccq:            s.ccq       != null ? parseFloat(s.ccq)     : null, // ya 0-100
+            txRate:         s.tx        != null ? parseFloat(s.tx)      : null, // ya Mbps
+            rxRate:         s.rx        != null ? parseFloat(s.rx)      : null,
+            distance:       s.ackdistance ?? (s.distance > 0 ? s.distance : null),
+            uptime:         s.uptime    ?? null,
+            txLatency:      s.tx_latency ?? null,
+            txPower:        s.txpower   != null ? parseInt(s.txpower)   : null,
+            hostname:       s.name || s.remote?.hostname || null,
+            remoteModel:    s.remote?.platform || null,
+            lastIp:         s.lastip    || null,
+            airmaxQuality:  s.airmax?.quality  ?? null,
+            airmaxCapacity: s.airmax?.capacity ?? null,
+        }));
+    } catch { return []; }
+};
+
+// ── Parser para /etc/board.info (modelo del hardware) ────────────────────
+const parseBoardInfo = (text) => {
+    if (!text || typeof text !== 'string') return {};
+    const kv = {};
+    text.split('\n').forEach(line => {
+        const eq = line.indexOf('=');
+        if (eq > 0) kv[line.slice(0, eq).trim().toLowerCase()] = line.slice(eq + 1).trim();
+    });
+    return {
+        deviceModel: kv['board.name'] || kv['board.shortname'] || null,
+        boardId:     kv['board.sysid'] || null,
+        fwPrefix:    kv['board.fwprefix'] || null,
+    };
+};
+
+// ── Parser principal: fusiona las 14 fuentes de datos ────────────────────
+const VALID_MARKERS = new Set(['MCA','CFG','HN','VER','IFC','UNAME','MEMINFO','ROUTES','IWCFG','WSTA','MCACLI','NETDEV','BOARD']);
 
 const parseFullOutput = (combined) => {
     const sections = {};
     let cur = null;
     for (const line of combined.split('\n')) {
-        const m = line.match(/^__(MCA|CFG|HN|VER|IFC|UNAME|MEMINFO|ROUTES|IWCFG|WSTA|MCACLI|NETDEV)__\s*$/);
+        // Marcador en su propia línea (caso normal)
+        const m = line.match(/^__(MCA|CFG|HN|VER|IFC|UNAME|MEMINFO|ROUTES|IWCFG|WSTA|MCACLI|NETDEV|BOARD)__\s*$/);
         if (m && VALID_MARKERS.has(m[1])) { cur = m[1]; sections[cur] = ''; continue; }
+        // Marcador pegado al final de la línea anterior (BusyBox sin trailing newline)
+        const inlineM = line.match(/^(.+?)(__(MCA|CFG|HN|VER|IFC|UNAME|MEMINFO|ROUTES|IWCFG|WSTA|MCACLI|NETDEV|BOARD)__)\s*$/);
+        if (inlineM && VALID_MARKERS.has(inlineM[3])) {
+            if (cur) sections[cur] += inlineM[1] + '\n';
+            cur = inlineM[3]; sections[cur] = ''; continue;
+        }
         if (cur) sections[cur] += line + '\n';
     }
 
@@ -427,19 +653,46 @@ const parseFullOutput = (combined) => {
     const mcacliRaw = s('MCACLI');
     const netdevRaw = s('NETDEV');
 
-    const base    = parseAirOSStats(mcaRaw || '{}');
-    const cfg     = parseSystemCfg(cfgRaw);
-    const ifc     = parseIfconfig(ifcRaw);
-    const iwc     = parseIwconfigData(iwcfgRaw);
-    const mem     = parseMeminfo(meminfoRaw);
-    const traffic = parseNetDev(netdevRaw);
+    const boardRaw  = s('BOARD');
+
+    const base      = parseAirOSStats(mcaRaw || '{}');
+    const cfg       = parseSystemCfg(cfgRaw);
+    const ifc       = parseIfconfig(ifcRaw);
+    const iwc       = parseIwconfigData(iwcfgRaw);
+    const mem       = parseMeminfo(meminfoRaw);
+    const traffic   = parseNetDev(netdevRaw);
+    const mcaCli    = parseMcaCli(mcacliRaw);         // mca-cli-op info → modelo human-readable
+    const wstaSta   = parseWstalist(wstaRaw);          // wstalist → estaciones
+    const board     = parseBoardInfo(boardRaw);         // /etc/board.info → modelo hardware
+
+    // Primera estación de wstalist — cuando el dispositivo es STA, esta ES su conexión al AP
+    // y contiene rxRate, noiseFloor, ccq, distance que el JSON principal a veces no tiene
+    const wstaFirst = wstaSta.length > 0 ? wstaSta[0] : null;
 
     const fill = (a, b) => (a != null && a !== '') ? a : (b != null && b !== '') ? b : null;
 
+    // Calcular memoryPercent desde /proc/meminfo si mca-status no lo tiene
+    const memPct = base.memoryPercent != null ? base.memoryPercent
+        : (mem.memTotalKb > 0 ? Math.round(((mem.memTotalKb - (mem.memFreeKb || 0)) / mem.memTotalKb) * 100) : null);
+
+    // CPU: load average (promediado 1min) es más confiable que host.cpuload (instantáneo,
+    // sube a 100% por el propio SSH+status.cgi). Solo usar cpuload si load avg no existe.
+    const cpuFromUptime = (() => {
+        const loadMatch = unameRaw.match(/load average:\s*([\d.]+)/);
+        if (loadMatch) return Math.min(100, Math.round(parseFloat(loadMatch[1]) * 100));
+        return base.cpuLoad ?? null;
+    })();
+
     return {
         ...base,
-        deviceName:      hnRaw     || base.deviceName      || cfg.deviceName,
-        firmwareVersion: verRaw    || base.firmwareVersion,
+        // Modelo: mca-cli-op > board.info > status.cgi/mca-status JSON
+        deviceModel:     mcaCli.deviceModel || board.deviceModel || base.deviceModel || null,
+        // Nombre: /proc/sys/kernel/hostname > mca-status > system.cfg > mca-cli-op
+        deviceName:      hnRaw || base.deviceName || cfg.deviceName || mcaCli.deviceName || null,
+        // Firmware: /etc/version (primera línea) > mca-status > mca-cli-op
+        firmwareVersion: verRaw || base.firmwareVersion || mcaCli.firmwareVersion || null,
+        // Uptime: mca-status (calculado) > mca-cli-op (pre-formateado)
+        uptimeStr:       base.uptimeStr || mcaCli.uptimeStr || null,
         mode:            fill(base.mode,        fill(cfg.mode,    iwc.mode)),
         networkMode:     fill(base.networkMode, cfg.networkMode),
         essid:           fill(base.essid,       fill(cfg.essid,   iwc.essid)),
@@ -448,11 +701,24 @@ const parseFullOutput = (combined) => {
         channelWidth:    base.channelWidth != null ? base.channelWidth : (cfg.channelWidth ?? null),
         txPower:         base.txPower      != null ? base.txPower      : (cfg.txPower      ?? iwc.txPower  ?? null),
         airmaxEnabled:   base.airmaxEnabled != null ? base.airmaxEnabled : cfg.airmaxEnabled,
+        fwPrefix:        base.fwPrefix || board.fwPrefix || null,
         wlanMac:         fill(base.wlanMac, ifc.wlanMac),
         lanMac:          fill(base.lanMac,  ifc.lanMac),
         apMac:           fill(base.apMac,   iwc.apMac),
-        signal:          base.signal  != null ? base.signal  : (iwc.signal  ?? null),
-        txRate:          base.txRate  != null ? base.txRate  : (iwc.txRate  ?? null),
+        // ── Métricas RF: cascada de fuentes ──────────────────────────────────
+        // Cada fuente se intenta en orden: JSON > mca-cli > iwconfig > wstalist[0]
+        signal:          base.signal     != null ? base.signal     : (mcaCli.signal     ?? iwc.signal        ?? wstaFirst?.signal     ?? null),
+        noiseFloor:      base.noiseFloor != null ? base.noiseFloor : (mcaCli.noiseFloor ?? iwc.noiseFloor    ?? wstaFirst?.noiseFloor ?? null),
+        txRate:          base.txRate     != null ? base.txRate     : (mcaCli.txRate     ?? iwc.txRate        ?? wstaFirst?.txRate     ?? null),
+        rxRate:          base.rxRate     != null ? base.rxRate     : (mcaCli.rxRate     ?? wstaFirst?.rxRate ?? null),
+        ccq:             base.ccq        != null ? base.ccq        : (mcaCli.ccq        ?? wstaFirst?.ccq   ?? null),
+        // Distancia: JSON > wstalist primera estación
+        distance:        base.distance   != null ? base.distance   : (wstaFirst?.distance ?? null),
+        // CPU y Memoria con fallback desde /proc y uptime
+        cpuLoad:         cpuFromUptime,
+        memoryPercent:   memPct,
+        // Estaciones: mca-status data.sta[] (primario) → wstalist
+        stations: (base.stations && base.stations.length > 0) ? base.stations : wstaSta,
         // Memoria detallada (/proc/meminfo)
         ...mem,
         // Tráfico TX/RX por interfaz (/proc/net/dev)
@@ -465,6 +731,7 @@ const parseFullOutput = (combined) => {
         _rawMcaCli:   mcacliRaw  || null,
         _rawNetDev:   netdevRaw  || null,
         _rawMeminfo:  meminfoRaw || null,
+        _rawBoard:    boardRaw   || null,
     };
 };
 

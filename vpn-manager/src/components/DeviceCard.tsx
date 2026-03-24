@@ -2,8 +2,8 @@ import { useState } from 'react';
 import {
   Radio, Signal, Trash2, RefreshCw, Loader2,
   Activity, ArrowUp, ArrowDown, Waves,
-  Cpu, Clock, Wifi,
-  Info,
+  Cpu, Clock, Wifi, Thermometer, Zap,
+  Info, Database,
 } from 'lucide-react';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import type { SavedDevice, AntennaStats } from '../types/devices';
@@ -185,7 +185,7 @@ export default function DeviceCard({ device, onRemove, onUpdate, isPreview }: De
               <h3 className="font-bold text-white text-sm truncate">{displayName}</h3>
               <span className="text-[9px] font-bold bg-white/20 text-white px-1.5 py-0.5 rounded-md shrink-0">{roleLabel}</span>
             </div>
-            <p className="text-[10px] text-white/70 font-mono truncate">{device.model} · {device.firmware}</p>
+            <p className="text-[10px] text-white/70 font-mono truncate">{antennaStats?.deviceModel || device.model} · {antennaStats?.firmwareVersion || device.firmware}</p>
           </div>
         </div>
         {!isPreview && onRemove && (
@@ -438,6 +438,79 @@ export default function DeviceCard({ device, onRemove, onUpdate, isPreview }: De
               </div>
             </div>
 
+            {/* ── Parámetros AC (solo airOS AC v8+) ── */}
+            {(antennaStats.temperature != null || antennaStats.cinr != null || antennaStats.txNss != null
+              || antennaStats.dcap != null || antennaStats.airtime != null || antennaStats.gpsSync != null
+              || antennaStats.antennaGain != null || antennaStats.centerFreq1 != null) && (
+              <div className="bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50 rounded-xl p-4 shadow-sm">
+                <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3 flex items-center space-x-2">
+                  <Thermometer className="w-3 h-3 text-orange-500" /><span>Parámetros AC</span>
+                </p>
+                <div className="flex flex-col">
+                  <ParamRow label="Temperatura" value={antennaStats.temperature != null ? `${antennaStats.temperature} °C` : null} />
+                  <ParamRow label="CINR" value={antennaStats.cinr != null ? `${antennaStats.cinr} dB` : null} />
+                  <ParamRow label="Flujos TX/RX (NSS)" value={(antennaStats.txNss != null || antennaStats.rxNss != null)
+                    ? `${antennaStats.txNss ?? '—'} TX / ${antennaStats.rxNss ?? '—'} RX` : null} />
+                  <ParamRow label="Índice MCS TX/RX" value={(antennaStats.txIdx != null || antennaStats.rxIdx != null)
+                    ? `${antennaStats.txIdx ?? '—'} / ${antennaStats.rxIdx ?? '—'}` : null} />
+                  <ParamRow label="Ganancia de antena" value={antennaStats.antennaGain != null ? `${antennaStats.antennaGain} dBi` : null} />
+                  <ParamRow label="Frecuencia central" value={antennaStats.centerFreq1 != null ? `${antennaStats.centerFreq1} MHz` : null} />
+                  <ParamRow label="Airtime total" value={antennaStats.airtime != null ? `${antennaStats.airtime}%` : null} />
+                  <ParamRow label="Airtime TX / RX" value={(antennaStats.txAirtime != null || antennaStats.rxAirtime != null)
+                    ? `${antennaStats.txAirtime ?? '—'}% / ${antennaStats.rxAirtime ?? '—'}%` : null} />
+                  <ParamRow label="Capacidad DL / UL" value={(antennaStats.dcap != null || antennaStats.ucap != null)
+                    ? `${antennaStats.dcap ?? '—'}% / ${antennaStats.ucap ?? '—'}%` : null} />
+                  <ParamRow label="GPS Sync" value={antennaStats.gpsSync != null ? (antennaStats.gpsSync ? 'Sí' : 'No') : null} />
+                  <ParamRow label="Tramas fijas" value={antennaStats.fixedFrame != null ? (antennaStats.fixedFrame ? 'Sí' : 'No') : null} />
+                  {antennaStats.chainNames && antennaStats.chainNames.length > 0 && (
+                    <ParamRow label="Cadenas" value={antennaStats.chainNames.join(', ')} />
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ── Parámetros avanzados M-series ── */}
+            {(antennaStats.txRetries != null || antennaStats.chainRssi != null || antennaStats.opmode != null
+              || antennaStats.atpcStatus != null || antennaStats.airsyncMode != null || antennaStats.countryCode != null) && (
+              <div className="bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50 rounded-xl p-4 shadow-sm">
+                <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3 flex items-center space-x-2">
+                  <Zap className="w-3 h-3 text-amber-500" /><span>Avanzado</span>
+                </p>
+                <div className="flex flex-col">
+                  <ParamRow label="Modo HT/WiFi" value={antennaStats.opmode} />
+                  <ParamRow label="Reintentos TX" value={antennaStats.txRetries != null ? String(antennaStats.txRetries) : null} />
+                  <ParamRow label="Balizas perdidas" value={antennaStats.missedBeacons != null ? String(antennaStats.missedBeacons) : null} />
+                  <ParamRow label="Errores RX (cripto)" value={antennaStats.rxCrypts != null ? String(antennaStats.rxCrypts) : null} />
+                  <ParamRow label="ATPC" value={antennaStats.atpcStatus} />
+                  <ParamRow label="Airsync" value={antennaStats.airsyncMode} />
+                  <ParamRow label="País/Región" value={antennaStats.countryCode} />
+                  <ParamRow label="Familia FW" value={antennaStats.fwPrefix} />
+                  {antennaStats.chainRssi && antennaStats.chainRssi.length > 0 && (
+                    <ParamRow label="RSSI por cadena" value={antennaStats.chainRssi.map(v => `${v} dBm`).join(' / ')} />
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ── Interfaces físicas ── */}
+            {antennaStats.ifaceDetails && antennaStats.ifaceDetails.length > 0 && (
+              <div className="bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50 rounded-xl p-4 shadow-sm">
+                <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3 flex items-center space-x-2">
+                  <Database className="w-3 h-3" /><span>Interfaces</span>
+                </p>
+                {antennaStats.ifaceDetails.map((ifc, i) => (
+                  <div key={i} className="mb-2 last:mb-0">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">{ifc.ifname} {ifc.hwaddr && <span className="font-mono font-normal">{ifc.hwaddr}</span>}</p>
+                    <div className="pl-2 flex flex-col">
+                      {ifc.ipaddr && <ParamRow label="IP" value={ifc.ipaddr} />}
+                      {ifc.speed != null && <ParamRow label="Velocidad" value={`${ifc.speed} Mbps${ifc.duplex != null ? (ifc.duplex ? ' Full-Duplex' : ' Half-Duplex') : ''}`} />}
+                      {ifc.snr != null && <ParamRow label="SNR" value={`${ifc.snr} dB`} />}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* ── Estaciones (modo AP) ── */}
             {antennaStats.stations && antennaStats.stations.length > 0 && (
               <div>
@@ -447,14 +520,22 @@ export default function DeviceCard({ device, onRemove, onUpdate, isPreview }: De
                 <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700">
                   {antennaStats.stations.map((sta, i) => (
                     <div key={i}
-                      className={`flex items-center justify-between px-3 py-3 text-xs
+                      className={`px-3 py-2.5 text-xs border-b border-slate-100 dark:border-slate-700 last:border-0
                           ${i % 2 === 0 ? 'bg-slate-50 dark:bg-slate-800/80' : 'bg-white dark:bg-slate-800/40'}`}>
-                      <span className="font-mono text-emerald-400 text-[10px]">{sta.mac}</span>
-                      <div className="flex items-center space-x-3 text-slate-600 dark:text-slate-300 font-mono">
-                        <span>{sta.signal ?? '—'} dBm</span>
-                        <span>{sta.ccq ?? '—'}%</span>
-                        <span className="text-emerald-400">{sta.txRate ?? '—'}↑</span>
-                        <span className="text-sky-400">{sta.rxRate ?? '—'}↓</span>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-mono text-emerald-600 dark:text-emerald-400 text-[10px]">{sta.mac}</span>
+                        {sta.hostname && <span className="text-[10px] text-slate-500 truncate max-w-[50%]">{sta.hostname}</span>}
+                        {sta.remoteModel && <span className="text-[9px] bg-slate-100 dark:bg-slate-700 text-slate-500 px-1.5 py-0.5 rounded">{sta.remoteModel}</span>}
+                      </div>
+                      <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 text-slate-600 dark:text-slate-300 font-mono text-[11px]">
+                        {sta.signal != null && <span className={sta.signal >= -65 ? 'text-emerald-600 dark:text-emerald-400' : sta.signal >= -75 ? 'text-sky-600' : 'text-amber-500'}>{sta.signal} dBm</span>}
+                        {sta.noiseFloor != null && <span className="text-slate-400">/ {sta.noiseFloor} dBm</span>}
+                        {sta.ccq != null && <span className={sta.ccq >= 80 ? 'text-emerald-600 dark:text-emerald-400' : sta.ccq >= 60 ? 'text-sky-600' : 'text-amber-500'}>{sta.ccq}%</span>}
+                        {sta.txRate != null && <span className="text-emerald-600 dark:text-emerald-400">{sta.txRate}↑</span>}
+                        {sta.rxRate != null && <span className="text-sky-600 dark:text-sky-400">{sta.rxRate}↓ Mbps</span>}
+                        {sta.distance != null && <span className="text-slate-400">{sta.distance}m</span>}
+                        {sta.txLatency != null && <span className="text-violet-500">{sta.txLatency}ms</span>}
+                        {sta.airmaxQuality != null && <span className="text-indigo-500">AM:{sta.airmaxQuality}%</span>}
                       </div>
                     </div>
                   ))}

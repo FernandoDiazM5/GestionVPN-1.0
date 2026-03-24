@@ -39,7 +39,7 @@ function AppContent() {
     <div className="page-bg text-slate-900">
       {/* Navbar */}
       <nav className="sticky top-0 z-50 glass-nav">
-        <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 flex items-center justify-between gap-2 sm:gap-4">
 
           {/* Logo */}
           <div className="flex items-center space-x-3 shrink-0">
@@ -84,7 +84,7 @@ function AppContent() {
           <div className="flex items-center space-x-3 shrink-0">
             <div className="status-online">
               <Wifi className="w-3.5 h-3.5" />
-              <span>{credentials.ip}</span>
+              <span className="hidden sm:inline">{credentials.ip}</span>
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse ml-1" />
             </div>
 

@@ -56,6 +56,12 @@ export interface NodeInfo {
   running: boolean;
   ip_tunnel: string;
   uptime: string;
+  /** true cuando el nodo viene del caché SQLite local (MikroTik no disponible) */
+  cached?: boolean;
+  /** timestamp Unix ms de la última vez que se sincronizó con MikroTik */
+  last_seen?: number;
+  /** timestamp Unix ms de creación en SQLite */
+  created_at?: number;
 }
 
 /** Peer WireGuard devuelto por /api/wireguard/peers */
