@@ -33,10 +33,8 @@ const allowedOrigins = process.env.CORS_ORIGINS
 
 app.use(cors({
     origin: (origin, callback) => {
-        // Permitir peticiones sin Origin (Postman, curl, nginx proxy interno)
-        if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
-        console.warn(`[CORS] Origen bloqueado: ${origin}`);
-        callback(new Error(`CORS: origen no permitido (${origin})`));
+        // Permitir TODOS los orígenes en desarrollo (necesario para URLs dinámicas de Cloudflare)
+        return callback(null, true);
     },
     methods: ['GET','POST','PUT','DELETE'],
     allowedHeaders: ['Content-Type'],

@@ -33,4 +33,21 @@ export const deviceDb = {
       console.error('Error eliminando device:', err);
     }
   },
+
+  async removeByIds(ids: string[]): Promise<void> {
+    await Promise.allSettled(ids.map(id =>
+      fetch(`${API_BASE_URL}/api/db/devices/${id}`, { method: 'DELETE' })
+    ));
+  },
+
+  async cleanupOrphans(): Promise<number> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/db/cleanup-orphan-devices`, { method: 'POST' });
+      const data = await res.json();
+      return typeof data.devicesDeleted === 'number' ? data.devicesDeleted : 0;
+    } catch (err) {
+      console.error('Error limpiando devices huérfanos:', err);
+      return 0;
+    }
+  },
 };

@@ -27,6 +27,19 @@ const estimateIpCount = (cidr: string): number => {
   return Math.max(2, (1 << (32 - prefix)) - 2);
 };
 
+// Verifica si una IP está dentro de un bloque CIDR (ej: 10.1.1.5 en 10.1.1.0/24)
+const ipInCidr = (ip: string, cidr: string): boolean => {
+  if (!ip || !cidr) return false;
+  try {
+    const [net, bits] = cidr.split('/');
+    if (!net || !bits) return false;
+    const b = 32 - parseInt(bits);
+    const mask = b >= 32 ? 0 : (~((1 << b) - 1)) >>> 0;
+    const toInt = (s: string) => s.split('.').reduce((a, o) => ((a << 8) >>> 0) + parseInt(o), 0) >>> 0;
+    return (toInt(ip) & mask) === (toInt(net) & mask);
+  } catch { return false; }
+};
+
 // ── Estado de autenticación SSH por IP ───────────────────────────────────
 type SshAuthStatus = 'pending' | 'success' | 'failed';
 
@@ -363,7 +376,7 @@ function AddDeviceModal({ device, node, existing, onSave, onClose }: AddDeviceMo
       name: device.name,
       model: device.model,
       firmware: device.firmware,
-      role: device.role,
+      role: (device.role === 'ap' || (device.role as string) === 'master') ? 'ap' : device.role === 'sta' ? 'sta' : 'unknown',
       parentAp: device.parentAp,
       essid: device.essid,
       frequency: device.frequency,
@@ -439,6 +452,20 @@ function AddDeviceModal({ device, node, existing, onSave, onClose }: AddDeviceMo
             </p>
           </div>
         </div>
+
+        {/* Advertencia de subred incorrecta */}
+        {node.segmento_lan && !ipInCidr(device.ip, node.segmento_lan) && (
+          <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
+            <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-bold text-amber-700">IP fuera del nodo seleccionado</p>
+              <p className="text-[11px] text-amber-600 mt-0.5">
+                <span className="font-mono">{device.ip}</span> no pertenece a <span className="font-mono">{node.segmento_lan}</span>.<br />
+                Verifica que el nodo sea correcto antes de guardar.
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className="flex gap-2 pt-1">
           <button onClick={onClose}
@@ -1700,6 +1727,21 @@ export default function NetworkDevicesModule() {
     });
   }, []);
 
+  // Cuando la lista de nodos cambia (ej: se eliminó un nodo), recargar devices desde DB
+  // para reflejar la limpieza de orphans sin necesidad de F5
+  const nodesLengthRef = useRef(nodes.length);
+  useEffect(() => {
+    const prev = nodesLengthRef.current;
+    nodesLengthRef.current = nodes.length;
+    // Solo actuar cuando hay una reducción (eliminación de nodo), no en la carga inicial
+    if (prev > nodes.length) {
+      deviceDb.load().then(devices => {
+        setSavedDevices(devices);
+        setSavedIds(new Set(devices.map(d => d.id)));
+      });
+    }
+  }, [nodes.length]);
+
   const loadNodes = useCallback(async () => {
     if (!credentials) return;
     try {
@@ -1730,6 +1772,21 @@ export default function NetworkDevicesModule() {
       }
     }
   }, [activeNodeVrf, nodes]);
+
+  // Limpiar resultados de escaneo al cambiar de nodo (previene guardar equipos en nodo equivocado)
+  const prevSelectedNodeIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const newId = selectedNode?.id ?? null;
+    if (prevSelectedNodeIdRef.current !== null && newId !== prevSelectedNodeIdRef.current) {
+      setScanResults([]);
+      setAllScannedIPs([]);
+      setSshStatus({});
+      setScannedCount(0);
+      setScanState({ phase: 'idle', current: 0, total: 0 });
+      try { sessionStorage.removeItem(SESSION_SCAN_KEY); } catch { /* */ }
+    }
+    prevSelectedNodeIdRef.current = newId;
+  }, [selectedNode]);
 
   const activeNode = activeNodeVrf ? nodes.find(n => n.nombre_vrf === activeNodeVrf) ?? null : null;
   const availableSubnets: string[] = activeNode
@@ -1865,7 +1922,7 @@ export default function NetworkDevicesModule() {
                   mac: s.wlanMac || next[idx].mac,
                   essid: s.essid || next[idx].essid,
                   frequency: s.frequency || next[idx].frequency,
-                  role: s.mode || next[idx].role,
+                  role: (s.mode === 'ap' || s.mode === 'master') ? 'ap' : s.mode === 'sta' ? 'sta' : next[idx].role,
                 };
               }
               return next;
@@ -2000,7 +2057,7 @@ export default function NetworkDevicesModule() {
                 mac: s.wlanMac || next[idx].mac,
                 essid: s.essid ?? next[idx].essid,
                 frequency: s.frequency ?? next[idx].frequency,
-                role: s.mode || next[idx].role,
+                role: (s.mode === 'ap' || s.mode === 'master') ? 'ap' : s.mode === 'sta' ? 'sta' : next[idx].role,
               };
             }
             return next;
@@ -2119,6 +2176,11 @@ export default function NetworkDevicesModule() {
 
   // ── Guardar directamente (sin modal) cuando SSH ya validó credenciales ──
   const handleDirectSave = async (dev: ScannedDevice, node: NodeInfo) => {
+    // Si la IP no pertenece a la subred del nodo, abrir modal para que el usuario vea la advertencia
+    if (node.segmento_lan && !ipInCidr(dev.ip, node.segmento_lan)) {
+      setAddingDevice(dev);
+      return;
+    }
     const deviceId = dev.mac ? dev.mac.replace(/:/g, '') : dev.ip.replace(/\./g, '');
     const s = dev.cachedStats;
     const rawMode = s?.mode || dev.role;
@@ -2719,136 +2781,6 @@ export default function NetworkDevicesModule() {
         )}
       </div>
 
-      {/* Saved devices TABLE grouped by node */}
-      {Object.keys(devicesByNode).length > 0 && (
-        <div className="space-y-4">
-          {Object.entries(devicesByNode).map(([nodeId, { nodeName, devices }]) => (
-            <div key={nodeId} className="card overflow-hidden">
-              {/* Node header */}
-              <div className="flex items-center space-x-2 px-5 py-3 bg-slate-50 border-b border-slate-100">
-                <Radio className="w-3.5 h-3.5 text-indigo-400" />
-                <h3 className="text-sm font-bold text-slate-700">{nodeName}</h3>
-                <span className="text-xs text-slate-400">· {devices.length} equipo{devices.length !== 1 ? 's' : ''}</span>
-              </div>
-              {/* Table header */}
-              <div className="grid grid-cols-[72px_1fr_1fr_1fr_auto]
-                px-5 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider
-                border-b border-slate-100 bg-white">
-                <span>Modo</span>
-                <span>Nombre / MAC</span>
-                <span>IP / Frec.</span>
-                <span>SSID / AP</span>
-                <span className="text-right">Acciones</span>
-              </div>
-              {/* Rows */}
-              {devices.map((dev, devIdx) => {
-                const rawMode = dev.cachedStats?.mode || (dev.role !== 'unknown' ? dev.role : null);
-                const isApMode = rawMode === 'ap' || rawMode === 'master';
-                const isCpe = rawMode === 'sta';
-                const displayName = dev.deviceName || dev.name;
-                const displayMac = dev.mac || '—';
-                const antennaUrl = `http://${dev.ip}`;
-                const routerUrl = `http://${dev.routerIp || dev.ip}:${dev.routerPort ?? 8075}`;
-                return (
-                  <div key={dev.id}
-                    className={`grid grid-cols-[72px_1fr_1fr_1fr_auto]
-                      items-center px-5 py-3 border-b border-slate-100 last:border-0 transition-colors
-                      ${devIdx % 2 === 0 ? 'bg-white hover:bg-slate-50' : 'bg-slate-50/50 hover:bg-slate-50'}`}>
-                    {/* Modo */}
-                    <div>
-                      {rawMode ? (
-                        <span className={`inline-flex text-[10px] font-bold px-1.5 py-0.5 rounded-md
-                          ${isApMode ? 'bg-indigo-100 text-indigo-700' : isCpe ? 'bg-violet-100 text-violet-700' : 'bg-slate-100 text-slate-500'}`}>
-                          {isApMode ? 'AP' : isCpe ? 'CPE' : rawMode.toUpperCase()}
-                        </span>
-                      ) : (
-                        <span
-                          className="flex items-center gap-0.5 text-[10px] text-slate-400"
-                          title="Sin datos de modo — abre el detalle y actualiza para detectarlo"
-                        >
-                          <AlertCircle className="w-3 h-3 text-amber-400 shrink-0" />
-                          <span className="text-slate-300">Sin datos</span>
-                        </span>
-                      )}
-                    </div>
-                    {/* Nombre + MAC */}
-                    <div className="min-w-0 pr-2">
-                      <p className="text-xs font-semibold text-slate-800 truncate" title={displayName}>{displayName}</p>
-                      <p className="font-mono text-[9px] text-slate-400 truncate">{displayMac}</p>
-                    </div>
-                    {/* IP + GHz */}
-                    <div className="min-w-0 pr-2">
-                      <p className="font-mono text-xs text-slate-600 truncate">{dev.ip}</p>
-                      {dev.frequency ? (
-                        <p className={`text-[9px] font-bold ${dev.frequency >= 5000 ? 'text-sky-600' : 'text-amber-600'}`}>
-                          {(dev.frequency / 1000).toFixed(1)} GHz
-                        </p>
-                      ) : null}
-                    </div>
-                    {/* SSID (AP) o AP MAC (CPE) */}
-                    <div className="min-w-0 pr-2">
-                      {isApMode ? (
-                        <>
-                          {dev.essid && <p className="font-mono text-[11px] text-slate-600 truncate" title={dev.essid}>{dev.essid}</p>}
-                          {dev.security && <p className="text-[9px] text-slate-400">{dev.security}</p>}
-                        </>
-                      ) : (
-                        <>
-                          {dev.apMac
-                            ? <p className="font-mono text-[10px] text-violet-600 truncate" title={`AP: ${dev.apMac}`}>{dev.apMac}</p>
-                            : dev.essid && <p className="font-mono text-[10px] text-slate-500 truncate">{dev.essid}</p>
-                          }
-                          {dev.lastSeen && (
-                            <p className="text-[9px] text-slate-300">{new Date(dev.lastSeen).toLocaleDateString()}</p>
-                          )}
-                        </>
-                      )}
-                    </div>
-                    {/* Acciones */}
-                    <div className="flex items-center justify-end gap-0.5">
-                      <a href={antennaUrl} target="_blank" rel="noopener noreferrer"
-                        title={`Abrir antena: ${antennaUrl}`}
-                        className="p-1.5 text-sky-600 hover:bg-sky-50 rounded-lg transition-colors flex items-center">
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </a>
-                      <a href={routerUrl} target="_blank" rel="noopener noreferrer"
-                        title={`Abrir router: ${routerUrl}`}
-                        className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors flex items-center">
-                        <Router className="w-3.5 h-3.5" />
-                      </a>
-                      <button onClick={() => setViewingDevice(dev)} title="Ver stats antena"
-                        className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors">
-                        <Eye className="w-3.5 h-3.5" />
-                      </button>
-                      <button onClick={() => setEditingDevice(dev)} title="Editar credenciales"
-                        className="p-1.5 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors">
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                      <button onClick={() => handleRemoveDevice(dev.id)} title="Eliminar"
-                        className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Empty state */}
-      {savedDevices.length === 0 && (
-        <div className="card border-dashed border-2 border-slate-200 py-16 flex flex-col items-center text-center space-y-3">
-          <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center">
-            <Cpu className="w-7 h-7 text-indigo-400" />
-          </div>
-          <p className="text-slate-500 font-medium">Sin dispositivos guardados</p>
-          <p className="text-slate-400 text-sm max-w-xs">
-            Selecciona un nodo, ingresa su subred LAN y presiona "Escanear dispositivos"
-          </p>
-        </div>
-      )}
 
       {/* Modal: datos SSH completos */}
       {viewingRawDevice && (

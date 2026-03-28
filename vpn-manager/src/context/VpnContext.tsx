@@ -32,10 +32,11 @@ interface VpnContextType {
   adminIP: string;
   setAdminIP: React.Dispatch<React.SetStateAction<string>>;
   deactivateAllNodes: () => Promise<void>;
+  removeNodeFromState: (pppUser: string) => void;
 
   // Navegación
-  activeModule: 'nodes' | 'devices' | 'monitor';
-  setActiveModule: React.Dispatch<React.SetStateAction<'nodes' | 'devices' | 'monitor'>>;
+  activeModule: 'nodes' | 'devices' | 'monitor' | 'topology';
+  setActiveModule: React.Dispatch<React.SetStateAction<'nodes' | 'devices' | 'monitor' | 'topology'>>;
 
   // Tema
   darkMode: boolean;
@@ -51,9 +52,9 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [credentials, setCredentials] = useState<RouterCredentials | undefined>();
   const [managedVpns, setManagedVpns] = useState<VpnSecret[]>([]);
-  const [activeModule, setActiveModule] = useState<'nodes' | 'devices' | 'monitor'>(() => {
+  const [activeModule, setActiveModule] = useState<'nodes' | 'devices' | 'monitor' | 'topology'>(() => {
     const stored = localStorage.getItem('vpn_active_module');
-    return (['nodes', 'devices', 'monitor'].includes(stored ?? '') ? stored : 'nodes') as 'nodes' | 'devices' | 'monitor';
+    return (['nodes', 'devices', 'monitor', 'topology'].includes(stored ?? '') ? stored : 'nodes') as 'nodes' | 'devices' | 'monitor' | 'topology';
   });
   const [isReady, setIsReady] = useState(false);
   const [scannedSecrets, setScannedSecrets] = useState<VpnSecret[]>([]);
@@ -119,6 +120,22 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
       keepaliveRef.current = null;
     }
   }, [credentials]);
+
+  // Limpiar un nodo del estado local sin tocar MikroTik (ya fue deprovisioned)
+  const removeNodeFromState = useCallback((pppUser: string) => {
+    setNodes(prev => {
+      const removed = prev.find(n => n.ppp_user === pppUser);
+      if (!removed) return prev;
+      // Si el nodo eliminado tenía el túnel activo, revocar estado local
+      if (activeNodeVrfRef.current === removed.nombre_vrf) {
+        setActiveNodeVrf(null);
+        setTunnelExpiry(null);
+        if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null; }
+        if (keepaliveRef.current) { clearInterval(keepaliveRef.current); keepaliveRef.current = null; }
+      }
+      return prev.filter(n => n.ppp_user !== pppUser);
+    });
+  }, []);
 
   // Auto-timeout: cuando se activa un tunnel, programar desactivación a los 30 min
   useEffect(() => {
@@ -294,6 +311,7 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
         adminIP,
         setAdminIP,
         deactivateAllNodes,
+        removeNodeFromState,
         activeModule,
         setActiveModule,
         darkMode,
