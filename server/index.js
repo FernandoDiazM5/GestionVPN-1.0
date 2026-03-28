@@ -31,17 +31,25 @@ const allowedOrigins = process.env.CORS_ORIGINS
     ? [...new Set([...process.env.CORS_ORIGINS.split(',').map(s => s.trim()), ...defaultOrigins])]
     : defaultOrigins;
 
+const authRoutes = require('./auth.routes');
+const { verifyToken } = require('./auth.middleware');
+
 app.use(cors({
     origin: (origin, callback) => {
         // Permitir TODOS los orígenes en desarrollo (necesario para URLs dinámicas de Cloudflare)
         return callback(null, true);
     },
     methods: ['GET','POST','PUT','DELETE'],
-    allowedHeaders: ['Content-Type'],
+    allowedHeaders: ['Content-Type', 'Authorization'], // Allow Authorization
 }));
 app.use(express.json());
-app.use('/api', apiRoutes);
-app.use('/api/ap-monitor', apRoutes);
+
+// Montar rutas públicas e integradas
+app.use('/api/auth', authRoutes);
+
+// Proteger todas las rutas restantes
+app.use('/api', verifyToken, apiRoutes);
+app.use('/api/ap-monitor', verifyToken, apRoutes);
 
 // ── Inicia el servidor con reintentos si el puerto sigue ocupado ─────────────
 function startServer(attempt = 1) {

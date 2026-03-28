@@ -729,16 +729,61 @@ router.post('/settings/save', async (req, res) => {
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
-router.post('/node/scan-devices', async (req, res) => {
+router.post('/node/scan-stream', async (req, res) => {
     const { nodeLan } = req.body;
-    if (!nodeLan || !CIDR_REGEX.test(nodeLan) || parseInt(nodeLan.split('/')[1], 10) < 16) return res.status(400).json({ success: false, message: 'CIDR inválido o muy grande' });
+    if (!nodeLan || !CIDR_REGEX.test(nodeLan) || parseInt(nodeLan.split('/')[1], 10) < 16) {
+        return res.status(400).json({ success: false, message: 'CIDR inválido o muy grande' });
+    }
+    
+    // SSE-like streaming over fetch (manteniendo POST para auth tokens si es necesario)
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
     const hostIPs = getSubnetHosts(nodeLan);
+    let scannedCount = 0;
+    const totalCount = hostIPs.length;
+    
+    const sendEvent = (event, data) => {
+        res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    };
+
     try {
-        const BATCH = 40; const allResults = [];
-        for (let i = 0; i < hostIPs.length; i += BATCH) allResults.push(...await Promise.allSettled(hostIPs.slice(i, i + BATCH).map(probeUbiquiti)));
-        const devices = allResults.filter(r => r.status === 'fulfilled' && r.value !== null).map(r => r.value);
-        res.json({ success: true, devices, allIPs: devices.map(d => d.ip), scanned: hostIPs.length, debug: `Escaneadas ${hostIPs.length} IPs — ${devices.length} encontrados` });
-    } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+        sendEvent('start', { total: totalCount });
+        const BATCH = 40; 
+        const allDevices = [];
+        
+        for (let i = 0; i < hostIPs.length; i += BATCH) {
+            const batchIPs = hostIPs.slice(i, i + BATCH);
+            const batchResults = await Promise.allSettled(batchIPs.map(probeUbiquiti));
+            
+            const foundDevices = batchResults
+                .filter(r => r.status === 'fulfilled' && r.value !== null)
+                .map(r => r.value);
+            
+            allDevices.push(...foundDevices);
+            scannedCount += batchIPs.length;
+            
+            sendEvent('progress', { 
+                scanned: scannedCount, 
+                total: totalCount, 
+                found: foundDevices,
+                percent: Math.round((scannedCount / totalCount) * 100)
+            });
+        }
+        
+        sendEvent('complete', { 
+            success: true, 
+            scanned: scannedCount, 
+            total: totalCount,
+            devices: allDevices 
+        });
+    } catch (error) { 
+        sendEvent('error', { message: error.message });
+    } finally {
+        res.end();
+    }
 });
 
 router.post('/device/auto-login', async (req, res) => {
