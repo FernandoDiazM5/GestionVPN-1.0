@@ -1,4 +1,4 @@
-import { Server, Radio, LogOut, Wifi, Cpu, Activity } from 'lucide-react';
+import { Server, Radio, LogOut, Wifi, Cpu, Activity, Network } from 'lucide-react';
 import { VpnProvider, useVpn } from './context/VpnContext';
 
 import RouterAccess from './components/RouterAccess';
@@ -6,6 +6,7 @@ import RouterAccess from './components/RouterAccess';
 import NodeAccessPanel from './components/NodeAccessPanel';
 import NetworkDevicesModule from './components/NetworkDevicesModule';
 import ApMonitorModule from './components/ApMonitorModule';
+import NetworkTopologyModule from './components/NetworkTopologyModule';
 
 function AppContent() {
   const {
@@ -78,6 +79,13 @@ function AppContent() {
               <Activity className="w-4 h-4" />
               <span>Monitor AP</span>
             </button>
+            <button
+              onClick={() => setActiveModule('topology')}
+              className={`tab-btn ${activeModule === 'topology' ? 'tab-active' : 'tab-inactive'}`}
+            >
+              <Network className="w-4 h-4" />
+              <span className="hidden sm:inline">Topología</span>
+            </button>
           </div>
 
           {/* Derecha */}
@@ -108,6 +116,8 @@ function AppContent() {
         {activeModule === 'devices' && <NetworkDevicesModule />}
 
         {activeModule === 'monitor' && <ApMonitorModule />}
+
+        {activeModule === 'topology' && <NetworkTopologyModule />}
       </main>
 
     </div>

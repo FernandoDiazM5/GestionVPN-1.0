@@ -47,8 +47,11 @@ export interface SavedDevice {
   networkMode?: string;   // netrole: "router" | "bridge"
   chains?: string;   // cadenas TX/RX: "1X1", "2X2"
   apMac?: string;   // MAC del AP al que conecta (modo STA)
+  activo?: number | boolean;
   addedAt: number;
   lastSeen?: number;
+  lastCpeCount?: number;      // cantidad de CPEs en la última sincronización manual
+  lastCpeCountAt?: number;    // timestamp de esa sincronización
   // Stats completas cacheadas desde la última lectura SSH
   cachedStats?: AntennaStats;
 }
@@ -166,6 +169,35 @@ export interface AntennaStats {
   txAirtime?: number;         // TX airtime %
   rxAirtime?: number;         // RX airtime %
   txLatency?: number;         // Latencia TX ms
+
+  // ── Campos CPE extraídos de wstalist/sta.cgi (vista topología) ───────────
+  // Señal desde el lado remoto (CPE reportando al AP)
+  remoteSig?: number | null;
+  remoteNoiseFloor?: number | null;
+  remoteTxPower?: number | null;
+  remoteCpuLoad?: number | null;
+  remoteHostname?: string | null;
+  remoteModel?: string | null;
+  remoteVersion?: string | null;
+  remoteNetrole?: string | null;
+  remoteDistance?: number | null;   // distancia desde el CPE (M5)
+  remoteTxLatency?: number | null;  // latencia TX desde el CPE (M5)
+  // AirMax M5 (wstalist airmax.signal)
+  airmaxSignal?: number | null;     // AirMax RF signal dBm (M5)
+  // AirMax AC (valores del wstalist AC-series)
+  airmaxDcap?: number | null;       // downlink capacity Mbps
+  airmaxUcap?: number | null;       // uplink capacity Mbps
+  airmaxCinrRx?: number | null;     // CINR RX dB
+  airmaxCinrTx?: number | null;     // CINR TX dB
+  // Throughput calculado (delta bytes entre polls)
+  throughputRxKbps?: number | null;
+  throughputTxKbps?: number | null;
+  txBytes?: number | null;
+  rxBytes?: number | null;
+  // Misc
+  firmwareFamily?: string | null;   // 'AC' | 'M5'
+  uptime?: number | null;           // uptime en segundos
+  lastIp?: string | null;           // última IP asignada (wstalist lastip)
 
   // ── Tráfico TX/RX por interfaz (/proc/net/dev) ──────────────────────────
   ifaceTraffic?: Record<string, {

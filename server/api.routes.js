@@ -525,14 +525,16 @@ router.post('/node/deprovision', async (req, res) => {
 
         await api.close();
 
-        // --- Eliminar nodo de SQLite (cascade: labels, creds, tags, history, ssh_creds) ---
+        // --- Eliminar nodo de SQLite (cascade: labels, creds, tags, history, ssh_creds, devices, cpes) ---
+        let deletedDeviceIds = [];
         try {
-            await deleteNode(pppUser);
+            const result = await deleteNode(pppUser);
+            deletedDeviceIds = result?.deviceIds || [];
         } catch (dbErr) {
             console.error('[DB] Error eliminando nodo de SQLite:', dbErr.message);
         }
 
-        res.json({ success: true, message: `Nodo eliminado correctamente`, steps });
+        res.json({ success: true, message: `Nodo eliminado correctamente`, steps, deletedDeviceIds });
     } catch (error) {
         if (api) try { await api.close(); } catch (_) { }
         res.status(500).json({ success: false, message: getErrorMessage(error, ip, user), steps, failedAt: steps.length + 1 });
@@ -1013,6 +1015,22 @@ router.post('/db/devices', async (req, res) => {
     }
 });
 
+router.put('/db/devices/:id', async (req, res) => {
+    try {
+        const db = await getDb();
+        const row = await db.get('SELECT data FROM devices WHERE id = ?', req.params.id);
+        if (!row) return res.status(404).json({ success: false, message: 'Dispositivo no encontrado' });
+        const existing = decryptDevice(JSON.parse(row.data));
+        const { id: _id, ...patch } = req.body; // prevent id change
+        const merged = { ...existing, ...patch };
+        const secure = encryptDevice(merged);
+        await db.run('UPDATE devices SET data = ? WHERE id = ?', [JSON.stringify(secure), req.params.id]);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
 router.delete('/db/devices/:id', async (req, res) => {
     try {
         const db = await getDb();
@@ -1067,6 +1085,77 @@ router.post('/node/history/get', async (req, res) => {
             [pppUser]);
         res.json({ success: true, history: rows });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// ─────────────────────────────────────────────
+// DB MAINTENANCE
+// ─────────────────────────────────────────────
+
+// Elimina devices cuyo nodeId no existe en la tabla nodes,
+// junto con sus registros asociados en cpes_conocidos e historial_senal.
+router.post('/db/cleanup-orphan-devices', async (req, res) => {
+    try {
+        const db = await getDb();
+
+        // 1. Obtener MikroTik .id de cada nodo válido (nodes.data contiene {id: "*17", ...})
+        //    devices.data.nodeId almacena el MikroTik .id, NO el ppp_user
+        const validNodes = await db.all('SELECT id, data FROM nodes');
+
+        if (validNodes.length === 0) {
+            return res.json({ success: true, devicesDeleted: 0, cpesDeleted: 0, historialDeleted: 0, orphanIds: [], message: 'No hay nodos válidos — limpieza abortada por seguridad' });
+        }
+
+        const validMikrotikIds = new Set();
+        for (const n of validNodes) {
+            try {
+                const d = JSON.parse(n.data);
+                if (d.id) validMikrotikIds.add(d.id);
+            } catch { /* ignore */ }
+            validMikrotikIds.add(n.id); // también incluir ppp_user por si acaso
+        }
+
+        // 2. Encontrar devices huérfanos (nodeId no coincide con ningún MikroTik .id ni ppp_user)
+        const allDevices = await db.all('SELECT id, JSON_EXTRACT(data, \'$.nodeId\') as nodeId FROM devices');
+        const orphans = allDevices.filter(d => !validMikrotikIds.has(d.nodeId));
+
+        if (orphans.length === 0) {
+            return res.json({ success: true, devicesDeleted: 0, cpesDeleted: 0, historialDeleted: 0, orphanIds: [], message: 'No se encontraron devices huérfanos' });
+        }
+
+        const orphanIds = orphans.map(d => d.id);
+        const placeholders = orphanIds.map(() => '?').join(',');
+
+        // 3. Eliminar registros dependientes primero
+        const histResult = await db.run(
+            `DELETE FROM historial_senal WHERE ap_id IN (${placeholders})`,
+            orphanIds
+        );
+        const cpesResult = await db.run(
+            `DELETE FROM cpes_conocidos WHERE ap_id IN (${placeholders})`,
+            orphanIds
+        );
+
+        // 4. Eliminar los devices huérfanos
+        const devResult = await db.run(
+            `DELETE FROM devices WHERE id IN (${placeholders})`,
+            orphanIds
+        );
+
+        console.log(`[CLEANUP] Devices huérfanos eliminados: ${devResult.changes} | cpes_conocidos: ${cpesResult.changes} | historial_senal: ${histResult.changes}`);
+        console.log(`[CLEANUP] IDs eliminados: ${orphanIds.join(', ')}`);
+
+        res.json({
+            success: true,
+            devicesDeleted: devResult.changes,
+            cpesDeleted: cpesResult.changes,
+            historialDeleted: histResult.changes,
+            orphanIds,
+            orphanNodeIds: [...new Set(orphans.map(d => d.nodeId))]
+        });
+    } catch (e) {
+        console.error('[CLEANUP] Error:', e.message);
+        res.status(500).json({ success: false, message: e.message });
+    }
 });
 
 module.exports = router;

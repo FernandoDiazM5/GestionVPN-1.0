@@ -25,6 +25,19 @@ const ANTENNA_CMD = [
     'echo "";echo __BOARD__',   'cat /etc/board.info 2>/dev/null || cat /tmp/board.info 2>/dev/null',
 ].join('; ');
 
+// ── Decodifica entidades HTML (&# y &; notación) ─────────────
+const decodeHtmlEntities = (str) => {
+    if (!str || typeof str !== 'string') return str;
+    return str
+        .replace(/&#x([0-9a-f]+);/gi, (match, hex) => String.fromCharCode(parseInt(hex, 16)))
+        .replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(parseInt(dec, 10)))
+        .replace(/&quot;/g, '"')
+        .replace(/&apos;/g, "'")
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&amp;/g, '&');  // Debe ser último
+};
+
 const getSubnetHosts = (cidr) => {
     const [network, bits] = cidr.split('/');
     const prefixLen = parseInt(bits, 10);
@@ -57,10 +70,10 @@ const probeStatusCgi = (deviceIP, port, useHttps) => {
                     // Así el modal M5 muestra todos los campos desde el primer escaneo HTTP, sin SSH.
                     const cachedStats = parseAirOSStats(body);
                     resolve({
-                        ip: deviceIP, mac: (h.macaddr || '').toUpperCase(), name: h.hostname || deviceIP,
+                        ip: deviceIP, mac: (h.macaddr || '').toUpperCase(), name: decodeHtmlEntities(h.hostname || deviceIP),
                         model: h.devmodel || 'Unknown', firmware: h.fwversion || 'Unknown',
                         role: (['master', 'ap', 'apauto', 'ap-ptp', 'ap-ptmp'].includes(w.mode)) ? 'ap' : (w.mode ? 'sta' : 'unknown'),
-                        parentAp: (w.remote && w.remote.hostname) || w.essid || '', essid: w.essid || '', frequency: parseInt(w.frequency) || 0,
+                        parentAp: decodeHtmlEntities((w.remote && w.remote.hostname) || w.essid || ''), essid: decodeHtmlEntities(w.essid || ''), frequency: parseInt(w.frequency) || 0,
                         cachedStats,
                     });
                 } catch { resolve(null); }
@@ -220,17 +233,17 @@ const parseAirOSStats = (output) => {
                 uptime:     s.uptime ?? null,
                 txLatency:  s.tx_latency ?? null,
                 txPower:    s.txpower != null ? parseInt(s.txpower) : null,
-                hostname:   s.hostname || s.name || s.remote?.hostname || null,
+                hostname:   decodeHtmlEntities(s.name || s.remote?.hostname || null),
                 remoteModel: s.remote?.platform || null,
                 lastIp:     s.lastip || null,
                 airmaxQuality:  s.airmax?.quality ?? null,
                 airmaxCapacity: s.airmax?.capacity ?? null,
             })),
-            deviceName:      pick([h, data], 'hostname', 'name', 'devname') || null,
+            deviceName:      decodeHtmlEntities(pick([h, data], 'hostname', 'name', 'devname') || null),
             deviceModel:     pick([h, data], 'devmodel', 'product', 'model') || null,
             firmwareVersion: pick([h, data], 'fwversion', 'version', 'fw') || null,
             wlanMac: wlanMac || null, lanMac: lanMac || null, apMac,
-            essid:       pick([w, data], 'essid', 'ssid') || null,
+            essid:       decodeHtmlEntities(pick([w, data], 'essid', 'ssid') || null),
             security:    pick([w, data], 'security', 'auth', 'encrypt') || null,
             mode:        pick([w, data], 'mode', 'wmode', 'opermode') || null,
             networkMode: pick([h, data], 'netrole', 'network_mode', 'role') || null,
@@ -753,4 +766,4 @@ const trySshCredentials = async (ip, credentialsArray) => {
     return null;
 };
 
-module.exports = { IPV4_REGEX, CIDR_REGEX, getSubnetHosts, probeUbiquiti, sshExec, parseAirOSStats, parseFullOutput, ANTENNA_CMD, trySshCredentials };
+module.exports = { IPV4_REGEX, CIDR_REGEX, getSubnetHosts, probeUbiquiti, sshExec, parseAirOSStats, parseFullOutput, ANTENNA_CMD, trySshCredentials, decodeHtmlEntities };

@@ -11,6 +11,8 @@ import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import type { NodeInfo, WgPeer } from '../types/api';
 import NodeCard from './NodeCard';
 import { API_BASE_URL } from '../config';
+import { deviceDb } from '../store/deviceDb';
+import { cpeCache } from '../store/cpeCache';
 
 // ── Tipos para provisión ───────────────────────────────────────────────────
 interface ProvisionStep {
@@ -580,12 +582,13 @@ function EliminarNodoModal({
 }: {
   node: NodeInfo;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (deletedDeviceIds: string[]) => void;
 }) {
   const { credentials } = useVpn();
   const [confirmed, setConfirmed] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [result, setResult] = useState<ProvisionResult | null>(null);
+  const [deletedDeviceIds, setDeletedDeviceIds] = useState<string[]>([]);
   const [visibleSteps, setVisibleSteps] = useState(0);
   const [delStep, setDelStep] = useState(0);
 
@@ -635,8 +638,9 @@ function EliminarNodoModal({
           vrfName: node.nombre_vrf, pppUser: node.ppp_user, lanSubnets,
         }),
       }, 60_000);
-      const d: ProvisionResult = await r.json();
-      setResult(d);
+      const d = await r.json();
+      setResult(d as ProvisionResult);
+      if (d.deletedDeviceIds) setDeletedDeviceIds(d.deletedDeviceIds);
     } catch (e) {
       setResult({ success: false, message: e instanceof Error ? e.message : 'Error', steps: [], failedAt: 0 });
     }
@@ -703,7 +707,7 @@ function EliminarNodoModal({
                 <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">Pasos ejecutados</p>
                 <StepResultList steps={result.steps} failedAt={result.failedAt} visible={visibleSteps} />
               </div>
-              <button onClick={() => result.success ? onSuccess() : onClose()}
+              <button onClick={() => result.success ? onSuccess(deletedDeviceIds) : onClose()}
                 className="w-full py-2.5 rounded-xl text-sm font-bold bg-rose-600 text-white hover:bg-rose-700 transition-colors">
                 {result.success ? 'Listo' : 'Cerrar'}
               </button>
@@ -1862,6 +1866,7 @@ export default function NodeAccessPanel() {
     tunnelExpiry, setTunnelExpiry,
     adminIP, setAdminIP,
     deactivateAllNodes,
+    removeNodeFromState,
   } = useVpn();
 
   // Si ya hay nodos en contexto (persistidos) mostramos directo sin necesidad de recargar
@@ -2621,7 +2626,17 @@ export default function NodeAccessPanel() {
         <EliminarNodoModal
           node={deleteNode}
           onClose={() => setDeleteNode(null)}
-          onSuccess={() => { setDeleteNode(null); handleLoadNodes(); }}
+          onSuccess={(deletedDeviceIds: string[]) => {
+            const pppUser = deleteNode.ppp_user;
+            setDeleteNode(null);
+            removeNodeFromState(pppUser);
+            // Limpiar devices huérfanos de SQLite + cache IndexedDB de CPEs
+            deviceDb.cleanupOrphans().catch(() => {});
+            if (deletedDeviceIds.length > 0) {
+              deviceDb.removeByIds(deletedDeviceIds).catch(() => {});
+            }
+            cpeCache.clear().catch(() => {});
+          }}
         />
       )}
       {editNode && (

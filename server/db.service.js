@@ -18,7 +18,7 @@ if (fs.existsSync(SECRET_FILE)) {
     ENCRYPTION_KEY = Buffer.from(fs.readFileSync(SECRET_FILE, 'utf8'), 'hex');
 } else {
     ENCRYPTION_KEY = crypto.randomBytes(32);
-    fs.writeFileSync(SECRET_FILE, ENCRYPTION_KEY.toString('hex'));
+    fs.writeFileSync(SECRET_FILE, ENCRYPTION_KEY.toString('hex'), { mode: 0o600 });
 }
 
 let db;
@@ -133,8 +133,29 @@ async function initDb() {
             value TEXT NOT NULL DEFAULT ''
         );
     `);
-    // Migración: añadir ssh_creds si la tabla ya existía sin esa columna
-    try { await db.run("ALTER TABLE node_ssh_creds ADD COLUMN ssh_creds TEXT DEFAULT '[]'"); } catch { /* ya existe */ }
+    // Migraciones: añadir columnas si la tabla ya existía sin ellas
+    const migrate = async (sql) => {
+        try { await db.run(sql); } catch (e) {
+            if (!e.message?.includes('duplicate column')) console.error('[DB] Migration error:', e.message);
+        }
+    };
+    await migrate("ALTER TABLE node_ssh_creds ADD COLUMN ssh_creds TEXT DEFAULT '[]'");
+    // last_stats: JSON completo de la última lectura wstalist/sta.cgi para cada CPE
+    await migrate("ALTER TABLE cpes_conocidos ADD COLUMN last_stats TEXT DEFAULT NULL");
+    // remote_hostname / remote_platform: nombre y modelo del equipo remoto (CPE)
+    await migrate("ALTER TABLE cpes_conocidos ADD COLUMN remote_hostname TEXT DEFAULT ''");
+    await migrate("ALTER TABLE cpes_conocidos ADD COLUMN remote_platform TEXT DEFAULT ''");
+
+    // B15: Índices para performance
+    await db.run('CREATE INDEX IF NOT EXISTS idx_aps_nodo ON aps(nodo_id)');
+    await db.run('CREATE INDEX IF NOT EXISTS idx_cpes_apid ON cpes_conocidos(ap_id)');
+    await db.run('CREATE INDEX IF NOT EXISTS idx_hist_mac_ts ON historial_senal(cpe_mac, timestamp DESC)');
+    await db.run('CREATE INDEX IF NOT EXISTS idx_hist_apid ON historial_senal(ap_id)');
+
+    // B16: Purgar historial más antiguo de 30 días
+    const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+    await db.run('DELETE FROM historial_senal WHERE timestamp < ?', [thirtyDaysAgo]);
+
     console.log('[DB] Base de datos SQLite conectada y tablas validadas.');
 }
 
@@ -198,7 +219,8 @@ function decryptPass(stored) {
         let dec = decipher.update(data, 'hex', 'utf8');
         dec += decipher.final('utf8');
         return dec;
-    } catch {
+    } catch (e) {
+        console.warn('[DB] decryptPass failed:', e.message);
         return '';
     }
 }
@@ -246,17 +268,50 @@ async function getNodes() {
  * @param {string} pppUser
  */
 async function deleteNode(pppUser) {
-    if (!pppUser) return;
+    if (!pppUser) return { devicesDeleted: 0, deviceIds: [] };
     const db = await getDb();
-    await Promise.all([
+
+    // IMPORTANTE: devices.data.nodeId almacena el MikroTik .id (ej: "*17"),
+    // mientras que nodes.id = ppp_user (ej: "TorreHousenet").
+    // Primero leemos el nodo para obtener su MikroTik .id y usarlo para buscar devices.
+    let mikrotikId = null;
+    const nodeRow = await db.get('SELECT data FROM nodes WHERE id = ?', [pppUser]);
+    if (nodeRow) {
+        try { mikrotikId = JSON.parse(nodeRow.data).id; } catch { /* ignore */ }
+    }
+
+    // Buscar devices por el MikroTik .id (campo nodeId en el JSON de devices)
+    let deviceIds = [];
+    if (mikrotikId) {
+        const rows = await db.all(
+            "SELECT id FROM devices WHERE JSON_EXTRACT(data, '$.nodeId') = ?",
+            [mikrotikId]
+        );
+        deviceIds = rows.map(r => r.id);
+    }
+
+    const deletions = [
         db.run('DELETE FROM nodes          WHERE id       = ?', [pppUser]),
         db.run('DELETE FROM node_labels    WHERE ppp_user = ?', [pppUser]),
         db.run('DELETE FROM node_creds     WHERE ppp_user = ?', [pppUser]),
         db.run('DELETE FROM node_tags      WHERE ppp_user = ?', [pppUser]),
         db.run('DELETE FROM node_history   WHERE ppp_user = ?', [pppUser]),
         db.run('DELETE FROM node_ssh_creds WHERE ppp_user = ?', [pppUser]),
-    ]);
-    console.log(`[DB] Nodo eliminado (cascade): ${pppUser}`);
+    ];
+
+    // Cascade: devices + CPEs + historial
+    if (deviceIds.length > 0) {
+        const ph = deviceIds.map(() => '?').join(',');
+        deletions.push(
+            db.run(`DELETE FROM devices          WHERE id    IN (${ph})`, deviceIds),
+            db.run(`DELETE FROM historial_senal  WHERE ap_id IN (${ph})`, deviceIds),
+            db.run(`DELETE FROM cpes_conocidos   WHERE ap_id IN (${ph})`, deviceIds),
+        );
+    }
+
+    await Promise.all(deletions);
+    console.log(`[DB] Nodo eliminado (cascade): ${pppUser} (mikrotikId=${mikrotikId}) — ${deviceIds.length} devices eliminados`);
+    return { devicesDeleted: deviceIds.length, deviceIds };
 }
 
 module.exports = { initDb, getDb, encryptDevice, decryptDevice, encryptPass, decryptPass, saveNode, getNodes, deleteNode };

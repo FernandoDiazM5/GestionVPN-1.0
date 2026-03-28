@@ -30,30 +30,58 @@ export interface RegisteredAp {
   // clave_ssh is NEVER sent to the frontend
 }
 
-/** CPE en tiempo real — datos de wstalist (no se guardan en DB como live) */
+/** CPE en tiempo real — datos de wstalist/sta.cgi (no se guardan en DB como live) */
 export interface LiveCpe {
   mac: string;
-  signal?: number | null;        // dBm
-  rssi?: number | null;          // Remote Signal dBm
-  noisefloor?: number | null;    // Noise Floor dBm
-  cinr?: number | null;          // dB
-  ccq?: number | null;           // 0-100 %
-  tx_rate?: number | null;       // kbps — Downlink Capacity
-  rx_rate?: number | null;       // kbps — Uplink Capacity
-  airtime_tx?: number | null;    // %
-  airtime_rx?: number | null;    // %
-  uptime?: number | null;        // seconds
+
+  // ── AP side (lo que ve el AP del CPE) ─────────────────────────────────
+  signal?: number | null;           // dBm — señal AP side
+  rssi?: number | null;             // RSSI AP side (puede diferir de signal)
+  noisefloor?: number | null;       // Noise Floor dBm
+  ccq?: number | null;              // 0-100 %
+  tx_rate?: number | null;          // Mbps — tasa downlink (AP→CPE)
+  rx_rate?: number | null;          // Mbps — tasa uplink (CPE→AP)
+  tx_power?: number | null;         // dBm — potencia TX del AP hacia el CPE
+  tx_latency?: number | null;       // ms — latencia TX AP side
+  distance?: number | null;         // metros — distancia AP side
+  uptime?: number | null;           // segundos
   uptimeStr?: string | null;
-  distance?: number | null;      // km
   lastip?: string | null;
   tx_bytes?: number | null;
   rx_bytes?: number | null;
   throughputRxKbps?: number | null;
   throughputTxKbps?: number | null;
-  // From wstalist (some firmware versions include device identity)
+
+  // ── Remote / CPE side (wstalist remote.*) ─────────────────────────────
+  remote_signal?: number | null;        // dBm — señal desde el CPE
+  remote_noisefloor?: number | null;    // dBm
+  remote_tx_power?: number | null;      // dBm
+  remote_cpuload?: number | null;       // %
+  remote_hostname?: string | null;      // hostname del CPE remoto
+  remote_distance?: number | null;      // metros (M5)
+  remote_tx_latency?: number | null;    // ms (M5)
+
+  // ── AirMax M5 (airmax.quality/capacity/signal) ─────────────────────────
+  airmax_quality?: number | null;       // %
+  airmax_capacity?: number | null;      // %
+  airmax_signal?: number | null;        // dBm
+
+  // ── AirMax AC (airmax.downlink_capacity, uplink_capacity, cinr) ────────
+  airmax_dcap?: number | null;          // Mbps downlink capacity
+  airmax_ucap?: number | null;          // Mbps uplink capacity
+  airmax_cinr_rx?: number | null;       // dB CINR RX
+  airmax_cinr_tx?: number | null;       // dB CINR TX
+  airmax_rx_usage?: number | null;      // % airtime RX
+  airmax_tx_usage?: number | null;      // % airtime TX
+
+  // ── Identificación del firmware ────────────────────────────────────────
+  firmware_family?: string | null;      // 'AC' | 'M5'
+
+  // ── Identidad del CPE desde wstalist ──────────────────────────────────
   cpe_name?: string | null;
   cpe_product?: string | null;
-  // Enriched from cpes_conocidos DB
+
+  // ── Enriquecido desde cpes_conocidos DB ───────────────────────────────
   hostname?: string | null;
   modelo?: string | null;
   isKnown?: boolean;
