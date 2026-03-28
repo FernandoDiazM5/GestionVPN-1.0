@@ -3,6 +3,7 @@ import { dbService, type VpnSecret, type RouterCredentials } from '../store/db';
 import type { NodeInfo } from '../types/api';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { API_BASE_URL } from '../config';
+import { setGlobalToken } from '../main';
 
 interface VpnContextType {
   // Auth
@@ -207,9 +208,10 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
     const initApp = async () => {
       try {
         const store = await dbService.getStore();
-        if (store.isAuthenticated && store.credentials) {
+        if (store.isAuthenticated && store.credentials && store.credentials.token) {
           setIsAuthenticated(true);
           setCredentials(store.credentials);
+          setGlobalToken(store.credentials.token);
         }
         if (store.managedVpns?.length) {
           const validVpns = store.managedVpns.filter((v) => !!v.id);
@@ -266,6 +268,7 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
     setCredentials(creds);
     setIsAuthenticated(true);
     setActiveModule('nodes');
+    if (creds.token) setGlobalToken(creds.token);
   };
 
   const handleLogout = async () => {
@@ -284,6 +287,7 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
     setTunnelExpiry(null);
     setAdminIP('192.168.21.20');
     localStorage.removeItem('vpn_active_module');
+    setGlobalToken('');
     await dbService.clearStore();
     isLoggingOutRef.current = false;
   };

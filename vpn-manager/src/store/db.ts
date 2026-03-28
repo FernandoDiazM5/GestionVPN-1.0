@@ -5,7 +5,8 @@ import type { NodeInfo } from '../types/api';
 export interface RouterCredentials {
   ip: string;
   user: string;
-  pass: string;
+  pass: string; // Deprecated, kept for interface compat for now
+  token?: string; // JWT token
 }
 
 export interface VpnSecret {
@@ -38,7 +39,7 @@ interface StoredData {
   credentials?: {
     ip: string;
     user: string;
-    encPass: string; // AES-GCM encrypted + base64
+    encPass: string; // AES-GCM encrypted + base64 (now stores JWT)
   };
   managedVpns: VpnSecret[];
   scannedSecrets?: VpnSecret[];
@@ -65,8 +66,9 @@ export const dbService = {
       }
       let credentials: RouterCredentials | undefined;
       if (raw.credentials) {
-        const pass = await decryptText(raw.credentials.encPass);
-        credentials = { ip: raw.credentials.ip, user: raw.credentials.user, pass };
+        const tokenOrPass = await decryptText(raw.credentials.encPass);
+        // Si el valor largo es un JWT, lo asignamos a token. Si era un pass viejo, forzará re-login porque fallará Auth, lo cual es sano.
+        credentials = { ip: raw.credentials.ip, user: raw.credentials.user, pass: '', token: tokenOrPass };
       }
       return {
         isAuthenticated: raw.isAuthenticated,
@@ -86,8 +88,9 @@ export const dbService = {
 
   async saveStore(data: VpnStoreData): Promise<void> {
     let storedCredentials: StoredData['credentials'];
-    if (data.credentials) {
-      const encPass = await encryptText(data.credentials.pass);
+    if (data.credentials && data.credentials.token) {
+      // Encriptamos el JWT localmente para máxima seguridad
+      const encPass = await encryptText(data.credentials.token);
       storedCredentials = {
         ip: data.credentials.ip,
         user: data.credentials.user,

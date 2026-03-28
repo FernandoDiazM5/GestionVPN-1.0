@@ -29,7 +29,7 @@ export default function RouterAccess() {
     setDiagResult(null);
     try {
       const response = await fetchWithTimeout(
-        `${API_BASE_URL}/api/connect`,
+        `${API_BASE_URL}/api/auth/login`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -37,10 +37,11 @@ export default function RouterAccess() {
         },
         15_000,
       );
-      const data: ConnectResponse = await response.json();
+      // Hack tipado temporal si ConnectResponse no tiene token aún
+      const data: any = await response.json();
       if (response.ok && data.success) {
         setSyncStatus('success');
-        setTimeout(() => handleLoginSuccess({ ip: targetIp, user, pass: password }), 1500);
+        setTimeout(() => handleLoginSuccess({ ip: targetIp, user, pass: '', token: data.token }), 1500);
       } else {
         setErrorDetail(data.message ?? 'El router rechazó la conexión.');
         setSyncStatus('error');
