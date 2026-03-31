@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { apiFetch } from '../utils/apiClient';
 import {
   Radio, Wifi, RefreshCw, Activity,
   Circle, Layers, ArrowLeft, Server,
@@ -82,7 +83,8 @@ async function extractAndPersistCpes(
             parentAp:    apName,
             essid:       apEssid || prev.essid || '',
             lastSeen:    Date.now(),
-            cachedStats: { ...(prev.cachedStats ?? {}), ...freshStats },
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            cachedStats: { ...(prev.cachedStats ?? {}), ...freshStats } as any,
           }
         : {
             id,
@@ -122,7 +124,7 @@ async function loadAndCacheCpesFromServer(
   devices: SavedDevice[],
 ): Promise<SavedDevice[]> {
   try {
-    const res  = await fetch(`${API_BASE_URL}/api/ap-monitor/topology-cpes`);
+    const res  = await apiFetch(`${API_BASE_URL}/api/ap-monitor/topology-cpes`);
     const data = await res.json() as {
       success: boolean;
       cpes: Array<{
@@ -239,7 +241,8 @@ async function loadAndCacheCpesFromServer(
       };
 
       const cpe: SavedDevice = existingDev
-        ? { ...existingDev, parentAp: apName, lastSeen: c.ultima_vez_visto, cachedStats: { ...(existingDev.cachedStats ?? {}), ...cachedStats } }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ? { ...existingDev, parentAp: apName, lastSeen: c.ultima_vez_visto, cachedStats: { ...(existingDev.cachedStats ?? {}), ...cachedStats } as any }
         : {
             id,
             mac:        c.mac.toUpperCase(),
@@ -501,8 +504,8 @@ function CpeCard({ device }: { device: SavedDevice }) {
   const sig       = cs?.signal;
   const remoteSig = cs?.remoteSig;
   const model     = cs?.deviceModel || device.model;
-  const sc        = sigColor(sig);
-  const rsc       = sigColor(remoteSig);
+  const _sc        = sigColor(sig); void _sc;
+  const _rsc       = sigColor(remoteSig); void _rsc;
   const ff        = cs?.firmwareFamily;
 
   const hasAirMaxM5 = cs?.airmaxQuality != null || cs?.airmaxCapacity != null;
@@ -1006,7 +1009,7 @@ export default function NetworkTopologyModule() {
     // 1. Pollea APs del AP Monitor (tabla aps) — incluye M5 y AC
     setPollMsg('Polleando AP Monitor…');
     try {
-      await fetch(`${API_BASE_URL}/api/ap-monitor/poll-all-monitor`, { method: 'POST' });
+      await apiFetch(`${API_BASE_URL}/api/ap-monitor/poll-all-monitor`, { method: 'POST' });
     } catch { /* ignora si el servidor no responde */ }
 
     // 2. Pollea APs del módulo Escanear (tabla devices, con SSH directo)
@@ -1019,7 +1022,7 @@ export default function NetworkTopologyModule() {
       let done = 0;
       await Promise.allSettled(aps.map(async (ap) => {
         try {
-          await fetch(`${API_BASE_URL}/api/ap-monitor/poll-direct`, {
+          await apiFetch(`${API_BASE_URL}/api/ap-monitor/poll-direct`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

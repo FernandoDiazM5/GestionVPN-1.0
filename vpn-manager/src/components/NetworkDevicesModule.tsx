@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useRef, Fragment, useMemo } from 'react';
+import { apiFetch } from '../utils/apiClient';
 import type { ReactNode } from 'react';
 import {
   Cpu, RefreshCw, Loader2, Radio, AlertCircle,
   ShieldCheck, ShieldOff, Check, X, Wifi, Info,
-  Eye, Pencil, Trash2, CheckCircle2, ExternalLink, Router,
-  ChevronUp, ChevronDown, ChevronRight, PlusCircle,
+  Eye, CheckCircle2, ChevronUp, ChevronDown, ChevronRight, PlusCircle,
   SlidersHorizontal, Database, Search, KeyRound,
   Activity, Shield, Network, GripVertical, Copy,
 } from 'lucide-react';
@@ -957,13 +957,8 @@ function RawBlock({ title, content, icon }: { title: string; content: string | n
   );
 }
 
-// ── Strips raw diagnostic fields before saving to IndexedDB ──────────────
-const stripRawStats = (stats?: AntennaStats): AntennaStats | undefined => {
-  if (!stats) return stats;
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { _rawUname, _rawRoutes, _rawIwconfig, _rawWstalist, _rawMcaCli, _rawNetDev, _rawMeminfo, _rawBoard, ...rest } = stats;
-  return rest;
-};
+// cachedStats se guarda COMPLETO en IndexedDB (statsCache) via deviceDb.saveSingle()
+// No se realiza ningún filtrado — todo el JSON de mca-status se persiste para diagnóstico IA.
 
 // ── Modal diagnóstico SSH — muestra todos los datos obtenidos via SSH ─────
 interface SshDataModalProps { dev: ScannedDevice; onClose: () => void; }
@@ -1748,7 +1743,7 @@ export default function NetworkDevicesModule() {
       const res = await fetchWithTimeout(`${API_BASE_URL}/api/nodes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ip: credentials.ip, user: credentials.user, pass: credentials.pass }),
+        body: JSON.stringify({}),
       }, 20_000);
       const data = await res.json();
       if (!res.ok) throw new Error((data as { message?: string }).message ?? `HTTP ${res.status}`);
@@ -1957,19 +1952,57 @@ export default function NetworkDevicesModule() {
     sessionStorage.removeItem(SESSION_SCAN_KEY);
 
     try {
-      const res = await fetchWithTimeout(`${API_BASE_URL}/api/node/scan-devices`, {
+      const res = await apiFetch(`${API_BASE_URL}/api/node/scan-stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nodeLan: effectiveLan }),
-      }, 90_000);
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message ?? 'Error en el escaneo');
+      });
+      if (!res.ok || !res.body) throw new Error('Error en el inicio del escaneo asíncrono');
 
-      const discoveredDevices: ScannedDevice[] = data.devices ?? [];
-      setScanResults(discoveredDevices);
-      setAllScannedIPs(data.allIPs ?? []);
-      setScannedCount(data.scanned ?? 0);
-      setDebugMsg(data.debug ?? '');
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let discoveredDevices: ScannedDevice[] = [];
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || ''; 
+        
+        for (const block of lines) {
+           const linesSplit = block.split('\n');
+           const eventLine = linesSplit.find(l => l.startsWith('event:'));
+           const dataLine = linesSplit.find(l => l.startsWith('data:'));
+           if (!eventLine || !dataLine) continue;
+           
+           const eventName = eventLine.replace('event:', '').trim();
+           const dataCode = dataLine.replace('data:', '').trim();
+           if (!dataCode) continue;
+           const data = JSON.parse(dataCode);
+           
+           if (eventName === 'progress') {
+              setScannedCount(data.scanned);
+              if (data.found && data.found.length > 0) {
+                 setScanResults(prev => {
+                   const map = new Map(prev.map(d => [d.ip, d]));
+                   data.found.forEach((d: ScannedDevice) => map.set(d.ip, d));
+                   return Array.from(map.values());
+                 });
+              }
+           } else if (eventName === 'complete') {
+              discoveredDevices = data.devices || discoveredDevices;
+              setScanResults(discoveredDevices);
+              setAllScannedIPs(discoveredDevices.map((d: ScannedDevice) => d.ip));
+              setScannedCount(data.total);
+              setDebugMsg(`Escaneadas ${data.total} IPs — ${discoveredDevices.length} encontrados`);
+           } else if (eventName === 'error') {
+              throw new Error(data.message);
+           }
+        }
+      }
 
       // Cargar credenciales SSH del nodo activo
       let creds: ScanCred[] = nodeSshCreds;
@@ -2035,7 +2068,7 @@ export default function NetworkDevicesModule() {
             deviceName: s.deviceName ?? merged.deviceName, lanMac: s.lanMac ?? merged.lanMac,
             security: s.security ?? merged.security, channelWidth: s.channelWidth ?? merged.channelWidth,
             networkMode: s.networkMode ?? merged.networkMode, chains: s.chains ?? merged.chains,
-            apMac: s.apMac ?? merged.apMac, cachedStats: stripRawStats(s),
+            apMac: s.apMac ?? merged.apMac, cachedStats: s,
           };
           setSavedDevices(prev => prev.map(d => d.id === enriched.id ? enriched : d));
           await deviceDb.saveSingle(enriched);
@@ -2150,7 +2183,7 @@ export default function NetworkDevicesModule() {
     });
   }, [filteredRows, sortConfig]);
 
-  const devicesByNode = savedDevices.reduce<Record<string, { nodeName: string; devices: SavedDevice[] }>>((acc, d) => {
+  void savedDevices.reduce<Record<string, { nodeName: string; devices: SavedDevice[] }>>((acc, d) => {
     if (!acc[d.nodeId]) acc[d.nodeId] = { nodeName: nodes.find(n => n.id === d.nodeId)?.nombre_nodo || d.nodeName, devices: [] };
     acc[d.nodeId].devices.push(d);
     return acc;
@@ -2209,7 +2242,7 @@ export default function NetworkDevicesModule() {
       networkMode: s?.networkMode,
       chains: s?.chains,
       apMac: s?.apMac,
-      cachedStats: stripRawStats(s),
+      cachedStats: s,
       addedAt: Date.now(),
       lastSeen: Date.now(),
     };
@@ -2810,7 +2843,7 @@ export default function NetworkDevicesModule() {
             id: editingDevice.nodeId,
             nombre_nodo: editingDevice.nodeName,
             ppp_user: '', segmento_lan: '', nombre_vrf: '',
-            service: '', disabled: false, running: false,
+            service: 'sstp' as const, disabled: false, running: false,
             ip_tunnel: '', uptime: '',
           }}
           existing={{

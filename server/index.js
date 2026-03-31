@@ -1,6 +1,11 @@
 const express = require('express');
 const cors    = require('cors');
-const apiRoutes = require('./api.routes');
+const coreRoutes = require('./routes/core.routes');
+const nodeRoutes = require('./routes/node.routes');
+const deviceRoutes = require('./routes/device.routes');
+const wireguardRoutes = require('./routes/wireguard.routes');
+const settingsRoutes = require('./routes/settings.routes');
+const usersRoutes = require('./routes/users.routes');
 const apRoutes  = require('./ap.routes');
 const { initDb } = require('./db.service');
 
@@ -36,19 +41,36 @@ const { verifyToken } = require('./auth.middleware');
 
 app.use(cors({
     origin: (origin, callback) => {
-        // Permitir TODOS los orígenes en desarrollo (necesario para URLs dinámicas de Cloudflare)
-        return callback(null, true);
+        // Permitir requests sin origin (curl, Postman, server-to-server)
+        if (!origin) return callback(null, true);
+        const allowed = [
+            'http://localhost:5173',
+            'http://localhost:4173',
+            'http://127.0.0.1:5173',
+            process.env.FRONTEND_URL,
+        ].filter(Boolean);
+        if (allowed.includes(origin) || origin.endsWith('.trycloudflare.com')) {
+            return callback(null, true);
+        }
+        console.warn(`[CORS] Origen bloqueado: ${origin}`);
+        callback(new Error('Not allowed by CORS'));
     },
     methods: ['GET','POST','PUT','DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization'], // Allow Authorization
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
 }));
 app.use(express.json());
 
 // Montar rutas públicas e integradas
 app.use('/api/auth', authRoutes);
 
-// Proteger todas las rutas restantes
-app.use('/api', verifyToken, apiRoutes);
+// Omitir apiRoutes legado que ya fue borrado, registrar los modulares protegidos
+app.use('/api', verifyToken, coreRoutes);
+app.use('/api', verifyToken, nodeRoutes);
+app.use('/api', verifyToken, deviceRoutes);
+app.use('/api', verifyToken, wireguardRoutes);
+app.use('/api', verifyToken, settingsRoutes);
+app.use('/api/users', verifyToken, usersRoutes);
 app.use('/api/ap-monitor', verifyToken, apRoutes);
 
 // ── Inicia el servidor con reintentos si el puerto sigue ocupado ─────────────

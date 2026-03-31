@@ -321,30 +321,32 @@ router.post('/poll-direct', async (req, res) => {
         const { apId, ip, port, user, pass, saveHistory, firmware } = req.body;
         if (!apId || !ip) return res.status(400).json({ success: false, message: 'apId e ip requeridos' });
 
-        // Buscar credenciales del nodo al que pertenece el AP
+        // Buscar credenciales SSH del AP desde tabla aps (normalizada) o node_ssh_creds (fallback)
         let sshUser = user || '';
         let sshPass = pass || '';
         try {
             const db = await getDb();
-            const devRow = await db.get('SELECT data FROM devices WHERE id = ?', [apId]);
-            if (devRow) {
-                const dev = JSON.parse(devRow.data);
-                const nodeId = dev.nodeId;
-                if (nodeId) {
-                    const credsRow = await db.get(
-                        'SELECT ssh_creds, ssh_user, ssh_pass FROM node_ssh_creds WHERE ppp_user = ?',
-                        [nodeId]
-                    );
-                    if (credsRow) {
-                        let credList = [];
-                        if (credsRow.ssh_creds && credsRow.ssh_creds !== '[]') {
-                            credList = JSON.parse(credsRow.ssh_creds)
-                                .map(c => ({ user: c.user || '', pass: decryptPass(c.encPass) }));
-                        } else if (credsRow.ssh_user) {
-                            credList = [{ user: credsRow.ssh_user, pass: decryptPass(credsRow.ssh_pass) }];
-                        }
-                        if (credList.length > 0) { sshUser = credList[0].user; sshPass = credList[0].pass; }
+            // Primero intentar leer credenciales propias del AP desde tabla aps
+            const apRow = await db.get('SELECT usuario_ssh, clave_ssh, puerto_ssh, nodo_id FROM aps WHERE id = ?', [apId]);
+            if (apRow && apRow.usuario_ssh) {
+                sshUser = sshUser || apRow.usuario_ssh;
+                sshPass = sshPass || (apRow.clave_ssh ? decryptPass(apRow.clave_ssh) : '');
+            }
+            // Si no hay credenciales propias, buscar por nodo padre
+            if (!sshUser && apRow && apRow.nodo_id) {
+                const credsRow = await db.get(
+                    'SELECT ssh_creds, ssh_user, ssh_pass FROM node_ssh_creds WHERE ppp_user = ?',
+                    [apRow.nodo_id]
+                );
+                if (credsRow) {
+                    let credList = [];
+                    if (credsRow.ssh_creds && credsRow.ssh_creds !== '[]') {
+                        credList = JSON.parse(credsRow.ssh_creds)
+                            .map(c => ({ user: c.user || '', pass: decryptPass(c.encPass) }));
+                    } else if (credsRow.ssh_user) {
+                        credList = [{ user: credsRow.ssh_user, pass: decryptPass(credsRow.ssh_pass) }];
                     }
+                    if (credList.length > 0) { sshUser = credList[0].user; sshPass = credList[0].pass; }
                 }
             }
         } catch (e) {
@@ -455,57 +457,100 @@ router.post('/cpes/enrich-batch', async (req, res) => {
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
-// ── CPE detail direct — usa credenciales del nodo (node_ssh_creds) ────────
+// ── CPE detail direct — resuelve credenciales en orden: CPE propio > AP > nodo > ubnt default ──
 router.post('/cpes/:mac/detail-direct', async (req, res) => {
     try {
         const { cpe_ip, port, user, pass, apId } = req.body;
         if (!cpe_ip) return res.status(400).json({ success: false, message: 'cpe_ip requerido' });
 
-        // Buscar credenciales del nodo al que pertenece el AP
+        const db = await getDb();
+        const mac = req.params.mac.toUpperCase();
         let credList = [];
+
+        // 1. Credenciales propias del CPE (almacenadas en cpes_conocidos)
+        try {
+            const cpeRow = await db.get(
+                'SELECT usuario_ssh, clave_ssh, puerto_ssh FROM cpes_conocidos WHERE mac = ?', [mac]
+            );
+            if (cpeRow && cpeRow.usuario_ssh) {
+                credList.push({ user: cpeRow.usuario_ssh, pass: cpeRow.clave_ssh ? decryptPass(cpeRow.clave_ssh) : '', port: cpeRow.puerto_ssh || 22 });
+            }
+        } catch (e) {
+            console.warn('[detail-direct] Error leyendo credenciales propias del CPE:', e.message);
+        }
+
+        // 2. Credenciales del AP padre y su nodo (como fallback — el CPE puede compartir usuario/pass con el AP en algunas redes)
         if (apId) {
             try {
-                const db = await getDb();
-                const devRow = await db.get('SELECT data FROM devices WHERE id = ?', [apId]);
-                if (devRow) {
-                    const dev = JSON.parse(devRow.data);
-                    const nodeId = dev.nodeId; // nodeId === ppp_user en la tabla nodes
-                    if (nodeId) {
+                const apRow = await db.get('SELECT usuario_ssh, clave_ssh, nodo_id, puerto_ssh FROM aps WHERE id = ?', [apId]);
+                if (apRow) {
+                    if (apRow.usuario_ssh) {
+                        credList.push({ user: apRow.usuario_ssh, pass: apRow.clave_ssh ? decryptPass(apRow.clave_ssh) : '', port: apRow.puerto_ssh || 22 });
+                    }
+                    // Credenciales del nodo padre
+                    if (apRow.nodo_id) {
                         const credsRow = await db.get(
                             'SELECT ssh_creds, ssh_user, ssh_pass FROM node_ssh_creds WHERE ppp_user = ?',
-                            [nodeId]
+                            [apRow.nodo_id]
                         );
                         if (credsRow) {
                             if (credsRow.ssh_creds && credsRow.ssh_creds !== '[]') {
-                                credList = JSON.parse(credsRow.ssh_creds)
-                                    .map(c => ({ user: c.user || '', pass: decryptPass(c.encPass) }));
+                                const parsed = JSON.parse(credsRow.ssh_creds);
+                                for (const c of parsed) {
+                                    credList.push({ user: c.user || '', pass: decryptPass(c.encPass), port: 22 });
+                                }
                             } else if (credsRow.ssh_user) {
-                                credList = [{ user: credsRow.ssh_user, pass: decryptPass(credsRow.ssh_pass) }];
+                                credList.push({ user: credsRow.ssh_user, pass: decryptPass(credsRow.ssh_pass), port: 22 });
                             }
                         }
                     }
                 }
             } catch (e) {
-                console.warn('[detail-direct] Error buscando credenciales del nodo:', e.message);
+                console.warn('[detail-direct] Error buscando credenciales del AP/nodo:', e.message);
             }
         }
-        // Fallback: credenciales enviadas por el frontend
-        if (credList.length === 0) credList = [{ user: user || '', pass: pass || '' }];
+
+        // 3. Credenciales enviadas explícitamente por el frontend (si son distintas de las ya acumuladas)
+        if (user && !credList.some(c => c.user === user)) {
+            credList.push({ user, pass: pass || '', port: parseInt(port) || 22 });
+        }
+
+        // 4. Default Ubiquiti airOS (ubnt/ubnt) — la mayoría de LiteBeam en campo usan este usuario
+        if (!credList.some(c => c.user === 'ubnt')) {
+            credList.push({ user: 'ubnt', pass: 'ubnt', port: parseInt(port) || 22 });
+        }
 
         const sshPort = parseInt(port) || 22;
-        let s = null, lastError = null;
+        let s = null, lastError = null, usedCred = null;
         for (const cred of credList) {
             try {
-                s = await getDetail(cpe_ip, sshPort, cred.user, cred.pass);
+                s = await getDetail(cpe_ip, cred.port || sshPort, cred.user, cred.pass);
+                usedCred = cred;
                 break;
             } catch (e) {
                 lastError = e;
-                console.warn(`[detail-direct] Credencial '${cred.user}' fallida: ${e.message}`);
+                console.warn(`[detail-direct] Credencial '${cred.user}' fallida en ${cpe_ip}: ${e.message}`);
             }
         }
         if (!s) throw lastError || new Error('Sin credenciales válidas');
-        const mac = req.params.mac.toUpperCase();
-        const db = await getDb();
+
+        // Si el login funcionó con ubnt/ubnt (o cualquier cred que no estaba guardada en el CPE),
+        // persistir esas credenciales en cpes_conocidos para evitar el ciclo de intentos la próxima vez.
+        if (usedCred) {
+            const existingCpe = await db.get('SELECT usuario_ssh FROM cpes_conocidos WHERE mac = ?', [mac]);
+            if (!existingCpe || !existingCpe.usuario_ssh) {
+                const encPass = usedCred.pass ? encryptPass(usedCred.pass) : null;
+                await db.run(
+                    `INSERT INTO cpes_conocidos (mac, usuario_ssh, clave_ssh, puerto_ssh, ultima_vez_visto)
+                     VALUES (?, ?, ?, ?, ?)
+                     ON CONFLICT(mac) DO UPDATE SET
+                       usuario_ssh = excluded.usuario_ssh,
+                       clave_ssh   = excluded.clave_ssh,
+                       puerto_ssh  = excluded.puerto_ssh`,
+                    [mac, usedCred.user, encPass, usedCred.port || 22, Date.now()]
+                );
+            }
+        }
 
         await db.run(
             `INSERT INTO cpes_conocidos
@@ -527,6 +572,27 @@ router.post('/cpes/:mac/detail-direct', async (req, res) => {
         );
 
         res.json({ success: true, stats: { ...s, ip: cpe_ip } });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// ── Guardar/actualizar credenciales SSH de un CPE específico ─────────────
+router.put('/cpes/:mac/credentials', async (req, res) => {
+    try {
+        const mac = req.params.mac.toUpperCase();
+        const { user, pass, port } = req.body;
+        if (!user) return res.status(400).json({ success: false, message: 'user requerido' });
+        const db = await getDb();
+        const encPass = pass ? encryptPass(pass) : null;
+        await db.run(
+            `INSERT INTO cpes_conocidos (mac, usuario_ssh, clave_ssh, puerto_ssh, ultima_vez_visto)
+             VALUES (?, ?, ?, ?, ?)
+             ON CONFLICT(mac) DO UPDATE SET
+               usuario_ssh = excluded.usuario_ssh,
+               clave_ssh   = excluded.clave_ssh,
+               puerto_ssh  = excluded.puerto_ssh`,
+            [mac, user, encPass, parseInt(port) || 22, Date.now()]
+        );
+        res.json({ success: true });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
@@ -624,22 +690,7 @@ router.get('/topology-cpes', async (req, res) => {
             apIds
         );
 
-        // b) Buscar en tabla devices (ap_id = MAC del device, 12 chars hex)
-        const macIds   = apIds.filter(id => /^[0-9A-Fa-f]{12}$/.test(id));
-        let devRows = [];
-        if (macIds.length > 0) {
-            const devPh = macIds.map(() => '?').join(',');
-            const raw   = await db.all(
-                `SELECT id, data FROM devices WHERE id IN (${devPh})`,
-                macIds
-            );
-            devRows = raw.map(r => {
-                try {
-                    const d = JSON.parse(r.data);
-                    return { id: r.id, ip: d.ip || '', hostname: d.name || '', nodeId: d.nodeId || '' };
-                } catch { return { id: r.id, ip: '', hostname: '', nodeId: '' }; }
-            });
-        }
+        // Nota: tabla 'devices' (legacy) ya no se consulta. Todos los APs están en tabla 'aps'.
 
         // Cargar nodos VPN para resolver nodeId por subred (segmento_lan)
         const vpnNodeRows = await db.all('SELECT data FROM nodes');
@@ -657,10 +708,9 @@ router.get('/topology-cpes', async (req, res) => {
         // Mapa ap_id → { ip, hostname, nodeId }
         const apMap = {};
         apsRows.forEach(a => {
-            const nodeId = nodeIdByIp(a.ip);
+            const nodeId = a.nodo_id || nodeIdByIp(a.ip);
             apMap[a.id] = { ip: a.ip, hostname: a.hostname || a.ssid || '', nodeId };
         });
-        devRows.forEach(d => { apMap[d.id] = { ip: d.ip, hostname: d.hostname, nodeId: d.nodeId }; });
 
         // 3. Última señal por CPE
         const macs  = cpes.map(c => c.mac).filter(Boolean);

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Play, ShieldOff, Wifi, WifiOff, Clock, Loader2, Radio, Pencil, Trash2, FileCode, History, Tag, KeyRound, Check, X, PlusCircle, Eye, EyeOff } from 'lucide-react';
+import { apiFetch } from '../utils/apiClient';
+import { Play, ShieldOff, Wifi, WifiOff, Clock, Loader2, Radio, Pencil, Trash2, FileCode, History, Tag, KeyRound, Check, X, PlusCircle, Eye, EyeOff, Wrench, MoreVertical } from 'lucide-react';
 import { useVpn, TUNNEL_TIMEOUT_MS } from '../context/VpnContext';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import type { NodeInfo, TunnelActivateResponse } from '../types/api';
@@ -58,8 +59,14 @@ export default function NodeCard({ node, rowIndex, onEdit, onDelete, onScript, o
   const [sshLoading, setSshLoading] = useState(false);
   const [sshSaved, setSshSaved] = useState(false);
   const [showPasswords, setShowPasswords] = useState(false);
+  const [isRepairing, setIsRepairing] = useState(false);
+  const [showWgPeerForm, setShowWgPeerForm] = useState(false);
+  const [wgPeerKey, setWgPeerKey] = useState('');
+  const [isSettingPeer, setIsSettingPeer] = useState(false);
+  const [showKebab, setShowKebab] = useState(false);
   const logsEndRef = useRef<HTMLDivElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
+  const kebabRef = useRef<HTMLDivElement>(null);
 
   const isThisNodeActive = activeNodeVrf === node.nombre_vrf && !!node.nombre_vrf;
   const isAnyNodeActive = !!activeNodeVrf;
@@ -80,11 +87,32 @@ export default function NodeCard({ node, rowIndex, onEdit, onDelete, onScript, o
     logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [logs]);
 
+  // Limpiar logs cuando este nodo pierde el túnel activo (otro nodo lo tomó o fue revocado externamente)
+  const prevActiveRef = useRef(isThisNodeActive);
+  useEffect(() => {
+    if (prevActiveRef.current && !isThisNodeActive && !isDeactivating) {
+      setTimeout(() => setLogs([]), 800);
+    }
+    prevActiveRef.current = isThisNodeActive;
+  }, [isThisNodeActive, isDeactivating]);
+
   const addLog = (msg: string) => setLogs(prev => [...prev.slice(-8), msg]);
 
   useEffect(() => {
     if (editingName) nameInputRef.current?.focus();
   }, [editingName]);
+
+  // Cerrar kebab al hacer click fuera del dropdown
+  useEffect(() => {
+    if (!showKebab) return;
+    const handler = (e: MouseEvent) => {
+      if (kebabRef.current && !kebabRef.current.contains(e.target as Node)) {
+        setShowKebab(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showKebab]);
 
   const startEditName = () => {
     setNameInput(node.nombre_nodo || '');
@@ -145,7 +173,7 @@ export default function NodeCard({ node, rowIndex, onEdit, onDelete, onScript, o
       addLog(`Red remota: ${node.segmento_lan || 'N/A'}`);
       setActiveNodeVrf(node.nombre_vrf);
       setTunnelExpiry(Date.now() + TUNNEL_TIMEOUT_MS);
-      fetch(`${API_BASE_URL}/api/node/history/add`, {
+      apiFetch(`${API_BASE_URL}/api/node/history/add`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pppUser: node.ppp_user, event: 'tunnel_activated' }),
       }).catch(() => {});
@@ -162,7 +190,7 @@ export default function NodeCard({ node, rowIndex, onEdit, onDelete, onScript, o
     try {
       await deactivateAllNodes();
       addLog('✓ Acceso revocado correctamente');
-      fetch(`${API_BASE_URL}/api/node/history/add`, {
+      apiFetch(`${API_BASE_URL}/api/node/history/add`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pppUser: node.ppp_user, event: 'tunnel_deactivated' }),
       }).catch(() => {});
@@ -171,6 +199,66 @@ export default function NodeCard({ node, rowIndex, onEdit, onDelete, onScript, o
       addLog(`✗ Error: ${err instanceof Error ? err.message : 'Error desconocido'}`);
     } finally {
       setIsDeactivating(false);
+    }
+  };
+
+  const handleRepair = async () => {
+    if (!credentials || !node.nombre_vrf) return;
+    setIsRepairing(true);
+    setLogs([]);
+    addLog('Verificando configuración MikroTik...');
+    try {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/api/tunnel/repair`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pppUser: node.ppp_user,
+          vrfName: node.nombre_vrf,
+          lanSubnets: node.lan_subnets || [],
+          tunnelIP: isThisNodeActive ? adminIP : null,
+          adminWgNet: '192.168.21.0/24',
+        }),
+      }, 30_000);
+      const data = await res.json() as { success?: boolean; message?: string; steps?: Array<{ obj: string; action?: string; status?: string }>; repaired?: number };
+      if (!res.ok || !data.success) throw new Error(data.message ?? `Error HTTP ${res.status}`);
+      for (const step of (data.steps || [])) {
+        const icon = step.action === 'created' ? '+ ' : step.status === 'error' ? '✗ ' : '✓ ';
+        addLog(`${icon}${step.obj}: ${step.action ?? step.status}`);
+      }
+      const repaired = data.repaired ?? 0;
+      addLog(repaired > 0 ? `✓ Reparación completa (${repaired} elementos)` : '✓ Todo OK — sin cambios necesarios');
+    } catch (err) {
+      addLog(`✗ Error: ${err instanceof Error ? err.message : 'Error desconocido'}`);
+    } finally {
+      setIsRepairing(false);
+      setTimeout(() => setLogs([]), 3000);
+    }
+  };
+
+  const handleSetWgPeer = async () => {
+    if (!wgPeerKey.trim()) return;
+    setIsSettingPeer(true);
+    setLogs([]);
+    try {
+      addLog('Configurando peer CPE en el servidor...');
+      const res = await apiFetch(`${API_BASE_URL}/api/node/wg/set-peer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pppUser: node.ppp_user, cpePublicKey: wgPeerKey.trim() }),
+      });
+      const data = await res.json() as { success?: boolean; message?: string; peerIP?: string };
+      if (data.success) {
+        addLog(`✓ Peer configurado — IP ${data.peerIP}`);
+        setShowWgPeerForm(false);
+        setWgPeerKey('');
+        setTimeout(() => setLogs([]), 3000);
+      } else {
+        addLog(`✗ Error: ${data.message}`);
+      }
+    } catch (e) {
+      addLog(`✗ ${e instanceof Error ? e.message : 'Error'}`);
+    } finally {
+      setIsSettingPeer(false);
     }
   };
 
@@ -292,7 +380,11 @@ export default function NodeCard({ node, rowIndex, onEdit, onDelete, onScript, o
               </div>
             ) : (
               <div className="flex items-center gap-1.5 group/name">
-                <p className="font-semibold text-slate-800 text-xs leading-tight truncate max-w-[180px]" title={node.nombre_nodo}>
+                {node.service === 'wireguard'
+                  ? <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 border border-violet-200 leading-none shrink-0" title="WireGuard">WG</span>
+                  : <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 border border-sky-200 leading-none shrink-0" title="SSTP">SSTP</span>
+                }
+                <p className="font-semibold text-slate-800 text-xs flex-1 leading-tight truncate max-w-[150px]" title={node.nombre_nodo}>
                   {node.nombre_nodo}
                 </p>
                 <button onClick={startEditName} title="Editar nombre"
@@ -303,6 +395,13 @@ export default function NodeCard({ node, rowIndex, onEdit, onDelete, onScript, o
             )}
             <div className="flex items-center gap-1.5 flex-wrap">
               <span
+                title={
+                  !node.running && !node.disabled && node.service === 'wireguard'
+                    ? 'Sin handshake WireGuard reciente'
+                    : !node.running && !node.disabled
+                      ? 'Torre no conectada al VPN'
+                      : undefined
+                }
                 className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-md leading-none
                   ${node.running && !node.disabled
                     ? 'bg-emerald-100 text-emerald-700'
@@ -376,7 +475,7 @@ export default function NodeCard({ node, rowIndex, onEdit, onDelete, onScript, o
         {/* Acciones */}
         <td className="px-4 py-3">
           <div className="flex items-center justify-end gap-2">
-            {/* Razón de bloqueo como tooltip en el botón */}
+            {/* Acceder — acción primaria */}
             <button
               disabled={!canActivate || isThisNodeActive}
               onClick={handleActivate}
@@ -392,6 +491,7 @@ export default function NodeCard({ node, rowIndex, onEdit, onDelete, onScript, o
               <span>{isActivating ? 'Abriendo...' : 'Acceder'}</span>
             </button>
 
+            {/* Revocar — acción primaria */}
             <button
               disabled={!isThisNodeActive || isPending}
               onClick={handleDeactivate}
@@ -409,48 +509,123 @@ export default function NodeCard({ node, rowIndex, onEdit, onDelete, onScript, o
             {/* Separator */}
             <div className="w-px h-5 bg-slate-200" />
 
-            <button
-              onClick={onEdit}
-              title="Editar nodo"
-              className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
-            >
-              <Pencil className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={onDelete}
-              title="Eliminar nodo"
-              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={onScript}
-              title="Copiar script de configuración para el equipo remoto"
-              className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
-            >
-              <FileCode className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={onTagClick}
-              title="Gestionar etiquetas"
-              className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
-            >
-              <Tag className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={onHistory}
-              title="Historial de conexión"
-              className="p-1.5 rounded-lg text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition-colors"
-            >
-              <History className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={openSshForm}
-              title="Credenciales SSH para escaneo de equipos"
-              className={`p-1.5 rounded-lg transition-colors ${showSshForm ? 'text-amber-600 bg-amber-50' : 'text-slate-400 hover:text-amber-600 hover:bg-amber-50'}`}
-            >
-              <KeyRound className="w-3.5 h-3.5" />
-            </button>
+            {/* Kebab menu — acciones secundarias */}
+            <div ref={kebabRef} className="relative">
+              <button
+                onClick={() => setShowKebab(v => !v)}
+                title="Más acciones"
+                className={`relative p-1.5 rounded-lg transition-colors
+                  ${showKebab
+                    ? 'text-slate-700 bg-slate-100'
+                    : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'}`}
+              >
+                <MoreVertical className="w-4 h-4" />
+                {/* Badge de actividad (logs activos) */}
+                {logs.length > 0 && (
+                  <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-indigo-500 ring-1 ring-white" />
+                )}
+              </button>
+
+              {showKebab && (
+                <div className="absolute right-0 top-full mt-1 w-52 bg-white border border-slate-200 rounded-xl shadow-lg shadow-slate-200/60 z-50 py-1 overflow-hidden">
+
+                  {/* Sección: WireGuard */}
+                  {node.service === 'wireguard' && !node.wg_public_key && (
+                    <button
+                      onClick={() => { setShowWgPeerForm(v => !v); setShowKebab(false); }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-600 hover:bg-violet-50 hover:text-violet-700 transition-colors text-left"
+                    >
+                      <KeyRound className="w-3.5 h-3.5 text-violet-500 shrink-0" />
+                      <span>Configurar peer WireGuard</span>
+                    </button>
+                  )}
+
+                  {/* Sección: Configuración / Reparar */}
+                  {!!node.nombre_vrf && (
+                    <button
+                      onClick={() => { handleRepair(); setShowKebab(false); }}
+                      disabled={isPending || isRepairing}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-600 hover:bg-amber-50 hover:text-amber-700 transition-colors text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {isRepairing
+                        ? <Loader2 className="w-3.5 h-3.5 text-amber-500 shrink-0 animate-spin" />
+                        : <Wrench className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
+                      <span>{isRepairing ? 'Reparando...' : 'Verificar y reparar'}</span>
+                    </button>
+                  )}
+
+                  {/* Sección: Credenciales SSH */}
+                  <button
+                    onClick={() => { openSshForm(); setShowKebab(false); }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors text-left
+                      ${showSshForm
+                        ? 'bg-amber-50 text-amber-700'
+                        : 'text-slate-600 hover:bg-amber-50 hover:text-amber-700'}`}
+                  >
+                    <KeyRound className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <span>Credenciales SSH</span>
+                  </button>
+
+                  {/* Divisor */}
+                  <div className="my-1 border-t border-slate-100" />
+
+                  {/* Sección: Editar / Eliminar */}
+                  <button
+                    onClick={() => { onEdit?.(); setShowKebab(false); }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 transition-colors text-left"
+                  >
+                    <Pencil className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                    <span>Editar nodo</span>
+                  </button>
+
+                  <button
+                    onClick={() => { onScript?.(); setShowKebab(false); }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 transition-colors text-left"
+                  >
+                    <FileCode className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    <span>Script de configuración</span>
+                  </button>
+
+                  <button
+                    onClick={() => { onTagClick?.(); setShowKebab(false); }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-600 hover:bg-amber-50 hover:text-amber-700 transition-colors text-left"
+                  >
+                    <Tag className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <span>Gestionar etiquetas</span>
+                  </button>
+
+                  <button
+                    onClick={() => { onHistory?.(); setShowKebab(false); }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-600 hover:bg-sky-50 hover:text-sky-700 transition-colors text-left"
+                  >
+                    <History className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                    <span>Historial de conexión</span>
+                  </button>
+
+                  {/* Divisor + Eliminar (acción destructiva al final) */}
+                  <div className="my-1 border-t border-slate-100" />
+
+                  <button
+                    onClick={() => { onDelete?.(); setShowKebab(false); }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors text-left"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                    <span>Eliminar nodo</span>
+                  </button>
+
+                  {/* Logs activos — ítem informativo al final si hay actividad */}
+                  {logs.length > 0 && (
+                    <>
+                      <div className="my-1 border-t border-slate-100" />
+                      <div className="flex items-center gap-2.5 px-3 py-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" />
+                        <span className="text-[10px] text-indigo-500 font-semibold">Logs activos ({logs.length})</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </td>
       </tr>
@@ -467,6 +642,40 @@ export default function NodeCard({ node, rowIndex, onEdit, onDelete, onScript, o
                   </div>
                 ))}
                 <div ref={logsEndRef} />
+              </div>
+            </div>
+          </td>
+        </tr>
+      )}
+
+      {/* ── Fila expandida: clave pública CPE WireGuard ── */}
+      {showWgPeerForm && (
+        <tr className={rowBg}>
+          <td colSpan={7} className="px-4 pb-3 pt-0">
+            <div className="ml-10 bg-violet-50 border border-violet-200 rounded-xl p-3 space-y-2 animate-in slide-in-from-top-2 duration-200">
+              <p className="text-[10px] font-bold text-violet-700 uppercase tracking-wider">Clave Pública del CPE</p>
+              <p className="text-[10px] text-violet-500">Obtener con: <span className="font-mono">/interface wireguard print</span></p>
+              <textarea
+                value={wgPeerKey}
+                onChange={e => setWgPeerKey(e.target.value)}
+                placeholder="Pegar aquí la public key del router torre..."
+                className="w-full font-mono text-xs resize-none rounded-lg border border-violet-200 bg-white px-2 py-1.5 text-slate-700 focus:outline-none focus:border-violet-400"
+                rows={3}
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={handleSetWgPeer}
+                  disabled={!wgPeerKey.trim() || isSettingPeer}
+                  className="flex-1 py-1.5 rounded-lg text-xs font-bold bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isSettingPeer ? 'Configurando...' : 'Configurar Peer'}
+                </button>
+                <button
+                  onClick={() => { setShowWgPeerForm(false); setWgPeerKey(''); }}
+                  className="px-3 py-1.5 rounded-lg text-xs text-slate-500 hover:bg-slate-100 transition-colors"
+                >
+                  Cancelar
+                </button>
               </div>
             </div>
           </td>

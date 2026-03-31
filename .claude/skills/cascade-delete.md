@@ -3,43 +3,54 @@
 ## Trigger
 Usar cuando el usuario elimina un nodo VPN (deprovision), o reporta que datos persisten después de eliminar un nodo.
 
-## Contexto
-El sistema tiene 4 capas de persistencia que deben limpiarse al eliminar un nodo:
-1. **MikroTik RouterOS** — VRF, PPP secret, rutas, mangle rules
-2. **SQLite backend** — nodes, devices, cpes_conocidos, historial_senal
-3. **IndexedDB frontend** — VpnContext (vpn_store) + cpeCache (topology_cpes)
-4. **React state** — nodes[], devices[] en cada componente
+## Estado: CORREGIDO (2026-03-28)
 
-## Relación de IDs (CRÍTICO)
-- `NodeInfo.id` = MikroTik `.id` (ej: `*17`) — ID interno del router
-- `NodeInfo.ppp_user` = nombre PPP (ej: `ppp-pass-torreX`) — PK en SQLite `nodes`
-- `SavedDevice.nodeId` = `node.id` (MikroTik `.id`, NO ppp_user)
-- SQLite `nodes.id` = `ppp_user`
+### Bug original
+`deleteNode()` buscaba APs en tabla `devices` (deprecada) usando `ppp_user` como `nodeId`. Pero:
+- Los APs se guardan en tabla `aps` (normalizada, v3.2)
+- `aps.nodo_id` = MikroTik `.id` (ej: `*17`), NO `ppp_user`
+- `nodes.id` = `ppp_user`, pero `nodes.data.id` = MikroTik `.id`
 
-Por tanto: `devices.data.nodeId` NO coincide con `nodes.id`. Son dominios distintos.
+### Fix implementado
 
-## Flujo correcto de eliminación
+**`server/db.service.js` — `deleteNode(pppUser)`:**
+1. Lee `nodes.data` → extrae MikroTik `.id`
+2. Busca en tabla `aps` por `nodo_id IN (pppUser, mikrotikId)`
+3. Busca en tabla `devices` legacy (fallback) con `JSON_VALID` guard
+4. Cascade delete: `aps` + `devices` + `cpes_conocidos` + `historial_senal`
+5. Retorna `{ devicesDeleted, deviceIds }` al frontend
 
-### Backend (server/api.routes.js → POST /node/deprovision)
-1. Eliminar recursos de MikroTik (8 pasos)
-2. Llamar `deleteNode(pppUser)` que:
-   - DELETE FROM nodes WHERE id = pppUser
-   - DELETE FROM devices WHERE nodeId pertenecía al nodo (buscar por ppp_user en JSON data)
-   - DELETE FROM cpes_conocidos WHERE ap_id en los devices eliminados
-   - DELETE FROM historial_senal WHERE ap_id en los devices eliminados
+**`server/routes/device.routes.js` — `cleanup-orphan-devices`:**
+1. Lee `nodes.data` de cada nodo → extrae MikroTik `.id` → Set de IDs válidos
+2. Busca APs en tabla `aps` cuyo `nodo_id` no está en el Set
+3. Cascade delete: `aps` + `cpes_conocidos`
 
-### Frontend (NodeAccessPanel.tsx → onSuccess del EliminarNodoModal)
-1. `removeNodeFromState(pppUser)` — limpia VpnContext.nodes + revoca túnel si aplica
-2. `deviceDb.cleanupOrphans()` — limpia devices huérfanos en SQLite
-3. `cpeCache.removeByNodeId(nodeId)` — limpia cache de topología
-4. NO llamar `handleLoadNodes()` — sobreescribe el estado recién limpiado
+**Frontend (`NodeAccessPanel.tsx` — `onSuccess`):**
+1. `removeNodeFromState(pppUser)` — limpia VpnContext
+2. `deviceDb.cleanupOrphans()` — limpia SQLite
+3. `deviceDb.removeByIds(deletedDeviceIds)` — limpia por IDs explícitos
+4. `cpeCache.clear()` — limpia IndexedDB topology_cpes
 
-## Archivos involucrados
-- `server/db.service.js` — deleteNode()
-- `server/api.routes.js` — /node/deprovision, /db/cleanup-orphan-devices
-- `vpn-manager/src/context/VpnContext.tsx` — removeNodeFromState()
-- `vpn-manager/src/components/NodeAccessPanel.tsx` — onSuccess del modal
-- `vpn-manager/src/store/deviceDb.ts` — cleanupOrphans()
-- `vpn-manager/src/store/cpeCache.ts` — cache IndexedDB de CPEs
-- `vpn-manager/src/components/ApMonitorModule.tsx` — devices state local
-- `vpn-manager/src/components/NetworkDevicesModule.tsx` — savedDevices state + nodesLengthRef
+## Relación de IDs
+| Entidad | Campo | Ejemplo | Dónde |
+|---------|-------|---------|-------|
+| NodeInfo.id | MikroTik `.id` | `*17` | Frontend, nodes.data |
+| NodeInfo.ppp_user | PPP secret name | `TorreHousenet` | Frontend, nodes.id (PK) |
+| SavedDevice.nodeId | MikroTik `.id` | `*17` | Frontend, aps.nodo_id |
+| nodes.id (SQLite) | ppp_user | `TorreHousenet` | Backend PK |
+
+## Capas de persistencia (todas limpiadas)
+1. SQLite `aps` + `devices` → `deleteNode()` cascade
+2. SQLite `cpes_conocidos` + `historial_senal` → cascade por ap_id
+3. SQLite `node_*` (6 tablas) → cascade por ppp_user
+4. IndexedDB `vpn_store` → `removeNodeFromState()` → auto-save (debounce 500ms)
+5. IndexedDB `topology_cpes` → `cpeCache.clear()`
+6. IndexedDB `antenna_stats_cache` → `statsCache.remove()` via `deviceDb.removeByIds()`
+7. React state → `nodes.length` decrease triggers reload in ApMonitorModule + NetworkDevicesModule
+
+## Bug encadenado corregido (2026-03-28)
+Al enmascarar `pppPassword` en `/node/details` (fix B2), se descubrió que `NodeAccessPanel.tsx` tenía un bug de nombre de campo (`creds?.password` en vez de `creds?.pppPassword`). Esto causaba que la contraseña de DB nunca se cargara, y el fallback de MikroTik guardaba `'********'` como contraseña real.
+Fix: campo corregido + guard contra valores enmascarados.
+
+## Componentes eliminados
+- `ControlPanel.tsx` — Panel original de túneles, reemplazado por NodeAccessPanel.tsx. Eliminado como código muerto.

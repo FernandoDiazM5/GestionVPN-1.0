@@ -41,7 +41,7 @@ export const cpeCache = {
     const keys = await store.keys();
     const items = await Promise.all(keys.map(async k => {
       const item = await store.getItem<SavedDevice>(k);
-      return item && deviceIds.includes(item.nodeId) ? k : null;
+      return item && deviceIds.includes(item.id) ? k : null;
     }));
     await Promise.allSettled(items.filter(Boolean).map(k => store.removeItem(k!)));
   },
