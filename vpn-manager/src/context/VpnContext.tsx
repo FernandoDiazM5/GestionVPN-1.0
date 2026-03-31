@@ -3,7 +3,7 @@ import { dbService, type VpnSecret, type RouterCredentials } from '../store/db';
 import type { NodeInfo } from '../types/api';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { API_BASE_URL } from '../config';
-import { setGlobalToken } from '../main';
+import { setApiToken, getApiToken } from '../utils/apiClient';
 
 interface VpnContextType {
   // Auth
@@ -36,8 +36,8 @@ interface VpnContextType {
   removeNodeFromState: (pppUser: string) => void;
 
   // Navegación
-  activeModule: 'nodes' | 'devices' | 'monitor' | 'topology';
-  setActiveModule: React.Dispatch<React.SetStateAction<'nodes' | 'devices' | 'monitor' | 'topology'>>;
+  activeModule: 'nodes' | 'devices' | 'monitor' | 'topology' | 'settings';
+  setActiveModule: React.Dispatch<React.SetStateAction<'nodes' | 'devices' | 'monitor' | 'topology' | 'settings'>>;
 
   // Tema
   darkMode: boolean;
@@ -53,15 +53,17 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [credentials, setCredentials] = useState<RouterCredentials | undefined>();
   const [managedVpns, setManagedVpns] = useState<VpnSecret[]>([]);
-  const [activeModule, setActiveModule] = useState<'nodes' | 'devices' | 'monitor' | 'topology'>(() => {
+  const [activeModule, setActiveModule] = useState<'nodes' | 'devices' | 'monitor' | 'topology' | 'settings'>(() => {
     const stored = localStorage.getItem('vpn_active_module');
-    return (['nodes', 'devices', 'monitor', 'topology'].includes(stored ?? '') ? stored : 'nodes') as 'nodes' | 'devices' | 'monitor' | 'topology';
+    return (['nodes', 'devices', 'monitor', 'topology', 'settings'].includes(stored ?? '') ? stored : 'nodes') as 'nodes' | 'devices' | 'monitor' | 'topology' | 'settings';
   });
   const [isReady, setIsReady] = useState(false);
   const [scannedSecrets, setScannedSecrets] = useState<VpnSecret[]>([]);
   const [hasScanned, setHasScanned] = useState(false);
   const isLoggingOutRef = useRef(false);
   const deactivateOnReady = useRef(false); // túnel expirado mientras página cerrada
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const immediateSaveRef = useRef(false); // true → el próximo save omite el debounce
 
   // Estado de nodos VRF
   const [nodes, setNodes] = useState<NodeInfo[]>([]);
@@ -75,6 +77,31 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
   const adminIPRef       = useRef<string>('192.168.21.20');
   useEffect(() => { activeNodeVrfRef.current = activeNodeVrf; }, [activeNodeVrf]);
   useEffect(() => { adminIPRef.current = adminIP; }, [adminIP]);
+
+  // BroadcastChannel: sincroniza estado de túnel entre pestañas del mismo origen
+  const tunnelChannelRef = useRef<BroadcastChannel | null>(null);
+  useEffect(() => {
+    const ch = new BroadcastChannel('vpn_tunnel_sync');
+    tunnelChannelRef.current = ch;
+    ch.onmessage = (e) => {
+      const { type, activeNodeVrf: vrf, tunnelExpiry: expiry } = e.data ?? {};
+      if (type === 'tunnel_update') {
+        setActiveNodeVrf(vrf ?? null);
+        setTunnelExpiry(expiry ?? null);
+      }
+    };
+    return () => { ch.close(); tunnelChannelRef.current = null; };
+  }, []);
+
+  // Emitir cambios de túnel a otras pestañas
+  useEffect(() => {
+    if (!isReady) return;
+    tunnelChannelRef.current?.postMessage({
+      type: 'tunnel_update',
+      activeNodeVrf,
+      tunnelExpiry,
+    });
+  }, [activeNodeVrf, tunnelExpiry, isReady]);
 
   // Dark mode y módulo activo — persisten en localStorage
   const [darkMode, setDarkMode] = useState(() => {
@@ -98,14 +125,11 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
     if (!credentials) return;
     try {
       // fetchWithTimeout evita que la llamada cuelgue si el router no responde
+      // apiFetch inyecta automáticamente el JWT
       await fetchWithTimeout(`${API_BASE_URL}/api/tunnel/deactivate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ip: credentials.ip,
-          user: credentials.user,
-          pass: credentials.pass,
-        }),
+        body: JSON.stringify({}),
       }, 15_000);
     } catch (err) {
       console.error('Error desactivando tunnels:', err);
@@ -124,6 +148,9 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
 
   // Limpiar un nodo del estado local sin tocar MikroTik (ya fue deprovisioned)
   const removeNodeFromState = useCallback((pppUser: string) => {
+    // Señalar que el próximo save debe ser inmediato (sin debounce)
+    // para evitar perder la eliminación si el usuario cierra el navegador
+    immediateSaveRef.current = true;
     setNodes(prev => {
       const removed = prev.find(n => n.ppp_user === pppUser);
       if (!removed) return prev;
@@ -179,7 +206,6 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            ip: credentials.ip, user: credentials.user, pass: credentials.pass,
             tunnelIP: hostIP, targetVRF: vrf,
           }),
         }, 12_000);
@@ -211,7 +237,7 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
         if (store.isAuthenticated && store.credentials && store.credentials.token) {
           setIsAuthenticated(true);
           setCredentials(store.credentials);
-          setGlobalToken(store.credentials.token);
+          setApiToken(store.credentials.token);
         }
         if (store.managedVpns?.length) {
           const validVpns = store.managedVpns.filter((v) => !!v.id);
@@ -254,21 +280,68 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isReady, deactivateAllNodes]);
 
-  // Persistir en DB cuando el estado cambie (omitir durante logout)
+  // SSE: suscripción en tiempo real a cambios de túnel (cross-device)
   useEffect(() => {
-    if (isReady && !isLoggingOutRef.current) {
+    if (!isReady || !isAuthenticated) return;
+
+    // Sync inicial desde el backend al conectar
+    fetchWithTimeout(`${API_BASE_URL}/api/tunnel/status`, {}, 5_000)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.success) {
+          setActiveNodeVrf(data.activeNodeVrf ?? null);
+          setTunnelExpiry(data.tunnelExpiry ?? null);
+        }
+      })
+      .catch(() => {});
+
+    // Conexión SSE para recibir cambios en tiempo real desde cualquier dispositivo
+    const token = getApiToken();
+    const es = new EventSource(`${API_BASE_URL}/api/tunnel/events?token=${encodeURIComponent(token)}`);
+    es.onmessage = (e) => {
+      try {
+        const { activeNodeVrf: vrf, tunnelExpiry: expiry } = JSON.parse(e.data);
+        setActiveNodeVrf(vrf ?? null);
+        setTunnelExpiry(expiry ?? null);
+      } catch { /* ignorar mensajes malformados */ }
+    };
+    es.onerror = () => { /* reconexión automática por el browser */ };
+
+    return () => es.close();
+  }, [isReady, isAuthenticated]);
+
+  // Detector Global de Sesión Expirada (401 devuelto por la API)
+  useEffect(() => {
+    const onAuthExpired = () => {
+       console.warn('[AUTH] Token expirado o sesión inválida detectada por la API.');
+       handleLogout();
+    };
+
+    window.addEventListener('auth_expired', onAuthExpired);
+    return () => window.removeEventListener('auth_expired', onAuthExpired);
+  }, []);
+
+  // Persistir en DB cuando el estado cambie
+  // Si immediateSaveRef está activo (ej: nodo eliminado), guarda sin debounce
+  useEffect(() => {
+    if (!isReady || isLoggingOutRef.current) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    const delay = immediateSaveRef.current ? 0 : 500;
+    immediateSaveRef.current = false;
+    saveTimerRef.current = setTimeout(() => {
       dbService.saveStore({
         isAuthenticated, credentials, managedVpns, scannedSecrets,
         activeNodeVrf, tunnelExpiry, adminIP, nodes,
       });
-    }
+    }, delay);
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
   }, [managedVpns, scannedSecrets, isAuthenticated, credentials, isReady, activeNodeVrf, tunnelExpiry, adminIP, nodes]);
 
   const handleLoginSuccess = (creds: RouterCredentials) => {
     setCredentials(creds);
     setIsAuthenticated(true);
     setActiveModule('nodes');
-    if (creds.token) setGlobalToken(creds.token);
+    if (creds.token) setApiToken(creds.token);
   };
 
   const handleLogout = async () => {
@@ -287,7 +360,7 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
     setTunnelExpiry(null);
     setAdminIP('192.168.21.20');
     localStorage.removeItem('vpn_active_module');
-    setGlobalToken('');
+    setApiToken('');
     await dbService.clearStore();
     isLoggingOutRef.current = false;
   };

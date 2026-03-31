@@ -29,9 +29,17 @@ async function initDb() {
         driver: sqlite3.Database
     });
 
+    // Activar soporte para alta concurrencia y foreign keys
+    await db.exec('PRAGMA journal_mode = WAL;');
+    await db.exec('PRAGMA synchronous = NORMAL;');
+    await db.exec('PRAGMA foreign_keys = ON;');
+
     // Usamos una columna 'data' en texto para guardar todo el JSON de los equipos
     // y nodos de forma flexible, facilitando la extracción y guardado.
     await db.exec(`
+        -- DEPRECADA v3.2: Los APs ahora se almacenan en la tabla 'aps' (device.routes.js).
+        -- Esta tabla se mantiene vacía por compatibilidad retroactiva con el código de migración Phase 3.
+        -- NO escribir aquí nuevos registros.
         CREATE TABLE IF NOT EXISTS devices (
             id TEXT PRIMARY KEY,
             data TEXT
@@ -72,7 +80,10 @@ async function initDb() {
             usuario_ssh TEXT DEFAULT '',
             clave_ssh TEXT,
             puerto_ssh INTEGER DEFAULT 22,
+            wifi_password TEXT DEFAULT '',
+            cpes_conectados_count INTEGER DEFAULT 0,
             activo INTEGER DEFAULT 1,
+            last_saved INTEGER NOT NULL,
             registrado_en INTEGER NOT NULL
         );
         CREATE TABLE IF NOT EXISTS cpes_conocidos (
@@ -132,6 +143,13 @@ async function initDb() {
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL DEFAULT ''
         );
+        CREATE TABLE IF NOT EXISTS vpn_users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            role TEXT NOT NULL DEFAULT 'viewer',
+            created_at INTEGER NOT NULL
+        );
     `);
     // Migraciones: añadir columnas si la tabla ya existía sin ellas
     const migrate = async (sql) => {
@@ -146,11 +164,63 @@ async function initDb() {
     await migrate("ALTER TABLE cpes_conocidos ADD COLUMN remote_hostname TEXT DEFAULT ''");
     await migrate("ALTER TABLE cpes_conocidos ADD COLUMN remote_platform TEXT DEFAULT ''");
 
+    // Normalización Phase 3: Columnas explícitas para alto rendimiento
+    await migrate("ALTER TABLE nodes ADD COLUMN nombre_nodo TEXT DEFAULT ''");
+    await migrate("ALTER TABLE nodes ADD COLUMN nombre_vrf TEXT DEFAULT ''");
+    await migrate("ALTER TABLE nodes ADD COLUMN iface_name TEXT DEFAULT ''");
+    await migrate("ALTER TABLE nodes ADD COLUMN segmento_lan TEXT DEFAULT ''");
+    await migrate("ALTER TABLE nodes ADD COLUMN ip_tunnel TEXT DEFAULT ''");
+    
+    await migrate("ALTER TABLE devices ADD COLUMN node_id TEXT DEFAULT ''");
+    await migrate("ALTER TABLE devices ADD COLUMN ip TEXT DEFAULT ''");
+    await migrate("ALTER TABLE devices ADD COLUMN mac TEXT DEFAULT ''");
+
+    // Phase 4: Nuevas columnas aps — partición SQLite/IndexedDB
+    await migrate("ALTER TABLE aps ADD COLUMN wifi_password TEXT DEFAULT ''");
+    await migrate("ALTER TABLE aps ADD COLUMN cpes_conectados_count INTEGER DEFAULT 0");
+    await migrate("ALTER TABLE aps ADD COLUMN last_saved INTEGER DEFAULT 0");
+
+    // Phase 5: Credenciales SSH propias de cada CPE (distintas de las del AP padre)
+    await migrate("ALTER TABLE cpes_conocidos ADD COLUMN usuario_ssh TEXT DEFAULT ''");
+    await migrate("ALTER TABLE cpes_conocidos ADD COLUMN clave_ssh TEXT DEFAULT NULL");
+    await migrate("ALTER TABLE cpes_conocidos ADD COLUMN puerto_ssh INTEGER DEFAULT 22");
+
+    // Backfill de datos JSON a las nuevas columnas
+    try {
+        const unmigratedN = await db.all("SELECT id, data FROM nodes WHERE nombre_nodo IS NULL OR nombre_nodo = ''");
+        if (unmigratedN.length) console.log(`[DB] Migrando ${unmigratedN.length} nodos a DB estructurada...`);
+        for (const r of unmigratedN) {
+            if (!r.data) continue;
+            try {
+                const p = JSON.parse(r.data);
+                await db.run(
+                    `UPDATE nodes SET nombre_nodo=?, nombre_vrf=?, iface_name=?, segmento_lan=?, ip_tunnel=? WHERE id=?`,
+                    [p.nombre_nodo || '', p.nombre_vrf || '', p.iface_name || '', p.segmento_lan || '', p.ip_tunnel || '', r.id]
+                );
+            } catch(e) { console.error('[DB] Error en migración:', e.message); }
+        }
+        
+        const unmigratedD = await db.all("SELECT id, data FROM devices WHERE node_id IS NULL OR node_id = ''");
+        if (unmigratedD.length) console.log(`[DB] Migrando ${unmigratedD.length} dispositivos a DB estructurada...`);
+        for (const r of unmigratedD) {
+            if (!r.data) continue;
+            try {
+                const p = JSON.parse(r.data);
+                await db.run(`UPDATE devices SET node_id=?, ip=?, mac=? WHERE id=?`, [p.nodeId || '', p.ip || '', p.mac || '', r.id]);
+            } catch(e) { console.error('[DB] Error en migración:', e.message); }
+        }
+    } catch(e) { console.error('[DB] Error en Phase 3 Migration', e); }
+
     // B15: Índices para performance
     await db.run('CREATE INDEX IF NOT EXISTS idx_aps_nodo ON aps(nodo_id)');
+    await db.run('CREATE INDEX IF NOT EXISTS idx_aps_activo ON aps(activo)');
     await db.run('CREATE INDEX IF NOT EXISTS idx_cpes_apid ON cpes_conocidos(ap_id)');
     await db.run('CREATE INDEX IF NOT EXISTS idx_hist_mac_ts ON historial_senal(cpe_mac, timestamp DESC)');
     await db.run('CREATE INDEX IF NOT EXISTS idx_hist_apid ON historial_senal(ap_id)');
+    await db.run('CREATE INDEX IF NOT EXISTS idx_node_labels_ppp ON node_labels(ppp_user)');
+    await db.run('CREATE INDEX IF NOT EXISTS idx_node_creds_ppp ON node_creds(ppp_user)');
+    await db.run('CREATE INDEX IF NOT EXISTS idx_node_history_ppp ON node_history(ppp_user)');
+    await db.run('CREATE INDEX IF NOT EXISTS idx_vpn_users_username ON vpn_users(username)');
 
     // B16: Purgar historial más antiguo de 30 días
     const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
@@ -205,8 +275,8 @@ function encryptPass(plaintext) {
         enc += cipher.final('hex');
         return JSON.stringify({ iv: iv.toString('hex'), data: enc, tag: cipher.getAuthTag().toString('hex') });
     } catch (e) {
-        console.error('[DB] encryptPass error', e);
-        return null;
+        console.error('[DB] encryptPass error:', e.message);
+        throw e;
     }
 }
 
@@ -246,8 +316,24 @@ async function saveNode(nodeData) {
         merged = { ...nodeData, created_at: now, updated_at: now };
     }
     await db.run(
-        'INSERT INTO nodes (id, data) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data',
-        [nodeData.ppp_user, JSON.stringify(merged)]
+        `INSERT INTO nodes (id, data, nombre_nodo, nombre_vrf, iface_name, segmento_lan, ip_tunnel) 
+         VALUES (?, ?, ?, ?, ?, ?, ?) 
+         ON CONFLICT(id) DO UPDATE SET 
+            data = excluded.data, 
+            nombre_nodo = excluded.nombre_nodo,
+            nombre_vrf = excluded.nombre_vrf,
+            iface_name = excluded.iface_name,
+            segmento_lan = excluded.segmento_lan,
+            ip_tunnel = excluded.ip_tunnel`,
+        [
+            nodeData.ppp_user, 
+            JSON.stringify(merged),
+            merged.nombre_nodo || '',
+            merged.nombre_vrf || '',
+            merged.iface_name || '',
+            merged.segmento_lan || '',
+            merged.ip_tunnel || ''
+        ]
     );
     return merged;
 }
@@ -257,10 +343,20 @@ async function saveNode(nodeData) {
  */
 async function getNodes() {
     const db = await getDb();
-    const rows = await db.all('SELECT data FROM nodes ORDER BY rowid ASC');
-    return rows
-        .map(r => { try { return JSON.parse(r.data); } catch { return null; } })
-        .filter(Boolean);
+    const rows = await db.all('SELECT id, nombre_nodo, nombre_vrf, iface_name, segmento_lan, ip_tunnel, data FROM nodes ORDER BY rowid ASC');
+    return rows.map(r => {
+        let parsed = {};
+        try { if (r.data) parsed = JSON.parse(r.data); } catch { }
+        return {
+            ...parsed,
+            ppp_user: r.id,
+            nombre_nodo: r.nombre_nodo || parsed.nombre_nodo,
+            nombre_vrf: r.nombre_vrf || parsed.nombre_vrf,
+            iface_name: r.iface_name || parsed.iface_name,
+            segmento_lan: r.segmento_lan || parsed.segmento_lan,
+            ip_tunnel: r.ip_tunnel || parsed.ip_tunnel,
+        };
+    }).filter(Boolean);
 }
 
 /**
@@ -271,24 +367,33 @@ async function deleteNode(pppUser) {
     if (!pppUser) return { devicesDeleted: 0, deviceIds: [] };
     const db = await getDb();
 
-    // IMPORTANTE: devices.data.nodeId almacena el MikroTik .id (ej: "*17"),
-    // mientras que nodes.id = ppp_user (ej: "TorreHousenet").
-    // Primero leemos el nodo para obtener su MikroTik .id y usarlo para buscar devices.
+    // nodes.id = ppp_user, pero nodes.data.id = MikroTik .id (ej: "*17").
+    // La tabla aps.nodo_id almacena el MikroTik .id (viene del frontend como node.id).
+    // Primero leemos el nodo para obtener su MikroTik .id.
     let mikrotikId = null;
     const nodeRow = await db.get('SELECT data FROM nodes WHERE id = ?', [pppUser]);
     if (nodeRow) {
         try { mikrotikId = JSON.parse(nodeRow.data).id; } catch { /* ignore */ }
     }
 
-    // Buscar devices por el MikroTik .id (campo nodeId en el JSON de devices)
-    let deviceIds = [];
+    // Buscar APs en tabla aps por nodo_id (MikroTik .id) o ppp_user (fallback)
+    const searchIds = [pppUser];
+    if (mikrotikId) searchIds.push(String(mikrotikId));
+    const ph = searchIds.map(() => '?').join(',');
+    const apRows = await db.all(`SELECT id FROM aps WHERE nodo_id IN (${ph})`, searchIds);
+    const apIds = apRows.map(r => r.id);
+
+    // También buscar en tabla devices legacy (por si hay datos remanentes)
+    let legacyIds = [];
     if (mikrotikId) {
-        const rows = await db.all(
-            "SELECT id FROM devices WHERE JSON_EXTRACT(data, '$.nodeId') = ?",
-            [mikrotikId]
+        const legacyRows = await db.all(
+            "SELECT id FROM devices WHERE node_id = ? OR (data IS NOT NULL AND JSON_VALID(data) AND JSON_EXTRACT(data, '$.nodeId') = ?)",
+            [String(mikrotikId), String(mikrotikId)]
         );
-        deviceIds = rows.map(r => r.id);
+        legacyIds = legacyRows.map(r => r.id);
     }
+
+    const allDeviceIds = [...new Set([...apIds, ...legacyIds])];
 
     const deletions = [
         db.run('DELETE FROM nodes          WHERE id       = ?', [pppUser]),
@@ -299,19 +404,57 @@ async function deleteNode(pppUser) {
         db.run('DELETE FROM node_ssh_creds WHERE ppp_user = ?', [pppUser]),
     ];
 
-    // Cascade: devices + CPEs + historial
-    if (deviceIds.length > 0) {
-        const ph = deviceIds.map(() => '?').join(',');
+    // Cascade: aps + devices legacy + CPEs + historial
+    if (allDeviceIds.length > 0) {
+        const devPh = allDeviceIds.map(() => '?').join(',');
         deletions.push(
-            db.run(`DELETE FROM devices          WHERE id    IN (${ph})`, deviceIds),
-            db.run(`DELETE FROM historial_senal  WHERE ap_id IN (${ph})`, deviceIds),
-            db.run(`DELETE FROM cpes_conocidos   WHERE ap_id IN (${ph})`, deviceIds),
+            db.run(`DELETE FROM aps              WHERE id    IN (${devPh})`, allDeviceIds),
+            db.run(`DELETE FROM devices          WHERE id    IN (${devPh})`, allDeviceIds),
+            db.run(`DELETE FROM historial_senal  WHERE ap_id IN (${devPh})`, allDeviceIds),
+            db.run(`DELETE FROM cpes_conocidos   WHERE ap_id IN (${devPh})`, allDeviceIds),
         );
     }
 
     await Promise.all(deletions);
-    console.log(`[DB] Nodo eliminado (cascade): ${pppUser} (mikrotikId=${mikrotikId}) — ${deviceIds.length} devices eliminados`);
-    return { devicesDeleted: deviceIds.length, deviceIds };
+    console.log(`[DB] Nodo eliminado (cascade): ${pppUser} (mikrotikId=${mikrotikId}) — ${allDeviceIds.length} APs eliminados`);
+    return { devicesDeleted: allDeviceIds.length, deviceIds: allDeviceIds };
 }
 
-module.exports = { initDb, getDb, encryptDevice, decryptDevice, encryptPass, decryptPass, saveNode, getNodes, deleteNode };
+// ── Gestión de Usuarios (RBAC) ────────────────────────────────────────────
+
+async function hasUsers() {
+    const db = await getDb();
+    const result = await db.get('SELECT COUNT(*) as count FROM vpn_users');
+    return result.count > 0;
+}
+
+async function getUserByUsername(username) {
+    const db = await getDb();
+    return db.get('SELECT * FROM vpn_users WHERE username = ?', [username]);
+}
+
+async function createUser(username, password_hash, role = 'viewer') {
+    const db = await getDb();
+    await db.run('INSERT INTO vpn_users (username, password_hash, role, created_at) VALUES (?, ?, ?, ?)', 
+        [username, password_hash, role, Date.now()]
+    );
+}
+
+// ── Gestión App Settings (Credenciales MikroTik Ocultas) ────────────────
+
+async function setAppSetting(key, value) {
+    const db = await getDb();
+    await db.run('INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value', [key, value]);
+}
+
+async function getAppSetting(key) {
+    const db = await getDb();
+    const result = await db.get('SELECT value FROM app_settings WHERE key = ?', [key]);
+    return result ? result.value : null;
+}
+
+module.exports = { 
+    initDb, getDb, encryptDevice, decryptDevice, encryptPass, decryptPass, 
+    saveNode, getNodes, deleteNode,
+    hasUsers, getUserByUsername, createUser, setAppSetting, getAppSetting
+};

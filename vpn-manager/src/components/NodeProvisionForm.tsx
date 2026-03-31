@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PlusCircle, Copy, Check, Loader2, Terminal, Cpu, ChevronDown, ChevronUp } from 'lucide-react';
+import { PlusCircle, Copy, Check, Loader2, Terminal, Cpu, ChevronDown, ChevronUp, Shield } from 'lucide-react';
 import { useVpn } from '../context/VpnContext';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { API_BASE_URL } from '../config';
@@ -21,6 +21,10 @@ export default function NodeProvisionForm() {
   const [pppPassword, setPppPassword] = useState('');
   const [lanSubnet, setLanSubnet] = useState('');
   const [remoteAddress, setRemoteAddress] = useState('');
+  const [protocol, setProtocol] = useState<'sstp' | 'wireguard'>('sstp');
+  const [cpePublicKey, setCpePublicKey] = useState('');
+  const [serverPublicKey, setWgServerPublicKey] = useState('');
+  const [wgPort, setWgPort] = useState<number | null>(null);
   const [serverPublicIP, setServerPublicIP] = useState('');
 
   const [isProvisioning, setIsProvisioning] = useState(false);
@@ -33,13 +37,14 @@ export default function NodeProvisionForm() {
 
   // Nombres derivados
   const ifaceName = nodeNumber && nodeName
-    ? `VPN-SSTP-ND${nodeNumber}-${nodeName.toUpperCase()}`
+    ? `VPN-${protocol === 'wireguard' ? 'WG' : 'SSTP'}-ND${nodeNumber}-${nodeName.toUpperCase()}`
     : '';
   const vrfName = nodeNumber && nodeName
     ? `VRF-ND${nodeNumber}-${nodeName.toUpperCase()}`
     : '';
 
-  const canProvision = !isProvisioning && nodeNumber && nodeName && pppUser && pppPassword && lanSubnet && remoteAddress;
+  const canProvision = !isProvisioning && nodeNumber && nodeName && lanSubnet && remoteAddress && 
+    (protocol === 'wireguard' ? cpePublicKey : pppUser && pppPassword);
 
   const addLog = (msg: string) =>
     setProvisionLogs(prev => [...prev, msg]);
@@ -50,6 +55,8 @@ export default function NodeProvisionForm() {
     setProvisionLogs([]);
     setProvisionError('');
     setGeneratedScript('');
+    setWgServerPublicKey('');
+    setWgPort(null);
 
     addLog(`Provisionando ND${nodeNumber}-${nodeName.toUpperCase()}...`);
 
@@ -67,6 +74,8 @@ export default function NodeProvisionForm() {
           pppPassword,
           lanSubnet,
           remoteAddress,
+          protocol,
+          cpePublicKey
         }),
       }, 30_000);
 
@@ -84,6 +93,11 @@ export default function NodeProvisionForm() {
       }
 
       addLog(`✓ Nodo ND${nodeNumber}-${nodeName.toUpperCase()} creado exitosamente`);
+      
+      if (protocol === 'wireguard' && data.serverPublicKey) {
+        setWgServerPublicKey(data.serverPublicKey);
+        setWgPort(data.wgPort);
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error desconocido';
       setProvisionError(msg);
@@ -174,24 +188,67 @@ export default function NodeProvisionForm() {
               />
             </div>
             <div>
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 block">Usuario PPP</label>
-              <input
-                value={pppUser}
-                onChange={e => setPppUser(e.target.value)}
-                placeholder="TorreEtapa12"
-                className="input-field w-full"
-              />
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 block">Protocolo</label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setProtocol('sstp')}
+                  className={`flex-1 py-2 px-3 rounded-lg text-xs font-semibold border transition-colors ${
+                    protocol === 'sstp'
+                      ? 'bg-sky-50 border-sky-400 text-sky-700'
+                      : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'
+                  }`}
+                >
+                  SSTP
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setProtocol('wireguard')}
+                  className={`flex-1 py-2 px-3 rounded-lg text-xs font-semibold border transition-colors ${
+                    protocol === 'wireguard'
+                      ? 'bg-violet-50 border-violet-400 text-violet-700'
+                      : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'
+                  }`}
+                >
+                  WireGuard
+                </button>
+              </div>
             </div>
-            <div>
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 block">Contraseña PPP</label>
-              <input
-                type="password"
-                value={pppPassword}
-                onChange={e => setPppPassword(e.target.value)}
-                placeholder="••••••••"
-                className="input-field w-full"
-              />
-            </div>
+            {protocol === 'sstp' ? (
+              <>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 block">Usuario PPP</label>
+                  <input
+                    value={pppUser}
+                    onChange={e => setPppUser(e.target.value)}
+                    placeholder="TorreEtapa12"
+                    className="input-field w-full"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 block">Contraseña PPP</label>
+                  <input
+                    type="password"
+                    value={pppPassword}
+                    onChange={e => setPppPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="input-field w-full"
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="sm:col-span-2">
+                <label className="text-xs font-semibold text-slate-600">Clave Pública WireGuard del CPE</label>
+                <textarea
+                  value={cpePublicKey}
+                  onChange={e => setCpePublicKey(e.target.value)}
+                  placeholder="Pega aquí la public key del MikroTik remoto..."
+                  rows={2}
+                  className="w-full mt-1 px-3 py-2 text-xs font-mono border border-slate-200 rounded-lg resize-none focus:border-violet-400 outline-none"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">Obtener en el router torre: /interface/wireguard/print</p>
+              </div>
+            )}
             <div>
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 block">Subred LAN Remota</label>
               <input
@@ -279,6 +336,37 @@ export default function NodeProvisionForm() {
           {provisionError && !isProvisioning && (
             <div className="px-3 py-2 bg-rose-50 border border-rose-200 rounded-xl">
               <p className="text-xs font-semibold text-rose-600">⚠ {provisionError}</p>
+            </div>
+          )}
+
+          {/* Detalles post-provisión para WireGuard */}
+          {serverPublicKey && (
+            <div className="bg-violet-50 border border-violet-200 rounded-lg p-3 mt-2">
+              <p className="text-xs font-semibold text-violet-700 mb-1 flex items-center gap-1.5">
+                <Shield className="w-3.5 h-3.5" />
+                Clave Pública del Servidor (para configurar el CPE):
+              </p>
+              <code className="text-[10px] font-mono text-violet-900 break-all block mb-2">{serverPublicKey}</code>
+              <button
+                onClick={() => navigator.clipboard.writeText(serverPublicKey)}
+                className="text-[10px] text-violet-600 hover:text-violet-800 font-semibold"
+              >
+                Copiar
+              </button>
+              {wgPort && (
+                <div className="mt-2 pt-2 border-t border-violet-200">
+                  <p className="text-[10px] font-bold text-violet-500 uppercase tracking-wider mb-1">Listen Port</p>
+                  <div className="flex items-center gap-2">
+                    <code className="text-xs font-mono text-violet-900">{wgPort}</code>
+                    <button
+                      onClick={() => navigator.clipboard.writeText(String(wgPort))}
+                      className="text-[10px] text-violet-600 hover:text-violet-800 font-semibold"
+                    >
+                      Copiar
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

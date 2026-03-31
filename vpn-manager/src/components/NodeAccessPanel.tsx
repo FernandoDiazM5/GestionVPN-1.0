@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { apiFetch } from '../utils/apiClient';
 import {
   RefreshCw, Search,
   ShieldCheck, ShieldOff, AlertCircle, Radio, Clock, X,
@@ -30,6 +31,7 @@ interface ProvisionResult {
   remoteAddress?: string;
   steps: ProvisionStep[];
   failedAt?: number;
+  serverPublicKey?: string;
 }
 
 // ── Helper: detección de solapamiento de subnets ─────────────────────────
@@ -76,7 +78,7 @@ function StepResultList({ steps, failedAt, visible }: {
 }) {
   return (
     <div className="space-y-1.5">
-      {steps.slice(0, visible).map(s => (
+      {(steps ?? []).slice(0, visible).map(s => (
         <div key={String(s.step)} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs border
           animate-in fade-in slide-in-from-left-2 duration-200
           ${s.status === 'ok' ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'}`}>
@@ -145,6 +147,10 @@ function NuevoNodoModal({
   const [showResPass, setShowResPass] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [lanSubnets, setLanSubnets] = useState<string[]>(['']);
+  const [protocol, setProtocol] = useState<'sstp' | 'wireguard'>('sstp');
+  const [cpePublicKey, setCpePublicKey] = useState('');
+  const [serverPublicKey, setServerPublicKey] = useState('');
+  const [wanIp, setWanIp] = useState<string>(() => localStorage.getItem('wg_wan_ip') ?? '');
 
   // Generar contraseña segura al abrir el modal
   useEffect(() => { setPppPass(generateSecurePassword()); }, []);
@@ -163,7 +169,7 @@ function NuevoNodoModal({
 
   const nameClean = nombre.toUpperCase().replace(/[^A-Z0-9]/g, '');
   const ndNum = nextNode ?? '?';
-  const ifaceName = nameClean ? `VPN-SSTP-ND${ndNum}-${nameClean}` : '';
+  const ifaceName = nameClean ? `VPN-${protocol === 'wireguard' ? 'WG' : 'SSTP'}-ND${ndNum}-${nameClean}` : '';
   const vrfName = nameClean ? `VRF-ND${ndNum}-${nameClean}` : '';
 
   // Auto-generar usuario PPP: ppp-pass-{nombreLimpio} (en minúsculas, único por nodo)
@@ -226,10 +232,19 @@ function NuevoNodoModal({
     return () => clearInterval(id);
   }, [result]);
 
-  const canSubmit = nameClean.length >= 2 && pppUser.trim() && pppPass.trim()
+  const canSubmit = nameClean.length >= 2
+    && (protocol === 'sstp' ? (!!pppUser.trim() && !!pppPass.trim()) : true)
     && validSubnets.length > 0 && nextNode != null && !provisioning && subnetConflicts.length === 0;
 
-  const PASOS_LABELS = [
+  const PASOS_LABELS = protocol === 'wireguard' ? [
+    'WireGuard Interface',
+    'WireGuard Peer (CPE)',
+    'IP del túnel WireGuard',
+    'Interface List (LIST-VPN-TOWERS)',
+    'VRF',
+    'Rutas LAN remota(s)',
+    'Ruta retorno MGMT',
+  ] : [
     'PPP Secret',
     'SSTP Interface',
     'Interface List (LIST-VPN-TOWERS)',
@@ -251,10 +266,15 @@ function NuevoNodoModal({
           pppUser: pppUser.trim(), pppPassword: pppPass,
           lanSubnets: validSubnets,
           remoteAddress: nextRemote,
+          protocol,
+          cpePublicKey: protocol === 'wireguard' ? cpePublicKey.trim() : undefined,
         }),
       }, 90_000);
       const d: ProvisionResult = await r.json();
       setResult(d);
+      if (d.success && d.serverPublicKey) {
+        setServerPublicKey(d.serverPublicKey);
+      }
       // El backend ya guardó el nodo + contraseña en SQLite durante /node/provision.
       // Aquí solo guardamos la etiqueta con el nombre original (puede tener tildes/espacios).
       if (d.success) {
@@ -343,53 +363,118 @@ function NuevoNodoModal({
                     ))}
                   </div>
 
-                  {/* ── Credenciales para MikroTik ── */}
-                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2">
-                    <div className="flex items-center gap-2 mb-3">
-                      <ShieldCheck className="w-4 h-4 text-amber-600" />
-                      <p className="text-xs font-bold text-amber-700 uppercase tracking-wider">Credenciales PPP — para ingresar en MikroTik</p>
-                    </div>
-                    {/* Usuario */}
-                    <div className="flex items-center justify-between bg-white border border-amber-100 rounded-lg px-3 py-2.5 gap-3">
-                      <div className="min-w-0">
-                        <p className="text-[9px] font-bold text-amber-500 uppercase tracking-wider">Usuario PPP</p>
-                        <p className="text-sm font-mono font-bold text-slate-800">{pppUser}</p>
+                  {/* ── Credenciales para MikroTik (solo SSTP) ── */}
+                  {protocol === 'sstp' && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2">
+                      <div className="flex items-center gap-2 mb-3">
+                        <ShieldCheck className="w-4 h-4 text-amber-600" />
+                        <p className="text-xs font-bold text-amber-700 uppercase tracking-wider">Credenciales PPP — para ingresar en MikroTik</p>
                       </div>
-                      <button onClick={() => copyField(pppUser, 'res-user')}
-                        className="p-1.5 text-slate-400 hover:text-emerald-600 rounded-lg transition-colors shrink-0">
-                        {copiedField === 'res-user' ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
-                      </button>
-                    </div>
-                    {/* Contraseña */}
-                    <div className="flex items-center justify-between bg-white border border-amber-100 rounded-lg px-3 py-2.5 gap-3">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[9px] font-bold text-amber-500 uppercase tracking-wider">Contraseña PPP</p>
-                        <p className={`text-sm font-mono font-bold text-slate-800 truncate transition-all ${showResPass ? '' : 'blur-sm select-none'}`}>
-                          {pppPass}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button onClick={() => setShowResPass(v => !v)}
-                          className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg transition-colors">
-                          {showResPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                        <button onClick={() => copyField(pppPass, 'res-pass')}
-                          className="p-1.5 text-slate-400 hover:text-emerald-600 rounded-lg transition-colors">
-                          {copiedField === 'res-pass' ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                      {/* Usuario */}
+                      <div className="flex items-center justify-between bg-white border border-amber-100 rounded-lg px-3 py-2.5 gap-3">
+                        <div className="min-w-0">
+                          <p className="text-[9px] font-bold text-amber-500 uppercase tracking-wider">Usuario PPP</p>
+                          <p className="text-sm font-mono font-bold text-slate-800">{pppUser}</p>
+                        </div>
+                        <button onClick={() => copyField(pppUser, 'res-user')}
+                          className="p-1.5 text-slate-400 hover:text-emerald-600 rounded-lg transition-colors shrink-0">
+                          {copiedField === 'res-user' ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
                         </button>
                       </div>
+                      {/* Contraseña */}
+                      <div className="flex items-center justify-between bg-white border border-amber-100 rounded-lg px-3 py-2.5 gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[9px] font-bold text-amber-500 uppercase tracking-wider">Contraseña PPP</p>
+                          <p className={`text-sm font-mono font-bold text-slate-800 truncate transition-all ${showResPass ? '' : 'blur-sm select-none'}`}>
+                            {pppPass}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button onClick={() => setShowResPass(v => !v)}
+                            className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg transition-colors">
+                            {showResPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                          <button onClick={() => copyField(pppPass, 'res-pass')}
+                            className="p-1.5 text-slate-400 hover:text-emerald-600 rounded-lg transition-colors">
+                            {copiedField === 'res-pass' ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-amber-600 pt-1">
+                        Guarda estas credenciales — también las encontrarás en el botón de Script del nodo.
+                      </p>
                     </div>
-                    <p className="text-[10px] text-amber-600 pt-1">
-                      Guarda estas credenciales — también las encontrarás en el botón de Script del nodo.
-                    </p>
-                  </div>
+                  )}
                 </>
               )}
 
               <div>
                 <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">Pasos ejecutados</p>
-                <StepResultList steps={result.steps} failedAt={result.failedAt} visible={visibleSteps} />
+                <StepResultList steps={result.steps ?? []} failedAt={result.failedAt} visible={visibleSteps} />
               </div>
+
+              {serverPublicKey && (
+                <div className="mt-3 p-3 bg-violet-50 border border-violet-200 rounded-lg">
+                  <p className="text-[10px] font-bold text-violet-600 uppercase tracking-wider mb-1">Clave Pública del Servidor WireGuard</p>
+                  <p className="font-mono text-xs text-violet-800 break-all">{serverPublicKey}</p>
+                  <p className="text-[10px] text-violet-500 mt-1">Configurar esta clave en el router torre como peer del servidor</p>
+                </div>
+              )}
+
+              {protocol === 'wireguard' && result.success && (() => {
+                const wgNodeNum = nextNode ?? 0;
+                // Usar valores reales del backend si están disponibles
+                const peerIP = (result as { peerIP?: string }).peerIP ?? `10.10.251.${wgNodeNum * 4 - 2}`;
+                const wgPort = (result as { wgPort?: number }).wgPort ?? (13300 + wgNodeNum);
+                const serverIP = wanIp || credentials?.ip || '<IP-servidor>';
+                // Calcular el /30 del peer: peerIP termina en .2, .6, .10, .14...
+                // networkBase = peerIP - 2 (ej: .14 → .12), serverEnd = peerIP - 1 (ej: .13)
+                const peerOct = parseInt(peerIP.split('.')[3] ?? '2');
+                const blockBase30 = peerOct - 2; // base de la red /30
+                const tunnelNet30 = `10.10.251.${blockBase30}/30`;
+                const cpeSteps = [
+                  { n: 1, title: 'Crear interfaz WireGuard', cmd: `/interface wireguard add name=WG-CORE-ISP mtu=1420 comment="Conexion al Servidor Core"` },
+                  { n: 2, title: 'Asignar IP al túnel (/30)', cmd: `/ip address add address=${peerIP}/30 interface=WG-CORE-ISP network=10.10.251.${blockBase30} comment="IP WG Cliente ND${wgNodeNum}"` },
+                  { n: 3, title: 'Agregar peer (servidor Core)', cmd: serverPublicKey
+                    ? `/interface wireguard peers add interface=WG-CORE-ISP public-key="${serverPublicKey}" endpoint-address=${serverIP} endpoint-port=${wgPort} allowed-address=192.168.21.0/24,${tunnelNet30} persistent-keepalive=25s comment="Conexion al Servidor Core"`
+                    : '(esperando clave pública del servidor)' },
+                  { n: 4, title: 'Ruta de retorno hacia administración', cmd: `/ip route add dst-address=192.168.21.0/24 gateway=WG-CORE-ISP comment="Retorno hacia Administracion/Software"` },
+                ];
+                return (
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Globe className="w-4 h-4 text-slate-600" />
+                      <p className="text-xs font-bold text-slate-600 uppercase tracking-wider">Pasos a configurar en el router torre (CPE)</p>
+                    </div>
+                    {!cpePublicKey && (
+                      <div className="mb-3 p-2.5 bg-amber-50 border border-amber-200 rounded-lg">
+                        <p className="text-[10px] font-semibold text-amber-700">
+                          Nodo creado sin peer CPE. Configura el router torre con los comandos de abajo, obtén su public key y agrégala desde las opciones del nodo.
+                        </p>
+                      </div>
+                    )}
+                    <ol className="space-y-2">
+                      {cpeSteps.map(step => (
+                        <li key={step.n} className="flex items-start gap-3 bg-white border border-slate-100 rounded-lg px-3 py-2.5">
+                          <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-600 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{step.n}</span>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-semibold text-slate-700 mb-0.5">{step.title}</p>
+                            <p className="text-[10px] font-mono text-violet-700 break-all bg-violet-50 rounded px-2 py-1 mt-1">{step.cmd}</p>
+                          </div>
+                          <button onClick={() => navigator.clipboard.writeText(step.cmd)}
+                            className="p-1.5 text-slate-400 hover:text-emerald-600 rounded-lg transition-colors shrink-0 mt-0.5"
+                            title="Copiar">
+                            <Copy className="w-3.5 h-3.5" />
+                          </button>
+                        </li>
+                      ))}
+                    </ol>
+                    <p className="text-[10px] text-slate-400 mt-3">
+                      Luego obtén la public key del CPE con: <span className="font-mono">/interface wireguard print</span>
+                    </p>
+                  </div>
+                );
+              })()}
 
               <button onClick={() => { result.success ? onSuccess() : onClose(); }}
                 className="w-full py-2.5 rounded-xl text-sm font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors">
@@ -412,7 +497,7 @@ function NuevoNodoModal({
                   {[
                     { l: 'Número Nodo', v: nextNode != null ? `ND${nextNode}` : '—' },
                     { l: 'IP Túnel (remota)', v: nextRemote || '—' },
-                    { l: 'Interfaz SSTP', v: ifaceName || '(ingresar nombre)' },
+                    { l: `Interfaz ${protocol === 'wireguard' ? 'WG' : 'SSTP'}`, v: ifaceName || '(ingresar nombre)' },
                     { l: 'VRF', v: vrfName || '(ingresar nombre)' },
                   ].map(row => (
                     <div key={row.l} className="bg-white rounded-lg px-3 py-2 border border-indigo-100">
@@ -437,6 +522,26 @@ function NuevoNodoModal({
                   {nameClean && <p className="text-[10px] text-slate-400 mt-0.5">Se usará: <span className="font-mono font-bold text-indigo-600">{nameClean}</span></p>}
                 </div>
 
+                {/* Toggle de protocolo */}
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 block">Protocolo</label>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setProtocol('sstp')}
+                      className={`flex-1 py-2 px-3 rounded-lg text-xs font-semibold border transition-colors ${
+                        protocol === 'sstp' ? 'bg-sky-50 border-sky-400 text-sky-700' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'
+                      }`}>
+                      SSTP
+                    </button>
+                    <button type="button" onClick={() => setProtocol('wireguard')}
+                      className={`flex-1 py-2 px-3 rounded-lg text-xs font-semibold border transition-colors ${
+                        protocol === 'wireguard' ? 'bg-violet-50 border-violet-400 text-violet-700' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'
+                      }`}>
+                      WireGuard
+                    </button>
+                  </div>
+                </div>
+
+                {protocol === 'sstp' && (<>
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">
                     Usuario PPP <span className="text-rose-500">*</span>
@@ -487,6 +592,38 @@ function NuevoNodoModal({
                   </div>
                   <p className="text-[10px] text-slate-400 mt-0.5">Puedes editar o regenerar — se guardará en la base de datos local</p>
                 </div>
+                </>)}
+
+                {protocol === 'wireguard' && (
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 block">IP Pública WAN del Servidor</label>
+                    <input
+                      value={wanIp}
+                      onChange={e => { setWanIp(e.target.value); localStorage.setItem('wg_wan_ip', e.target.value); }}
+                      placeholder="213.173.36.232"
+                      className="input-field w-full font-mono text-sm"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">IP pública del MikroTik. Se guarda automáticamente para próximos nodos.</p>
+                  </div>
+                )}
+
+                {protocol === 'wireguard' && (
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 block">
+                      Clave Pública del CPE <span className="text-slate-400 font-normal normal-case">(opcional)</span>
+                    </label>
+                    <textarea
+                      value={cpePublicKey}
+                      onChange={e => setCpePublicKey(e.target.value)}
+                      placeholder="Dejar vacío si aún no configuraste WireGuard en el router torre..."
+                      className="input-field w-full font-mono text-xs resize-none"
+                      rows={3}
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Si no la tienes aún: crea el nodo primero, obtén la clave del servidor y configura el CPE. Luego agrega la clave del CPE desde el script del nodo.
+                    </p>
+                  </div>
+                )}
 
                 {/* Múltiples subnets */}
                 <div>
@@ -635,7 +772,7 @@ function EliminarNodoModal({
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ip: credentials.ip, user: credentials.user, pass: credentials.pass,
-          vrfName: node.nombre_vrf, pppUser: node.ppp_user, lanSubnets,
+          vrfName: node.nombre_vrf, pppUser: node.ppp_user, lanSubnets, protocol: node.service,
         }),
       }, 60_000);
       const d = await r.json();
@@ -705,7 +842,7 @@ function EliminarNodoModal({
               </div>
               <div>
                 <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">Pasos ejecutados</p>
-                <StepResultList steps={result.steps} failedAt={result.failedAt} visible={visibleSteps} />
+                <StepResultList steps={result.steps ?? []} failedAt={result.failedAt} visible={visibleSteps} />
               </div>
               <button onClick={() => result.success ? onSuccess(deletedDeviceIds) : onClose()}
                 className="w-full py-2.5 rounded-xl text-sm font-bold bg-rose-600 text-white hover:bg-rose-700 transition-colors">
@@ -773,6 +910,7 @@ function EditarNodoModal({
   onSuccess: (newLabel?: string) => void;
 }) {
   const { credentials } = useVpn();
+  const isWg = node.service === 'wireguard';
   const [currentSubnets, setCurrentSubnets] = useState<string[]>([]);
   const [currentRemoteIP, setCurrentRemoteIP] = useState('');
   const [loadingDetails, setLoadingDetails] = useState(true);
@@ -841,13 +979,13 @@ function EditarNodoModal({
 
       // ── 3. Aplicar contraseña: DB tiene prioridad, MikroTik es fallback ──
       const creds = credsRes.status === 'fulfilled' ? credsRes.value : null;
-      const dbPass: string = (creds?.success && creds?.password) ? creds.password : '';
+      const dbPass: string = (creds?.success && creds?.pppPassword) ? creds.pppPassword : '';
 
       if (dbPass) {
         // Caso A: clave ya guardada en DB → mostrarla
         setLoadedPass(dbPass);
         setNewPass(dbPass);
-      } else if (mikrotikPass) {
+      } else if (mikrotikPass && mikrotikPass !== '********') {
         // Caso B: no está en DB pero MikroTik la tiene → mostrarla Y guardarla
         setNewPass(mikrotikPass);
         try {
@@ -967,7 +1105,7 @@ function EditarNodoModal({
                   <p className="text-xs text-slate-500 mt-0.5">{result.message}</p>
                 </div>
               </div>
-              <StepResultList steps={result.steps} failedAt={result.failedAt} visible={visibleSteps} />
+              <StepResultList steps={result.steps ?? []} failedAt={result.failedAt} visible={visibleSteps} />
               <button onClick={() => result.success ? onSuccess(labelChanged ? newLabel.trim() : undefined) : onClose()}
                 className="w-full py-2.5 rounded-xl text-sm font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors">
                 {result.success ? 'Listo' : 'Cerrar'}
@@ -989,7 +1127,7 @@ function EditarNodoModal({
                 {[
                   { l: 'Nodo', v: node.nombre_nodo },
                   { l: 'VRF', v: node.nombre_vrf || '—' },
-                  { l: 'Interfaz SSTP', v: node.nombre_vrf?.replace(/^VRF-/, 'VPN-SSTP-') || '—' },
+                  { l: isWg ? 'Interfaz WG' : 'Interfaz SSTP', v: node.nombre_vrf?.replace(/^VRF-/, isWg ? 'VPN-WG-' : 'VPN-SSTP-') || '—' },
                   { l: 'IP Túnel actual', v: currentRemoteIP || node.ip_tunnel || '—' },
                 ].map(row => (
                   <div key={row.l} className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">
@@ -1012,7 +1150,8 @@ function EditarNodoModal({
                   {labelChanged && <p className="text-[10px] text-amber-600 mt-0.5">Cambiará de <span className="font-mono font-bold">{node.nombre_nodo}</span> a <span className="font-mono font-bold">{newLabel}</span></p>}
                 </div>
 
-                {/* Usuario PPP */}
+                {/* Usuario PPP — solo SSTP */}
+                {!isWg && (
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">Usuario PPP</label>
                   <input value={newPppUser} onChange={e => setNewPppUser(e.target.value)}
@@ -1022,8 +1161,10 @@ function EditarNodoModal({
                       ${pppUserChanged ? 'border-amber-300 bg-amber-50' : 'border-slate-200'}`} />
                   {pppUserChanged && <p className="text-[10px] text-amber-600 mt-0.5">Cambiará de <span className="font-mono font-bold">{node.ppp_user}</span> a <span className="font-mono font-bold">{newPppUser}</span></p>}
                 </div>
+                )}
 
-                {/* Contraseña */}
+                {/* Contraseña PPP — solo SSTP */}
+                {!isWg && (
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="text-xs font-semibold text-slate-600">Contraseña PPP</label>
@@ -1090,8 +1231,10 @@ function EditarNodoModal({
                     </div>
                   )}
                 </div>
+                )}
 
-                {/* IP Túnel remota */}
+                {/* IP Túnel remota — solo SSTP */}
+                {!isWg && (
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">IP Túnel remota (PPP remote-address)</label>
                   <input value={newRemote} onChange={e => setNewRemote(e.target.value)}
@@ -1100,6 +1243,7 @@ function EditarNodoModal({
                       ${newRemote && !IPV4_RE.test(newRemote.trim()) ? 'border-rose-300 focus:ring-rose-300' : remoteChanged ? 'border-amber-300 bg-amber-50' : 'border-slate-200 focus:ring-indigo-300'}`} />
                   {remoteChanged && <p className="text-[10px] text-amber-600 mt-0.5">Cambiará de <span className="font-mono font-bold">{currentRemoteIP}</span> a <span className="font-mono font-bold">{newRemote}</span></p>}
                 </div>
+                )}
               </div>
 
               {/* Subnets actuales */}
@@ -1420,7 +1564,7 @@ function ScriptModal({ node, onClose }: { node: NodeInfo; onClose: () => void })
               <input value={serverIP} onChange={e => {
                 setServerIP(e.target.value);
                 localStorage.setItem('server_public_ip', e.target.value.trim());
-                fetch(`${API_BASE_URL}/api/settings/save`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'server_public_ip', value: e.target.value.trim() }) }).catch(() => { });
+                apiFetch(`${API_BASE_URL}/api/settings/save`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'server_public_ip', value: e.target.value.trim() }) }).catch(() => { });
               }}
                 placeholder="Ej: 213.173.36.232"
                 className={`w-full px-3 py-2 text-sm border rounded-xl focus:outline-none focus:ring-2 font-mono
@@ -1500,7 +1644,7 @@ function HistoryModal({ node, onClose }: { node: NodeInfo; onClose: () => void }
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${API_BASE_URL}/api/node/history/get`, {
+    apiFetch(`${API_BASE_URL}/api/node/history/get`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pppUser: node.ppp_user }),
     }).then(r => r.json()).then(d => { if (d.success) setHistory(d.history || []); })
@@ -1684,13 +1828,13 @@ function BatchCsvModal({ onClose, onSuccess, nodes }: { onClose: () => void; onS
       setResults(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'processing' } : r));
       try {
         // Get next node number
-        const nextRes = await fetch(`${API_BASE_URL}/api/node/next`, {
+        const nextRes = await apiFetch(`${API_BASE_URL}/api/node/next`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ip: credentials.ip, user: credentials.user, pass: credentials.pass }),
         }).then(r => r.json());
         if (!nextRes.success) throw new Error(nextRes.message || 'Error obteniendo número de nodo');
         const nameClean = row.nombre.toUpperCase().replace(/[^A-Z0-9]/g, '');
-        const provRes = await fetch(`${API_BASE_URL}/api/node/provision`, {
+        const provRes = await apiFetch(`${API_BASE_URL}/api/node/provision`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             ip: credentials.ip, user: credentials.user, pass: credentials.pass,
@@ -1702,7 +1846,7 @@ function BatchCsvModal({ onClose, onSuccess, nodes }: { onClose: () => void; onS
         if (provRes.success) {
           setResults(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'ok', message: provRes.message } : r));
           // Save creds
-          fetch(`${API_BASE_URL}/api/node/creds/save`, {
+          apiFetch(`${API_BASE_URL}/api/node/creds/save`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ pppUser: row.usuario, pppPassword: row.pass }),
           }).catch(() => { });
@@ -1867,6 +2011,7 @@ export default function NodeAccessPanel() {
     adminIP, setAdminIP,
     deactivateAllNodes,
     removeNodeFromState,
+    isReady,
   } = useVpn();
 
   // Si ya hay nodos en contexto (persistidos) mostramos directo sin necesidad de recargar
@@ -1958,13 +2103,13 @@ export default function NodeAccessPanel() {
       setNodes(nodeList);
       disconnected.forEach(n => {
         addToast(`${n.nombre_nodo} se desconectó del VPN`, 'warn');
-        fetch(`${API_BASE_URL}/api/node/history/add`, {
+        apiFetch(`${API_BASE_URL}/api/node/history/add`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ pppUser: n.ppp_user, event: 'disconnected' }),
         }).catch(() => { });
       });
       reconnected.forEach(n => {
-        fetch(`${API_BASE_URL}/api/node/history/add`, {
+        apiFetch(`${API_BASE_URL}/api/node/history/add`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ pppUser: n.ppp_user, event: 'connected' }),
         }).catch(() => { });
@@ -1986,6 +2131,26 @@ export default function NodeAccessPanel() {
     return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
   }, [hasLoaded, credentials, silentPoll]);
 
+  // Auto-sync silencioso al montar: una vez que IndexedDB cargó (isReady) y hay
+  // credenciales válidas, sincronizar contra MikroTik para purgar nodos fantasma
+  const autoSyncRanRef = useRef(false);
+  useEffect(() => {
+    if (!isReady || !credentials || autoSyncRanRef.current) return;
+    autoSyncRanRef.current = true;
+    const timer = setTimeout(async () => {
+      try {
+        const live = await fetchNodes();
+        if (!live) return;
+        setNodes(live);
+        setHasLoaded(true);
+      } catch {
+        // Silencioso — si el backend no responde, conservar caché
+      }
+    }, 2000);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isReady, credentials]);
+
   // Alerta de renovación cuando quedan < 2 min
   useEffect(() => {
     if (!tunnelExpiry) { setShowRenewalWarn(false); return; }
@@ -2002,7 +2167,7 @@ export default function NodeAccessPanel() {
   useEffect(() => {
     if (!tagsLoadedRef.current) {
       tagsLoadedRef.current = true;
-      fetch(`${API_BASE_URL}/api/node/tags`)
+      apiFetch(`${API_BASE_URL}/api/node/tags`)
         .then(r => r.json())
         .then(d => { if (d.success) setNodeTags(d.tags || {}); })
         .catch(() => { });
@@ -2011,7 +2176,7 @@ export default function NodeAccessPanel() {
 
   // Cargar IP del servidor SSTP desde la base de datos al iniciar
   useEffect(() => {
-    fetch(`${API_BASE_URL}/api/settings/get`)
+    apiFetch(`${API_BASE_URL}/api/settings/get`)
       .then(r => r.json())
       .then(d => {
         if (d.success && d.settings?.server_public_ip) {
@@ -2025,7 +2190,7 @@ export default function NodeAccessPanel() {
 
   const saveNodeTags = (pppUser: string, tags: string[]) => {
     setNodeTags(prev => ({ ...prev, [pppUser]: tags }));
-    fetch(`${API_BASE_URL}/api/node/tag/save`, {
+    apiFetch(`${API_BASE_URL}/api/node/tag/save`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pppUser, tags }),
     }).catch(() => { });
@@ -2085,7 +2250,7 @@ export default function NodeAccessPanel() {
     if (credentials && !wgLoadedRef.current) {
       wgLoadedRef.current = true;
       loadWgPeers();
-      fetch(`${API_BASE_URL}/api/wireguard/peer/colors`)
+      apiFetch(`${API_BASE_URL}/api/wireguard/peer/colors`)
         .then(r => r.json())
         .then(d => { if (d.success) setPeerColors(d.colors || {}); })
         .catch(() => { });
@@ -2095,7 +2260,7 @@ export default function NodeAccessPanel() {
   const savePeerColor = (peerAddress: string, color: string) => {
     setPeerColors(prev => ({ ...prev, [peerAddress]: color }));
     setColorPickerAddr(null);
-    fetch(`${API_BASE_URL}/api/wireguard/peer/color/save`, {
+    apiFetch(`${API_BASE_URL}/api/wireguard/peer/color/save`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ peerAddress, color }),
     }).catch(() => { });
@@ -2191,14 +2356,14 @@ export default function NodeAccessPanel() {
                 onBlur={() => {
                   const ip = globalServerIP.trim();
                   localStorage.setItem('server_public_ip', ip);
-                  fetch(`${API_BASE_URL}/api/settings/save`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'server_public_ip', value: ip }) }).catch(() => { });
+                  apiFetch(`${API_BASE_URL}/api/settings/save`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'server_public_ip', value: ip }) }).catch(() => { });
                   setEditingGlobalIP(false);
                 }}
                 onKeyDown={e => {
                   if (e.key === 'Enter') {
                     const ip = globalServerIP.trim();
                     localStorage.setItem('server_public_ip', ip);
-                    fetch(`${API_BASE_URL}/api/settings/save`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'server_public_ip', value: ip }) }).catch(() => { });
+                    apiFetch(`${API_BASE_URL}/api/settings/save`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'server_public_ip', value: ip }) }).catch(() => { });
                     setEditingGlobalIP(false);
                   }
                   if (e.key === 'Escape') { setGlobalServerIP(localStorage.getItem('server_public_ip') || ''); setEditingGlobalIP(false); }

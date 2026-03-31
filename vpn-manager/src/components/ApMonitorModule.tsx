@@ -34,7 +34,7 @@ const fmtMbps = (v?: number | null) => {
   return `${Number(v).toFixed(1)} Mbps`;
 };
 // Alias para no romper referencias existentes
-const fmtRate = fmtMbps;
+const _fmtRate = fmtMbps; void _fmtRate;
 const sigColor = (v?: number | null) =>
   v == null ? 'text-slate-300' : v >= -65 ? 'text-emerald-600' : v >= -75 ? 'text-sky-600' : 'text-amber-500';
 const ccqColor = (v?: number | null) =>
@@ -346,19 +346,60 @@ function CpeDetailModal({
   const [detail, setDetail] = useState<CpeDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  // Credential override form — shown when SSH auth fails
+  const [showCredForm, setShowCredForm] = useState(false);
+  const [credUser, setCredUser] = useState('ubnt');
+  const [credPass, setCredPass] = useState('');
+  const [credPort, setCredPort] = useState(String(sshPort ?? 22));
+  const [savingCreds, setSavingCreds] = useState(false);
 
-  useEffect(() => {
+  const isAuthError = (msg: string) =>
+    /authentication|auth.*failed|configured.*method|credencial/i.test(msg);
+
+  const fetchDetail = (overrideUser?: string, overridePass?: string, overridePort?: string) => {
     if (!cpeIp) { setError('IP del CPE no disponible — esperando próximo poll'); return; }
     setLoading(true);
+    setError('');
+    setDetail(null);
     fetchWithTimeout(`${BASE}/cpes/${mac}/detail-direct`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cpe_ip: cpeIp, port: sshPort, user: sshUser, pass: sshPass, apId }),
-    }, 22_000)
+      body: JSON.stringify({
+        cpe_ip: cpeIp,
+        port: parseInt(overridePort ?? credPort) || sshPort,
+        user: overrideUser ?? sshUser,
+        pass: overridePass ?? sshPass,
+        apId,
+      }),
+    }, 25_000)
       .then(r => r.json())
-      .then(d => { if (d.success) setDetail(d.stats); else setError(d.message); })
-      .catch(e => setError(e.message))
+      .then(d => {
+        if (d.success) { setDetail(d.stats); setShowCredForm(false); }
+        else {
+          setError(d.message);
+          if (isAuthError(d.message)) setShowCredForm(true);
+        }
+      })
+      .catch(e => { setError(e.message); if (isAuthError(e.message)) setShowCredForm(true); })
       .finally(() => setLoading(false));
-  }, [mac, apId, cpeIp, sshPort, sshUser, sshPass]);
+  };
+
+  // Auto-fetch on mount
+  useEffect(() => { fetchDetail(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleCredSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!credUser) return;
+    // Save credentials to backend first so they persist for future opens
+    setSavingCreds(true);
+    try {
+      await fetchWithTimeout(`${BASE}/cpes/${mac}/credentials`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user: credUser, pass: credPass, port: parseInt(credPort) || 22 }),
+      }, 5_000);
+    } catch (_) { /* non-fatal — still attempt the connection */ }
+    setSavingCreds(false);
+    fetchDetail(credUser, credPass, credPort);
+  };
 
   const rows: Array<{ l: string; v: string | null | undefined; mono?: boolean; color?: string }> = detail ? [
     { l: 'Hostname', v: detail.deviceName },
@@ -394,7 +435,7 @@ function CpeDetailModal({
           </div>
           <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg"><X className="w-4 h-4" /></button>
         </div>
-        <div className="overflow-y-auto p-5">
+        <div className="overflow-y-auto p-5 space-y-4">
           {loading && (
             <div className="flex items-center justify-center gap-3 py-12 text-slate-400">
               <Loader2 className="w-5 h-5 animate-spin" />
@@ -406,6 +447,47 @@ function CpeDetailModal({
               <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
               <p className="text-xs text-rose-600">{error}</p>
             </div>
+          )}
+          {/* Credential form — appears automatically on auth failure */}
+          {showCredForm && !loading && (
+            <form onSubmit={handleCredSubmit} className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
+              <p className="text-xs font-semibold text-amber-800">Credenciales SSH del CPE</p>
+              <p className="text-[10px] text-amber-600">
+                Las credenciales del CPE son independientes de las del AP.
+                Los equipos Ubiquiti usan por defecto <span className="font-mono">ubnt / ubnt</span>.
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="col-span-1">
+                  <label className="block text-[10px] font-semibold text-slate-500 mb-1">Usuario</label>
+                  <input
+                    className="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    value={credUser} onChange={e => setCredUser(e.target.value)}
+                    placeholder="ubnt" autoComplete="off"
+                  />
+                </div>
+                <div className="col-span-1">
+                  <label className="block text-[10px] font-semibold text-slate-500 mb-1">Contrasena</label>
+                  <input type="password"
+                    className="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    value={credPass} onChange={e => setCredPass(e.target.value)}
+                    placeholder="ubnt" autoComplete="current-password"
+                  />
+                </div>
+                <div className="col-span-1">
+                  <label className="block text-[10px] font-semibold text-slate-500 mb-1">Puerto SSH</label>
+                  <input type="number"
+                    className="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    value={credPort} onChange={e => setCredPort(e.target.value)}
+                    placeholder="22" min={1} max={65535}
+                  />
+                </div>
+              </div>
+              <button type="submit" disabled={savingCreds || !credUser}
+                className="w-full py-1.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white text-xs font-semibold rounded-lg transition-colors flex items-center justify-center gap-2">
+                {savingCreds ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                Conectar y guardar credenciales
+              </button>
+            </form>
           )}
           {detail && !loading && (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
@@ -606,7 +688,7 @@ function ApDetailModal({
 function KnownCpesModal({ apId, onClose }: { apId: string; onClose: () => void }) {
   const [cpes, setCpes] = useState<KnownCpe[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [_error, setError] = useState('');
 
   useEffect(() => {
     setError('');

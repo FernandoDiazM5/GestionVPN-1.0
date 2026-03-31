@@ -51,7 +51,8 @@ export interface NodeInfo {
   segmento_lan: string;
   lan_subnets?: string[];
   nombre_vrf: string;
-  service: string;
+  /** Discriminador de protocolo VPN del nodo */
+  service: 'sstp' | 'wireguard';
   disabled: boolean;
   running: boolean;
   ip_tunnel: string;
@@ -62,6 +63,12 @@ export interface NodeInfo {
   last_seen?: number;
   /** timestamp Unix ms de creación en SQLite */
   created_at?: number;
+  // Campos WireGuard — solo presentes cuando service === 'wireguard'
+  wg_public_key?: string;
+  wg_listen_port?: number;
+  /** null cuando el peer nunca ha hecho handshake */
+  wg_last_handshake_secs?: number | null;
+  wg_allowed_ips?: string;
 }
 
 /** Peer WireGuard devuelto por /api/wireguard/peers */

@@ -68,7 +68,18 @@ const getErrorMessage = (error, ip, user = '') => {
     return msg || `Error de conexión al router (${error?.name || 'desconocido'})`;
 };
 
-const cleanTunnelRules = async (api) => {
+/**
+ * cleanTunnelRules — Elimina entradas de vpn-activa y mangle WEB-ACCESS.
+ *
+ * Si se pasa `tunnelIP`, solo elimina las entradas correspondientes a esa IP,
+ * preservando entradas de otros usuarios o entradas permanentes.
+ * Si `tunnelIP` es null/undefined, comportamiento anterior: elimina TODAS
+ * (solo mantener para compatibilidad; preferir siempre pasar tunnelIP).
+ *
+ * @param {object} api - Instancia de RouterOSAPI conectada
+ * @param {string|null} tunnelIP - IP del túnel a limpiar, ej: "10.10.0.5"
+ */
+const cleanTunnelRules = async (api, tunnelIP) => {
     const [addrsResult, mangleResult] = await Promise.allSettled([
         safeWrite(api, ['/ip/firewall/address-list/print'], 3000),
         safeWrite(api, ['/ip/firewall/mangle/print'], 3000),
@@ -76,14 +87,62 @@ const cleanTunnelRules = async (api) => {
     const allAddrs  = addrsResult.status  === 'fulfilled' ? addrsResult.value  : [];
     const allMangle = mangleResult.status === 'fulfilled' ? mangleResult.value : [];
 
+    // Si se especifica tunnelIP, filtrar solo esa IP; si no, comportamiento legacy (todas)
+    const addrFilter  = tunnelIP
+        ? (e) => e.list === 'vpn-activa' && e.address === tunnelIP && e['.id']
+        : (e) => e.list === 'vpn-activa' && e['.id'];
+    const mangleFilter = tunnelIP
+        ? (e) => e.comment === 'WEB-ACCESS' && e['src-address'] === tunnelIP && e['.id']
+        : (e) => e.comment === 'WEB-ACCESS' && e['.id'];
+
     const removeOps = [
-        ...allAddrs.filter(e => e.list === 'vpn-activa' && e['.id'])
+        ...allAddrs.filter(addrFilter)
             .map(e => safeWrite(api, ['/ip/firewall/address-list/remove', `=.id=${e['.id']}`])),
-        ...allMangle.filter(e => e.comment === 'WEB-ACCESS' && e['.id'])
+        ...allMangle.filter(mangleFilter)
             .map(e => safeWrite(api, ['/ip/firewall/mangle/remove', `=.id=${e['.id']}`])),
     ];
 
     if (removeOps.length > 0) await Promise.allSettled(removeOps);
 };
 
-module.exports = { connectToMikrotik, safeWrite, getErrorMessage, cleanTunnelRules };
+/**
+ * writeIdempotent — Ejecuta un comando /add en MikroTik ignorando errores de duplicado.
+ * RouterOS lanza errores como "already have", "entry already exists", "failure: already have such"
+ * cuando el recurso ya existe. Esta función los ignora para ser idempotente.
+ */
+const writeIdempotent = async (api, commands, timeoutMs = 8000) => {
+    try {
+        return await Promise.race([
+            api.write(commands),
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Timeout en writeIdempotent')), timeoutMs)
+            ),
+        ]);
+    } catch (err) {
+        const msg = (err?.message || '').toLowerCase();
+        // Errores conocidos de duplicado en RouterOS — safe to ignore
+        if (msg.includes('already have') ||
+            msg.includes('entry already exists') ||
+            msg.includes('already exists') ||
+            msg.includes('failure: already')) {
+            console.log(`[writeIdempotent] Recurso ya existe (ignorado): ${commands[0]}`);
+            return [];
+        }
+        throw err;
+    }
+};
+
+/**
+ * parseHandshakeSecs — Convierte el campo last-handshake de RouterOS a segundos.
+ * Formatos posibles: "1m30s", "45s", "2h5m", "" (nunca conectado → Infinity).
+ */
+const parseHandshakeSecs = (str) => {
+    if (!str || str.trim() === '') return Infinity;
+    let total = 0;
+    const h = str.match(/(\d+)h/); if (h) total += parseInt(h[1]) * 3600;
+    const m = str.match(/(\d+)m/); if (m) total += parseInt(m[1]) * 60;
+    const s = str.match(/(\d+)s/); if (s) total += parseInt(s[1]);
+    return total || Infinity;
+};
+
+module.exports = { connectToMikrotik, safeWrite, getErrorMessage, cleanTunnelRules, writeIdempotent, parseHandshakeSecs };

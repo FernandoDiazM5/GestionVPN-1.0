@@ -3,10 +3,12 @@ import { encryptText, decryptText, clearEncryptionKey } from '../utils/crypto';
 import type { NodeInfo } from '../types/api';
 
 export interface RouterCredentials {
-  ip: string;
   user: string;
-  pass: string; // Deprecated, kept for interface compat for now
+  role: string;
   token?: string; // JWT token
+  /** @deprecated Las credenciales MikroTik se leen desde app_settings en el backend (req.mikrotik). Estos campos son ignorados por el servidor. */
+  ip?: string;
+  pass?: string;
 }
 
 export interface VpnSecret {
@@ -34,11 +36,11 @@ export interface VpnStoreData {
 
 /** Formato serializado en disco — la contraseña se almacena cifrada */
 interface StoredData {
-  version: 2;
+  version: 3;
   isAuthenticated: boolean;
   credentials?: {
-    ip: string;
     user: string;
+    role: string;
     encPass: string; // AES-GCM encrypted + base64 (now stores JWT)
   };
   managedVpns: VpnSecret[];
@@ -49,7 +51,7 @@ interface StoredData {
   nodes?: NodeInfo[];
 }
 
-const STORAGE_KEY = 'mikrotik_vpn_store_v2';
+const STORAGE_KEY = 'mikrotik_vpn_store_v3';
 
 localforage.config({
   name: 'MikroTikVPNManager',
@@ -61,14 +63,13 @@ export const dbService = {
   async getStore(): Promise<VpnStoreData> {
     try {
       const raw = await localforage.getItem<StoredData>(STORAGE_KEY);
-      if (!raw || raw.version !== 2) {
+      if (!raw || raw.version !== 3) {
         return { isAuthenticated: false, managedVpns: [] };
       }
       let credentials: RouterCredentials | undefined;
       if (raw.credentials) {
         const tokenOrPass = await decryptText(raw.credentials.encPass);
-        // Si el valor largo es un JWT, lo asignamos a token. Si era un pass viejo, forzará re-login porque fallará Auth, lo cual es sano.
-        credentials = { ip: raw.credentials.ip, user: raw.credentials.user, pass: '', token: tokenOrPass };
+        credentials = { user: raw.credentials.user, role: raw.credentials.role, token: tokenOrPass };
       }
       return {
         isAuthenticated: raw.isAuthenticated,
@@ -92,13 +93,13 @@ export const dbService = {
       // Encriptamos el JWT localmente para máxima seguridad
       const encPass = await encryptText(data.credentials.token);
       storedCredentials = {
-        ip: data.credentials.ip,
         user: data.credentials.user,
+        role: data.credentials.role,
         encPass,
       };
     }
     const stored: StoredData = {
-      version: 2,
+      version: 3,
       isAuthenticated: data.isAuthenticated,
       credentials:    storedCredentials,
       managedVpns:    data.managedVpns,

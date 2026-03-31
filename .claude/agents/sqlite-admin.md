@@ -2,82 +2,85 @@
 
 Agent especializado en la gestión de la base de datos SQLite del proyecto MikroTik VPN Manager.
 
+## Estado: Auditoría completa aplicada (2026-03-28)
+
 ## Responsabilidades
 - Cascade delete de nodos VPN y todas las entidades relacionadas
-- Integridad referencial entre tablas (nodes, devices, cpes_conocidos, historial_senal)
-- Operaciones CRUD sobre devices, nodes, y tablas auxiliares
+- Integridad referencial entre tablas (nodes, aps, cpes_conocidos, historial_senal)
+- Operaciones CRUD sobre aps, nodes, y tablas auxiliares
 - Limpieza de registros huérfanos
 - Encriptación/desencriptación de credenciales (AES-256-GCM)
 
-## Esquema de tablas
+## Esquema de tablas (v3.2 — actualizado)
 
 ### Sistema VPN (clave: ppp_user)
-| Tabla | PK | Descripción |
+| Tabla | PK | Índices | Descripción |
+|---|---|---|---|
+| `nodes` | `id` = ppp_user | PK | Cache de nodos SSTP (data JSON + columnas) |
+| `node_labels` | `ppp_user` | `idx_node_labels_ppp` | Etiquetas personalizadas |
+| `node_creds` | `ppp_user` | `idx_node_creds_ppp` | Credenciales PPP cifradas |
+| `node_tags` | `ppp_user` | PK | Tags libres |
+| `node_history` | `id` (auto) | `idx_node_history_ppp` | Historial de eventos |
+| `node_ssh_creds` | `ppp_user` | PK | Credenciales SSH del nodo |
+
+### Sistema APs/Devices (clave: MAC sin separadores)
+| Tabla | PK | Índices | Estado |
+|---|---|---|---|
+| `aps` | `id` (MAC) | `idx_aps_nodo`, `idx_aps_activo` | ACTIVA — tabla canónica |
+| `cpes_conocidos` | `mac` | `idx_cpes_apid` | ACTIVA |
+| `historial_senal` | `id` (auto) | `idx_hist_mac_ts`, `idx_hist_apid` | ACTIVA (purga 30d) |
+| `devices` | `id` | — | DEPRECADA — solo lectura legacy |
+
+### Sistema Auth/Config
+| Tabla | PK | Índices |
 |---|---|---|
-| `nodes` | `id` = ppp_user | Cache de nodos SSTP |
-| `node_labels` | `ppp_user` | Etiquetas personalizadas |
-| `node_creds` | `ppp_user` | Credenciales PPP cifradas |
-| `node_tags` | `ppp_user` | Tags libres |
-| `node_history` | `id` (auto) | Historial de eventos (FK: ppp_user) |
-| `node_ssh_creds` | `ppp_user` | Credenciales SSH del nodo |
+| `vpn_users` | `id` | `idx_vpn_users_username` |
+| `app_settings` | `key` | PK |
+| `peer_colors` | `peer_address` | PK |
+| `ap_nodos` | `id` | — |
 
-### Sistema Devices/APs (clave: device.id = MAC sin separadores)
-| Tabla | PK | Descripción |
-|---|---|---|
-| `devices` | `id` | APs Ubiquiti guardados (JSON en campo `data`) |
-| `cpes_conocidos` | `mac` | CPEs descubiertos (FK: ap_id → devices.id) |
-| `historial_senal` | `id` (auto) | Historial de señal (FK: ap_id → devices.id) |
+## Relación crítica: IDs
 
-### Sistema AP Legacy
-| Tabla | PK | Descripción |
-|---|---|---|
-| `ap_nodos` | `id` | Agrupador de APs (sistema legacy) |
-| `aps` | `id` | APs registrados (FK: nodo_id → ap_nodos.id) |
-
-### Otras
-| Tabla | PK | Descripción |
-|---|---|---|
-| `peer_colors` | `peer_address` | Colores de peers WireGuard |
-| `app_settings` | `key` | Configuración global |
-
-## Relación crítica: node.id vs nodeId en devices
-
-**BUG CONOCIDO (corregido 2026-03-27):**
-- `NodeInfo.id` = MikroTik `.id` (ej: `*17`, `*19`) — viene de `/ppp/secret/print`
-- `NodeInfo.ppp_user` = nombre del PPP secret (ej: `ppp-pass-torreagapito`)
-- `SavedDevice.nodeId` = `node.id` (el `.id` de MikroTik, NO el ppp_user)
-- `nodes` SQLite table: `id = ppp_user` (NO el `.id` de MikroTik)
-
-Esto significa que `JSON_EXTRACT(data, '$.nodeId')` almacena el `.id` de MikroTik (ej: `*17`),
-pero la tabla `nodes` usa `ppp_user` como PK. Son valores DISTINTOS.
-
-**Patrón correcto para cascade delete (implementado):**
-1. `deleteNode(pppUser)`: Lee `nodes.data` → extrae MikroTik `.id` → busca devices por ese `.id`
-2. `cleanup-orphan-devices`: Lee `nodes.data` de cada nodo → construye Set de MikroTik `.id` → compara devices
+| Entidad | Campo | Valor ejemplo | Almacenamiento |
+|---------|-------|---------------|----------------|
+| NodeInfo.id | MikroTik `.id` | `*17` | `nodes.data.id` (JSON) |
+| NodeInfo.ppp_user | PPP secret | `TorreHousenet` | `nodes.id` (PK SQLite) |
+| SavedDevice.nodeId | MikroTik `.id` | `*17` | `aps.nodo_id` |
 
 ## Funciones clave en db.service.js
 - `encryptDevice(device)` — AES-256-GCM sobre sshPass → campo `_enc`
 - `decryptDevice(device)` — Inverso, retorna device con sshPass plano
-- `encryptPass(text)` / `decryptPass(text)` — Cifrado general
-- `saveNode(pppUser, nodeData)` — UPSERT en tabla nodes
-- `deleteNode(pppUser)` — CASCADE DELETE de nodo + devices + CPEs + historial
-- `getNodes()` — Lista todos los nodos
+- `encryptPass(text)` — Cifrado general. **LANZA excepción en error** (no retorna null)
+- `decryptPass(text)` — Descifrado
+- `saveNode(nodeData)` — UPSERT en tabla nodes (usa nodeData.ppp_user como PK)
+- `deleteNode(pppUser)` — CASCADE DELETE: lee MikroTik `.id` de nodes.data, busca en `aps` + `devices` legacy, elimina todo
+- `getNodes()` — Lista todos los nodos (merge JSON + columnas)
 
-## Endpoints de DB en api.routes.js
-- `GET /api/db/devices` — Lista todos (descifrados)
-- `POST /api/db/devices` — Guarda uno (cifra antes)
-- `PUT /api/db/devices/:id` — Actualiza (merge + cifra)
-- `DELETE /api/db/devices/:id` — Elimina uno
-- `POST /api/db/cleanup-orphan-devices` — Elimina devices huérfanos
+## PRAGMAs activos
+```sql
+PRAGMA journal_mode = WAL;
+PRAGMA synchronous = NORMAL;
+PRAGMA foreign_keys = ON;
+```
 
 ## Capas de persistencia frontend
-1. **SQLite** (`server/database.sqlite`) — devices, nodes, cpes_conocidos, historial_senal
-2. **IndexedDB via localforage** (`vpn_store`) — VpnContext state (nodes, credentials, tunnelExpiry)
-3. **IndexedDB via localforage** (`topology_cpes`) — cpeCache (cache de CPEs para topología)
-4. **React state** — cada componente tiene su propio state de devices (NO compartido)
+1. **SQLite** (`server/database.sqlite`) — aps, nodes, cpes_conocidos, historial_senal
+2. **IndexedDB** (`vpn_store`) — VpnContext (nodes, credentials, tunnelExpiry) — con debounce 500ms
+3. **IndexedDB** (`topology_cpes`) — cpeCache (CPEs para topología)
+4. **IndexedDB** (`antenna_stats_cache`) — statsCache (diagnóstico completo de antenas)
+5. **React state** — cada componente tiene su propio state de devices (NO compartido)
 
-**Al eliminar un nodo, TODAS las capas deben limpiarse:**
-1. SQLite → `deleteNode()` + cascade
-2. IndexedDB vpn_store → `removeNodeFromState()` → auto-save por useEffect
-3. IndexedDB topology_cpes → `cpeCache.clear()` o limpieza selectiva
-4. React state → `removeNodeFromState()` actualiza nodes; components deben recargar devices
+## Seguridad implementada
+- CORS restrictivo (whitelist de orígenes)
+- JWT con refresh endpoint (`POST /api/auth/refresh`)
+- requireAdmin middleware en settings
+- Credenciales MikroTik inyectadas vía middleware (`req.mikrotik`), nunca desde frontend
+- pppPassword enmascarado (`********`) en respuestas API (excepto `/node/creds/get` que es endpoint dedicado)
+- JSON_VALID guard en queries con JSON_EXTRACT
+- `encryptPass()` lanza excepción en error (no retorna null)
+- Transacción BEGIN/COMMIT en saveNode + saveCreds
+- Scanner con límite de concurrencia (50 simultáneos vía pLimit)
+
+## Auditoría completada (2026-03-28): 38/38 issues
+Todos los problemas identificados en la auditoría profunda (7 críticos, 8 altos, 14 medios, 8 bajos + 1 bug encadenado) están resueltos.
+Componente muerto `ControlPanel.tsx` eliminado. Tabla `devices` deprecada con fallback legacy en `deleteNode()`.
