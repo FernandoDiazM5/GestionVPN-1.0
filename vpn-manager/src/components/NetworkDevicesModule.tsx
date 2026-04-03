@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { useVpn } from '../context/VpnContext';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
-import { deviceDb } from '../store/deviceDb';
+import { deviceDb, credCache } from '../store/deviceDb';
 import DeviceCard from './DeviceCard';
 import { API_BASE_URL } from '../config';
 import type { ScannedDevice, SavedDevice, AntennaStats } from '../types/devices';
@@ -1830,7 +1830,7 @@ export default function NetworkDevicesModule() {
 
   // ── Fase 2 reutilizable: autenticación SSH vía /device/antenna (igual que "Guardar") ──
   // Usa el mismo endpoint que funciona al guardar manualmente, sin persistir en DB.
-  // Prueba las claves del nodo activo en orden: primero las del dispositivo guardado (si existe),
+  // Prueba las claves del nodo activo en orden: primero el cache, luego el dispositivo guardado,
   // luego las del nodo activo.
   const runAuthPhase = async (devices: ScannedDevice[], baseCreds: ScanCred[]) => {
     if (devices.length === 0) return;
@@ -1851,14 +1851,16 @@ export default function NetworkDevicesModule() {
           // Construir lista de credenciales efectivas
           const devId = dev.mac ? dev.mac.replace(/:/g, '') : dev.ip.replace(/\./g, '');
           const savedDev = savedDevices.find(s => s.id === devId);
+          const cachedCred = await credCache.get(devId);
 
-          let effectiveCreds = baseCreds;
+let effectiveCreds = [...baseCreds];
           if (savedDev?.sshUser && savedDev?.sshPass) {
-            const knownCred = { user: savedDev.sshUser, pass: savedDev.sshPass };
-            const others = baseCreds.filter(
-              c => !(c.user === knownCred.user && c.pass === knownCred.pass)
-            );
-            effectiveCreds = [knownCred, ...others];
+            effectiveCreds = effectiveCreds.filter(c => !(c.user === savedDev.sshUser && c.pass === savedDev.sshPass));
+            effectiveCreds.unshift({ user: savedDev.sshUser, pass: savedDev.sshPass });
+          }
+          if (cachedCred?.user && cachedCred?.pass) {
+            effectiveCreds = effectiveCreds.filter(c => !(c.user === cachedCred.user && c.pass === cachedCred.pass));
+            effectiveCreds.unshift({ user: cachedCred.user, pass: cachedCred.pass });
           }
 
           if (effectiveCreds.length === 0) {
@@ -1908,6 +1910,9 @@ export default function NetworkDevicesModule() {
           if (foundStats) {
             const s = foundStats;
             setSshStatus(prev => ({ ...prev, [dev.ip]: 'success' }));
+            // Guardar en cache de credenciales para próximos escaneos paralelos
+            await credCache.save(devId, foundUser!, foundPass!);
+            
             setScanResults(prev => {
               const next = [...prev];
               const idx = next.findIndex(d => d.ip === dev.ip);

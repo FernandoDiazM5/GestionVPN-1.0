@@ -11,6 +11,49 @@ const statsStore = localforage.createInstance({
   description: 'Cache de diagnóstico completo por antena (mca-status, meminfo, routes, etc.)',
 });
 
+// ── Credentials Cache (IndexedDB local) ──────────────────────────────────
+// Guarda credenciales SSH que funcionaron durante el escaneo.
+// NO viaja al servidor. Solo vive en el navegador (se persiste entre recargas).
+const credStore = localforage.createInstance({
+  name: 'MikroTikVPNManager',
+  storeName: 'device_credentials_cache',
+  description: 'Cache de credenciales SSH validadas por dispositivo',
+});
+
+export const credCache = {
+  async save(deviceId: string, user: string, pass: string, port?: number): Promise<void> {
+    try {
+      await credStore.setItem(deviceId, { user, pass, port: port ?? 22 });
+    } catch (err) {
+      console.error('[CredCache] Error guardando credenciales:', err);
+    }
+  },
+
+  async get(deviceId: string): Promise<{ user: string; pass: string; port: number } | null> {
+    try {
+      return await credStore.getItem(deviceId);
+    } catch {
+      return null;
+    }
+  },
+
+  async remove(deviceId: string): Promise<void> {
+    try {
+      await credStore.removeItem(deviceId);
+    } catch { /* ignore */ }
+  },
+
+  async getAll(): Promise<Record<string, { user: string; pass: string; port: number }>> {
+    const result: Record<string, { user: string; pass: string; port: number }> = {};
+    try {
+      await credStore.iterate((value, key) => {
+        result[key] = value as { user: string; pass: string; port: number };
+      });
+    } catch { /* ignore */ }
+    return result;
+  },
+};
+
 // ── Stats Cache (IndexedDB local) ─────────────────────────────────────────
 export const statsCache = {
   /** Guarda el objeto AntennaStats completo (todo lo que devuelve el botón Estado) */
