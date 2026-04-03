@@ -19,10 +19,17 @@ router.post('/device/auto-login', async (req, res) => {
 });
 
 router.post('/device/antenna', async (req, res) => {
-    const { deviceIP, deviceUser, devicePass, devicePort } = req.body;
+    const { deviceIP, deviceUser, devicePass, devicePort, deviceId } = req.body;
     try {
+        let actualPass = devicePass;
+        if (deviceId && !actualPass) {
+            const db = await getDb();
+            const row = await db.get('SELECT clave_ssh FROM aps WHERE id = ?', [deviceId]);
+            if (row && row.clave_ssh) actualPass = decryptPass(row.clave_ssh);
+        }
+        
         // Comando combinado: mca-status + system.cfg + hostname + version + ifconfig
-        const output = await sshExec(deviceIP, parseInt(devicePort) || 22, deviceUser, devicePass, ANTENNA_CMD, 20000, 8000);
+        const output = await sshExec(deviceIP, parseInt(devicePort) || 22, deviceUser, actualPass || '', ANTENNA_CMD, 20000, 8000);
         res.json({ success: true, stats: parseFullOutput(output) });
     } catch (error) {
         const msg = error.message || '';
@@ -82,13 +89,16 @@ router.get('/db/devices', async (req, res) => {
             wlanMac: r.mac_wlan,
             role: r.modo_red === 'station' ? 'sta' : 'ap',
             sshUser: r.usuario_ssh,
-            sshPass: r.clave_ssh ? decryptPass(r.clave_ssh) : '',
+            hasSshPass: !!r.clave_ssh,
             sshPort: r.puerto_ssh,
             wifiPassword: r.wifi_password,
             activo: r.activo === 1,
             lastCpeCount: r.cpes_conectados_count,
             lastCpeCountAt: r.last_saved,
-            addedAt: r.registrado_en
+            addedAt: r.registrado_en,
+            nodeName: r.nombre_nodo || '',
+            routerPort: r.router_port || 8075,
+            lastSeen: r.last_seen || 0
         }));
         res.json({ success: true, devices });
     } catch (e) {
@@ -115,11 +125,12 @@ router.post('/db/devices', async (req, res) => {
         // UPSERT en la tabla "aps"
         await db.run(
             `INSERT INTO aps (
-                id, nodo_id, hostname, modelo, firmware, mac_lan, mac_wlan, ip, frecuencia_ghz, 
+                id, nodo_id, hostname, modelo, firmware, mac_lan, mac_wlan, ip, frecuencia_ghz,
                 ssid, canal_mhz, modo_red, usuario_ssh, clave_ssh, puerto_ssh, wifi_password,
-                cpes_conectados_count, last_saved, registrado_en
-             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) 
-             ON CONFLICT(id) DO UPDATE SET 
+                cpes_conectados_count, last_saved, activo, nombre_nodo, router_port, last_seen,
+                registrado_en
+             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET
                 nodo_id = excluded.nodo_id,
                 hostname = excluded.hostname,
                 modelo = excluded.modelo,
@@ -134,13 +145,19 @@ router.post('/db/devices', async (req, res) => {
                 puerto_ssh = excluded.puerto_ssh,
                 wifi_password = excluded.wifi_password,
                 cpes_conectados_count = excluded.cpes_conectados_count,
-                last_saved = excluded.last_saved`, 
+                last_saved = excluded.last_saved,
+                activo = excluded.activo,
+                nombre_nodo = excluded.nombre_nodo,
+                router_port = excluded.router_port,
+                last_seen = excluded.last_seen`,
             [
                 d.id, d.nodeId || '', d.name || d.deviceName || '', d.model || '', d.firmware || '',
                 d.lanMac || '', d.wlanMac || '', d.ip || '', d.frequency || 0, d.essid || '',
                 d.channelWidth || 0, d.role === 'sta' ? 'station' : 'ap',
                 d.sshUser || '', sshEncrypted, d.sshPort || 22, wifiPassword,
-                cpesCount, now, d.addedAt || now
+                cpesCount, now, d.activo !== false ? 1 : 0,
+                d.nodeName || '', d.routerPort || 8075, d.lastSeen || 0,
+                d.addedAt || now
             ]
         );
         res.json({ success: true, id: d.id });

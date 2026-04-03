@@ -122,6 +122,9 @@ export const deviceDb = {
     try {
       const res = await apiFetch(`${API_BASE_URL}/api/db/cleanup-orphan-devices`, { method: 'POST' });
       const data = await res.json();
+      if (data.success && Array.isArray(data.orphanIds)) {
+        await Promise.allSettled(data.orphanIds.map((id: string) => statsCache.remove(id)));
+      }
       return typeof data.devicesDeleted === 'number' ? data.devicesDeleted : 0;
     } catch (err) {
       console.error('Error limpiando devices huérfanos:', err);

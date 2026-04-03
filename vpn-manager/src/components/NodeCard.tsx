@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { apiFetch } from '../utils/apiClient';
 import { Play, ShieldOff, Wifi, WifiOff, Clock, Loader2, Radio, Pencil, Trash2, FileCode, History, Tag, KeyRound, Check, X, PlusCircle, Eye, EyeOff, Wrench, MoreVertical } from 'lucide-react';
 import { useVpn, TUNNEL_TIMEOUT_MS } from '../context/VpnContext';
@@ -64,9 +65,11 @@ export default function NodeCard({ node, rowIndex, onEdit, onDelete, onScript, o
   const [wgPeerKey, setWgPeerKey] = useState('');
   const [isSettingPeer, setIsSettingPeer] = useState(false);
   const [showKebab, setShowKebab] = useState(false);
+  const [kebabCoords, setKebabCoords] = useState<{ top?: number, bottom?: number, right: number }>({ top: 0, right: 0 });
   const logsEndRef = useRef<HTMLDivElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const kebabRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const isThisNodeActive = activeNodeVrf === node.nombre_vrf && !!node.nombre_vrf;
   const isAnyNodeActive = !!activeNodeVrf;
@@ -102,16 +105,26 @@ export default function NodeCard({ node, rowIndex, onEdit, onDelete, onScript, o
     if (editingName) nameInputRef.current?.focus();
   }, [editingName]);
 
-  // Cerrar kebab al hacer click fuera del dropdown
+  // Cerrar kebab al hacer click fuera del dropdown o hacer scroll
   useEffect(() => {
     if (!showKebab) return;
     const handler = (e: MouseEvent) => {
-      if (kebabRef.current && !kebabRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        kebabRef.current && !kebabRef.current.contains(target) &&
+        (!dropdownRef.current || !dropdownRef.current.contains(target))
+      ) {
         setShowKebab(false);
       }
     };
+    const scrollHandler = () => setShowKebab(false);
+    
     document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    window.addEventListener('scroll', scrollHandler, true);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      window.removeEventListener('scroll', scrollHandler, true);
+    };
   }, [showKebab]);
 
   const startEditName = () => {
@@ -512,7 +525,25 @@ export default function NodeCard({ node, rowIndex, onEdit, onDelete, onScript, o
             {/* Kebab menu — acciones secundarias */}
             <div ref={kebabRef} className="relative">
               <button
-                onClick={() => setShowKebab(v => !v)}
+                onClick={(e) => {
+                  if (!showKebab) {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const spaceBelow = window.innerHeight - rect.bottom;
+                    const MENU_HEIGHT = 280;
+                    if (spaceBelow < MENU_HEIGHT) {
+                      setKebabCoords({
+                        bottom: window.innerHeight - rect.top + 4,
+                        right: window.innerWidth - rect.right
+                      });
+                    } else {
+                      setKebabCoords({
+                        top: rect.bottom + 4,
+                        right: window.innerWidth - rect.right
+                      });
+                    }
+                  }
+                  setShowKebab(v => !v);
+                }}
                 title="Más acciones"
                 className={`relative p-1.5 rounded-lg transition-colors
                   ${showKebab
@@ -526,8 +557,12 @@ export default function NodeCard({ node, rowIndex, onEdit, onDelete, onScript, o
                 )}
               </button>
 
-              {showKebab && (
-                <div className="absolute right-0 top-full mt-1 w-52 bg-white border border-slate-200 rounded-xl shadow-lg shadow-slate-200/60 z-50 py-1 overflow-hidden">
+              {showKebab && createPortal(
+                <div 
+                  ref={dropdownRef}
+                  style={kebabCoords}
+                  className="fixed w-52 bg-white border border-slate-200 rounded-xl shadow-lg shadow-slate-200/60 z-[9999] py-1 overflow-hidden"
+                >
 
                   {/* Sección: WireGuard */}
                   {node.service === 'wireguard' && !node.wg_public_key && (
@@ -623,7 +658,8 @@ export default function NodeCard({ node, rowIndex, onEdit, onDelete, onScript, o
                       </div>
                     </>
                   )}
-                </div>
+                </div>,
+                document.body
               )}
             </div>
           </div>

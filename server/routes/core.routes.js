@@ -383,6 +383,8 @@ router.post('/tunnel/repair', async (req, res) => {
             routesResult,
             addressListResult,
             mangleResult,
+            ipAddressResult,
+            wgPeersResult,
         ] = await Promise.allSettled([
             safeWrite(api, ['/interface/sstp-server/print']),
             safeWrite(api, ['/interface/wireguard/print']),
@@ -391,6 +393,8 @@ router.post('/tunnel/repair', async (req, res) => {
             safeWrite(api, ['/ip/route/print']),
             safeWrite(api, ['/ip/firewall/address-list/print']),
             safeWrite(api, ['/ip/firewall/mangle/print']),
+            safeWrite(api, ['/ip/address/print']),
+            safeWrite(api, ['/interface/wireguard/peers/print']),
         ]);
 
         const allSstp     = sstpResult.status        === 'fulfilled' ? sstpResult.value        : [];
@@ -400,6 +404,8 @@ router.post('/tunnel/repair', async (req, res) => {
         const allRoutes   = routesResult.status      === 'fulfilled' ? routesResult.value      : [];
         const allAddrs    = addressListResult.status === 'fulfilled' ? addressListResult.value : [];
         const allMangle   = mangleResult.status      === 'fulfilled' ? mangleResult.value      : [];
+        const allIpAddrs  = ipAddressResult.status   === 'fulfilled' ? ipAddressResult.value   : [];
+        const allWgPeers  = wgPeersResult.status     === 'fulfilled' ? wgPeersResult.value     : [];
 
         // ── Paso 1: Interface SSTP (o WireGuard) ────────────────────────────────
         try {
@@ -421,6 +427,61 @@ router.post('/tunnel/repair', async (req, res) => {
                     ]);
                     steps.push({ step: 1, obj: 'WG Interface', name: ifaceName, status: 'created', action: 'created' });
                     repaired++;
+                }
+
+                // Obtener datos WG desde DB local para restaurar IP y Peers
+                const db = await getDb();
+                const nodeRowDB = await db.get('SELECT data FROM nodes WHERE id = ?', [pppUser]);
+                let ipTunnel = '', wgPubKey = '';
+                if (nodeRowDB && nodeRowDB.data) {
+                    try {
+                        const parsed = JSON.parse(nodeRowDB.data);
+                        ipTunnel = parsed.ip_tunnel;
+                        wgPubKey = parsed.wg_public_key || parsed.cpePublicKey;
+                    } catch (e) { /* ignore */ }
+                }
+
+                // Restaurar IP Address WG
+                if (ipTunnel) {
+                    const existsIp = allIpAddrs.some(a => a.interface === ifaceName && a.address.startsWith(ipTunnel.split('/')[0]));
+                    if (existsIp) {
+                        steps.push({ step: 1.1, obj: 'WG IP', name: ipTunnel, status: 'ok', action: 'exists' });
+                    } else {
+                        await writeIdempotent(api, [
+                            '/ip/address/add',
+                            `=address=${ipTunnel}`,
+                            `=interface=${ifaceName}`,
+                            `=comment=IP Core a ${ndComment}`,
+                        ]);
+                        steps.push({ step: 1.1, obj: 'WG IP', name: ipTunnel, status: 'created', action: 'created' });
+                        repaired++;
+                    }
+                }
+
+                // Restaurar Peer WG
+                if (wgPubKey) {
+                    const existsPeer = allWgPeers.some(p => p.interface === ifaceName && p['public-key'] === wgPubKey);
+                    if (existsPeer) {
+                        steps.push({ step: 1.2, obj: 'WG Peer', name: 'peer CPE', status: 'ok', action: 'exists' });
+                    } else {
+                        // Derivar IP del Peer usando el bloque WG
+                        const ipMatch = (ipTunnel || '').match(/10\.10\.251\.(\d+)/);
+                        let peerIp = '';
+                        if (ipMatch) {
+                             const blockBase = Math.floor(parseInt(ipMatch[1]) / 4) * 4;
+                             peerIp = `10.10.251.${blockBase + 2}/32`;
+                        }
+                        const allowedIps = peerIp ? `${peerIp},${(lanSubnets || []).join(',')}` : (lanSubnets || []).join(',');
+                        await writeIdempotent(api, [
+                            '/interface/wireguard/peers/add',
+                            `=interface=${ifaceName}`,
+                            `=public-key=${wgPubKey}`,
+                            `=allowed-address=${allowedIps}`,
+                            `=comment=Peer CPE ${ndComment}`,
+                        ]);
+                        steps.push({ step: 1.2, obj: 'WG Peer', name: 'peer CPE', status: 'created', action: 'created' });
+                        repaired++;
+                    }
                 }
             } else {
                 // Para SSTP: verificar/crear la interface SSTP server
@@ -531,6 +592,7 @@ router.post('/tunnel/repair', async (req, res) => {
                     `=dst-address=${wgMgmtNet}`,
                     '=gateway=VPN-WG-MGMT',
                     `=routing-table=${vrfName}`,
+                    '=distance=2',
                 ]);
                 steps.push({ step: 4, obj: 'VRF Route MGMT', name: wgMgmtNet, status: 'created', action: 'created' });
                 repaired++;

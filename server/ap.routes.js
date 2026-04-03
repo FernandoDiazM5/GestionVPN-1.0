@@ -414,9 +414,18 @@ router.post('/poll-direct', async (req, res) => {
 // ── Full AP detail direct — all 12 SSH sections (ANTENNA_CMD) ────────────
 router.post('/ap-detail-direct', async (req, res) => {
     try {
-        const { ip, port, user, pass } = req.body;
-        if (!ip || !user || !pass) return res.status(400).json({ success: false, message: 'ip, user y pass requeridos' });
-        const s = await getFullDetail(ip, parseInt(port) || 22, user, pass);
+        const { ip, port, user, pass, id } = req.body;
+        if (!ip || !user) return res.status(400).json({ success: false, message: 'ip y user requeridos' });
+        
+        let actualPass = pass;
+        if (id && !actualPass) {
+            const db = await getDb();
+            const row = await db.get('SELECT clave_ssh FROM aps WHERE id = ?', [id]);
+            if (row && row.clave_ssh) actualPass = decryptPass(row.clave_ssh);
+        }
+        if (!actualPass) return res.status(400).json({ success: false, message: 'Password no provisto' });
+        
+        const s = await getFullDetail(ip, parseInt(port) || 22, user, actualPass);
         res.json({ success: true, stats: s });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });

@@ -38,7 +38,8 @@ interface ProvisionResult {
 // Redes reservadas que no deben usarse como LAN remota de un nodo
 const PROTECTED_NETS = [
   { cidr: '192.168.21.0/24', label: 'WireGuard gestión (192.168.21.0/24)' },
-  { cidr: '10.10.250.0/24',  label: 'Pool PPP túnel (10.10.250.0/24)' },
+  { cidr: '10.10.250.0/24', label: 'Pool PPP túnel (10.10.250.0/24)' },
+  { cidr: '10.10.251.0/24', label: 'Pool WG túnel core (10.10.251.0/24)' },
 ];
 
 function ipToInt(ip: string): number {
@@ -104,9 +105,9 @@ function StepResultList({ steps, failedAt, visible }: {
 
 // ── Generador de contraseña segura ────────────────────────────────────────
 function generateSecurePassword(): string {
-  const upper   = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-  const lower   = 'abcdefghjkmnpqrstuvwxyz';
-  const digits  = '23456789';
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const lower = 'abcdefghjkmnpqrstuvwxyz';
+  const digits = '23456789';
   const symbols = '!@#$%*-_+=?';
   const all = upper + lower + digits + symbols;
   const mandatory = [
@@ -240,9 +241,9 @@ function NuevoNodoModal({
     'WireGuard Interface',
     'WireGuard Peer (CPE)',
     'IP del túnel WireGuard',
-    'Interface List (LIST-VPN-TOWERS)',
+    'Interface List (LIST-VPN-TOWERS + WG)',
     'VRF',
-    'Rutas LAN remota(s)',
+    'Ruta(s) LAN remota(s)',
     'Ruta retorno MGMT',
   ] : [
     'PPP Secret',
@@ -435,10 +436,12 @@ function NuevoNodoModal({
                 const cpeSteps = [
                   { n: 1, title: 'Crear interfaz WireGuard', cmd: `/interface wireguard add name=WG-CORE-ISP mtu=1420 comment="Conexion al Servidor Core"` },
                   { n: 2, title: 'Asignar IP al túnel (/30)', cmd: `/ip address add address=${peerIP}/30 interface=WG-CORE-ISP network=10.10.251.${blockBase30} comment="IP WG Cliente ND${wgNodeNum}"` },
-                  { n: 3, title: 'Agregar peer (servidor Core)', cmd: serverPublicKey
-                    ? `/interface wireguard peers add interface=WG-CORE-ISP public-key="${serverPublicKey}" endpoint-address=${serverIP} endpoint-port=${wgPort} allowed-address=192.168.21.0/24,${tunnelNet30} persistent-keepalive=25s comment="Conexion al Servidor Core"`
-                    : '(esperando clave pública del servidor)' },
-                  { n: 4, title: 'Ruta de retorno hacia administración', cmd: `/ip route add dst-address=192.168.21.0/24 gateway=WG-CORE-ISP comment="Retorno hacia Administracion/Software"` },
+                  {
+                    n: 3, title: 'Agregar peer (servidor Core)', cmd: serverPublicKey
+                      ? `/interface wireguard peers add interface=WG-CORE-ISP public-key="${serverPublicKey}" endpoint-address=${serverIP} endpoint-port=${wgPort} allowed-address=192.168.21.0/24,${tunnelNet30} persistent-keepalive=25s comment="Conexion al Servidor Core"`
+                      : '(esperando clave pública del servidor)'
+                  },
+                  { n: 4, title: 'Ruta de retorno hacia administración', cmd: `/ip route add dst-address=192.168.21.0/24 distance=2 gateway=WG-CORE-ISP comment="Retorno hacia Administracion/Software"` },
                 ];
                 return (
                   <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
@@ -527,71 +530,69 @@ function NuevoNodoModal({
                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 block">Protocolo</label>
                   <div className="flex gap-2">
                     <button type="button" onClick={() => setProtocol('sstp')}
-                      className={`flex-1 py-2 px-3 rounded-lg text-xs font-semibold border transition-colors ${
-                        protocol === 'sstp' ? 'bg-sky-50 border-sky-400 text-sky-700' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'
-                      }`}>
+                      className={`flex-1 py-2 px-3 rounded-lg text-xs font-semibold border transition-colors ${protocol === 'sstp' ? 'bg-sky-50 border-sky-400 text-sky-700' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'
+                        }`}>
                       SSTP
                     </button>
                     <button type="button" onClick={() => setProtocol('wireguard')}
-                      className={`flex-1 py-2 px-3 rounded-lg text-xs font-semibold border transition-colors ${
-                        protocol === 'wireguard' ? 'bg-violet-50 border-violet-400 text-violet-700' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'
-                      }`}>
+                      className={`flex-1 py-2 px-3 rounded-lg text-xs font-semibold border transition-colors ${protocol === 'wireguard' ? 'bg-violet-50 border-violet-400 text-violet-700' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'
+                        }`}>
                       WireGuard
                     </button>
                   </div>
                 </div>
 
                 {protocol === 'sstp' && (<>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
-                    Usuario PPP <span className="text-rose-500">*</span>
-                    <span className="text-[10px] font-normal text-slate-400 ml-1">— ingresar manualmente</span>
-                  </label>
-                  <div className="relative">
-                    <input value={pppUser} onChange={e => setPppUser(e.target.value)}
-                      placeholder="Ej: TorreVirginia-ND2"
-                      className="w-full px-3 py-2 pr-10 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300 font-mono" />
-                    {pppUser && (
-                      <button onClick={() => copyField(pppUser, 'form-user')}
-                        title="Copiar usuario"
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600 transition-colors">
-                        {copiedField === 'form-user' ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-semibold text-slate-600">
-                      Contraseña PPP <span className="text-rose-500">*</span>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Usuario PPP <span className="text-rose-500">*</span>
+                      <span className="text-[10px] font-normal text-slate-400 ml-1">— ingresar manualmente</span>
                     </label>
-                    <span className="flex items-center gap-1 text-[10px] text-emerald-600 font-medium">
-                      <ShieldCheck className="w-3 h-3" />
-                      Auto-generada · {pppPass.length} chars
-                    </span>
-                  </div>
-                  <div className="relative">
-                    <input type={showPass ? 'text' : 'password'} value={pppPass}
-                      onChange={e => setPppPass(e.target.value)}
-                      className="w-full px-3 py-2 pr-24 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300 font-mono" />
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
-                      <button onClick={() => setShowPass(v => !v)} title={showPass ? 'Ocultar' : 'Ver'}
-                        className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg transition-colors">
-                        {showPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                      </button>
-                      <button onClick={() => setPppPass(generateSecurePassword())} title="Regenerar contraseña"
-                        className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg transition-colors">
-                        <RefreshCw className="w-3.5 h-3.5" />
-                      </button>
-                      <button onClick={() => copyField(pppPass, 'form-pass')} title="Copiar contraseña"
-                        className="p-1.5 text-slate-400 hover:text-emerald-600 rounded-lg transition-colors">
-                        {copiedField === 'form-pass' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                      </button>
+                    <div className="relative">
+                      <input value={pppUser} onChange={e => setPppUser(e.target.value)}
+                        placeholder="Ej: TorreVirginia-ND2"
+                        className="w-full px-3 py-2 pr-10 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300 font-mono" />
+                      {pppUser && (
+                        <button onClick={() => copyField(pppUser, 'form-user')}
+                          title="Copiar usuario"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600 transition-colors">
+                          {copiedField === 'form-user' ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                        </button>
+                      )}
                     </div>
                   </div>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Puedes editar o regenerar — se guardará en la base de datos local</p>
-                </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-semibold text-slate-600">
+                        Contraseña PPP <span className="text-rose-500">*</span>
+                      </label>
+                      <span className="flex items-center gap-1 text-[10px] text-emerald-600 font-medium">
+                        <ShieldCheck className="w-3 h-3" />
+                        Auto-generada · {pppPass.length} chars
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <input type={showPass ? 'text' : 'password'} value={pppPass}
+                        onChange={e => setPppPass(e.target.value)}
+                        className="w-full px-3 py-2 pr-24 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300 font-mono" />
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+                        <button onClick={() => setShowPass(v => !v)} title={showPass ? 'Ocultar' : 'Ver'}
+                          className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg transition-colors">
+                          {showPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                        <button onClick={() => setPppPass(generateSecurePassword())} title="Regenerar contraseña"
+                          className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg transition-colors">
+                          <RefreshCw className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => copyField(pppPass, 'form-pass')} title="Copiar contraseña"
+                          className="p-1.5 text-slate-400 hover:text-emerald-600 rounded-lg transition-colors">
+                          {copiedField === 'form-pass' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Puedes editar o regenerar — se guardará en la base de datos local</p>
+                  </div>
                 </>)}
 
                 {protocol === 'wireguard' && (
@@ -1152,97 +1153,97 @@ function EditarNodoModal({
 
                 {/* Usuario PPP — solo SSTP */}
                 {!isWg && (
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Usuario PPP</label>
-                  <input value={newPppUser} onChange={e => setNewPppUser(e.target.value)}
-                    placeholder={node.ppp_user || ''}
-                    autoComplete="off"
-                    className={`w-full px-3 py-2 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">Usuario PPP</label>
+                    <input value={newPppUser} onChange={e => setNewPppUser(e.target.value)}
+                      placeholder={node.ppp_user || ''}
+                      autoComplete="off"
+                      className={`w-full px-3 py-2 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300
                       ${pppUserChanged ? 'border-amber-300 bg-amber-50' : 'border-slate-200'}`} />
-                  {pppUserChanged && <p className="text-[10px] text-amber-600 mt-0.5">Cambiará de <span className="font-mono font-bold">{node.ppp_user}</span> a <span className="font-mono font-bold">{newPppUser}</span></p>}
-                </div>
+                    {pppUserChanged && <p className="text-[10px] text-amber-600 mt-0.5">Cambiará de <span className="font-mono font-bold">{node.ppp_user}</span> a <span className="font-mono font-bold">{newPppUser}</span></p>}
+                  </div>
                 )}
 
                 {/* Contraseña PPP — solo SSTP */}
                 {!isWg && (
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-semibold text-slate-600">Contraseña PPP</label>
-                    {passChanged && (
-                      <span className="text-[10px] text-amber-600 font-medium">Se actualizará en MikroTik al guardar</span>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-semibold text-slate-600">Contraseña PPP</label>
+                      {passChanged && (
+                        <span className="text-[10px] text-amber-600 font-medium">Se actualizará en MikroTik al guardar</span>
+                      )}
+                    </div>
+                    {/* Inputs trampa: evitan que Chrome/Edge autorrellene el campo real */}
+                    <input type="text" style={{ display: 'none' }} aria-hidden="true" readOnly tabIndex={-1} />
+                    <input type="password" style={{ display: 'none' }} aria-hidden="true" readOnly tabIndex={-1} />
+                    <div className="relative">
+                      <input type={showPass ? 'text' : 'password'} value={newPass}
+                        onChange={e => setNewPass(e.target.value)}
+                        placeholder="Contraseña actual del nodo"
+                        autoComplete="new-password"
+                        name={`ppp-pass-${node.ppp_user}`}
+                        className={`w-full px-3 py-2 pr-24 text-sm border rounded-xl focus:outline-none focus:ring-2 font-mono
+                        ${newPass && newPass !== loadedPass ? 'border-amber-300 focus:ring-amber-300 bg-amber-50' : 'border-slate-200 focus:ring-indigo-300'}`} />
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+                        <button onClick={() => setShowPass(v => !v)} title={showPass ? 'Ocultar' : 'Ver'}
+                          className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg transition-colors">
+                          {showPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                        <button onClick={() => setNewPass(generateSecurePassword())} title="Generar nueva contraseña segura"
+                          className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg transition-colors">
+                          <RefreshCw className="w-3.5 h-3.5" />
+                        </button>
+                        {newPass && (
+                          <button onClick={() => copyEditField(newPass, 'edit-pass')} title="Copiar contraseña"
+                            className="p-1.5 text-slate-400 hover:text-emerald-600 rounded-lg transition-colors">
+                            {copiedEditField === 'edit-pass' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    {/* Estado de la contraseña */}
+                    {!loadingDetails && (
+                      <div className="flex items-center justify-between mt-1.5 gap-2">
+                        {!loadedPass ? (
+                          <p className="text-[10px] text-slate-400">
+                            Sin contraseña en DB local — ingrésala y pulsa <span className="font-bold">Guardar en DB</span>
+                          </p>
+                        ) : newPass === loadedPass ? (
+                          <p className="text-[10px] text-emerald-600 flex items-center gap-1">
+                            <ShieldCheck className="w-3 h-3" /> Sincronizada con DB local
+                          </p>
+                        ) : (
+                          <p className="text-[10px] text-amber-600">Modificada — guarda para actualizar</p>
+                        )}
+
+                        {/* Botón guardar solo en DB (sin tocar MikroTik) */}
+                        {newPass.trim() && newPass !== loadedPass && (
+                          <button onClick={handleSavePassToDb} disabled={savingPassDb}
+                            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-colors shrink-0
+                            bg-sky-50 border-sky-200 text-sky-700 hover:bg-sky-100 disabled:opacity-50">
+                            {savingPassDb
+                              ? <Loader2 className="w-3 h-3 animate-spin" />
+                              : passDbSaved
+                                ? <Check className="w-3 h-3 text-emerald-500" />
+                                : <ShieldCheck className="w-3 h-3" />}
+                            {passDbSaved ? '¡Guardada!' : 'Guardar en DB'}
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
-                  {/* Inputs trampa: evitan que Chrome/Edge autorrellene el campo real */}
-                  <input type="text"     style={{ display: 'none' }} aria-hidden="true" readOnly tabIndex={-1} />
-                  <input type="password" style={{ display: 'none' }} aria-hidden="true" readOnly tabIndex={-1} />
-                  <div className="relative">
-                    <input type={showPass ? 'text' : 'password'} value={newPass}
-                      onChange={e => setNewPass(e.target.value)}
-                      placeholder="Contraseña actual del nodo"
-                      autoComplete="new-password"
-                      name={`ppp-pass-${node.ppp_user}`}
-                      className={`w-full px-3 py-2 pr-24 text-sm border rounded-xl focus:outline-none focus:ring-2 font-mono
-                        ${newPass && newPass !== loadedPass ? 'border-amber-300 focus:ring-amber-300 bg-amber-50' : 'border-slate-200 focus:ring-indigo-300'}`} />
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
-                      <button onClick={() => setShowPass(v => !v)} title={showPass ? 'Ocultar' : 'Ver'}
-                        className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg transition-colors">
-                        {showPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                      </button>
-                      <button onClick={() => setNewPass(generateSecurePassword())} title="Generar nueva contraseña segura"
-                        className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg transition-colors">
-                        <RefreshCw className="w-3.5 h-3.5" />
-                      </button>
-                      {newPass && (
-                        <button onClick={() => copyEditField(newPass, 'edit-pass')} title="Copiar contraseña"
-                          className="p-1.5 text-slate-400 hover:text-emerald-600 rounded-lg transition-colors">
-                          {copiedEditField === 'edit-pass' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  {/* Estado de la contraseña */}
-                  {!loadingDetails && (
-                    <div className="flex items-center justify-between mt-1.5 gap-2">
-                      {!loadedPass ? (
-                        <p className="text-[10px] text-slate-400">
-                          Sin contraseña en DB local — ingrésala y pulsa <span className="font-bold">Guardar en DB</span>
-                        </p>
-                      ) : newPass === loadedPass ? (
-                        <p className="text-[10px] text-emerald-600 flex items-center gap-1">
-                          <ShieldCheck className="w-3 h-3" /> Sincronizada con DB local
-                        </p>
-                      ) : (
-                        <p className="text-[10px] text-amber-600">Modificada — guarda para actualizar</p>
-                      )}
-
-                      {/* Botón guardar solo en DB (sin tocar MikroTik) */}
-                      {newPass.trim() && newPass !== loadedPass && (
-                        <button onClick={handleSavePassToDb} disabled={savingPassDb}
-                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-colors shrink-0
-                            bg-sky-50 border-sky-200 text-sky-700 hover:bg-sky-100 disabled:opacity-50">
-                          {savingPassDb
-                            ? <Loader2 className="w-3 h-3 animate-spin" />
-                            : passDbSaved
-                              ? <Check className="w-3 h-3 text-emerald-500" />
-                              : <ShieldCheck className="w-3 h-3" />}
-                          {passDbSaved ? '¡Guardada!' : 'Guardar en DB'}
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
                 )}
 
                 {/* IP Túnel remota — solo SSTP */}
                 {!isWg && (
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">IP Túnel remota (PPP remote-address)</label>
-                  <input value={newRemote} onChange={e => setNewRemote(e.target.value)}
-                    placeholder={currentRemoteIP || '10.10.250.xxx'}
-                    className={`w-full px-3 py-2 text-sm border rounded-xl focus:outline-none focus:ring-2 font-mono
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">IP Túnel remota (PPP remote-address)</label>
+                    <input value={newRemote} onChange={e => setNewRemote(e.target.value)}
+                      placeholder={currentRemoteIP || '10.10.250.xxx'}
+                      className={`w-full px-3 py-2 text-sm border rounded-xl focus:outline-none focus:ring-2 font-mono
                       ${newRemote && !IPV4_RE.test(newRemote.trim()) ? 'border-rose-300 focus:ring-rose-300' : remoteChanged ? 'border-amber-300 bg-amber-50' : 'border-slate-200 focus:ring-indigo-300'}`} />
-                  {remoteChanged && <p className="text-[10px] text-amber-600 mt-0.5">Cambiará de <span className="font-mono font-bold">{currentRemoteIP}</span> a <span className="font-mono font-bold">{newRemote}</span></p>}
-                </div>
+                    {remoteChanged && <p className="text-[10px] text-amber-600 mt-0.5">Cambiará de <span className="font-mono font-bold">{currentRemoteIP}</span> a <span className="font-mono font-bold">{newRemote}</span></p>}
+                  </div>
                 )}
               </div>
 
@@ -1470,6 +1471,7 @@ function ScriptModal({ node, onClose }: { node: NodeInfo; onClose: () => void })
   const [pppPass, setPppPass] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [script, setScript] = useState('');
+  const [cpeSteps, setCpeSteps] = useState<{title: string, cmd: string}[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
@@ -1489,13 +1491,24 @@ function ScriptModal({ node, onClose }: { node: NodeInfo; onClose: () => void })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node.ppp_user]);
 
+  const isWG = node.ppp_user?.startsWith('WG-ND') || node.ppp_user?.startsWith('VPN-WG-');
   const IPV4_RE = /^(\d{1,3}\.){3}\d{1,3}$/;
-  const canGenerate = IPV4_RE.test(serverIP.trim()) && !!pppPass.trim();
+  const canGenerate = IPV4_RE.test(serverIP.trim()) && (isWG || !!pppPass.trim());
+
+  const autoGenRun = useRef(false);
+
+  useEffect(() => {
+    if (canGenerate && !loadingPass && !autoGenRun.current) {
+      autoGenRun.current = true;
+      handleGenerate();
+    }
+  }, [canGenerate, loadingPass]);
 
   const handleGenerate = async () => {
     setLoading(true);
     setError('');
     setScript('');
+    setCpeSteps([]);
     try {
       const r = await fetchWithTimeout(`${API_BASE_URL}/api/node/script`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1508,6 +1521,7 @@ function ScriptModal({ node, onClose }: { node: NodeInfo; onClose: () => void })
       const d = await r.json();
       if (!d.success) throw new Error(d.message || 'Error al generar');
       setScript(d.script);
+      setCpeSteps(d.cpeSteps || []);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error desconocido');
     }
@@ -1570,6 +1584,7 @@ function ScriptModal({ node, onClose }: { node: NodeInfo; onClose: () => void })
                 className={`w-full px-3 py-2 text-sm border rounded-xl focus:outline-none focus:ring-2 font-mono
                   ${serverIP && !IPV4_RE.test(serverIP.trim()) ? 'border-rose-300 focus:ring-rose-300' : 'border-slate-200 focus:ring-emerald-300'}`} />
             </div>
+            {isWG ? null : (
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1 flex items-center gap-1.5">
                 Contraseña PPP <span className="text-rose-500">*</span>
@@ -1585,6 +1600,7 @@ function ScriptModal({ node, onClose }: { node: NodeInfo; onClose: () => void })
                 </button>
               </div>
             </div>
+            )}
           </div>
 
           {error && (
@@ -1593,7 +1609,33 @@ function ScriptModal({ node, onClose }: { node: NodeInfo; onClose: () => void })
             </div>
           )}
 
-          {script && (
+          {cpeSteps.length > 0 ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pasos a configurar en el router torre (CPE)</p>
+                <button onClick={handleCopy}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all
+                    ${copied ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700'}`}>
+                  {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copied ? '¡Copiado!' : 'Copiar Todo'}</span>
+                </button>
+              </div>
+              <div className="space-y-2">
+                {cpeSteps.map((step, idx) => (
+                  <div key={idx} className="bg-slate-900 rounded-xl overflow-hidden">
+                    <div className="bg-slate-800/80 px-3 py-2 border-b border-white/5">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                        Paso {idx + 1}: <span className="text-emerald-300">{step.title}</span>
+                      </span>
+                    </div>
+                    <div className="p-3 text-[11px] font-mono text-emerald-400 break-all whitespace-pre-wrap leading-relaxed">
+                      {step.cmd}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : script ? (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Script generado</p>
@@ -1608,7 +1650,7 @@ function ScriptModal({ node, onClose }: { node: NodeInfo; onClose: () => void })
                 {script}
               </pre>
             </div>
-          )}
+          ) : null}
         </div>
 
         <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-slate-100 shrink-0 bg-slate-50 rounded-b-2xl">
@@ -1680,10 +1722,10 @@ function HistoryModal({ node, onClose }: { node: NodeInfo; onClose: () => void }
             <div className="space-y-2">
               {history.map((h, i) => {
                 const cfg: Record<string, { dot: string; label: string; row: string; text: string }> = {
-                  connected:          { dot: 'bg-emerald-500', label: 'Conectado VPN',       row: 'bg-emerald-50 border-emerald-100',  text: 'text-emerald-700' },
-                  disconnected:       { dot: 'bg-rose-500',    label: 'Desconectado VPN',    row: 'bg-rose-50 border-rose-100',        text: 'text-rose-700'    },
-                  tunnel_activated:   { dot: 'bg-sky-500',     label: 'Túnel activado',      row: 'bg-sky-50 border-sky-100',          text: 'text-sky-700'     },
-                  tunnel_deactivated: { dot: 'bg-amber-500',   label: 'Túnel desactivado',   row: 'bg-amber-50 border-amber-100',      text: 'text-amber-700'   },
+                  connected: { dot: 'bg-emerald-500', label: 'Conectado VPN', row: 'bg-emerald-50 border-emerald-100', text: 'text-emerald-700' },
+                  disconnected: { dot: 'bg-rose-500', label: 'Desconectado VPN', row: 'bg-rose-50 border-rose-100', text: 'text-rose-700' },
+                  tunnel_activated: { dot: 'bg-sky-500', label: 'Túnel activado', row: 'bg-sky-50 border-sky-100', text: 'text-sky-700' },
+                  tunnel_deactivated: { dot: 'bg-amber-500', label: 'Túnel desactivado', row: 'bg-amber-50 border-amber-100', text: 'text-amber-700' },
                 };
                 const c = cfg[h.event] ?? { dot: 'bg-slate-400', label: h.event, row: 'bg-slate-50 border-slate-100', text: 'text-slate-600' };
                 return (
@@ -2148,7 +2190,7 @@ export default function NodeAccessPanel() {
       }
     }, 2000);
     return () => clearTimeout(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isReady, credentials]);
 
   // Alerta de renovación cuando quedan < 2 min
@@ -2636,7 +2678,7 @@ export default function NodeAccessPanel() {
             <span className="font-bold text-amber-700">MikroTik no disponible</span>
             <span className="text-amber-600 ml-1.5">
               Mostrando {nodes.length} nodo{nodes.length !== 1 ? 's' : ''} desde la base de datos local.
-              {nodes[0]?.last_seen ? ` Última sincronización: ${new Date(nodes[0].last_seen).toLocaleString('es', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })}` : ''}
+              {nodes[0]?.last_seen ? ` Última sincronización: ${new Date(nodes[0].last_seen).toLocaleString('es', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : ''}
             </span>
           </div>
           <button onClick={fetchNodes}
@@ -2693,9 +2735,9 @@ export default function NodeAccessPanel() {
             {/* Búsqueda */}
             <div className="relative w-full sm:w-64">
               {/* Dummy inputs para atrapar el autofill agresivo de Chrome/Edge */}
-              <input type="text" name="dummy-user" style={{display: 'none'}} />
-              <input type="password" name="dummy-pass" style={{display: 'none'}} />
-              
+              <input type="text" name="dummy-user" style={{ display: 'none' }} />
+              <input type="password" name="dummy-pass" style={{ display: 'none' }} />
+
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
               <input
                 type="text"
@@ -2796,11 +2838,11 @@ export default function NodeAccessPanel() {
             setDeleteNode(null);
             removeNodeFromState(pppUser);
             // Limpiar devices huérfanos de SQLite + cache IndexedDB de CPEs
-            deviceDb.cleanupOrphans().catch(() => {});
+            deviceDb.cleanupOrphans().catch(() => { });
             if (deletedDeviceIds.length > 0) {
-              deviceDb.removeByIds(deletedDeviceIds).catch(() => {});
+              deviceDb.removeByIds(deletedDeviceIds).catch(() => { });
             }
-            cpeCache.clear().catch(() => {});
+            cpeCache.clear().catch(() => { });
           }}
         />
       )}

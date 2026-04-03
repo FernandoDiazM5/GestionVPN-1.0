@@ -519,11 +519,11 @@ function ApDetailModal({
   const [saved, setSaved] = useState(false);
 
   const refresh = useCallback(() => {
-    if (!dev.sshUser || !dev.sshPass) { setError('Sin credenciales SSH'); return; }
+    if (!dev.sshUser || (!('hasSshPass' in dev ? dev.hasSshPass : false) && !dev.sshPass)) { setError('Sin credenciales SSH'); return; }
     setLoading(true); setError('');
     fetchWithTimeout(`${BASE}/ap-detail-direct`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ip: dev.ip, port: dev.sshPort ?? 22, user: dev.sshUser, pass: dev.sshPass }),
+      body: JSON.stringify({ id: dev.id, ip: dev.ip, port: dev.sshPort ?? 22, user: dev.sshUser, pass: dev.sshPass }),
     }, 35_000)
       .then(r => r.json())
       .then(d => { if (d.success) { setStats(d.stats); setSaved(false); } else setError(d.message); })
