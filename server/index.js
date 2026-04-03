@@ -43,13 +43,7 @@ app.use(cors({
     origin: (origin, callback) => {
         // Permitir requests sin origin (curl, Postman, server-to-server)
         if (!origin) return callback(null, true);
-        const allowed = [
-            'http://localhost:5173',
-            'http://localhost:4173',
-            'http://127.0.0.1:5173',
-            process.env.FRONTEND_URL,
-        ].filter(Boolean);
-        if (allowed.includes(origin) || origin.endsWith('.trycloudflare.com')) {
+        if (allowedOrigins.includes(origin) || origin.endsWith('.trycloudflare.com')) {
             return callback(null, true);
         }
         console.warn(`[CORS] Origen bloqueado: ${origin}`);

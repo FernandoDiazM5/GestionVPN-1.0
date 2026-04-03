@@ -558,14 +558,14 @@ function DeviceStatusPanel({ dev, onRefresh }: { dev: ScannedDevice; onRefresh?:
 
   const doFetch = async () => {
     const d = devRef.current;
-    if (!d.sshUser || !d.sshPass || isFetchingRef.current) return;
+    if (!d.sshUser || (!('hasSshPass' in d ? d.hasSshPass : false) && !d.sshPass) || isFetchingRef.current) return;
     isFetchingRef.current = true;
     setRefreshing(true);
     try {
       const res = await fetchWithTimeout(`${API_BASE_URL}/api/device/antenna`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deviceIP: d.ip, deviceUser: d.sshUser, devicePass: d.sshPass, devicePort: d.sshPort ?? 22 }),
+        body: JSON.stringify({ deviceId: 'id' in d ? d.id : undefined, deviceIP: d.ip, deviceUser: d.sshUser, devicePass: d.sshPass, devicePort: d.sshPort ?? 22 }),
       }, 15_000);
       const data = await res.json();
       if (data.success && data.stats) {
@@ -580,7 +580,7 @@ function DeviceStatusPanel({ dev, onRefresh }: { dev: ScannedDevice; onRefresh?:
 
   // Auto-refresh cada 5 segundos mientras el panel está montado (visible)
   useEffect(() => {
-    if (!dev.sshUser || !dev.sshPass) return;
+    if (!dev.sshUser || (!('hasSshPass' in dev ? dev.hasSshPass : false) && !dev.sshPass)) return;
     const id = setInterval(doFetch, 5000);
     return () => clearInterval(id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1656,6 +1656,12 @@ export default function NetworkDevicesModule() {
 
   const [nodeSshCreds, setNodeSshCreds] = useState<ScanCred[]>([]);
 
+  // FIX 2 — ref to cancel the SSE reader on error or unmount
+  const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
+  useEffect(() => {
+    return () => { readerRef.current?.cancel(); };
+  }, []);
+
   // ── Resize de columnas ──────────────────────────────────────────────────
   const [colWidths, setColWidths] = useState<Record<string, number>>({});
   const resizingRef = useRef<{ key: string; startX: number; startW: number } | null>(null);
@@ -1776,6 +1782,7 @@ export default function NetworkDevicesModule() {
       setScanResults([]);
       setAllScannedIPs([]);
       setSshStatus({});
+      setNodeSshCreds([]); // FIX 4 — clear stale SSH creds when node changes
       setScannedCount(0);
       setScanState({ phase: 'idle', current: 0, total: 0 });
       try { sessionStorage.removeItem(SESSION_SCAN_KEY); } catch { /* */ }
@@ -1819,7 +1826,7 @@ export default function NetworkDevicesModule() {
       const t = setTimeout(() => setScanState({ phase: 'idle', current: 0, total: 0 }), 3000);
       return () => clearTimeout(t);
     }
-  }, [scanState.phase, scanResults, allScannedIPs, scannedCount, debugMsg]);
+  }, [scanState.phase, scanResults, allScannedIPs, scannedCount, debugMsg, sshStatus]); // FIX 3
 
   // ── Fase 2 reutilizable: autenticación SSH vía /device/antenna (igual que "Guardar") ──
   // Usa el mismo endpoint que funciona al guardar manualmente, sin persistir en DB.
@@ -1940,6 +1947,8 @@ export default function NetworkDevicesModule() {
   // ── Fase 1 + Fase 2: escanear red y luego autenticar ────────────────────
   const handleScan = async () => {
     if (!effectiveLan) return;
+    // FIX 5 — mutex guard: prevent concurrent invocations
+    if (scanState.phase !== 'idle') return;
 
     setScanState({ phase: 'discovering', current: 0, total: 0 });
     setSshStatus({});
@@ -1960,6 +1969,7 @@ export default function NetworkDevicesModule() {
       if (!res.ok || !res.body) throw new Error('Error en el inicio del escaneo asíncrono');
 
       const reader = res.body.getReader();
+      readerRef.current = reader; // FIX 2 — store reader so unmount cleanup can cancel it
       const decoder = new TextDecoder();
       let buffer = '';
       let discoveredDevices: ScannedDevice[] = [];
@@ -1967,42 +1977,55 @@ export default function NetworkDevicesModule() {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        
+
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n\n');
-        buffer = lines.pop() || ''; 
-        
+        buffer = lines.pop() || '';
+
         for (const block of lines) {
            const linesSplit = block.split('\n');
            const eventLine = linesSplit.find(l => l.startsWith('event:'));
            const dataLine = linesSplit.find(l => l.startsWith('data:'));
            if (!eventLine || !dataLine) continue;
-           
+
            const eventName = eventLine.replace('event:', '').trim();
            const dataCode = dataLine.replace('data:', '').trim();
            if (!dataCode) continue;
-           const data = JSON.parse(dataCode);
-           
+
+           // FIX 1 — guard against malformed SSE chunks
+           let data: unknown;
+           try {
+             data = JSON.parse(dataCode);
+           } catch (parseErr) {
+             console.warn('[scan-stream] malformed JSON chunk, skipping:', parseErr);
+             continue;
+           }
+
            if (eventName === 'progress') {
-              setScannedCount(data.scanned);
-              if (data.found && data.found.length > 0) {
+              const d = data as { scanned: number; found?: ScannedDevice[] };
+              setScannedCount(d.scanned);
+              if (d.found && d.found.length > 0) {
                  setScanResults(prev => {
-                   const map = new Map(prev.map(d => [d.ip, d]));
-                   data.found.forEach((d: ScannedDevice) => map.set(d.ip, d));
+                   const map = new Map(prev.map(r => [r.ip, r]));
+                   d.found!.forEach((dev: ScannedDevice) => map.set(dev.ip, dev));
                    return Array.from(map.values());
                  });
               }
            } else if (eventName === 'complete') {
-              discoveredDevices = data.devices || discoveredDevices;
+              const d = data as { devices?: ScannedDevice[]; total: number };
+              discoveredDevices = d.devices || discoveredDevices;
               setScanResults(discoveredDevices);
-              setAllScannedIPs(discoveredDevices.map((d: ScannedDevice) => d.ip));
-              setScannedCount(data.total);
-              setDebugMsg(`Escaneadas ${data.total} IPs — ${discoveredDevices.length} encontrados`);
+              setAllScannedIPs(discoveredDevices.map((dev: ScannedDevice) => dev.ip));
+              setScannedCount(d.total);
+              setDebugMsg(`Escaneadas ${d.total} IPs — ${discoveredDevices.length} encontrados`);
            } else if (eventName === 'error') {
-              throw new Error(data.message);
+              const d = data as { message?: string };
+              throw new Error(d.message);
            }
         }
       }
+
+      readerRef.current = null;
 
       // Cargar credenciales SSH del nodo activo
       let creds: ScanCred[] = nodeSshCreds;
@@ -2023,6 +2046,9 @@ export default function NetworkDevicesModule() {
 
       await runAuthPhase(discoveredDevices, creds);
     } catch (err: unknown) {
+      // FIX 2 — cancel the reader if an error interrupts the stream
+      readerRef.current?.cancel();
+      readerRef.current = null;
       setScanError(err instanceof Error ? err.message : 'Error desconocido');
       setScanState({ phase: 'idle', current: 0, total: 0 });
     }
@@ -2183,19 +2209,14 @@ export default function NetworkDevicesModule() {
     });
   }, [filteredRows, sortConfig]);
 
-  void savedDevices.reduce<Record<string, { nodeName: string; devices: SavedDevice[] }>>((acc, d) => {
-    if (!acc[d.nodeId]) acc[d.nodeId] = { nodeName: nodes.find(n => n.id === d.nodeId)?.nombre_nodo || d.nodeName, devices: [] };
-    acc[d.nodeId].devices.push(d);
-    return acc;
-  }, {});
-
   // Grid template dinámico — columnas en orden elegido por el usuario
   const activeConfigCols = visibleCols
     .map(k => COLUMN_DEFS.find(c => c.key === k))
     .filter(Boolean) as ColumnDef[];
 
   // Ancho mínimo de la tabla: suma de todas las columnas fijas + configurables
-  const minTableWidth = [40, 54, 148, 120, ...activeConfigCols.map(c => parseInt(c.width) || 80), 32, 180].reduce((a, b) => a + b, 0);
+  // FIX 7 — extract first number from width to handle 'minmax(120px, 1fr)' strings correctly
+  const minTableWidth = [40, 54, 148, 120, ...activeConfigCols.map(c => parseInt(c.width.match(/\d+/)?.[0] || '80') || 80), 32, 180].reduce((a, b) => a + b, 0);
 
   const gridTemplate = [
     '40px',   // SSH status

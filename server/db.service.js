@@ -180,6 +180,11 @@ async function initDb() {
     await migrate("ALTER TABLE aps ADD COLUMN cpes_conectados_count INTEGER DEFAULT 0");
     await migrate("ALTER TABLE aps ADD COLUMN last_saved INTEGER DEFAULT 0");
 
+    // Phase 5: Columnas adicionales de APs — nombre del nodo, puerto webUI del router, último poll SSH
+    await migrate("ALTER TABLE aps ADD COLUMN nombre_nodo TEXT DEFAULT ''");
+    await migrate("ALTER TABLE aps ADD COLUMN router_port INTEGER DEFAULT 8075");
+    await migrate("ALTER TABLE aps ADD COLUMN last_seen INTEGER DEFAULT 0");
+
     // Phase 5: Credenciales SSH propias de cada CPE (distintas de las del AP padre)
     await migrate("ALTER TABLE cpes_conocidos ADD COLUMN usuario_ssh TEXT DEFAULT ''");
     await migrate("ALTER TABLE cpes_conocidos ADD COLUMN clave_ssh TEXT DEFAULT NULL");

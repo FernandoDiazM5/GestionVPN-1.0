@@ -70,7 +70,7 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
   const [activeNodeVrf, setActiveNodeVrf] = useState<string | null>(null);
   const [tunnelExpiry, setTunnelExpiry] = useState<number | null>(null);
   const [adminIP, setAdminIP] = useState('192.168.21.20');
-  const timeoutRef   = useRef<ReturnType<typeof setTimeout>  | null>(null);
+  const timeoutRef   = useRef<ReturnType<typeof setInterval> | null>(null);
   const keepaliveRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Ref para leer activeNodeVrf / adminIP sin capturarlos en el closure del intervalo
   const activeNodeVrfRef = useRef<string | null>(null);
@@ -137,7 +137,7 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
     setActiveNodeVrf(null);
     setTunnelExpiry(null);
     if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
+      clearInterval(timeoutRef.current);
       timeoutRef.current = null;
     }
     if (keepaliveRef.current) {
@@ -158,31 +158,34 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
       if (activeNodeVrfRef.current === removed.nombre_vrf) {
         setActiveNodeVrf(null);
         setTunnelExpiry(null);
-        if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null; }
+        if (timeoutRef.current) { clearInterval(timeoutRef.current); timeoutRef.current = null; }
         if (keepaliveRef.current) { clearInterval(keepaliveRef.current); keepaliveRef.current = null; }
       }
       return prev.filter(n => n.ppp_user !== pppUser);
     });
   }, []);
 
-  // Auto-timeout: cuando se activa un tunnel, programar desactivación a los 30 min
+  // Auto-timeout resiliente: sobrevive a suspensión (sleep)
   useEffect(() => {
     if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
+      clearInterval(timeoutRef.current);
       timeoutRef.current = null;
     }
     if (tunnelExpiry) {
-      const remaining = tunnelExpiry - Date.now();
-      if (remaining <= 0) {
-        deactivateAllNodes();
-      } else {
-        timeoutRef.current = setTimeout(() => {
-          deactivateAllNodes();
-        }, remaining);
-      }
+      const checkExpiry = () => {
+        if (Date.now() >= tunnelExpiry) {
+          if (navigator.onLine) {
+            deactivateAllNodes();
+          } else {
+            console.warn('[VPNContext] Túnel expirado pero no hay red — esperando reconexión para apagarlo...');
+          }
+        }
+      };
+      checkExpiry(); // Check inmediato
+      timeoutRef.current = setInterval(checkExpiry, 5000); // Polling cada 5s por si el PC durmió
     }
     return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      if (timeoutRef.current) clearInterval(timeoutRef.current);
     };
   }, [tunnelExpiry, deactivateAllNodes]);
 

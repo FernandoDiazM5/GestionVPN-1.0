@@ -33,6 +33,7 @@ export interface SavedDevice {
   // SSH al dispositivo Ubiquiti (para mca-status)
   sshUser?: string;
   sshPass?: string;
+  hasSshPass?: boolean;
   sshPort?: number;
   // Router detrás de la antena (WebUI)
   routerIp?: string;
