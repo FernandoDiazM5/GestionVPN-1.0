@@ -545,3 +545,21 @@ Resultado mostrado en `bg-violet-50 border-violet-200`:
 - **Túneles Zombies post-Suspensión (VpnContext)**: Nunca dependas de `setTimeout` o `setInterval` simples para temporizadores críticos (ej. expirar túnel VPN en `tunnelExpiry`). Si la PC entra en suspensión, JS se congela, y al despertar el timeout caduca de forma masiva sin conexión de red, dejando "túneles zombies" en el servidor. La solución correcta es hacer polling con un `setInterval` resiliente que verifique `if (!navigator.onLine) return;` antes de disparar llamadas de red tipo `deactivateAllNodes()`.
 - **Riesgos de Credenciales Planas**: El Frontend ahora NO recibe ni procesa la contraseña de los dispositivos (AP, Antenas) en texto plano. \`SavedDevice\` ahora tiene una bandera \`hasSshPass\` (booleana) en lugar del string plano. Debes adaptar la lógica (`ApMonitorModule`, `NetworkDevicesModule`) para usar `hasSshPass` en validaciones visuales, y enviar el `id` o `deviceId` al backend en endpoints como `/device/antenna` y `/ap-detail-direct` para desencriptación Just-In-Time (JIT) en el servidor.
 - **Protección de Colisiones (WireGuard)**: En `NodeAccessPanel.tsx`, la lista de `PROTECTED_NETS` que blinda la red de subredes inválidas ahora incluye el pool de WireGuard `10.10.251.0/24`. Evitar colisiones en Frontend ahorra errores fatales en el Backend.
+
+---
+
+## UX / UI Design Principles (Micro-interacciones y UI)
+
+### 1. Bloqueo Inteligente de Inputs Críticos
+Para campos estructurales que rara vez cambian (ej. IP del servidor), usar un diseño de "bloqueo inteligente".
+- El `input` debe ser `readOnly` por defecto para evitar ediciones accidentales.
+- Proveer un botón lateral pequeño (ej. icono `<Pencil />` o `<Lock />`) para alternar un estado `isEditing` que desbloquee el input.
+
+### 2. Micro-interacciones (Touch & Feel)
+Los modales altamente interactivos deben responder kinésicamente a los clics.
+- Agregar la clase `active:scale-[0.97]` a los botones principales ("Regenerar", "Copiar Todo", "Guardar") para lograr una sensación táctil ("hundimiento rápido") bajo el mouse.
+- Usar `transition-transform duration-150` junto con esta escala.
+
+### 3. Estilizado de Scrollbars en Modales
+Evitar el scrollbar nativo (gris y rústico de Windows/Chrome) en elementos con `overflow-y-auto`.
+- Usar clases custom en el CSS global o utilidades de Tailwind para que la barra de desplazamiento sea delgada (`scrollbar-thin`), redondeada y con pista transparente (`scrollbar-thumb-slate-300 scrollbar-track-transparent`), integrándose sutilmente al modal.

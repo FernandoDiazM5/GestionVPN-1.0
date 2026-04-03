@@ -1086,7 +1086,7 @@ const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCol
   const channel = stats?.channelWidth ?? dev.channelWidth;
   const txPower = stats?.txPower;
   const netMode = stats?.networkMode ?? dev.networkMode;
-  const noSsh = !dev.sshUser || !dev.sshPass;
+  const noSsh = !dev.sshUser || (dev.sshPass === undefined && !dev.hasSshPass);
   const isPolling = pollResult?.loading ?? false;
   const cpeCount = pollResult?.stations.length ?? null;
   const lastCount = dev.lastCpeCount ?? null;
