@@ -92,3 +92,23 @@ export interface TunnelDeactivateResponse {
   success: boolean;
   message?: string;
 }
+
+export interface Torre {
+  id: string;
+  nombre: string;
+  ubicacion: string;
+  tramos: number;
+  contacto: string;
+  pdf_path: string;
+  nodo_id: string;
+  ptp_emisor_ip: string;
+  ptp_emisor_nombre: string;
+  ptp_emisor_modelo: string;
+  ptp_emisor_desc: string;
+  ptp_receptor_ip: string;
+  ptp_receptor_nombre: string;
+  ptp_receptor_modelo: string;
+  ptp_receptor_desc: string;
+  creado_en: number;
+}
+

@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useVpn } from '../../context/VpnContext';
 import { API_BASE_URL } from '../../config';
+import { apiFetch } from '../../utils/apiClient';
 import { topologyDb } from '../db/db';
 import type { Tower, Device, Link } from '../db/tables';
 import type { SavedDevice } from '../../types/devices';
+import type { Torre } from '../../types/api';
 
 /**
  * Syncs live VPN nodes, APs, and CPEs into the topology Dexie DB.
@@ -17,8 +19,8 @@ export function useTopologySync(): { syncing: boolean; lastSync: number } {
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState(0);
   const syncingRef = useRef(false);
-  const syncTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
-  const intervalRef = useRef<ReturnType<typeof setInterval>>();
+  const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const nodesRef = useRef(nodes);
   nodesRef.current = nodes;
 
@@ -34,65 +36,114 @@ export function useTopologySync(): { syncing: boolean; lastSync: number } {
       // ── Fetch APs from backend ──
       let allAps: SavedDevice[] = [];
       try {
-        const res = await fetch(`${API_BASE_URL}/db/devices`);
-        if (res.ok) allAps = await res.json();
+        const res = await apiFetch(`${API_BASE_URL}/api/db/devices`);
+        if (res.ok) {
+          const data = await res.json();
+          allAps = data.devices ?? data ?? [];
+        }
       } catch { /* offline — use empty */ }
 
       const aps = allAps.filter(d => d.role === 'ap');
 
-      // ── 1. Sync Towers from VPN nodes ──
+      // ── Fetch Torres from backend ──
+      let backendTorres: Torre[] = [];
+      try {
+        const resTorres = await apiFetch(`${API_BASE_URL}/api/topology/torres`);
+        if (resTorres.ok) {
+          const data = await resTorres.json();
+          backendTorres = data.torres ?? [];
+        }
+      } catch { /* offline */ }
+
+      // ── 1. Sync Towers from Backend Torres ──
       const existingTowers = await topologyDb.towers.toArray();
       const vpnTowerIds = new Set<string>();
 
-      for (let i = 0; i < vpnNodes.length; i++) {
-        const node = vpnNodes[i];
-        const towerId = `tower-${node.id}`;
+      for (let i = 0; i < backendTorres.length; i++) {
+        const torre = backendTorres[i];
+        const towerId = `tower-${torre.id}`; // local ID
         vpnTowerIds.add(towerId);
+
+        // Find connected vpn node for status
+        const node = vpnNodes.find(n => n.id === torre.nodo_id);
+
+        // Dynamic tower sizing based on AP count
+        const towerAps = aps.filter(ap => ap.nodeId === torre.nodo_id);
+        const calcHeight = Math.max(450, 200 + (towerAps.length * 140));
 
         const existing = existingTowers.find(t => t.id === towerId);
         if (existing) {
           await topologyDb.towers.update(towerId, {
-            name: node.nombre_nodo,
-            vpnRunning: node.running,
-            vpnProtocol: node.service,
+            name: torre.nombre,
+            location: torre.ubicacion,
+            vpnRunning: node ? node.running : undefined,
+            vpnProtocol: node ? node.service : undefined,
+            sourceNodeId: torre.nodo_id || undefined,
             updatedAt: now,
+            tramos: torre.tramos,
+            contacto: torre.contacto,
+            pdf_path: torre.pdf_path,
+            nodo_id: torre.nodo_id,
+            ptp_emisor_ip: torre.ptp_emisor_ip,
+            ptp_emisor_nombre: torre.ptp_emisor_nombre,
+            ptp_emisor_modelo: torre.ptp_emisor_modelo,
+            ptp_receptor_ip: torre.ptp_receptor_ip,
+            ptp_receptor_nombre: torre.ptp_receptor_nombre,
+            ptp_receptor_modelo: torre.ptp_receptor_modelo,
+            canvasHeight: existing.canvasHeight < calcHeight ? calcHeight : existing.canvasHeight,
           });
         } else {
           const tower: Tower = {
             id: towerId,
-            name: node.nombre_nodo,
-            sourceNodeId: node.id,
-            sourceType: 'vpn_node',
-            vpnProtocol: node.service,
-            vpnRunning: node.running,
+            name: torre.nombre,
+            location: torre.ubicacion,
+            sourceNodeId: torre.nodo_id || undefined,
+            sourceType: 'manual', // Loaded from DB, not auto-generated from VPN
+            vpnProtocol: node ? node.service : undefined,
+            vpnRunning: node ? node.running : undefined,
             canvasX: 80 + i * 650,
             canvasY: 80,
             canvasWidth: 550,
-            canvasHeight: 450,
+            canvasHeight: calcHeight,
             collapsed: false,
-            createdAt: now,
+            createdAt: torre.creado_en || now,
             updatedAt: now,
+            
+            tramos: torre.tramos,
+            contacto: torre.contacto,
+            pdf_path: torre.pdf_path,
+            nodo_id: torre.nodo_id,
+            ptp_emisor_ip: torre.ptp_emisor_ip,
+            ptp_emisor_nombre: torre.ptp_emisor_nombre,
+            ptp_emisor_modelo: torre.ptp_emisor_modelo,
+            ptp_receptor_ip: torre.ptp_receptor_ip,
+            ptp_receptor_nombre: torre.ptp_receptor_nombre,
+            ptp_receptor_modelo: torre.ptp_receptor_modelo,
           };
           await topologyDb.towers.add(tower);
         }
       }
 
-      // Remove stale VPN towers
+      // Remove stale DB towers
       const staleTowers = existingTowers.filter(
-        t => t.sourceType === 'vpn_node' && !vpnTowerIds.has(t.id)
+        t => t.sourceType === 'manual' && !t.id.startsWith('tower-manual-') && !vpnTowerIds.has(t.id)
       );
       if (staleTowers.length > 0) {
         await topologyDb.towers.bulkDelete(staleTowers.map(t => t.id));
       }
 
-      // ── 2. Sync VPN Node devices ──
+      // ── 2. Sync VPN Node devices (only for those assigned to a Tower) ──
       const existingDevices = await topologyDb.devices.toArray();
       const vpnDevIds = new Set<string>();
 
-      for (const node of vpnNodes) {
-        const devId = `vpndev-${node.id}`;
+      for (const torre of backendTorres) {
+        if (!torre.nodo_id) continue;
+        const node = vpnNodes.find(n => n.id === torre.nodo_id);
+        if (!node) continue;
+
+        const devId = `vpndev-${node.id}-torre-${torre.id}`;
         vpnDevIds.add(devId);
-        const towerId = `tower-${node.id}`;
+        const towerId = `tower-${torre.id}`;
 
         const existing = existingDevices.find(d => d.id === devId);
         if (existing) {
@@ -122,7 +173,7 @@ export function useTopologySync(): { syncing: boolean; lastSync: number } {
             vpnService: node.service,
             lanSegment: node.segmento_lan,
             canvasX: 60,
-            canvasY: 80,
+            canvasY: 150, // Moved down to make room for PTP above
             status: node.running ? 'online' : 'offline',
             createdAt: now,
             updatedAt: now,
@@ -139,53 +190,137 @@ export function useTopologySync(): { syncing: boolean; lastSync: number } {
         await topologyDb.devices.bulkDelete(staleVpnDevs.map(d => d.id));
       }
 
+      // ── 2b. Sync Virtual PTP Devices ──
+      const ptpDevIds = new Set<string>();
+
+      for (const torre of backendTorres) {
+        if (!torre.ptp_emisor_ip && !torre.ptp_receptor_ip) continue;
+        
+        const towerId = `tower-${torre.id}`;
+
+        // Sync Emisor
+        if (torre.ptp_emisor_ip) {
+          const emisorId = `ptp-emisor-${torre.id}`;
+          ptpDevIds.add(emisorId);
+          const existing = existingDevices.find(d => d.id === emisorId);
+          if (existing) {
+            await topologyDb.devices.update(emisorId, {
+              name: torre.ptp_emisor_nombre || 'PTP Emisor',
+              ipAddress: torre.ptp_emisor_ip,
+              model: torre.ptp_emisor_modelo || 'PTP',
+              towerId: null,
+              updatedAt: now,
+            });
+          } else {
+            // PTP Emisor is OUTSIDE the tower (comes from a remote site)
+            const towerObj = existingTowers.find(t => t.id === towerId);
+            await topologyDb.devices.add({
+              id: emisorId,
+              towerId: null,
+              type: 'ptp',
+              role: 'ptp_main',
+              name: torre.ptp_emisor_nombre || 'PTP Emisor',
+              model: torre.ptp_emisor_modelo || 'PTP',
+              brand: 'Desconocido',
+              ipAddress: torre.ptp_emisor_ip,
+              sourceId: torre.id,
+              sourceType: 'ptp_virtual',
+              canvasX: (towerObj?.canvasX ?? 0) - 180,
+              canvasY: (towerObj?.canvasY ?? 0) + 30,
+              status: 'online',
+              createdAt: now,
+              updatedAt: now,
+            });
+          }
+        }
+
+        // Sync Receptor
+        if (torre.ptp_receptor_ip) {
+          const receptorId = `ptp-receptor-${torre.id}`;
+          ptpDevIds.add(receptorId);
+          const existing = existingDevices.find(d => d.id === receptorId);
+          if (existing) {
+            await topologyDb.devices.update(receptorId, {
+              name: torre.ptp_receptor_nombre || 'PTP Receptor',
+              ipAddress: torre.ptp_receptor_ip,
+              model: torre.ptp_receptor_modelo || 'PTP',
+              updatedAt: now,
+            });
+          } else {
+            await topologyDb.devices.add({
+              id: receptorId,
+              towerId,
+              type: 'ptp',
+              role: 'ptp_station',
+              name: torre.ptp_receptor_nombre || 'PTP Receptor',
+              model: torre.ptp_receptor_modelo || 'PTP',
+              brand: 'Desconocido',
+              ipAddress: torre.ptp_receptor_ip,
+              sourceId: torre.id,
+              sourceType: 'ptp_virtual',
+              canvasX: 280, // Next to Emisor
+              canvasY: 30,
+              status: 'online',
+              createdAt: now,
+              updatedAt: now,
+            });
+          }
+        }
+      }
+
+      // Remove stale virtual PTPs
+      const stalePtps = existingDevices.filter(d => d.sourceType === 'ptp_virtual' && !ptpDevIds.has(d.id));
+      if (stalePtps.length > 0) {
+        await topologyDb.devices.bulkDelete(stalePtps.map(d => d.id));
+      }
+
       // ── 3. Sync APs ──
       const apDevIds = new Set<string>();
-      const nodeIdSet = new Set(vpnNodes.map(n => n.id));
+      
+      for (const torre of backendTorres) {
+        if (!torre.nodo_id) continue;
+        const towerAps = aps.filter(ap => ap.nodeId === torre.nodo_id);
+        
+        for (let apIdx = 0; apIdx < towerAps.length; apIdx++) {
+          const ap = towerAps[apIdx];
+          const devId = `ap-${ap.id}-torre-${torre.id}`;
+          apDevIds.add(devId);
+          const towerId = `tower-${torre.id}`;
 
-      for (const ap of aps) {
-        if (!nodeIdSet.has(ap.nodeId)) continue; // AP belongs to unknown node
-        const devId = `ap-${ap.id}`;
-        apDevIds.add(devId);
-        const towerId = `tower-${ap.nodeId}`;
-
-        // Calculate position inside tower
-        const sameNodeAps = aps.filter(a => a.nodeId === ap.nodeId && nodeIdSet.has(a.nodeId));
-        const apIdx = sameNodeAps.indexOf(ap);
-
-        const existing = existingDevices.find(d => d.id === devId);
-        if (existing) {
-          await topologyDb.devices.update(devId, {
-            name: ap.name,
-            ipAddress: ap.ip,
-            macAddress: ap.mac,
-            model: ap.model || 'AP',
-            status: ap.activo ? 'online' : 'unknown',
-            cpeCount: ap.lastCpeCount ?? 0,
-            towerId,
-            updatedAt: now,
-          });
-        } else {
-          const dev: Device = {
-            id: devId,
-            towerId,
-            type: 'ap',
-            role: 'ap',
-            name: ap.name,
-            model: ap.model || 'AP',
-            brand: 'Ubiquiti',
-            ipAddress: ap.ip,
-            macAddress: ap.mac,
-            sourceId: ap.id,
-            sourceType: 'ap',
-            cpeCount: ap.lastCpeCount ?? 0,
-            canvasX: 300,
-            canvasY: 80 + apIdx * 130,
-            status: ap.activo ? 'online' : 'unknown',
-            createdAt: now,
-            updatedAt: now,
-          };
-          await topologyDb.devices.add(dev);
+          const existing = existingDevices.find(d => d.id === devId);
+          if (existing) {
+            await topologyDb.devices.update(devId, {
+              name: ap.name,
+              ipAddress: ap.ip,
+              macAddress: ap.mac,
+              model: ap.model || 'AP',
+              status: ap.activo ? 'online' : 'unknown',
+              cpeCount: ap.lastCpeCount ?? 0,
+              towerId,
+              updatedAt: now,
+            });
+          } else {
+            const dev: Device = {
+              id: devId,
+              towerId,
+              type: 'ap',
+              role: 'ap',
+              name: ap.name,
+              model: ap.model || 'AP',
+              brand: 'Ubiquiti',
+              ipAddress: ap.ip,
+              macAddress: ap.mac,
+              sourceId: ap.id,
+              sourceType: 'ap',
+              cpeCount: ap.lastCpeCount ?? 0,
+              canvasX: 300,
+              canvasY: 150 + apIdx * 130, // Aligned with vpn node vertically
+              status: ap.activo ? 'online' : 'unknown',
+              createdAt: now,
+              updatedAt: now,
+            };
+            await topologyDb.devices.add(dev);
+          }
         }
       }
 
@@ -197,71 +332,117 @@ export function useTopologySync(): { syncing: boolean; lastSync: number } {
         await topologyDb.devices.bulkDelete(staleApDevs.map(d => d.id));
       }
 
-      // ── 4. Sync CPEs from cachedStats.stations ──
+      // ── 4. Sync CPEs from /api/ap/topology-cpes (SQLite cpes_conocidos) ──
       const cpeDevIds = new Set<string>();
       const apCpeMap = new Map<string, string[]>(); // apDevId → cpeDevIds[]
 
-      for (const ap of aps) {
-        if (!nodeIdSet.has(ap.nodeId)) continue;
-        const stations = ap.cachedStats?.stations;
-        if (!stations?.length) continue;
-
-        const apDevId = `ap-${ap.id}`;
-        const cpeIds: string[] = [];
-
-        // Find tower for position calculation
-        const tower = existingTowers.find(t => t.id === `tower-${ap.nodeId}`)
-          ?? { canvasX: 80, canvasY: 80, canvasWidth: 550 };
-
-        for (let si = 0; si < stations.length; si++) {
-          const st = stations[si];
-          if (!st.mac) continue;
-          const cpeId = `cpe-${st.mac.replace(/[^a-fA-F0-9]/g, '')}`;
-          cpeDevIds.add(cpeId);
-          cpeIds.push(cpeId);
-
-          const existing = existingDevices.find(d => d.id === cpeId);
-          if (existing) {
-            await topologyDb.devices.update(cpeId, {
-              name: st.hostname || st.mac,
-              model: st.remoteModel || 'CPE',
-              ipAddress: st.lastIp ?? undefined,
-              signal: st.signal ?? undefined,
-              ccq: st.ccq ?? undefined,
-              txRate: st.txRate ?? undefined,
-              rxRate: st.rxRate ?? undefined,
-              status: st.signal != null ? 'online' : 'offline',
-              updatedAt: now,
-            });
-          } else {
-            const dev: Device = {
-              id: cpeId,
-              towerId: null,
-              type: 'cpe',
-              role: 'cpe',
-              name: st.hostname || st.mac,
-              model: st.remoteModel || 'CPE',
-              brand: 'Ubiquiti',
-              ipAddress: st.lastIp ?? undefined,
-              macAddress: st.mac,
-              sourceId: st.mac,
-              sourceType: 'cpe',
-              signal: st.signal ?? undefined,
-              ccq: st.ccq ?? undefined,
-              txRate: st.txRate ?? undefined,
-              rxRate: st.rxRate ?? undefined,
-              canvasX: tower.canvasX + (tower as Tower).canvasWidth + 200,
-              canvasY: tower.canvasY + si * 100,
-              status: st.signal != null ? 'online' : 'offline',
-              createdAt: now,
-              updatedAt: now,
-            };
-            await topologyDb.devices.add(dev);
-          }
+      // Fetch all known CPEs from the backend (cpes_conocidos table)
+      // Uses the same endpoint as AP Monitor: /api/ap-monitor/cpes
+      interface KnownCpe {
+        mac: string;
+        hostname: string;
+        modelo: string;
+        ip_lan: string;
+        ap_id: string | null;
+        last_stats: string | null;
+        remote_hostname: string;
+        remote_platform: string;
+        ultima_vez_visto: number;
+      }
+      let allKnownCpes: KnownCpe[] = [];
+      try {
+        const resCpe = await apiFetch(`${API_BASE_URL}/api/ap-monitor/cpes`);
+        if (resCpe.ok) {
+          const dataCpe = await resCpe.json();
+          allKnownCpes = dataCpe.cpes ?? [];
         }
+      } catch { /* offline */ }
 
-        if (cpeIds.length > 0) {
-          apCpeMap.set(apDevId, cpeIds);
+      for (const torre of backendTorres) {
+        if (!torre.nodo_id) continue;
+        const towerAps = aps.filter(ap => ap.nodeId === torre.nodo_id);
+        const towerId = `tower-${torre.id}`;
+
+        for (const ap of towerAps) {
+          const apDevId = `ap-${ap.id}-torre-${torre.id}`;
+          // Find CPEs linked to this AP in the backend data (ap_id matches ap.id from aps table)
+          const apCpes = allKnownCpes.filter((c: KnownCpe) => c.ap_id === ap.id);
+          if (apCpes.length === 0) continue;
+
+          const cpeIds: string[] = [];
+
+          // Find tower for position calculation
+          const tower = existingTowers.find(t => t.id === towerId)
+            ?? { canvasX: 80, canvasY: 80, canvasWidth: 550 };
+
+          for (let si = 0; si < apCpes.length; si++) {
+            const cpe = apCpes[si];
+            if (!cpe.mac) continue;
+            const cpeId = `cpe-${cpe.mac.replace(/[^a-fA-F0-9:]/g, '')}`;
+            cpeDevIds.add(cpeId);
+            cpeIds.push(cpeId);
+
+            // Parse last_stats for signal data (same JSON the AP Monitor stores per poll)
+            let signal: number | undefined;
+            let ccq: number | undefined;
+            let txRate: number | undefined;
+            let rxRate: number | undefined;
+            if (cpe.last_stats) {
+              try {
+                const stats = JSON.parse(cpe.last_stats);
+                signal = stats.signal ?? undefined;
+                ccq = stats.ccq ?? undefined;
+                txRate = stats.tx_rate ?? undefined;
+                rxRate = stats.rx_rate ?? undefined;
+              } catch { /* ignore */ }
+            }
+
+            const cpeName = cpe.hostname || cpe.remote_hostname || cpe.mac;
+            const existing = existingDevices.find(d => d.id === cpeId);
+            if (existing) {
+              await topologyDb.devices.update(cpeId, {
+                name: cpeName,
+                model: cpe.modelo || 'CPE',
+                ipAddress: cpe.ip_lan || undefined,
+                signal,
+                ccq,
+                txRate,
+                rxRate,
+                sourceId: apDevId,
+                towerId: null,
+                status: signal != null ? 'online' : 'offline',
+                updatedAt: now,
+              });
+            } else {
+              const dev: Device = {
+                id: cpeId,
+                towerId: null,
+                type: 'cpe',
+                role: 'cpe',
+                name: cpeName,
+                model: cpe.modelo || 'CPE',
+                brand: 'Ubiquiti',
+                ipAddress: cpe.ip_lan || undefined,
+                macAddress: cpe.mac,
+                sourceId: apDevId,
+                sourceType: 'cpe',
+                signal,
+                ccq,
+                txRate,
+                rxRate,
+                canvasX: (tower as Tower).canvasX + (tower as Tower).canvasWidth + 80,
+                canvasY: (tower as Tower).canvasY + 150 + si * 100,
+                status: signal != null ? 'online' : 'offline',
+                createdAt: now,
+                updatedAt: now,
+              };
+              await topologyDb.devices.add(dev);
+            }
+          }
+
+          if (cpeIds.length > 0) {
+            apCpeMap.set(apDevId, cpeIds);
+          }
         }
       }
 
@@ -272,18 +453,26 @@ export function useTopologySync(): { syncing: boolean; lastSync: number } {
       if (staleCpeDevs.length > 0) {
         await topologyDb.devices.bulkDelete(staleCpeDevs.map(d => d.id));
       }
+      // Update AP cpeCount from real CPE data
+      for (const [apDevId, cpeIds] of apCpeMap) {
+        await topologyDb.devices.update(apDevId, { cpeCount: cpeIds.length });
+      }
 
       // ── 5. Sync auto Links ──
       const existingLinks = await topologyDb.links.toArray();
       const autoLinkIds = new Set<string>();
 
-      // VPN Node → AP links (wired)
-      for (const node of vpnNodes) {
-        const vpnDevId = `vpndev-${node.id}`;
-        const nodeAps = aps.filter(a => a.nodeId === node.id);
+      // VPN Node → AP links (wired) - Only for Torrer nodes
+      for (const torre of backendTorres) {
+        if (!torre.nodo_id) continue;
+        const node = vpnNodes.find(n => n.id === torre.nodo_id);
+        if (!node) continue;
+        
+        const vpnDevId = `vpndev-${node.id}-torre-${torre.id}`;
+        const towerAps = aps.filter(a => a.nodeId === node.id);
 
-        for (const ap of nodeAps) {
-          const apDevId = `ap-${ap.id}`;
+        for (const ap of towerAps) {
+          const apDevId = `ap-${ap.id}-torre-${torre.id}`;
           const linkId = `link-vpn-ap-${vpnDevId}-${apDevId}`;
           autoLinkIds.add(linkId);
 
@@ -305,6 +494,72 @@ export function useTopologySync(): { syncing: boolean; lastSync: number } {
         }
       }
 
+      // PTP Receptor → PTP Emisor links (wireless_ptp) — Receptor inside tower (left), Emisor outside (right)
+      for (const torre of backendTorres) {
+        if (!torre.ptp_emisor_ip || !torre.ptp_receptor_ip) continue;
+        const linkId = `link-ptp-${torre.id}`;
+        const emisorId = `ptp-emisor-${torre.id}`;
+        const receptorId = `ptp-receptor-${torre.id}`;
+        autoLinkIds.add(linkId);
+
+        const existing = existingLinks.find(l => l.id === linkId);
+        if (!existing) {
+          const link: Link = {
+            id: linkId,
+            name: `${torre.ptp_receptor_nombre || 'Receptor'} ↔ ${torre.ptp_emisor_nombre || 'Emisor'} PTP`,
+            sourceId: receptorId,
+            targetId: emisorId,
+            linkType: 'wireless_ptp',
+            status: 'active',
+            sourceType: 'auto',
+            createdAt: now,
+            updatedAt: now,
+          };
+          await topologyDb.links.add(link);
+        } else if (existing.sourceId !== receptorId || existing.targetId !== emisorId) {
+          // Fix old crossed direction
+          await topologyDb.links.update(linkId, {
+            sourceId: receptorId,
+            targetId: emisorId,
+            updatedAt: now,
+          });
+        }
+      }
+
+      // VPN Node → PTP Receptor links (wired) — VPN source (right) → Receptor target (left)
+      for (const torre of backendTorres) {
+        if (!torre.ptp_receptor_ip || !torre.nodo_id) continue;
+        const node = vpnNodes.find(n => n.id === torre.nodo_id);
+        if (!node) continue;
+
+        const linkId = `link-ptp-vpn-${torre.id}`;
+        const receptorId = `ptp-receptor-${torre.id}`;
+        const vpnDevId = `vpndev-${node.id}-torre-${torre.id}`;
+        autoLinkIds.add(linkId);
+
+        const existing = existingLinks.find(l => l.id === linkId);
+        if (!existing) {
+          const link: Link = {
+            id: linkId,
+            name: `${node.nombre_nodo} → ${torre.ptp_receptor_nombre || 'Receptor'}`,
+            sourceId: vpnDevId,
+            targetId: receptorId,
+            linkType: 'wired',
+            status: 'active',
+            sourceType: 'auto',
+            createdAt: now,
+            updatedAt: now,
+          };
+          await topologyDb.links.add(link);
+        } else if (existing.sourceId !== vpnDevId || existing.targetId !== receptorId) {
+          await topologyDb.links.update(linkId, {
+            sourceId: vpnDevId,
+            targetId: receptorId,
+            updatedAt: now,
+          });
+        }
+      }
+
       // AP → CPE links (wireless)
       for (const [apDevId, cpeIds] of apCpeMap) {
         for (const cpeId of cpeIds) {
@@ -312,7 +567,6 @@ export function useTopologySync(): { syncing: boolean; lastSync: number } {
           autoLinkIds.add(linkId);
 
           // Determine status from CPE device
-          const cpeStatus = cpeDevIds.has(cpeId) ? 'online' : 'offline';
           const cpeDev = await topologyDb.devices.get(cpeId);
           const linkStatus = cpeDev?.status === 'online' ? 'active' : 'no_link';
 
@@ -323,7 +577,7 @@ export function useTopologySync(): { syncing: boolean; lastSync: number } {
               updatedAt: now,
             });
           } else {
-            const apName = aps.find(a => `ap-${a.id}` === apDevId)?.name ?? 'AP';
+            const apName = aps.find(a => `ap-${a.id}-torre-${a.nodeId}` === apDevId)?.name ?? 'AP';
             const link: Link = {
               id: linkId,
               name: `${apName} → ${cpeDev?.name ?? cpeId}`,
@@ -364,7 +618,7 @@ export function useTopologySync(): { syncing: boolean; lastSync: number } {
             id: groupId,
             apDeviceId: apDevId,
             cpeDeviceIds: cpeIds,
-            expanded: true,
+            expanded: false,
             updatedAt: now,
           });
         }

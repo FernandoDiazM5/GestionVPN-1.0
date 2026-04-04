@@ -2,7 +2,8 @@ import { useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import type { Node, Edge } from '@xyflow/react';
 import { topologyDb } from '../db/db';
-import type { Tower, Device, Link } from '../db/tables';
+import { useTopoUiStore } from '../store/topoUiStore';
+import type { Device, Link } from '../db/tables';
 
 /** Map device role to custom node type */
 function deviceNodeType(role: Device['role']): string {
@@ -45,6 +46,8 @@ export function useTopologyBuilder(): {
   const towers = useLiveQuery(() => topologyDb.towers.toArray());
   const devices = useLiveQuery(() => topologyDb.devices.toArray());
   const links = useLiveQuery(() => topologyDb.links.toArray());
+  const apCpeGroups = useLiveQuery(() => topologyDb.apCpeGroups.toArray());
+  const { selectedTowerId } = useTopoUiStore();
 
   const isLoading = towers === undefined || devices === undefined || links === undefined;
 
@@ -53,8 +56,35 @@ export function useTopologyBuilder(): {
 
     const result: Node[] = [];
 
+    // Build a set of AP device IDs that belong to the selected tower
+    // (needed to resolve external devices: PTP Emisor + CPEs)
+    const towerApDevIds = new Set<string>();
+    const towerPtpSourceIds = new Set<string>(); // sourceId (torre.id) for PTP devices
+
     // Tower group nodes
     for (const t of towers) {
+      if (selectedTowerId && t.id !== selectedTowerId) continue;
+
+      // Count only devices with towerId set to this tower (internal devices)
+      const internalCount = devices.filter((d) => d.towerId === t.id).length;
+      // Also count external devices linked to this tower's APs
+      const towerInternalAps = devices.filter(d => d.towerId === t.id && d.role === 'ap');
+      towerInternalAps.forEach(ap => towerApDevIds.add(ap.id));
+
+      // Track PTP sourceIds for this tower
+      const towerIdStripped = t.id.replace('tower-', '');
+      towerPtpSourceIds.add(towerIdStripped);
+
+      // Count external CPEs linked to internal APs
+      const externalCpeCount = devices.filter(d => 
+        d.role === 'cpe' && d.towerId === null && d.sourceId && towerApDevIds.has(d.sourceId)
+      ).length;
+
+      // Count external PTP emisor
+      const externalPtpCount = devices.filter(d => 
+        d.role === 'ptp_main' && d.towerId === null && d.sourceId === towerIdStripped
+      ).length;
+
       result.push({
         id: t.id,
         type: 'towerGroup',
@@ -65,7 +95,7 @@ export function useTopologyBuilder(): {
           collapsed: t.collapsed,
           width: t.canvasWidth,
           height: t.canvasHeight,
-          deviceCount: devices.filter((d) => d.towerId === t.id).length,
+          deviceCount: internalCount + externalCpeCount + externalPtpCount,
           vpnRunning: t.vpnRunning,
           vpnProtocol: t.vpnProtocol,
           sourceType: t.sourceType,
@@ -79,8 +109,45 @@ export function useTopologyBuilder(): {
       });
     }
 
+    // Build set of hidden CPE IDs (collapsed groups)
+    const hiddenCpeIds = new Set<string>();
+    if (apCpeGroups) {
+      for (const g of apCpeGroups) {
+        if (!g.expanded) {
+          g.cpeDeviceIds.forEach(id => hiddenCpeIds.add(id));
+        }
+      }
+    }
+
     // Device nodes
     for (const d of devices) {
+      // For devices WITH a towerId, filter by selectedTowerId
+      if (d.towerId) {
+        if (selectedTowerId && d.towerId !== selectedTowerId) continue;
+      } else {
+        // External devices (towerId === null): PTP Emisor and CPEs
+        // Only show if they belong to the selected tower's context
+        if (selectedTowerId) {
+          const isPtpEmisor = d.role === 'ptp_main' && d.sourceType === 'ptp_virtual';
+          const isCpe = d.role === 'cpe';
+
+          if (isPtpEmisor) {
+            // PTP Emisor: sourceId is torre.id, check if it matches selected tower
+            if (!towerPtpSourceIds.has(d.sourceId ?? '')) continue;
+          } else if (isCpe) {
+            // CPE: sourceId is apDevId, check if it belongs to a tower AP
+            if (!d.sourceId || !towerApDevIds.has(d.sourceId)) continue;
+          } else {
+            continue; // Skip other external devices
+          }
+        } else {
+          continue; // No tower selected → don't show external devices
+        }
+      }
+
+      // Hide CPEs whose group is collapsed
+      if (d.role === 'cpe' && hiddenCpeIds.has(d.id)) continue;
+
       const node: Node = {
         id: d.id,
         type: deviceNodeType(d.role),
@@ -119,25 +186,48 @@ export function useTopologyBuilder(): {
     }
 
     return result;
-  }, [towers, devices]);
+  }, [towers, devices, selectedTowerId, apCpeGroups]);
+
+  // Build a set of visible node IDs for edge filtering
+  const visibleNodeIds = useMemo(() => {
+    return new Set(nodes.map(n => n.id));
+  }, [nodes]);
 
   const edges = useMemo<Edge[]>(() => {
     if (!links) return [];
 
-    return links.map((l) => ({
-      id: l.id,
-      source: l.sourceId,
-      target: l.targetId,
-      type: linkEdgeType(l),
-      data: {
-        label: buildEdgeLabel(l),
-        linkType: l.linkType,
-        status: l.status,
-        capacityGbps: l.capacityGbps,
-      },
-      label: buildEdgeLabel(l),
-    }));
-  }, [links]);
+    // Only show edges where both source and target nodes are visible
+    return links
+      .filter(l => visibleNodeIds.has(l.sourceId) && visibleNodeIds.has(l.targetId))
+      .map((l) => {
+        const edge: Edge = {
+          id: l.id,
+          source: l.sourceId,
+          target: l.targetId,
+          type: linkEdgeType(l),
+          data: {
+            label: buildEdgeLabel(l),
+            linkType: l.linkType,
+            status: l.status,
+            capacityGbps: l.capacityGbps,
+          },
+          label: buildEdgeLabel(l),
+        };
+
+        // VPN→Receptor link: use specific handles (Receptor bottom → VPN top)
+        // The link is stored as source=vpnDevId, target=receptorId
+        // But we want cable from Receptor bottom to VPN top, so we swap and use handles
+        if (l.id.startsWith('link-ptp-vpn-')) {
+          // Swap source/target for visual routing: Receptor bottom → VPN top
+          edge.source = l.targetId; // receptorId
+          edge.target = l.sourceId; // vpnDevId
+          edge.sourceHandle = 'bottom';
+          edge.targetHandle = 'top';
+        }
+
+        return edge;
+      });
+  }, [links, visibleNodeIds]);
 
   return { nodes, edges, isLoading };
 }

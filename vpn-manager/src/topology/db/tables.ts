@@ -17,6 +17,19 @@ export interface Tower {
   collapsed: boolean;
   createdAt: number;
   updatedAt: number;
+  // Nuevos campos de Base de Datos
+  tramos?: number;
+  contacto?: string;
+  pdf_path?: string;
+  nodo_id?: string;
+  ptp_emisor_ip?: string;
+  ptp_emisor_nombre?: string;
+  ptp_emisor_modelo?: string;
+  ptp_emisor_desc?: string;
+  ptp_receptor_ip?: string;
+  ptp_receptor_nombre?: string;
+  ptp_receptor_modelo?: string;
+  ptp_receptor_desc?: string;
 }
 
 export type DeviceType = 'vpn_node' | 'router' | 'ptp' | 'ap' | 'cpe' | 'backbone';
@@ -46,7 +59,7 @@ export interface Device {
   /** Source ID from live data (SavedDevice.id for APs, CPE mac, NodeInfo.id) */
   sourceId?: string;
   /** 'ap' | 'cpe' | 'vpn_node' = auto-synced, 'ptp_manual' = user-created */
-  sourceType?: 'ap' | 'cpe' | 'vpn_node' | 'ptp_manual';
+  sourceType?: 'ap' | 'cpe' | 'vpn_node' | 'ptp_manual' | 'ptp_virtual';
   /** Signal dBm — for CPEs */
   signal?: number;
   /** CCQ % — for CPEs */

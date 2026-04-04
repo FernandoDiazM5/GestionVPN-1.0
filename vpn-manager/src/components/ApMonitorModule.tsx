@@ -3,13 +3,14 @@ import {
   Radio, Wifi, RefreshCw, Loader2, X,
   ChevronDown, ChevronRight, Eye, ExternalLink,
   AlertCircle, CheckCircle2, Activity, Clock,
-  Database, Server, Users, ZapOff, WifiOff,
-  Info, Columns, Search, Trash2,
+  Server, Users, ZapOff, WifiOff,
+  Columns, Search, Trash2,
   Download, Upload, ScanSearch, ArrowRightLeft,
   AlertTriangle,
 } from 'lucide-react';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import DeviceCard from './DeviceCard';
+import M5FullInfoModal from './M5FullInfoModal';
 import { API_BASE_URL } from '../config';
 import { deviceDb } from '../store/deviceDb';
 import { useVpn } from '../context/VpnContext';
@@ -17,7 +18,7 @@ import type { SavedDevice, AntennaStats } from '../types/devices';
 import type { LiveCpe, PollResult, CpeDetail, KnownCpe } from '../types/apMonitor';
 import type { NodeInfo } from '../types/api';
 
-const POLL_MS = 30_000;
+const LS_POLL_INTERVAL_KEY = 'vpn_ap_poll_ms';
 const BASE = `${API_BASE_URL}/api/ap-monitor`;
 const LS_KEY = 'ap_monitor_cpe_cols';
 
@@ -59,29 +60,29 @@ const fmtMem = (totalKb?: number | null, freeKb?: number | null, pct?: number | 
 // ── CPE column definitions ────────────────────────────────────────────────
 interface ColDef { key: string; label: string; always?: boolean; width: string; right?: boolean; }
 const CPE_COL_DEFS: ColDef[] = [
-  { key: 'status',    label: 'Estado',          always: true, width: '28px' },
-  { key: 'mac',       label: 'MAC / Host',       always: true, width: '150px' },
-  { key: 'modelo',    label: 'Modelo',           width: '120px' },
-  { key: 'nombre',    label: 'Nombre Disp.',     width: '140px' },
-  { key: 'signal',    label: 'Señal AP',         width: '72px', right: true },
-  { key: 'rssi',      label: 'Señal CPE',        width: '72px', right: true },
-  { key: 'noise',     label: 'Noise',            width: '72px', right: true },
-  { key: 'cinr',      label: 'CINR',             width: '64px', right: true },
-  { key: 'ccq',       label: 'CCQ',              width: '64px', right: true },
-  { key: 'tx_rate',   label: '↓ TX Rate',        width: '80px', right: true },
-  { key: 'rx_rate',   label: '↑ RX Rate',        width: '80px', right: true },
-  { key: 'am_qual',   label: 'AM Qual',          width: '66px', right: true },
-  { key: 'am_cap',    label: 'AM Cap',           width: '66px', right: true },
-  { key: 'am_dcap',   label: 'DL Cap',           width: '72px', right: true },
-  { key: 'am_ucap',   label: 'UL Cap',           width: '72px', right: true },
-  { key: 'air_tx',    label: 'Air TX %',         width: '62px', right: true },
-  { key: 'air_rx',    label: 'Air RX %',         width: '62px', right: true },
-  { key: 'thr_rx',    label: 'Thr ↓',            width: '80px', right: true },
-  { key: 'thr_tx',    label: 'Thr ↑',            width: '80px', right: true },
-  { key: 'uptime',    label: 'Uptime',           width: '100px' },
-  { key: 'distance',  label: 'Dist (m)',         width: '66px', right: true },
-  { key: 'lastip',    label: 'Última IP',        width: '108px' },
-  { key: 'actions',   label: 'Acciones',         always: true, width: '72px' },
+  { key: 'status', label: 'Estado', always: true, width: '28px' },
+  { key: 'mac', label: 'MAC / Host', always: true, width: '150px' },
+  { key: 'modelo', label: 'Modelo', width: '120px' },
+  { key: 'nombre', label: 'Nombre Disp.', width: '140px' },
+  { key: 'signal', label: 'Señal AP', width: '72px', right: true },
+  { key: 'rssi', label: 'Señal CPE', width: '72px', right: true },
+  { key: 'noise', label: 'Noise', width: '72px', right: true },
+  { key: 'cinr', label: 'CINR', width: '64px', right: true },
+  { key: 'ccq', label: 'CCQ', width: '64px', right: true },
+  { key: 'tx_rate', label: '↓ TX Rate', width: '80px', right: true },
+  { key: 'rx_rate', label: '↑ RX Rate', width: '80px', right: true },
+  { key: 'am_qual', label: 'AM Qual', width: '66px', right: true },
+  { key: 'am_cap', label: 'AM Cap', width: '66px', right: true },
+  { key: 'am_dcap', label: 'DL Cap', width: '72px', right: true },
+  { key: 'am_ucap', label: 'UL Cap', width: '72px', right: true },
+  { key: 'air_tx', label: 'Air TX %', width: '62px', right: true },
+  { key: 'air_rx', label: 'Air RX %', width: '62px', right: true },
+  { key: 'thr_rx', label: 'Thr ↓', width: '80px', right: true },
+  { key: 'thr_tx', label: 'Thr ↑', width: '80px', right: true },
+  { key: 'uptime', label: 'Uptime', width: '100px' },
+  { key: 'distance', label: 'Dist (m)', width: '66px', right: true },
+  { key: 'lastip', label: 'Última IP', width: '108px' },
+  { key: 'actions', label: 'Acciones', always: true, width: '72px' },
 ];
 const DEFAULT_HIDDEN = new Set<string>(['noise', 'cinr', 'am_qual', 'am_cap', 'am_dcap', 'am_ucap', 'air_tx', 'air_rx', 'thr_rx', 'thr_tx']);
 
@@ -97,7 +98,7 @@ function saveColPrefs(hidden: Set<string>) {
 }
 
 // ── Node group ────────────────────────────────────────────────────────────
-interface NodeGroup { nodeId: string; nodeName: string; aps: SavedDevice[]; }
+interface NodeGroup { nodeId: string; nodeName: string; aps: SavedDevice[]; stas: SavedDevice[]; }
 
 // Estado de AP amarrado al túnel VPN, no al campo d.activo de la BD
 type ApStatus = 'online' | 'partial' | 'inactive' | 'connecting';
@@ -271,18 +272,18 @@ function MoveToNodeModal({ device, nodes, knownNames, onConfirm, onClose }: {
 // ── AP Column definitions ─────────────────────────────────────────────────
 interface ApColDef { key: string; label: string; always?: boolean; width: string; right?: boolean; }
 const AP_COL_DEFS: ApColDef[] = [
-  { key: 'modo',    label: 'Modo',         always: true, width: '72px' },
-  { key: 'nombre',  label: 'Nombre / IP',  always: true, width: 'minmax(120px,1fr)' },
-  { key: 'modelo',  label: 'Modelo',       width: '130px' },
-  { key: 'ssid',    label: 'SSID / Canal', width: '140px' },
-  { key: 'signal',  label: 'Señal',        width: '72px',  right: true },
-  { key: 'ccq',     label: 'CCQ',          width: '60px',  right: true },
-  { key: 'txpwr',   label: 'TX Pwr',       width: '72px',  right: true },
-  { key: 'uptime',  label: 'Uptime',       width: '96px' },
-  { key: 'cpu',     label: 'CPU',          width: '56px',  right: true },
-  { key: 'cpes',    label: 'CPEs',         always: true,  width: '64px' },
-  { key: 'estado',  label: '',             always: true,  width: '32px' },
-  { key: 'actions', label: 'Acciones',     always: true,  width: '230px' },
+  { key: 'modo', label: 'Modo', always: true, width: '72px' },
+  { key: 'nombre', label: 'Nombre / IP', always: true, width: 'minmax(120px,1fr)' },
+  { key: 'modelo', label: 'Modelo', width: '130px' },
+  { key: 'ssid', label: 'SSID / Canal', width: '140px' },
+  { key: 'signal', label: 'Señal', width: '72px', right: true },
+  { key: 'ccq', label: 'CCQ', width: '60px', right: true },
+  { key: 'txpwr', label: 'TX Pwr', width: '72px', right: true },
+  { key: 'uptime', label: 'Uptime', width: '96px' },
+  { key: 'cpu', label: 'CPU', width: '56px', right: true },
+  { key: 'cpes', label: 'CPEs', always: true, width: '64px' },
+  { key: 'estado', label: '', always: true, width: '32px' },
+  { key: 'actions', label: 'Acciones', always: true, width: '230px' },
 ];
 const AP_DEFAULT_HIDDEN = new Set<string>(['signal', 'ccq', 'uptime', 'cpu']);
 const AP_LS_KEY = 'ap_monitor_ap_cols_v1';
@@ -954,7 +955,7 @@ function StationTable({ poll, onCpeDetail, dev }: {
   );
 
   const handleEnrichAll = async () => {
-    if (!dev.sshUser || !dev.sshPass || needEnrich.length === 0) return;
+    if (!dev.sshUser || (!dev.sshPass && !dev.hasSshPass) || needEnrich.length === 0) return;
     setEnriching(true); setEnrichMsg('');
     try {
       const r = await fetchWithTimeout(`${BASE}/cpes/enrich-batch`, {
@@ -1062,15 +1063,15 @@ function StationTable({ poll, onCpeDetail, dev }: {
 }
 
 // ── AP Row ────────────────────────────────────────────────────────────────
-const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCols, onToggle, onKnownCpes, onCpeDetail, onDetail, onView, onSync, onDelete, onMove }: {
+const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCols, onToggle, onCpeDetail, onDetail, onM5Detail, onView, onSync, onDelete, onMove }: {
   dev: SavedDevice;
   pollResult?: PollResult;
   expanded: boolean;
   hiddenApCols: Set<string>;
   onToggle: () => void;
-  onKnownCpes: () => void;
   onCpeDetail: (mac: string, ip: string | null) => void;
   onDetail: () => void;
+  onM5Detail: () => void;
   onView: () => void;
   onSync: () => void;
   onDelete: () => void;
@@ -1177,7 +1178,7 @@ const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCol
             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold
               ${expanded ? 'bg-indigo-600 text-white'
                 : isHistorical ? 'bg-slate-100 text-slate-400'
-                : 'bg-violet-100 text-violet-700'}`}
+                  : 'bg-violet-100 text-violet-700'}`}
               title={isHistorical && dev.lastCpeCountAt
                 ? `Última sync: ${new Date(dev.lastCpeCountAt).toLocaleString()}`
                 : undefined}>
@@ -1228,19 +1229,16 @@ const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCol
             className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-40">
             {isPolling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
           </button>
-          <button onClick={onDetail} title="Detalle SSH completo del AP"
-            className="p-1.5 text-sky-500 hover:bg-sky-50 rounded-lg transition-colors">
-            <Info className="w-3.5 h-3.5" />
+          <button onClick={onM5Detail} title="Ver estado completo del dispositivo (airOS)"
+            className="flex items-center space-x-1 px-2 py-1.5 rounded-lg text-[11px] font-bold bg-violet-50 text-violet-600 hover:bg-violet-100 border border-violet-200 transition-colors">
+            <Activity className="w-2.5 h-2.5" />
+            <span>Informe</span>
           </button>
           <a href={`http://${dev.ip}`} target="_blank" rel="noopener noreferrer"
             title={`Abrir ${dev.ip}`}
             className="p-1.5 text-slate-400 hover:bg-slate-100 rounded-lg transition-colors flex items-center">
             <ExternalLink className="w-3.5 h-3.5" />
           </a>
-          <button onClick={onKnownCpes} title="Ver CPEs conocidos (guardados)"
-            className="p-1.5 text-violet-500 hover:bg-violet-50 rounded-lg transition-colors">
-            <Database className="w-3.5 h-3.5" />
-          </button>
           <button onClick={onMove} title="Mover a otro nodo"
             className="p-1.5 text-indigo-400 hover:bg-indigo-50 rounded-lg transition-colors">
             <ArrowRightLeft className="w-3.5 h-3.5" />
@@ -1260,22 +1258,31 @@ const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCol
 });
 
 // ── AP Group Card ─────────────────────────────────────────────────────────
-function ApGroupCard({ group, expandedAps, pollResults, activeNodeId, tunnelActive, onToggleAp, onKnownCpes, onCpeDetail, onApDetail, onApView, onApSync, onApDelete, onApMove }: {
+function ApGroupCard({ group, expandedAps, pollResults, activeNodeId, tunnelActive, onToggleAp, onCpeDetail, onApDetail, onM5Detail, onApView, onApSync, onApDelete, onApMove }: {
   group: NodeGroup;
   expandedAps: Set<string>;
   pollResults: Record<string, PollResult>;
   activeNodeId: string | null;
   tunnelActive: boolean;
   onToggleAp: (apId: string) => void;
-  onKnownCpes: (apId: string) => void;
   onCpeDetail: (mac: string, ip: string | null, dev: SavedDevice) => void;
   onApDetail: (dev: SavedDevice) => void;
+  onM5Detail: (dev: SavedDevice) => void;
   onApView: (dev: SavedDevice) => void;
   onApSync: (apId: string) => void;
   onApDelete: (dev: SavedDevice) => void;
   onApMove: (dev: SavedDevice) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('apMonitor_expanded_' + group.nodeId);
+      if (saved !== null) return saved === 'true';
+    } catch(e) {}
+    return true;
+  });
+  useEffect(() => {
+    sessionStorage.setItem('apMonitor_expanded_' + group.nodeId, String(expanded));
+  }, [expanded, group.nodeId]);
   const [hiddenApCols, setHiddenApCols] = useState<Set<string>>(loadApColPrefs);
   const handleApColChange = (h: Set<string>) => { setHiddenApCols(h); saveApColPrefs(h); };
 
@@ -1313,14 +1320,15 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeId, tunnelActi
         </div>
         <div className="flex items-center gap-3 text-xs text-slate-500 shrink-0">
           <span className="flex items-center gap-1"><Server className="w-3 h-3" /> {group.aps.length} AP{group.aps.length !== 1 ? 's' : ''}</span>
-          {totalCpes > 0 && <span className="flex items-center gap-1"><Users className="w-3 h-3 text-violet-500" /> {totalCpes} CPEs</span>}
+          {group.stas.length > 0 && <span className="flex items-center gap-1 text-cyan-600"><Users className="w-3 h-3" /> {group.stas.length} CPE{group.stas.length !== 1 ? 's' : ''}</span>}
+          {totalCpes > 0 && <span className="flex items-center gap-1"><Users className="w-3 h-3 text-violet-500" /> {totalCpes} live</span>}
           <ApColSelector hidden={hiddenApCols} onChange={handleApColChange} />
         </div>
       </div>
 
       {expanded && (
         <>
-          {group.aps.length === 0 && (
+          {group.aps.length === 0 && group.stas.length === 0 && (
             <div className="flex flex-col items-center py-10 gap-3 text-slate-400">
               <Wifi className="w-8 h-8" />
               <p className="text-sm">No hay APs guardados en este nodo</p>
@@ -1346,25 +1354,48 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeId, tunnelActi
                       ))}
                     </div>
                     {group.aps.map(dev => (
-                <ApRow
-                  key={dev.id}
-                  dev={dev}
-                  pollResult={pollResults[dev.id]}
-                  expanded={expandedAps.has(dev.id)}
-                  hiddenApCols={hiddenApCols}
-                  onToggle={() => onToggleAp(dev.id)}
-                  onKnownCpes={() => onKnownCpes(dev.id)}
-                  onCpeDetail={(mac, ip) => onCpeDetail(mac, ip, dev)}
-                  onDetail={() => onApDetail(dev)}
-                  onView={() => onApView(dev)}
-                  onSync={() => onApSync(dev.id)}
-                  onDelete={() => onApDelete(dev)}
-                  onMove={() => onApMove(dev)}
-                />
-              ))}
+                      <ApRow
+                        key={dev.id}
+                        dev={dev}
+                        pollResult={pollResults[dev.id]}
+                        expanded={expandedAps.has(dev.id)}
+                        hiddenApCols={hiddenApCols}
+                        onToggle={() => onToggleAp(dev.id)}
+                        onCpeDetail={(mac, ip) => onCpeDetail(mac, ip, dev)}
+                        onDetail={() => onApDetail(dev)}
+                        onM5Detail={() => onM5Detail(dev)}
+                        onView={() => onApView(dev)}
+                        onSync={() => onApSync(dev.id)}
+                        onDelete={() => onApDelete(dev)}
+                        onMove={() => onApMove(dev)}
+                      />
+                    ))}
                   </div>
                 );
               })()}
+            </div>
+          )}
+
+          {/* STAs guardados (role === 'sta') del grupo */}
+          {group.stas.length > 0 && (
+            <div className="border-t border-cyan-100 bg-cyan-50/30">
+              <div className="px-4 py-2 flex items-center gap-2 border-b border-cyan-100">
+                <span className="text-[9px] font-bold text-cyan-600 uppercase tracking-wider">CPEs guardados · {group.stas.length}</span>
+              </div>
+              {group.stas.map(sta => (
+                <div key={sta.id} className="flex items-center gap-3 px-4 py-2.5 border-b border-cyan-100/60 last:border-0 hover:bg-cyan-50 transition-colors text-xs">
+                  <span className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-cyan-100 text-cyan-700 border border-cyan-200">CPE</span>
+                  <span className="font-semibold text-slate-700 truncate min-w-0 max-w-[160px]" title={sta.name || sta.ip}>{sta.name || sta.ip}</span>
+                  <span className="font-mono text-[10px] text-slate-400 shrink-0">{sta.ip}</span>
+                  {sta.mac && <span className="font-mono text-[10px] text-slate-400 shrink-0 hidden sm:block">{sta.mac}</span>}
+                  {sta.model && <span className="text-[10px] text-slate-500 truncate shrink-0 hidden md:block">{sta.model}</span>}
+                  {sta.nodeName && <span className="text-[10px] text-indigo-400 truncate shrink-0 hidden lg:block">{sta.nodeName}</span>}
+                  <button onClick={() => onApDelete(sta)} title="Eliminar CPE guardado"
+                    className="ml-auto p-1.5 text-rose-400 hover:bg-rose-50 rounded-lg transition-colors shrink-0">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
             </div>
           )}
         </>
@@ -1380,9 +1411,34 @@ export default function ApMonitorModule() {
   const activeNode = useMemo(() => nodes.find(n => n.nombre_vrf === activeNodeVrf) ?? null, [nodes, activeNodeVrf]);
   const activeNodeId = activeNode?.id ?? null;
   const [devices, setDevices] = useState<SavedDevice[]>([]);
+  const [pollInterval, setPollInterval] = useState<number>(() => {
+    const saved = localStorage.getItem(LS_POLL_INTERVAL_KEY);
+    return saved ? parseInt(saved, 10) : 30_000;
+  });
+  const pollIntervalRef = useRef(pollInterval);
   const [loading, setLoading] = useState(true);
-  const [expandedAps, setExpandedAps] = useState<Set<string>>(new Set());
-  const [pollResults, setPollResults] = useState<Record<string, PollResult>>({});
+  const [expandedAps, setExpandedAps] = useState<Set<string>>(() => {
+    try {
+      const saved = sessionStorage.getItem('apMonitorExpandedAps');
+      if (saved) return new Set(JSON.parse(saved));
+    } catch(e) {}
+    return new Set();
+  });
+  useEffect(() => {
+    sessionStorage.setItem('apMonitorExpandedAps', JSON.stringify([...expandedAps]));
+  }, [expandedAps]);
+  const [pollResults, setPollResults] = useState<Record<string, PollResult>>(() => {
+    try {
+      const saved = sessionStorage.getItem('apMonitorPollResults');
+      if (saved) return JSON.parse(saved);
+    } catch(e) {}
+    return {};
+  });
+  useEffect(() => {
+    sessionStorage.setItem('apMonitorPollResults', JSON.stringify(pollResults));
+  }, [pollResults]);
+  const pollResultsRef = useRef(pollResults);
+  useEffect(() => { pollResultsRef.current = pollResults; }, [pollResults]);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [apSearch, setApSearch] = useState('');
   const [nodeFilter, setNodeFilter] = useState<'active' | 'inactive' | 'all'>('active');
@@ -1392,8 +1448,8 @@ export default function ApMonitorModule() {
     mac: string; apId: string; ip: string | null;
     sshPort: number; sshUser: string; sshPass: string;
   } | null>(null);
-  const [knownCpesApId, setKnownCpesApId] = useState<string | null>(null);
   const [apDetailDev, setApDetailDev] = useState<SavedDevice | null>(null);
+  const [m5DetailDevice, setM5DetailDevice] = useState<SavedDevice | null>(null);
   const [viewingApDevice, setViewingApDevice] = useState<SavedDevice | null>(null);
   const [movingDevice, setMovingDevice] = useState<SavedDevice | null>(null);
 
@@ -1428,18 +1484,31 @@ export default function ApMonitorModule() {
     toastTimer.current = setTimeout(() => setToast(null), 4000);
   };
 
-  // Node groups (all non-STA devices, grouped by active node or nodeName fallback)
+  // Node groups (APs + STAs grouped by node)
   const nodeGroups: NodeGroup[] = useMemo(() => {
     const apDevices = devices.filter(d => d.role !== 'sta');
+    const staDevices = devices.filter(d => d.role === 'sta');
     const map = new Map<string, NodeGroup>();
+
+    // Build groups from APs first
     for (const d of apDevices) {
       const node = nodes.find(n => n.id === d.nodeId);
       // If nodeId matches an active node, group by nodeId; otherwise group by nodeName to unify orphaned devices
       const groupKey = node ? d.nodeId : (d.nodeName || d.nodeId);
       const groupName = node?.nombre_nodo || d.nodeName || d.nodeId;
-      if (!map.has(groupKey)) map.set(groupKey, { nodeId: d.nodeId, nodeName: groupName, aps: [] });
+      if (!map.has(groupKey)) map.set(groupKey, { nodeId: d.nodeId, nodeName: groupName, aps: [], stas: [] });
       map.get(groupKey)!.aps.push(d);
     }
+
+    // Ensure groups exist for STAs whose nodeId may not have any APs yet
+    for (const d of staDevices) {
+      const node = nodes.find(n => n.id === d.nodeId);
+      const groupKey = node ? d.nodeId : (d.nodeName || d.nodeId);
+      const groupName = node?.nombre_nodo || d.nodeName || d.nodeId;
+      if (!map.has(groupKey)) map.set(groupKey, { nodeId: d.nodeId, nodeName: groupName, aps: [], stas: [] });
+      map.get(groupKey)!.stas.push(d);
+    }
+
     return [...map.values()];
   }, [devices, nodes]);
 
@@ -1466,7 +1535,13 @@ export default function ApMonitorModule() {
         (d.model ?? '').toLowerCase().includes(q) ||
         (d.cachedStats?.essid ?? d.essid ?? '').toLowerCase().includes(q)
       ),
-    })).filter(g => g.aps.length > 0);
+      stas: g.stas.filter(d =>
+        (d.name ?? '').toLowerCase().includes(q) ||
+        (d.ip || '').toLowerCase().includes(q) ||
+        (d.model ?? '').toLowerCase().includes(q) ||
+        (d.mac ?? '').toLowerCase().includes(q)
+      ),
+    })).filter(g => g.aps.length > 0 || g.stas.length > 0);
   }, [nodeGroups, apSearch, nodeFilter, activeNodeId]);
 
   const loadDevices = useCallback(async () => {
@@ -1535,9 +1610,9 @@ export default function ApMonitorModule() {
     }
 
     // Solo reprogramar timer si scheduleNext=true Y el AP está expandido
-    if (scheduleNext) {
+    if (scheduleNext && pollIntervalRef.current > 0) {
       if (expandedApsRef.current.has(apId)) {
-        pollTimers.current[apId] = setTimeout(() => pollApDirect(apId, true), POLL_MS);
+        pollTimers.current[apId] = window.setTimeout(() => pollApDirect(apId, true), pollIntervalRef.current);
       } else {
         delete pollTimers.current[apId];
       }
@@ -1560,31 +1635,45 @@ export default function ApMonitorModule() {
       const node = currentNodes.find(n => n.id === d.nodeId);
       const groupKey = node ? d.nodeId : (d.nodeName || d.nodeId);
       const groupName = node?.nombre_nodo || d.nodeName || d.nodeId;
-      if (!map.has(groupKey)) map.set(groupKey, { nodeId: d.nodeId, nodeName: groupName, aps: [] });
+      if (!map.has(groupKey)) map.set(groupKey, { nodeId: d.nodeId, nodeName: groupName, aps: [], stas: [] });
       map.get(groupKey)!.aps.push(d);
     }
     const allGroups = [...map.values()];
     // Buscar el grupo cuyo nodeId === activeNodeId
     const activeGroup = allGroups.find(g => g.nodeId === activeNodeId);
     if (!activeGroup) return;
-    const apsToInit = activeGroup.aps.filter(ap => ap.sshUser && ap.sshPass);
+    const apsToInit = activeGroup.aps.filter(ap => {
+      const hasCreds = ap.sshUser && (ap.sshPass || ap.hasSshPass);
+      const pr = pollResultsRef.current[ap.id];
+      const isFresh = pr?.polledAt && (Date.now() - pr.polledAt < 300_000); // 5 minutes
+      return hasCreds && !isFresh;
+    });
     const initTimers = apsToInit.map((dev, i) =>
       setTimeout(() => pollApDirect(dev.id, false), i * 600)
     );
     return () => initTimers.forEach(clearTimeout);
-  // devices.length garantiza re-ejecución cuando carguen, sin incluir el array completo
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // devices.length garantiza re-ejecución cuando carguen, sin incluir el array completo
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [devices.length, pollApDirect, activeNodeId]);
 
-  // Start/stop polling loops when expandedAps changes
+  // Start/stop polling loops when expandedAps or pollInterval changes
   useEffect(() => {
-    expandedAps.forEach(apId => {
-      if (!pollTimers.current[apId]) pollApDirect(apId);
-    });
+    pollIntervalRef.current = pollInterval;
+    localStorage.setItem(LS_POLL_INTERVAL_KEY, pollInterval.toString());
+
+    if (pollInterval > 0) {
+      expandedAps.forEach(apId => {
+        if (!pollTimers.current[apId]) pollApDirect(apId);
+      });
+    } else {
+      Object.keys(pollTimers.current).forEach(apId => {
+        clearTimeout(pollTimers.current[apId]); delete pollTimers.current[apId];
+      });
+    }
     Object.keys(pollTimers.current).forEach(apId => {
       if (!expandedAps.has(apId)) { clearTimeout(pollTimers.current[apId]); delete pollTimers.current[apId]; }
     });
-  }, [expandedAps, pollApDirect]);
+  }, [expandedAps, pollApDirect, pollInterval]);
 
   // Cleanup on unmount
   useEffect(() => () => {
@@ -1721,6 +1810,22 @@ export default function ApMonitorModule() {
             />
             {apSearch && <button onClick={() => setApSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"><X className="w-3.5 h-3.5" /></button>}
           </div>
+          <div className="flex items-center gap-1.5 border border-slate-200 rounded-xl px-2 bg-white">
+            <Clock className="w-3.5 h-3.5 text-slate-400" />
+            <select
+              value={pollInterval}
+              onChange={e => setPollInterval(Number(e.target.value))}
+              className="text-xs bg-transparent focus:outline-none text-slate-600 font-medium py-2 appearance-none pr-4"
+              style={{ backgroundImage: `url('data:image/svg+xml;utf8,<svg fill="none" viewBox="0 0 24 24" stroke="%2394a3b8" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>')`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right center', backgroundSize: '0.8rem' }}
+            >
+              <option value={0}>Auto-poll Off</option>
+              <option value={15000}>15s</option>
+              <option value={30000}>30s</option>
+              <option value={60000}>1m</option>
+              <option value={120000}>2m</option>
+              <option value={300000}>5m</option>
+            </select>
+          </div>
           <button onClick={() => {
             Object.values(pollTimers.current).forEach(clearTimeout);
             pollTimers.current = {};
@@ -1740,9 +1845,7 @@ export default function ApMonitorModule() {
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400" /> Parcial / Errores</span>
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-sky-400" /> Conectando…</span>
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-300" /> Sin datos</span>
-        <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> Poll cada 30s (expandido)</span>
-        <span className="flex items-center gap-1"><Info className="w-3 h-3 text-sky-500" /> Detalle AP (SSH completo)</span>
-        <span className="flex items-center gap-1"><Database className="w-3 h-3" /> CPEs conocidos (guardados)</span>
+        <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {pollInterval > 0 ? `Poll cada ${pollInterval/1000}s (expandido)` : 'Auto-poll desactivado'}</span>
         <span className="flex items-center gap-1"><ScanSearch className="w-3 h-3 text-violet-500" /> Enrich: obtiene nombre/modelo de CPEs vía SSH</span>
       </div>
 
@@ -1785,7 +1888,6 @@ export default function ApMonitorModule() {
           activeNodeId={activeNodeId}
           tunnelActive={tunnelActive}
           onToggleAp={toggleAp}
-          onKnownCpes={apId => setKnownCpesApId(apId)}
           onCpeDetail={(mac, ip, dev) => {
             if (!dev) return;
             setCpeDetailTarget({
@@ -1798,6 +1900,7 @@ export default function ApMonitorModule() {
             });
           }}
           onApDetail={dev => setApDetailDev(dev)}
+          onM5Detail={dev => setM5DetailDevice(dev)}
           onApView={dev => setViewingApDevice(dev)}
           onApSync={apId => pollApDirect(apId, true, true)}
           onApDelete={dev => handleDeleteDev(dev)}
@@ -1818,10 +1921,6 @@ export default function ApMonitorModule() {
         />
       )}
 
-      {knownCpesApId && (
-        <KnownCpesModal apId={knownCpesApId} onClose={() => setKnownCpesApId(null)} />
-      )}
-
       {apDetailDev && (
         <ApDetailModal
           dev={apDetailDev}
@@ -1833,6 +1932,10 @@ export default function ApMonitorModule() {
             }
           }}
         />
+      )}
+
+      {m5DetailDevice && (
+        <M5FullInfoModal dev={m5DetailDevice} onClose={() => setM5DetailDevice(null)} />
       )}
 
       {viewingApDevice && (

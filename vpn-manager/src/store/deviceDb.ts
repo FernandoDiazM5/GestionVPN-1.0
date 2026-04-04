@@ -43,6 +43,7 @@ export const credCache = {
     } catch { /* ignore */ }
   },
 
+  async clear() { await credStore.clear(); },
   async getAll(): Promise<Record<string, { user: string; pass: string; port: number }>> {
     const result: Record<string, { user: string; pass: string; port: number }> = {};
     try {
@@ -110,12 +111,22 @@ export const deviceDb = {
       const res = await apiFetch(`${API_BASE_URL}/api/db/devices`);
       const data = await res.json();
       if (data.success && data.devices) {
-        // Enriquecer con cachedStats del store local si está disponible
-        const allStats = await statsCache.getAll();
-        return data.devices.map((d: SavedDevice) => ({
-          ...d,
-          cachedStats: allStats[d.id]?.stats ?? undefined,
-        }));
+        // Enriquecer con stats y credenciales del IndexedDB local
+        const [allStats, allCreds] = await Promise.all([
+          statsCache.getAll(),
+          credCache.getAll(),
+        ]);
+        return data.devices.map((d: SavedDevice) => {
+          const cred = allCreds[d.id];
+          return {
+            ...d,
+            cachedStats: allStats[d.id]?.stats ?? undefined,
+            // Si hay credenciales en IndexedDB, usarlas (sobrescribe el hasSshPass del backend)
+            sshUser: d.sshUser || cred?.user,
+            sshPass: cred?.pass ?? undefined,
+            sshPort: d.sshPort || cred?.port,
+          };
+        });
       }
       return [];
     } catch (err) {
@@ -131,7 +142,13 @@ export const deviceDb = {
         await statsCache.save(device.id, device.cachedStats);
       }
 
-      // 2. Enviar SOLO el esqueleto estático a SQLite via backend
+      // 2. Guardar credenciales SSH en IndexedDB (siempre que existan)
+      //    Esto garantiza que load() pueda recuperar sshPass aunque el backend no lo devuelva
+      if (device.sshUser && device.sshPass) {
+        await credCache.save(device.id, device.sshUser, device.sshPass, device.sshPort);
+      }
+
+      // 3. Enviar SOLO el esqueleto estático a SQLite via backend
       const skeleton = toSQLiteSkeleton(device);
       await apiFetch(`${API_BASE_URL}/api/db/devices`, {
         method: 'POST',
@@ -148,6 +165,7 @@ export const deviceDb = {
       await Promise.all([
         apiFetch(`${API_BASE_URL}/api/db/devices/${id}`, { method: 'DELETE' }),
         statsCache.remove(id),
+        credCache.remove(id),
       ]);
     } catch (err) {
       console.error('Error eliminando device:', err);
@@ -158,6 +176,7 @@ export const deviceDb = {
     await Promise.allSettled([
       ...ids.map(id => apiFetch(`${API_BASE_URL}/api/db/devices/${id}`, { method: 'DELETE' })),
       ...ids.map(id => statsCache.remove(id)),
+      ...ids.map(id => credCache.remove(id)),
     ]);
   },
 
