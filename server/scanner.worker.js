@@ -18,9 +18,15 @@ async function runWorker() {
     let scannedCount = 0;
     const totalCount = hostIPs.length;
     const allDevices = [];
+    let isAborted = false;
+
+    parentPort.on('message', (msg) => {
+        if (msg.type === 'abort') isAborted = true;
+    });
 
     try {
         for (let i = 0; i < hostIPs.length; i += BATCH) {
+            if (isAborted) break;
             const batchIPs = hostIPs.slice(i, i + BATCH);
             // Execute SSH checks with concurrency limiter to avoid fd/socket exhaustion
             const batchResults = await pLimit(batchIPs.map(ip => () => probeUbiquiti(ip)), 50);

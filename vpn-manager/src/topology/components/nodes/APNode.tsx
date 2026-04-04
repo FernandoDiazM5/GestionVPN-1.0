@@ -52,10 +52,10 @@ function APNodeInner({ data }: NodeProps) {
       {cpeCount > 0 && (
         <button
           onClick={toggleExpanded}
-          className="absolute right-[-12px] top-1/2 -translate-y-1/2 bg-blue-600 hover:bg-blue-700 rounded-full w-5 h-5 text-white text-xs flex items-center justify-center shadow-sm transition-colors"
+          className="absolute right-[-30px] top-1/2 -translate-y-1/2 bg-blue-600 hover:bg-blue-700 rounded-full w-6 h-6 text-white text-xs flex items-center justify-center shadow-md transition-colors z-10"
           title={isExpanded ? 'Ocultar CPEs' : 'Mostrar CPEs'}
         >
-          {isExpanded ? <Minus size={10} /> : <Plus size={10} />}
+          {isExpanded ? <Minus size={12} /> : <Plus size={12} />}
         </button>
       )}
 

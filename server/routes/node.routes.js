@@ -904,9 +904,13 @@ router.post('/node/scan-stream', async (req, res) => {
         }
     });
 
-    // Abortar hilo si el cliente cierra la conexión HTTP
+    // Abortar hilo gracefully si el cliente cierra la conexión HTTP
     req.on('close', () => {
-        worker.terminate();
+        worker.postMessage({ type: 'abort' });
+        // Darle un margen para cerrar antes de forzar su terminación (que puede crashear por ssh2)
+        setTimeout(() => {
+            try { worker.terminate(); } catch(e) {}
+        }, 5000);
     });
 });
 

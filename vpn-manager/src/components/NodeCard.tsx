@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Fragment } from 'react';
 import { createPortal } from 'react-dom';
 import { apiFetch } from '../utils/apiClient';
 import { Play, ShieldOff, Wifi, WifiOff, Clock, Loader2, Radio, Pencil, Trash2, FileCode, History, Tag, KeyRound, Check, X, PlusCircle, Eye, EyeOff, Wrench, MoreVertical } from 'lucide-react';
@@ -343,7 +343,7 @@ export default function NodeCard({ node, rowIndex, onEdit, onDelete, onScript, o
       : 'border-l-2 border-l-transparent';
 
   return (
-    <>
+    <Fragment>
       {/* ── Fila principal ── */}
       <tr className={`${rowBg} ${borderLeft} transition-colors hover:bg-indigo-50/30 group`}>
 
@@ -795,6 +795,6 @@ export default function NodeCard({ node, rowIndex, onEdit, onDelete, onScript, o
           </td>
         </tr>
       )}
-    </>
+    </Fragment>
   );
 }

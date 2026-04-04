@@ -150,6 +150,24 @@ async function initDb() {
             role TEXT NOT NULL DEFAULT 'viewer',
             created_at INTEGER NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS torres (
+            id TEXT PRIMARY KEY,
+            nombre TEXT NOT NULL,
+            ubicacion TEXT DEFAULT '',
+            tramos INTEGER DEFAULT 0,
+            contacto TEXT DEFAULT '',
+            pdf_path TEXT DEFAULT '',
+            nodo_id TEXT DEFAULT '',
+            ptp_emisor_ip TEXT DEFAULT '',
+            ptp_emisor_nombre TEXT DEFAULT '',
+            ptp_emisor_modelo TEXT DEFAULT '',
+            ptp_emisor_desc TEXT DEFAULT '',
+            ptp_receptor_ip TEXT DEFAULT '',
+            ptp_receptor_nombre TEXT DEFAULT '',
+            ptp_receptor_modelo TEXT DEFAULT '',
+            ptp_receptor_desc TEXT DEFAULT '',
+            creado_en INTEGER NOT NULL
+        );
     `);
     // Migraciones: añadir columnas si la tabla ya existía sin ellas
     const migrate = async (sql) => {
@@ -458,8 +476,65 @@ async function getAppSetting(key) {
     return result ? result.value : null;
 }
 
+// ── Gestión de Torres ─────────────────────────────────────────────────────
+
+async function getTorres() {
+    const db = await getDb();
+    return db.all('SELECT * FROM torres ORDER BY creado_en DESC');
+}
+
+async function saveTorre(torreData) {
+    if (!torreData?.id || !torreData?.nombre) throw new Error('id y nombre requeridos para la torre');
+    const db = await getDb();
+    const now = Date.now();
+    await db.run(`INSERT INTO torres 
+        (id, nombre, ubicacion, tramos, contacto, pdf_path, nodo_id, 
+         ptp_emisor_ip, ptp_emisor_nombre, ptp_emisor_modelo, ptp_emisor_desc,
+         ptp_receptor_ip, ptp_receptor_nombre, ptp_receptor_modelo, ptp_receptor_desc,
+         creado_en) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET 
+            nombre = excluded.nombre,
+            ubicacion = excluded.ubicacion,
+            tramos = excluded.tramos,
+            contacto = excluded.contacto,
+            pdf_path = excluded.pdf_path,
+            nodo_id = excluded.nodo_id,
+            ptp_emisor_ip = excluded.ptp_emisor_ip,
+            ptp_emisor_nombre = excluded.ptp_emisor_nombre,
+            ptp_emisor_modelo = excluded.ptp_emisor_modelo,
+            ptp_emisor_desc = excluded.ptp_emisor_desc,
+            ptp_receptor_ip = excluded.ptp_receptor_ip,
+            ptp_receptor_nombre = excluded.ptp_receptor_nombre,
+            ptp_receptor_modelo = excluded.ptp_receptor_modelo,
+            ptp_receptor_desc = excluded.ptp_receptor_desc`,
+        [
+            torreData.id, torreData.nombre, torreData.ubicacion || '', 
+            torreData.tramos || 0, torreData.contacto || '', torreData.pdf_path || '',
+            torreData.nodo_id || '',
+            torreData.ptp_emisor_ip || '', torreData.ptp_emisor_nombre || '', 
+            torreData.ptp_emisor_modelo || '', torreData.ptp_emisor_desc || '',
+            torreData.ptp_receptor_ip || '', torreData.ptp_receptor_nombre || '', 
+            torreData.ptp_receptor_modelo || '', torreData.ptp_receptor_desc || '',
+            torreData.creado_en || now
+        ]
+    );
+    return torreData;
+}
+
+async function deleteTorre(id) {
+    if (!id) return false;
+    const db = await getDb();
+    // Return pdf_path if we need to remove the physical file
+    const torre = await db.get('SELECT pdf_path FROM torres WHERE id = ?', [id]);
+    await db.run('DELETE FROM torres WHERE id = ?', [id]);
+    return torre?.pdf_path || null;
+}
+
+
 module.exports = { 
     initDb, getDb, encryptDevice, decryptDevice, encryptPass, decryptPass, 
     saveNode, getNodes, deleteNode,
-    hasUsers, getUserByUsername, createUser, setAppSetting, getAppSetting
+    hasUsers, getUserByUsername, createUser, setAppSetting, getAppSetting,
+    getTorres, saveTorre, deleteTorre
 };

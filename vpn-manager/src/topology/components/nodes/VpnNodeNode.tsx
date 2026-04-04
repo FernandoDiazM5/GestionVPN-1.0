@@ -40,6 +40,7 @@ function VpnNodeNodeInner({ data }: NodeProps) {
         </div>
       </div>
 
+      <Handle type="target" id="top" position={Position.Top} className="!w-2 !h-2 !bg-indigo-400 !border-indigo-500" />
       <Handle type="source" position={Position.Right} className="!w-2 !h-2 !bg-indigo-400 !border-indigo-500" />
     </div>
   );

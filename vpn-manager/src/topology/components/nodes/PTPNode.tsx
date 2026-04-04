@@ -19,6 +19,7 @@ function PTPNodeInner({ data }: NodeProps) {
         <Handle type="target" position={Position.Left} className="!w-2 !h-2 !bg-blue-400 !border-blue-500" />
         <Radio size={22} className={isStation ? 'text-sky-500' : 'text-blue-600'} />
         <Handle type="source" position={Position.Right} className="!w-2 !h-2 !bg-blue-400 !border-blue-500" />
+        <Handle type="source" id="bottom" position={Position.Bottom} className="!w-2 !h-2 !bg-blue-400 !border-blue-500" />
       </div>
       <div className="text-center max-w-[100px]">
         <p className="text-[12px] font-bold text-slate-800 leading-tight truncate">{d.label}</p>

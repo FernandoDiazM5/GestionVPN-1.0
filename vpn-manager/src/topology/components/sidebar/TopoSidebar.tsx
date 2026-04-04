@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { User, GitBranch, Building2, Calculator, Plus, ChevronRight, ChevronDown, Wifi, Network, Radio } from 'lucide-react';
+import { User, GitBranch, Building2, Calculator, Plus, ChevronRight, ChevronDown, Wifi, Network, Radio, Settings } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { topologyDb } from '../../db/db';
 import { useTopoUiStore } from '../../store/topoUiStore';
@@ -24,16 +24,21 @@ const roleIcon: Record<string, typeof Wifi> = {
 function TowerList() {
   const towers = useLiveQuery(() => topologyDb.towers.toArray());
   const devices = useLiveQuery(() => topologyDb.devices.toArray());
-  const { setShowAddTowerModal, setShowAddPTPModal, setSelectedDeviceId } = useTopoUiStore();
+  const { setShowAddTowerModal, setShowAddPTPModal, setSelectedDeviceId, setSelectedTowerId, setShowTowerSettings, selectedTowerId } = useTopoUiStore();
   const [expandedTowers, setExpandedTowers] = useState<Set<string>>(new Set());
 
-  const toggleTower = (id: string) => {
+  const toggleTower = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     setExpandedTowers((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
+  };
+
+  const handleSelectTower = (id: string) => {
+    setSelectedTowerId(id);
   };
 
   return (
@@ -68,32 +73,47 @@ function TowerList() {
 
           return (
             <div key={t.id} className="mb-1">
-              <button
-                onClick={() => toggleTower(t.id)}
-                className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-md hover:bg-slate-100 text-left transition-colors"
-              >
-                {isOpen ? (
-                  <ChevronDown size={12} className="text-slate-400" />
-                ) : (
-                  <ChevronRight size={12} className="text-slate-400" />
-                )}
-                {isVpn ? (
-                  <Network size={12} className={t.vpnRunning ? 'text-indigo-500' : 'text-slate-400'} />
-                ) : (
-                  <Wifi size={12} className="text-blue-500" />
-                )}
-                <span className="text-xs font-medium text-slate-700 truncate flex-1">{t.name}</span>
-                <div className="flex items-center gap-1">
-                  {isVpn && (
-                    <span
-                      className={`w-1.5 h-1.5 rounded-full ${
-                        t.vpnRunning ? 'bg-emerald-400' : 'bg-red-400'
-                      }`}
-                    />
+              <div className="w-full flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-slate-100 transition-colors group">
+                <button
+                  onClick={() => handleSelectTower(t.id)}
+                  className="flex items-center gap-1.5 flex-1 text-left"
+                >
+                  <div onClick={(e) => toggleTower(t.id, e)} className="p-0.5 hover:bg-slate-200 rounded cursor-pointer">
+                    {isOpen ? (
+                      <ChevronDown size={12} className="text-slate-500" />
+                    ) : (
+                      <ChevronRight size={12} className="text-slate-500" />
+                    )}
+                  </div>
+                  {isVpn ? (
+                    <Network size={12} className={t.vpnRunning ? 'text-indigo-500' : 'text-slate-400'} />
+                  ) : (
+                    <Wifi size={12} className="text-blue-500" />
                   )}
-                  <span className="text-[10px] text-slate-400">{towerDevices.length}</span>
-                </div>
-              </button>
+                  <span className={`text-xs font-medium truncate flex-1 ${selectedTowerId === t.id ? 'text-blue-600 font-bold' : 'text-slate-700'}`}>{t.name}</span>
+                  <div className="flex items-center gap-1">
+                    {isVpn && (
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          t.vpnRunning ? 'bg-emerald-400' : 'bg-red-400'
+                        }`}
+                      />
+                    )}
+                    <span className="text-[10px] text-slate-400 mr-2">{towerDevices.length}</span>
+                  </div>
+                </button>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSelectTower(t.id);
+                    setShowTowerSettings(true);
+                  }}
+                  className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-200 opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Configurar Torre"
+                >
+                  <Settings size={13} />
+                </button>
+              </div>
 
               {isOpen && (
                 <div className="ml-5 pl-2 border-l border-slate-100">

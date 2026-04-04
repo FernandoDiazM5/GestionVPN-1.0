@@ -6,8 +6,10 @@ const deviceRoutes = require('./routes/device.routes');
 const wireguardRoutes = require('./routes/wireguard.routes');
 const settingsRoutes = require('./routes/settings.routes');
 const usersRoutes = require('./routes/users.routes');
+const topologyRoutes = require('./routes/topology.routes');
 const apRoutes  = require('./ap.routes');
 const { initDb } = require('./db.service');
+const path = require('path');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -65,7 +67,11 @@ app.use('/api', verifyToken, deviceRoutes);
 app.use('/api', verifyToken, wireguardRoutes);
 app.use('/api', verifyToken, settingsRoutes);
 app.use('/api/users', verifyToken, usersRoutes);
+app.use('/api', verifyToken, topologyRoutes);
 app.use('/api/ap-monitor', verifyToken, apRoutes);
+
+// Servir estáticos (PDF de contratos)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ── Inicia el servidor con reintentos si el puerto sigue ocupado ─────────────
 function startServer(attempt = 1) {
