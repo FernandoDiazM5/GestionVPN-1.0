@@ -32,53 +32,55 @@ export default function AddPTPModal() {
       const towerY = tower?.canvasY ?? 80;
       const towerW = tower?.canvasWidth ?? 550;
 
-      // Main PTP inside tower
-      await topologyDb.devices.add({
-        id: mainId,
-        towerId,
-        type: 'ptp',
-        role: 'ptp_main',
-        name: mainName.trim(),
-        model: model.trim() || 'airFiber',
-        brand: 'Ubiquiti',
-        ipAddress: mainIp.trim() || undefined,
-        sourceType: 'ptp_manual',
-        canvasX: 300,
-        canvasY: 60,
-        status: 'online',
-        createdAt: now,
-        updatedAt: now,
-      });
+      await topologyDb.transaction('rw', [topologyDb.devices, topologyDb.links], async () => {
+        // Main PTP inside tower
+        await topologyDb.devices.add({
+          id: mainId,
+          towerId,
+          type: 'ptp',
+          role: 'ptp_main',
+          name: mainName.trim(),
+          model: model.trim() || 'airFiber',
+          brand: 'Ubiquiti',
+          ipAddress: mainIp.trim() || undefined,
+          sourceType: 'ptp_manual',
+          canvasX: 300,
+          canvasY: 60,
+          status: 'online',
+          createdAt: now,
+          updatedAt: now,
+        });
 
-      // Station PTP outside tower
-      await topologyDb.devices.add({
-        id: stationId,
-        towerId: null,
-        type: 'ptp',
-        role: 'ptp_station',
-        name: stationName.trim() || `${mainName.trim()}-STA`,
-        model: model.trim() || 'airFiber',
-        brand: 'Ubiquiti',
-        ipAddress: stationIp.trim() || undefined,
-        sourceType: 'ptp_manual',
-        canvasX: towerX + towerW + 200,
-        canvasY: towerY + 60,
-        status: 'online',
-        createdAt: now,
-        updatedAt: now,
-      });
+        // Station PTP outside tower
+        await topologyDb.devices.add({
+          id: stationId,
+          towerId: null,
+          type: 'ptp',
+          role: 'ptp_station',
+          name: stationName.trim() || `${mainName.trim()}-STA`,
+          model: model.trim() || 'airFiber',
+          brand: 'Ubiquiti',
+          ipAddress: stationIp.trim() || undefined,
+          sourceType: 'ptp_manual',
+          canvasX: towerX + towerW + 200,
+          canvasY: towerY + 60,
+          status: 'online',
+          createdAt: now,
+          updatedAt: now,
+        });
 
-      // Wireless PTP link
-      await topologyDb.links.add({
-        id: uuidv4(),
-        name: `${mainName.trim()} ↔ ${stationName.trim() || 'Station'}`,
-        sourceId: mainId,
-        targetId: stationId,
-        linkType: 'wireless_ptp',
-        status: 'active',
-        sourceType: 'manual',
-        createdAt: now,
-        updatedAt: now,
+        // Wireless PTP link
+        await topologyDb.links.add({
+          id: uuidv4(),
+          name: `${mainName.trim()} ↔ ${stationName.trim() || 'Station'}`,
+          sourceId: mainId,
+          targetId: stationId,
+          linkType: 'wireless_ptp',
+          status: 'active',
+          sourceType: 'manual',
+          createdAt: now,
+          updatedAt: now,
+        });
       });
 
       // Reset form

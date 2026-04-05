@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ReactFlow,
   Background,
@@ -127,24 +127,29 @@ export default function TopologyCanvas() {
     }
   }, [builderNodes.length, fitView]);
 
-  // Persist position on drag stop
+  // Debounced drag stop to avoid excessive Dexie writes
+  const dragTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const onNodeDragStop: NodeMouseHandler = useCallback(
-    async (_event, node: Node) => {
-      const now = Date.now();
-      const tower = await topologyDb.towers.get(node.id);
-      if (tower) {
-        await topologyDb.towers.update(node.id, {
-          canvasX: node.position.x,
-          canvasY: node.position.y,
-          updatedAt: now,
-        });
-      } else {
-        await topologyDb.devices.update(node.id, {
-          canvasX: node.position.x,
-          canvasY: node.position.y,
-          updatedAt: now,
-        });
-      }
+    (_event, node: Node) => {
+      if (dragTimerRef.current) clearTimeout(dragTimerRef.current);
+      dragTimerRef.current = setTimeout(async () => {
+        const now = Date.now();
+        const tower = await topologyDb.towers.get(node.id);
+        if (tower) {
+          await topologyDb.towers.update(node.id, {
+            canvasX: node.position.x,
+            canvasY: node.position.y,
+            updatedAt: now,
+          });
+        } else {
+          await topologyDb.devices.update(node.id, {
+            canvasX: node.position.x,
+            canvasY: node.position.y,
+            updatedAt: now,
+          });
+        }
+      }, 300);
     },
     []
   );
@@ -244,14 +249,17 @@ export default function TopologyCanvas() {
     return () => window.removeEventListener('keydown', handler);
   }, [selectedDeviceId, selectedLinkId, setSelectedDeviceId, setSelectedLinkId]);
 
-  // Highlight selected edges
-  const styledEdges = edges.map(e => ({
-    ...e,
-    selected: e.id === selectedLinkId,
-    style: e.id === selectedLinkId
-      ? { stroke: '#ef4444', strokeWidth: 3 }
-      : undefined,
-  }));
+  // Highlight selected edges (memoized to avoid re-renders on every keystroke)
+  const styledEdges = useMemo(
+    () => edges.map(e => ({
+      ...e,
+      selected: e.id === selectedLinkId,
+      style: e.id === selectedLinkId
+        ? { stroke: '#ef4444', strokeWidth: 3 }
+        : undefined,
+    })),
+    [edges, selectedLinkId]
+  );
 
   if (isLoading) {
     return (
