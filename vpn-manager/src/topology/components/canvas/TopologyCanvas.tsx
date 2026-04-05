@@ -55,7 +55,7 @@ interface ContextMenuProps {
   onClose: () => void;
 }
 
-function ContextMenu({ x, y, nodeId, edgeId, onDelete, onClose }: ContextMenuProps) {
+function ContextMenu({ x, y, nodeId, edgeId: _edgeId, onDelete, onClose }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
