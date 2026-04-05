@@ -10,11 +10,12 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-# Copiar solo el código fuente (no node_modules, no .db_secret, no database.sqlite)
+# Copiar TODO el código fuente (archivos .js raíz + subdirectorios routes/)
 COPY *.js ./
+COPY routes/ ./routes/
 
 # Directorio de datos persistente (montado como volumen en docker-compose)
-RUN mkdir -p /data
+RUN mkdir -p /data /app/uploads
 
 EXPOSE 3001
 
