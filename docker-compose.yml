@@ -2,26 +2,20 @@ version: '3.8'
 
 services:
 
-  # ── Backend Node.js ─────────────────────────────────────────────────────────
+  # ── Backend Node.js (host network para acceder al túnel WireGuard) ──────────
   backend:
     build:
       context: ./server
       dockerfile: Dockerfile
     container_name: vpn-backend
     restart: unless-stopped
+    network_mode: host
     environment:
       PORT: "3001"
       DATA_DIR: "/data"
-      # Agrega aquí los orígenes permitidos si accedes desde otros hosts
-      CORS_ORIGINS: "http://localhost:8080,http://127.0.0.1:8080"
+      CORS_ORIGINS: "http://localhost:8080,http://127.0.0.1:8080,http://134.199.212.232:8080"
     volumes:
       - vpn-data:/data
-    networks:
-      - vpn-net
-    # Exponer 3001 al host es opcional si solo accedes via nginx.
-    # Descomenta si quieres acceso directo a la API:
-    # ports:
-    #   - "3001:3001"
 
   # ── Frontend nginx (sirve el build de React + proxy /api → backend) ─────────
   frontend:
@@ -29,16 +23,13 @@ services:
       context: ./vpn-manager
       dockerfile: Dockerfile
       args:
-        # Vacío = URLs relativas → nginx las redirige al backend internamente.
-        # Si accedes desde otra máquina de la red, cambia a:
-        #   VITE_API_URL: "http://IP_DEL_SERVIDOR:3001"
         VITE_API_URL: ""
     container_name: vpn-frontend
     restart: unless-stopped
     ports:
       - "8080:80"
-    depends_on:
-      - backend
+    extra_hosts:
+      - "backend:host-gateway"
     networks:
       - vpn-net
 
