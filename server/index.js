@@ -33,7 +33,8 @@ process.on('unhandledRejection', (reason) => {
 
 // Orígenes permitidos: variables de entorno (Docker) o valores por defecto (dev local)
 const defaultOrigins = ['http://localhost:5173','http://localhost:5174','http://localhost:4173',
-                        'http://127.0.0.1:5173','http://127.0.0.1:5174','http://localhost:8080','http://127.0.0.1:8080'];
+                        'http://127.0.0.1:5173','http://127.0.0.1:5174','http://localhost:8080','http://127.0.0.1:8080',
+                        'http://134.199.212.232:8080'];
 const allowedOrigins = process.env.CORS_ORIGINS
     ? [...new Set([...process.env.CORS_ORIGINS.split(',').map(s => s.trim()), ...defaultOrigins])]
     : defaultOrigins;
