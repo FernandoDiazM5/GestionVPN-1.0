@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { topologyDb } from '../../db/db';
 import { useTopoUiStore } from '../../store/topoUiStore';
@@ -10,6 +11,18 @@ export default function TopologyListView() {
   const { selectedTowerId } = useTopoUiStore();
   const towers = useLiveQuery(() => topologyDb.towers.toArray()) || [];
   const devices = useLiveQuery(() => topologyDb.devices.toArray()) || [];
+
+  // Pre-compute CPEs by sourceId (AP device ID) to avoid O(n²) in TowerBlock
+  const cpesBySourceId = useMemo(() => {
+    const map = new Map<string, Device[]>();
+    devices.forEach(d => {
+      if (d.role === 'cpe' && d.sourceId) {
+        if (!map.has(d.sourceId)) map.set(d.sourceId, []);
+        map.get(d.sourceId)!.push(d);
+      }
+    });
+    return map;
+  }, [devices]);
 
   const getTowerDevices = (towerId: string) => {
     // Internal devices belonging to this tower
@@ -50,7 +63,7 @@ export default function TopologyListView() {
           </div>
         ) : (
           displayTowers.map(tower => (
-            <TowerBlock key={tower.id} tower={tower} devices={getTowerDevices(tower.id)} />
+            <TowerBlock key={tower.id} tower={tower} devices={getTowerDevices(tower.id)} cpesBySourceId={cpesBySourceId} />
           ))
         )}
       </div>
@@ -109,7 +122,7 @@ function MockGenericCard({ title, name, ip, model, onClick }: { title: string; n
   );
 }
 
-function TowerBlock({ tower, devices }: { tower: Tower; devices: Device[] }) {
+function TowerBlock({ tower, devices, cpesBySourceId }: { tower: Tower; devices: Device[]; cpesBySourceId: Map<string, Device[]> }) {
   const { setShowTowerSettings } = useTopoUiStore();
   const nodeDevice = devices.find(d => d.role === 'vpn_node' || d.role === 'tower_router');
   const aps = devices.filter(d => d.role === 'ap');
@@ -136,7 +149,7 @@ function TowerBlock({ tower, devices }: { tower: Tower; devices: Device[] }) {
         >
           <div className="flex flex-col gap-3">
             {aps.map(ap => {
-              const cpes = devices.filter(d => d.role === 'cpe' && d.sourceId === ap.id);
+              const cpes = cpesBySourceId.get(ap.id) ?? [];
               return (
                 <CollapsibleNode
                   key={ap.id}

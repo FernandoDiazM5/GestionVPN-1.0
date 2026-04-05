@@ -1,5 +1,5 @@
 import { useReactFlow } from '@xyflow/react';
-import { ZoomIn, ZoomOut, Maximize2, RefreshCw, Trash2, ListTree, Grid } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize2, RefreshCw, Trash2, ListTree, Grid, Pause, Play } from 'lucide-react';
 import { topologyDb } from '../../db/db';
 import { useTopoUiStore } from '../../store/topoUiStore';
 
@@ -9,7 +9,7 @@ interface TopoToolbarProps {
 
 export default function TopoToolbar({ syncing }: TopoToolbarProps) {
   const { zoomIn, zoomOut, fitView } = useReactFlow();
-  const { viewMode, setViewMode } = useTopoUiStore();
+  const { viewMode, setViewMode, autoSync, setAutoSync } = useTopoUiStore();
 
   return (
     <div className="flex items-center justify-between px-4 py-2 border-b border-slate-200 bg-white shrink-0">
@@ -63,7 +63,7 @@ export default function TopoToolbar({ syncing }: TopoToolbarProps) {
         )}
       </div>
 
-      {/* Center: info pill + sync indicator */}
+      {/* Center: info pill + sync indicator + auto-sync toggle */}
       <div className="flex items-center gap-2">
         <div className="px-3 py-1 bg-blue-50 text-blue-600 text-xs font-semibold rounded-full border border-blue-200">
           Topologia de Red
@@ -74,6 +74,18 @@ export default function TopoToolbar({ syncing }: TopoToolbarProps) {
             <span>Sincronizando...</span>
           </div>
         )}
+        <button
+          onClick={() => setAutoSync(!autoSync)}
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-colors ${
+            autoSync
+              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+              : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+          }`}
+          title={autoSync ? 'Auto-sync activo (cada 30s). Clic para pausar.' : 'Auto-sync pausado. Clic para activar.'}
+        >
+          {autoSync ? <Pause size={10} /> : <Play size={10} />}
+          {autoSync ? 'Auto' : 'Pausado'}
+        </button>
       </div>
 
       {/* Right: legend + Actions */}
@@ -97,24 +109,28 @@ export default function TopoToolbar({ syncing }: TopoToolbarProps) {
           Limpiar Todo
         </button>
 
-        <div className="flex items-center gap-1.5">
-          <svg width="24" height="6">
-            <line x1="0" y1="3" x2="24" y2="3" stroke="#60a5fa" strokeWidth="1.5" strokeDasharray="4 3" />
-          </svg>
-          <span>Wireless</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <svg width="24" height="6">
-            <line x1="0" y1="3" x2="24" y2="3" stroke="#3b82f6" strokeWidth="2" />
-          </svg>
-          <span>Wired</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <svg width="24" height="6">
-            <line x1="0" y1="3" x2="24" y2="3" stroke="#ef4444" strokeWidth="1.5" strokeDasharray="4 3" />
-          </svg>
-          <span>No Link</span>
-        </div>
+        {viewMode === 'canvas' && (
+          <>
+            <div className="flex items-center gap-1.5">
+              <svg width="24" height="6">
+                <line x1="0" y1="3" x2="24" y2="3" stroke="#60a5fa" strokeWidth="1.5" strokeDasharray="4 3" />
+              </svg>
+              <span>Wireless</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <svg width="24" height="6">
+                <line x1="0" y1="3" x2="24" y2="3" stroke="#3b82f6" strokeWidth="2" />
+              </svg>
+              <span>Wired</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <svg width="24" height="6">
+                <line x1="0" y1="3" x2="24" y2="3" stroke="#ef4444" strokeWidth="1.5" strokeDasharray="4 3" />
+              </svg>
+              <span>No Link</span>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { User, GitBranch, Building2, Calculator, Plus, ChevronRight, ChevronDown, Wifi, Network, Radio, Settings } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { topologyDb } from '../../db/db';
@@ -26,6 +26,18 @@ function TowerList() {
   const devices = useLiveQuery(() => topologyDb.devices.toArray());
   const { setShowAddTowerModal, setShowAddPTPModal, setSelectedDeviceId, setSelectedTowerId, setShowTowerSettings, selectedTowerId } = useTopoUiStore();
   const [expandedTowers, setExpandedTowers] = useState<Set<string>>(new Set());
+
+  // Pre-compute devices by towerId to avoid O(n²) inside the map
+  const devicesByTower = useMemo(() => {
+    const map = new Map<string, NonNullable<typeof devices>[number][]>();
+    devices?.forEach(d => {
+      if (d.towerId) {
+        if (!map.has(d.towerId)) map.set(d.towerId, []);
+        map.get(d.towerId)!.push(d);
+      }
+    });
+    return map;
+  }, [devices]);
 
   const toggleTower = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -66,8 +78,15 @@ function TowerList() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-2 py-1">
+        {(!towers || !devices) && (
+          <div className="flex flex-col gap-2 p-3">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="h-12 bg-slate-100 rounded-lg animate-pulse" />
+            ))}
+          </div>
+        )}
         {towers?.map((t) => {
-          const towerDevices = devices?.filter((d) => d.towerId === t.id) ?? [];
+          const towerDevices = devicesByTower.get(t.id) ?? [];
           const isOpen = expandedTowers.has(t.id);
           const isVpn = t.sourceType === 'vpn_node';
 

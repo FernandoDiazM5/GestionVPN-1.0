@@ -3,6 +3,7 @@ import { useVpn } from '../../context/VpnContext';
 import { API_BASE_URL } from '../../config';
 import { apiFetch } from '../../utils/apiClient';
 import { topologyDb } from '../db/db';
+import { useTopoUiStore } from '../store/topoUiStore';
 import type { Tower, Device, Link } from '../db/tables';
 import type { SavedDevice } from '../../types/devices';
 import type { Torre } from '../../types/api';
@@ -39,7 +40,7 @@ export function useTopologySync(): { syncing: boolean; lastSync: number } {
         const res = await apiFetch(`${API_BASE_URL}/api/db/devices`);
         if (res.ok) {
           const data = await res.json();
-          allAps = data.devices ?? data ?? [];
+          allAps = Array.isArray(data?.devices) ? data.devices : Array.isArray(data) ? data : [];
         }
       } catch { /* offline — use empty */ }
 
@@ -126,7 +127,7 @@ export function useTopologySync(): { syncing: boolean; lastSync: number } {
 
       // Remove stale DB towers
       const staleTowers = existingTowers.filter(
-        t => t.sourceType === 'manual' && !t.id.startsWith('tower-manual-') && !vpnTowerIds.has(t.id)
+        t => t.sourceType === 'manual' && !vpnTowerIds.has(t.id)
       );
       if (staleTowers.length > 0) {
         await topologyDb.towers.bulkDelete(staleTowers.map(t => t.id));
@@ -367,7 +368,14 @@ export function useTopologySync(): { syncing: boolean; lastSync: number } {
           const apDevId = `ap-${ap.id}-torre-${torre.id}`;
           // Find CPEs linked to this AP in the backend data (ap_id matches ap.id from aps table)
           const apCpes = allKnownCpes.filter((c: KnownCpe) => c.ap_id === ap.id);
-          if (apCpes.length === 0) continue;
+          if (apCpes.length === 0) {
+            // Limpiar CPEs huérfanos de este AP si los hubiera
+            const orphanCpes = existingDevices.filter(d => d.sourceType === 'cpe' && d.sourceId === apDevId);
+            if (orphanCpes.length > 0) {
+              await topologyDb.devices.bulkDelete(orphanCpes.map(d => d.id));
+            }
+            continue;
+          }
 
           const cpeIds: string[] = [];
 
@@ -378,7 +386,7 @@ export function useTopologySync(): { syncing: boolean; lastSync: number } {
           for (let si = 0; si < apCpes.length; si++) {
             const cpe = apCpes[si];
             if (!cpe.mac) continue;
-            const cpeId = `cpe-${cpe.mac.replace(/[^a-fA-F0-9:]/g, '')}`;
+            const cpeId = `cpe-${ap.id}-${cpe.mac.replace(/:/g, '')}`;
             cpeDevIds.add(cpeId);
             cpeIds.push(cpeId);
 
@@ -642,25 +650,39 @@ export function useTopologySync(): { syncing: boolean; lastSync: number } {
     }
   }, []);
 
+  const { autoSync } = useTopoUiStore();
+  const initialSyncDone = useRef(false);
+
   // Debounced sync trigger
   const triggerSync = useCallback(() => {
     if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
     syncTimeoutRef.current = setTimeout(doSync, 1500);
   }, [doSync]);
 
-  // Sync when nodes change
+  // Initial sync always runs once; subsequent syncs respect autoSync
   useEffect(() => {
-    triggerSync();
+    if (!initialSyncDone.current) {
+      initialSyncDone.current = true;
+      triggerSync();
+    } else if (autoSync) {
+      triggerSync();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes, triggerSync]);
 
-  // Periodic re-sync every 30s
+  // Periodic re-sync every 30s (only when autoSync is enabled)
   useEffect(() => {
+    if (!autoSync) {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      intervalRef.current = null;
+      return;
+    }
     intervalRef.current = setInterval(doSync, 30000);
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
       if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
     };
-  }, [doSync]);
+  }, [doSync, autoSync]);
 
   return { syncing, lastSync };
 }
