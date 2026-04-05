@@ -15,7 +15,7 @@ import { API_BASE_URL } from '../config';
 import { deviceDb } from '../store/deviceDb';
 import { useVpn } from '../context/VpnContext';
 import type { SavedDevice, AntennaStats } from '../types/devices';
-import type { LiveCpe, PollResult, CpeDetail, KnownCpe } from '../types/apMonitor';
+import type { LiveCpe, PollResult, CpeDetail } from '../types/apMonitor';
 import type { NodeInfo } from '../types/api';
 
 const LS_POLL_INTERVAL_KEY = 'vpn_ap_poll_ms';
@@ -686,50 +686,6 @@ function ApDetailModal({
 }
 
 // ── Known CPEs Modal ──────────────────────────────────────────────────────
-function KnownCpesModal({ apId, onClose }: { apId: string; onClose: () => void }) {
-  const [cpes, setCpes] = useState<KnownCpe[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [_error, setError] = useState('');
-
-  useEffect(() => {
-    setError('');
-    fetchWithTimeout(`${BASE}/cpes`, {}, 10_000)
-      .then(r => r.json())
-      .then(d => { if (d.success) setCpes(d.cpes.filter((c: KnownCpe) => c.ap_id === apId)); else setError(d.message || 'Error al cargar CPEs'); })
-      .catch(e => { setError(e instanceof Error ? e.message : 'Error de red'); })
-      .finally(() => setLoading(false));
-  }, [apId]);
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"
-      onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col animate-in zoom-in-95 duration-200">
-        <div className="flex items-center justify-between bg-slate-800 rounded-t-2xl px-5 py-3 shrink-0">
-          <p className="text-xs font-bold text-white">CPEs conocidos del AP</p>
-          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg"><X className="w-4 h-4" /></button>
-        </div>
-        <div className="overflow-y-auto p-4">
-          {loading && <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-slate-400" /></div>}
-          {!loading && cpes.length === 0 && <p className="text-sm text-slate-400 text-center py-8">Sin CPEs conocidos para este AP</p>}
-          {!loading && cpes.length > 0 && (
-            <div className="space-y-2">
-              {cpes.map(c => (
-                <div key={c.mac} className="bg-slate-50 rounded-xl p-3 border border-slate-100 grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
-                  <div><p className="text-[8px] font-bold text-slate-400 uppercase">Hostname</p><p className="font-semibold text-slate-700 truncate">{c.hostname || '—'}</p></div>
-                  <div><p className="text-[8px] font-bold text-slate-400 uppercase">MAC</p><p className="font-mono text-slate-600 truncate">{c.mac}</p></div>
-                  <div><p className="text-[8px] font-bold text-slate-400 uppercase">Modelo</p><p className="text-slate-600 truncate">{c.modelo || '—'}</p></div>
-                  <div><p className="text-[8px] font-bold text-slate-400 uppercase">IP LAN</p><p className="font-mono text-slate-600">{c.ip_lan || '—'}</p></div>
-                  <div><p className="text-[8px] font-bold text-slate-400 uppercase">SSID AP</p><p className="text-slate-600 truncate">{c.ssid_ap || '—'}</p></div>
-                  <div><p className="text-[8px] font-bold text-slate-400 uppercase">Última vez</p><p className="text-slate-400">{c.ultima_vez_visto ? new Date(c.ultima_vez_visto).toLocaleString() : '—'}</p></div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ── CPE Station Row ───────────────────────────────────────────────────────
 function CpeRow({ cpe, idx, onDetail, hiddenCols, gridCols }: {
@@ -1063,14 +1019,13 @@ function StationTable({ poll, onCpeDetail, dev }: {
 }
 
 // ── AP Row ────────────────────────────────────────────────────────────────
-const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCols, onToggle, onCpeDetail, onDetail, onM5Detail, onView, onSync, onDelete, onMove }: {
+const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCols, onToggle, onCpeDetail, onM5Detail, onView, onSync, onDelete, onMove }: {
   dev: SavedDevice;
   pollResult?: PollResult;
   expanded: boolean;
   hiddenApCols: Set<string>;
   onToggle: () => void;
   onCpeDetail: (mac: string, ip: string | null) => void;
-  onDetail: () => void;
   onM5Detail: () => void;
   onView: () => void;
   onSync: () => void;
@@ -1258,7 +1213,7 @@ const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCol
 });
 
 // ── AP Group Card ─────────────────────────────────────────────────────────
-function ApGroupCard({ group, expandedAps, pollResults, activeNodeId, tunnelActive, onToggleAp, onCpeDetail, onApDetail, onM5Detail, onApView, onApSync, onApDelete, onApMove }: {
+function ApGroupCard({ group, expandedAps, pollResults, activeNodeId, tunnelActive, onToggleAp, onCpeDetail, onApDetail: _onApDetail, onM5Detail, onApView, onApSync, onApDelete, onApMove }: {
   group: NodeGroup;
   expandedAps: Set<string>;
   pollResults: Record<string, PollResult>;
@@ -1362,7 +1317,6 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeId, tunnelActi
                         hiddenApCols={hiddenApCols}
                         onToggle={() => onToggleAp(dev.id)}
                         onCpeDetail={(mac, ip) => onCpeDetail(mac, ip, dev)}
-                        onDetail={() => onApDetail(dev)}
                         onM5Detail={() => onM5Detail(dev)}
                         onView={() => onApView(dev)}
                         onSync={() => onApSync(dev.id)}

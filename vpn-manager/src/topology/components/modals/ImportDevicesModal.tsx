@@ -23,7 +23,7 @@ function tryParseJson(raw: string): ParsedPayload | null {
     if (typeof obj !== 'object' || obj === null) return null;
     const record = obj as Record<string, unknown>;
     if (!Array.isArray(record.aps)) return null;
-    return record as ParsedPayload;
+    return record as unknown as ParsedPayload;
   } catch {
     return null;
   }

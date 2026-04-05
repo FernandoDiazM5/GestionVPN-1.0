@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Server, Radio, LogOut, Wifi, Cpu, Activity, Network, GitBranch, Settings, AlertTriangle } from 'lucide-react';
+import { Server, Radio, LogOut, Wifi, Cpu, Activity, GitBranch, Settings, AlertTriangle } from 'lucide-react';
 import { VpnProvider, useVpn } from './context/VpnContext';
 
 import RouterAccess from './components/RouterAccess';
@@ -7,7 +7,6 @@ import RouterAccess from './components/RouterAccess';
 import NodeAccessPanel from './components/NodeAccessPanel';
 import NetworkDevicesModule from './components/NetworkDevicesModule';
 import ApMonitorModule from './components/ApMonitorModule';
-import NetworkTopologyModule from './components/NetworkTopologyModule';
 import TopologyPage from './topology/TopologyPage';
 import SettingsModule from './components/SettingsModule';
 

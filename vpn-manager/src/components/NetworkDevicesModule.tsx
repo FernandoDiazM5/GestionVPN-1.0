@@ -6,7 +6,7 @@ import {
   ShieldCheck, ShieldOff, Check, X, Wifi, Info,
   Eye, CheckCircle2, ChevronUp, ChevronDown, ChevronRight, PlusCircle,
   SlidersHorizontal, Search, KeyRound,
-  Activity, Shield, Network, GripVertical, Copy,
+  Activity, GripVertical,
 } from 'lucide-react';
 import { useVpn } from '../context/VpnContext';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';

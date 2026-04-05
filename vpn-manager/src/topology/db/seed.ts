@@ -21,6 +21,7 @@ export async function seedDemoData(): Promise<void> {
     id: towerId,
     name: 'Tower 1',
     location: 'Main Site',
+    sourceType: 'manual' as const,
     canvasX: 80,
     canvasY: 80,
     canvasWidth: 500,
@@ -35,8 +36,8 @@ export async function seedDemoData(): Promise<void> {
     {
       id: switchId,
       towerId,
-      type: 'switch',
-      role: 'tower_switch',
+      type: 'router',
+      role: 'tower_router',
       name: 'Switch1',
       model: 'UISP Switch',
       brand: 'Ubiquiti',
