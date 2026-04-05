@@ -1,4 +1,7 @@
 node_modules
 database.sqlite
+database.sqlite-shm
+database.sqlite-wal
 .db_secret
 *.log
+uploads/
