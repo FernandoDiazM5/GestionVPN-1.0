@@ -17,7 +17,7 @@ RUN npm run build
 FROM nginx:1.27-alpine
 
 # Copiar el build de Vite
-COPY --from=builder /app/dist /usr/share/nginx/html
+COPY --from=builder /app/dist /usr/share/nginx/html/GestionVPN-1.0
 
 # Configuración de nginx (proxy /api → backend, SPA fallback)
 COPY nginx.conf /etc/nginx/conf.d/default.conf
