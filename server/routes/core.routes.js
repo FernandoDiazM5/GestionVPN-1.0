@@ -16,6 +16,9 @@ const { connectToMikrotik, safeWrite, getErrorMessage, cleanTunnelRules, writeId
 const { IPV4_REGEX, CIDR_REGEX, getSubnetHosts, probeUbiquiti, sshExec, parseAirOSStats, parseFullOutput, ANTENNA_CMD, trySshCredentials } = require('../ubiquiti.service');
 const { getDb, encryptDevice, decryptDevice, encryptPass, decryptPass, saveNode, getNodes, deleteNode, setAppSetting, getAppSetting } = require('../db.service');
 
+// IP estática del VPS para reglas mangle ACCESO-DINAMICO
+const IP_VPS = '192.168.21.60';
+
 router.post('/connect', async (req, res) => {
     if (!req.mikrotik) return res.status(503).json({ success: false, needsConfig: true, message: 'Configura las credenciales MikroTik en Ajustes antes de continuar.' });
     const { ip, user, pass } = req.mikrotik;
@@ -146,13 +149,8 @@ router.post('/tunnel/activate', async (req, res) => {
     try {
         api = await connectToMikrotik(ip, user, pass);
 
-        // Leer estado actual de address-list y mangle en una sola conexión
-        const [addrsResult, mangleResult] = await Promise.allSettled([
-            safeWrite(api, ['/ip/firewall/address-list/print'], 3000),
-            safeWrite(api, ['/ip/firewall/mangle/print'], 3000),
-        ]);
-        const allAddrs  = addrsResult.status  === 'fulfilled' ? addrsResult.value  : [];
-        const allMangle = mangleResult.status === 'fulfilled' ? mangleResult.value : [];
+        // Leer address-list para vpn-activa
+        const allAddrs = await safeWrite(api, ['/ip/firewall/address-list/print']).catch(() => []);
 
         // Agregar a vpn-activa solo si esta IP específica no existe ya
         const alreadyInList = allAddrs.some(a => a.list === 'vpn-activa' && a.address === tunnelIP);
@@ -165,45 +163,10 @@ router.post('/tunnel/activate', async (req, res) => {
             ]);
             console.log(`[TUNNEL-ACTIVATE] Agregado ${tunnelIP} a vpn-activa`);
         } else {
-            console.log(`[TUNNEL-ACTIVATE] ${tunnelIP} ya existe en vpn-activa — sin cambios en address-list`);
+            console.log(`[TUNNEL-ACTIVATE] ${tunnelIP} ya existe en vpn-activa — sin cambios`);
         }
 
-        // Siempre limpiar mangles de esta IP que apunten a un VRF diferente (stale por cambio de sesión)
-        const staleIds = allMangle
-            .filter(m =>
-                m.comment === 'WEB-ACCESS' &&
-                m['src-address'] === tunnelIP &&
-                m['new-routing-mark'] !== targetVRF &&
-                m['.id']
-            )
-            .map(m => m['.id']);
-        for (const staleId of staleIds) {
-            await safeWrite(api, ['/ip/firewall/mangle/remove', `=.id=${staleId}`]);
-            console.log(`[TUNNEL-ACTIVATE] Mangle stale eliminado: id=${staleId} IP=${tunnelIP} VRF≠${targetVRF}`);
-        }
-
-        // Agregar mangle WEB-ACCESS solo si la combinación exacta (IP + VRF) no existe aún
-        const alreadyHasMangle = allMangle.some(m =>
-            m.comment === 'WEB-ACCESS' &&
-            m['src-address'] === tunnelIP &&
-            m['new-routing-mark'] === targetVRF
-        );
-        if (!alreadyHasMangle) {
-            await writeIdempotent(api, [
-                '/ip/firewall/mangle/add',
-                '=chain=prerouting',
-                `=src-address=${tunnelIP}`,
-                '=dst-address-list=LIST-NET-REMOTE-TOWERS',
-                '=action=mark-routing',
-                `=new-routing-mark=${targetVRF}`,
-                '=passthrough=yes',
-                '=comment=WEB-ACCESS',
-            ]);
-            console.log(`[TUNNEL-ACTIVATE] Mangle WEB-ACCESS creado para ${tunnelIP} → ${targetVRF}`);
-        } else {
-            console.log(`[TUNNEL-ACTIVATE] Mangle WEB-ACCESS ya existe para ${tunnelIP} → ${targetVRF} — sin cambios`);
-        }
-
+        // Las reglas mangle ACCESO-DINAMICO se crean en /tunnel/mangle-access (VPS + Operador)
         await api.close();
 
         const TUNNEL_TIMEOUT_MS = 30 * 60 * 1000; // 30 min, igual que el frontend
@@ -238,7 +201,7 @@ router.post('/tunnel/deactivate', async (req, res) => {
             await cleanTunnelRules(api, tunnelIP);
             console.log(`[TUNNEL-DEACTIVATE] Reglas eliminadas para IP=${tunnelIP}`);
         } else {
-            // Sin tunnelIP conocida (sesión antigua) — limpiar todos los mangles WEB-ACCESS
+            // Sin tunnelIP conocida (sesión antigua) — limpiar todos los mangles ACCESO-DINAMICO
             // y todas las entradas vpn-activa comment=User Access como fallback seguro
             console.warn('[TUNNEL-DEACTIVATE] tunnelIP desconocida — aplicando limpieza por comment (fallback)');
             await cleanTunnelRules(api, null);
@@ -266,12 +229,9 @@ router.post('/tunnel/keepalive', async (req, res) => {
     let api;
     try {
         api = await connectToMikrotik(ip, user, pass);
-        const [addrsResult, mangleResult] = await Promise.allSettled([
-            safeWrite(api, ['/ip/firewall/address-list/print'], 3000),
-            safeWrite(api, ['/ip/firewall/mangle/print'], 3000),
-        ]);
-        const addrs  = addrsResult.status  === 'fulfilled' ? addrsResult.value  : [];
-        const mangle = mangleResult.status === 'fulfilled' ? mangleResult.value : [];
+        // SECUENCIAL — RouterOS no soporta comandos paralelos en la misma conexión
+        const addrs  = await safeWrite(api, ['/ip/firewall/address-list/print']).catch(() => []);
+        const mangle = await safeWrite(api, ['/ip/firewall/mangle/print']).catch(() => []);
 
         const restoredItems = [];
 
@@ -282,31 +242,35 @@ router.post('/tunnel/keepalive', async (req, res) => {
             restoredItems.push('vpn-activa');
         }
 
-        // Verificar mangle WEB-ACCESS para este VRF específico
+        // Verificar que existan reglas ACCESO-DINAMICO para este VRF
         const hasMangleForVRF = mangle.some(m =>
-            m.comment === 'WEB-ACCESS' &&
-            m['src-address'] === tunnelIP &&
+            m.comment === 'ACCESO-DINAMICO' &&
             m['new-routing-mark'] === targetVRF
         );
         if (!hasMangleForVRF) {
-            // Limpiar mangle obsoleto para este mismo VRF (si quedó huérfano con otra IP)
-            const staleMangleIds = mangle
-                .filter(m => m.comment === 'WEB-ACCESS' && m['new-routing-mark'] === targetVRF && m['.id'])
-                .map(m => m['.id']);
-            for (const id of staleMangleIds) {
-                await safeWrite(api, ['/ip/firewall/mangle/remove', `=.id=${id}`]);
-            }
+            // Recrear las 2 reglas ACCESO-DINAMICO (VPS + Operador)
+            const toHost = (addr) => addr.includes('/') ? addr : `${addr}/32`;
             await safeWrite(api, [
                 '/ip/firewall/mangle/add',
                 '=chain=prerouting',
-                `=src-address=${tunnelIP}`,
-                '=dst-address-list=LIST-NET-REMOTE-TOWERS',
                 '=action=mark-routing',
+                '=comment=ACCESO-DINAMICO',
+                '=dst-address-list=LIST-NET-REMOTE-TOWERS',
                 `=new-routing-mark=${targetVRF}`,
+                `=src-address=${toHost(IP_VPS)}`,
                 '=passthrough=yes',
-                '=comment=WEB-ACCESS',
             ]);
-            restoredItems.push('mangle-WEB-ACCESS');
+            await safeWrite(api, [
+                '/ip/firewall/mangle/add',
+                '=chain=prerouting',
+                '=action=mark-routing',
+                '=comment=ACCESO-DINAMICO',
+                '=dst-address-list=LIST-NET-REMOTE-TOWERS',
+                `=new-routing-mark=${targetVRF}`,
+                `=src-address=${toHost(tunnelIP)}`,
+                '=passthrough=yes',
+            ]);
+            restoredItems.push('mangle-ACCESO-DINAMICO');
         }
 
         await api.close();
@@ -649,35 +613,29 @@ router.post('/tunnel/repair', async (req, res) => {
             steps.push({ step: 6, obj: 'vpn-activa', name: null, status: 'skipped', action: 'no tunnelIP' });
         }
 
-        // ── Paso 7: Mangle WEB-ACCESS (solo si tunnelIP y vrfName presentes) ────
+        // ── Paso 7: Mangle ACCESO-DINAMICO (VPS + Operador) ────
         if (tunnelIP && vrfName) {
             try {
-                const existsMangle = allMangle.some(m =>
-                    m.comment === 'WEB-ACCESS' &&
-                    m['src-address'] === tunnelIP &&
-                    m['new-routing-mark'] === vrfName
-                );
-                if (existsMangle) {
-                    steps.push({ step: 7, obj: 'Mangle WEB-ACCESS', name: `${tunnelIP}→${vrfName}`, status: 'ok', action: 'exists' });
+                const toHost = (addr) => addr.includes('/') ? addr : `${addr}/32`;
+                const hasVps = allMangle.some(m => m.comment === 'ACCESO-DINAMICO' && m['src-address'] === toHost(IP_VPS) && m['new-routing-mark'] === vrfName);
+                const hasOp  = allMangle.some(m => m.comment === 'ACCESO-DINAMICO' && m['src-address'] === toHost(tunnelIP) && m['new-routing-mark'] === vrfName);
+                if (hasVps && hasOp) {
+                    steps.push({ step: 7, obj: 'Mangle ACCESO-DINAMICO', name: `VPS+OP→${vrfName}`, status: 'ok', action: 'exists' });
                 } else {
-                    await writeIdempotent(api, [
-                        '/ip/firewall/mangle/add',
-                        '=chain=prerouting',
-                        `=src-address=${tunnelIP}`,
-                        '=dst-address-list=LIST-NET-REMOTE-TOWERS',
-                        '=action=mark-routing',
-                        `=new-routing-mark=${vrfName}`,
-                        '=passthrough=yes',
-                        '=comment=WEB-ACCESS',
-                    ]);
-                    steps.push({ step: 7, obj: 'Mangle WEB-ACCESS', name: `${tunnelIP}→${vrfName}`, status: 'created', action: 'created' });
+                    if (!hasVps) {
+                        await writeIdempotent(api, ['/ip/firewall/mangle/add', '=chain=prerouting', '=action=mark-routing', '=comment=ACCESO-DINAMICO', '=dst-address-list=LIST-NET-REMOTE-TOWERS', `=new-routing-mark=${vrfName}`, `=src-address=${toHost(IP_VPS)}`, '=passthrough=yes']);
+                    }
+                    if (!hasOp) {
+                        await writeIdempotent(api, ['/ip/firewall/mangle/add', '=chain=prerouting', '=action=mark-routing', '=comment=ACCESO-DINAMICO', '=dst-address-list=LIST-NET-REMOTE-TOWERS', `=new-routing-mark=${vrfName}`, `=src-address=${toHost(tunnelIP)}`, '=passthrough=yes']);
+                    }
+                    steps.push({ step: 7, obj: 'Mangle ACCESO-DINAMICO', name: `VPS+OP→${vrfName}`, status: 'created', action: 'created' });
                     repaired++;
                 }
             } catch (e) {
-                steps.push({ step: 7, obj: 'Mangle WEB-ACCESS', name: `${tunnelIP}→${vrfName}`, status: 'error', action: e.message });
+                steps.push({ step: 7, obj: 'Mangle ACCESO-DINAMICO', name: `→${vrfName}`, status: 'error', action: e.message });
             }
         } else {
-            steps.push({ step: 7, obj: 'Mangle WEB-ACCESS', name: null, status: 'skipped', action: 'no tunnelIP or vrfName' });
+            steps.push({ step: 7, obj: 'Mangle ACCESO-DINAMICO', name: null, status: 'skipped', action: 'no tunnelIP or vrfName' });
         }
 
         await api.close();
@@ -688,6 +646,102 @@ router.post('/tunnel/repair', async (req, res) => {
         if (api) try { await api.close(); } catch (_) { }
         const msg = getErrorMessage(error, ip, user);
         console.error('[TUNNEL-REPAIR] Error:', error?.message);
+        res.status(500).json({ success: false, message: msg });
+    }
+});
+
+// ── POST /tunnel/mangle-access ─────────────────────────────────────────────
+// Limpia todas las reglas mangle con comment="ACCESO-DINAMICO" e inyecta dos
+// nuevas: una para el VPS y otra para el operador (IP capturada del request).
+//
+// Body: { vrfSeleccionado: "VRF-ND4-TORREVICTORN2" }
+// Headers (auto): X-Forwarded-For o req.socket.remoteAddress → IP del operador
+//
+router.post('/tunnel/mangle-access', async (req, res) => {
+    if (!req.mikrotik) return res.status(503).json({ success: false, needsConfig: true, message: 'Configura las credenciales MikroTik en Ajustes antes de continuar.' });
+    const { ip, user, pass } = req.mikrotik;
+
+    const { vrfSeleccionado, ipCliente: ipClienteBody } = req.body;
+    if (!vrfSeleccionado || typeof vrfSeleccionado !== 'string' || !vrfSeleccionado.trim()) {
+        return res.status(400).json({ success: false, message: 'vrfSeleccionado es requerido en el body.' });
+    }
+
+    // Prioridad: body.ipCliente → X-Forwarded-For → socket remoteAddress
+    let ipCliente = '';
+    if (ipClienteBody && typeof ipClienteBody === 'string') {
+        ipCliente = ipClienteBody.trim();
+    } else {
+        const xForwarded = req.headers['x-forwarded-for'];
+        const rawIp = xForwarded ? xForwarded.split(',')[0] : (req.socket?.remoteAddress || '');
+        ipCliente = rawIp.trim().replace(/^::ffff:/i, '').trim();
+    }
+    console.log(`[MANGLE-ACCESS] ipCliente="${ipCliente}" vrf="${vrfSeleccionado}"`);
+
+    if (!ipCliente) {
+        return res.status(400).json({ success: false, message: 'No se pudo determinar la IP del operador.' });
+    }
+
+    // Validar que sea una IPv4 válida antes de enviar a RouterOS
+    if (!IPV4_REGEX.test(ipCliente)) {
+        return res.status(400).json({ success: false, message: `IP del operador no es IPv4 válida: "${ipCliente}"` });
+    }
+
+    let api;
+    try {
+        api = await connectToMikrotik(ip, user, pass);
+
+        // ── Paso A: Limpiar todas las reglas ACCESO-DINAMICO ──────────────────
+        const allMangle = await safeWrite(api, ['/ip/firewall/mangle/print']).catch(() => []);
+        const toDelete = allMangle.filter(m => m.comment === 'ACCESO-DINAMICO' && m['.id']);
+
+        for (const rule of toDelete) {
+            await safeWrite(api, ['/ip/firewall/mangle/remove', `=.id=${rule['.id']}`]);
+        }
+        console.log(`[MANGLE-ACCESS] ${toDelete.length} reglas ACCESO-DINAMICO eliminadas.`);
+
+        // RouterOS requiere CIDR en src-address — agregar /32 si no lo tiene
+        const toHost = (ip) => ip.includes('/') ? ip : `${ip}/32`;
+
+        // ── Paso B: Inyectar regla VPS ────────────────────────────────────────
+        await safeWrite(api, [
+            '/ip/firewall/mangle/add',
+            '=chain=prerouting',
+            '=action=mark-routing',
+            '=comment=ACCESO-DINAMICO',
+            '=dst-address-list=LIST-NET-REMOTE-TOWERS',
+            `=new-routing-mark=${vrfSeleccionado.trim()}`,
+            `=src-address=${toHost(IP_VPS)}`,
+            '=passthrough=yes',
+        ]);
+        console.log(`[MANGLE-ACCESS] Regla VPS creada: ${toHost(IP_VPS)} → ${vrfSeleccionado}`);
+
+        // ── Paso B: Inyectar regla Operador ───────────────────────────────────
+        await safeWrite(api, [
+            '/ip/firewall/mangle/add',
+            '=chain=prerouting',
+            '=action=mark-routing',
+            '=comment=ACCESO-DINAMICO',
+            '=dst-address-list=LIST-NET-REMOTE-TOWERS',
+            `=new-routing-mark=${vrfSeleccionado.trim()}`,
+            `=src-address=${toHost(ipCliente)}`,
+            '=passthrough=yes',
+        ]);
+        console.log(`[MANGLE-ACCESS] Regla Operador creada: ${ipCliente} → ${vrfSeleccionado}`);
+
+        await api.close();
+
+        res.json({
+            success: true,
+            message: `Reglas ACCESO-DINAMICO aplicadas: ${IP_VPS} y ${ipCliente} → ${vrfSeleccionado}`,
+            vrf: vrfSeleccionado,
+            ipVps: IP_VPS,
+            ipCliente,
+            deletedCount: toDelete.length,
+        });
+    } catch (error) {
+        if (api) try { await api.close(); } catch (_) {}
+        const msg = getErrorMessage(error, ip, user);
+        console.error('[MANGLE-ACCESS] Error:', error?.message || error);
         res.status(500).json({ success: false, message: msg });
     }
 });

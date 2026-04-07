@@ -80,29 +80,26 @@ const getErrorMessage = (error, ip, user = '') => {
  * @param {string|null} tunnelIP - IP del túnel a limpiar, ej: "10.10.0.5"
  */
 const cleanTunnelRules = async (api, tunnelIP) => {
-    const [addrsResult, mangleResult] = await Promise.allSettled([
-        safeWrite(api, ['/ip/firewall/address-list/print'], 3000),
-        safeWrite(api, ['/ip/firewall/mangle/print'], 3000),
-    ]);
-    const allAddrs  = addrsResult.status  === 'fulfilled' ? addrsResult.value  : [];
-    const allMangle = mangleResult.status === 'fulfilled' ? mangleResult.value : [];
+    // SECUENCIAL — RouterOS no soporta comandos paralelos en la misma conexión
+    const allAddrs  = await safeWrite(api, ['/ip/firewall/address-list/print']).catch(() => []);
+    const allMangle = await safeWrite(api, ['/ip/firewall/mangle/print']).catch(() => []);
 
     // Si se especifica tunnelIP, filtrar solo esa IP; si no, comportamiento legacy (todas)
     const addrFilter  = tunnelIP
         ? (e) => e.list === 'vpn-activa' && e.address === tunnelIP && e['.id']
         : (e) => e.list === 'vpn-activa' && e['.id'];
     const mangleFilter = tunnelIP
-        ? (e) => e.comment === 'WEB-ACCESS' && e['src-address'] === tunnelIP && e['.id']
-        : (e) => e.comment === 'WEB-ACCESS' && e['.id'];
+        ? (e) => e.comment === 'ACCESO-DINAMICO' && e['.id']
+        : (e) => e.comment === 'ACCESO-DINAMICO' && e['.id'];
 
-    const removeOps = [
-        ...allAddrs.filter(addrFilter)
-            .map(e => safeWrite(api, ['/ip/firewall/address-list/remove', `=.id=${e['.id']}`])),
-        ...allMangle.filter(mangleFilter)
-            .map(e => safeWrite(api, ['/ip/firewall/mangle/remove', `=.id=${e['.id']}`])),
-    ];
-
-    if (removeOps.length > 0) await Promise.allSettled(removeOps);
+    // Eliminar address-list entries secuencialmente
+    for (const e of allAddrs.filter(addrFilter)) {
+        await safeWrite(api, ['/ip/firewall/address-list/remove', `=.id=${e['.id']}`]).catch(() => {});
+    }
+    // Eliminar mangle entries secuencialmente
+    for (const e of allMangle.filter(mangleFilter)) {
+        await safeWrite(api, ['/ip/firewall/mangle/remove', `=.id=${e['.id']}`]).catch(() => {});
+    }
 };
 
 /**

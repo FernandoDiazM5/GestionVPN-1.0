@@ -93,6 +93,16 @@ export interface TunnelDeactivateResponse {
   message?: string;
 }
 
+/** Respuesta de /api/tunnel/mangle-access */
+export interface MangleAccessResponse {
+  success: boolean;
+  message?: string;
+  vrf?: string;
+  ipVps?: string;
+  ipCliente?: string;
+  deletedCount?: number;
+}
+
 export interface Torre {
   id: string;
   nombre: string;
