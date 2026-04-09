@@ -362,10 +362,13 @@ interface AddDeviceModalProps {
 }
 
 function AddDeviceModal({ device, node, existing, onSave, onClose }: AddDeviceModalProps) {
-  const [sshUser, setSshUser] = useState(existing?.sshUser ?? 'ubnt');
-  const [sshPass, setSshPass] = useState(existing?.sshPass ?? '');
-  const [sshPort, setSshPort] = useState(existing?.sshPort ?? 22);
+  // Precarga: credenciales existentes > credenciales obtenidas durante el scan > default 'ubnt'
+  const [sshUser, setSshUser] = useState(existing?.sshUser ?? device.sshUser ?? 'ubnt');
+  const [sshPass, setSshPass] = useState(existing?.sshPass ?? device.sshPass ?? '');
+  const [sshPort, setSshPort] = useState(existing?.sshPort ?? device.sshPort ?? 22);
   const [routerPort, setRouterPort] = useState(existing?.routerPort ?? 8075);
+  // Indica si la clave proviene del scan (para mostrar pista visual)
+  const prefilledFromScan = !existing && !!device.sshPass;
 
   const deviceId = device.mac ? device.mac.replace(/:/g, '') : device.ip.replace(/\./g, '');
 
@@ -424,8 +427,19 @@ function AddDeviceModal({ device, node, existing, onSave, onClose }: AddDeviceMo
             </div>
           </div>
           <div>
-            <label className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Clave SSH</label>
-            <input type="password" value={sshPass} onChange={e => setSshPass(e.target.value)} className="input-field w-full text-xs" placeholder="contraseña SSH" />
+            <label className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">
+              Clave SSH
+              {prefilledFromScan && (
+                <span className="ml-2 normal-case font-normal text-emerald-600">✓ obtenida del escaneo</span>
+              )}
+            </label>
+            <input
+              type="password"
+              value={sshPass}
+              onChange={e => setSshPass(e.target.value)}
+              className={`input-field w-full text-xs ${prefilledFromScan ? 'bg-emerald-50 border-emerald-200' : ''}`}
+              placeholder="contraseña SSH"
+            />
           </div>
         </div>
 
@@ -2574,16 +2588,11 @@ export default function NetworkDevicesModule() {
         <SshDataModal dev={viewingRawDevice} onClose={() => setViewingRawDevice(null)} />
       )}
 
-      {/* Modal: añadir desde escáner — pre-rellena credenciales si ya se autenticó */}
+      {/* Modal: añadir desde escáner — credenciales del scan se precargan vía device.sshUser/sshPass */}
       {addingDevice && selectedNode && (
         <AddDeviceModal
           device={addingDevice}
           node={selectedNode}
-          existing={addingDevice.sshUser ? {
-            sshUser: addingDevice.sshUser,
-            sshPass: addingDevice.sshPass,
-            sshPort: addingDevice.sshPort ?? 22,
-          } : undefined}
           onSave={handleAddDevice}
           onClose={() => setAddingDevice(null)}
         />

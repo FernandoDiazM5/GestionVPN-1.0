@@ -9,7 +9,7 @@ const connectToMikrotik = async (host, user, password) => {
         return api;
     } catch (err) {
         const errno = err?.errno;
-        const code  = err?.code;
+        const code = err?.code;
         // Solo reintentamos en ECONNREFUSED (puerto cerrado activamente).
         // Si el puerto está filtrado/firewall (SOCKTMOUT/ETIMEDOUT), ambos puertos
         // tendrán el mismo problema y no tiene sentido esperar 8s extra en 8729.
@@ -40,8 +40,8 @@ const safeWrite = (api, commands, timeoutMs = 6000) =>
 
 const getErrorMessage = (error, ip, user = '') => {
     const errno = error?.errno;
-    const code  = error?.code;
-    const msg   = error?.message || '';
+    const code = error?.code;
+    const msg = error?.message || '';
     const msgLc = msg.toLowerCase();
 
     // ── Conectividad rechazada ───────────────────────────────────────────────
@@ -81,11 +81,11 @@ const getErrorMessage = (error, ip, user = '') => {
  */
 const cleanTunnelRules = async (api, tunnelIP) => {
     // SECUENCIAL — RouterOS no soporta comandos paralelos en la misma conexión
-    const allAddrs  = await safeWrite(api, ['/ip/firewall/address-list/print']).catch(() => []);
+    const allAddrs = await safeWrite(api, ['/ip/firewall/address-list/print']).catch(() => []);
     const allMangle = await safeWrite(api, ['/ip/firewall/mangle/print']).catch(() => []);
 
     // Si se especifica tunnelIP, filtrar solo esa IP; si no, comportamiento legacy (todas)
-    const addrFilter  = tunnelIP
+    const addrFilter = tunnelIP
         ? (e) => e.list === 'vpn-activa' && e.address === tunnelIP && e['.id']
         : (e) => e.list === 'vpn-activa' && e['.id'];
     const mangleFilter = tunnelIP
@@ -94,11 +94,11 @@ const cleanTunnelRules = async (api, tunnelIP) => {
 
     // Eliminar address-list entries secuencialmente
     for (const e of allAddrs.filter(addrFilter)) {
-        await safeWrite(api, ['/ip/firewall/address-list/remove', `=.id=${e['.id']}`]).catch(() => {});
+        await safeWrite(api, ['/ip/firewall/address-list/remove', `=.id=${e['.id']}`]).catch(() => { });
     }
     // Eliminar mangle entries secuencialmente
     for (const e of allMangle.filter(mangleFilter)) {
-        await safeWrite(api, ['/ip/firewall/mangle/remove', `=.id=${e['.id']}`]).catch(() => {});
+        await safeWrite(api, ['/ip/firewall/mangle/remove', `=.id=${e['.id']}`]).catch(() => { });
     }
 };
 
