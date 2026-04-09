@@ -433,10 +433,27 @@ router.post('/ap-detail-direct', async (req, res) => {
 // ── Batch CPE enrich — SSH to multiple CPEs to get hostname/model ─────────
 router.post('/cpes/enrich-batch', async (req, res) => {
     try {
-        const { cpes, port, user, pass } = req.body;
+        const { cpes, apId, port } = req.body;
+        let { user, pass } = req.body;
         // cpes: [{ mac, ip }]
-        if (!Array.isArray(cpes) || !user || !pass) return res.status(400).json({ success: false, message: 'cpes[], user, pass requeridos' });
+        if (!Array.isArray(cpes)) return res.status(400).json({ success: false, message: 'cpes[] requerido' });
         const db = await getDb();
+
+        // Fallback: resolver credenciales desde tabla aps por apId
+        if (apId && (!user || !pass)) {
+            try {
+                const apRow = await db.get('SELECT usuario_ssh, clave_ssh, puerto_ssh FROM aps WHERE id = ?', [apId]);
+                if (apRow && apRow.usuario_ssh) {
+                    user = user || apRow.usuario_ssh;
+                    pass = pass || (apRow.clave_ssh ? decryptPass(apRow.clave_ssh) : '');
+                }
+            } catch (e) {
+                console.warn('[enrich-batch] Error leyendo credenciales del AP:', e.message);
+            }
+        }
+
+        if (!user || !pass) return res.status(400).json({ success: false, message: 'Sin credenciales SSH (ni body ni DB)' });
+
         const results = [];
         for (const { mac, ip } of cpes) {
             if (!mac || !ip) continue;

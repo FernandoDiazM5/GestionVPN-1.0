@@ -5,7 +5,7 @@ import {
   ShieldCheck, ShieldOff, AlertCircle, Radio, Clock, X,
   Plus, CheckCircle2, Loader2, Eye, EyeOff, Info, Trash2, Pencil, Minus,
   Wifi, Copy, Check, FileCode, UserPlus, Download, History, Upload,
-  ArrowUpDown, Tag, SortAsc, SortDesc, Bell, Globe,
+  ArrowUpDown, Tag, SortAsc, SortDesc, Bell, Globe, Server,
 } from 'lucide-react';
 import { useVpn, TUNNEL_TIMEOUT_MS } from '../context/VpnContext';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
@@ -33,6 +33,9 @@ interface ProvisionResult {
   failedAt?: number;
   serverPublicKey?: string;
 }
+
+// ── VPS fijo (peer WireGuard principal del servidor) ─────────────────────
+const VPS_IP = '192.168.21.60';
 
 // ── Helper: detección de solapamiento de subnets ─────────────────────────
 // Redes reservadas que no deben usarse como LAN remota de un nodo
@@ -2322,15 +2325,6 @@ export default function NodeAccessPanel() {
     setSavingPeerName(false);
   };
 
-  // Auto-seleccionar adminIP si hay exactamente un peer activo
-  useEffect(() => {
-    const active = wgPeers.filter(p => p.active);
-    if (active.length === 1 && !active.find(p => p.allowedAddress === adminIP)) {
-      setAdminIP(active[0].allowedAddress);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wgPeers]);
-
   const copyWgConfig = (peer: WgPeer) => {
     const endpoint = serverEndpointIP && serverListenPort
       ? `${serverEndpointIP}:${serverListenPort}`
@@ -2358,6 +2352,12 @@ export default function NodeAccessPanel() {
   const activeNodeName = activeNodeVrf
     ? nodes.find(n => n.nombre_vrf === activeNodeVrf)?.nombre_nodo ?? activeNodeVrf
     : null;
+
+  // ── Separación VPS vs administradores humanos ───────────────────────────
+  const vpsPeer = wgPeers.find(p => p.allowedAddress === VPS_IP);
+  const adminPeers = wgPeers.filter(p => p.allowedAddress !== VPS_IP);
+  const vpsWgActive = !!vpsPeer?.active;
+  const mangleActive = !!activeNodeVrf;
 
   const q = search.trim().toLowerCase();
   const baseNodes = q
@@ -2512,15 +2512,111 @@ export default function NodeAccessPanel() {
         </>
       )}
 
+      {/* ── VPS (Principal) ── */}
+      {!vpsPeer && !loadingWg && (
+        <div className="card p-4 border-amber-200 bg-amber-50 flex items-center gap-3">
+          <AlertCircle className="w-5 h-5 text-amber-500 shrink-0" />
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-amber-700">VPS no encontrado en peers WireGuard</p>
+            <p className="text-[11px] text-amber-600">Se esperaba un peer con <span className="font-mono">{VPS_IP}</span>. Verifica la configuración del servidor.</p>
+          </div>
+        </div>
+      )}
+      {vpsPeer && (
+        <div
+          className={`card p-4 border transition-colors ${
+            vpsWgActive && mangleActive
+              ? 'border-emerald-300 bg-gradient-to-r from-emerald-50 to-teal-50'
+              : vpsWgActive
+                ? 'border-sky-200 bg-sky-50/50'
+                : 'border-slate-200 bg-slate-50'
+          }`}
+        >
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-3 min-w-0">
+              <div
+                className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-md shrink-0 ${
+                  vpsWgActive && mangleActive
+                    ? 'bg-emerald-500 shadow-emerald-500/30'
+                    : vpsWgActive
+                      ? 'bg-sky-400 shadow-sky-400/30'
+                      : 'bg-slate-400 shadow-slate-400/20'
+                }`}
+              >
+                <Server className="w-5 h-5 text-white" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-sm font-bold text-slate-800">VPS (Principal)</p>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-slate-900/5 text-slate-600 font-mono">
+                    {VPS_IP}
+                  </span>
+                  <span
+                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1 ${
+                      vpsWgActive
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : 'bg-slate-100 text-slate-400'
+                    }`}
+                  >
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        vpsWgActive && mangleActive
+                          ? 'bg-emerald-500 animate-pulse'
+                          : vpsWgActive
+                            ? 'bg-sky-400'
+                            : 'bg-slate-400'
+                      }`}
+                    />
+                    <span>WG {vpsWgActive ? 'activo' : 'inactivo'}</span>
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                  <span
+                    className={`text-[11px] font-semibold flex items-center gap-1 ${
+                      mangleActive ? 'text-emerald-600' : 'text-slate-400'
+                    }`}
+                  >
+                    <ShieldCheck className="w-3 h-3" />
+                    {mangleActive
+                      ? <>Mangle aplicado: <span className="font-mono">{activeNodeVrf}</span></>
+                      : 'Sin mangle activo'}
+                  </span>
+                  {mangleActive && activeNodeName && (
+                    <span className="text-[11px] text-slate-500">
+                      → <span className="font-semibold text-slate-700">{activeNodeName}</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <span
+              className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg shrink-0 ${
+                vpsWgActive && mangleActive
+                  ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/30'
+                  : vpsWgActive
+                    ? 'bg-sky-100 text-sky-700 border border-sky-200'
+                    : 'bg-slate-100 text-slate-500 border border-slate-200'
+              }`}
+            >
+              {vpsWgActive && mangleActive
+                ? 'Enrutando'
+                : vpsWgActive
+                  ? 'En espera'
+                  : 'Sin conexión'}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* ── Admin IP (WireGuard peers) ── */}
       <div className="card p-4">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-slate-600">IP Administrador</span>
-            {wgPeers.length > 0 && (
+            {adminPeers.length > 0 && (
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500">
-                {wgPeers.filter(p => p.active).length}/{wgPeers.length} activos
+                {adminPeers.filter(p => p.active).length}/{adminPeers.length} activos
               </span>
             )}
             {loadingWg && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />}
@@ -2534,7 +2630,7 @@ export default function NodeAccessPanel() {
               className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 transition-colors">
               <UserPlus className="w-3 h-3" /><span>Nuevo</span>
             </button>
-            {wgPeers.length > 0 && (
+            {adminPeers.length > 0 && (
               <button onClick={() => setPeersExpanded(v => !v)}
                 className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:bg-slate-100 border border-slate-200 transition-colors">
                 <span>{peersExpanded ? 'Contraer' : 'Ver todos'}</span>
@@ -2544,28 +2640,43 @@ export default function NodeAccessPanel() {
           </div>
         </div>
 
-        {/* Collapsed: active peer selector buttons with color */}
+        {/* Collapsed: administradores humanos (solo lectura) */}
         {!peersExpanded && (
           <div className="flex items-center flex-wrap gap-2 mt-3">
-            {wgPeers.filter(p => p.active).length === 0 && !loadingWg && (
-              <span className="text-xs text-slate-400 italic">No hay administradores activos en este momento</span>
+            {adminPeers.length === 0 && !loadingWg && (
+              <span className="text-xs text-slate-400 italic">No hay administradores configurados</span>
             )}
-            {wgPeers.filter(p => p.active).map(peer => {
+            {adminPeers.map(peer => {
               const color = peerColors[peer.allowedAddress];
-              const isSelected = adminIP === peer.allowedAddress;
+              const isSelected = activeNodeVrf !== null && adminIP === peer.allowedAddress;
               return (
-                <button key={peer.id} onClick={() => setAdminIP(peer.allowedAddress)}
-                  style={color ? { borderColor: color, backgroundColor: isSelected ? color : undefined } : undefined}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all border
+                <div
+                  key={peer.id}
+                  style={isSelected && color ? { borderColor: color, backgroundColor: color } : color ? { borderColor: color } : undefined}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition-all
                     ${isSelected
                       ? color ? 'text-white shadow-md' : 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-500/25'
-                      : color ? 'bg-white text-slate-700 hover:opacity-80' : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300 hover:bg-indigo-50'}`}>
+                      : peer.active
+                        ? 'bg-white text-slate-700 border-slate-200'
+                        : 'bg-slate-50 text-slate-400 border-slate-200'}`}
+                >
                   {color
-                    ? <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                    : <Wifi className="w-3.5 h-3.5" />}
+                    ? <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: isSelected ? '#fff' : color }} />
+                    : <Wifi className={`w-3.5 h-3.5 ${peer.active ? '' : 'opacity-50'}`} />}
                   <span>{peer.name}</span>
                   <span className="font-mono text-[10px] opacity-70">{peer.allowedAddress}</span>
-                </button>
+                  <span
+                    className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${
+                      isSelected
+                        ? 'bg-white/25 text-white'
+                        : peer.active
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : 'bg-slate-100 text-slate-400'
+                    }`}
+                  >
+                    {peer.active ? 'Activo' : 'Inactivo'}
+                  </span>
+                </div>
               );
             })}
           </div>
@@ -2587,11 +2698,11 @@ export default function NodeAccessPanel() {
                 className="w-20 px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300 font-mono" />
             </div>
 
-            {wgPeers.length === 0 && (
+            {adminPeers.length === 0 && (
               <p className="text-xs text-slate-400 italic text-center py-4">Sin administradores configurados</p>
             )}
 
-            {wgPeers.map(peer => {
+            {adminPeers.map(peer => {
               const color = peerColors[peer.allowedAddress];
               const showPicker = colorPickerAddr === peer.allowedAddress;
               const isEditing = editingPeerId === peer.id;

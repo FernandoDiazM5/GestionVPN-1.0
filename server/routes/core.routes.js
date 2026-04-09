@@ -686,63 +686,102 @@ router.post('/tunnel/mangle-access', async (req, res) => {
         return res.status(400).json({ success: false, message: `IP del operador no es IPv4 válida: "${ipCliente}"` });
     }
 
-    let api;
-    try {
-        api = await connectToMikrotik(ip, user, pass);
+    // RouterOS requiere CIDR en src-address — agregar /32 si no lo tiene
+    const toHost = (addr) => addr.includes('/') ? addr : `${addr}/32`;
+    const vrf    = vrfSeleccionado.trim();
+    const srcVps = toHost(IP_VPS);
+    const srcOp  = toHost(ipCliente);
 
-        // ── Paso A: Limpiar todas las reglas ACCESO-DINAMICO ──────────────────
-        const allMangle = await safeWrite(api, ['/ip/firewall/mangle/print']).catch(() => []);
+    // ──────────────────────────────────────────────────────────────────────────
+    // ESTRATEGIA: usar conexiones separadas por fase para evitar desincronización
+    // del protocolo node-routeros cuando se hacen múltiples add consecutivos.
+    // Fase 1: conn1 → print + cleanup de ACCESO-DINAMICO
+    // Fase 2: conn2 → add VPS + add Operador (con writeIdempotent)
+    // ──────────────────────────────────────────────────────────────────────────
+
+    // ── Fase 1: Limpieza ──────────────────────────────────────────────────────
+    let api1;
+    let deletedCount = 0;
+    try {
+        api1 = await connectToMikrotik(ip, user, pass);
+        const allMangle = await safeWrite(api1, ['/ip/firewall/mangle/print'], 15000).catch((e) => {
+            console.warn('[MANGLE-ACCESS] print falló:', e?.message);
+            return [];
+        });
         const toDelete = allMangle.filter(m => m.comment === 'ACCESO-DINAMICO' && m['.id']);
+        console.log(`[MANGLE-ACCESS] Total mangle: ${allMangle.length}, ACCESO-DINAMICO a eliminar: ${toDelete.length}`);
 
         for (const rule of toDelete) {
-            await safeWrite(api, ['/ip/firewall/mangle/remove', `=.id=${rule['.id']}`]);
+            try {
+                await safeWrite(api1, ['/ip/firewall/mangle/remove', `=.id=${rule['.id']}`], 10000);
+                deletedCount++;
+            } catch (e) {
+                console.warn(`[MANGLE-ACCESS] remove ${rule['.id']} falló:`, e?.message);
+            }
         }
-        console.log(`[MANGLE-ACCESS] ${toDelete.length} reglas ACCESO-DINAMICO eliminadas.`);
+        console.log(`[MANGLE-ACCESS] Cleanup terminado (${deletedCount} eliminadas).`);
+    } catch (error) {
+        if (api1) try { await api1.close(); } catch (_) {}
+        const msg = getErrorMessage(error, ip, user);
+        console.error('[MANGLE-ACCESS] Error en fase 1 (cleanup):', error?.message || error);
+        return res.status(500).json({ success: false, message: `Cleanup falló: ${msg}` });
+    }
+    try { await api1.close(); } catch (_) {}
 
-        // RouterOS requiere CIDR en src-address — agregar /32 si no lo tiene
-        const toHost = (ip) => ip.includes('/') ? ip : `${ip}/32`;
+    // Pausa entre fases para que RouterOS asiente los removes
+    await new Promise(r => setTimeout(r, 300));
 
-        // ── Paso B: Inyectar regla VPS ────────────────────────────────────────
-        await safeWrite(api, [
+    // ── Fase 2: Adds en conexión fresca ───────────────────────────────────────
+    let api2;
+    try {
+        api2 = await connectToMikrotik(ip, user, pass);
+
+        // Regla VPS
+        console.log(`[MANGLE-ACCESS] Creando regla VPS: ${srcVps} → ${vrf}`);
+        await writeIdempotent(api2, [
             '/ip/firewall/mangle/add',
             '=chain=prerouting',
             '=action=mark-routing',
             '=comment=ACCESO-DINAMICO',
             '=dst-address-list=LIST-NET-REMOTE-TOWERS',
-            `=new-routing-mark=${vrfSeleccionado.trim()}`,
-            `=src-address=${toHost(IP_VPS)}`,
+            `=new-routing-mark=${vrf}`,
+            `=src-address=${srcVps}`,
             '=passthrough=yes',
-        ]);
-        console.log(`[MANGLE-ACCESS] Regla VPS creada: ${toHost(IP_VPS)} → ${vrfSeleccionado}`);
+        ], 12000);
+        console.log(`[MANGLE-ACCESS] ✓ Regla VPS creada.`);
 
-        // ── Paso B: Inyectar regla Operador ───────────────────────────────────
-        await safeWrite(api, [
+        // Pausa defensiva entre adds
+        await new Promise(r => setTimeout(r, 250));
+
+        // Regla Operador
+        console.log(`[MANGLE-ACCESS] Creando regla Operador: ${srcOp} → ${vrf}`);
+        await writeIdempotent(api2, [
             '/ip/firewall/mangle/add',
             '=chain=prerouting',
             '=action=mark-routing',
             '=comment=ACCESO-DINAMICO',
             '=dst-address-list=LIST-NET-REMOTE-TOWERS',
-            `=new-routing-mark=${vrfSeleccionado.trim()}`,
-            `=src-address=${toHost(ipCliente)}`,
+            `=new-routing-mark=${vrf}`,
+            `=src-address=${srcOp}`,
             '=passthrough=yes',
-        ]);
-        console.log(`[MANGLE-ACCESS] Regla Operador creada: ${ipCliente} → ${vrfSeleccionado}`);
+        ], 12000);
+        console.log(`[MANGLE-ACCESS] ✓ Regla Operador creada.`);
 
-        await api.close();
+        try { await api2.close(); } catch (_) {}
 
-        res.json({
+        return res.json({
             success: true,
-            message: `Reglas ACCESO-DINAMICO aplicadas: ${IP_VPS} y ${ipCliente} → ${vrfSeleccionado}`,
-            vrf: vrfSeleccionado,
+            message: `Reglas ACCESO-DINAMICO aplicadas: ${IP_VPS} y ${ipCliente} → ${vrf}`,
+            vrf,
             ipVps: IP_VPS,
             ipCliente,
-            deletedCount: toDelete.length,
+            deletedCount,
         });
     } catch (error) {
-        if (api) try { await api.close(); } catch (_) {}
+        if (api2) try { await api2.close(); } catch (_) {}
         const msg = getErrorMessage(error, ip, user);
-        console.error('[MANGLE-ACCESS] Error:', error?.message || error);
-        res.status(500).json({ success: false, message: msg });
+        console.error('[MANGLE-ACCESS] Error en fase 2 (adds):', error?.message || error);
+        return res.status(500).json({ success: false, message: `Add falló: ${msg}` });
     }
 });
 

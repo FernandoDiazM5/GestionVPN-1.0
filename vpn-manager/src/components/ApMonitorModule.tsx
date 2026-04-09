@@ -918,9 +918,10 @@ function StationTable({ poll, onCpeDetail, dev }: {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           cpes: needEnrich.map(s => ({ mac: s.mac, ip: s.lastip })),
+          apId: dev.id,
           port: dev.sshPort ?? 22,
           user: dev.sshUser,
-          pass: dev.sshPass,
+          pass: dev.sshPass ?? '',
         }),
       }, 120_000);
       const d = await r.json();

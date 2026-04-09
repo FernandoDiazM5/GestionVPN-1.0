@@ -192,7 +192,7 @@ export default function NodeCard({ node, rowIndex, onEdit, onDelete, onScript, o
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ vrfSeleccionado: node.nombre_vrf, ipCliente: adminIP }),
-        }, 15_000);
+        }, 45_000);
         const mangleData: MangleAccessResponse = await mangleRes.json().catch(() => ({ success: false }));
         if (mangleData.success) {
           addLog(`✓ Mangle VPS: ${mangleData.ipVps} → ${mangleData.vrf}`);
