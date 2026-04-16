@@ -175,6 +175,32 @@ router.post('/tunnel/activate', async (req, res) => {
         await setAppSetting('tunnel_ip', tunnelIP);
         await setAppSetting('tunnel_expiry', String(expiry));
         broadcastTunnelEvent(targetVRF, expiry);
+
+        // ── Regla ACCESO-ADMIN: pool de administración WireGuard ──────────────
+        // Una sola regla con src-address=192.168.21.0/24 cubre todos los peers
+        // del pool VPN-WG-MGMT. Cualquier admin conectado accede automáticamente
+        // a las torres de la VRF activa sin configuración adicional.
+        let apiAdmin;
+        try {
+            apiAdmin = await connectToMikrotik(ip, user, pass);
+            await writeIdempotent(apiAdmin, [
+                '/ip/firewall/mangle/add',
+                '=chain=prerouting',
+                '=action=mark-routing',
+                '=comment=ACCESO-ADMIN',
+                '=dst-address-list=LIST-NET-REMOTE-TOWERS',
+                `=new-routing-mark=${targetVRF}`,
+                '=src-address=192.168.21.0/24',
+                '=passthrough=yes',
+            ], 12000);
+            await apiAdmin.close();
+            console.log(`[TUNNEL-ACTIVATE] Regla ACCESO-ADMIN creada: 192.168.21.0/24 → ${targetVRF}`);
+        } catch (e) {
+            if (apiAdmin) try { await apiAdmin.close(); } catch (_) {}
+            console.error('[TUNNEL-ACTIVATE] Error creando regla ACCESO-ADMIN:', e?.message);
+            // El túnel ya está activo — no revertir por este error no crítico
+        }
+
         res.json({ success: true, message: `Acceso abierto a ${targetVRF}` });
     } catch (error) {
         if (api) try { await api.close(); } catch (_) { }
@@ -206,6 +232,20 @@ router.post('/tunnel/deactivate', async (req, res) => {
             console.warn('[TUNNEL-DEACTIVATE] tunnelIP desconocida — aplicando limpieza por comment (fallback)');
             await cleanTunnelRules(api, null);
             console.log('[TUNNEL-DEACTIVATE] Limpieza por comment completada (fallback null)');
+        }
+
+        // ── Limpiar también reglas ACCESO-ADMIN del pool de administración ─────
+        try {
+            const adminMangle = await safeWrite(api, ['/ip/firewall/mangle/print']).catch(() => []);
+            const adminToDelete = adminMangle.filter(m => m.comment === 'ACCESO-ADMIN' && m['.id']);
+            for (const rule of adminToDelete) {
+                await safeWrite(api, ['/ip/firewall/mangle/remove', `=.id=${rule['.id']}`]).catch(() => {});
+            }
+            if (adminToDelete.length > 0) {
+                console.log(`[TUNNEL-DEACTIVATE] ${adminToDelete.length} regla(s) ACCESO-ADMIN eliminadas`);
+            }
+        } catch (e) {
+            console.warn('[TUNNEL-DEACTIVATE] Error limpiando ACCESO-ADMIN:', e?.message);
         }
 
         await api.close();
@@ -729,40 +769,50 @@ router.post('/tunnel/mangle-access', async (req, res) => {
     await new Promise(r => setTimeout(r, 300));
 
     // ── Fase 2: Adds en conexión fresca ───────────────────────────────────────
+    // IPs dentro de 192.168.21.0/24 ya están cubiertas por la regla ACCESO-ADMIN
+    // que se crea al activar el túnel — no duplicar con ACCESO-DINAMICO.
+    const inAdminPool = (addr) => addr.replace('/32', '').startsWith('192.168.21.');
+
     let api2;
     try {
         api2 = await connectToMikrotik(ip, user, pass);
 
-        // Regla VPS
-        console.log(`[MANGLE-ACCESS] Creando regla VPS: ${srcVps} → ${vrf}`);
-        await writeIdempotent(api2, [
-            '/ip/firewall/mangle/add',
-            '=chain=prerouting',
-            '=action=mark-routing',
-            '=comment=ACCESO-DINAMICO',
-            '=dst-address-list=LIST-NET-REMOTE-TOWERS',
-            `=new-routing-mark=${vrf}`,
-            `=src-address=${srcVps}`,
-            '=passthrough=yes',
-        ], 12000);
-        console.log(`[MANGLE-ACCESS] ✓ Regla VPS creada.`);
+        // Regla VPS (omitir si está en el pool admin 192.168.21.0/24)
+        if (inAdminPool(srcVps)) {
+            console.log(`[MANGLE-ACCESS] VPS ${srcVps} cubierta por ACCESO-ADMIN — omitida`);
+        } else {
+            console.log(`[MANGLE-ACCESS] Creando regla VPS: ${srcVps} → ${vrf}`);
+            await writeIdempotent(api2, [
+                '/ip/firewall/mangle/add',
+                '=chain=prerouting',
+                '=action=mark-routing',
+                '=comment=ACCESO-DINAMICO',
+                '=dst-address-list=LIST-NET-REMOTE-TOWERS',
+                `=new-routing-mark=${vrf}`,
+                `=src-address=${srcVps}`,
+                '=passthrough=yes',
+            ], 12000);
+            console.log(`[MANGLE-ACCESS] ✓ Regla VPS creada.`);
+            await new Promise(r => setTimeout(r, 250));
+        }
 
-        // Pausa defensiva entre adds
-        await new Promise(r => setTimeout(r, 250));
-
-        // Regla Operador
-        console.log(`[MANGLE-ACCESS] Creando regla Operador: ${srcOp} → ${vrf}`);
-        await writeIdempotent(api2, [
-            '/ip/firewall/mangle/add',
-            '=chain=prerouting',
-            '=action=mark-routing',
-            '=comment=ACCESO-DINAMICO',
-            '=dst-address-list=LIST-NET-REMOTE-TOWERS',
-            `=new-routing-mark=${vrf}`,
-            `=src-address=${srcOp}`,
-            '=passthrough=yes',
-        ], 12000);
-        console.log(`[MANGLE-ACCESS] ✓ Regla Operador creada.`);
+        // Regla Operador (omitir si está en el pool admin 192.168.21.0/24)
+        if (inAdminPool(srcOp)) {
+            console.log(`[MANGLE-ACCESS] Operador ${srcOp} cubierto por ACCESO-ADMIN — omitido`);
+        } else {
+            console.log(`[MANGLE-ACCESS] Creando regla Operador: ${srcOp} → ${vrf}`);
+            await writeIdempotent(api2, [
+                '/ip/firewall/mangle/add',
+                '=chain=prerouting',
+                '=action=mark-routing',
+                '=comment=ACCESO-DINAMICO',
+                '=dst-address-list=LIST-NET-REMOTE-TOWERS',
+                `=new-routing-mark=${vrf}`,
+                `=src-address=${srcOp}`,
+                '=passthrough=yes',
+            ], 12000);
+            console.log(`[MANGLE-ACCESS] ✓ Regla Operador creada.`);
+        }
 
         try { await api2.close(); } catch (_) {}
 

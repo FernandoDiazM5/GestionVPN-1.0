@@ -54,12 +54,14 @@ router.post('/device/wifi/get', async (req, res) => {
     let api;
     try {
         api = await connectToMikrotik(routerIP, routerUser, routerPass || '');
-        const [ifaces, profiles] = await Promise.allSettled([safeWrite(api, ['/interface/wireless/print']), safeWrite(api, ['/interface/wireless/security-profiles/print'])]);
+        // SECUENCIAL — RouterOS no soporta comandos paralelos en la misma conexión
+        const ifaces   = await safeWrite(api, ['/interface/wireless/print']).catch(() => []);
+        const profiles = await safeWrite(api, ['/interface/wireless/security-profiles/print']).catch(() => []);
         await api.close();
         res.json({
             success: true,
-            interfaces: ifaces.status === 'fulfilled' ? ifaces.value.map(i => ({ id: i['.id'], name: i.name, ssid: i.ssid, mode: i.mode, disabled: i.disabled === 'true' })) : [],
-            profiles: profiles.status === 'fulfilled' ? profiles.value.map(p => ({ id: p['.id'], name: p.name, wpa2Key: p['wpa2-pre-shared-key'] })) : []
+            interfaces: Array.isArray(ifaces) ? ifaces.map(i => ({ id: i['.id'], name: i.name, ssid: i.ssid, mode: i.mode, disabled: i.disabled === 'true' })) : [],
+            profiles: Array.isArray(profiles) ? profiles.map(p => ({ id: p['.id'], name: p.name, wpa2Key: p['wpa2-pre-shared-key'] })) : []
         });
     } catch (error) {
         if (api) try { await api.close(); } catch (_) { }
