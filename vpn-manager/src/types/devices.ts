@@ -13,6 +13,7 @@ export interface ScannedDevice {
   sshUser?: string;
   sshPass?: string;
   sshPort?: number;
+  routerPort?: number;
   cachedStats?: AntennaStats;
 }
 

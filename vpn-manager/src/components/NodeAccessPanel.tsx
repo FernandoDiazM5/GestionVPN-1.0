@@ -2053,7 +2053,7 @@ export default function NodeAccessPanel() {
     nodes, setNodes,
     activeNodeVrf,
     tunnelExpiry, setTunnelExpiry,
-    adminIP, setAdminIP,
+    adminIP,
     deactivateAllNodes,
     removeNodeFromState,
     isReady,
