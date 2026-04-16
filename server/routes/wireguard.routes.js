@@ -9,11 +9,10 @@ router.post('/wireguard/peers', async (req, res) => {
     let api;
     try {
         api = await connectToMikrotik(ip, user, pass);
-        const [peers, ifaces, cloud] = await Promise.all([
-            safeWrite(api, ['/interface/wireguard/peers/print']),
-            safeWrite(api, ['/interface/wireguard/print']),
-            safeWrite(api, ['/ip/cloud/print']).catch(() => []),
-        ]);
+        // SECUENCIAL — RouterOS no soporta comandos paralelos en la misma conexión
+        const peers  = await safeWrite(api, ['/interface/wireguard/peers/print']).catch(() => []);
+        const ifaces = await safeWrite(api, ['/interface/wireguard/print']).catch(() => []);
+        const cloud  = await safeWrite(api, ['/ip/cloud/print']).catch(() => []);
         await api.close();
         const mgmtIface = ifaces.find(i => i.name === 'VPN-WG-MGMT');
         const publicIP = cloud?.[0]?.['public-address'] || '';
@@ -39,6 +38,7 @@ router.post('/wireguard/peers', async (req, res) => {
         });
     } catch (error) {
         if (api) try { await api.close(); } catch (_) { }
+        console.error(`[WG-PEERS] Error → IP:${ip} errno:${error?.errno} code:${error?.code} msg:${error?.message}`);
         res.status(500).json({ success: false, message: getErrorMessage(error, ip, user) });
     }
 });

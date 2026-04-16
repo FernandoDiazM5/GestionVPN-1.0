@@ -20,15 +20,14 @@ router.post('/nodes', async (req, res) => {
     let api;
     try {
         api = await connectToMikrotik(ip, user, pass);
-        const [secrets, wgIfaces, wgPeers, vrfs, active, sstpIfaces, routes] = await Promise.all([
-            safeWrite(api, ['/ppp/secret/print']),
-            safeWrite(api, ['/interface/wireguard/print']).catch(() => []),
-            safeWrite(api, ['/interface/wireguard/peers/print']).catch(() => []),
-            safeWrite(api, ['/ip/vrf/print']),
-            safeWrite(api, ['/ppp/active/print']),
-            safeWrite(api, ['/interface/sstp-server/print']),
-            safeWrite(api, ['/ip/route/print']),
-        ]);
+        // SECUENCIAL — RouterOS no soporta comandos paralelos en la misma conexión
+        const secrets    = await safeWrite(api, ['/ppp/secret/print']);
+        const wgIfaces   = await safeWrite(api, ['/interface/wireguard/print']).catch(() => []);
+        const wgPeers    = await safeWrite(api, ['/interface/wireguard/peers/print']).catch(() => []);
+        const vrfs       = await safeWrite(api, ['/ip/vrf/print']);
+        const active     = await safeWrite(api, ['/ppp/active/print']);
+        const sstpIfaces = await safeWrite(api, ['/interface/sstp-server/print']);
+        const routes     = await safeWrite(api, ['/ip/route/print']);
         await api.close();
 
         const vrfByInterface = {}; vrfs.forEach(vrf => (vrf.interfaces || '').split(',').forEach(i => { if (i.trim()) vrfByInterface[i.trim()] = vrf.name; }));
@@ -162,10 +161,9 @@ router.post('/node/next', async (req, res) => {
     let api;
     try {
         api = await connectToMikrotik(ip, user, pass);
-        const [vrfs, secrets] = await Promise.all([
-            safeWrite(api, ['/ip/vrf/print']),
-            safeWrite(api, ['/ppp/secret/print']),
-        ]);
+        // SECUENCIAL — RouterOS no soporta comandos paralelos en la misma conexión
+        const vrfs    = await safeWrite(api, ['/ip/vrf/print']);
+        const secrets = await safeWrite(api, ['/ppp/secret/print']);
         await api.close();
 
         // Extraer números de nodo de los VRFs existentes (VRF-ND1-..., VRF-ND2-...)
@@ -586,11 +584,10 @@ router.post('/node/details', async (req, res) => {
     let api;
     try {
         api = await connectToMikrotik(ip, user, pass);
-        const [routes, addrList, secrets] = await Promise.all([
-            vrfName ? safeWrite(api, ['/ip/route/print']) : Promise.resolve([]),
-            vrfName ? safeWrite(api, ['/ip/firewall/address-list/print']) : Promise.resolve([]),
-            pppUser ? safeWrite(api, ['/ppp/secret/print']) : Promise.resolve([]),
-        ]);
+        // SECUENCIAL — RouterOS no soporta comandos paralelos en la misma conexión
+        const routes   = vrfName ? await safeWrite(api, ['/ip/route/print']) : [];
+        const addrList = vrfName ? await safeWrite(api, ['/ip/firewall/address-list/print']) : [];
+        const secrets  = pppUser ? await safeWrite(api, ['/ppp/secret/print']) : [];
         const vrfSubnets = routes
             .filter(r => r['routing-table'] === vrfName && r['dst-address'] !== '192.168.21.0/24')
             .map(r => r['dst-address']);
@@ -689,10 +686,9 @@ router.post('/node/edit', async (req, res) => {
 
         // Eliminar subnets
         if (Array.isArray(removeSubnets) && removeSubnets.length > 0 && hasVrf) {
-            const [addrList, routes] = await Promise.all([
-                safeWrite(api, ['/ip/firewall/address-list/print']),
-                safeWrite(api, ['/ip/route/print']),
-            ]);
+            // SECUENCIAL — RouterOS no soporta comandos paralelos en la misma conexión
+            const addrList = await safeWrite(api, ['/ip/firewall/address-list/print']);
+            const routes   = await safeWrite(api, ['/ip/route/print']);
             for (const subnet of removeSubnets) {
                 const entry = addrList.find(a => a.list === 'LIST-NET-REMOTE-TOWERS' && a.address === subnet);
                 if (entry) await safeWrite(api, ['/ip/firewall/address-list/remove', `=.id=${entry['.id']}`]);

@@ -28,15 +28,18 @@ const connectToMikrotik = async (host, user, password) => {
 };
 
 const safeWrite = (api, commands, timeoutMs = 6000) =>
-    Promise.race([
-        api.write(commands),
-        new Promise((_, reject) =>
-            setTimeout(
-                () => reject(new Error('Sin respuesta del router (posible !empty — tabla vacía o filtro sin resultados)')),
-                timeoutMs,
-            )
-        ),
-    ]);
+    new Promise((resolve, reject) => {
+        let settled = false;
+        const timer = setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            reject(new Error('Sin respuesta del router (posible !empty — tabla vacía o filtro sin resultados)'));
+        }, timeoutMs);
+        api.write(commands).then(
+            (result) => { if (!settled) { settled = true; clearTimeout(timer); resolve(result); } },
+            (err)    => { if (!settled) { settled = true; clearTimeout(timer); reject(err); } },
+        );
+    });
 
 const getErrorMessage = (error, ip, user = '') => {
     const errno = error?.errno;

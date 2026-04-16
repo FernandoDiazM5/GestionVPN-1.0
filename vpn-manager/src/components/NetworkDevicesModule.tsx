@@ -350,6 +350,29 @@ const COLUMN_DEFS: ColumnDef[] = [
       return <span className="font-mono text-[10px] text-slate-500">{v}</span>;
     },
   },
+  {
+    key: 'routerLink',
+    label: 'Acceso Router',
+    width: '130px',
+    defaultVisible: false,
+    requiresStats: false,
+    render: (dev) => {
+      const port = dev.routerPort ?? 8075;
+      const url = `http://${dev.ip}:${port}`;
+      return (
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="inline-flex items-center gap-1 font-mono text-[10px] text-sky-600 hover:text-sky-800 hover:underline truncate"
+          title={`Abrir ${url}`}
+        >
+          {dev.ip}:{port}
+        </a>
+      );
+    },
+  },
 ];
 
 // ── Modal agregar / editar credenciales ──────────────────────────────────
@@ -2424,7 +2447,14 @@ export default function NetworkDevicesModule() {
 
                         {/* IP / MAC */}
                         <div className="px-3 py-3 min-w-0 pr-3">
-                          <p className="font-mono text-sm font-semibold text-slate-700 truncate">{dev.ip}</p>
+                          <a
+                            href={`http://${dev.ip}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            title={`Abrir http://${dev.ip}`}
+                            className="font-mono text-sm font-semibold text-slate-700 hover:text-sky-600 hover:underline truncate block"
+                          >{dev.ip}</a>
                           {displayMac
                             ? <p className="font-mono text-[9px] text-slate-400 truncate">{displayMac}</p>
                             : <p className="text-[9px] text-amber-500">SSH-only</p>
