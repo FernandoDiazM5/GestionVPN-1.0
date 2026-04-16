@@ -4,30 +4,30 @@ export interface ApNode {
   nombre: string;
   descripcion?: string;
   ubicacion?: string;
-  creado_en: number;
+  created_at: number;
   ap_count?: number;
 }
 
 /** AP registrado en un nodo */
 export interface RegisteredAp {
   id: string;
-  nodo_id: string;
+  ap_group_id: number;
   hostname?: string;
   modelo?: string;
   firmware?: string;
   mac_lan?: string;
   mac_wlan?: string;
   ip: string;
-  frecuencia_ghz?: number;
+  frecuencia_mhz?: number;
   ssid?: string;
   canal_mhz?: number;
   tx_power?: number;
   modo_red?: string;
   usuario_ssh?: string;
   puerto_ssh?: number;
-  activo?: number;
-  registrado_en?: number;
-  // clave_ssh is NEVER sent to the frontend
+  is_active?: number;
+  created_at?: number;
+  // clave_ssh_enc is NEVER sent to the frontend (encrypted server-side)
 }
 
 /** CPE en tiempo real — datos de wstalist/sta.cgi (no se guardan en DB como live) */
@@ -81,7 +81,7 @@ export interface LiveCpe {
   cpe_name?: string | null;
   cpe_product?: string | null;
 
-  // ── Enriquecido desde cpes_conocidos DB ───────────────────────────────
+  // ── Enriquecido desde cpes DB ─────────────────────────────────────────
   hostname?: string | null;
   modelo?: string | null;
   isKnown?: boolean;
@@ -111,7 +111,7 @@ export interface KnownCpe {
   canal_mhz?: number;
   tx_power?: number;
   ssid_ap?: string;
-  ultima_vez_visto?: number;
+  last_seen?: number;
 }
 
 /** Detalle de un CPE obtenido por SSH */
@@ -141,7 +141,7 @@ export interface CpeDetail {
 /** Snapshot histórico de señal */
 export interface SignalSnapshot {
   id: number;
-  cpe_mac: string;
+  cpe_id: number;
   ap_id: string;
   timestamp: number;
   signal_dbm?: number;

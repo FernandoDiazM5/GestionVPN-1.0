@@ -119,6 +119,6 @@ export interface Torre {
   ptp_receptor_nombre: string;
   ptp_receptor_modelo: string;
   ptp_receptor_desc: string;
-  creado_en: number;
+  created_at: number;
 }
 

@@ -74,11 +74,11 @@ router.post('/edit', async (req, res) => {
         if (password && password.length >= 6) {
             const salt = await bcrypt.genSalt(10);
             const hash = await bcrypt.hash(password, salt);
-            await db.run('UPDATE vpn_users SET username = ?, role = ?, password_hash = ? WHERE id = ?',
-                [username, role, hash, id]);
+            await db.run('UPDATE vpn_users SET username = ?, role = ?, password_hash = ?, updated_at = ? WHERE id = ?',
+                [username, role, hash, Date.now(), id]);
         } else {
-            await db.run('UPDATE vpn_users SET username = ?, role = ? WHERE id = ?', 
-                [username, role, id]);
+            await db.run('UPDATE vpn_users SET username = ?, role = ?, updated_at = ? WHERE id = ?',
+                [username, role, Date.now(), id]);
         }
             
         res.json({ success: true, message: 'Miembro actualizado exitosamente' });

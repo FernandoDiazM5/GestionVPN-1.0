@@ -42,7 +42,9 @@ router.post('/setup', async (req, res) => {
         await createUser(username, hash, 'admin');
 
         // Generar JWT y loguear
-        const token = jwt.sign({ username, role: 'admin' }, JWT_SECRET, { expiresIn: '24h' });
+        // Setup: primer usuario, aún no tiene row.id — consultar después de crear
+        const newUser = await getUserByUsername(username);
+        const token = jwt.sign({ id: newUser.id, username, role: 'admin' }, JWT_SECRET, { expiresIn: '24h' });
 
         res.json({
             success: true,
@@ -76,7 +78,7 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ success: false, message: 'Usuario o contraseña incorrectos' });
         }
 
-        const token = jwt.sign({ username: row.username, role: row.role }, JWT_SECRET, { expiresIn: '24h' });
+        const token = jwt.sign({ id: row.id, username: row.username, role: row.role }, JWT_SECRET, { expiresIn: '24h' });
 
         res.json({
             success: true,
@@ -104,7 +106,7 @@ router.post('/refresh', (req, res) => {
     try {
         const decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
         const token = jwt.sign(
-            { username: decoded.username, role: decoded.role },
+            { id: decoded.id, username: decoded.username, role: decoded.role },
             JWT_SECRET,
             { expiresIn: '24h' }
         );

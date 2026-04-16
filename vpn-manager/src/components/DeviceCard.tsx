@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Radio, Signal, Trash2, RefreshCw, Loader2,
   Activity, ArrowUp, ArrowDown, Waves,
@@ -14,6 +14,8 @@ interface DeviceCardProps {
   onRemove?: () => void;
   onUpdate?: (updated: SavedDevice) => void;
   isPreview?: boolean;
+  /** Modo compacto: solo muestra señal, TX/RX, CPU/Mem — sin parámetros detallados */
+  compact?: boolean;
 }
 
 // ── Gauge circular SVG ───────────────────────────────────────────────────
@@ -112,10 +114,11 @@ function cleanDeviceName(name?: string | null): string | null {
 }
 
 // ───────────────────────────────────────────────────────────────────────
-export default function DeviceCard({ device, onRemove, onUpdate, isPreview }: DeviceCardProps) {
+export default function DeviceCard({ device, onRemove, onUpdate, isPreview, compact }: DeviceCardProps) {
   const [antennaStats, setAntennaStats] = useState<AntennaStats | null>(device.cachedStats ?? null);
   const [isLoadingAntenna, setIsLoadingAntenna] = useState(false);
   const [antennaError, setAntennaError] = useState('');
+  const autoFetched = useRef(false);
 
   const handleLoadAntenna = async () => {
     if (!device.sshUser || !device.sshPass) {
@@ -163,6 +166,15 @@ export default function DeviceCard({ device, onRemove, onUpdate, isPreview }: De
       setIsLoadingAntenna(false);
     }
   };
+
+  // Auto-fetch en modo compacto si tiene credenciales y no tiene datos cacheados
+  useEffect(() => {
+    if (compact && !antennaStats && !autoFetched.current && device.sshUser && device.sshPass) {
+      autoFetched.current = true;
+      handleLoadAntenna();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [compact]);
 
   const roleLabel = device.role === 'ap' ? 'AP' : device.role === 'sta' ? 'CPE' : '?';
   const roleGrad = device.role === 'ap' ? 'from-indigo-500 to-indigo-600' : 'from-violet-500 to-violet-600';
@@ -389,7 +401,7 @@ export default function DeviceCard({ device, onRemove, onUpdate, isPreview }: De
             )}
 
             {/* ── Parámetros del dispositivo ── */}
-            <div className="bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50 rounded-xl p-4 shadow-sm">
+            {!compact && <div className="bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50 rounded-xl p-4 shadow-sm">
               <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3 flex items-center space-x-2">
                 <Info className="w-3 h-3" /><span>Dispositivo</span>
               </p>
@@ -404,8 +416,9 @@ export default function DeviceCard({ device, onRemove, onUpdate, isPreview }: De
                 <ParamRow label="LAN MAC" value={antennaStats.lanMac} />
                 <ParamRow label="LAN" value={antennaStats.lanInfo} />
               </div>
-            </div>
+            </div>}
 
+            {!compact && <>
             {/* ── Parámetros inalámbricos ── */}
             <div className="bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50 rounded-xl p-4 shadow-sm">
               <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3 flex items-center space-x-2">
@@ -542,6 +555,7 @@ export default function DeviceCard({ device, onRemove, onUpdate, isPreview }: De
                 </div>
               </div>
             )}
+            </>}
           </div>
         )}
 

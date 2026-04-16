@@ -35,6 +35,8 @@ export interface SavedDevice {
   sshPass?: string;
   hasSshPass?: boolean;
   sshPort?: number;
+  wlanMac?: string;       // MAC de la interfaz WLAN (ath0)
+  wifiPassword?: string;  // contraseña WiFi (enmascarada desde backend)
   // Router detrás de la antena (WebUI)
   routerIp?: string;
   routerUser?: string;
@@ -48,7 +50,7 @@ export interface SavedDevice {
   networkMode?: string;   // netrole: "router" | "bridge"
   chains?: string;   // cadenas TX/RX: "1X1", "2X2"
   apMac?: string;   // MAC del AP al que conecta (modo STA)
-  activo?: number | boolean;
+  is_active?: number | boolean;
   addedAt: number;
   lastSeen?: number;
   lastCpeCount?: number;      // cantidad de CPEs en la última sincronización manual

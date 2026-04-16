@@ -89,7 +89,7 @@ const cleanTunnelRules = async (api, tunnelIP) => {
         ? (e) => e.list === 'vpn-activa' && e.address === tunnelIP && e['.id']
         : (e) => e.list === 'vpn-activa' && e['.id'];
     const mangleFilter = tunnelIP
-        ? (e) => e.comment === 'ACCESO-DINAMICO' && e['.id']
+        ? (e) => e.comment === 'ACCESO-DINAMICO' && e['src-address']?.includes(tunnelIP) && e['.id']
         : (e) => e.comment === 'ACCESO-DINAMICO' && e['.id'];
 
     // Eliminar address-list entries secuencialmente

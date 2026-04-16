@@ -2524,7 +2524,26 @@ export default function NetworkDevicesModule() {
                                   const savedDev = savedDevices.find(s => s.id === devId);
                                   if (savedDev) setViewingDevice(savedDev);
                                 } else {
-                                  setM5DetailDevice(dev);
+                                  // Convertir ScannedDevice a SavedDevice para mostrar el mismo DeviceCard
+                                  setViewingDevice({
+                                    id: devId,
+                                    mac: dev.mac,
+                                    ip: dev.ip,
+                                    name: dev.name,
+                                    model: dev.model,
+                                    firmware: dev.firmware,
+                                    role: dev.role === 'unknown' ? 'ap' : dev.role,
+                                    essid: dev.essid,
+                                    frequency: dev.frequency,
+                                    sshUser: dev.sshUser,
+                                    sshPass: dev.sshPass,
+                                    sshPort: dev.sshPort,
+                                    cachedStats: dev.cachedStats,
+                                    nodeId: '',
+                                    nodeName: selectedNode?.nombre_nodo || '',
+                                    addedAt: Date.now(),
+                                    is_active: true,
+                                  } as SavedDevice);
                                 }
                               }}
                               title={isSaved ? "Ver ficha guardada" : "Ver datos del dispositivo"}

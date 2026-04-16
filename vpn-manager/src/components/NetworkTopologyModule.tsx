@@ -138,7 +138,7 @@ async function loadAndCacheCpesFromServer(
         mac_wlan: string;
         ssid_ap: string;
         frecuencia_mhz: number | null;
-        ultima_vez_visto: number;
+        last_seen: number;
         ap_id: string;
         ap_ip: string | null;
         ap_hostname: string | null;
@@ -182,7 +182,7 @@ async function loadAndCacheCpesFromServer(
         ? (apDevice.cachedStats?.deviceName || apDevice.name)
         : (c.ap_hostname || c.ap_ip || '');
 
-      const nodeName = devices.find(d => d.nodeId === c.ap_nodeId)?.nodeName || c.ap_nodeId;
+      const nodeName = devices.find(d => d.nodeId === c.ap_nodeId)?.nodeName || c.ap_nodeId || '';
 
       const sig = c.lastSignal;
       // Parse full wstalist/sta.cgi record if available
@@ -244,7 +244,7 @@ async function loadAndCacheCpesFromServer(
 
       const cpe: SavedDevice = existingDev
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ? { ...existingDev, parentAp: apName, lastSeen: c.ultima_vez_visto, cachedStats: { ...(existingDev.cachedStats ?? {}), ...cachedStats } as any }
+        ? { ...existingDev, parentAp: apName, lastSeen: c.last_seen, cachedStats: { ...(existingDev.cachedStats ?? {}), ...cachedStats } as any }
         : {
             id,
             mac:        c.mac.toUpperCase(),
@@ -256,10 +256,10 @@ async function loadAndCacheCpesFromServer(
             parentAp:   apName,
             essid:      c.ssid_ap  || '',
             frequency:  c.frecuencia_mhz || 0,
-            nodeId:     c.ap_nodeId,
+            nodeId:     c.ap_nodeId || '',
             nodeName,
-            addedAt:    c.ultima_vez_visto,
-            lastSeen:   c.ultima_vez_visto,
+            addedAt:    c.last_seen,
+            lastSeen:   c.last_seen,
             cachedStats,
           };
 
@@ -1050,15 +1050,17 @@ export default function NetworkTopologyModule() {
   const staCount     = devices.filter(d => d.role === 'sta').length;
 
   /* ── derived ── */
-  const devicesByNode = useMemo(() =>
+  // Group devices by nodeName (reliable link between ap_groups and VPN nodes)
+  const devicesByNodeName = useMemo(() =>
     devices.reduce<Record<string, SavedDevice[]>>((acc, d) => {
-      (acc[d.nodeId] ??= []).push(d);
+      const key = d.nodeName || d.nodeId;
+      (acc[key] ??= []).push(d);
       return acc;
     }, {}),
   [devices]);
 
   const selectedNode = vpnNodes.find(n => n.id === selId);
-  const nodeDevices  = selId ? (devicesByNode[selId] ?? []) : [];
+  const nodeDevices  = selectedNode ? (devicesByNodeName[selectedNode.nombre_nodo] ?? []) : [];
 
   const openDetail = (id: string) => { setSelId(id); setView('detail'); };
   const goBack     = () => { setView('nodes'); setSelId(null); };
@@ -1235,7 +1237,7 @@ export default function NetworkTopologyModule() {
                     <NodeCard
                       key={n.id}
                       node={n}
-                      deviceCount={(devicesByNode[n.id] ?? []).length}
+                      deviceCount={(devicesByNodeName[n.nombre_nodo] ?? []).length}
                       onClick={() => openDetail(n.id)}
                     />
                   ))}
