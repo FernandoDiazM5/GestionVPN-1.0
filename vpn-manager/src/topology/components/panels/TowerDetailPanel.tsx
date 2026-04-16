@@ -133,7 +133,7 @@ export default function TowerDetailPanel() {
               >
                 <option value="">-- Sin Nodo --</option>
                 {vpnNodes.map(n => (
-                  <option key={n.id} value={n.id}>{n.nombre_nodo} ({n.ip_tunnel})</option>
+                  <option key={n.ppp_user} value={n.ppp_user}>{n.nombre_nodo} ({n.ip_tunnel})</option>
                 ))}
               </select>
             </div>

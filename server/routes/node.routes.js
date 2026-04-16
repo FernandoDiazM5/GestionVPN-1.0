@@ -4,7 +4,15 @@ const { Worker } = require('worker_threads');
 const path = require('path');
 const { connectToMikrotik, safeWrite, getErrorMessage, cleanTunnelRules, writeIdempotent, parseHandshakeSecs } = require('../routeros.service');
 const { IPV4_REGEX, CIDR_REGEX, getSubnetHosts, probeUbiquiti, sshExec, parseAirOSStats, parseFullOutput, ANTENNA_CMD, trySshCredentials } = require('../ubiquiti.service');
-const { getDb, encryptDevice, decryptDevice, encryptPass, decryptPass, saveNode, getNodes, deleteNode } = require('../db.service');
+const { getDb, encryptDevice, decryptDevice, encryptPass, decryptPass, saveNode, getNodes, getNodeByPppUser, getNodeId, deleteNode } = require('../db.service');
+
+/** Middleware: solo admin u operator pueden acceder a endpoints de credenciales */
+function requireOperator(req, res, next) {
+    if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'operator')) {
+        return res.status(403).json({ success: false, message: 'Acceso denegado: se requiere rol de operador o admin' });
+    }
+    next();
+}
 
 router.post('/nodes', async (req, res) => {
     if (!req.mikrotik) return res.status(503).json({ success: false, needsConfig: true, message: 'Configura las credenciales MikroTik en Ajustes antes de continuar.' });
@@ -90,7 +98,7 @@ router.post('/nodes', async (req, res) => {
         // --- Merge etiquetas personalizadas desde SQLite (tienen prioridad sobre el comment de MikroTik) ---
         try {
             const db = await getDb();
-            const labelRows = await db.all('SELECT ppp_user, label FROM node_labels');
+            const labelRows = await db.all('SELECT ppp_user, label FROM nodes WHERE label IS NOT NULL AND label != \'\'');
             const labelMap = {};
             labelRows.forEach(r => { if (r.label) labelMap[r.ppp_user] = r.label; });
             nodes = nodes.map(n => labelMap[n.ppp_user] ? { ...n, nombre_nodo: labelMap[n.ppp_user] } : n);
@@ -418,8 +426,8 @@ router.post('/node/provision', async (req, res) => {
                 if (!isWG) {
                     const encrypted = encryptPass(pppPassword);
                     await db.run(
-                        'INSERT INTO node_creds (ppp_user, ppp_password) VALUES (?, ?) ON CONFLICT(ppp_user) DO UPDATE SET ppp_password = excluded.ppp_password',
-                        [pppUser, encrypted]
+                        'UPDATE nodes SET ppp_password_enc = ? WHERE ppp_user = ?',
+                        [encrypted, pppUser]
                     );
                 }
 
@@ -593,10 +601,10 @@ router.post('/node/details', async (req, res) => {
         const isWG = pppUser && (pppUser.startsWith('WG-ND') || pppUser.startsWith('VPN-WG-'));
 
         const db = await getDb();
-        const nodeRow = await db.get('SELECT data FROM nodes WHERE id = ?', [pppUser]);
+        const nodeRow = await db.get('SELECT * FROM nodes WHERE ppp_user = ?', [pppUser]);
         let ipTunnel = '';
-        if (nodeRow && nodeRow.data) {
-            try { ipTunnel = JSON.parse(nodeRow.data).ip_tunnel || ''; } catch (e) { }
+        if (nodeRow) {
+            ipTunnel = nodeRow.ip_tunnel || '';
         }
 
         await api.close();
@@ -673,7 +681,7 @@ router.post('/node/edit', async (req, res) => {
         if (newComment !== undefined && newComment !== null) {
             try {
                 const db = await getDb();
-                await db.run('INSERT INTO node_labels (ppp_user, label) VALUES (?, ?) ON CONFLICT(ppp_user) DO UPDATE SET label = excluded.label', [pppUser, newComment]);
+                await db.run('UPDATE nodes SET label = ? WHERE ppp_user = ?', [newComment, pppUser]);
             } catch (e) {
                 console.error('[DB] Error merging labels during edit:', e.message);
             }
@@ -708,22 +716,20 @@ router.post('/node/edit', async (req, res) => {
 
         // Para WireGuard, si cambiaron las subredes, hay que actualizar el allowed-address del Peer
         let updatedLanSubnets = null;
-        if (hasVrf && (Array.isArray(removeSubnets) && removeSubnets.length > 0) || (Array.isArray(addSubnets) && addSubnets.length > 0)) {
+        if (hasVrf && ((Array.isArray(removeSubnets) && removeSubnets.length > 0) || (Array.isArray(addSubnets) && addSubnets.length > 0))) {
             const db = await getDb();
-            const nodeRow = await db.get('SELECT data FROM nodes WHERE id = ?', [pppUser]);
+            const nodeRow = await db.get('SELECT * FROM nodes WHERE ppp_user = ?', [pppUser]);
             let currentSubnets = [];
             let wgPeerIp = '';
             let wgPubKey = '';
-            if (nodeRow && nodeRow.data) {
-                try {
-                    const parsed = JSON.parse(nodeRow.data);
-                    currentSubnets = parsed.lan_subnets || [];
-                    if (parsed.ip_tunnel) {
-                        const match = parsed.ip_tunnel.match(/10\.10\.251\.(\d+)/);
-                        if (match) wgPeerIp = `10.10.251.${Math.floor(parseInt(match[1]) / 4) * 4 + 2}/32`;
-                    }
-                    wgPubKey = parsed.wg_public_key || parsed.cpePublicKey;
-                } catch (e) { }
+            if (nodeRow) {
+                // segmento_lan stores the primary subnet; for multi-subnet, read routes from MikroTik
+                currentSubnets = nodeRow.segmento_lan ? [nodeRow.segmento_lan] : [];
+                if (nodeRow.ip_tunnel) {
+                    const match = nodeRow.ip_tunnel.match(/10\.10\.251\.(\d+)/);
+                    if (match) wgPeerIp = `10.10.251.${Math.floor(parseInt(match[1]) / 4) * 4 + 2}/32`;
+                }
+                wgPubKey = nodeRow.wg_public_key || '';
             }
 
             // Computar nueva lista de subredes
@@ -790,11 +796,11 @@ router.post('/node/script', async (req, res) => {
 
         try {
             const db = await getDb();
-            const nodeRow = await db.get('SELECT data FROM nodes WHERE id = ?', [pppUser]);
-            if (nodeRow && nodeRow.data) {
-                const parsed = JSON.parse(nodeRow.data);
-                ipTunnel = parsed.ip_tunnel || '';
-                wgNodeNum = parsed.node_number || parseInt(pppUser.match(/ND(\d+)/)?.[1] || '0');
+            const nodeRow = await db.get('SELECT * FROM nodes WHERE ppp_user = ?', [pppUser]);
+            if (nodeRow) {
+                ipTunnel = nodeRow.ip_tunnel || '';
+                // Derive node number from interface name pattern (WG-NDx-NAME)
+                wgNodeNum = parseInt(pppUser.match(/ND(\d+)/)?.[1] || '0');
             }
             if (req.mikrotik) {
                 const { ip, user, pass } = req.mikrotik;
@@ -848,8 +854,7 @@ router.post('/node/label/save', async (req, res) => {
     if (!pppUser) return res.status(400).json({ success: false, message: 'pppUser requerido' });
     try {
         const db = await getDb();
-        await db.run('INSERT INTO node_labels (ppp_user, label) VALUES (?, ?) ON CONFLICT(ppp_user) DO UPDATE SET label = excluded.label',
-            [pppUser, label || '']);
+        await db.run('UPDATE nodes SET label = ? WHERE ppp_user = ?', [label || '', pppUser]);
         res.json({ success: true });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
@@ -920,21 +925,21 @@ router.post('/node/creds/save', async (req, res) => {
     try {
         const db = await getDb();
         const encrypted = encryptPass(pppPassword);
-        await db.run('INSERT INTO node_creds (ppp_user, ppp_password) VALUES (?, ?) ON CONFLICT(ppp_user) DO UPDATE SET ppp_password = excluded.ppp_password', [pppUser, encrypted]);
+        await db.run('UPDATE nodes SET ppp_password_enc = ? WHERE ppp_user = ?', [encrypted, pppUser]);
         res.json({ success: true });
     } catch (e) {
         res.status(500).json({ success: false, message: e.message });
     }
 });
 
-router.post('/node/creds/get', async (req, res) => {
+router.post('/node/creds/get', requireOperator, async (req, res) => {
     const { pppUser } = req.body;
     if (!pppUser) return res.status(400).json({ success: false, message: 'pppUser requerido' });
     try {
         const db = await getDb();
-        const row = await db.get('SELECT ppp_password FROM node_creds WHERE ppp_user = ?', [pppUser]);
-        if (!row) return res.json({ success: false, message: 'Sin credenciales guardadas' });
-        res.json({ success: true, pppPassword: decryptPass(row.ppp_password) });
+        const row = await db.get('SELECT ppp_password_enc FROM nodes WHERE ppp_user = ?', [pppUser]);
+        if (!row || !row.ppp_password_enc) return res.json({ success: false, message: 'Sin credenciales guardadas' });
+        res.json({ success: true, pppPassword: decryptPass(row.ppp_password_enc) });
     } catch (e) {
         res.status(500).json({ success: false, message: e.message });
     }
@@ -945,33 +950,36 @@ router.post('/node/ssh-creds/save', async (req, res) => {
     if (!pppUser || !Array.isArray(creds)) return res.status(400).json({ success: false, message: 'pppUser y creds[] requeridos' });
     try {
         const db = await getDb();
-        // Cifrar cada contraseña individualmente
-        const encrypted = JSON.stringify(creds.map(c => ({ user: c.user || '', encPass: encryptPass(c.pass || '') })));
-        await db.run(
-            'INSERT INTO node_ssh_creds (ppp_user, ssh_creds) VALUES (?, ?) ON CONFLICT(ppp_user) DO UPDATE SET ssh_creds=excluded.ssh_creds',
-            [pppUser, encrypted]
-        );
+        const nodeId = await getNodeId(pppUser);
+        if (!nodeId) return res.status(404).json({ success: false, message: `Nodo no encontrado: ${pppUser}` });
+
+        // Reemplazar todas las credenciales SSH del nodo
+        await db.run('DELETE FROM node_ssh_creds WHERE node_id = ?', [nodeId]);
+        for (let i = 0; i < creds.length; i++) {
+            const c = creds[i];
+            await db.run(
+                'INSERT INTO node_ssh_creds (node_id, ssh_user, ssh_pass_enc, ssh_port, priority) VALUES (?, ?, ?, ?, ?)',
+                [nodeId, c.user || 'ubnt', encryptPass(c.pass || ''), c.port || 22, i]
+            );
+        }
         res.json({ success: true });
     } catch (e) {
         res.status(500).json({ success: false, message: e.message });
     }
 });
 
-router.post('/node/ssh-creds/get', async (req, res) => {
+router.post('/node/ssh-creds/get', requireOperator, async (req, res) => {
     const { pppUser } = req.body;
     if (!pppUser) return res.status(400).json({ success: false, message: 'pppUser requerido' });
     try {
         const db = await getDb();
-        const row = await db.get('SELECT ssh_creds, ssh_user, ssh_pass FROM node_ssh_creds WHERE ppp_user = ?', [pppUser]);
-        if (!row) return res.json({ success: true, creds: [] });
-        // Leer desde ssh_creds (nuevo) o migrar desde ssh_user/ssh_pass (legado)
-        let creds = [];
-        if (row.ssh_creds && row.ssh_creds !== '[]') {
-            const parsed = JSON.parse(row.ssh_creds);
-            creds = parsed.map(c => ({ user: c.user, pass: decryptPass(c.encPass) }));
-        } else if (row.ssh_user) {
-            creds = [{ user: row.ssh_user, pass: decryptPass(row.ssh_pass) }];
-        }
+        const nodeId = await getNodeId(pppUser);
+        if (!nodeId) return res.json({ success: true, creds: [] });
+        const rows = await db.all(
+            'SELECT ssh_user, ssh_pass_enc, ssh_port, priority FROM node_ssh_creds WHERE node_id = ? ORDER BY priority',
+            [nodeId]
+        );
+        const creds = rows.map(r => ({ user: r.ssh_user, pass: decryptPass(r.ssh_pass_enc), port: r.ssh_port }));
         res.json({ success: true, creds });
     } catch (e) {
         res.status(500).json({ success: false, message: e.message });
@@ -981,9 +989,17 @@ router.post('/node/ssh-creds/get', async (req, res) => {
 router.get('/node/tags', async (req, res) => {
     try {
         const db = await getDb();
-        const rows = await db.all('SELECT ppp_user, tags FROM node_tags');
+        const rows = await db.all(
+            `SELECT n.ppp_user, GROUP_CONCAT(t.name, ',') as tags_csv
+             FROM nodes n
+             LEFT JOIN node_tags nt ON nt.node_id = n.id
+             LEFT JOIN tags t ON t.id = nt.tag_id
+             GROUP BY n.id`
+        );
         const result = {};
-        rows.forEach(r => { try { result[r.ppp_user] = JSON.parse(r.tags); } catch { result[r.ppp_user] = []; } });
+        rows.forEach(r => {
+            result[r.ppp_user] = r.tags_csv ? r.tags_csv.split(',') : [];
+        });
         res.json({ success: true, tags: result });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
@@ -993,8 +1009,25 @@ router.post('/node/tag/save', async (req, res) => {
     if (!pppUser) return res.status(400).json({ success: false, message: 'pppUser requerido' });
     try {
         const db = await getDb();
-        await db.run('INSERT INTO node_tags (ppp_user, tags) VALUES (?, ?) ON CONFLICT(ppp_user) DO UPDATE SET tags = excluded.tags',
-            [pppUser, JSON.stringify(Array.isArray(tags) ? tags : [])]);
+        const nodeId = await getNodeId(pppUser);
+        if (!nodeId) return res.status(404).json({ success: false, message: `Nodo no encontrado: ${pppUser}` });
+
+        const tagList = Array.isArray(tags) ? tags : [];
+
+        // Ensure all tag names exist in the tags table
+        for (const tagName of tagList) {
+            await db.run('INSERT OR IGNORE INTO tags (name) VALUES (?)', [tagName]);
+        }
+
+        // Replace all tags for this node
+        await db.run('DELETE FROM node_tags WHERE node_id = ?', [nodeId]);
+        for (const tagName of tagList) {
+            const tagRow = await db.get('SELECT id FROM tags WHERE name = ?', [tagName]);
+            if (tagRow) {
+                await db.run('INSERT INTO node_tags (node_id, tag_id) VALUES (?, ?)', [nodeId, tagRow.id]);
+            }
+        }
+
         res.json({ success: true });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
@@ -1004,8 +1037,10 @@ router.post('/node/history/add', async (req, res) => {
     if (!pppUser || !event) return res.status(400).json({ success: false, message: 'pppUser y event requeridos' });
     try {
         const db = await getDb();
-        await db.run('INSERT INTO node_history (ppp_user, event, timestamp) VALUES (?, ?, ?)',
-            [pppUser, event, Date.now()]);
+        const nodeId = await getNodeId(pppUser);
+        if (!nodeId) return res.status(404).json({ success: false, message: `Nodo no encontrado: ${pppUser}` });
+        await db.run('INSERT INTO node_history (node_id, event, timestamp) VALUES (?, ?, ?)',
+            [nodeId, event, Date.now()]);
         res.json({ success: true });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
@@ -1015,9 +1050,11 @@ router.post('/node/history/get', async (req, res) => {
     if (!pppUser) return res.status(400).json({ success: false, message: 'pppUser requerido' });
     try {
         const db = await getDb();
+        const nodeId = await getNodeId(pppUser);
+        if (!nodeId) return res.json({ success: true, history: [] });
         const rows = await db.all(
-            'SELECT event, timestamp FROM node_history WHERE ppp_user = ? ORDER BY timestamp DESC LIMIT 200',
-            [pppUser]);
+            'SELECT event, timestamp FROM node_history WHERE node_id = ? ORDER BY timestamp DESC LIMIT 200',
+            [nodeId]);
         res.json({ success: true, history: rows });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
@@ -1048,14 +1085,10 @@ router.post('/node/wg/set-peer', async (req, res) => {
 
         // Obtener LAN subnets del nodo desde SQLite
         const db = await getDb();
-        const nodeRow = await db.get('SELECT data, segmento_lan FROM nodes WHERE id = ?', [pppUser]);
+        const nodeRow = await db.get('SELECT * FROM nodes WHERE ppp_user = ?', [pppUser]);
         let lanSubnets = [];
         if (nodeRow) {
-            try {
-                const parsed = JSON.parse(nodeRow.data || '{}');
-                lanSubnets = Array.isArray(parsed.lan_subnets) ? parsed.lan_subnets : [];
-            } catch (_) { }
-            if (lanSubnets.length === 0 && nodeRow.segmento_lan) lanSubnets = [nodeRow.segmento_lan];
+            if (nodeRow.segmento_lan) lanSubnets = [nodeRow.segmento_lan];
         }
         const allowedAddress = [`${peerIP}/32`, ...lanSubnets].join(',');
 

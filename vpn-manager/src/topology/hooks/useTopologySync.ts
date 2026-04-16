@@ -65,11 +65,12 @@ export function useTopologySync(): { syncing: boolean; lastSync: number } {
         const towerId = `tower-${torre.id}`; // local ID
         vpnTowerIds.add(towerId);
 
-        // Find connected vpn node for status
-        const node = vpnNodes.find(n => n.id === torre.nodo_id);
+        // Find connected vpn node for status (torre.nodo_id is ppp_user)
+        const node = vpnNodes.find(n => n.ppp_user === torre.nodo_id);
 
         // Dynamic tower sizing based on AP count
-        const towerAps = aps.filter(ap => ap.nodeId === torre.nodo_id);
+        // APs link via nodeName matching node.nombre_nodo (no direct FK from ap_groups to nodes)
+        const towerAps = node ? aps.filter(ap => ap.nodeName === node.nombre_nodo) : [];
         const calcHeight = Math.max(450, 200 + (towerAps.length * 140));
 
         const existing = existingTowers.find(t => t.id === towerId);
@@ -107,7 +108,7 @@ export function useTopologySync(): { syncing: boolean; lastSync: number } {
             canvasWidth: 550,
             canvasHeight: calcHeight,
             collapsed: false,
-            createdAt: torre.creado_en || now,
+            createdAt: torre.created_at || now,
             updatedAt: now,
             
             tramos: torre.tramos,
@@ -139,7 +140,7 @@ export function useTopologySync(): { syncing: boolean; lastSync: number } {
 
       for (const torre of backendTorres) {
         if (!torre.nodo_id) continue;
-        const node = vpnNodes.find(n => n.id === torre.nodo_id);
+        const node = vpnNodes.find(n => n.ppp_user === torre.nodo_id);
         if (!node) continue;
 
         const devId = `vpndev-${node.id}-torre-${torre.id}`;
@@ -280,8 +281,9 @@ export function useTopologySync(): { syncing: boolean; lastSync: number } {
       
       for (const torre of backendTorres) {
         if (!torre.nodo_id) continue;
-        const towerAps = aps.filter(ap => ap.nodeId === torre.nodo_id);
-        
+        const torreNode = vpnNodes.find(n => n.ppp_user === torre.nodo_id);
+        const towerAps = torreNode ? aps.filter(ap => ap.nodeName === torreNode.nombre_nodo) : [];
+
         for (let apIdx = 0; apIdx < towerAps.length; apIdx++) {
           const ap = towerAps[apIdx];
           const devId = `ap-${ap.id}-torre-${torre.id}`;
@@ -295,7 +297,7 @@ export function useTopologySync(): { syncing: boolean; lastSync: number } {
               ipAddress: ap.ip,
               macAddress: ap.mac,
               model: ap.model || 'AP',
-              status: ap.activo ? 'online' : 'unknown',
+              status: ap.is_active ? 'online' : 'unknown',
               cpeCount: ap.lastCpeCount ?? 0,
               towerId,
               updatedAt: now,
@@ -316,7 +318,7 @@ export function useTopologySync(): { syncing: boolean; lastSync: number } {
               cpeCount: ap.lastCpeCount ?? 0,
               canvasX: 300,
               canvasY: 150 + apIdx * 130, // Aligned with vpn node vertically
-              status: ap.activo ? 'online' : 'unknown',
+              status: ap.is_active ? 'online' : 'unknown',
               createdAt: now,
               updatedAt: now,
             };
@@ -333,11 +335,11 @@ export function useTopologySync(): { syncing: boolean; lastSync: number } {
         await topologyDb.devices.bulkDelete(staleApDevs.map(d => d.id));
       }
 
-      // ── 4. Sync CPEs from /api/ap/topology-cpes (SQLite cpes_conocidos) ──
+      // ── 4. Sync CPEs from /api/ap/topology-cpes (SQLite cpes table) ──
       const cpeDevIds = new Set<string>();
       const apCpeMap = new Map<string, string[]>(); // apDevId → cpeDevIds[]
 
-      // Fetch all known CPEs from the backend (cpes_conocidos table)
+      // Fetch all known CPEs from the backend (cpes table)
       // Uses the same endpoint as AP Monitor: /api/ap-monitor/cpes
       interface KnownCpe {
         mac: string;
@@ -348,7 +350,7 @@ export function useTopologySync(): { syncing: boolean; lastSync: number } {
         last_stats: string | null;
         remote_hostname: string;
         remote_platform: string;
-        ultima_vez_visto: number;
+        last_seen: number;
       }
       let allKnownCpes: KnownCpe[] = [];
       try {
@@ -361,10 +363,11 @@ export function useTopologySync(): { syncing: boolean; lastSync: number } {
 
       for (const torre of backendTorres) {
         if (!torre.nodo_id) continue;
-        const towerAps = aps.filter(ap => ap.nodeId === torre.nodo_id);
+        const torreNodeCpe = vpnNodes.find(n => n.ppp_user === torre.nodo_id);
+        const towerApsCpe = torreNodeCpe ? aps.filter(ap => ap.nodeName === torreNodeCpe.nombre_nodo) : [];
         const towerId = `tower-${torre.id}`;
 
-        for (const ap of towerAps) {
+        for (const ap of towerApsCpe) {
           const apDevId = `ap-${ap.id}-torre-${torre.id}`;
           // Find CPEs linked to this AP in the backend data (ap_id matches ap.id from aps table)
           const apCpes = allKnownCpes.filter((c: KnownCpe) => c.ap_id === ap.id);
@@ -470,14 +473,14 @@ export function useTopologySync(): { syncing: boolean; lastSync: number } {
       const existingLinks = await topologyDb.links.toArray();
       const autoLinkIds = new Set<string>();
 
-      // VPN Node → AP links (wired) - Only for Torrer nodes
+      // VPN Node → AP links (wired) - Only for Torre nodes
       for (const torre of backendTorres) {
         if (!torre.nodo_id) continue;
-        const node = vpnNodes.find(n => n.id === torre.nodo_id);
+        const node = vpnNodes.find(n => n.ppp_user === torre.nodo_id);
         if (!node) continue;
-        
+
         const vpnDevId = `vpndev-${node.id}-torre-${torre.id}`;
-        const towerAps = aps.filter(a => a.nodeId === node.id);
+        const towerAps = aps.filter(a => a.nodeName === node.nombre_nodo);
 
         for (const ap of towerAps) {
           const apDevId = `ap-${ap.id}-torre-${torre.id}`;
@@ -537,7 +540,7 @@ export function useTopologySync(): { syncing: boolean; lastSync: number } {
       // VPN Node → PTP Receptor links (wired) — VPN source (right) → Receptor target (left)
       for (const torre of backendTorres) {
         if (!torre.ptp_receptor_ip || !torre.nodo_id) continue;
-        const node = vpnNodes.find(n => n.id === torre.nodo_id);
+        const node = vpnNodes.find(n => n.ppp_user === torre.nodo_id);
         if (!node) continue;
 
         const linkId = `link-ptp-vpn-${torre.id}`;

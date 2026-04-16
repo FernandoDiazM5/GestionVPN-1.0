@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const { getAppSetting, decryptPass } = require('./db.service');
 
-const SECRET_FILE = `${process.env.DATA_DIR || '.'}/.jwt_secret`;
+const SECRET_FILE = `${process.env.DATA_DIR || __dirname}/.jwt_secret`;
 let JWT_SECRET;
 if (fs.existsSync(SECRET_FILE)) {
     JWT_SECRET = fs.readFileSync(SECRET_FILE, 'utf8');

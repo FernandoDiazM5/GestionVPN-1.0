@@ -41,8 +41,8 @@ router.post('/settings/save', requireAdmin, async (req, res) => {
             if (finalValue) finalValue = encryptPass(finalValue);
         }
 
-        await db.run('INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
-            [key, finalValue]);
+        await db.run('INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at',
+            [key, finalValue, Date.now()]);
         res.json({ success: true });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });

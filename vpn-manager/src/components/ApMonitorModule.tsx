@@ -100,16 +100,16 @@ function saveColPrefs(hidden: Set<string>) {
 // ── Node group ────────────────────────────────────────────────────────────
 interface NodeGroup { nodeId: string; nodeName: string; aps: SavedDevice[]; stas: SavedDevice[]; }
 
-// Estado de AP amarrado al túnel VPN, no al campo d.activo de la BD
+// Estado de AP amarrado al túnel VPN, no al campo d.is_active de la BD
 type ApStatus = 'online' | 'partial' | 'inactive' | 'connecting';
 
 function getApStatus(
   d: SavedDevice,
   pollResults: Record<string, PollResult>,
-  activeNodeId: string | null,
+  activeNodeName: string | null,
   tunnelActive: boolean,
 ): ApStatus {
-  const belongsToActiveNode = d.nodeId === activeNodeId;
+  const belongsToActiveNode = !!activeNodeName && d.nodeName === activeNodeName;
   if (!tunnelActive || !belongsToActiveNode) {
     const r = pollResults[d.id];
     if (r && (r.stations.length > 0 || r.polledAt > 0)) return 'partial';
@@ -171,7 +171,7 @@ function ColSelector({ hidden, onChange }: {
   );
 }
 
-// ── Device Card Modal (Estado / Ficha) ───────────────────────────────────
+// ── Device Card Modal (Estado / Ficha — modo compacto) ───────────────────
 function DeviceCardModal({ device, onClose, onRemove, onUpdate }: {
   device: SavedDevice; onClose: () => void;
   onRemove?: () => void; onUpdate?: (updated: SavedDevice) => void;
@@ -242,12 +242,12 @@ function MoveToNodeModal({ device, nodes, knownNames, onConfirm, onClose }: {
               className={`w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium border transition-all
                 ${selected?.id === opt.id
                   ? 'bg-indigo-600 text-white border-indigo-600'
-                  : opt.id === device.nodeId
+                  : opt.name === device.nodeName
                     ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-default'
                     : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-indigo-50 hover:border-indigo-300'}`}
-              disabled={opt.id === device.nodeId}>
+              disabled={opt.name === device.nodeName}>
               {opt.name}
-              {opt.id === device.nodeId && <span className="ml-2 text-[10px] opacity-60">(nodo actual)</span>}
+              {opt.name === device.nodeName && <span className="ml-2 text-[10px] opacity-60">(nodo actual)</span>}
             </button>
           ))}
         </div>
@@ -258,8 +258,8 @@ function MoveToNodeModal({ device, nodes, knownNames, onConfirm, onClose }: {
             Cancelar
           </button>
           <button
-            onClick={() => selected && selected.id !== device.nodeId && onConfirm(selected.id, selected.name)}
-            disabled={!selected || selected.id === device.nodeId}
+            onClick={() => selected && selected.name !== device.nodeName && onConfirm(selected.id, selected.name)}
+            disabled={!selected || selected.name === device.nodeName}
             className="flex-1 px-4 py-2 rounded-xl text-sm font-bold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
             Mover
           </button>
@@ -1214,11 +1214,11 @@ const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCol
 });
 
 // ── AP Group Card ─────────────────────────────────────────────────────────
-function ApGroupCard({ group, expandedAps, pollResults, activeNodeId, tunnelActive, onToggleAp, onCpeDetail, onApDetail: _onApDetail, onM5Detail, onApView, onApSync, onApDelete, onApMove }: {
+function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelActive, onToggleAp, onCpeDetail, onApDetail: _onApDetail, onM5Detail, onApView, onApSync, onApDelete, onApMove }: {
   group: NodeGroup;
   expandedAps: Set<string>;
   pollResults: Record<string, PollResult>;
-  activeNodeId: string | null;
+  activeNodeName: string | null;
   tunnelActive: boolean;
   onToggleAp: (apId: string) => void;
   onCpeDetail: (mac: string, ip: string | null, dev: SavedDevice) => void;
@@ -1243,7 +1243,7 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeId, tunnelActi
   const handleApColChange = (h: Set<string>) => { setHiddenApCols(h); saveApColPrefs(h); };
 
   // Calcular estado del grupo derivando el estado de cada AP individualmente
-  const apStatuses = group.aps.map(ap => getApStatus(ap, pollResults, activeNodeId, tunnelActive));
+  const apStatuses = group.aps.map(ap => getApStatus(ap, pollResults, activeNodeName, tunnelActive));
   const anyOnline = apStatuses.some(s => s === 'online');
   const anyPartial = apStatuses.some(s => s === 'partial');
   const anyConnecting = apStatuses.some(s => s === 'connecting');
@@ -1364,7 +1364,7 @@ export default function ApMonitorModule() {
   const { nodes, activeNodeVrf, tunnelExpiry } = useVpn();
   const tunnelActive = activeNodeVrf !== null && tunnelExpiry !== null && tunnelExpiry > Date.now();
   const activeNode = useMemo(() => nodes.find(n => n.nombre_vrf === activeNodeVrf) ?? null, [nodes, activeNodeVrf]);
-  const activeNodeId = activeNode?.id ?? null;
+  const activeNodeName = activeNode?.nombre_nodo ?? null;
   const [devices, setDevices] = useState<SavedDevice[]>([]);
   const [pollInterval, setPollInterval] = useState<number>(() => {
     const saved = localStorage.getItem(LS_POLL_INTERVAL_KEY);
@@ -1414,7 +1414,7 @@ export default function ApMonitorModule() {
   const nodesRef = useRef(nodes);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const autoPolledRef = useRef(false);
-  const prevActiveNodeIdRef = useRef<string | null>(null);
+  const prevActiveNodeNameRef = useRef<string | null>(null);
 
   useEffect(() => { expandedApsRef.current = expandedAps; }, [expandedAps]);
   useEffect(() => { devicesRef.current = devices; }, [devices]);
@@ -1422,16 +1422,16 @@ export default function ApMonitorModule() {
 
   // Efecto de limpieza cuando el túnel cae: detener polls y resetear auto-poll
   useEffect(() => {
-    const prevId = prevActiveNodeIdRef.current;
-    prevActiveNodeIdRef.current = activeNodeId;
-    if (prevId !== null && activeNodeId === null) {
+    const prevName = prevActiveNodeNameRef.current;
+    prevActiveNodeNameRef.current = activeNodeName;
+    if (prevName !== null && activeNodeName === null) {
       // Túnel cayó: detener todos los polls
       Object.values(pollTimers.current).forEach(clearTimeout);
       pollTimers.current = {};
       setExpandedAps(new Set());
       autoPolledRef.current = false;
     }
-  }, [activeNodeId]);
+  }, [activeNodeName]);
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type });
@@ -1445,20 +1445,19 @@ export default function ApMonitorModule() {
     const staDevices = devices.filter(d => d.role === 'sta');
     const map = new Map<string, NodeGroup>();
 
-    // Build groups from APs first
+    // Build groups from APs first — group by nodeName (reliable link between ap_groups and VPN nodes)
     for (const d of apDevices) {
-      const node = nodes.find(n => n.id === d.nodeId);
-      // If nodeId matches an active node, group by nodeId; otherwise group by nodeName to unify orphaned devices
-      const groupKey = node ? d.nodeId : (d.nodeName || d.nodeId);
+      const groupKey = d.nodeName || d.nodeId;
+      const node = nodes.find(n => n.nombre_nodo === groupKey);
       const groupName = node?.nombre_nodo || d.nodeName || d.nodeId;
       if (!map.has(groupKey)) map.set(groupKey, { nodeId: d.nodeId, nodeName: groupName, aps: [], stas: [] });
       map.get(groupKey)!.aps.push(d);
     }
 
-    // Ensure groups exist for STAs whose nodeId may not have any APs yet
+    // Ensure groups exist for STAs whose nodeName may not have any APs yet
     for (const d of staDevices) {
-      const node = nodes.find(n => n.id === d.nodeId);
-      const groupKey = node ? d.nodeId : (d.nodeName || d.nodeId);
+      const groupKey = d.nodeName || d.nodeId;
+      const node = nodes.find(n => n.nombre_nodo === groupKey);
       const groupName = node?.nombre_nodo || d.nodeName || d.nodeId;
       if (!map.has(groupKey)) map.set(groupKey, { nodeId: d.nodeId, nodeName: groupName, aps: [], stas: [] });
       map.get(groupKey)!.stas.push(d);
@@ -1468,15 +1467,15 @@ export default function ApMonitorModule() {
   }, [devices, nodes]);
 
   // Filtered node groups by search + nodeFilter
-  // "active" = APs del nodo cuyo túnel VPN está abierto (activeNodeId)
+  // "active" = APs del nodo cuyo túnel VPN está abierto (activeNodeName)
   const filteredGroups: NodeGroup[] = useMemo(() => {
     let groups = nodeGroups;
 
     if (nodeFilter === 'active') {
       // Si no hay túnel activo, grupos vacíos (se mostrará banner)
-      groups = groups.filter(g => g.nodeId === activeNodeId);
+      groups = groups.filter(g => !!activeNodeName && g.nodeName === activeNodeName);
     } else if (nodeFilter === 'inactive') {
-      groups = groups.filter(g => g.nodeId !== activeNodeId);
+      groups = groups.filter(g => !activeNodeName || g.nodeName !== activeNodeName);
     }
 
     // Aplicar filtro de búsqueda
@@ -1497,7 +1496,7 @@ export default function ApMonitorModule() {
         (d.mac ?? '').toLowerCase().includes(q)
       ),
     })).filter(g => g.aps.length > 0 || g.stas.length > 0);
-  }, [nodeGroups, apSearch, nodeFilter, activeNodeId]);
+  }, [nodeGroups, apSearch, nodeFilter, activeNodeName]);
 
   const loadDevices = useCallback(async () => {
     setLoading(true);
@@ -1577,25 +1576,23 @@ export default function ApMonitorModule() {
 
   // ── AUTO-POLL on load: solo el nodo activo (túnel VPN abierto) ────────────
   // Lee devices/nodes a través de refs para evitar que el array de deps cambie de tamaño.
-  // Solo pollea el grupo cuyo nodeId === activeNodeId una vez al cargar o al cambiar de nodo.
+  // Solo pollea el grupo cuyo nodeName === activeNodeName una vez al cargar o al cambiar de nodo.
   useEffect(() => {
     const currentDevices = devicesRef.current;
-    const currentNodes = nodesRef.current;
     if (currentDevices.length === 0 || autoPolledRef.current) return;
     autoPolledRef.current = true;
 
     const apDevices = currentDevices.filter(d => d.role !== 'sta');
     const map = new Map<string, NodeGroup>();
     for (const d of apDevices) {
-      const node = currentNodes.find(n => n.id === d.nodeId);
-      const groupKey = node ? d.nodeId : (d.nodeName || d.nodeId);
-      const groupName = node?.nombre_nodo || d.nodeName || d.nodeId;
+      const groupKey = d.nodeName || d.nodeId;
+      const groupName = d.nodeName || d.nodeId;
       if (!map.has(groupKey)) map.set(groupKey, { nodeId: d.nodeId, nodeName: groupName, aps: [], stas: [] });
       map.get(groupKey)!.aps.push(d);
     }
     const allGroups = [...map.values()];
-    // Buscar el grupo cuyo nodeId === activeNodeId
-    const activeGroup = allGroups.find(g => g.nodeId === activeNodeId);
+    // Buscar el grupo cuyo nodeName === activeNodeName
+    const activeGroup = allGroups.find(g => !!activeNodeName && g.nodeName === activeNodeName);
     if (!activeGroup) return;
     const apsToInit = activeGroup.aps.filter(ap => {
       const hasCreds = ap.sshUser && (ap.sshPass || ap.hasSshPass);
@@ -1609,7 +1606,7 @@ export default function ApMonitorModule() {
     return () => initTimers.forEach(clearTimeout);
     // devices.length garantiza re-ejecución cuando carguen, sin incluir el array completo
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [devices.length, pollApDirect, activeNodeId]);
+  }, [devices.length, pollApDirect, activeNodeName]);
 
   // Start/stop polling loops when expandedAps or pollInterval changes
   useEffect(() => {
@@ -1840,7 +1837,7 @@ export default function ApMonitorModule() {
           group={group}
           expandedAps={expandedAps}
           pollResults={pollResults}
-          activeNodeId={activeNodeId}
+          activeNodeName={activeNodeName}
           tunnelActive={tunnelActive}
           onToggleAp={toggleAp}
           onCpeDetail={(mac, ip, dev) => {

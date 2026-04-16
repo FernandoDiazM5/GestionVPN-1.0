@@ -395,14 +395,11 @@ router.post('/tunnel/repair', async (req, res) => {
 
                 // Obtener datos WG desde DB local para restaurar IP y Peers
                 const db = await getDb();
-                const nodeRowDB = await db.get('SELECT data FROM nodes WHERE id = ?', [pppUser]);
+                const nodeRowDB = await db.get('SELECT * FROM nodes WHERE ppp_user = ?', [pppUser]);
                 let ipTunnel = '', wgPubKey = '';
-                if (nodeRowDB && nodeRowDB.data) {
-                    try {
-                        const parsed = JSON.parse(nodeRowDB.data);
-                        ipTunnel = parsed.ip_tunnel;
-                        wgPubKey = parsed.wg_public_key || parsed.cpePublicKey;
-                    } catch (e) { /* ignore */ }
+                if (nodeRowDB) {
+                    ipTunnel = nodeRowDB.ip_tunnel || '';
+                    wgPubKey = nodeRowDB.wg_public_key || nodeRowDB.cpe_public_key || '';
                 }
 
                 // Restaurar IP Address WG
