@@ -74,6 +74,7 @@ async function initDb() {
     await migrate("ALTER TABLE nodes ADD COLUMN lan_subnets TEXT DEFAULT '[]'");
     await migrate("ALTER TABLE nodes ADD COLUMN protocol TEXT DEFAULT 'sstp'");
     await migrate("ALTER TABLE nodes ADD COLUMN node_number INTEGER DEFAULT NULL");
+    await migrate("ALTER TABLE app_settings ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0");
 
     // Índices de rendimiento (idempotentes)
     const indexes = [
