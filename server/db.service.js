@@ -50,9 +50,15 @@ async function initDb() {
             if (colInfo.length === 0) {
                 console.log('[DB] Instalación nueva — creando schema v2.0...');
                 if (fs.existsSync(SCHEMA_FILE)) {
-                    const sql = fs.readFileSync(SCHEMA_FILE, 'utf8');
+                    const raw = fs.readFileSync(SCHEMA_FILE, 'utf8');
+                    // Eliminar líneas de comentario ANTES de dividir por ';'
+                    // para evitar que los bloques "-- comentario\nCREATE TABLE"
+                    // sean descartados por el filtro startsWith('--')
+                    const sql = raw.split('\n')
+                        .filter(line => !line.trim().startsWith('--'))
+                        .join('\n');
                     const stmts = sql.split(';').map(s => s.trim()).filter(s =>
-                        s.length > 0 && !s.startsWith('PRAGMA') && !s.startsWith('--')
+                        s.length > 0 && !s.toUpperCase().startsWith('PRAGMA')
                     );
                     for (const stmt of stmts) {
                         try { await db.exec(stmt + ';'); } catch (e) {
