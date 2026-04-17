@@ -12,6 +12,7 @@ RUN npm ci --omit=dev
 
 # Copiar TODO el código fuente (archivos .js raíz + subdirectorios routes/)
 COPY *.js ./
+COPY *.sql ./
 COPY routes/ ./routes/
 
 # Directorio de datos persistente (montado como volumen en docker-compose)
