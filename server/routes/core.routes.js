@@ -152,18 +152,19 @@ router.post('/tunnel/activate', async (req, res) => {
         // Leer address-list para vpn-activa
         const allAddrs = await safeWrite(api, ['/ip/firewall/address-list/print']).catch(() => []);
 
-        // Agregar a vpn-activa solo si esta IP específica no existe ya
-        const alreadyInList = allAddrs.some(a => a.list === 'vpn-activa' && a.address === tunnelIP);
+        // Agregar pool admin completo a vpn-activa (cubre laptop, celular y cualquier peer WG)
+        const ADMIN_POOL = '192.168.21.0/24';
+        const alreadyInList = allAddrs.some(a => a.list === 'vpn-activa' && a.address === ADMIN_POOL);
         if (!alreadyInList) {
             await writeIdempotent(api, [
                 '/ip/firewall/address-list/add',
                 '=list=vpn-activa',
-                `=address=${tunnelIP}`,
+                `=address=${ADMIN_POOL}`,
                 '=comment=User Access',
             ]);
-            console.log(`[TUNNEL-ACTIVATE] Agregado ${tunnelIP} a vpn-activa`);
+            console.log(`[TUNNEL-ACTIVATE] Agregado ${ADMIN_POOL} a vpn-activa`);
         } else {
-            console.log(`[TUNNEL-ACTIVATE] ${tunnelIP} ya existe en vpn-activa — sin cambios`);
+            console.log(`[TUNNEL-ACTIVATE] ${ADMIN_POOL} ya existe en vpn-activa — sin cambios`);
         }
 
         // Las reglas mangle ACCESO-DINAMICO se crean en /tunnel/mangle-access (VPS + Operador)
@@ -625,29 +626,26 @@ router.post('/tunnel/repair', async (req, res) => {
             }
         }
 
-        // ── Paso 6: vpn-activa (solo si tunnelIP presente) ──────────────────────
-        if (tunnelIP) {
-            try {
-                const existsInVpnActiva = allAddrs.some(a =>
-                    a.list === 'vpn-activa' && a.address === tunnelIP
-                );
-                if (existsInVpnActiva) {
-                    steps.push({ step: 6, obj: 'vpn-activa', name: tunnelIP, status: 'ok', action: 'exists' });
-                } else {
-                    await writeIdempotent(api, [
-                        '/ip/firewall/address-list/add',
-                        '=list=vpn-activa',
-                        `=address=${tunnelIP}`,
-                        '=comment=User Access',
-                    ]);
-                    steps.push({ step: 6, obj: 'vpn-activa', name: tunnelIP, status: 'created', action: 'created' });
-                    repaired++;
-                }
-            } catch (e) {
-                steps.push({ step: 6, obj: 'vpn-activa', name: tunnelIP, status: 'error', action: e.message });
+        // ── Paso 6: vpn-activa (pool admin completo) ────────────────────────────
+        const ADMIN_POOL_REPAIR = '192.168.21.0/24';
+        try {
+            const existsInVpnActiva = allAddrs.some(a =>
+                a.list === 'vpn-activa' && a.address === ADMIN_POOL_REPAIR
+            );
+            if (existsInVpnActiva) {
+                steps.push({ step: 6, obj: 'vpn-activa', name: ADMIN_POOL_REPAIR, status: 'ok', action: 'exists' });
+            } else {
+                await writeIdempotent(api, [
+                    '/ip/firewall/address-list/add',
+                    '=list=vpn-activa',
+                    `=address=${ADMIN_POOL_REPAIR}`,
+                    '=comment=User Access',
+                ]);
+                steps.push({ step: 6, obj: 'vpn-activa', name: ADMIN_POOL_REPAIR, status: 'created', action: 'created' });
+                repaired++;
             }
-        } else {
-            steps.push({ step: 6, obj: 'vpn-activa', name: null, status: 'skipped', action: 'no tunnelIP' });
+        } catch (e) {
+            steps.push({ step: 6, obj: 'vpn-activa', name: ADMIN_POOL_REPAIR, status: 'error', action: e.message });
         }
 
         // ── Paso 7: Mangle ACCESO-DINAMICO (VPS + Operador) ────
