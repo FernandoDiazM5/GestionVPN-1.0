@@ -92,16 +92,20 @@ const cleanTunnelRules = async (api, tunnelIP) => {
         ? (e) => e.list === 'vpn-activa' && e.address === tunnelIP && e['.id']
         : (e) => e.list === 'vpn-activa' && e['.id'];
     const mangleFilter = tunnelIP
-        ? (e) => e.comment === 'ACCESO-DINAMICO' && e['src-address']?.includes(tunnelIP) && e['.id']
+        ? (e) => e.comment === 'ACCESO-DINAMICO' && (e['src-address']?.includes(tunnelIP) || e['src-address']?.includes('192.168.21.0/24')) && e['.id']
         : (e) => e.comment === 'ACCESO-DINAMICO' && e['.id'];
 
     // Eliminar address-list entries secuencialmente
     for (const e of allAddrs.filter(addrFilter)) {
-        await safeWrite(api, ['/ip/firewall/address-list/remove', `=.id=${e['.id']}`]).catch(() => { });
+        await safeWrite(api, ['/ip/firewall/address-list/remove', `=.id=${e['.id']}`]).catch(err => {
+            console.error(`[WARN] No se pudo borrar address-list id=${e['.id']}`, err.message);
+        });
     }
     // Eliminar mangle entries secuencialmente
     for (const e of allMangle.filter(mangleFilter)) {
-        await safeWrite(api, ['/ip/firewall/mangle/remove', `=.id=${e['.id']}`]).catch(() => { });
+        await safeWrite(api, ['/ip/firewall/mangle/remove', `=.id=${e['.id']}`]).catch(err => {
+            console.error(`[WARN] No se pudo borrar mangle id=${e['.id']}`, err.message);
+        });
     }
 };
 

@@ -1,0 +1,937 @@
+﻿
+> vpn-manager@0.0.0 lint
+> eslint .
+
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx
+   388:21   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:388:21
+  386 |
+  387 |   // Auto-fetch on mount
+> 388 |   useEffect(() => { fetchDetail(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+      |                     ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  389 |
+  390 |   const handleCredSubmit = async (e: React.FormEvent) => {
+  391 |     e.preventDefault();                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   react-hooks/set-state-in-effect
+   400:14   error    '_' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            @typescript-eslint/no-unused-vars
+   535:43   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:535:43
+  533 |   }, [dev]);
+  534 |
+> 535 |   useEffect(() => { if (!dev.cachedStats) refresh(); }, [dev.id]);
+      |                                           ^^^^^^^ Avoid calling setState() directly within an effect
+  536 |
+  537 |   const handleSave = () => {
+  538 |     if (!stats) return;                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      react-hooks/set-state-in-effect
+   535:57   warning  React Hook useEffect has missing dependencies: 'dev.cachedStats' and 'refresh'. Either include them or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       react-hooks/exhaustive-deps
+   599:37   error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:599:37
+  597 |                 <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">Sistema</p>
+  598 |                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+> 599 |                   {s.deviceName && <StatCard label="Hostname" value={s.deviceName} />}
+      |                                     ^^^^^^^^ This component is created during render
+  600 |                   {s.deviceModel && <StatCard label="Modelo" value={s.deviceModel} />}
+  601 |                   {s.firmwareVersion && <StatCard label="Firmware" value={fmtFw(s.firmwareVersion) ?? s.firmwareVersion} />}
+  602 |                   {s.uptimeStr && <StatCard label="Uptime" value={s.uptimeStr} color="text-emerald-700" />}
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:551:20
+  549 |     : [];
+  550 |
+> 551 |   const StatCard = ({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) => (
+      |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 552 |     <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 553 |       <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 554 |       <p className={`text-sm font-bold truncate font-mono tracking-tight ${color ?? 'text-slate-800'}`}>{value}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 555 |       {sub && <p className="text-[10px] text-slate-500 truncate mt-0.5">{sub}</p>}
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 556 |     </div>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 557 |   );
+      | ^^^^ The component is created during render here
+  558 |
+  559 |   return (
+  560 |     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"                                     react-hooks/static-components
+   600:38   error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:600:38
+  598 |                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+  599 |                   {s.deviceName && <StatCard label="Hostname" value={s.deviceName} />}
+> 600 |                   {s.deviceModel && <StatCard label="Modelo" value={s.deviceModel} />}
+      |                                      ^^^^^^^^ This component is created during render
+  601 |                   {s.firmwareVersion && <StatCard label="Firmware" value={fmtFw(s.firmwareVersion) ?? s.firmwareVersion} />}
+  602 |                   {s.uptimeStr && <StatCard label="Uptime" value={s.uptimeStr} color="text-emerald-700" />}
+  603 |                   {s.cpuLoad != null && <StatCard label="CPU" value={fmtCpu(s.cpuLoad)}
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:551:20
+  549 |     : [];
+  550 |
+> 551 |   const StatCard = ({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) => (
+      |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 552 |     <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 553 |       <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 554 |       <p className={`text-sm font-bold truncate font-mono tracking-tight ${color ?? 'text-slate-800'}`}>{value}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 555 |       {sub && <p className="text-[10px] text-slate-500 truncate mt-0.5">{sub}</p>}
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 556 |     </div>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 557 |   );
+      | ^^^^ The component is created during render here
+  558 |
+  559 |   return (
+  560 |     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"                                                         react-hooks/static-components
+   601:42   error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:601:42
+  599 |                   {s.deviceName && <StatCard label="Hostname" value={s.deviceName} />}
+  600 |                   {s.deviceModel && <StatCard label="Modelo" value={s.deviceModel} />}
+> 601 |                   {s.firmwareVersion && <StatCard label="Firmware" value={fmtFw(s.firmwareVersion) ?? s.firmwareVersion} />}
+      |                                          ^^^^^^^^ This component is created during render
+  602 |                   {s.uptimeStr && <StatCard label="Uptime" value={s.uptimeStr} color="text-emerald-700" />}
+  603 |                   {s.cpuLoad != null && <StatCard label="CPU" value={fmtCpu(s.cpuLoad)}
+  604 |                     color={s.cpuLoad > 80 ? 'text-rose-600' : s.cpuLoad > 60 ? 'text-amber-600' : 'text-slate-700'} />}
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:551:20
+  549 |     : [];
+  550 |
+> 551 |   const StatCard = ({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) => (
+      |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 552 |     <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 553 |       <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 554 |       <p className={`text-sm font-bold truncate font-mono tracking-tight ${color ?? 'text-slate-800'}`}>{value}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 555 |       {sub && <p className="text-[10px] text-slate-500 truncate mt-0.5">{sub}</p>}
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 556 |     </div>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 557 |   );
+      | ^^^^ The component is created during render here
+  558 |
+  559 |   return (
+  560 |     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"       react-hooks/static-components
+   602:36   error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:602:36
+  600 |                   {s.deviceModel && <StatCard label="Modelo" value={s.deviceModel} />}
+  601 |                   {s.firmwareVersion && <StatCard label="Firmware" value={fmtFw(s.firmwareVersion) ?? s.firmwareVersion} />}
+> 602 |                   {s.uptimeStr && <StatCard label="Uptime" value={s.uptimeStr} color="text-emerald-700" />}
+      |                                    ^^^^^^^^ This component is created during render
+  603 |                   {s.cpuLoad != null && <StatCard label="CPU" value={fmtCpu(s.cpuLoad)}
+  604 |                     color={s.cpuLoad > 80 ? 'text-rose-600' : s.cpuLoad > 60 ? 'text-amber-600' : 'text-slate-700'} />}
+  605 |                   {(s.memoryPercent != null || (s.memTotalKb && s.memFreeKb != null)) &&
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:551:20
+  549 |     : [];
+  550 |
+> 551 |   const StatCard = ({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) => (
+      |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 552 |     <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 553 |       <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 554 |       <p className={`text-sm font-bold truncate font-mono tracking-tight ${color ?? 'text-slate-800'}`}>{value}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 555 |       {sub && <p className="text-[10px] text-slate-500 truncate mt-0.5">{sub}</p>}
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 556 |     </div>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 557 |   );
+      | ^^^^ The component is created during render here
+  558 |
+  559 |   return (
+  560 |     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"           react-hooks/static-components
+   603:42   error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:603:42
+  601 |                   {s.firmwareVersion && <StatCard label="Firmware" value={fmtFw(s.firmwareVersion) ?? s.firmwareVersion} />}
+  602 |                   {s.uptimeStr && <StatCard label="Uptime" value={s.uptimeStr} color="text-emerald-700" />}
+> 603 |                   {s.cpuLoad != null && <StatCard label="CPU" value={fmtCpu(s.cpuLoad)}
+      |                                          ^^^^^^^^ This component is created during render
+  604 |                     color={s.cpuLoad > 80 ? 'text-rose-600' : s.cpuLoad > 60 ? 'text-amber-600' : 'text-slate-700'} />}
+  605 |                   {(s.memoryPercent != null || (s.memTotalKb && s.memFreeKb != null)) &&
+  606 |                     <StatCard label="Memoria" value={memLabel}
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:551:20
+  549 |     : [];
+  550 |
+> 551 |   const StatCard = ({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) => (
+      |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 552 |     <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 553 |       <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 554 |       <p className={`text-sm font-bold truncate font-mono tracking-tight ${color ?? 'text-slate-800'}`}>{value}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 555 |       {sub && <p className="text-[10px] text-slate-500 truncate mt-0.5">{sub}</p>}
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 556 |     </div>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 557 |   );
+      | ^^^^ The component is created during render here
+  558 |
+  559 |   return (
+  560 |     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"                             react-hooks/static-components
+   606:22   error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:606:22
+  604 |                     color={s.cpuLoad > 80 ? 'text-rose-600' : s.cpuLoad > 60 ? 'text-amber-600' : 'text-slate-700'} />}
+  605 |                   {(s.memoryPercent != null || (s.memTotalKb && s.memFreeKb != null)) &&
+> 606 |                     <StatCard label="Memoria" value={memLabel}
+      |                      ^^^^^^^^ This component is created during render
+  607 |                       sub={s.memTotalKb ? `${Math.round(s.memTotalKb / 1024)} MB total` : undefined}
+  608 |                       color={parseInt(memLabel) > 85 ? 'text-rose-600' : parseInt(memLabel) > 70 ? 'text-amber-600' : 'text-slate-700'} />}
+  609 |                   {s.lanMac && <StatCard label="MAC LAN" value={s.lanMac} />}
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:551:20
+  549 |     : [];
+  550 |
+> 551 |   const StatCard = ({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) => (
+      |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 552 |     <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 553 |       <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 554 |       <p className={`text-sm font-bold truncate font-mono tracking-tight ${color ?? 'text-slate-800'}`}>{value}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 555 |       {sub && <p className="text-[10px] text-slate-500 truncate mt-0.5">{sub}</p>}
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 556 |     </div>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 557 |   );
+      | ^^^^ The component is created during render here
+  558 |
+  559 |   return (
+  560 |     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"                                                   react-hooks/static-components
+   609:33   error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:609:33
+  607 |                       sub={s.memTotalKb ? `${Math.round(s.memTotalKb / 1024)} MB total` : undefined}
+  608 |                       color={parseInt(memLabel) > 85 ? 'text-rose-600' : parseInt(memLabel) > 70 ? 'text-amber-600' : 'text-slate-700'} />}
+> 609 |                   {s.lanMac && <StatCard label="MAC LAN" value={s.lanMac} />}
+      |                                 ^^^^^^^^ This component is created during render
+  610 |                   {s.wlanMac && <StatCard label="MAC WLAN" value={s.wlanMac} />}
+  611 |                 </div>
+  612 |               </div>
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:551:20
+  549 |     : [];
+  550 |
+> 551 |   const StatCard = ({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) => (
+      |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 552 |     <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 553 |       <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 554 |       <p className={`text-sm font-bold truncate font-mono tracking-tight ${color ?? 'text-slate-800'}`}>{value}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 555 |       {sub && <p className="text-[10px] text-slate-500 truncate mt-0.5">{sub}</p>}
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 556 |     </div>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 557 |   );
+      | ^^^^ The component is created during render here
+  558 |
+  559 |   return (
+  560 |     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"                                                                                                                                                                                           react-hooks/static-components
+   610:34   error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:610:34
+  608 |                       color={parseInt(memLabel) > 85 ? 'text-rose-600' : parseInt(memLabel) > 70 ? 'text-amber-600' : 'text-slate-700'} />}
+  609 |                   {s.lanMac && <StatCard label="MAC LAN" value={s.lanMac} />}
+> 610 |                   {s.wlanMac && <StatCard label="MAC WLAN" value={s.wlanMac} />}
+      |                                  ^^^^^^^^ This component is created during render
+  611 |                 </div>
+  612 |               </div>
+  613 |
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:551:20
+  549 |     : [];
+  550 |
+> 551 |   const StatCard = ({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) => (
+      |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 552 |     <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 553 |       <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 554 |       <p className={`text-sm font-bold truncate font-mono tracking-tight ${color ?? 'text-slate-800'}`}>{value}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 555 |       {sub && <p className="text-[10px] text-slate-500 truncate mt-0.5">{sub}</p>}
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 556 |     </div>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 557 |   );
+      | ^^^^ The component is created during render here
+  558 |
+  559 |   return (
+  560 |     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"                                                                                                                                                                                                                                                                                               react-hooks/static-components
+   618:32   error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:618:32
+  616 |                 <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">Radio / Wireless</p>
+  617 |                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+> 618 |                   {s.essid && <StatCard label="SSID" value={s.essid} />}
+      |                                ^^^^^^^^ This component is created during render
+  619 |                   {s.frequency && <StatCard label="Frecuencia" value={`${s.frequency} MHz`} sub={`${(s.frequency / 1000).toFixed(2)} GHz`} />}
+  620 |                   {s.channelWidth && <StatCard label="Canal" value={`${s.channelWidth} MHz`} />}
+  621 |                   {s.txPower != null && <StatCard label="TX Power" value={`${s.txPower} dBm`} />}
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:551:20
+  549 |     : [];
+  550 |
+> 551 |   const StatCard = ({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) => (
+      |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 552 |     <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 553 |       <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 554 |       <p className={`text-sm font-bold truncate font-mono tracking-tight ${color ?? 'text-slate-800'}`}>{value}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 555 |       {sub && <p className="text-[10px] text-slate-500 truncate mt-0.5">{sub}</p>}
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 556 |     </div>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 557 |   );
+      | ^^^^ The component is created during render here
+  558 |
+  559 |   return (
+  560 |     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"                             react-hooks/static-components
+   619:36   error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:619:36
+  617 |                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+  618 |                   {s.essid && <StatCard label="SSID" value={s.essid} />}
+> 619 |                   {s.frequency && <StatCard label="Frecuencia" value={`${s.frequency} MHz`} sub={`${(s.frequency / 1000).toFixed(2)} GHz`} />}
+      |                                    ^^^^^^^^ This component is created during render
+  620 |                   {s.channelWidth && <StatCard label="Canal" value={`${s.channelWidth} MHz`} />}
+  621 |                   {s.txPower != null && <StatCard label="TX Power" value={`${s.txPower} dBm`} />}
+  622 |                   {s.mode && <StatCard label="Modo" value={s.mode} />}
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:551:20
+  549 |     : [];
+  550 |
+> 551 |   const StatCard = ({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) => (
+      |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 552 |     <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 553 |       <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 554 |       <p className={`text-sm font-bold truncate font-mono tracking-tight ${color ?? 'text-slate-800'}`}>{value}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 555 |       {sub && <p className="text-[10px] text-slate-500 truncate mt-0.5">{sub}</p>}
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 556 |     </div>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 557 |   );
+      | ^^^^ The component is created during render here
+  558 |
+  559 |   return (
+  560 |     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"                                                                        react-hooks/static-components
+   620:39   error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:620:39
+  618 |                   {s.essid && <StatCard label="SSID" value={s.essid} />}
+  619 |                   {s.frequency && <StatCard label="Frecuencia" value={`${s.frequency} MHz`} sub={`${(s.frequency / 1000).toFixed(2)} GHz`} />}
+> 620 |                   {s.channelWidth && <StatCard label="Canal" value={`${s.channelWidth} MHz`} />}
+      |                                       ^^^^^^^^ This component is created during render
+  621 |                   {s.txPower != null && <StatCard label="TX Power" value={`${s.txPower} dBm`} />}
+  622 |                   {s.mode && <StatCard label="Modo" value={s.mode} />}
+  623 |                   {s.networkMode && <StatCard label="Modo Red" value={s.networkMode} />}
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:551:20
+  549 |     : [];
+  550 |
+> 551 |   const StatCard = ({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) => (
+      |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 552 |     <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 553 |       <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 554 |       <p className={`text-sm font-bold truncate font-mono tracking-tight ${color ?? 'text-slate-800'}`}>{value}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 555 |       {sub && <p className="text-[10px] text-slate-500 truncate mt-0.5">{sub}</p>}
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 556 |     </div>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 557 |   );
+      | ^^^^ The component is created during render here
+  558 |
+  559 |   return (
+  560 |     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"                                                      react-hooks/static-components
+   621:42   error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:621:42
+  619 |                   {s.frequency && <StatCard label="Frecuencia" value={`${s.frequency} MHz`} sub={`${(s.frequency / 1000).toFixed(2)} GHz`} />}
+  620 |                   {s.channelWidth && <StatCard label="Canal" value={`${s.channelWidth} MHz`} />}
+> 621 |                   {s.txPower != null && <StatCard label="TX Power" value={`${s.txPower} dBm`} />}
+      |                                          ^^^^^^^^ This component is created during render
+  622 |                   {s.mode && <StatCard label="Modo" value={s.mode} />}
+  623 |                   {s.networkMode && <StatCard label="Modo Red" value={s.networkMode} />}
+  624 |                   {s.security && <StatCard label="Seguridad" value={s.security} />}
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:551:20
+  549 |     : [];
+  550 |
+> 551 |   const StatCard = ({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) => (
+      |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 552 |     <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 553 |       <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 554 |       <p className={`text-sm font-bold truncate font-mono tracking-tight ${color ?? 'text-slate-800'}`}>{value}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 555 |       {sub && <p className="text-[10px] text-slate-500 truncate mt-0.5">{sub}</p>}
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 556 |     </div>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 557 |   );
+      | ^^^^ The component is created during render here
+  558 |
+  559 |   return (
+  560 |     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"                                        react-hooks/static-components
+   622:31   error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:622:31
+  620 |                   {s.channelWidth && <StatCard label="Canal" value={`${s.channelWidth} MHz`} />}
+  621 |                   {s.txPower != null && <StatCard label="TX Power" value={`${s.txPower} dBm`} />}
+> 622 |                   {s.mode && <StatCard label="Modo" value={s.mode} />}
+      |                               ^^^^^^^^ This component is created during render
+  623 |                   {s.networkMode && <StatCard label="Modo Red" value={s.networkMode} />}
+  624 |                   {s.security && <StatCard label="Seguridad" value={s.security} />}
+  625 |                   {s.chains && <StatCard label="Cadenas" value={s.chains} />}
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:551:20
+  549 |     : [];
+  550 |
+> 551 |   const StatCard = ({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) => (
+      |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 552 |     <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 553 |       <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 554 |       <p className={`text-sm font-bold truncate font-mono tracking-tight ${color ?? 'text-slate-800'}`}>{value}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 555 |       {sub && <p className="text-[10px] text-slate-500 truncate mt-0.5">{sub}</p>}
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 556 |     </div>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 557 |   );
+      | ^^^^ The component is created during render here
+  558 |
+  559 |   return (
+  560 |     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"                                                                                                                    react-hooks/static-components
+   623:38   error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:623:38
+  621 |                   {s.txPower != null && <StatCard label="TX Power" value={`${s.txPower} dBm`} />}
+  622 |                   {s.mode && <StatCard label="Modo" value={s.mode} />}
+> 623 |                   {s.networkMode && <StatCard label="Modo Red" value={s.networkMode} />}
+      |                                      ^^^^^^^^ This component is created during render
+  624 |                   {s.security && <StatCard label="Seguridad" value={s.security} />}
+  625 |                   {s.chains && <StatCard label="Cadenas" value={s.chains} />}
+  626 |                   {s.airmaxEnabled != null && <StatCard label="AirMax"
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:551:20
+  549 |     : [];
+  550 |
+> 551 |   const StatCard = ({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) => (
+      |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 552 |     <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 553 |       <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 554 |       <p className={`text-sm font-bold truncate font-mono tracking-tight ${color ?? 'text-slate-800'}`}>{value}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 555 |       {sub && <p className="text-[10px] text-slate-500 truncate mt-0.5">{sub}</p>}
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 556 |     </div>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 557 |   );
+      | ^^^^ The component is created during render here
+  558 |
+  559 |   return (
+  560 |     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"                                                                                                                                       react-hooks/static-components
+   624:35   error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:624:35
+  622 |                   {s.mode && <StatCard label="Modo" value={s.mode} />}
+  623 |                   {s.networkMode && <StatCard label="Modo Red" value={s.networkMode} />}
+> 624 |                   {s.security && <StatCard label="Seguridad" value={s.security} />}
+      |                                   ^^^^^^^^ This component is created during render
+  625 |                   {s.chains && <StatCard label="Cadenas" value={s.chains} />}
+  626 |                   {s.airmaxEnabled != null && <StatCard label="AirMax"
+  627 |                     value={s.airmaxEnabled ? 'Habilitado' : 'Deshabilitado'}
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:551:20
+  549 |     : [];
+  550 |
+> 551 |   const StatCard = ({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) => (
+      |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 552 |     <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 553 |       <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 554 |       <p className={`text-sm font-bold truncate font-mono tracking-tight ${color ?? 'text-slate-800'}`}>{value}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 555 |       {sub && <p className="text-[10px] text-slate-500 truncate mt-0.5">{sub}</p>}
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 556 |     </div>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 557 |   );
+      | ^^^^ The component is created during render here
+  558 |
+  559 |   return (
+  560 |     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"                                                                                                                                                               react-hooks/static-components
+   625:33   error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:625:33
+  623 |                   {s.networkMode && <StatCard label="Modo Red" value={s.networkMode} />}
+  624 |                   {s.security && <StatCard label="Seguridad" value={s.security} />}
+> 625 |                   {s.chains && <StatCard label="Cadenas" value={s.chains} />}
+      |                                 ^^^^^^^^ This component is created during render
+  626 |                   {s.airmaxEnabled != null && <StatCard label="AirMax"
+  627 |                     value={s.airmaxEnabled ? 'Habilitado' : 'Deshabilitado'}
+  628 |                     color={s.airmaxEnabled ? 'text-emerald-600' : 'text-slate-400'} />}
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:551:20
+  549 |     : [];
+  550 |
+> 551 |   const StatCard = ({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) => (
+      |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 552 |     <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 553 |       <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 554 |       <p className={`text-sm font-bold truncate font-mono tracking-tight ${color ?? 'text-slate-800'}`}>{value}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 555 |       {sub && <p className="text-[10px] text-slate-500 truncate mt-0.5">{sub}</p>}
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 556 |     </div>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 557 |   );
+      | ^^^^ The component is created during render here
+  558 |
+  559 |   return (
+  560 |     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"                                                                                                                                                react-hooks/static-components
+   626:48   error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:626:48
+  624 |                   {s.security && <StatCard label="Seguridad" value={s.security} />}
+  625 |                   {s.chains && <StatCard label="Cadenas" value={s.chains} />}
+> 626 |                   {s.airmaxEnabled != null && <StatCard label="AirMax"
+      |                                                ^^^^^^^^ This component is created during render
+  627 |                     value={s.airmaxEnabled ? 'Habilitado' : 'Deshabilitado'}
+  628 |                     color={s.airmaxEnabled ? 'text-emerald-600' : 'text-slate-400'} />}
+  629 |                   {s.airmaxQuality != null && <StatCard label="AM Quality" value={`${s.airmaxQuality}%`} />}
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:551:20
+  549 |     : [];
+  550 |
+> 551 |   const StatCard = ({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) => (
+      |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 552 |     <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 553 |       <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 554 |       <p className={`text-sm font-bold truncate font-mono tracking-tight ${color ?? 'text-slate-800'}`}>{value}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 555 |       {sub && <p className="text-[10px] text-slate-500 truncate mt-0.5">{sub}</p>}
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 556 |     </div>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 557 |   );
+      | ^^^^ The component is created during render here
+  558 |
+  559 |   return (
+  560 |     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"                                                                                                             react-hooks/static-components
+   629:48   error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:629:48
+  627 |                     value={s.airmaxEnabled ? 'Habilitado' : 'Deshabilitado'}
+  628 |                     color={s.airmaxEnabled ? 'text-emerald-600' : 'text-slate-400'} />}
+> 629 |                   {s.airmaxQuality != null && <StatCard label="AM Quality" value={`${s.airmaxQuality}%`} />}
+      |                                                ^^^^^^^^ This component is created during render
+  630 |                   {s.airmaxCapacity != null && <StatCard label="AM Capacity" value={`${s.airmaxCapacity}%`} />}
+  631 |                 </div>
+  632 |               </div>
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:551:20
+  549 |     : [];
+  550 |
+> 551 |   const StatCard = ({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) => (
+      |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 552 |     <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 553 |       <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 554 |       <p className={`text-sm font-bold truncate font-mono tracking-tight ${color ?? 'text-slate-800'}`}>{value}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 555 |       {sub && <p className="text-[10px] text-slate-500 truncate mt-0.5">{sub}</p>}
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 556 |     </div>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 557 |   );
+      | ^^^^ The component is created during render here
+  558 |
+  559 |   return (
+  560 |     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"                                                                                                                                                                                          react-hooks/static-components
+   630:49   error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:630:49
+  628 |                     color={s.airmaxEnabled ? 'text-emerald-600' : 'text-slate-400'} />}
+  629 |                   {s.airmaxQuality != null && <StatCard label="AM Quality" value={`${s.airmaxQuality}%`} />}
+> 630 |                   {s.airmaxCapacity != null && <StatCard label="AM Capacity" value={`${s.airmaxCapacity}%`} />}
+      |                                                 ^^^^^^^^ This component is created during render
+  631 |                 </div>
+  632 |               </div>
+  633 |
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:551:20
+  549 |     : [];
+  550 |
+> 551 |   const StatCard = ({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) => (
+      |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 552 |     <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 553 |       <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 554 |       <p className={`text-sm font-bold truncate font-mono tracking-tight ${color ?? 'text-slate-800'}`}>{value}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 555 |       {sub && <p className="text-[10px] text-slate-500 truncate mt-0.5">{sub}</p>}
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 556 |     </div>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 557 |   );
+      | ^^^^ The component is created during render here
+  558 |
+  559 |   return (
+  560 |     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"                                                                                                                                                                                                                                                                      react-hooks/static-components
+   639:43   error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:639:43
+  637 |                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">Se├▒al RF</p>
+  638 |                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+> 639 |                     {s.signal != null && <StatCard label="Se├▒al" value={fmtDbm(s.signal)} color={sigColor(s.signal)} />}
+      |                                           ^^^^^^^^ This component is created during render
+  640 |                     {s.noiseFloor != null && <StatCard label="Noise" value={fmtDbm(s.noiseFloor)} />}
+  641 |                     {s.ccq != null && <StatCard label="CCQ" value={fmtPct(s.ccq)} color={ccqColor(s.ccq)} />}
+  642 |                     {s.txRate != null && <StatCard label="TX Rate" value={`${s.txRate} Mbps`} />}
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:551:20
+  549 |     : [];
+  550 |
+> 551 |   const StatCard = ({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) => (
+      |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 552 |     <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 553 |       <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 554 |       <p className={`text-sm font-bold truncate font-mono tracking-tight ${color ?? 'text-slate-800'}`}>{value}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 555 |       {sub && <p className="text-[10px] text-slate-500 truncate mt-0.5">{sub}</p>}
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 556 |     </div>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 557 |   );
+      | ^^^^ The component is created during render here
+  558 |
+  559 |   return (
+  560 |     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"  react-hooks/static-components
+   640:47   error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:640:47
+  638 |                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+  639 |                     {s.signal != null && <StatCard label="Se├▒al" value={fmtDbm(s.signal)} color={sigColor(s.signal)} />}
+> 640 |                     {s.noiseFloor != null && <StatCard label="Noise" value={fmtDbm(s.noiseFloor)} />}
+      |                                               ^^^^^^^^ This component is created during render
+  641 |                     {s.ccq != null && <StatCard label="CCQ" value={fmtPct(s.ccq)} color={ccqColor(s.ccq)} />}
+  642 |                     {s.txRate != null && <StatCard label="TX Rate" value={`${s.txRate} Mbps`} />}
+  643 |                     {s.rxRate != null && <StatCard label="RX Rate" value={`${s.rxRate} Mbps`} />}
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:551:20
+  549 |     : [];
+  550 |
+> 551 |   const StatCard = ({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) => (
+      |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 552 |     <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 553 |       <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 554 |       <p className={`text-sm font-bold truncate font-mono tracking-tight ${color ?? 'text-slate-800'}`}>{value}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 555 |       {sub && <p className="text-[10px] text-slate-500 truncate mt-0.5">{sub}</p>}
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 556 |     </div>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 557 |   );
+      | ^^^^ The component is created during render here
+  558 |
+  559 |   return (
+  560 |     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"            react-hooks/static-components
+   641:40   error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:641:40
+  639 |                     {s.signal != null && <StatCard label="Se├▒al" value={fmtDbm(s.signal)} color={sigColor(s.signal)} />}
+  640 |                     {s.noiseFloor != null && <StatCard label="Noise" value={fmtDbm(s.noiseFloor)} />}
+> 641 |                     {s.ccq != null && <StatCard label="CCQ" value={fmtPct(s.ccq)} color={ccqColor(s.ccq)} />}
+      |                                        ^^^^^^^^ This component is created during render
+  642 |                     {s.txRate != null && <StatCard label="TX Rate" value={`${s.txRate} Mbps`} />}
+  643 |                     {s.rxRate != null && <StatCard label="RX Rate" value={`${s.rxRate} Mbps`} />}
+  644 |                   </div>
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:551:20
+  549 |     : [];
+  550 |
+> 551 |   const StatCard = ({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) => (
+      |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 552 |     <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 553 |       <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 554 |       <p className={`text-sm font-bold truncate font-mono tracking-tight ${color ?? 'text-slate-800'}`}>{value}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 555 |       {sub && <p className="text-[10px] text-slate-500 truncate mt-0.5">{sub}</p>}
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 556 |     </div>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 557 |   );
+      | ^^^^ The component is created during render here
+  558 |
+  559 |   return (
+  560 |     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"                                                                      react-hooks/static-components
+   642:43   error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:642:43
+  640 |                     {s.noiseFloor != null && <StatCard label="Noise" value={fmtDbm(s.noiseFloor)} />}
+  641 |                     {s.ccq != null && <StatCard label="CCQ" value={fmtPct(s.ccq)} color={ccqColor(s.ccq)} />}
+> 642 |                     {s.txRate != null && <StatCard label="TX Rate" value={`${s.txRate} Mbps`} />}
+      |                                           ^^^^^^^^ This component is created during render
+  643 |                     {s.rxRate != null && <StatCard label="RX Rate" value={`${s.rxRate} Mbps`} />}
+  644 |                   </div>
+  645 |                 </div>
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:551:20
+  549 |     : [];
+  550 |
+> 551 |   const StatCard = ({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) => (
+      |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 552 |     <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 553 |       <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 554 |       <p className={`text-sm font-bold truncate font-mono tracking-tight ${color ?? 'text-slate-800'}`}>{value}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 555 |       {sub && <p className="text-[10px] text-slate-500 truncate mt-0.5">{sub}</p>}
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 556 |     </div>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 557 |   );
+      | ^^^^ The component is created during render here
+  558 |
+  559 |   return (
+  560 |     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"                                                                                                                                                                     react-hooks/static-components
+   643:43   error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:643:43
+  641 |                     {s.ccq != null && <StatCard label="CCQ" value={fmtPct(s.ccq)} color={ccqColor(s.ccq)} />}
+  642 |                     {s.txRate != null && <StatCard label="TX Rate" value={`${s.txRate} Mbps`} />}
+> 643 |                     {s.rxRate != null && <StatCard label="RX Rate" value={`${s.rxRate} Mbps`} />}
+      |                                           ^^^^^^^^ This component is created during render
+  644 |                   </div>
+  645 |                 </div>
+  646 |               )}
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\ApMonitorModule.tsx:551:20
+  549 |     : [];
+  550 |
+> 551 |   const StatCard = ({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) => (
+      |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 552 |     <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 553 |       <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 554 |       <p className={`text-sm font-bold truncate font-mono tracking-tight ${color ?? 'text-slate-800'}`}>{value}</p>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 555 |       {sub && <p className="text-[10px] text-slate-500 truncate mt-0.5">{sub}</p>}
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 556 |     </div>
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 557 |   );
+      | ^^^^ The component is created during render here
+  558 |
+  559 |   return (
+  560 |     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"                                                                                                                                                                                                                                                          react-hooks/static-components
+  1217:124  error    '_onApDetail' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  @typescript-eslint/no-unused-vars
+  1236:13   error    'e' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            @typescript-eslint/no-unused-vars
+  1236:16   error    Empty block statement                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    no-empty
+  1379:13   error    'e' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            @typescript-eslint/no-unused-vars
+  1379:16   error    Empty block statement                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    no-empty
+  1389:13   error    'e' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            @typescript-eslint/no-unused-vars
+  1389:16   error    Empty block statement                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    no-empty
+  1608:5    warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/exhaustive-deps')
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\NodeAccessPanel.tsx
+   189:5   warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/exhaustive-deps')
+   485:40  error    Expected an assignment or function call and instead saw an expression                                              @typescript-eslint/no-unused-expressions
+  1018:53  error    Expected an assignment or function call and instead saw an expression                                              @typescript-eslint/no-unused-expressions
+  1494:5   warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/exhaustive-deps')
+  1508:6   warning  React Hook useEffect has a missing dependency: 'handleGenerate'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  2288:14  error    '_' is defined but never used                                                                                      @typescript-eslint/no-unused-vars
+  2324:14  error    '_' is defined but never used                                                                                      @typescript-eslint/no-unused-vars
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\NodeCard.tsx
+  152:14  error  '_' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\RouterAccess.tsx
+  52:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\SettingsModule.tsx
+  36:14  error  'error' is defined but never used         @typescript-eslint/no-unused-vars
+  62:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\UserManagementModule.tsx
+   31:5    error  Error: Cannot access variable before it is declared
+
+`loadUsers` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\UserManagementModule.tsx:31:5
+  29 |
+  30 |   useEffect(() => {
+> 31 |     loadUsers();
+     |     ^^^^^^^^^ `loadUsers` accessed before it is declared
+  32 |   }, []);
+  33 |
+  34 |   const loadUsers = async () => {
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\UserManagementModule.tsx:34:3
+  32 |   }, []);
+  33 |
+> 34 |   const loadUsers = async () => {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 35 |     setIsLoading(true);
+     | ^^^^^^^^^^^^^^^^^^^^^^^
+> 36 |     try {
+     ÔÇª
+     | ^^^^^^^^^^^^^^^^^^^^^^^
+> 45 |     setIsLoading(false);
+     | ^^^^^^^^^^^^^^^^^^^^^^^
+> 46 |   };
+     | ^^^^^ `loadUsers` is declared here
+  47 |
+  48 |   const handleDelete = async (user: UserInfo) => {
+  49 |     if (user.role === 'admin' && users.filter(u => u.role === 'admin').length === 1) {  react-hooks/immutability
+   42:14   error  'err' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-unused-vars
+   65:17   error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    @typescript-eslint/no-explicit-any
+   77:22   error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    @typescript-eslint/no-explicit-any
+   91:17   error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    @typescript-eslint/no-explicit-any
+  152:140  error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    @typescript-eslint/no-explicit-any
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\components\VpnCard.tsx
+  64:5  warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/exhaustive-deps')
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\context\VpnContext.tsx
+  325:6   warning  React Hook useEffect has a missing dependency: 'handleLogout'. Either include it or remove the dependency array                 react-hooks/exhaustive-deps
+  406:17  error    Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\topology\components\canvas\TopologyCanvas.tsx
+  58:46  error  '_edgeId' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\topology\components\list\TopologyListView.tsx
+  13:9  warning  The 'devices' logical expression could make the dependencies of useMemo Hook (at line 25) change on every render. To fix this, wrap the initialization of 'devices' in its own useMemo() Hook  react-hooks/exhaustive-deps
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\topology\components\list\TowerContainer.tsx
+  34:56  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\topology\components\panels\DeviceDetailPanel.tsx
+  60:7  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\topology\components\panels\DeviceDetailPanel.tsx:60:7
+  58 |       requestAnimationFrame(() => setVisible(true));
+  59 |     } else {
+> 60 |       setVisible(false);
+     |       ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  61 |     }
+  62 |   }, [device]);
+  63 |  react-hooks/set-state-in-effect
+
+C:\Users\sen_6\OneDrive\Desktop\Proyecto\vpn-manager\src\topology\components\panels\TowerDetailPanel.tsx
+  74:14  error  'e' is defined but never used  @typescript-eslint/no-unused-vars
+
+Ô£û 61 problems (53 errors, 8 warnings)
+  0 errors and 4 warnings potentially fixable with the `--fix` option.
+

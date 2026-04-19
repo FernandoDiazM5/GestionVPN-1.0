@@ -31,7 +31,7 @@ export function TowerContainer({ towerName, ptpDevice, nodeDevice, children }: T
         </label>
         <select 
           value={medium}
-          onChange={(e) => setMedium(e.target.value as any)}
+          onChange={(e) => setMedium(e.target.value as 'Wireless' | 'UTP' | 'Fiber')}
           className="text-sm border-slate-200 text-slate-700 rounded-md py-1.5 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
         >
           <option value="Wireless">Wireless</option>

@@ -308,7 +308,7 @@ router.post('/tunnel/keepalive', async (req, res) => {
                 '=comment=ACCESO-DINAMICO',
                 '=dst-address-list=LIST-NET-REMOTE-TOWERS',
                 `=new-routing-mark=${targetVRF}`,
-                `=src-address=${toHost(tunnelIP)}`,
+                `=src-address=192.168.21.0/24`,
                 '=passthrough=yes',
             ]);
             restoredItems.push('mangle-ACCESO-DINAMICO');
@@ -653,7 +653,7 @@ router.post('/tunnel/repair', async (req, res) => {
             try {
                 const toHost = (addr) => addr.includes('/') ? addr : `${addr}/32`;
                 const hasVps = allMangle.some(m => m.comment === 'ACCESO-DINAMICO' && m['src-address'] === toHost(IP_VPS) && m['new-routing-mark'] === vrfName);
-                const hasOp  = allMangle.some(m => m.comment === 'ACCESO-DINAMICO' && m['src-address'] === toHost(tunnelIP) && m['new-routing-mark'] === vrfName);
+                const hasOp  = allMangle.some(m => m.comment === 'ACCESO-DINAMICO' && m['src-address'] === '192.168.21.0/24' && m['new-routing-mark'] === vrfName);
                 if (hasVps && hasOp) {
                     steps.push({ step: 7, obj: 'Mangle ACCESO-DINAMICO', name: `VPS+OP→${vrfName}`, status: 'ok', action: 'exists' });
                 } else {
@@ -661,7 +661,7 @@ router.post('/tunnel/repair', async (req, res) => {
                         await writeIdempotent(api, ['/ip/firewall/mangle/add', '=chain=prerouting', '=action=mark-routing', '=comment=ACCESO-DINAMICO', '=dst-address-list=LIST-NET-REMOTE-TOWERS', `=new-routing-mark=${vrfName}`, `=src-address=${toHost(IP_VPS)}`, '=passthrough=yes']);
                     }
                     if (!hasOp) {
-                        await writeIdempotent(api, ['/ip/firewall/mangle/add', '=chain=prerouting', '=action=mark-routing', '=comment=ACCESO-DINAMICO', '=dst-address-list=LIST-NET-REMOTE-TOWERS', `=new-routing-mark=${vrfName}`, `=src-address=${toHost(tunnelIP)}`, '=passthrough=yes']);
+                        await writeIdempotent(api, ['/ip/firewall/mangle/add', '=chain=prerouting', '=action=mark-routing', '=comment=ACCESO-DINAMICO', '=dst-address-list=LIST-NET-REMOTE-TOWERS', `=new-routing-mark=${vrfName}`, `=src-address=192.168.21.0/24`, '=passthrough=yes']);
                     }
                     steps.push({ step: 7, obj: 'Mangle ACCESO-DINAMICO', name: `VPS+OP→${vrfName}`, status: 'created', action: 'created' });
                     repaired++;
@@ -794,23 +794,19 @@ router.post('/tunnel/mangle-access', async (req, res) => {
             await new Promise(r => setTimeout(r, 250));
         }
 
-        // Regla Operador (omitir si está en el pool admin 192.168.21.0/24)
-        if (inAdminPool(srcOp)) {
-            console.log(`[MANGLE-ACCESS] Operador ${srcOp} cubierto por ACCESO-ADMIN — omitido`);
-        } else {
-            console.log(`[MANGLE-ACCESS] Creando regla Operador: ${srcOp} → ${vrf}`);
-            await writeIdempotent(api2, [
-                '/ip/firewall/mangle/add',
-                '=chain=prerouting',
-                '=action=mark-routing',
-                '=comment=ACCESO-DINAMICO',
-                '=dst-address-list=LIST-NET-REMOTE-TOWERS',
-                `=new-routing-mark=${vrf}`,
-                `=src-address=${srcOp}`,
-                '=passthrough=yes',
-            ], 12000);
-            console.log(`[MANGLE-ACCESS] ✓ Regla Operador creada.`);
-        }
+        // Regla Operador: usar siempre 192.168.21.0/24 en lugar de 1 IP para abarcar todo el pool
+        console.log(`[MANGLE-ACCESS] Creando regla Operador Global: 192.168.21.0/24 → ${vrf}`);
+        await writeIdempotent(api2, [
+            '/ip/firewall/mangle/add',
+            '=chain=prerouting',
+            '=action=mark-routing',
+            '=comment=ACCESO-DINAMICO',
+            '=dst-address-list=LIST-NET-REMOTE-TOWERS',
+            `=new-routing-mark=${vrf}`,
+            `=src-address=192.168.21.0/24`,
+            '=passthrough=yes',
+        ], 12000);
+        console.log(`[MANGLE-ACCESS] ✓ Regla Operador creada.`);
 
         try { await api2.close(); } catch (_) {}
 

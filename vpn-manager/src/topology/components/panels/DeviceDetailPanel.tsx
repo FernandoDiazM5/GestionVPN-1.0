@@ -54,11 +54,8 @@ export default function DeviceDetailPanel() {
   );
 
   useEffect(() => {
-    if (device) {
-      requestAnimationFrame(() => setVisible(true));
-    } else {
-      setVisible(false);
-    }
+    const t = setTimeout(() => setVisible(!!device), 0);
+    return () => clearTimeout(t);
   }, [device]);
 
   if (!device) return null;
