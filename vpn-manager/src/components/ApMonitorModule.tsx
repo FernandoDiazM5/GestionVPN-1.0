@@ -171,6 +171,17 @@ function ColSelector({ hidden, onChange }: {
   );
 }
 
+// ── Shared Subcomponents ───────────────────────────────────────────────────
+function StatCard({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) {
+  return (
+    <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+      <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</p>
+      <p className={`text-sm font-bold truncate font-mono tracking-tight ${color ?? 'text-slate-800'}`}>{value}</p>
+      {sub && <p className="text-[10px] text-slate-500 truncate mt-0.5">{sub}</p>}
+    </div>
+  );
+}
+
 // ── Device Card Modal (Estado / Ficha — modo compacto) ───────────────────
 function DeviceCardModal({ device, onClose, onRemove, onUpdate }: {
   device: SavedDevice; onClose: () => void;
@@ -385,10 +396,13 @@ function CpeDetailModal({
   };
 
   // Auto-fetch on mount
-  useEffect(() => { fetchDetail(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { 
+    const timer = setTimeout(() => fetchDetail(), 0);
+    return () => clearTimeout(timer);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleCredSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleCredSubmit = async (evt: React.FormEvent) => {
+    evt.preventDefault();
     if (!credUser) return;
     // Save credentials to backend first so they persist for future opens
     setSavingCreds(true);
@@ -397,7 +411,7 @@ function CpeDetailModal({
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user: credUser, pass: credPass, port: parseInt(credPort) || 22 }),
       }, 5_000);
-    } catch (_) { /* non-fatal — still attempt the connection */ }
+    } catch { /* non-fatal — still attempt the connection */ }
     setSavingCreds(false);
     fetchDetail(credUser, credPass, credPort);
   };
@@ -532,7 +546,12 @@ function ApDetailModal({
       .finally(() => setLoading(false));
   }, [dev]);
 
-  useEffect(() => { if (!dev.cachedStats) refresh(); }, [dev.id]);
+  useEffect(() => { 
+    if (!dev.cachedStats) {
+      const t = setTimeout(() => refresh(), 0);
+      return () => clearTimeout(t);
+    }
+  }, [dev.id, dev.cachedStats, refresh]);
 
   const handleSave = () => {
     if (!stats) return;
@@ -547,14 +566,6 @@ function ApDetailModal({
   const trafficRows = s?.ifaceTraffic
     ? Object.entries(s.ifaceTraffic).filter(([, v]) => v.rxBytes > 0 || v.txBytes > 0)
     : [];
-
-  const StatCard = ({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) => (
-    <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-      <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</p>
-      <p className={`text-sm font-bold truncate font-mono tracking-tight ${color ?? 'text-slate-800'}`}>{value}</p>
-      {sub && <p className="text-[10px] text-slate-500 truncate mt-0.5">{sub}</p>}
-    </div>
-  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"

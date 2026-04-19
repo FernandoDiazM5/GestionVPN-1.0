@@ -71,7 +71,7 @@ export default function TowerDetailPanel() {
       await topologyDb.towers.update(rawTower.id, formData);
       setShowTowerSettings(false);
       alert('Configuración guardada correctamente.');
-    } catch (e) {
+    } catch {
       alert('Error guardando configuración');
     } finally {
       setSaving(false);

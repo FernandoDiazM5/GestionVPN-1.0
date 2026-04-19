@@ -24,8 +24,8 @@ process.on('uncaughtException', (err) => {
         console.error('[WARN] Error red/RouterOS (no fatal):', err.code || err.errno, '-', err.message);
         return;
     }
-    console.error('[FATAL]', err.message);
-    process.exit(1);
+    console.error('[FATAL]', err);
+    // process.exit(1); // Mantenemos vivo el server ante excepciones no reconocidas
 });
 process.on('unhandledRejection', (reason) => {
     console.error('[WARN] Promesa rechazada:', reason?.code || reason?.errno, '-', reason?.message || String(reason));
@@ -46,7 +46,7 @@ app.use(cors({
     origin: (origin, callback) => {
         // Permitir requests sin origin (curl, Postman, server-to-server)
         if (!origin) return callback(null, true);
-        if (allowedOrigins.includes(origin) || origin.endsWith('.trycloudflare.com')) {
+        if (allowedOrigins.includes(origin)) {
             return callback(null, true);
         }
         console.warn(`[CORS] Origen bloqueado: ${origin}`);
