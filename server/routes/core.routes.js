@@ -16,8 +16,6 @@ const { connectToMikrotik, safeWrite, getErrorMessage, cleanTunnelRules, writeId
 const { IPV4_REGEX, CIDR_REGEX, getSubnetHosts, probeUbiquiti, sshExec, parseAirOSStats, parseFullOutput, ANTENNA_CMD, trySshCredentials } = require('../ubiquiti.service');
 const { getDb, encryptDevice, decryptDevice, encryptPass, decryptPass, saveNode, getNodes, deleteNode, setAppSetting, getAppSetting } = require('../db.service');
 
-// IP estática del VPS para reglas mangle ACCESO-DINAMICO
-const IP_VPS = '192.168.21.60';
 
 router.post('/connect', async (req, res) => {
     if (!req.mikrotik) return res.status(503).json({ success: false, needsConfig: true, message: 'Configura las credenciales MikroTik en Ajustes antes de continuar.' });
@@ -167,7 +165,7 @@ router.post('/tunnel/activate', async (req, res) => {
             console.log(`[TUNNEL-ACTIVATE] ${ADMIN_POOL} ya existe en vpn-activa — sin cambios`);
         }
 
-        // Las reglas mangle ACCESO-DINAMICO se crean en /tunnel/mangle-access (VPS + Operador)
+        // La regla mangle ACCESO-ADMIN se crea en /tunnel/mangle-access
         await api.close();
 
         const TUNNEL_TIMEOUT_MS = 30 * 60 * 1000; // 30 min, igual que el frontend
@@ -176,31 +174,6 @@ router.post('/tunnel/activate', async (req, res) => {
         await setAppSetting('tunnel_ip', tunnelIP);
         await setAppSetting('tunnel_expiry', String(expiry));
         broadcastTunnelEvent(targetVRF, expiry);
-
-        // ── Regla ACCESO-ADMIN: pool de administración WireGuard ──────────────
-        // Una sola regla con src-address=192.168.21.0/24 cubre todos los peers
-        // del pool VPN-WG-MGMT. Cualquier admin conectado accede automáticamente
-        // a las torres de la VRF activa sin configuración adicional.
-        let apiAdmin;
-        try {
-            apiAdmin = await connectToMikrotik(ip, user, pass);
-            await writeIdempotent(apiAdmin, [
-                '/ip/firewall/mangle/add',
-                '=chain=prerouting',
-                '=action=mark-routing',
-                '=comment=ACCESO-ADMIN',
-                '=dst-address-list=LIST-NET-REMOTE-TOWERS',
-                `=new-routing-mark=${targetVRF}`,
-                '=src-address=192.168.21.0/24',
-                '=passthrough=yes',
-            ], 12000);
-            await apiAdmin.close();
-            console.log(`[TUNNEL-ACTIVATE] Regla ACCESO-ADMIN creada: 192.168.21.0/24 → ${targetVRF}`);
-        } catch (e) {
-            if (apiAdmin) try { await apiAdmin.close(); } catch (_) {}
-            console.error('[TUNNEL-ACTIVATE] Error creando regla ACCESO-ADMIN:', e?.message);
-            // El túnel ya está activo — no revertir por este error no crítico
-        }
 
         res.json({ success: true, message: `Acceso abierto a ${targetVRF}` });
     } catch (error) {
@@ -228,25 +201,11 @@ router.post('/tunnel/deactivate', async (req, res) => {
             await cleanTunnelRules(api, tunnelIP);
             console.log(`[TUNNEL-DEACTIVATE] Reglas eliminadas para IP=${tunnelIP}`);
         } else {
-            // Sin tunnelIP conocida (sesión antigua) — limpiar todos los mangles ACCESO-DINAMICO
+            // Sin tunnelIP conocida (sesión antigua) — limpiar todos los mangles ACCESO-ADMIN/ACCESO-DINAMICO
             // y todas las entradas vpn-activa comment=User Access como fallback seguro
             console.warn('[TUNNEL-DEACTIVATE] tunnelIP desconocida — aplicando limpieza por comment (fallback)');
             await cleanTunnelRules(api, null);
             console.log('[TUNNEL-DEACTIVATE] Limpieza por comment completada (fallback null)');
-        }
-
-        // ── Limpiar también reglas ACCESO-ADMIN del pool de administración ─────
-        try {
-            const adminMangle = await safeWrite(api, ['/ip/firewall/mangle/print']).catch(() => []);
-            const adminToDelete = adminMangle.filter(m => m.comment === 'ACCESO-ADMIN' && m['.id']);
-            for (const rule of adminToDelete) {
-                await safeWrite(api, ['/ip/firewall/mangle/remove', `=.id=${rule['.id']}`]).catch(() => {});
-            }
-            if (adminToDelete.length > 0) {
-                console.log(`[TUNNEL-DEACTIVATE] ${adminToDelete.length} regla(s) ACCESO-ADMIN eliminadas`);
-            }
-        } catch (e) {
-            console.warn('[TUNNEL-DEACTIVATE] Error limpiando ACCESO-ADMIN:', e?.message);
         }
 
         await api.close();
@@ -283,35 +242,24 @@ router.post('/tunnel/keepalive', async (req, res) => {
             restoredItems.push('vpn-activa');
         }
 
-        // Verificar que existan reglas ACCESO-DINAMICO para este VRF
+        // Verificar que exista la regla ACCESO-ADMIN para este VRF
         const hasMangleForVRF = mangle.some(m =>
-            m.comment === 'ACCESO-DINAMICO' &&
+            m.comment === 'ACCESO-ADMIN' &&
             m['new-routing-mark'] === targetVRF
         );
         if (!hasMangleForVRF) {
-            // Recrear las 2 reglas ACCESO-DINAMICO (VPS + Operador)
-            const toHost = (addr) => addr.includes('/') ? addr : `${addr}/32`;
+            // Recrear la única regla ACCESO-ADMIN con src-address=192.168.21.0/24
             await safeWrite(api, [
                 '/ip/firewall/mangle/add',
                 '=chain=prerouting',
                 '=action=mark-routing',
-                '=comment=ACCESO-DINAMICO',
+                '=comment=ACCESO-ADMIN',
                 '=dst-address-list=LIST-NET-REMOTE-TOWERS',
                 `=new-routing-mark=${targetVRF}`,
-                `=src-address=${toHost(IP_VPS)}`,
+                '=src-address=192.168.21.0/24',
                 '=passthrough=yes',
             ]);
-            await safeWrite(api, [
-                '/ip/firewall/mangle/add',
-                '=chain=prerouting',
-                '=action=mark-routing',
-                '=comment=ACCESO-DINAMICO',
-                '=dst-address-list=LIST-NET-REMOTE-TOWERS',
-                `=new-routing-mark=${targetVRF}`,
-                `=src-address=192.168.21.0/24`,
-                '=passthrough=yes',
-            ]);
-            restoredItems.push('mangle-ACCESO-DINAMICO');
+            restoredItems.push('mangle-ACCESO-ADMIN');
         }
 
         await api.close();
@@ -648,29 +596,35 @@ router.post('/tunnel/repair', async (req, res) => {
             steps.push({ step: 6, obj: 'vpn-activa', name: ADMIN_POOL_REPAIR, status: 'error', action: e.message });
         }
 
-        // ── Paso 7: Mangle ACCESO-DINAMICO (VPS + Operador) ────
+        // ── Paso 7: Mangle ACCESO-ADMIN (una sola regla: pool 192.168.21.0/24) ─
         if (tunnelIP && vrfName) {
             try {
-                const toHost = (addr) => addr.includes('/') ? addr : `${addr}/32`;
-                const hasVps = allMangle.some(m => m.comment === 'ACCESO-DINAMICO' && m['src-address'] === toHost(IP_VPS) && m['new-routing-mark'] === vrfName);
-                const hasOp  = allMangle.some(m => m.comment === 'ACCESO-DINAMICO' && m['src-address'] === '192.168.21.0/24' && m['new-routing-mark'] === vrfName);
-                if (hasVps && hasOp) {
-                    steps.push({ step: 7, obj: 'Mangle ACCESO-DINAMICO', name: `VPS+OP→${vrfName}`, status: 'ok', action: 'exists' });
+                const hasAdmin = allMangle.some(m =>
+                    m.comment === 'ACCESO-ADMIN' &&
+                    m['src-address'] === '192.168.21.0/24' &&
+                    m['new-routing-mark'] === vrfName
+                );
+                if (hasAdmin) {
+                    steps.push({ step: 7, obj: 'Mangle ACCESO-ADMIN', name: `192.168.21.0/24→${vrfName}`, status: 'ok', action: 'exists' });
                 } else {
-                    if (!hasVps) {
-                        await writeIdempotent(api, ['/ip/firewall/mangle/add', '=chain=prerouting', '=action=mark-routing', '=comment=ACCESO-DINAMICO', '=dst-address-list=LIST-NET-REMOTE-TOWERS', `=new-routing-mark=${vrfName}`, `=src-address=${toHost(IP_VPS)}`, '=passthrough=yes']);
-                    }
-                    if (!hasOp) {
-                        await writeIdempotent(api, ['/ip/firewall/mangle/add', '=chain=prerouting', '=action=mark-routing', '=comment=ACCESO-DINAMICO', '=dst-address-list=LIST-NET-REMOTE-TOWERS', `=new-routing-mark=${vrfName}`, `=src-address=192.168.21.0/24`, '=passthrough=yes']);
-                    }
-                    steps.push({ step: 7, obj: 'Mangle ACCESO-DINAMICO', name: `VPS+OP→${vrfName}`, status: 'created', action: 'created' });
+                    await writeIdempotent(api, [
+                        '/ip/firewall/mangle/add',
+                        '=chain=prerouting',
+                        '=action=mark-routing',
+                        '=comment=ACCESO-ADMIN',
+                        '=dst-address-list=LIST-NET-REMOTE-TOWERS',
+                        `=new-routing-mark=${vrfName}`,
+                        '=src-address=192.168.21.0/24',
+                        '=passthrough=yes',
+                    ]);
+                    steps.push({ step: 7, obj: 'Mangle ACCESO-ADMIN', name: `192.168.21.0/24→${vrfName}`, status: 'created', action: 'created' });
                     repaired++;
                 }
             } catch (e) {
-                steps.push({ step: 7, obj: 'Mangle ACCESO-DINAMICO', name: `→${vrfName}`, status: 'error', action: e.message });
+                steps.push({ step: 7, obj: 'Mangle ACCESO-ADMIN', name: `→${vrfName}`, status: 'error', action: e.message });
             }
         } else {
-            steps.push({ step: 7, obj: 'Mangle ACCESO-DINAMICO', name: null, status: 'skipped', action: 'no tunnelIP or vrfName' });
+            steps.push({ step: 7, obj: 'Mangle ACCESO-ADMIN', name: null, status: 'skipped', action: 'no tunnelIP or vrfName' });
         }
 
         await api.close();
@@ -686,11 +640,10 @@ router.post('/tunnel/repair', async (req, res) => {
 });
 
 // ── POST /tunnel/mangle-access ─────────────────────────────────────────────
-// Limpia todas las reglas mangle con comment="ACCESO-DINAMICO" e inyecta dos
-// nuevas: una para el VPS y otra para el operador (IP capturada del request).
+// Limpia todas las reglas mangle con comment="ACCESO-DINAMICO" o "ACCESO-ADMIN"
+// e inyecta UNA sola regla ACCESO-ADMIN con src-address=192.168.21.0/24.
 //
 // Body: { vrfSeleccionado: "VRF-ND4-TORREVICTORN2" }
-// Headers (auto): X-Forwarded-For o req.socket.remoteAddress → IP del operador
 //
 router.post('/tunnel/mangle-access', async (req, res) => {
     if (!req.mikrotik) return res.status(503).json({ success: false, needsConfig: true, message: 'Configura las credenciales MikroTik en Ajustes antes de continuar.' });
@@ -721,17 +674,13 @@ router.post('/tunnel/mangle-access', async (req, res) => {
         return res.status(400).json({ success: false, message: `IP del operador no es IPv4 válida: "${ipCliente}"` });
     }
 
-    // RouterOS requiere CIDR en src-address — agregar /32 si no lo tiene
-    const toHost = (addr) => addr.includes('/') ? addr : `${addr}/32`;
-    const vrf    = vrfSeleccionado.trim();
-    const srcVps = toHost(IP_VPS);
-    const srcOp  = toHost(ipCliente);
+    const vrf = vrfSeleccionado.trim();
 
     // ──────────────────────────────────────────────────────────────────────────
     // ESTRATEGIA: usar conexiones separadas por fase para evitar desincronización
     // del protocolo node-routeros cuando se hacen múltiples add consecutivos.
-    // Fase 1: conn1 → print + cleanup de ACCESO-DINAMICO
-    // Fase 2: conn2 → add VPS + add Operador (con writeIdempotent)
+    // Fase 1: conn1 → print + cleanup de ACCESO-DINAMICO y ACCESO-ADMIN
+    // Fase 2: conn2 → add única regla ACCESO-ADMIN (con writeIdempotent)
     // ──────────────────────────────────────────────────────────────────────────
 
     // ── Fase 1: Limpieza ──────────────────────────────────────────────────────
@@ -743,8 +692,10 @@ router.post('/tunnel/mangle-access', async (req, res) => {
             console.warn('[MANGLE-ACCESS] print falló:', e?.message);
             return [];
         });
-        const toDelete = allMangle.filter(m => m.comment === 'ACCESO-DINAMICO' && m['.id']);
-        console.log(`[MANGLE-ACCESS] Total mangle: ${allMangle.length}, ACCESO-DINAMICO a eliminar: ${toDelete.length}`);
+        const toDelete = allMangle.filter(m =>
+            (m.comment === 'ACCESO-DINAMICO' || m.comment === 'ACCESO-ADMIN') && m['.id']
+        );
+        console.log(`[MANGLE-ACCESS] Total mangle: ${allMangle.length}, ACCESO-DINAMICO/ACCESO-ADMIN a eliminar: ${toDelete.length}`);
 
         for (const rule of toDelete) {
             try {
@@ -766,62 +717,38 @@ router.post('/tunnel/mangle-access', async (req, res) => {
     // Pausa entre fases para que RouterOS asiente los removes
     await new Promise(r => setTimeout(r, 300));
 
-    // ── Fase 2: Adds en conexión fresca ───────────────────────────────────────
-    // IPs dentro de 192.168.21.0/24 ya están cubiertas por la regla ACCESO-ADMIN
-    // que se crea al activar el túnel — no duplicar con ACCESO-DINAMICO.
-    const inAdminPool = (addr) => addr.replace('/32', '').startsWith('192.168.21.');
-
+    // ── Fase 2: Add en conexión fresca ────────────────────────────────────────
+    // Una sola regla ACCESO-ADMIN con src-address=192.168.21.0/24 cubre todo el pool.
     let api2;
     try {
         api2 = await connectToMikrotik(ip, user, pass);
 
-        // Regla VPS (omitir si está en el pool admin 192.168.21.0/24)
-        if (inAdminPool(srcVps)) {
-            console.log(`[MANGLE-ACCESS] VPS ${srcVps} cubierta por ACCESO-ADMIN — omitida`);
-        } else {
-            console.log(`[MANGLE-ACCESS] Creando regla VPS: ${srcVps} → ${vrf}`);
-            await writeIdempotent(api2, [
-                '/ip/firewall/mangle/add',
-                '=chain=prerouting',
-                '=action=mark-routing',
-                '=comment=ACCESO-DINAMICO',
-                '=dst-address-list=LIST-NET-REMOTE-TOWERS',
-                `=new-routing-mark=${vrf}`,
-                `=src-address=${srcVps}`,
-                '=passthrough=yes',
-            ], 12000);
-            console.log(`[MANGLE-ACCESS] ✓ Regla VPS creada.`);
-            await new Promise(r => setTimeout(r, 250));
-        }
-
-        // Regla Operador: usar siempre 192.168.21.0/24 en lugar de 1 IP para abarcar todo el pool
-        console.log(`[MANGLE-ACCESS] Creando regla Operador Global: 192.168.21.0/24 → ${vrf}`);
+        console.log(`[MANGLE-ACCESS] Creando regla ACCESO-ADMIN: 192.168.21.0/24 → ${vrf}`);
         await writeIdempotent(api2, [
             '/ip/firewall/mangle/add',
             '=chain=prerouting',
             '=action=mark-routing',
-            '=comment=ACCESO-DINAMICO',
+            '=comment=ACCESO-ADMIN',
             '=dst-address-list=LIST-NET-REMOTE-TOWERS',
             `=new-routing-mark=${vrf}`,
-            `=src-address=192.168.21.0/24`,
+            '=src-address=192.168.21.0/24',
             '=passthrough=yes',
         ], 12000);
-        console.log(`[MANGLE-ACCESS] ✓ Regla Operador creada.`);
+        console.log(`[MANGLE-ACCESS] Regla ACCESO-ADMIN creada.`);
 
         try { await api2.close(); } catch (_) {}
 
         return res.json({
             success: true,
-            message: `Reglas ACCESO-DINAMICO aplicadas: ${IP_VPS} y ${ipCliente} → ${vrf}`,
+            message: `Regla ACCESO-ADMIN aplicada: 192.168.21.0/24 → ${vrf}`,
             vrf,
-            ipVps: IP_VPS,
             ipCliente,
             deletedCount,
         });
     } catch (error) {
         if (api2) try { await api2.close(); } catch (_) {}
         const msg = getErrorMessage(error, ip, user);
-        console.error('[MANGLE-ACCESS] Error en fase 2 (adds):', error?.message || error);
+        console.error('[MANGLE-ACCESS] Error en fase 2 (add):', error?.message || error);
         return res.status(500).json({ success: false, message: `Add falló: ${msg}` });
     }
 });

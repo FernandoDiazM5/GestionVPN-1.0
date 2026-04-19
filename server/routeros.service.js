@@ -72,12 +72,11 @@ const getErrorMessage = (error, ip, user = '') => {
 };
 
 /**
- * cleanTunnelRules — Elimina entradas de vpn-activa y mangle WEB-ACCESS.
+ * cleanTunnelRules — Elimina entradas de vpn-activa y reglas mangle de acceso.
  *
- * Si se pasa `tunnelIP`, solo elimina las entradas correspondientes a esa IP,
- * preservando entradas de otros usuarios o entradas permanentes.
- * Si `tunnelIP` es null/undefined, comportamiento anterior: elimina TODAS
- * (solo mantener para compatibilidad; preferir siempre pasar tunnelIP).
+ * Limpia las reglas mangle con comment=ACCESO-DINAMICO o comment=ACCESO-ADMIN.
+ * Si se pasa `tunnelIP`, solo elimina las entradas vpn-activa correspondientes
+ * a esa IP; si no, elimina todas las entradas vpn-activa.
  *
  * @param {object} api - Instancia de RouterOSAPI conectada
  * @param {string|null} tunnelIP - IP del túnel a limpiar, ej: "10.10.0.5"
@@ -91,9 +90,8 @@ const cleanTunnelRules = async (api, tunnelIP) => {
     const addrFilter = tunnelIP
         ? (e) => e.list === 'vpn-activa' && e.address === tunnelIP && e['.id']
         : (e) => e.list === 'vpn-activa' && e['.id'];
-    const mangleFilter = tunnelIP
-        ? (e) => e.comment === 'ACCESO-DINAMICO' && (e['src-address']?.includes(tunnelIP) || e['src-address']?.includes('192.168.21.0/24')) && e['.id']
-        : (e) => e.comment === 'ACCESO-DINAMICO' && e['.id'];
+    const mangleFilter = (e) =>
+        (e.comment === 'ACCESO-DINAMICO' || e.comment === 'ACCESO-ADMIN') && e['.id'];
 
     // Eliminar address-list entries secuencialmente
     for (const e of allAddrs.filter(addrFilter)) {

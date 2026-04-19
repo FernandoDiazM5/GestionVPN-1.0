@@ -66,8 +66,25 @@ Endpoint que verifica y reconstruye los 7 objetos RouterOS de un nodo VPN en una
 ## Patrón tunnel/activate — agregar solo si no existe (2026-03-28)
 
 En `tunnel/activate`:
-1. Leer `address-list/print` y `mangle/print` en una sola conexión con `Promise.allSettled`.
-2. Verificar con `.some()` antes de agregar — no llamar `cleanTunnelRules` global.
-3. Para mangle: si ya existe la combinación `tunnelIP + targetVRF` exacta, no tocar nada. Si existe la IP con otro VRF (cambio de sesión), borrar solo esas y crear la nueva.
-4. Usar `writeIdempotent` en los `/add` como segunda capa de defensa contra duplicados.
-5. Guardar `tunnel_ip` en `app_settings` junto con `active_vrf` y `tunnel_expiry`.
+1. Leer `address-list/print` en una sola conexión.
+2. Agregar `192.168.21.0/24` a `vpn-activa` solo si no existe ya.
+3. NO crear regla mangle aquí — la responsabilidad es de `/tunnel/mangle-access`.
+4. Guardar `tunnel_ip` en `app_settings` junto con `active_vrf` y `tunnel_expiry`.
+
+## Fix: Una sola regla mangle ACCESO-ADMIN (2026-04-19)
+
+**Problema:** Se creaban 2 reglas mangle duplicadas con `src-address=192.168.21.0/24`:
+- `tunnel/activate` creaba `ACCESO-ADMIN`
+- `tunnel/mangle-access` creaba `ACCESO-DINAMICO` (con la misma subred)
+- `keepalive` recreaba 2 reglas `ACCESO-DINAMICO` (VPS + pool)
+
+**Fix aplicado:**
+- `tunnel/activate`: eliminado el bloque `apiAdmin` que creaba `ACCESO-ADMIN`. Solo gestiona `vpn-activa` y SQLite.
+- `tunnel/mangle-access`: Fase 1 limpia AMBOS comments (`ACCESO-DINAMICO` y `ACCESO-ADMIN`). Fase 2 crea UNA sola regla `comment=ACCESO-ADMIN`, `src-address=192.168.21.0/24`. Eliminada la lógica `inAdminPool`, `srcVps`, `srcOp`, y la regla VPS separada.
+- `tunnel/keepalive`: verifica `ACCESO-ADMIN` (no `ACCESO-DINAMICO`). Recrea UNA sola regla con `src=192.168.21.0/24`.
+- `tunnel/deactivate`: eliminado el bloque manual que borraba `ACCESO-ADMIN` (ya lo hace `cleanTunnelRules`).
+- `cleanTunnelRules` en `routeros.service.js`: `mangleFilter` ahora limpia ambos comments: `ACCESO-DINAMICO` y `ACCESO-ADMIN`. Simplificado — ya no verifica `tunnelIP` en el mangle (los comments son suficiente clave de identificación).
+- `/tunnel/repair` paso 7: actualizado para crear una sola regla `ACCESO-ADMIN` en lugar de dos `ACCESO-DINAMICO`.
+- `IP_VPS` eliminada de `core.routes.js` — ya no se necesita.
+
+**Invariante:** En RouterOS siempre debe existir exactamente 1 regla mangle activa cuando hay un túnel activado: `comment=ACCESO-ADMIN`, `chain=prerouting`, `action=mark-routing`, `src-address=192.168.21.0/24`, `dst-address-list=LIST-NET-REMOTE-TOWERS`, `new-routing-mark=<VRF activo>`, `passthrough=yes`.
