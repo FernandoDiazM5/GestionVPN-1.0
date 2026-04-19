@@ -72,39 +72,25 @@ const getErrorMessage = (error, ip, user = '') => {
 };
 
 /**
- * cleanTunnelRules — Elimina entradas de vpn-activa y reglas mangle de acceso.
- *
- * Limpia las reglas mangle con comment=ACCESO-DINAMICO o comment=ACCESO-ADMIN.
- * Si se pasa `tunnelIP`, solo elimina las entradas vpn-activa correspondientes
- * a esa IP; si no, elimina todas las entradas vpn-activa.
+ * cleanTunnelRules — Elimina las reglas mangle de acceso dinámico.
+ * Borra todas las entradas con comment=ACCESO-ADMIN o comment=ACCESO-DINAMICO.
+ * vpn-activa NO se toca (192.168.21.0/24 es estático en MikroTik).
  *
  * @param {object} api - Instancia de RouterOSAPI conectada
- * @param {string|null} tunnelIP - IP del túnel a limpiar, ej: "10.10.0.5"
+ * @returns {number} Cantidad de reglas eliminadas
  */
-const cleanTunnelRules = async (api, tunnelIP) => {
-    // SECUENCIAL — RouterOS no soporta comandos paralelos en la misma conexión
-    const allAddrs = await safeWrite(api, ['/ip/firewall/address-list/print']).catch(() => []);
+const cleanTunnelRules = async (api) => {
+    // vpn-activa 192.168.21.0/24 es ESTÁTICO en MikroTik — no se toca aquí
     const allMangle = await safeWrite(api, ['/ip/firewall/mangle/print']).catch(() => []);
-
-    // Si se especifica tunnelIP, filtrar solo esa IP; si no, comportamiento legacy (todas)
-    const addrFilter = tunnelIP
-        ? (e) => e.list === 'vpn-activa' && e.address === tunnelIP && e['.id']
-        : (e) => e.list === 'vpn-activa' && e['.id'];
-    const mangleFilter = (e) =>
-        (e.comment === 'ACCESO-DINAMICO' || e.comment === 'ACCESO-ADMIN') && e['.id'];
-
-    // Eliminar address-list entries secuencialmente
-    for (const e of allAddrs.filter(addrFilter)) {
-        await safeWrite(api, ['/ip/firewall/address-list/remove', `=.id=${e['.id']}`]).catch(err => {
-            console.error(`[WARN] No se pudo borrar address-list id=${e['.id']}`, err.message);
-        });
-    }
-    // Eliminar mangle entries secuencialmente
-    for (const e of allMangle.filter(mangleFilter)) {
+    const toDelete = allMangle.filter(e =>
+        (e.comment === 'ACCESO-DINAMICO' || e.comment === 'ACCESO-ADMIN') && e['.id']
+    );
+    for (const e of toDelete) {
         await safeWrite(api, ['/ip/firewall/mangle/remove', `=.id=${e['.id']}`]).catch(err => {
             console.error(`[WARN] No se pudo borrar mangle id=${e['.id']}`, err.message);
         });
     }
+    return toDelete.length;
 };
 
 /**
