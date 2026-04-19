@@ -143,24 +143,37 @@ router.post('/tunnel/activate', async (req, res) => {
     const { tunnelIP, targetVRF } = req.body;
     if (!IPV4_REGEX.test(tunnelIP)) return res.status(400).json({ success: false, message: `tunnelIP inválida: "${tunnelIP}"` });
     if (!targetVRF) return res.status(400).json({ success: false, message: 'targetVRF requerido' });
+    // ── Fase 1: limpiar reglas de acceso anteriores (conexión independiente) ──
+    // Se usa una conexión separada para el cleanup y otra para el add.
+    // Motivo: node-routeros no soporta dos api.write() simultáneos en la misma
+    // sesión. Si safeWrite(print/remove) sufre un timeout, el write interno queda
+    // pendiente y corrompe la siguiente llamada si ambas comparten la conexión.
+    let deletedCount = 0;
+    try {
+        const apiClean = await connectToMikrotik(ip, user, pass);
+        try {
+            const allMangle = await safeWrite(apiClean, ['/ip/firewall/mangle/print'], 12000).catch(() => []);
+            const toDelete = allMangle.filter(m =>
+                (m.comment === 'ACCESO-ADMIN' || m.comment === 'ACCESO-DINAMICO') && m['.id']
+            );
+            for (const rule of toDelete) {
+                await safeWrite(apiClean, ['/ip/firewall/mangle/remove', `=.id=${rule['.id']}`], 10000)
+                    .catch(e => console.warn(`[TUNNEL-ACTIVATE] remove ${rule['.id']} falló:`, e?.message));
+            }
+            deletedCount = toDelete.length;
+            if (deletedCount > 0) console.log(`[TUNNEL-ACTIVATE] ${deletedCount} regla(s) previas eliminadas`);
+        } finally {
+            await apiClean.close().catch(() => {});
+        }
+    } catch (e) {
+        // Cleanup no crítico — si falla, continuamos igual (writeIdempotent ignora duplicados)
+        console.warn('[TUNNEL-ACTIVATE] Cleanup falló (no crítico):', e?.message);
+    }
+
+    // ── Fase 2: crear la regla ACCESO-ADMIN (conexión fresca) ────────────────
     let api;
     try {
         api = await connectToMikrotik(ip, user, pass);
-
-        // ── 1. Limpiar reglas mangle de acceso anteriores ────────────────────
-        // vpn-activa es ESTÁTICO en MikroTik (192.168.21.0/24) — no se gestiona aquí
-        const allMangle = await safeWrite(api, ['/ip/firewall/mangle/print']).catch(() => []);
-        const toDelete = allMangle.filter(m =>
-            (m.comment === 'ACCESO-ADMIN' || m.comment === 'ACCESO-DINAMICO') && m['.id']
-        );
-        for (const rule of toDelete) {
-            await safeWrite(api, ['/ip/firewall/mangle/remove', `=.id=${rule['.id']}`]).catch(() => {});
-        }
-        if (toDelete.length > 0) {
-            console.log(`[TUNNEL-ACTIVATE] ${toDelete.length} regla(s) de acceso previas eliminadas`);
-        }
-
-        // ── 2. Crear la única regla ACCESO-ADMIN ─────────────────────────────
         await writeIdempotent(api, [
             '/ip/firewall/mangle/add',
             '=chain=prerouting',
@@ -172,10 +185,9 @@ router.post('/tunnel/activate', async (req, res) => {
             '=passthrough=yes',
         ]);
         console.log(`[TUNNEL-ACTIVATE] Regla ACCESO-ADMIN creada: 192.168.21.0/24 → ${targetVRF}`);
+        await api.close().catch(() => {});
 
-        await api.close();
-
-        // ── 5. Persistir estado ───────────────────────────────────────────────
+        // ── Persistir estado ──────────────────────────────────────────────────
         const TUNNEL_TIMEOUT_MS = 30 * 60 * 1000;
         const expiry = Date.now() + TUNNEL_TIMEOUT_MS;
         await setAppSetting('active_vrf', targetVRF);
@@ -188,12 +200,12 @@ router.post('/tunnel/activate', async (req, res) => {
             message: `Acceso abierto a ${targetVRF}`,
             vrf: targetVRF,
             ipCliente: tunnelIP,
-            deletedCount: toDelete.length,
+            deletedCount,
         });
     } catch (error) {
         if (api) try { await api.close(); } catch (_) { }
         const msg = getErrorMessage(error, ip, user);
-        console.error('[TUNNEL-ACTIVATE] Error:', error?.message || error, '| Detalles:', error?.code, error?.errno);
+        console.error('[TUNNEL-ACTIVATE] Error en fase 2:', error?.message, '| code:', error?.code, '| errno:', error?.errno);
         res.status(500).json({ success: false, message: msg });
     }
 });
