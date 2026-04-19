@@ -147,36 +147,12 @@ router.post('/tunnel/activate', async (req, res) => {
     try {
         api = await connectToMikrotik(ip, user, pass);
 
-        // ── 1. Leer address-list filtrado (solo vpn-activa) ─────────────────
-        const addrs = await safeWrite(api, [
-            '/ip/firewall/address-list/print',
-            '?list=vpn-activa',
-        ]).catch(() => []);
-
-        // ── 2. Agregar pool admin a vpn-activa si no existe ──────────────────
-        const ADMIN_POOL = '192.168.21.0/24';
-        const alreadyInList = addrs.some(a => a.address === ADMIN_POOL);
-        if (!alreadyInList) {
-            await writeIdempotent(api, [
-                '/ip/firewall/address-list/add',
-                '=list=vpn-activa',
-                `=address=${ADMIN_POOL}`,
-                '=comment=User Access',
-            ]);
-            console.log(`[TUNNEL-ACTIVATE] Agregado ${ADMIN_POOL} a vpn-activa`);
-        }
-
-        // ── 3. Limpiar reglas mangle de acceso anteriores (filtrado) ─────────
-        const oldMangle = await safeWrite(api, [
-            '/ip/firewall/mangle/print',
-            '?comment=ACCESO-ADMIN',
-        ]).catch(() => []);
-        // También limpiar ACCESO-DINAMICO por si quedaron de versiones anteriores
-        const oldDinamico = await safeWrite(api, [
-            '/ip/firewall/mangle/print',
-            '?comment=ACCESO-DINAMICO',
-        ]).catch(() => []);
-        const toDelete = [...oldMangle, ...oldDinamico].filter(m => m['.id']);
+        // ── 1. Limpiar reglas mangle de acceso anteriores ────────────────────
+        // vpn-activa es ESTÁTICO en MikroTik (192.168.21.0/24) — no se gestiona aquí
+        const allMangle = await safeWrite(api, ['/ip/firewall/mangle/print']).catch(() => []);
+        const toDelete = allMangle.filter(m =>
+            (m.comment === 'ACCESO-ADMIN' || m.comment === 'ACCESO-DINAMICO') && m['.id']
+        );
         for (const rule of toDelete) {
             await safeWrite(api, ['/ip/firewall/mangle/remove', `=.id=${rule['.id']}`]).catch(() => {});
         }
@@ -184,7 +160,7 @@ router.post('/tunnel/activate', async (req, res) => {
             console.log(`[TUNNEL-ACTIVATE] ${toDelete.length} regla(s) de acceso previas eliminadas`);
         }
 
-        // ── 4. Crear la única regla ACCESO-ADMIN ─────────────────────────────
+        // ── 2. Crear la única regla ACCESO-ADMIN ─────────────────────────────
         await writeIdempotent(api, [
             '/ip/firewall/mangle/add',
             '=chain=prerouting',
@@ -227,25 +203,9 @@ router.post('/tunnel/deactivate', async (req, res) => {
     const { ip, user, pass } = req.mikrotik;
     let api;
     try {
-        // Recuperar la IP del túnel activo desde app_settings para no depender del frontend
-        // El frontend puede enviarla en el body como fallback secundario
-        const savedTunnelIP = await getAppSetting('tunnel_ip');
-        const tunnelIP = savedTunnelIP || req.body?.tunnelIP || null;
-
         api = await connectToMikrotik(ip, user, pass);
-
-        if (tunnelIP) {
-            // Eliminar solo las entradas de esta IP específica
-            await cleanTunnelRules(api, tunnelIP);
-            console.log(`[TUNNEL-DEACTIVATE] Reglas eliminadas para IP=${tunnelIP}`);
-        } else {
-            // Sin tunnelIP conocida (sesión antigua) — limpiar todos los mangles ACCESO-ADMIN/ACCESO-DINAMICO
-            // y todas las entradas vpn-activa comment=User Access como fallback seguro
-            console.warn('[TUNNEL-DEACTIVATE] tunnelIP desconocida — aplicando limpieza por comment (fallback)');
-            await cleanTunnelRules(api, null);
-            console.log('[TUNNEL-DEACTIVATE] Limpieza por comment completada (fallback null)');
-        }
-
+        const deleted = await cleanTunnelRules(api);
+        console.log(`[TUNNEL-DEACTIVATE] ${deleted} regla(s) ACCESO-ADMIN/ACCESO-DINAMICO eliminadas`);
         await api.close();
         await setAppSetting('active_vrf', '');
         await setAppSetting('tunnel_ip', '');
@@ -267,18 +227,10 @@ router.post('/tunnel/keepalive', async (req, res) => {
     let api;
     try {
         api = await connectToMikrotik(ip, user, pass);
-        // SECUENCIAL — RouterOS no soporta comandos paralelos en la misma conexión
-        const addrs  = await safeWrite(api, ['/ip/firewall/address-list/print']).catch(() => []);
+        // vpn-activa 192.168.21.0/24 es ESTÁTICO en MikroTik — no se gestiona aquí
         const mangle = await safeWrite(api, ['/ip/firewall/mangle/print']).catch(() => []);
 
         const restoredItems = [];
-
-        // Verificar address-list vpn-activa
-        const hasAddr = addrs.some(a => a.list === 'vpn-activa' && a.address === tunnelIP);
-        if (!hasAddr) {
-            await safeWrite(api, ['/ip/firewall/address-list/add', '=list=vpn-activa', `=address=${tunnelIP}`, '=comment=User Access']);
-            restoredItems.push('vpn-activa');
-        }
 
         // Verificar que exista la regla ACCESO-ADMIN para este VRF
         const hasMangleForVRF = mangle.some(m =>
