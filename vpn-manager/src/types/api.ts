@@ -85,6 +85,9 @@ export interface WgPeer {
 export interface TunnelActivateResponse {
   success: boolean;
   message?: string;
+  vrf?: string;
+  ipCliente?: string;
+  deletedCount?: number;
 }
 
 /** Respuesta de /api/tunnel/deactivate */

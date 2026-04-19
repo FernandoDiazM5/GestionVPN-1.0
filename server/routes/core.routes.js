@@ -147,12 +147,15 @@ router.post('/tunnel/activate', async (req, res) => {
     try {
         api = await connectToMikrotik(ip, user, pass);
 
-        // Leer address-list para vpn-activa
-        const allAddrs = await safeWrite(api, ['/ip/firewall/address-list/print']).catch(() => []);
+        // ── 1. Leer address-list filtrado (solo vpn-activa) ─────────────────
+        const addrs = await safeWrite(api, [
+            '/ip/firewall/address-list/print',
+            '?list=vpn-activa',
+        ]).catch(() => []);
 
-        // Agregar pool admin completo a vpn-activa (cubre laptop, celular y cualquier peer WG)
+        // ── 2. Agregar pool admin a vpn-activa si no existe ──────────────────
         const ADMIN_POOL = '192.168.21.0/24';
-        const alreadyInList = allAddrs.some(a => a.list === 'vpn-activa' && a.address === ADMIN_POOL);
+        const alreadyInList = addrs.some(a => a.address === ADMIN_POOL);
         if (!alreadyInList) {
             await writeIdempotent(api, [
                 '/ip/firewall/address-list/add',
@@ -161,21 +164,56 @@ router.post('/tunnel/activate', async (req, res) => {
                 '=comment=User Access',
             ]);
             console.log(`[TUNNEL-ACTIVATE] Agregado ${ADMIN_POOL} a vpn-activa`);
-        } else {
-            console.log(`[TUNNEL-ACTIVATE] ${ADMIN_POOL} ya existe en vpn-activa — sin cambios`);
         }
 
-        // La regla mangle ACCESO-ADMIN se crea en /tunnel/mangle-access
+        // ── 3. Limpiar reglas mangle de acceso anteriores (filtrado) ─────────
+        const oldMangle = await safeWrite(api, [
+            '/ip/firewall/mangle/print',
+            '?comment=ACCESO-ADMIN',
+        ]).catch(() => []);
+        // También limpiar ACCESO-DINAMICO por si quedaron de versiones anteriores
+        const oldDinamico = await safeWrite(api, [
+            '/ip/firewall/mangle/print',
+            '?comment=ACCESO-DINAMICO',
+        ]).catch(() => []);
+        const toDelete = [...oldMangle, ...oldDinamico].filter(m => m['.id']);
+        for (const rule of toDelete) {
+            await safeWrite(api, ['/ip/firewall/mangle/remove', `=.id=${rule['.id']}`]).catch(() => {});
+        }
+        if (toDelete.length > 0) {
+            console.log(`[TUNNEL-ACTIVATE] ${toDelete.length} regla(s) de acceso previas eliminadas`);
+        }
+
+        // ── 4. Crear la única regla ACCESO-ADMIN ─────────────────────────────
+        await writeIdempotent(api, [
+            '/ip/firewall/mangle/add',
+            '=chain=prerouting',
+            '=action=mark-routing',
+            '=comment=ACCESO-ADMIN',
+            '=dst-address-list=LIST-NET-REMOTE-TOWERS',
+            `=new-routing-mark=${targetVRF}`,
+            '=src-address=192.168.21.0/24',
+            '=passthrough=yes',
+        ]);
+        console.log(`[TUNNEL-ACTIVATE] Regla ACCESO-ADMIN creada: 192.168.21.0/24 → ${targetVRF}`);
+
         await api.close();
 
-        const TUNNEL_TIMEOUT_MS = 30 * 60 * 1000; // 30 min, igual que el frontend
+        // ── 5. Persistir estado ───────────────────────────────────────────────
+        const TUNNEL_TIMEOUT_MS = 30 * 60 * 1000;
         const expiry = Date.now() + TUNNEL_TIMEOUT_MS;
         await setAppSetting('active_vrf', targetVRF);
         await setAppSetting('tunnel_ip', tunnelIP);
         await setAppSetting('tunnel_expiry', String(expiry));
         broadcastTunnelEvent(targetVRF, expiry);
 
-        res.json({ success: true, message: `Acceso abierto a ${targetVRF}` });
+        res.json({
+            success: true,
+            message: `Acceso abierto a ${targetVRF}`,
+            vrf: targetVRF,
+            ipCliente: tunnelIP,
+            deletedCount: toDelete.length,
+        });
     } catch (error) {
         if (api) try { await api.close(); } catch (_) { }
         const msg = getErrorMessage(error, ip, user);

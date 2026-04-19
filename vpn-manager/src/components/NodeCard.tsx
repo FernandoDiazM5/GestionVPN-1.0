@@ -4,7 +4,7 @@ import { apiFetch } from '../utils/apiClient';
 import { Play, ShieldOff, Wifi, WifiOff, Clock, Loader2, Radio, Pencil, Trash2, FileCode, History, Tag, KeyRound, Check, X, PlusCircle, Eye, EyeOff, Wrench, MoreVertical } from 'lucide-react';
 import { useVpn, TUNNEL_TIMEOUT_MS } from '../context/VpnContext';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
-import type { NodeInfo, TunnelActivateResponse, MangleAccessResponse } from '../types/api';
+import type { NodeInfo, TunnelActivateResponse } from '../types/api';
 import { API_BASE_URL } from '../config';
 
 interface NodeCardProps {
@@ -164,8 +164,7 @@ export default function NodeCard({ node, rowIndex, onEdit, onDelete, onScript, o
         addLog('Revocando acceso anterior...');
         await deactivateAllNodes();
       }
-      addLog(`Configurando VRF: ${node.nombre_vrf}`);
-      addLog(`IP Admin: ${adminIP}`);
+      addLog(`Configurando acceso: ${node.nombre_vrf}`);
       if (!adminIP) throw new Error('IP Admin no configurada — revisa la sección de WireGuard');
       if (!node.nombre_vrf) throw new Error('Este nodo no tiene VRF asignado');
       const res = await fetchWithTimeout(`${API_BASE_URL}/api/tunnel/activate`, {
@@ -178,32 +177,13 @@ export default function NodeCard({ node, rowIndex, onEdit, onDelete, onScript, o
           tunnelIP: adminIP,
           targetVRF: node.nombre_vrf,
         }),
-      }, 20_000);
-      let data: TunnelActivateResponse;
+      }, 25_000);
+      let data: TunnelActivateResponse & { success: boolean; message?: string };
       try { data = await res.json(); } catch { throw new Error(`Error del servidor (HTTP ${res.status})`); }
       if (!res.ok || !data.success) throw new Error(data.message ?? `Error HTTP ${res.status}`);
-      addLog(`✓ Acceso abierto a ${node.nombre_vrf}`);
+      addLog(`✓ vpn-activa: 192.168.21.0/24`);
+      addLog(`✓ Mangle ACCESO-ADMIN: 192.168.21.0/24 → ${data.vrf ?? node.nombre_vrf}`);
       addLog(`Red remota: ${node.segmento_lan || 'N/A'}`);
-
-      // ── Reglas ACCESO-DINAMICO: VPS + Operador ────────────────────────────
-      addLog('Aplicando reglas de acceso dinámico...');
-      try {
-        const mangleRes = await fetchWithTimeout(`${API_BASE_URL}/api/tunnel/mangle-access`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ vrfSeleccionado: node.nombre_vrf, ipCliente: adminIP }),
-        }, 45_000);
-        const mangleData: MangleAccessResponse = await mangleRes.json().catch(() => ({ success: false }));
-        if (mangleData.success) {
-          addLog(`✓ Mangle VPS: ${mangleData.ipVps} → ${mangleData.vrf}`);
-          addLog(`✓ Mangle Operador: ${mangleData.ipCliente} → ${mangleData.vrf}`);
-        } else {
-          addLog(`⚠ Mangle-access: ${mangleData.message ?? 'Sin respuesta'}`);
-        }
-      } catch (mangleErr: unknown) {
-        // No bloquear el flujo principal si falla la regla dinámica
-        addLog(`⚠ Mangle dinámico: ${mangleErr instanceof Error ? mangleErr.message : 'Error'}`);
-      }
       setActiveNodeVrf(node.nombre_vrf);
       setTunnelExpiry(Date.now() + TUNNEL_TIMEOUT_MS);
       apiFetch(`${API_BASE_URL}/api/node/history/add`, {
