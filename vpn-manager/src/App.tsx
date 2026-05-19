@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Server, Radio, LogOut, Wifi, Cpu, Activity, GitBranch, Settings, AlertTriangle } from 'lucide-react';
+import { Server, Radio, LogOut, Wifi, Cpu, Activity, Settings, AlertTriangle } from 'lucide-react';
 import { VpnProvider, useVpn } from './context/VpnContext';
 
 import RouterAccess from './components/RouterAccess';
@@ -7,7 +7,6 @@ import RouterAccess from './components/RouterAccess';
 import NodeAccessPanel from './components/NodeAccessPanel';
 import NetworkDevicesModule from './components/NetworkDevicesModule';
 import ApMonitorModule from './components/ApMonitorModule';
-import TopologyPage from './topology/TopologyPage';
 import SettingsModule from './components/SettingsModule';
 
 function AppContent() {
@@ -92,13 +91,6 @@ function AppContent() {
               <Activity className="w-4 h-4" />
               <span>Monitor AP</span>
             </button>
-            <button
-              onClick={() => setActiveModule('topology')}
-              className={`tab-btn ${activeModule === 'topology' ? 'tab-active' : 'tab-inactive'}`}
-            >
-              <GitBranch className="w-4 h-4" />
-              <span className="hidden sm:inline">Topología UISP</span>
-            </button>
             {credentials?.role === 'admin' && (
                <button
                  onClick={() => setActiveModule('settings')}
@@ -158,8 +150,6 @@ function AppContent() {
 
         {activeModule === 'monitor' && <ApMonitorModule />}
 
-        {activeModule === 'topology' && <TopologyPage />}
-        
         {activeModule === 'settings' && <SettingsModule />}
       </main>
 

@@ -5,7 +5,7 @@ import {
   ShieldCheck, ShieldOff, AlertCircle, Radio, Clock, X,
   Plus, CheckCircle2, Loader2, Eye, EyeOff, Info, Trash2, Pencil, Minus,
   Wifi, Copy, Check, FileCode, UserPlus, Download, History, Upload,
-  ArrowUpDown, Tag, SortAsc, SortDesc, Bell, Globe, Server,
+  ArrowUpDown, Tag, SortAsc, SortDesc, Bell, Globe, Server, WifiOff,
 } from 'lucide-react';
 import { useVpn, TUNNEL_TIMEOUT_MS } from '../context/VpnContext';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
@@ -739,14 +739,14 @@ function EliminarNodoModal({
     : node.segmento_lan ? node.segmento_lan.split(',').map(s => s.trim()) : [];
 
   const DEL_STEPS = [
-    'Reglas Mangle (acceso VRF)',
-    'vpn-activa (sesiones activas)',
-    'Rutas VRF',
+    'Reglas Mangle (VRF)',
+    'Sesión activa PPP / WG Peers',
+    'PPP Secret / WG IP Address',
+    'SSTP Interface / WG Interface',
+    'Interface Lists (TOWERS + SSTP/WG)',
+    'Rutas VRF (ida + vuelta MGMT)',
     'VRF',
-    'LAN subnets (LIST-NET-REMOTE-TOWERS)',
-    'Interface List (LIST-VPN-TOWERS)',
-    'SSTP Interface',
-    'PPP Secret',
+    'SQLite (base de datos local)',
   ];
 
   useEffect(() => {
@@ -2085,6 +2085,7 @@ export default function NodeAccessPanel() {
   // WireGuard admin peers
   const [wgPeers, setWgPeers] = useState<WgPeer[]>([]);
   const [loadingWg, setLoadingWg] = useState(false);
+  const [wgError, setWgError] = useState<string | null>(null);
   const [showNuevoAdmin, setShowNuevoAdmin] = useState(false);
   const [peersExpanded, setPeersExpanded] = useState(false);
   const [serverPublicKey, setServerPublicKey] = useState('');
@@ -2265,6 +2266,7 @@ export default function NodeAccessPanel() {
   const loadWgPeers = useCallback(async () => {
     if (!credentials) return;
     setLoadingWg(true);
+    setWgError(null);
     try {
       const r = await fetchWithTimeout(`${API_BASE_URL}/api/wireguard/peers`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -2275,7 +2277,6 @@ export default function NodeAccessPanel() {
         setWgPeers(d.peers || []);
         if (d.serverPublicKey) setServerPublicKey(d.serverPublicKey);
         if (d.serverListenPort) setServerListenPort(String(d.serverListenPort));
-        // Preferir IP pública del router (desde /ip/cloud), luego localStorage, luego credentials.ip
         const publicIP = d.serverPublicIP || '';
         if (publicIP && publicIP !== serverEndpointIP) {
           setServerEndpointIP(publicIP);
@@ -2284,8 +2285,12 @@ export default function NodeAccessPanel() {
           const saved = localStorage.getItem('wg_endpoint_ip') || '';
           if (saved) setServerEndpointIP(saved);
         }
+      } else {
+        setWgError(d.message || 'No se pudo conectar al router MikroTik.');
       }
-    } catch (_) { /* silencioso */ }
+    } catch (_) {
+      setWgError('Sin conexión al router. Verifica que tu VPN WireGuard esté activa.');
+    }
     setLoadingWg(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [credentials]);
@@ -2512,8 +2517,25 @@ export default function NodeAccessPanel() {
         </>
       )}
 
+      {/* ── Error de conexión al router ── */}
+      {wgError && !loadingWg && (
+        <div className="card p-4 border-red-200 bg-red-50 flex items-center gap-3">
+          <WifiOff className="w-5 h-5 text-red-500 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-red-700">Router no alcanzable</p>
+            <p className="text-[11px] text-red-600">{wgError}</p>
+          </div>
+          <button
+            onClick={loadWgPeers}
+            className="text-xs font-semibold text-red-700 bg-red-100 hover:bg-red-200 px-3 py-1.5 rounded-lg transition-colors shrink-0"
+          >
+            Reintentar
+          </button>
+        </div>
+      )}
+
       {/* ── VPS (Principal) ── */}
-      {!vpsPeer && !loadingWg && (
+      {!vpsPeer && !loadingWg && !wgError && (
         <div className="card p-4 border-amber-200 bg-amber-50 flex items-center gap-3">
           <AlertCircle className="w-5 h-5 text-amber-500 shrink-0" />
           <div className="min-w-0">

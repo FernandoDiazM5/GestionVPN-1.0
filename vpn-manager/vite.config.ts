@@ -6,7 +6,6 @@ export default defineConfig({
   plugins: [react()],
   base: '/GestionVPN-1.0/',
   resolve: {
-    // Garantiza que @xyflow/react use la misma instancia de React del proyecto
     dedupe: ['react', 'react-dom'],
   },
   server: {

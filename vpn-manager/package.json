@@ -10,10 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@xyflow/react": "^12.10.1",
     "clsx": "^2.1.1",
-    "dexie": "^3.2.7",
-    "dexie-react-hooks": "^1.1.7",
     "localforage": "^1.10.0",
     "lucide-react": "^0.577.0",
     "react": "^19.2.4",

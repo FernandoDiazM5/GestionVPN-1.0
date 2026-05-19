@@ -1,0 +1,793 @@
+const express = require('express');
+const crypto  = require('crypto');
+const router  = express.Router();
+const { getDb, encryptPass, decryptPass, getApIntId, getCpeIntId, getApGroupIntId, getNodeByPppUser } = require('./db.service');
+const { pollAp, getDetail, getFullDetail, clearApCache }  = require('./ap.service');
+
+const genUuid = () => crypto.randomBytes(8).toString('hex');
+const isValidMac = (mac) => /^([0-9a-f]{2}:?){5}([0-9a-f]{2})$/i.test(mac);
+
+// ── Nodos (ap_groups) ────────────────────────────────────────────────────
+router.get('/nodos', async (req, res) => {
+    try {
+        const db   = await getDb();
+        const rows = await db.all('SELECT * FROM ap_groups ORDER BY created_at DESC');
+        const counts = await db.all('SELECT ap_group_id, COUNT(*) as c FROM aps GROUP BY ap_group_id');
+        const cm = {}; counts.forEach(r => { cm[r.ap_group_id] = r.c; });
+        res.json({ success: true, nodos: rows.map(r => ({ ...r, id: r.uuid, ap_count: cm[r.id] || 0 })) });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+router.post('/nodos', async (req, res) => {
+    try {
+        const { nombre, descripcion, ubicacion } = req.body;
+        if (!nombre) return res.status(400).json({ success: false, message: 'Nombre requerido' });
+        const db = await getDb();
+        const uuid = genUuid();
+        await db.run('INSERT INTO ap_groups (uuid,nombre,descripcion,ubicacion,created_at) VALUES (?,?,?,?,?)',
+            [uuid, nombre, descripcion || '', ubicacion || '', Date.now()]);
+        res.json({ success: true, id: uuid });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+router.put('/nodos/:id', async (req, res) => {
+    try {
+        const { nombre, descripcion, ubicacion } = req.body;
+        if (!nombre) return res.status(400).json({ success: false, message: 'Nombre requerido' });
+        const db = await getDb();
+        await db.run('UPDATE ap_groups SET nombre=?,descripcion=?,ubicacion=?,updated_at=? WHERE uuid=?',
+            [nombre, descripcion || '', ubicacion || '', Date.now(), req.params.id]);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+router.delete('/nodos/:id', async (req, res) => {
+    try {
+        const db = await getDb();
+        const groupIntId = await getApGroupIntId(req.params.id);
+        if (!groupIntId) return res.status(404).json({ success: false, message: 'Grupo no encontrado' });
+
+        const aps = await db.all('SELECT id, uuid FROM aps WHERE ap_group_id=?', groupIntId);
+        aps.forEach(ap => clearApCache(ap.uuid));
+
+        // B9: Cascade delete — limpiar historial y nullear ap_id de CPEs huerfanos
+        const apIntIds = aps.map(a => a.id);
+        if (apIntIds.length > 0) {
+            const ph = apIntIds.map(() => '?').join(',');
+            await db.run(`DELETE FROM signal_history WHERE ap_id IN (${ph})`, apIntIds);
+            await db.run(`UPDATE cpes SET ap_id=NULL WHERE ap_id IN (${ph})`, apIntIds);
+        }
+        await db.run('DELETE FROM aps WHERE ap_group_id=?', groupIntId);
+        await db.run('DELETE FROM ap_groups WHERE id=?', groupIntId);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// ── APs ───────────────────────────────────────────────────────────────────
+router.get('/nodos/:nodeId/aps', async (req, res) => {
+    try {
+        const db = await getDb();
+        const groupIntId = await getApGroupIntId(req.params.nodeId);
+        if (!groupIntId) return res.json({ success: true, aps: [] });
+        const rows = await db.all('SELECT * FROM aps WHERE ap_group_id=? ORDER BY created_at DESC', groupIntId);
+        // Strip encrypted password — never send to frontend
+        res.json({ success: true, aps: rows.map(r => { const { clave_ssh_enc, ...safe } = r; return { ...safe, id: r.uuid }; }) });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// Register AP — tries SSH immediately to pull static config
+router.post('/aps', async (req, res) => {
+    try {
+        const { nodo_id, ip, usuario_ssh, clave_ssh_plain, puerto_ssh } = req.body;
+        if (!nodo_id || !ip) return res.status(400).json({ success: false, message: 'nodo_id e ip requeridos' });
+        const db   = await getDb();
+        const uuid = genUuid();
+        const port = parseInt(puerto_ssh) || 22;
+        const enc  = clave_ssh_plain ? encryptPass(clave_ssh_plain) : '';
+
+        // Resolve ap_group_id from the uuid sent by frontend
+        const apGroupId = await getApGroupIntId(nodo_id);
+        if (!apGroupId) return res.status(404).json({ success: false, message: 'Grupo AP no encontrado' });
+
+        let hostname = '', modelo = '', firmware = '', mac_lan = '', mac_wlan = '',
+            frecuencia_mhz = null, ssid = '', canal_mhz = null, tx_power = null, modo_red = '';
+
+        if (usuario_ssh && clave_ssh_plain) {
+            try {
+                const s = await getDetail(ip, port, usuario_ssh, clave_ssh_plain);
+                hostname       = s.deviceName      || '';
+                modelo         = s.deviceModel     || '';
+                firmware       = s.firmwareVersion || '';
+                mac_lan        = s.lanMac          || '';
+                mac_wlan       = s.wlanMac         || '';
+                frecuencia_mhz = s.frequency ? parseInt(s.frequency) : null;
+                ssid           = s.essid           || '';
+                canal_mhz      = s.channelWidth    || null;
+                tx_power       = s.txPower         || null;
+                modo_red       = s.networkMode     || '';
+            } catch (sshErr) {
+                console.warn('[AP Routes] SSH on register failed:', sshErr.message);
+            }
+        }
+
+        await db.run(
+            `INSERT INTO aps (uuid,ap_group_id,hostname,modelo,firmware,mac_lan,mac_wlan,ip,
+             frecuencia_mhz,ssid,canal_mhz,tx_power,modo_red,usuario_ssh,clave_ssh_enc,puerto_ssh,is_active,created_at)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?)`,
+            [uuid, apGroupId, hostname, modelo, firmware, mac_lan, mac_wlan, ip,
+             frecuencia_mhz, ssid, canal_mhz, tx_power, modo_red,
+             usuario_ssh || '', enc, port, Date.now()]
+        );
+        res.json({ success: true, id: uuid, hostname, modelo, firmware, ssid, mac_wlan, frecuencia_mhz });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+router.put('/aps/:id', async (req, res) => {
+    try {
+        const { ip, usuario_ssh, clave_ssh_plain, puerto_ssh, activo } = req.body;
+        const db = await getDb();
+        const ap = await db.get('SELECT * FROM aps WHERE uuid=?', req.params.id);
+        if (!ap) return res.status(404).json({ success: false, message: 'AP no encontrado' });
+        const enc = clave_ssh_plain ? encryptPass(clave_ssh_plain) : ap.clave_ssh_enc;
+        await db.run('UPDATE aps SET ip=?,usuario_ssh=?,clave_ssh_enc=?,puerto_ssh=?,is_active=?,updated_at=? WHERE uuid=?',
+            [ip || ap.ip, usuario_ssh || ap.usuario_ssh, enc,
+             parseInt(puerto_ssh) || ap.puerto_ssh, activo != null ? activo : ap.is_active, Date.now(), req.params.id]);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+router.delete('/aps/:id', async (req, res) => {
+    try {
+        const db = await getDb();
+        clearApCache(req.params.id);
+        const apIntId = await getApIntId(req.params.id);
+        if (!apIntId) return res.status(404).json({ success: false, message: 'AP no encontrado' });
+        // B10: Cascade delete — limpiar historial y nullear ap_id de CPEs
+        await db.run('DELETE FROM signal_history WHERE ap_id=?', apIntId);
+        await db.run('UPDATE cpes SET ap_id=NULL WHERE ap_id=?', apIntId);
+        await db.run('DELETE FROM aps WHERE id=?', apIntId);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// ── Refresh AP static data (re-SSH) ──────────────────────────────────────
+router.post('/aps/:id/refresh', async (req, res) => {
+    try {
+        const db = await getDb();
+        const ap = await db.get('SELECT * FROM aps WHERE uuid=?', req.params.id);
+        if (!ap) return res.status(404).json({ success: false, message: 'AP no encontrado' });
+        const pass = decryptPass(ap.clave_ssh_enc);
+        const s = await getDetail(ap.ip, ap.puerto_ssh, ap.usuario_ssh, pass);
+        await db.run(
+            `UPDATE aps SET hostname=?,modelo=?,firmware=?,mac_lan=?,mac_wlan=?,
+             frecuencia_mhz=?,ssid=?,canal_mhz=?,tx_power=?,modo_red=?,updated_at=? WHERE uuid=?`,
+            [s.deviceName || ap.hostname, s.deviceModel || ap.modelo,
+             s.firmwareVersion || ap.firmware, s.lanMac || ap.mac_lan, s.wlanMac || ap.mac_wlan,
+             s.frequency ? parseInt(s.frequency) : ap.frecuencia_mhz,
+             s.essid || ap.ssid, s.channelWidth || ap.canal_mhz,
+             s.txPower || ap.tx_power, s.networkMode || ap.modo_red, Date.now(), req.params.id]
+        );
+        res.json({ success: true, stats: s });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// ── Poll AP → wstalist (real-time) ────────────────────────────────────────
+router.post('/aps/:id/poll', async (req, res) => {
+    try {
+        const db = await getDb();
+        const ap = await db.get('SELECT * FROM aps WHERE uuid=?', req.params.id);
+        if (!ap) return res.status(404).json({ success: false, message: 'AP no encontrado' });
+        const pass = decryptPass(ap.clave_ssh_enc);
+
+        const stations = await pollAp(ap.uuid, ap.ip, ap.puerto_ssh, ap.usuario_ssh, pass, ap.firmware || '');
+
+        // B8+B20: UPSERT atomico en transaccion — evita race condition y N+1
+        await db.run('BEGIN');
+        try {
+            for (const sta of stations) {
+                if (!sta.mac || !isValidMac(sta.mac)) continue;
+                const statsJson = JSON.stringify(sta);
+                await db.run(
+                    `INSERT INTO cpes
+                     (mac,ap_id,ip_lan,last_seen,last_stats,remote_hostname,remote_platform)
+                     VALUES (?,?,?,?,?,?,?)
+                     ON CONFLICT(mac) DO UPDATE SET
+                       last_seen=excluded.last_seen,
+                       ap_id=excluded.ap_id,
+                       ip_lan=COALESCE(excluded.ip_lan, ip_lan),
+                       last_stats=excluded.last_stats,
+                       remote_hostname=COALESCE(excluded.remote_hostname, remote_hostname),
+                       remote_platform=COALESCE(excluded.remote_platform, remote_platform)`,
+                    [sta.mac, ap.id, sta.lastip || null, Date.now(), statsJson,
+                     sta.remote_hostname || null, sta.remote_platform || null]
+                );
+                if (req.body?.saveHistory) {
+                    // Need cpe integer id for signal_history FK
+                    const cpeIntId = await getCpeIntId(sta.mac);
+                    if (cpeIntId) {
+                        // B6: sta.distance viene en metros, columna es distancia_km → convertir
+                        await db.run(
+                            `INSERT INTO signal_history
+                             (cpe_id,ap_id,timestamp,signal_dbm,remote_signal_dbm,noisefloor_dbm,
+                              cinr_db,ccq_pct,distancia_km,downlink_mbps,uplink_mbps,airtime_tx,airtime_rx)
+                             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+                            [cpeIntId, ap.id, Date.now(), sta.signal, sta.remote_signal, sta.noisefloor,
+                             sta.airmax_cinr_rx, sta.ccq,
+                             sta.distance != null ? Math.round(sta.distance / 1000 * 100) / 100 : null,
+                             sta.tx_rate ?? null, sta.rx_rate ?? null,
+                             sta.airmax_tx_usage, sta.airmax_rx_usage]
+                        );
+                    }
+                }
+            }
+            await db.run('COMMIT');
+        } catch (e) { await db.run('ROLLBACK'); throw e; }
+
+        // Enrich with known CPE names
+        const macs = stations.map(s => s.mac).filter(Boolean);
+        const known = macs.length > 0
+            ? await db.all(`SELECT * FROM cpes WHERE mac IN (${macs.map(() => '?').join(',')})`, macs)
+            : [];
+        const km = {}; known.forEach(k => { km[k.mac] = k; });
+
+        const enriched = stations.map(sta => ({
+            ...sta,
+            hostname: km[sta.mac]?.hostname || sta.cpe_name || null,
+            modelo:   km[sta.mac]?.modelo   || sta.cpe_product || null,
+            isKnown:  !!(km[sta.mac]?.hostname || sta.cpe_name),
+        }));
+
+        // Auto-enrich new CPEs without hostname (fire-and-forget, non-blocking)
+        const toEnrich = stations.filter(sta =>
+            sta.lastip && sta.mac && isValidMac(sta.mac) && !(km[sta.mac]?.hostname) && !sta.cpe_name && ap.usuario_ssh && pass
+        );
+        if (toEnrich.length > 0) {
+            (async () => {
+                for (const sta of toEnrich.slice(0, 5)) {  // limitar a 5 para no saturar SSH
+                    try {
+                        const s = await getDetail(sta.lastip, ap.puerto_ssh || 22, ap.usuario_ssh, pass);
+                        if (s.deviceName || s.deviceModel) {
+                            await db.run(
+                                `INSERT INTO cpes (mac,ap_id,hostname,modelo,firmware,ip_lan,mac_lan,mac_wlan,last_seen)
+                                 VALUES (?,?,?,?,?,?,?,?,?)
+                                 ON CONFLICT(mac) DO UPDATE SET
+                                   hostname=COALESCE(excluded.hostname, hostname),
+                                   modelo=COALESCE(excluded.modelo, modelo),
+                                   firmware=COALESCE(excluded.firmware, firmware),
+                                   ip_lan=excluded.ip_lan,
+                                   mac_lan=COALESCE(excluded.mac_lan, mac_lan),
+                                   mac_wlan=COALESCE(excluded.mac_wlan, mac_wlan),
+                                   last_seen=excluded.last_seen`,
+                                [sta.mac, ap.id || null, s.deviceName || '', s.deviceModel || '', s.firmwareVersion || '',
+                                 sta.lastip, s.lanMac || '', s.wlanMac || '', Date.now()]
+                            );
+                        }
+                    } catch { /* ignore individual failures */ }
+                }
+            })().catch(err => console.warn('[AP] Auto-enrich error:', err.message));
+        }
+
+        res.json({ success: true, stations: enriched, polledAt: Date.now() });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// ── CPE detail — SSH on demand ────────────────────────────────────────────
+router.post('/cpes/:mac/detail', async (req, res) => {
+    try {
+        const { ap_id, cpe_ip } = req.body;
+        if (!ap_id || !cpe_ip) return res.status(400).json({ success: false, message: 'ap_id y cpe_ip requeridos' });
+
+        const db = await getDb();
+        // ap_id from frontend is a uuid
+        const ap = await db.get('SELECT * FROM aps WHERE uuid=?', ap_id);
+        if (!ap) return res.status(404).json({ success: false, message: 'AP no encontrado' });
+        const pass = decryptPass(ap.clave_ssh_enc);
+
+        const s = await getDetail(cpe_ip, ap.puerto_ssh, ap.usuario_ssh, pass);
+        const mac = req.params.mac.toUpperCase();
+
+        // Save/update cpes
+        await db.run(
+            `INSERT INTO cpes
+             (mac,ap_id,hostname,modelo,firmware,ip_lan,mac_lan,mac_wlan,mac_ap,
+              modo_red,frecuencia_mhz,canal_mhz,tx_power,ssid_ap,last_seen)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+             ON CONFLICT(mac) DO UPDATE SET
+               hostname=excluded.hostname, modelo=excluded.modelo, firmware=excluded.firmware,
+               ip_lan=excluded.ip_lan, mac_lan=excluded.mac_lan, mac_wlan=excluded.mac_wlan,
+               mac_ap=excluded.mac_ap, modo_red=excluded.modo_red,
+               frecuencia_mhz=excluded.frecuencia_mhz, canal_mhz=excluded.canal_mhz,
+               tx_power=excluded.tx_power, ssid_ap=excluded.ssid_ap,
+               last_seen=excluded.last_seen`,
+            [mac, ap.id,
+             s.deviceName || '', s.deviceModel || '', s.firmwareVersion || '',
+             cpe_ip, s.lanMac || '', s.wlanMac || '', s.apMac || '',
+             s.networkMode || '', s.frequency || null, s.channelWidth || null,
+             s.txPower || null, s.essid || '', Date.now()]
+        );
+
+        res.json({ success: true, stats: { ...s, ip: cpe_ip } });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// ── CPEs DB ───────────────────────────────────────────────────────────────
+router.get('/cpes', async (req, res) => {
+    try {
+        const db  = await getDb();
+        const cpes = await db.all('SELECT * FROM cpes ORDER BY last_seen DESC');
+        res.json({ success: true, cpes });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// ── Signal history ────────────────────────────────────────────────────────
+router.get('/historial/:mac', async (req, res) => {
+    try {
+        const db    = await getDb();
+        const limit = parseInt(req.query.limit) || 100;
+        const cpeIntId = await getCpeIntId(req.params.mac.toUpperCase());
+        if (!cpeIntId) return res.json({ success: true, historial: [] });
+        const rows  = await db.all(
+            'SELECT * FROM signal_history WHERE cpe_id=? ORDER BY timestamp DESC LIMIT ?',
+            [cpeIntId, limit]
+        );
+        res.json({ success: true, historial: rows.reverse() });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// ── Poll AP directly — usa credenciales del nodo (node_ssh_creds) ────────
+router.post('/poll-direct', async (req, res) => {
+    try {
+        const { apId, ip, port, user, pass, saveHistory, firmware } = req.body;
+        if (!apId || !ip) return res.status(400).json({ success: false, message: 'apId e ip requeridos' });
+
+        // Resolve AP integer id from uuid
+        const apIntId = await getApIntId(apId);
+
+        // Buscar credenciales SSH del AP desde tabla aps (normalizada) o node_ssh_creds (fallback)
+        let sshUser = user || '';
+        let sshPass = pass || '';
+        try {
+            const db = await getDb();
+            // Primero intentar leer credenciales propias del AP desde tabla aps
+            const apRow = await db.get('SELECT usuario_ssh, clave_ssh_enc, puerto_ssh, ap_group_id FROM aps WHERE uuid = ?', [apId]);
+            if (apRow && apRow.usuario_ssh) {
+                sshUser = sshUser || apRow.usuario_ssh;
+                sshPass = sshPass || (apRow.clave_ssh_enc ? decryptPass(apRow.clave_ssh_enc) : '');
+            }
+            // Si no hay credenciales propias, buscar por nodo padre via ap_group
+            if (!sshUser && apRow && apRow.ap_group_id) {
+                // ap_group doesn't directly link to nodes — we need to find node_ssh_creds
+                // via the ap_group's associated node. For now, try reading from ap_group → node mapping
+                // The node_ssh_creds table uses node_id (INTEGER FK to nodes.id)
+                // We need to find which node this AP group belongs to.
+                // Strategy: look up nodes whose segmento_lan covers the AP's IP, or use a direct link if available
+                const nodeRows = await db.all('SELECT id FROM nodes');
+                for (const nr of nodeRows) {
+                    const credRows = await db.all(
+                        'SELECT ssh_user, ssh_pass_enc, ssh_port FROM node_ssh_creds WHERE node_id = ? ORDER BY priority',
+                        [nr.id]
+                    );
+                    if (credRows.length > 0) {
+                        sshUser = credRows[0].ssh_user;
+                        sshPass = credRows[0].ssh_pass_enc ? decryptPass(credRows[0].ssh_pass_enc) : '';
+                        break;
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('[poll-direct] Error buscando credenciales del nodo:', e.message);
+        }
+
+        const stations = await pollAp(apId, ip, parseInt(port) || 22, sshUser, sshPass, firmware || '');
+        const db = await getDb();
+
+        // B8+B17+B20: UPSERT atomico + validacion MAC + transaccion batch
+        await db.run('BEGIN');
+        try {
+            for (const sta of stations) {
+                if (!sta.mac || !isValidMac(sta.mac)) continue;
+                const statsJson = JSON.stringify(sta);
+                await db.run(
+                    `INSERT INTO cpes
+                     (mac,ap_id,ip_lan,last_seen,last_stats,remote_hostname,remote_platform)
+                     VALUES (?,?,?,?,?,?,?)
+                     ON CONFLICT(mac) DO UPDATE SET
+                       last_seen=excluded.last_seen,
+                       ap_id=excluded.ap_id,
+                       ip_lan=COALESCE(excluded.ip_lan, ip_lan),
+                       last_stats=excluded.last_stats,
+                       remote_hostname=COALESCE(excluded.remote_hostname, remote_hostname),
+                       remote_platform=COALESCE(excluded.remote_platform, remote_platform)`,
+                    [sta.mac, apIntId, sta.lastip || null, Date.now(), statsJson,
+                     sta.remote_hostname || null, sta.remote_platform || null]
+                );
+                if (saveHistory) {
+                    const cpeIntId = await getCpeIntId(sta.mac);
+                    if (cpeIntId && apIntId) {
+                        // B6: sta.distance viene en metros, columna es distancia_km → convertir
+                        await db.run(
+                            `INSERT INTO signal_history
+                             (cpe_id,ap_id,timestamp,signal_dbm,remote_signal_dbm,noisefloor_dbm,
+                              cinr_db,ccq_pct,distancia_km,downlink_mbps,uplink_mbps,airtime_tx,airtime_rx)
+                             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+                            [cpeIntId, apIntId, Date.now(), sta.signal, sta.remote_signal, sta.noisefloor,
+                             sta.airmax_cinr_rx, sta.ccq,
+                             sta.distance != null ? Math.round(sta.distance / 1000 * 100) / 100 : null,
+                             sta.tx_rate ?? null, sta.rx_rate ?? null,
+                             sta.airmax_tx_usage, sta.airmax_rx_usage]
+                        );
+                    }
+                }
+            }
+            await db.run('COMMIT');
+        } catch (e) { await db.run('ROLLBACK'); throw e; }
+
+        const macs = stations.map(s => s.mac).filter(Boolean);
+        const known = macs.length > 0
+            ? await db.all(`SELECT * FROM cpes WHERE mac IN (${macs.map(() => '?').join(',')})`, macs)
+            : [];
+        const km = {}; known.forEach(k => { km[k.mac] = k; });
+
+        const enriched = stations.map(sta => ({
+            ...sta,
+            hostname: km[sta.mac]?.hostname || null,
+            modelo:   km[sta.mac]?.modelo   || null,
+            isKnown:  !!(km[sta.mac]?.hostname),
+        }));
+
+        res.json({ success: true, stations: enriched, polledAt: Date.now() });
+    } catch (e) { res.json({ success: false, message: e.message }); }
+});
+
+// ── Full AP detail direct — all 12 SSH sections (ANTENNA_CMD) ────────────
+router.post('/ap-detail-direct', async (req, res) => {
+    try {
+        const { ip, port, user, pass, id } = req.body;
+        if (!ip || !user) return res.status(400).json({ success: false, message: 'ip y user requeridos' });
+
+        let actualPass = pass;
+        if (id && !actualPass) {
+            const db = await getDb();
+            const row = await db.get('SELECT clave_ssh_enc FROM aps WHERE uuid = ?', [id]);
+            if (row && row.clave_ssh_enc) actualPass = decryptPass(row.clave_ssh_enc);
+        }
+        if (!actualPass) return res.status(400).json({ success: false, message: 'Password no provisto' });
+
+        const s = await getFullDetail(ip, parseInt(port) || 22, user, actualPass);
+        res.json({ success: true, stats: s });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// ── Batch CPE enrich — SSH to multiple CPEs to get hostname/model ─────────
+router.post('/cpes/enrich-batch', async (req, res) => {
+    try {
+        const { cpes, apId, port } = req.body;
+        let { user, pass } = req.body;
+        // cpes: [{ mac, ip }]
+        if (!Array.isArray(cpes)) return res.status(400).json({ success: false, message: 'cpes[] requerido' });
+        const db = await getDb();
+
+        // Fallback: resolver credenciales desde tabla aps por apId (uuid)
+        if (apId && (!user || !pass)) {
+            try {
+                const apRow = await db.get('SELECT usuario_ssh, clave_ssh_enc, puerto_ssh FROM aps WHERE uuid = ?', [apId]);
+                if (apRow && apRow.usuario_ssh) {
+                    user = user || apRow.usuario_ssh;
+                    pass = pass || (apRow.clave_ssh_enc ? decryptPass(apRow.clave_ssh_enc) : '');
+                }
+            } catch (e) {
+                console.warn('[enrich-batch] Error leyendo credenciales del AP:', e.message);
+            }
+        }
+
+        if (!user || !pass) return res.status(400).json({ success: false, message: 'Sin credenciales SSH (ni body ni DB)' });
+
+        const results = [];
+        for (const { mac, ip } of cpes) {
+            if (!mac || !ip) continue;
+            try {
+                const s = await getDetail(ip, parseInt(port) || 22, user, pass);
+                const MAC = mac.toUpperCase();
+                await db.run(
+                    `INSERT INTO cpes (mac,hostname,modelo,firmware,ip_lan,mac_lan,mac_wlan,last_seen)
+                     VALUES (?,?,?,?,?,?,?,?)
+                     ON CONFLICT(mac) DO UPDATE SET
+                       hostname=COALESCE(excluded.hostname, hostname),
+                       modelo=COALESCE(excluded.modelo, modelo),
+                       firmware=COALESCE(excluded.firmware, firmware),
+                       ip_lan=excluded.ip_lan,
+                       mac_lan=COALESCE(excluded.mac_lan, mac_lan),
+                       mac_wlan=COALESCE(excluded.mac_wlan, mac_wlan),
+                       last_seen=excluded.last_seen`,
+                    [MAC, s.deviceName || '', s.deviceModel || '', s.firmwareVersion || '',
+                     ip, s.lanMac || '', s.wlanMac || '', Date.now()]
+                );
+                results.push({ mac: MAC, ok: true, hostname: s.deviceName, modelo: s.deviceModel });
+            } catch (err) {
+                results.push({ mac, ok: false, error: err.message });
+            }
+        }
+        res.json({ success: true, results });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// ── CPE detail direct — resuelve credenciales en orden: CPE propio > AP > nodo > ubnt default ──
+router.post('/cpes/:mac/detail-direct', async (req, res) => {
+    try {
+        const { cpe_ip, port, user, pass, apId } = req.body;
+        if (!cpe_ip) return res.status(400).json({ success: false, message: 'cpe_ip requerido' });
+
+        const db = await getDb();
+        const mac = req.params.mac.toUpperCase();
+        let credList = [];
+
+        // 1. Credenciales propias del CPE (almacenadas en cpes)
+        try {
+            const cpeRow = await db.get(
+                'SELECT usuario_ssh, clave_ssh_enc, puerto_ssh FROM cpes WHERE mac = ?', [mac]
+            );
+            if (cpeRow && cpeRow.usuario_ssh) {
+                credList.push({ user: cpeRow.usuario_ssh, pass: cpeRow.clave_ssh_enc ? decryptPass(cpeRow.clave_ssh_enc) : '', port: cpeRow.puerto_ssh || 22 });
+            }
+        } catch (e) {
+            console.warn('[detail-direct] Error leyendo credenciales propias del CPE:', e.message);
+        }
+
+        // 2. Credenciales del AP padre y su nodo (como fallback)
+        if (apId) {
+            try {
+                const apRow = await db.get('SELECT id, usuario_ssh, clave_ssh_enc, ap_group_id, puerto_ssh FROM aps WHERE uuid = ?', [apId]);
+                if (apRow) {
+                    if (apRow.usuario_ssh) {
+                        credList.push({ user: apRow.usuario_ssh, pass: apRow.clave_ssh_enc ? decryptPass(apRow.clave_ssh_enc) : '', port: apRow.puerto_ssh || 22 });
+                    }
+                    // Credenciales del nodo padre — node_ssh_creds uses node_id (INTEGER FK)
+                    // We need to find the node associated with this AP group's context
+                    // Try all node_ssh_creds ordered by priority
+                    const nodeCredRows = await db.all(
+                        'SELECT ssh_user, ssh_pass_enc, ssh_port FROM node_ssh_creds ORDER BY priority'
+                    );
+                    for (const c of nodeCredRows) {
+                        credList.push({ user: c.ssh_user || '', pass: c.ssh_pass_enc ? decryptPass(c.ssh_pass_enc) : '', port: c.ssh_port || 22 });
+                    }
+                }
+            } catch (e) {
+                console.warn('[detail-direct] Error buscando credenciales del AP/nodo:', e.message);
+            }
+        }
+
+        // 3. Credenciales enviadas explicitamente por el frontend (si son distintas de las ya acumuladas)
+        if (user && !credList.some(c => c.user === user)) {
+            credList.push({ user, pass: pass || '', port: parseInt(port) || 22 });
+        }
+
+        // 4. Default Ubiquiti airOS (ubnt/ubnt)
+        if (!credList.some(c => c.user === 'ubnt')) {
+            credList.push({ user: 'ubnt', pass: 'ubnt', port: parseInt(port) || 22 });
+        }
+
+        const sshPort = parseInt(port) || 22;
+        let s = null, lastError = null, usedCred = null;
+        for (const cred of credList) {
+            try {
+                s = await getDetail(cpe_ip, cred.port || sshPort, cred.user, cred.pass);
+                usedCred = cred;
+                break;
+            } catch (e) {
+                lastError = e;
+                console.warn(`[detail-direct] Credencial '${cred.user}' fallida en ${cpe_ip}: ${e.message}`);
+            }
+        }
+        if (!s) throw lastError || new Error('Sin credenciales validas');
+
+        // Persistir credenciales que funcionaron en cpes
+        if (usedCred) {
+            const existingCpe = await db.get('SELECT usuario_ssh FROM cpes WHERE mac = ?', [mac]);
+            if (!existingCpe || !existingCpe.usuario_ssh) {
+                const encPass = usedCred.pass ? encryptPass(usedCred.pass) : null;
+                await db.run(
+                    `INSERT INTO cpes (mac, usuario_ssh, clave_ssh_enc, puerto_ssh, last_seen)
+                     VALUES (?, ?, ?, ?, ?)
+                     ON CONFLICT(mac) DO UPDATE SET
+                       usuario_ssh = excluded.usuario_ssh,
+                       clave_ssh_enc = excluded.clave_ssh_enc,
+                       puerto_ssh  = excluded.puerto_ssh`,
+                    [mac, usedCred.user, encPass, usedCred.port || 22, Date.now()]
+                );
+            }
+        }
+
+        // Resolve ap integer id for the FK
+        const apIntId = apId ? await getApIntId(apId) : null;
+
+        await db.run(
+            `INSERT INTO cpes
+             (mac,ap_id,hostname,modelo,firmware,ip_lan,mac_lan,mac_wlan,mac_ap,
+              modo_red,frecuencia_mhz,canal_mhz,tx_power,ssid_ap,last_seen)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+             ON CONFLICT(mac) DO UPDATE SET
+               hostname=excluded.hostname, modelo=excluded.modelo, firmware=excluded.firmware,
+               ip_lan=excluded.ip_lan, mac_lan=excluded.mac_lan, mac_wlan=excluded.mac_wlan,
+               mac_ap=excluded.mac_ap, modo_red=excluded.modo_red,
+               frecuencia_mhz=excluded.frecuencia_mhz, canal_mhz=excluded.canal_mhz,
+               tx_power=excluded.tx_power, ssid_ap=excluded.ssid_ap,
+               last_seen=excluded.last_seen`,
+            [mac, apIntId || null,
+             s.deviceName || '', s.deviceModel || '', s.firmwareVersion || '',
+             cpe_ip, s.lanMac || '', s.wlanMac || '', s.apMac || '',
+             s.networkMode || '', s.frequency || null, s.channelWidth || null,
+             s.txPower || null, s.essid || '', Date.now()]
+        );
+
+        res.json({ success: true, stats: { ...s, ip: cpe_ip } });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// ── Guardar/actualizar credenciales SSH de un CPE especifico ─────────────
+router.put('/cpes/:mac/credentials', async (req, res) => {
+    try {
+        const mac = req.params.mac.toUpperCase();
+        const { user, pass, port } = req.body;
+        if (!user) return res.status(400).json({ success: false, message: 'user requerido' });
+        const db = await getDb();
+        const encPass = pass ? encryptPass(pass) : null;
+        await db.run(
+            `INSERT INTO cpes (mac, usuario_ssh, clave_ssh_enc, puerto_ssh, last_seen)
+             VALUES (?, ?, ?, ?, ?)
+             ON CONFLICT(mac) DO UPDATE SET
+               usuario_ssh   = excluded.usuario_ssh,
+               clave_ssh_enc = excluded.clave_ssh_enc,
+               puerto_ssh    = excluded.puerto_ssh`,
+            [mac, user, encPass, parseInt(port) || 22, Date.now()]
+        );
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// ── Poll masivo — pollea todos los APs activos del AP Monitor ────────────
+// Actualiza last_stats en cpes para cada CPE visible.
+// Usado por el boton "Actualizar" de la topologia.
+router.post('/poll-all-monitor', async (req, res) => {
+    try {
+        const db  = await getDb();
+        const aps = await db.all('SELECT * FROM aps WHERE is_active = 1');
+        let ok = 0, fail = 0;
+
+        // B3: Limitar concurrencia a 3 APs simultaneos para evitar SQLITE_BUSY
+        const BATCH_SIZE = 3;
+        for (let i = 0; i < aps.length; i += BATCH_SIZE) {
+            await Promise.allSettled(aps.slice(i, i + BATCH_SIZE).map(async (ap) => {
+                try {
+                    const pass     = decryptPass(ap.clave_ssh_enc);
+                    const stations = await pollAp(ap.uuid, ap.ip, ap.puerto_ssh, ap.usuario_ssh, pass, ap.firmware || '');
+
+                    await db.run('BEGIN');
+                    try {
+                        for (const sta of stations) {
+                            if (!sta.mac || !isValidMac(sta.mac)) continue;
+                            const statsJson = JSON.stringify(sta);
+                            // B8: UPSERT atomico — evita race condition SELECT-then-INSERT
+                            await db.run(
+                                `INSERT INTO cpes
+                                 (mac,ap_id,ip_lan,last_seen,last_stats,remote_hostname,remote_platform)
+                                 VALUES (?,?,?,?,?,?,?)
+                                 ON CONFLICT(mac) DO UPDATE SET
+                                   last_seen=excluded.last_seen,
+                                   ap_id=excluded.ap_id,
+                                   ip_lan=COALESCE(excluded.ip_lan, ip_lan),
+                                   last_stats=excluded.last_stats,
+                                   remote_hostname=COALESCE(excluded.remote_hostname, remote_hostname),
+                                   remote_platform=COALESCE(excluded.remote_platform, remote_platform)`,
+                                [sta.mac, ap.id, sta.lastip || null, Date.now(), statsJson,
+                                 sta.remote_hostname || null, sta.remote_platform || null]
+                            );
+                        }
+                        await db.run('COMMIT');
+                    } catch (e) { await db.run('ROLLBACK'); throw e; }
+                    ok++;
+                } catch { fail++; }
+            }));
+        }
+
+        res.json({ success: true, ok, fail, total: aps.length });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// ── Helper: verifica si una IP cae dentro de un CIDR ──────────────────────
+function ipInCidr(ip, cidr) {
+    if (!ip || !cidr) return false;
+    try {
+        const [net, bits] = cidr.split('/');
+        if (!net || !bits) return false;
+        const b = 32 - parseInt(bits);
+        const mask = b >= 32 ? 0 : ~((1 << b) - 1) >>> 0;
+        const toInt = s => s.split('.').reduce((a, o) => ((a << 8) >>> 0) + parseInt(o), 0) >>> 0;
+        return (toInt(ip) & mask) === (toInt(net) & mask);
+    } catch { return false; }
+}
+
+// ── CPEs para Topologia — CPEs conocidos con AP info y ultimo senal ───────
+// ap_id in cpes is now an INTEGER FK to aps.id
+router.get('/topology-cpes', async (req, res) => {
+    try {
+        const db = await getDb();
+
+        // 1. Todos los CPEs con ap_id asignado
+        const cpes = await db.all(`
+            SELECT c.id, c.mac, c.hostname, c.modelo, c.firmware,
+                   c.ip_lan, c.mac_wlan, c.mac_ap, c.ssid_ap,
+                   c.frecuencia_mhz, c.last_seen, c.ap_id,
+                   c.last_stats, c.remote_hostname, c.remote_platform
+            FROM cpes c
+            WHERE c.ap_id IS NOT NULL
+            ORDER BY c.last_seen DESC
+        `);
+
+        if (cpes.length === 0) { return res.json({ success: true, cpes: [] }); }
+
+        // 2. Resolver AP info para cada ap_id unico (INTEGER)
+        const apIntIds = [...new Set(cpes.map(c => c.ap_id))];
+
+        const apsPh   = apIntIds.map(() => '?').join(',');
+        const apsRows = await db.all(
+            `SELECT id, uuid, ip, hostname, ssid, ap_group_id FROM aps WHERE id IN (${apsPh})`,
+            apIntIds
+        );
+
+        // Cargar nodos VPN para resolver nodeId por subred (segmento_lan)
+        const vpnNodeRows = await db.all('SELECT * FROM nodes');
+        const vpnNodes = vpnNodeRows || [];
+
+        // Helper: dada una IP, devuelve el ppp_user del nodo VPN cuya subred la contiene
+        const nodeIdByIp = (ip) => {
+            if (!ip) return null;
+            for (const n of vpnNodes) {
+                if (n.segmento_lan && ipInCidr(ip, n.segmento_lan)) return n.ppp_user || null;
+            }
+            return null;
+        };
+
+        // Mapa ap integer id → { ip, hostname, nodeId, uuid }
+        const apMap = {};
+        apsRows.forEach(a => {
+            const nodeId = nodeIdByIp(a.ip);
+            apMap[a.id] = { ip: a.ip, hostname: a.hostname || a.ssid || '', nodeId, uuid: a.uuid };
+        });
+
+        // 3. Ultima senal por CPE — use cpe integer id
+        const cpeIntIds = cpes.map(c => c.id).filter(Boolean);
+        const sigMap = {};
+        if (cpeIntIds.length > 0) {
+            const ph  = cpeIntIds.map(() => '?').join(',');
+            const rows = await db.all(`
+                SELECT h.cpe_id, h.signal_dbm, h.noisefloor_dbm, h.ccq_pct,
+                       h.downlink_mbps, h.uplink_mbps, h.distancia_km, h.timestamp
+                FROM signal_history h
+                INNER JOIN (
+                    SELECT cpe_id, MAX(timestamp) AS ts
+                    FROM signal_history WHERE cpe_id IN (${ph})
+                    GROUP BY cpe_id
+                ) lts ON h.cpe_id = lts.cpe_id AND h.timestamp = lts.ts
+            `, cpeIntIds);
+            rows.forEach(r => { sigMap[r.cpe_id] = r; });
+        }
+
+        const result = cpes.map(c => {
+            const apInfo = apMap[c.ap_id] || {};
+            // Si el AP no resolvio nodeId, intentar por IP del CPE directamente
+            const nodeId = apInfo.nodeId || nodeIdByIp(c.ip_lan) || null;
+            return {
+                ...c,
+                ap_ip:       apInfo.ip       || null,
+                ap_hostname: apInfo.hostname || null,
+                ap_nodeId:   nodeId,
+                ap_uuid:     apInfo.uuid     || null,
+                lastSignal:  sigMap[c.id]    || null,
+            };
+        });
+
+        res.json({ success: true, cpes: result });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+module.exports = router;
