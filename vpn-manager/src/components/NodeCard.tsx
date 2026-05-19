@@ -460,8 +460,8 @@ export default function NodeCard({ node, rowIndex, onEdit, onDelete, onScript, o
         <td className="px-4 py-3">
           {node.lan_subnets && node.lan_subnets.length > 1 ? (
             <div className="flex flex-col gap-0.5">
-              {node.lan_subnets.map(s => (
-                <span key={s} className="font-mono text-xs font-semibold text-sky-600">{s}</span>
+              {[...new Set(node.lan_subnets)].map((s, i) => (
+                <span key={`${s}-${i}`} className="font-mono text-xs font-semibold text-sky-600">{s}</span>
               ))}
             </div>
           ) : (

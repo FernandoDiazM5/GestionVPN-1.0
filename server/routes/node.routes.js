@@ -359,10 +359,12 @@ router.post('/node/provision', async (req, res) => {
             steps.push({ step: 2, obj: 'SSTP Interface', name: ifaceName, status: 'ok' });
         }
 
-        // Paso 3 — Agregar a LIST-VPN-TOWERS
+        // Paso 3 — Agregar a LIST-VPN-TOWERS y LIST-VPN-SSTP
         await writeIdempotent(api, ['/interface/list/member/add',
             `=interface=${ifaceName}`, '=list=LIST-VPN-TOWERS']);
-        steps.push({ step: 3, obj: 'Interface List (LIST-VPN-TOWERS)', name: ifaceName, status: 'ok' });
+        await writeIdempotent(api, ['/interface/list/member/add',
+            `=interface=${ifaceName}`, '=list=LIST-VPN-SSTP']);
+        steps.push({ step: 3, obj: 'Interface Lists (LIST-VPN-TOWERS + LIST-VPN-SSTP)', name: ifaceName, status: 'ok' });
 
         // Paso 4 — Address List LIST-NET-REMOTE-TOWERS (una entrada por subred)
         const subnets = Array.isArray(lanSubnets) ? lanSubnets : [lanSubnet].filter(Boolean);
@@ -460,114 +462,139 @@ router.post('/node/deprovision', async (req, res) => {
     if (!pppUser)
         return res.status(400).json({ success: false, message: 'pppUser es requerido' });
 
-    // Determinar protocolo: WG si el campo protocol lo dice, o si el nombre de interfaz es WG
     const isWireGuard = protocol === 'wireguard' || pppUser.startsWith('WG-ND') || pppUser.startsWith('VPN-WG-');
     const hasVrf = !!vrfName;
-    // ifaceName: para WG === pppUser (el nombre de la interface WG); para SSTP se deriva del VRF
+    // Para WG: ifaceName === pppUser (ej. "WG-ND4-TORREVICTORN2")
+    // Para SSTP: ifaceName se deriva del VRF (ej. "VPN-SSTP-ND1-HOUSENET")
     const ifaceName = isWireGuard ? pppUser : (hasVrf ? vrfName.replace(/^VRF-/, 'VPN-SSTP-') : '');
+
     const steps = []; let api;
     try {
+        // ── CONEXIÓN 1: Leer TODOS los datos SECUENCIALMENTE ──────────────────────
+        // RouterOS (node-routeros) es protocolo secuencial: comandos concurrentes en
+        // la misma conexión causan "expected !re or !done" y corrupción. Leemos uno
+        // por uno con timeouts cortos (6s). Worst-case 10×6s=60s (suficiente margen),
+        // caso típico ~3-8s total porque /print sin filtro responde inmediato.
+        const apiRead = await connectToMikrotik(ip, user, pass);
+        const safeRead = (cmd) =>
+            safeWrite(apiRead, [cmd], 6000).catch(e => {
+                console.warn(`[DEPROVISION][READ] ${cmd} falló:`, e?.message);
+                return [];
+            });
+
+        const mangle     = await safeRead('/ip/firewall/mangle/print');
+        const members    = await safeRead('/interface/list/member/print');
+        const secrets    = !isWireGuard ? await safeRead('/ppp/secret/print')                : [];
+        const sstpIfaces = !isWireGuard ? await safeRead('/interface/sstp-server/print')     : [];
+        const actives    = !isWireGuard ? await safeRead('/ppp/active/print')                : [];
+        const wgPeers    =  isWireGuard ? await safeRead('/interface/wireguard/peers/print') : [];
+        const wgIfaces   =  isWireGuard ? await safeRead('/interface/wireguard/print')       : [];
+        const addrs      =  isWireGuard ? await safeRead('/ip/address/print')                : [];
+        const vrfs       = hasVrf       ? await safeRead('/ip/vrf/print')                    : [];
+        const routes     = hasVrf       ? await safeRead('/ip/route/print')                  : [];
+
+        // Cerramos apiRead antes de abrir la conexión de escritura para que no haya
+        // api.write() pendientes (por !empty) que contaminen los removes posteriores.
+        await apiRead.close().catch(() => {});
+
+        // ── CONEXIÓN 2: Removes secuenciales en conexión limpia ───────────────────
         api = await connectToMikrotik(ip, user, pass);
+        const silentRemove = (cmd, id) =>
+            safeWrite(api, [cmd, `=.id=${id}`], 10000).catch(e =>
+                console.warn(`[DEPROVISION] ${cmd} id=${id} ignorado:`, e?.message)
+            );
 
+        // ── Paso 1: Reglas Mangle (new-routing-mark === vrfName) ─────────────────
         if (hasVrf) {
-            // Paso 1: Reglas Mangle (WEB-ACCESS) — eliminar solo las que marcan con new-routing-mark === vrfName
-            // NO tocar vpn-activa — eso lo maneja cleanTunnelRules en tunnel/deactivate
-            const mangle = await safeWrite(api, ['/ip/firewall/mangle/print']);
-            const mangleMatch = mangle.filter(m => m['new-routing-mark'] === vrfName);
-            for (const m of mangleMatch) await safeWrite(api, ['/ip/firewall/mangle/remove', `=.id=${m['.id']}`]);
-            steps.push({ step: 1, obj: 'Reglas Mangle (acceso VRF)', name: `${mangleMatch.length} eliminadas`, status: 'ok' });
-
-            // Paso 2: Quitar interfaz de LIST-VPN-TOWERS y LIST-VPN-WG (si aplica)
-            const members = await safeWrite(api, ['/interface/list/member/print']);
-            const memberTowers = members.find(m => m.interface === ifaceName && m.list === 'LIST-VPN-TOWERS');
-            if (memberTowers) await safeWrite(api, ['/interface/list/member/remove', `=.id=${memberTowers['.id']}`]);
-            if (isWireGuard) {
-                const memberWg = members.find(m => m.interface === ifaceName && m.list === 'LIST-VPN-WG');
-                if (memberWg) await safeWrite(api, ['/interface/list/member/remove', `=.id=${memberWg['.id']}`]);
-            }
-            steps.push({ step: 2, obj: 'Interface List (LIST-VPN-TOWERS' + (isWireGuard ? ' + WG' : '') + ')', name: ifaceName, status: 'ok' });
-        } else {
-            steps.push({ step: '—', obj: 'Sin VRF configurado — se omiten pasos VRF', name: '', status: 'ok' });
+            const mangleMatch = mangle.filter(m => m['new-routing-mark'] === vrfName && m['.id']);
+            for (const m of mangleMatch) await silentRemove('/ip/firewall/mangle/remove', m['.id']);
+            steps.push({ step: 1, obj: 'Reglas Mangle', name: `${mangleMatch.length} eliminadas`, status: 'ok' });
         }
 
         if (isWireGuard) {
             // ── Flujo WireGuard ───────────────────────────────────────────────────
 
-            // Paso 3: Eliminar peer(s) WireGuard asociados a esta interface
-            const wgPeers = await safeWrite(api, ['/interface/wireguard/peers/print']).catch(() => []);
-            const peersToRemove = wgPeers.filter(p => p.interface === ifaceName);
-            for (const p of peersToRemove) {
-                await safeWrite(api, ['/interface/wireguard/peers/remove', `=.id=${p['.id']}`]);
-            }
-            steps.push({ step: 3, obj: 'WG Peers', name: `${peersToRemove.length} peer(s) eliminados`, status: 'ok' });
+            // Paso 2: Peers WG (buscar por interface === ifaceName)
+            const peersToRemove = wgPeers.filter(p => p.interface === ifaceName && p['.id']);
+            for (const p of peersToRemove) await silentRemove('/interface/wireguard/peers/remove', p['.id']);
+            steps.push({ step: 2, obj: 'WG Peers', name: `${peersToRemove.length} peer(s)`, status: 'ok' });
 
-            // Paso 4: Eliminar IP address de la interface WG
-            const addrs = await safeWrite(api, ['/ip/address/print']).catch(() => []);
-            const wgAddrs = addrs.filter(a => a.interface === ifaceName);
-            for (const a of wgAddrs) {
-                await safeWrite(api, ['/ip/address/remove', `=.id=${a['.id']}`]);
-            }
-            steps.push({ step: 4, obj: 'WG IP Address', name: `${wgAddrs.length} IP(s) eliminadas`, status: 'ok' });
+            // Paso 3: IP address de la interface WG
+            const wgAddrs = addrs.filter(a => a.interface === ifaceName && a['.id']);
+            for (const a of wgAddrs) await silentRemove('/ip/address/remove', a['.id']);
+            steps.push({ step: 3, obj: 'WG IP Address', name: `${wgAddrs.length} IP(s)`, status: 'ok' });
 
-            // Paso 5: Eliminar la interface WireGuard
-            const wgIfaces = await safeWrite(api, ['/interface/wireguard/print']).catch(() => []);
+            // Paso 4: Interface WireGuard
             const wgIface = wgIfaces.find(i => i.name === ifaceName);
-            if (wgIface) await safeWrite(api, ['/interface/wireguard/remove', `=.id=${wgIface['.id']}`]);
-            steps.push({ step: 5, obj: 'WG Interface', name: ifaceName, status: 'ok' });
+            if (wgIface) await silentRemove('/interface/wireguard/remove', wgIface['.id']);
+            steps.push({ step: 4, obj: 'WG Interface', name: ifaceName, status: 'ok' });
 
-            // Paso 5b: Firewall UDP — gestionado por regla global 13300-13400, no hay regla individual que eliminar
-            steps.push({ step: '5b', obj: 'Firewall Filter UDP', name: 'regla global — sin acción', status: 'ok' });
+            if (hasVrf) {
+                // Paso 5: Interface Lists — LIST-VPN-TOWERS + LIST-VPN-WG
+                let membersRemoved = 0;
+                for (const list of ['LIST-VPN-TOWERS', 'LIST-VPN-WG']) {
+                    const entry = members.find(m => m.interface === ifaceName && m.list === list);
+                    if (entry) { await silentRemove('/interface/list/member/remove', entry['.id']); membersRemoved++; }
+                }
+                steps.push({ step: 5, obj: 'Interface Lists (TOWERS + WG)', name: `${membersRemoved} entradas`, status: 'ok' });
+            }
 
         } else {
             // ── Flujo SSTP ────────────────────────────────────────────────────────
 
+            // Paso 2: Desconectar sesión PPP activa (evita que RouterOS rechace el remove del secret)
+            const activeSession = actives.find(a => a.name === pppUser);
+            if (activeSession) await silentRemove('/ppp/active/remove', activeSession['.id']);
+            steps.push({ step: 2, obj: 'Sesión PPP Activa', name: activeSession ? `desconectada (${pppUser})` : 'sin sesión activa', status: 'ok' });
+
             // Paso 3: PPP Secret
-            const secrets = await safeWrite(api, ['/ppp/secret/print']);
             const secret = secrets.find(s => s.name === pppUser);
-            if (secret) await safeWrite(api, ['/ppp/secret/remove', `=.id=${secret['.id']}`]);
+            if (secret) await silentRemove('/ppp/secret/remove', secret['.id']);
             steps.push({ step: 3, obj: 'PPP Secret', name: pppUser, status: 'ok' });
 
             if (hasVrf) {
-                // Paso 4: Interfaz SSTP server
-                const ifaces = await safeWrite(api, ['/interface/sstp-server/print']);
-                const iface = ifaces.find(i => i.name === ifaceName);
-                if (iface) await safeWrite(api, ['/interface/sstp-server/remove', `=.id=${iface['.id']}`]);
+                // Paso 4: SSTP Interface — buscar primero por user (más robusto), fallback por name
+                const iface = sstpIfaces.find(i => i.user === pppUser)
+                           || sstpIfaces.find(i => i.name === ifaceName);
+                if (iface) await silentRemove('/interface/sstp-server/remove', iface['.id']);
                 steps.push({ step: 4, obj: 'SSTP Interface', name: ifaceName, status: 'ok' });
+
+                // Paso 5: Interface Lists — LIST-VPN-TOWERS + LIST-VPN-SSTP
+                let membersRemoved = 0;
+                for (const list of ['LIST-VPN-TOWERS', 'LIST-VPN-SSTP']) {
+                    const entry = members.find(m => m.interface === ifaceName && m.list === list);
+                    if (entry) { await silentRemove('/interface/list/member/remove', entry['.id']); membersRemoved++; }
+                }
+                steps.push({ step: 5, obj: 'Interface Lists (TOWERS + SSTP)', name: `${membersRemoved} entradas`, status: 'ok' });
             }
         }
 
         if (hasVrf) {
-            // Paso 5 (WG) / Paso 5 (SSTP): LIST-NET-REMOTE-TOWERS — NO TOCAR
-            // Las subredes pueden ser compartidas entre múltiples nodos VPN
+            // Paso 6: Rutas — eliminar TODAS las de esta routing-table (ida LAN + vuelta MGMT)
+            // Hay exactamente 1 VRF por nodo → se eliminan todas las rutas estáticas del VRF
+            const vrfRoutes = routes.filter(r =>
+                r['routing-table'] === vrfName && r.dynamic !== 'true' && r['.id']
+            );
+            for (const r of vrfRoutes) await silentRemove('/ip/route/remove', r['.id']);
+            steps.push({ step: 6, obj: 'Rutas VRF (ida + vuelta)', name: `${vrfRoutes.length} rutas eliminadas`, status: 'ok' });
 
-            // Paso 6: VRF
-            const vrfs = await safeWrite(api, ['/ip/vrf/print']);
+            // Paso 7: VRF — 1 VRF por nodo, se elimina completo
             const vrf = vrfs.find(v => v.name === vrfName);
-            if (vrf) await safeWrite(api, ['/ip/vrf/remove', `=.id=${vrf['.id']}`]);
-            steps.push({ step: 6, obj: 'VRF', name: vrfName, status: 'ok' });
-
-            // Paso 7: Rutas del VRF (rutas LAN + ruta retorno MGMT)
-            const routes = await safeWrite(api, ['/ip/route/print']);
-            const vrfRoutes = routes.filter(r => r['routing-table'] === vrfName && r.dynamic !== 'true');
-            let removedCount = 0;
-            for (const r of vrfRoutes) {
-                try {
-                    await safeWrite(api, ['/ip/route/remove', `=.id=${r['.id']}`]);
-                    removedCount++;
-                } catch (e) { console.error('Error ignorado en delete de ruta:', e.message); }
-            }
-            steps.push({ step: 7, obj: 'Rutas VRF', name: `${removedCount} rutas eliminadas`, status: 'ok' });
+            if (vrf) await silentRemove('/ip/vrf/remove', vrf['.id']);
+            steps.push({ step: 7, obj: 'VRF', name: vrf ? `${vrfName} eliminado` : 'no encontrado (ya eliminado)', status: 'ok' });
         }
 
         await api.close();
 
-        // Paso 8: SQLite cascade (labels, creds, tags, history, ssh_creds, devices, cpes)
+        // Paso 8: SQLite cascade (nodes, aps, cpes_conocidos, historial_senal, node_*)
         let deletedDeviceIds = [];
         try {
             const result = await deleteNode(pppUser);
             deletedDeviceIds = result?.deviceIds || [];
+            steps.push({ step: 8, obj: 'SQLite', name: `${deletedDeviceIds.length} APs + cascadas eliminados`, status: 'ok' });
         } catch (dbErr) {
             console.error('[DB] Error eliminando nodo de SQLite:', dbErr.message);
+            steps.push({ step: 8, obj: 'SQLite', name: `Error: ${dbErr.message}`, status: 'warn' });
         }
 
         res.json({ success: true, message: `Nodo eliminado correctamente`, steps, deletedDeviceIds });
@@ -819,13 +846,13 @@ router.post('/node/script', async (req, res) => {
         const script = `/interface wireguard add name=WG-CORE-ISP mtu=1420 comment="Conexion al Servidor Core"
 /ip address add address=${ipTunnel || `10.10.251.${wgNodeNum * 4 - 2}`}/30 interface=WG-CORE-ISP network=10.10.251.${blockBase30} comment="IP WG Cliente ND${wgNodeNum}"
 /interface wireguard peers add interface=WG-CORE-ISP public-key="${serverPublicKey}" endpoint-address=${serverPublicIP} endpoint-port=${wgPort} allowed-address=192.168.21.0/24,${tunnelNet30} persistent-keepalive=25s comment="Conexion al Servidor Core"
-/ip route add dst-address=192.168.21.0/24 distance=2 gateway=WG-CORE-ISP comment="Retorno hacia Administracion/Software"
+/ip route add dst-address=192.168.21.0/24 distance=20 gateway=WG-CORE-ISP comment="Retorno hacia Administracion/Software"
 `;
         const cpeSteps = [
             { title: 'Crear interfaz WireGuard', cmd: `/interface wireguard add name=WG-CORE-ISP mtu=1420 comment="Conexion al Servidor Core"` },
             { title: 'Asignar IP al túnel (/30)', cmd: `/ip address add address=${ipTunnel || `10.10.251.${wgNodeNum * 4 - 2}`}/30 interface=WG-CORE-ISP network=10.10.251.${blockBase30} comment="IP WG Cliente ND${wgNodeNum}"` },
             { title: 'Agregar peer (servidor Core)', cmd: `/interface wireguard peers add interface=WG-CORE-ISP public-key="${serverPublicKey}" endpoint-address=${serverPublicIP} endpoint-port=${wgPort} allowed-address=192.168.21.0/24,${tunnelNet30} persistent-keepalive=25s comment="Conexion al Servidor Core"` },
-            { title: 'Ruta de retorno hacia administración', cmd: `/ip route add dst-address=192.168.21.0/24 distance=2 gateway=WG-CORE-ISP comment="Retorno hacia Administracion/Software"` }
+            { title: 'Ruta de retorno hacia administración', cmd: `/ip route add dst-address=192.168.21.0/24 distance=20 gateway=WG-CORE-ISP comment="Retorno hacia Administracion/Software"` }
         ];
         return res.json({ success: true, script, cpeSteps });
     }
