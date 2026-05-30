@@ -301,7 +301,11 @@ export default function ApMonitorModule() {
         <DeviceCardModal
           device={logic.viewingApDevice}
           onClose={() => logic.setViewingApDevice(null)}
-          onRemove={() => logic.handleDeleteDev(logic.viewingApDevice)}
+          onRemove={() => {
+            if (logic.viewingApDevice) {
+              logic.handleDeleteDev(logic.viewingApDevice);
+            }
+          }}
           onUpdate={logic.handleUpdateApDevice}
         />
       )}
