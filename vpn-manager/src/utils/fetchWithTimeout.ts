@@ -1,24 +1,30 @@
 import { apiFetch } from './apiClient';
 
 /**
- * Wrapper de fetch con AbortController.
- * Cancela la petición si supera `timeoutMs` (por defecto 10 segundos).
+ * Fetch con timeout automático para evitar que las peticiones queden colgadas.
+ * Automáticamente inyecta el JWT token como apiFetch lo hace.
+ * @param url URL a fetchear
+ * @param options Opciones de fetch (sin timeout)
+ * @param timeoutMs Tiempo máximo en milisegundos (default 30000)
+ * @returns Promise<Response>
  */
 export async function fetchWithTimeout(
-  url: string,
-  options: RequestInit = {},
-  timeoutMs = 10_000,
+  url: string | URL,
+  options?: RequestInit,
+  timeoutMs: number = 30000
 ): Promise<Response> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
   try {
-    return await apiFetch(url, { ...options, signal: controller.signal });
-  } catch (err: unknown) {
-    if (err instanceof Error && err.name === 'AbortError') {
-      throw new Error(`La petición tardó más de ${timeoutMs / 1000}s y fue cancelada.`);
-    }
-    throw err;
-  } finally {
-    clearTimeout(timer);
+    const response = await apiFetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
   }
 }
