@@ -9,8 +9,8 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
-import DeviceCard from './DeviceCard';
-import M5FullInfoModal from './M5FullInfoModal';
+import DeviceCard from '../Common/DeviceCard';
+import M5FullInfoModal from '../Common/M5FullInfoModal';
 import { API_BASE_URL } from '../../config';
 import { deviceDb } from '../../store/deviceDb';
 import { useVpn } from '../../context/VpnContext';

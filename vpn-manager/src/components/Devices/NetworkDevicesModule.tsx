@@ -11,8 +11,8 @@ import {
 import { useVpn } from '../../context/VpnContext';
 import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
 import { deviceDb, credCache } from '../../store/deviceDb';
-import DeviceCard from './DeviceCard';
-import M5FullInfoModal from './M5FullInfoModal';
+import DeviceCard from '../Common/DeviceCard';
+import M5FullInfoModal from '../Common/M5FullInfoModal';
 import { API_BASE_URL } from '../../config';
 import type { ScannedDevice, SavedDevice, AntennaStats } from '../../types/devices';
 import type { NodeInfo } from '../../types/api';

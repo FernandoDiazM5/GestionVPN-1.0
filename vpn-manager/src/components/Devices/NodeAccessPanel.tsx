@@ -10,7 +10,7 @@ import {
 import { useVpn, TUNNEL_TIMEOUT_MS } from '../../context/VpnContext';
 import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
 import type { NodeInfo, WgPeer } from '../../types/api';
-import NodeCard from './NodeCard';
+import NodeCard from '../VPN/NodeCard';
 import { API_BASE_URL } from '../../config';
 import { deviceDb } from '../../store/deviceDb';
 import { cpeCache } from '../../store/cpeCache';
