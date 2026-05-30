@@ -2,12 +2,12 @@ import { useState, useEffect } from 'react';
 import { Server, Radio, LogOut, Wifi, Cpu, Activity, Settings, AlertTriangle } from 'lucide-react';
 import { VpnProvider, useVpn } from './context/VpnContext';
 
-import RouterAccess from './components/RouterAccess';
+import RouterAccess from './components/Auth/RouterAccess';
 
-import NodeAccessPanel from './components/NodeAccessPanel';
-import NetworkDevicesModule from './components/NetworkDevicesModule';
-import ApMonitorModule from './components/ApMonitorModule';
-import SettingsModule from './components/SettingsModule';
+import NodeAccessPanel from './components/Devices/NodeAccessPanel';
+import NetworkDevicesModule from './components/Devices/NetworkDevicesModule';
+import ApMonitorModule from './components/Monitor/ApMonitorModule';
+import SettingsModule from './components/Settings/SettingsModule';
 
 function AppContent() {
   const {
