@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { PlusCircle, Copy, Check, Loader2, Terminal, Cpu, ChevronDown, ChevronUp, Shield } from 'lucide-react';
-import { useVpn } from '../context/VpnContext';
-import { fetchWithTimeout } from '../utils/fetchWithTimeout';
-import { API_BASE_URL } from '../config';
+import { useVpn } from '../../context/VpnContext';
+import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
+import { API_BASE_URL } from '../../config';
 
 interface ProvisionStep {
   step: number;

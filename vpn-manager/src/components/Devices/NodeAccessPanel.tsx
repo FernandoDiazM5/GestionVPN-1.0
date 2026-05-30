@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { apiFetch } from '../utils/apiClient';
+import { apiFetch } from '../../utils/apiClient';
 import {
   RefreshCw, Search,
   ShieldCheck, ShieldOff, AlertCircle, Radio, Clock, X,
@@ -7,13 +7,13 @@ import {
   Wifi, Copy, Check, FileCode, UserPlus, Download, History, Upload,
   ArrowUpDown, Tag, SortAsc, SortDesc, Bell, Globe, Server, WifiOff,
 } from 'lucide-react';
-import { useVpn, TUNNEL_TIMEOUT_MS } from '../context/VpnContext';
-import { fetchWithTimeout } from '../utils/fetchWithTimeout';
-import type { NodeInfo, WgPeer } from '../types/api';
+import { useVpn, TUNNEL_TIMEOUT_MS } from '../../context/VpnContext';
+import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
+import type { NodeInfo, WgPeer } from '../../types/api';
 import NodeCard from './NodeCard';
-import { API_BASE_URL } from '../config';
-import { deviceDb } from '../store/deviceDb';
-import { cpeCache } from '../store/cpeCache';
+import { API_BASE_URL } from '../../config';
+import { deviceDb } from '../../store/deviceDb';
+import { cpeCache } from '../../store/cpeCache';
 
 // ── Tipos para provisión ───────────────────────────────────────────────────
 interface ProvisionStep {

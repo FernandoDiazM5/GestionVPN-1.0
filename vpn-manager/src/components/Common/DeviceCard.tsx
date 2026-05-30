@@ -5,9 +5,9 @@ import {
   Cpu, Clock, Wifi, Thermometer, Zap,
   Info, Database,
 } from 'lucide-react';
-import { fetchWithTimeout } from '../utils/fetchWithTimeout';
-import type { SavedDevice, AntennaStats } from '../types/devices';
-import { API_BASE_URL } from '../config';
+import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
+import type { SavedDevice, AntennaStats } from '../../types/devices';
+import { API_BASE_URL } from '../../config';
 
 interface DeviceCardProps {
   device: SavedDevice;

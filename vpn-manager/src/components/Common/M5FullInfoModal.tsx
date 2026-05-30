@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { Activity, Check, Copy, Cpu, Network, Shield, Wifi, X } from 'lucide-react';
-import type { ScannedDevice, SavedDevice, AntennaStats } from '../types/devices';
+import type { ScannedDevice, SavedDevice, AntennaStats } from '../../types/devices';
 
 function M5Row({ label, value }: { label: string; value?: string | number | null }) {
   if (value == null || value === '') return null;

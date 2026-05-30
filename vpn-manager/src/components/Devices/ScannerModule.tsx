@@ -3,10 +3,10 @@ import {
   RefreshCw, Search, PlusCircle, CheckCircle2,
   ShieldOff, ShieldCheck, ChevronLeft, ChevronRight, AlertCircle,
 } from 'lucide-react';
-import { useVpn } from '../context/VpnContext';
-import { fetchWithTimeout } from '../utils/fetchWithTimeout';
-import type { VpnSecret } from '../store/db';
-import { API_BASE_URL } from '../config';
+import { useVpn } from '../../context/VpnContext';
+import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
+import type { VpnSecret } from '../../store/db';
+import { API_BASE_URL } from '../../config';
 
 const PAGE_SIZE = 20;
 

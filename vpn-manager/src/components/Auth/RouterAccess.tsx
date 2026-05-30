@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Radio, Lock, User, Server, ShieldCheck, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
-import { useVpn } from '../context/VpnContext';
-import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { useVpn } from '../../context/VpnContext';
+import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
 
-import { API_BASE_URL } from '../config';
+import { API_BASE_URL } from '../../config';
 
 export default function RouterAccess() {
   const { handleLoginSuccess } = useVpn();

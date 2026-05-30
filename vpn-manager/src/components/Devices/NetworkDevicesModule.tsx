@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, Fragment, useMemo } from 'react';
-import { apiFetch } from '../utils/apiClient';
+import { apiFetch } from '../../utils/apiClient';
 import type { ReactNode } from 'react';
 import {
   Cpu, RefreshCw, Loader2, Radio, AlertCircle,
@@ -8,14 +8,14 @@ import {
   SlidersHorizontal, Search, KeyRound,
   Activity, GripVertical,
 } from 'lucide-react';
-import { useVpn } from '../context/VpnContext';
-import { fetchWithTimeout } from '../utils/fetchWithTimeout';
-import { deviceDb, credCache } from '../store/deviceDb';
+import { useVpn } from '../../context/VpnContext';
+import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
+import { deviceDb, credCache } from '../../store/deviceDb';
 import DeviceCard from './DeviceCard';
 import M5FullInfoModal from './M5FullInfoModal';
-import { API_BASE_URL } from '../config';
-import type { ScannedDevice, SavedDevice, AntennaStats } from '../types/devices';
-import type { NodeInfo } from '../types/api';
+import { API_BASE_URL } from '../../config';
+import type { ScannedDevice, SavedDevice, AntennaStats } from '../../types/devices';
+import type { NodeInfo } from '../../types/api';
 
 const SESSION_SCAN_KEY = 'vpn_scan_results_v1';
 const COLS_STORAGE_KEY = 'vpn_diag_cols_v2';
