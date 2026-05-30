@@ -1,5 +1,2 @@
 export { default } from './VpnCard';
-export * from './types';
-export * from './utils';
-export * from './hooks';
-export * from './components';
+export type { VpnConnectionInfo } from './types';

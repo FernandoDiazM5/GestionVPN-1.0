@@ -1,5 +1,3 @@
 export { default } from './SettingsModule';
-export * from './types';
-export * from './constants';
-export * from './hooks';
-export * from './components';
+export type { AppSettings, SettingsState } from './types';
+export { SETTINGS_LABELS, TAB_VALUES, TAB_LABELS } from './constants';

@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import DeviceCard from '../../Common/DeviceCard';
 import M5FullInfoModal from '../../Common/M5FullInfoModal';
-import { useVpn } from '../../../context/VpnContext';
+import { useVpn } from '../../../context';
 import type { SavedDevice } from '../../../types/devices';
 
 import ApGroupCard from './components/ApGroupCard';

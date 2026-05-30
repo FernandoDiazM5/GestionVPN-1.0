@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Server, Radio, LogOut, Wifi, Cpu, Activity, Settings, AlertTriangle } from 'lucide-react';
-import { VpnProvider, useVpn } from './context/VpnContext';
+import { VpnProvider, useVpn } from './context';
 
 import RouterAccess from './components/Auth/RouterAccess';
 

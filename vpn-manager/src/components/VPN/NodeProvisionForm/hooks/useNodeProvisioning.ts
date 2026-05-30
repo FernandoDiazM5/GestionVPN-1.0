@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useVpn } from '../../../../context/VpnContext';
+import { useVpn } from '../../../../context';
 import { fetchWithTimeout } from '../../../../utils/fetchWithTimeout';
 import { API_BASE_URL } from '../../../../config';
 import { PROVISION_TIMEOUT } from '../constants';

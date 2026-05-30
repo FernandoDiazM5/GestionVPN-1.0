@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useVpn } from '../../context/VpnContext';
+import { useVpn } from '../../context';
 import { useSecretScanning, useSecretManagement } from './hooks';
 import { filterSecrets, calculateTotalPages, getPaginatedSecrets } from './utils';
 import { ScannerHeader, ScannerError, SecretsTable, EmptyState } from './components';

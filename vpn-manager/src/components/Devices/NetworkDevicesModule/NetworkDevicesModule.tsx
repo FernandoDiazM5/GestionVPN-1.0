@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, Fragment, useMemo } from 'react';
-import { useVpn } from '../../../context/VpnContext';
+import { useVpn } from '../../../context';
 import { deviceDb, credCache } from '../../../store/deviceDb';
 import { fetchWithTimeout } from '../../../utils/fetchWithTimeout';
 import { apiFetch } from '../../../utils/apiClient';

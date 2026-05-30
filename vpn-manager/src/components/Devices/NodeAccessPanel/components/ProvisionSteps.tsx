@@ -1,5 +1,5 @@
 import { AlertCircle } from 'lucide-react';
-import type { ProvisionStep } from '../types';
+import type { ProvisionStep } from '../utils';
 
 interface ProvisionStepsProps {
   steps: ProvisionStep[];
@@ -7,7 +7,7 @@ interface ProvisionStepsProps {
   visible: number;
 }
 
-export function ProvisionSteps({ steps, failedAt, visible }: ProvisionStepsProps) {
+export default function ProvisionSteps({ steps, failedAt, visible }: ProvisionStepsProps) {
   return (
     <div className="space-y-1.5">
       {(steps ?? []).slice(0, visible).map(s => (

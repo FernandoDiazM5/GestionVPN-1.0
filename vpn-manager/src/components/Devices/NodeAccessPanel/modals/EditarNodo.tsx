@@ -3,7 +3,7 @@ import {
   Pencil, X, CheckCircle2, AlertCircle, Loader2, Eye, EyeOff,
   RefreshCw, Copy, Check, Plus, Minus, ShieldCheck,
 } from 'lucide-react';
-import { useVpn } from '../../../../context/VpnContext';
+import { useVpn } from '../../../../context';
 import { fetchWithTimeout } from '../../../../utils/fetchWithTimeout';
 import { API_BASE_URL } from '../../../../config';
 import { generateSecurePassword, getSubnetConflicts } from '../utils';

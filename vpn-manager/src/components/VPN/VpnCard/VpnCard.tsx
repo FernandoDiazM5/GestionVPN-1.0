@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useVpn } from '../../../context/VpnContext';
+import { useVpn } from '../../../context';
 import { useVpnStatus, useVpnLogs, useVpnUptime } from './hooks';
 import { VpnCardRow } from './components';
 import ConfirmModal from '../../Common/ConfirmModal';

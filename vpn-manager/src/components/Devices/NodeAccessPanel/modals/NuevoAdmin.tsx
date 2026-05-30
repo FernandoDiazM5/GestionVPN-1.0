@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { UserPlus, X, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
-import { useVpn } from '../../../../context/VpnContext';
+import { useVpn } from '../../../../context';
 import { fetchWithTimeout } from '../../../../utils/fetchWithTimeout';
 import { API_BASE_URL } from '../../../../config';
 import type { WgPeer } from '../../../../types/api';

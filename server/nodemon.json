@@ -1,0 +1,8 @@
+{
+  "watch": ["*.js", "routes/", "db.service.js", "routeros.service.js", "ubiquiti.service.js", "ap.service.js", "auth.middleware.js"],
+  "ignore": ["*.sqlite*", "node_modules/"],
+  "ext": "js,json",
+  "env": {
+    "NODE_ENV": "development"
+  }
+}

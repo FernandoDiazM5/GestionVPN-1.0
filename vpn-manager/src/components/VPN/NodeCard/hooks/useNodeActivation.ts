@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { apiFetch } from '../../../../utils/apiClient';
 import { fetchWithTimeout } from '../../../../utils/fetchWithTimeout';
-import { useVpn, TUNNEL_TIMEOUT_MS } from '../../../../context/VpnContext';
+import { useVpn, TUNNEL_TIMEOUT_MS } from '../../../../context';
 import { API_BASE_URL } from '../../../../config';
 import type { NodeInfo, TunnelActivateResponse } from '../../../../types/api';
 

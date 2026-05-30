@@ -1,1 +1,1 @@
-export { ProvisionSteps } from './ProvisionSteps';
+export { default as ProvisionSteps } from './ProvisionSteps';

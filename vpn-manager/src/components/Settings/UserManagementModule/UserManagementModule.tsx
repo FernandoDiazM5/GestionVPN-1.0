@@ -1,4 +1,4 @@
-import { useVpn } from '../../../context/VpnContext';
+import { useVpn } from '../../../context';
 import { useLoadUsers, useUserForm, useUserActions } from './hooks';
 import {
   UserListHeader,

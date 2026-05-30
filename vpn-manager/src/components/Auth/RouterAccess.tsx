@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Radio, Lock, User, Server, ShieldCheck, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
-import { useVpn } from '../../context/VpnContext';
+import { useVpn } from '../../context';
 import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
 
 import { API_BASE_URL } from '../../config';

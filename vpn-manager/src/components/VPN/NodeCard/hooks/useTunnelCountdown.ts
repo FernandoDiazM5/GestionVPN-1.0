@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useVpn } from '../../../../context/VpnContext';
+import { useVpn } from '../../../../context';
 import { formatCountdown } from '../utils';
 
 export function useTunnelCountdown(isThisNodeActive: boolean) {
