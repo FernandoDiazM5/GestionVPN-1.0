@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, Fragment } from 'react';
 import { createPortal } from 'react-dom';
-import { apiFetch } from '../utils/apiClient';
+import { apiFetch } from '../../utils/apiClient';
 import { Play, ShieldOff, Wifi, WifiOff, Clock, Loader2, Radio, Pencil, Trash2, FileCode, History, Tag, KeyRound, Check, X, PlusCircle, Eye, EyeOff, Wrench, MoreVertical } from 'lucide-react';
-import { useVpn, TUNNEL_TIMEOUT_MS } from '../context/VpnContext';
-import { fetchWithTimeout } from '../utils/fetchWithTimeout';
-import type { NodeInfo, TunnelActivateResponse } from '../types/api';
-import { API_BASE_URL } from '../config';
+import { useVpn, TUNNEL_TIMEOUT_MS } from '../../context/VpnContext';
+import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
+import type { NodeInfo, TunnelActivateResponse } from '../../types/api';
+import { API_BASE_URL } from '../../config';
 
 interface NodeCardProps {
   node: NodeInfo;

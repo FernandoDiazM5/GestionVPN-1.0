@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { Play, Square, Trash2, Loader2, Wifi, WifiOff, Clock } from 'lucide-react';
-import { useVpn } from '../context/VpnContext';
-import { fetchWithTimeout } from '../utils/fetchWithTimeout';
-import type { VpnSecret } from '../store/db';
-import type { ActivateResponse, DeactivateResponse } from '../types/api';
+import { useVpn } from '../../context/VpnContext';
+import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
+import type { VpnSecret } from '../../store/db';
+import type { ActivateResponse, DeactivateResponse } from '../../types/api';
 import ConfirmModal from './ConfirmModal';
-import { API_BASE_URL } from '../config';
+import { API_BASE_URL } from '../../config';
 
 function parseRouterUptime(uptime: string): number {
   let total = 0;

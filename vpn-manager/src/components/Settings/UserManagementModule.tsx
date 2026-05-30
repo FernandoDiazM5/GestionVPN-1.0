@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Users, UserPlus, Save, Trash2, Shield, Loader2, ArrowLeft } from 'lucide-react';
-import { apiFetch } from '../utils/apiClient';
-import { API_BASE_URL } from '../config';
-import { useVpn } from '../context/VpnContext';
+import { apiFetch } from '../../utils/apiClient';
+import { API_BASE_URL } from '../../config';
+import { useVpn } from '../../context/VpnContext';
 
 interface UserInfo {
   id: number;

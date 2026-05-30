@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Settings, Save, Server, Shield, Loader2, Key, Users } from 'lucide-react';
-import { apiFetch } from '../utils/apiClient';
-import { API_BASE_URL } from '../config';
+import { apiFetch } from '../../utils/apiClient';
+import { API_BASE_URL } from '../../config';
 import UserManagementModule from './UserManagementModule';
 
 interface AppSettings {
