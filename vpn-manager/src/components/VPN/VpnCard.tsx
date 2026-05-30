@@ -4,7 +4,7 @@ import { useVpn } from '../../context/VpnContext';
 import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
 import type { VpnSecret } from '../../store/db';
 import type { ActivateResponse, DeactivateResponse } from '../../types/api';
-import ConfirmModal from './ConfirmModal';
+import ConfirmModal from '../Common/ConfirmModal';
 import { API_BASE_URL } from '../../config';
 
 function parseRouterUptime(uptime: string): number {
