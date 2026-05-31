@@ -1,5 +1,8 @@
+try { require('dotenv').config(); } catch (_) { /* opcional */ }
 const express = require('express');
 const cors    = require('cors');
+const healthRoutes = require('./routes/health.routes');
+const { errorMiddleware } = require('./lib/apiResponse');
 const coreRoutes = require('./routes/core.routes');
 const nodeRoutes = require('./routes/node.routes');
 const deviceRoutes = require('./routes/device.routes');
@@ -57,6 +60,7 @@ app.use(cors({
 app.use(express.json());
 
 // Montar rutas públicas e integradas
+app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
 
 // Omitir apiRoutes legado que ya fue borrado, registrar los modulares protegidos
@@ -67,6 +71,9 @@ app.use('/api', verifyToken, wireguardRoutes);
 app.use('/api', verifyToken, settingsRoutes);
 app.use('/api/users', verifyToken, usersRoutes);
 app.use('/api/ap-monitor', verifyToken, apRoutes);
+
+// ── Middleware de error central (estandariza respuestas) ─────────────────────
+app.use(errorMiddleware);
 
 // ── Inicia el servidor con reintentos si el puerto sigue ocupado ─────────────
 function startServer(attempt = 1) {
