@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Users, Loader2, ShieldCheck, WifiOff, RefreshCw } from 'lucide-react';
-import { useSession } from '../../../hooks/useSession';
+import { useWorkspaceSession } from '../../../context/WorkspaceSession';
 import { useWorkspaceEvents } from '../../../hooks/useWorkspaceEvents';
 import { teamApi } from '../../../services/teamApi';
 import { auditApi } from '../../../services/auditApi';
@@ -10,9 +10,10 @@ import { canInvite, isModerator } from '../../../utils/permissions';
 import MembersTable from './components/MembersTable';
 import InvitePanel from './components/InvitePanel';
 import AuditTimeline from './components/AuditTimeline';
+import MemberProfile from './components/MemberProfile';
 
 export default function TeamModule() {
-  const { session, loading, refresh } = useSession();
+  const { session, loading, refresh } = useWorkspaceSession();
 
   const [members, setMembers] = useState<Member[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
@@ -89,6 +90,11 @@ export default function TeamModule() {
         </button>
       </div>
     );
+  }
+
+  // ── View (MEMBER): ve su propio perfil, no la gestión del equipo ──
+  if (session.role === 'MEMBER') {
+    return <MemberProfile session={session} />;
   }
 
   return (

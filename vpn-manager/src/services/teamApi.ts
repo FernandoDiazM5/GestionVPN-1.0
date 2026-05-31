@@ -40,4 +40,8 @@ export const teamApi = {
 
   getMemberWireguard: (userId: string) =>
     get<{ success: true; wireguard: MemberWireguard }>(`/api/team/member/${userId}/wireguard`),
+
+  /** Acceso WireGuard del propio usuario en sesión. */
+  myWireguard: () =>
+    get<{ success: true; wireguard: MemberWireguard }>('/api/team/member/me/wireguard'),
 };
