@@ -17,8 +17,13 @@ const workspaceRepo = require('../db/repos/workspaceRepo');
  * devuelve { token, user } con la sesión multi-tenant.
  * @param {string} username  username del login legacy
  */
+// Usuario que opera la plataforma (Administrador / Sistemas). Configurable.
+const PLATFORM_ADMIN_USERNAME = (process.env.PLATFORM_ADMIN_USERNAME || 'admin').toLowerCase();
+
 async function buildSessionForLegacyUser(username) {
   const email = `${String(username).toLowerCase()}@local.app`;
+  const isPlatformAdmin = String(username).toLowerCase() === PLATFORM_ADMIN_USERNAME;
+  const { query } = require('../db/mysql');
   let user = await userRepo.findByEmail(email);
 
   if (!user) {
@@ -26,13 +31,17 @@ async function buildSessionForLegacyUser(username) {
     const now = Date.now();
     await withTransaction(async (tx) => {
       await tx.query(
-        `INSERT INTO users (id, email, password_hash, name, email_verified, created_at, updated_at)
-         VALUES (?,?,?,?,1,?,?)`,
-        [id, email, await bcrypt.hash(crypto.randomUUID(), 10), username, now, now]
+        `INSERT INTO users (id, email, password_hash, name, is_platform_admin, email_verified, created_at, updated_at)
+         VALUES (?,?,?,?,?,1,?,?)`,
+        [id, email, await bcrypt.hash(crypto.randomUUID(), 10), username, isPlatformAdmin ? 1 : 0, now, now]
       );
       await workspaceRepo.createForOwner(tx, { ownerId: id, name: `Espacio de ${username}` });
     });
     user = await userRepo.findByEmail(email);
+  } else if (Number(user.is_platform_admin) !== (isPlatformAdmin ? 1 : 0)) {
+    // Sincroniza el flag si cambió la designación
+    await query('UPDATE users SET is_platform_admin = ? WHERE id = ?', [isPlatformAdmin ? 1 : 0, user.id]);
+    user.is_platform_admin = isPlatformAdmin ? 1 : 0;
   }
 
   let membership = await workspaceRepo.findMembershipByUser(user.id);
@@ -43,14 +52,16 @@ async function buildSessionForLegacyUser(username) {
     membership = await workspaceRepo.findMembershipByUser(user.id);
   }
 
+  const platform_admin = Number(user.is_platform_admin) === 1;
   const token = signSession({
-    sub: user.id, email: user.email, workspace_id: membership.workspace_id, role: membership.role,
+    sub: user.id, email: user.email, workspace_id: membership.workspace_id,
+    role: membership.role, platform_admin,
   });
   return {
     token,
     user: {
       id: user.id, email: user.email, name: user.name,
-      role: membership.role, workspace_id: membership.workspace_id,
+      role: membership.role, workspace_id: membership.workspace_id, platform_admin,
     },
   };
 }

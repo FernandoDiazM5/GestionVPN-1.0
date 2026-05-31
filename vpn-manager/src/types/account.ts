@@ -12,6 +12,29 @@ export interface SessionUser {
   name?: string;
   role: Role;
   workspace_id: string;
+  /** Administrador de plataforma (Sistemas) — opera la plataforma. */
+  platform_admin?: boolean;
+}
+
+/** Moderador (OWNER de un workspace) visto por el Administrador. */
+export interface Moderator {
+  user_id: string;
+  email: string;
+  name: string;
+  created_at: number;
+  workspace_id: string;
+  workspace_name: string;
+  miembros: number;
+}
+
+/** Métricas del dashboard del Administrador. */
+export interface AdminSummary {
+  workspaces: number;
+  usuarios: number;
+  moderadores: number;
+  comoderadores: number;
+  miembros: number;
+  acciones_24h: number;
 }
 
 /** Miembro del workspace (GET /api/team/members). */

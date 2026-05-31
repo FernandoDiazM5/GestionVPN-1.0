@@ -32,8 +32,8 @@ export interface VpnContextType {
   removeNodeFromState: (pppUser: string) => void;
 
   // Navegación
-  activeModule: 'nodes' | 'users' | 'team' | 'devices' | 'monitor' | 'settings';
-  setActiveModule: React.Dispatch<React.SetStateAction<'nodes' | 'users' | 'team' | 'devices' | 'monitor' | 'settings'>>;
+  activeModule: 'dashboard' | 'moderators' | 'nodes' | 'users' | 'team' | 'devices' | 'monitor' | 'settings';
+  setActiveModule: React.Dispatch<React.SetStateAction<'dashboard' | 'moderators' | 'nodes' | 'users' | 'team' | 'devices' | 'monitor' | 'settings'>>;
 
   // Tema
   darkMode: boolean;

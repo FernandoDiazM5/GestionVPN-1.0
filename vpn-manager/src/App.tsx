@@ -4,7 +4,10 @@ import { VpnProvider, useVpn } from './context';
 
 import RouterAccess from './components/Auth/RouterAccess';
 import Sidebar from './components/Layout/Sidebar';
+import { WorkspaceSessionProvider } from './context/WorkspaceSession';
 
+import AdminDashboard from './components/Admin/AdminDashboard/AdminDashboard';
+import ModeratorsModule from './components/Admin/ModeratorsModule/ModeratorsModule';
 import NodeAccessPanel from './components/Devices/NodeAccessPanel';
 import UserManagementPanel from './components/Users/UserManagementPanel';
 import TeamModule from './components/Team/TeamModule';
@@ -51,12 +54,17 @@ function AppContent() {
   }
 
   return (
+    <WorkspaceSessionProvider>
     <div className="page-bg text-slate-900 flex flex-col lg:flex-row min-h-screen">
       {/* Sidebar (desktop) + barra superior y drawer (móvil) */}
       <Sidebar />
 
       {/* Contenido */}
       <main className="flex-1 min-w-0 max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in slide-in-from-bottom-3 duration-400">
+
+        {activeModule === 'dashboard' && <AdminDashboard />}
+
+        {activeModule === 'moderators' && <ModeratorsModule />}
 
         {/* Banner: MikroTik no configurado */}
         {configAlert && activeModule !== 'settings' && (
@@ -91,6 +99,7 @@ function AppContent() {
       </main>
 
     </div>
+    </WorkspaceSessionProvider>
   );
 }
 

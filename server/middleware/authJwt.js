@@ -29,4 +29,11 @@ function requireRole(...roles) {
   };
 }
 
-module.exports = { requireSession, requireRole };
+/** Exige Administrador de plataforma (Sistemas). */
+function requirePlatformAdmin(req, res, next) {
+  if (!req.account) return sendError(res, 401, 'No autenticado', 'NO_SESSION');
+  if (!req.account.platform_admin) return sendError(res, 403, 'Solo el Administrador', 'NOT_PLATFORM_ADMIN');
+  next();
+}
+
+module.exports = { requireSession, requireRole, requirePlatformAdmin };

@@ -1,17 +1,16 @@
 import { useState, useEffect } from 'react';
 import {
-  Radio, Cpu, Users, UsersRound, Activity, Settings,
+  Radio, Cpu, Users, UsersRound, Activity, Settings, LayoutDashboard, UserCog,
   LogOut, ChevronLeft, Menu, X, Wifi, Server, Sun, Moon,
 } from 'lucide-react';
 import { useVpn } from '../../context';
-
-type ModuleId = 'nodes' | 'users' | 'team' | 'devices' | 'monitor' | 'settings';
+import { useWorkspaceSession } from '../../context/WorkspaceSession';
+import { visibleModules, type ModuleId } from '../../utils/permissions';
 
 interface NavItem {
   id: ModuleId;
   label: string;
   icon: typeof Radio;
-  adminOnly?: boolean;
 }
 
 interface NavGroup {
@@ -20,6 +19,13 @@ interface NavGroup {
 }
 
 const NAV: NavGroup[] = [
+  {
+    category: 'Plataforma',
+    items: [
+      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { id: 'moderators', label: 'Moderadores', icon: UserCog },
+    ],
+  },
   {
     category: 'Red',
     items: [
@@ -43,7 +49,7 @@ const NAV: NavGroup[] = [
   {
     category: 'Sistema',
     items: [
-      { id: 'settings', label: 'Ajustes', icon: Settings, adminOnly: true },
+      { id: 'settings', label: 'Ajustes', icon: Settings },
     ],
   },
 ];
@@ -52,6 +58,7 @@ const LS_COLLAPSED = 'vpn_sidebar_collapsed';
 
 export default function Sidebar() {
   const { activeModule, setActiveModule, credentials, handleLogout, darkMode, toggleDarkMode } = useVpn();
+  const { session } = useWorkspaceSession();
 
   const [collapsed, setCollapsed] = useState<boolean>(() => localStorage.getItem(LS_COLLAPSED) === 'true');
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -60,10 +67,19 @@ export default function Sidebar() {
     localStorage.setItem(LS_COLLAPSED, String(collapsed));
   }, [collapsed]);
 
-  const isAdmin = credentials?.role === 'admin';
+  // Módulos visibles según la sesión (rol + plataforma)
+  const visible = visibleModules(session);
+
+  // Si el módulo activo no es visible para este rol, salta al primero permitido
+  useEffect(() => {
+    if (session && !visible.includes(activeModule as ModuleId)) {
+      setActiveModule(visible[0] as never);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, activeModule]);
 
   const handleNav = (id: ModuleId) => {
-    setActiveModule(id);
+    setActiveModule(id as never);
     setMobileOpen(false);
   };
 
@@ -115,7 +131,7 @@ export default function Sidebar() {
       {/* ── Navegación por categorías ── */}
       <nav className="flex-1 overflow-y-auto py-3 space-y-4">
         {NAV.map(group => {
-          const items = group.items.filter(it => !it.adminOnly || isAdmin);
+          const items = group.items.filter(it => visible.includes(it.id));
           if (items.length === 0) return null;
           return (
             <div key={group.category}>

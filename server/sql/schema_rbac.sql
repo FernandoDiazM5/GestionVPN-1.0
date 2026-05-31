@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS users (
   email           VARCHAR(255)  NOT NULL,
   password_hash   VARCHAR(255)  NOT NULL,
   name            VARCHAR(120)  NOT NULL DEFAULT '',
+  is_platform_admin TINYINT(1)  NOT NULL DEFAULT 0,     -- Administrador (Sistemas): opera la plataforma
   email_verified  TINYINT(1)    NOT NULL DEFAULT 0,     -- verificado vía OTP
   otp_hash        VARCHAR(255)  DEFAULT NULL,           -- HASH del OTP de registro (nunca en claro)
   otp_expires_at  BIGINT        DEFAULT NULL,

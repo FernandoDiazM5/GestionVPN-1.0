@@ -2,10 +2,31 @@
 //  Helpers de permisos RBAC (Fase 4)
 //  Reflejan las reglas aplicadas en el backend (team.routes.js).
 // ============================================================
-import type { Role } from '../types/account';
+import type { Role, SessionUser } from '../types/account';
 
 export const isOwner = (role?: Role) => role === 'OWNER';
 export const isModerator = (role?: Role) => role === 'OWNER' || role === 'CO_MODERATOR';
+
+/** Administrador de plataforma (Sistemas). */
+export const isPlatformAdmin = (s?: SessionUser | null) => !!s?.platform_admin;
+
+export type ModuleId = 'dashboard' | 'moderators' | 'nodes' | 'devices' | 'users' | 'team' | 'monitor' | 'settings';
+
+/**
+ * Módulos visibles según la sesión (RBAC + plataforma).
+ *  - Administrador (Sistemas): solo opera la plataforma (dashboard + moderadores).
+ *  - Moderador (OWNER): sistema completo.
+ *  - View (MEMBER): solo sus túneles + equipo(perfil) + ajustes(perfil).
+ */
+export function visibleModules(s?: SessionUser | null): ModuleId[] {
+  if (!s) return ['nodes'];
+  if (s.platform_admin) return ['dashboard', 'moderators'];
+  if (s.role === 'MEMBER') return ['nodes', 'team', 'settings'];
+  // OWNER / CO_MODERATOR → sistema completo
+  return ['nodes', 'devices', 'users', 'team', 'monitor', 'settings'];
+}
+
+export const canSeeModule = (s: SessionUser | null | undefined, m: ModuleId) => visibleModules(s).includes(m);
 
 /** Puede invitar miembros. */
 export const canInvite = (role?: Role) => isModerator(role);

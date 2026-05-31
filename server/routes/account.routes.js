@@ -182,6 +182,7 @@ router.get('/me', requireSession, asyncHandler(async (req, res) => {
     user: {
       id: user.id, email: user.email, name: user.name,
       role: req.account.role, workspace_id: req.account.workspace_id,
+      platform_admin: Number(user.is_platform_admin) === 1,
     },
   });
 }));
