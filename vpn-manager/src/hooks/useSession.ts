@@ -23,7 +23,14 @@ export function useSession(): UseSessionResult {
       const r = await accountApi.me();
       setSession(r.user);
     } catch {
-      setSession(null);
+      // Sin sesión multi-usuario: intenta puente automático desde el login
+      // actual de la app (evita pedir doble login).
+      try {
+        const b = await accountApi.bridge();
+        setSession(b.user);
+      } catch {
+        setSession(null);
+      }
     } finally {
       setLoading(false);
     }

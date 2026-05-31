@@ -1,14 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Users, Loader2, LogOut, ShieldCheck } from 'lucide-react';
+import { Users, Loader2, ShieldCheck, WifiOff, RefreshCw } from 'lucide-react';
 import { useSession } from '../../../hooks/useSession';
 import { useWorkspaceEvents } from '../../../hooks/useWorkspaceEvents';
 import { teamApi } from '../../../services/teamApi';
 import { auditApi } from '../../../services/auditApi';
-import { accountApi } from '../../../services/accountApi';
 import { ROLE_LABEL } from '../../../types/account';
 import type { Member, Invitation, AuditLog, Role } from '../../../types/account';
 import { canInvite, isModerator } from '../../../utils/permissions';
-import SessionGate from './components/SessionGate';
 import MembersTable from './components/MembersTable';
 import InvitePanel from './components/InvitePanel';
 import AuditTimeline from './components/AuditTimeline';
@@ -66,9 +64,7 @@ export default function TeamModule() {
     try { await teamApi.removeMember(m.user_id); await loadData(); }
     finally { setBusyId(null); }
   };
-  const handleLogout = async () => { try { await accountApi.logout(); } finally { refresh(); } };
-
-  // ── Estados de carga / sin sesión ──
+  // ── Estado de carga ──
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
@@ -76,27 +72,39 @@ export default function TeamModule() {
       </div>
     );
   }
-  if (!session) return <SessionGate onAuthed={refresh} />;
+
+  // ── Sin sesión: el puente automático falló (p. ej. MySQL apagado) ──
+  if (!session) {
+    return (
+      <div className="card border-dashed border-2 border-slate-200 dark:border-slate-700 py-16 flex flex-col items-center text-center space-y-3">
+        <div className="w-14 h-14 bg-amber-50 dark:bg-amber-500/15 rounded-2xl flex items-center justify-center">
+          <WifiOff className="w-7 h-7 text-amber-500" />
+        </div>
+        <p className="text-slate-600 dark:text-slate-300 font-semibold">Gestión de equipo no disponible</p>
+        <p className="text-slate-400 dark:text-slate-500 text-sm max-w-sm">
+          No se pudo conectar al servicio multi-usuario. Verifica que la base de datos (MySQL/XAMPP) esté activa.
+        </p>
+        <button onClick={refresh} className="btn-outline px-4 py-2 flex items-center gap-2 text-sm">
+          <RefreshCw className="w-4 h-4" /> Reintentar
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
       {/* Cabecera */}
-      <div className="card p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="min-w-0">
-          <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-            <Users className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
-            <span>Equipo</span>
-          </h2>
-          <p className="text-slate-400 dark:text-slate-500 text-sm mt-1 flex items-center gap-2 flex-wrap">
-            <span className="font-mono text-xs">{session.email}</span>
-            <span className="badge badge-info inline-flex items-center gap-1">
-              <ShieldCheck className="w-3 h-3" /> {ROLE_LABEL[session.role]}
-            </span>
-          </p>
-        </div>
-        <button onClick={handleLogout} className="btn-outline px-4 py-2.5 flex items-center gap-2 text-sm shrink-0">
-          <LogOut className="w-4 h-4" /> Cerrar sesión de equipo
-        </button>
+      <div className="card p-6">
+        <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+          <Users className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
+          <span>Equipo</span>
+        </h2>
+        <p className="text-slate-400 dark:text-slate-500 text-sm mt-1 flex items-center gap-2 flex-wrap">
+          <span className="font-mono text-xs">{session.email}</span>
+          <span className="badge badge-info inline-flex items-center gap-1">
+            <ShieldCheck className="w-3 h-3" /> {ROLE_LABEL[session.role]}
+          </span>
+        </p>
       </div>
 
       {loadingData && (
