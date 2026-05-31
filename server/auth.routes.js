@@ -6,7 +6,7 @@ const bcrypt = require('bcryptjs');
 const { hasUsers, getUserByUsername, createUser } = require('./db.service');
 const { JWT_SECRET } = require('./auth.middleware');
 const { setSessionCookie } = require('./lib/jwt');
-const { buildSessionForLegacyUser } = require('./lib/sessionBridge');
+const { buildSessionForLegacyUser, authenticateMysqlUser } = require('./lib/sessionBridge');
 
 // Establece (si es posible) la sesión RBAC por cookie a partir del login legacy.
 // No rompe el login si MySQL está caído: degrada a solo-Bearer.
@@ -78,32 +78,30 @@ router.post('/login', async (req, res) => {
     try {
         const { username, password } = loginSchema.parse(req.body);
 
-        const configured = await hasUsers();
-        if (!configured) {
-            return res.status(400).json({ success: false, message: 'La aplicación no ha sido inicializada. Vaya a /setup' });
+        // 1) Usuario legacy (SQLite) por username
+        const row = await getUserByUsername(username).catch(() => null);
+        if (row && await bcrypt.compare(password, row.password_hash)) {
+            const token = jwt.sign({ id: row.id, username: row.username, role: row.role }, JWT_SECRET, { expiresIn: '24h' });
+            await attachRbacSession(res, row.username);
+            return res.json({ success: true, message: 'Conectado exitosamente', token, user: row.username, role: row.role });
         }
 
-        const row = await getUserByUsername(username);
-        if (!row) {
-            return res.status(401).json({ success: false, message: 'Usuario o contraseña incorrectos' });
+        // 2) Usuario multi-tenant (MySQL): Moderador / Miembro por email
+        try {
+            const s = await authenticateMysqlUser(username, password);
+            if (s) {
+                setSessionCookie(res, s.token);
+                const legacyRole = s.user.role === 'MEMBER' ? 'viewer' : 'admin';
+                return res.json({
+                    success: true, message: 'Conectado exitosamente',
+                    token: s.token, user: s.user.email, role: legacyRole,
+                });
+            }
+        } catch (e) {
+            console.warn('[auth] login multi-usuario no disponible:', e.message);
         }
 
-        const passMatch = await bcrypt.compare(password, row.password_hash);
-        if (!passMatch) {
-            return res.status(401).json({ success: false, message: 'Usuario o contraseña incorrectos' });
-        }
-
-        const token = jwt.sign({ id: row.id, username: row.username, role: row.role }, JWT_SECRET, { expiresIn: '24h' });
-
-        await attachRbacSession(res, row.username);
-
-        res.json({
-            success: true,
-            message: 'Conectado exitosamente',
-            token,
-            user: row.username,
-            role: row.role
-        });
+        return res.status(401).json({ success: false, message: 'Usuario o contraseña incorrectos' });
     } catch (zodError) {
         res.status(400).json({ success: false, message: 'Datos de entrada inválidos', errors: zodError.errors });
     }

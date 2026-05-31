@@ -50,7 +50,13 @@ const verifyToken = async (req, res, next) => {
     }
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
-        req.user = decoded; // { id, username, role }
+        if (decoded && decoded.sub && decoded.workspace_id) {
+            // Token RBAC usado como Bearer (moderador/miembro)
+            req.account = decoded;
+            req.user = { id: decoded.sub, username: (decoded.email || '').split('@')[0], role: mapRbacRole(decoded.role) };
+        } else {
+            req.user = decoded; // token legacy { id, username, role }
+        }
         await injectMikrotik(req);
         next();
     } catch (err) {

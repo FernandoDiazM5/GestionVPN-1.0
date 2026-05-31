@@ -166,9 +166,26 @@ router.post('/logout', (req, res) => {
 //  multi-tenant y su workspace, y emite la cookie de sesión. Evita
 //  el doble login: si ya estás autenticado en la app, "entras" solo.
 router.post('/bridge', verifyToken, asyncHandler(async (req, res) => {
-  const legacy = req.user; // { id, username, role }
+  // Ya hay sesión RBAC (cookie o Bearer RBAC) → reemítela tal cual.
+  if (req.account?.sub && req.account?.workspace_id) {
+    const u = await userRepo.findById(req.account.sub);
+    const token = signSession({
+      sub: req.account.sub, email: req.account.email,
+      workspace_id: req.account.workspace_id, role: req.account.role,
+      platform_admin: !!req.account.platform_admin,
+    });
+    setSessionCookie(res, token);
+    return sendOk(res, {
+      user: {
+        id: req.account.sub, email: req.account.email, name: u?.name,
+        role: req.account.role, workspace_id: req.account.workspace_id,
+        platform_admin: !!req.account.platform_admin,
+      },
+    });
+  }
+  // Si no, es un usuario legacy → construye la sesión desde su username.
+  const legacy = req.user;
   if (!legacy?.username) throw new AppError('Sesión no válida', 401, 'NO_LEGACY');
-
   const { token, user } = await buildSessionForLegacyUser(legacy.username);
   setSessionCookie(res, token);
   return sendOk(res, { user });

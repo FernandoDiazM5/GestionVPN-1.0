@@ -140,14 +140,14 @@ export default function RouterAccess() {
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
-                  Usuario {needsSetup && 'Administrador'}
+                  {needsSetup ? 'Usuario Administrador' : 'Usuario o correo'}
                 </label>
                 <div className="relative">
                   <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
                     type="text"
                     required
-                    placeholder={needsSetup ? "admin" : "juan_soporte"}
+                    placeholder={needsSetup ? "admin" : "admin o correo@ejemplo.com"}
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     className="input-field pl-10 font-mono"

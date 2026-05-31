@@ -66,4 +66,39 @@ async function buildSessionForLegacyUser(username) {
   };
 }
 
-module.exports = { buildSessionForLegacyUser };
+/**
+ * Autentica un usuario multi-tenant (MySQL) por email + contraseña.
+ * Devuelve { token, user } si las credenciales son válidas, o null.
+ * Permite que Moderadores/Miembros inicien sesión en la app.
+ */
+async function authenticateMysqlUser(login, password) {
+  const email = String(login || '').includes('@') ? String(login).toLowerCase() : null;
+  if (!email) return null; // los usuarios RBAC usan email como identificador
+  const user = await userRepo.findByEmail(email);
+  if (!user || !user.password_hash) return null;
+  const ok = await bcrypt.compare(password, user.password_hash);
+  if (!ok) return null;
+
+  let membership = await workspaceRepo.findMembershipByUser(user.id);
+  if (!membership) {
+    await withTransaction(async (tx) => {
+      await workspaceRepo.createForOwner(tx, { ownerId: user.id, name: `Espacio de ${user.name || email}` });
+    });
+    membership = await workspaceRepo.findMembershipByUser(user.id);
+  }
+
+  const platform_admin = Number(user.is_platform_admin) === 1;
+  const token = signSession({
+    sub: user.id, email: user.email, workspace_id: membership.workspace_id,
+    role: membership.role, platform_admin,
+  });
+  return {
+    token,
+    user: {
+      id: user.id, email: user.email, name: user.name,
+      role: membership.role, workspace_id: membership.workspace_id, platform_admin,
+    },
+  };
+}
+
+module.exports = { buildSessionForLegacyUser, authenticateMysqlUser };
