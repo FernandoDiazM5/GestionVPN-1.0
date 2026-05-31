@@ -16,6 +16,9 @@ const { requireSession, requireRole } = require('../middleware/authJwt');
 const userRepo = require('../db/repos/userRepo');
 const memberRepo = require('../db/repos/memberRepo');
 const invitationRepo = require('../db/repos/invitationRepo');
+const assignmentRepo = require('../db/repos/assignmentRepo');
+
+const isModeratorRole = (role) => role === 'OWNER' || role === 'CO_MODERATOR';
 
 const router = express.Router();
 
@@ -158,6 +161,39 @@ router.post('/invitation/:id/revoke', requireSession, requireRole('OWNER', 'CO_M
     const ok = await invitationRepo.revoke(req.params.id, req.account.workspace_id);
     if (!ok) throw new AppError('Invitación no encontrada o ya procesada', 404, 'NO_INVITE');
     return sendOk(res, { message: 'Invitación revocada' });
+  }));
+
+// ── GET /assignments — asignaciones de túneles ──────────────
+//  Moderador (OWNER/CO_MOD): todas las del workspace.
+//  View (MEMBER): solo las suyas.
+router.get('/assignments', requireSession, asyncHandler(async (req, res) => {
+  const wsId = req.account.workspace_id;
+  if (isModeratorRole(req.account.role)) {
+    return sendOk(res, { assignments: await assignmentRepo.listForWorkspace(wsId) });
+  }
+  return sendOk(res, { assignments: await assignmentRepo.listByUser(wsId, req.account.sub) });
+}));
+
+// ── POST /assignments — asignar túnel a miembro (Moderador) ──
+router.post('/assignments', requireSession, requireRole('OWNER', 'CO_MODERATOR'),
+  asyncHandler(async (req, res) => {
+    const { userId, tunnelId } = z.object({
+      userId: z.string().min(1), tunnelId: z.string().min(1).max(160),
+    }).parse(req.body);
+    const member = await memberRepo.findMembership(req.account.workspace_id, userId);
+    if (!member) throw new AppError('El usuario no es miembro del workspace', 404, 'NOT_MEMBER');
+    await assignmentRepo.add(null, {
+      workspaceId: req.account.workspace_id, tunnelId, userId, assignedBy: req.account.sub,
+    });
+    return sendOk(res, { message: 'Túnel asignado', userId, tunnelId }, 201);
+  }));
+
+// ── DELETE /assignments/:id — quitar asignación (Moderador) ──
+router.delete('/assignments/:id', requireSession, requireRole('OWNER', 'CO_MODERATOR'),
+  asyncHandler(async (req, res) => {
+    const ok = await assignmentRepo.remove(req.params.id, req.account.workspace_id);
+    if (!ok) throw new AppError('Asignación no encontrada', 404, 'NOT_FOUND');
+    return sendOk(res, { message: 'Asignación eliminada' });
   }));
 
 module.exports = router;

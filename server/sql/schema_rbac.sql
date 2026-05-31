@@ -121,6 +121,40 @@ CREATE TABLE IF NOT EXISTS tunnel_logs (
   CONSTRAINT fk_tl_user FOREIGN KEY (user_id)      REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ── 6b. Asignación de túneles a miembros (Roles v2 — Fase C) ──
+--  Un Moderador (OWNER) asigna túneles a sus miembros (View). El
+--  miembro solo ve/usa los túneles que tiene asignados.
+CREATE TABLE IF NOT EXISTS tunnel_assignments (
+  id            CHAR(36)     NOT NULL,
+  workspace_id  CHAR(36)     NOT NULL,
+  tunnel_id     VARCHAR(160) NOT NULL,   -- ppp_user / vrf (textual)
+  user_id       CHAR(36)     NOT NULL,
+  assigned_by   CHAR(36)     DEFAULT NULL,
+  created_at    BIGINT       NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_assign (workspace_id, tunnel_id, user_id),
+  KEY idx_assign_user (user_id),
+  CONSTRAINT fk_assign_ws   FOREIGN KEY (workspace_id) REFERENCES workspaces(id),
+  CONSTRAINT fk_assign_user FOREIGN KEY (user_id)      REFERENCES users(id),
+  CONSTRAINT fk_assign_by   FOREIGN KEY (assigned_by)  REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ── 6c. WireGuard por miembro (Roles v2 — Fase E) ──
+CREATE TABLE IF NOT EXISTS member_wireguard (
+  id            CHAR(36)     NOT NULL,
+  workspace_id  CHAR(36)     NOT NULL,
+  user_id       CHAR(36)     NOT NULL,
+  peer_name     VARCHAR(120) NOT NULL,
+  allowed_ip    VARCHAR(64)  NOT NULL,
+  public_key    VARCHAR(120),
+  config_enc    TEXT,                    -- .conf cifrado (AES-256-GCM)
+  created_at    BIGINT       NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_member_wg (workspace_id, user_id),
+  CONSTRAINT fk_mwg_ws   FOREIGN KEY (workspace_id) REFERENCES workspaces(id),
+  CONSTRAINT fk_mwg_user FOREIGN KEY (user_id)      REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ── 7. Intentos de autenticación (rate limiting — Fase 2) ────
 CREATE TABLE IF NOT EXISTS auth_attempts (
   id          CHAR(36)    NOT NULL,
