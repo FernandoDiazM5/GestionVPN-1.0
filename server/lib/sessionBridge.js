@@ -72,8 +72,10 @@ async function buildSessionForLegacyUser(username) {
  * Permite que Moderadores/Miembros inicien sesión en la app.
  */
 async function authenticateMysqlUser(login, password) {
-  const email = String(login || '').includes('@') ? String(login).toLowerCase() : null;
-  if (!email) return null; // los usuarios RBAC usan email como identificador
+  // Acepta email directo o username corto (mapea a <username>@local.app)
+  const raw = String(login || '').toLowerCase();
+  if (!raw) return null;
+  const email = raw.includes('@') ? raw : `${raw}@local.app`;
   const user = await userRepo.findByEmail(email);
   if (!user || !user.password_hash) return null;
   const ok = await bcrypt.compare(password, user.password_hash);

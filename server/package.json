@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "init:rbac": "node db/initRbac.js"
+    "init:rbac": "node db/initRbac.js",
+    "seed:roles": "node db/seedRoles.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
