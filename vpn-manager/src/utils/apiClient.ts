@@ -26,6 +26,7 @@ export const apiFetch = async (input: RequestInfo | URL, init?: RequestInit): Pr
 
   const response = await fetch(input, {
     ...init,
+    credentials: 'include',   // envía la cookie RBAC para que el backend lea req.account (Roles v2)
     headers
   });
 

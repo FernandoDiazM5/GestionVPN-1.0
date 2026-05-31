@@ -5,6 +5,23 @@ const path = require('path');
 const { connectToMikrotik, safeWrite, getErrorMessage, cleanTunnelRules, writeIdempotent, parseHandshakeSecs } = require('../routeros.service');
 const { IPV4_REGEX, CIDR_REGEX, getSubnetHosts, probeUbiquiti, sshExec, parseAirOSStats, parseFullOutput, ANTENNA_CMD, trySshCredentials } = require('../ubiquiti.service');
 const { getDb, encryptDevice, decryptDevice, encryptPass, decryptPass, saveNode, getNodes, getNodeByPppUser, getNodeId, deleteNode } = require('../db.service');
+const assignmentRepo = require('../db/repos/assignmentRepo');
+
+/**
+ * Filtra los nodos según el rol RBAC (Roles v2). El rol MEMBER (View) solo
+ * ve sus túneles asignados; OWNER/CO_MODERATOR y el Admin de plataforma ven todo.
+ * Ante error de DB no expone túneles al miembro (seguro por defecto).
+ */
+async function filterNodesForRole(req, nodes) {
+    const acc = req.account;
+    if (!acc || acc.platform_admin || acc.role !== 'MEMBER') return nodes;
+    try {
+        const ids = new Set(await assignmentRepo.assignedTunnelIds(acc.workspace_id, acc.sub));
+        return nodes.filter(n => ids.has(n.nombre_vrf) || ids.has(n.ppp_user));
+    } catch (_) {
+        return [];
+    }
+}
 
 /** Middleware: solo admin u operator pueden acceder a endpoints de credenciales */
 function requireOperator(req, res, next) {
@@ -129,7 +146,7 @@ router.post('/nodes', async (req, res) => {
             console.error('[DB] Error actualizando caché de nodos:', dbErr.message);
         }
 
-        res.json(nodes);
+        res.json(await filterNodesForRole(req, nodes));
     } catch (error) {
         if (api) try { await api.close(); } catch (_) { }
 
@@ -145,7 +162,7 @@ router.post('/nodes', async (req, res) => {
                     ip_tunnel: n.ip_tunnel || '',
                     cached: true,   // flag para el frontend
                 }));
-                return res.json(offlineNodes);
+                return res.json(await filterNodesForRole(req, offlineNodes));
             }
         } catch (dbErr) {
             console.error('[DB] Error leyendo caché de nodos:', dbErr.message);
