@@ -5,6 +5,19 @@ const { z } = require('zod');
 const bcrypt = require('bcryptjs');
 const { hasUsers, getUserByUsername, createUser } = require('./db.service');
 const { JWT_SECRET } = require('./auth.middleware');
+const { setSessionCookie } = require('./lib/jwt');
+const { buildSessionForLegacyUser } = require('./lib/sessionBridge');
+
+// Establece (si es posible) la sesión RBAC por cookie a partir del login legacy.
+// No rompe el login si MySQL está caído: degrada a solo-Bearer.
+async function attachRbacSession(res, username) {
+  try {
+    const { token } = await buildSessionForLegacyUser(username);
+    setSessionCookie(res, token);
+  } catch (e) {
+    console.warn('[auth] sesión RBAC no establecida (login continúa con Bearer):', e.message);
+  }
+}
 
 const loginSchema = z.object({
     username: z.string().min(1, "El usuario es requerido"),
@@ -46,6 +59,8 @@ router.post('/setup', async (req, res) => {
         const newUser = await getUserByUsername(username);
         const token = jwt.sign({ id: newUser.id, username, role: 'admin' }, JWT_SECRET, { expiresIn: '24h' });
 
+        await attachRbacSession(res, username);
+
         res.json({
             success: true,
             message: 'Administrador creado y logueado exitosamente',
@@ -79,6 +94,8 @@ router.post('/login', async (req, res) => {
         }
 
         const token = jwt.sign({ id: row.id, username: row.username, role: row.role }, JWT_SECRET, { expiresIn: '24h' });
+
+        await attachRbacSession(res, row.username);
 
         res.json({
             success: true,

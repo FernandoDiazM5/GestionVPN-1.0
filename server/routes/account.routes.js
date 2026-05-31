@@ -17,6 +17,7 @@ const userRepo = require('../db/repos/userRepo');
 const workspaceRepo = require('../db/repos/workspaceRepo');
 const { requireSession } = require('../middleware/authJwt');
 const { verifyToken } = require('../auth.middleware');
+const { buildSessionForLegacyUser } = require('../lib/sessionBridge');
 
 const router = express.Router();
 
@@ -168,36 +169,9 @@ router.post('/bridge', verifyToken, asyncHandler(async (req, res) => {
   const legacy = req.user; // { id, username, role }
   if (!legacy?.username) throw new AppError('Sesión no válida', 401, 'NO_LEGACY');
 
-  const email = `${String(legacy.username).toLowerCase()}@local.app`;
-  let user = await userRepo.findByEmail(email);
-
-  if (!user) {
-    const id = crypto.randomUUID();
-    const now = Date.now();
-    await withTransaction(async (tx) => {
-      await tx.query(
-        `INSERT INTO users (id, email, password_hash, name, email_verified, created_at, updated_at)
-         VALUES (?,?,?,?,1,?,?)`,
-        [id, email, await bcrypt.hash(crypto.randomUUID(), 10), legacy.username, now, now]
-      );
-      await workspaceRepo.createForOwner(tx, { ownerId: id, name: `Espacio de ${legacy.username}` });
-    });
-    user = await userRepo.findByEmail(email);
-  }
-
-  let membership = await workspaceRepo.findMembershipByUser(user.id);
-  if (!membership) {
-    await withTransaction(async (tx) => {
-      await workspaceRepo.createForOwner(tx, { ownerId: user.id, name: `Espacio de ${legacy.username}` });
-    });
-    membership = await workspaceRepo.findMembershipByUser(user.id);
-  }
-
-  const token = signSession({ sub: user.id, email: user.email, workspace_id: membership.workspace_id, role: membership.role });
+  const { token, user } = await buildSessionForLegacyUser(legacy.username);
   setSessionCookie(res, token);
-  return sendOk(res, {
-    user: { id: user.id, email: user.email, name: user.name, role: membership.role, workspace_id: membership.workspace_id },
-  });
+  return sendOk(res, { user });
 }));
 
 // ── GET /me ──────────────────────────────────────────────────
