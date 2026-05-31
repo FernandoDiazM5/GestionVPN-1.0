@@ -122,10 +122,15 @@ CREATE TABLE member_wireguard (
 
 ### 4.1 Usuarios (RBAC, reemplaza legacy `/api/users`)
 - `GET  /api/team/members` — ya existe (listar con roles).
-- `POST /api/team/invite` — ya existe (rol MEMBER/CO_MODERATOR).
 - `POST /api/team/role` · `DELETE /api/team/member/:id` — ya existen.
-- **NUEVO** `POST /api/team/admin/create` — el Owner crea directamente un usuario
-  con rol (incluye Administrador) sin flujo de invitación (alta inmediata).
+- **AMPLIADO** `POST /api/team/members` — alta de miembro que recibe además
+  `{ tunnelIds: [], wireguard: { mode:'generate'|'publicKey', publicKey? } }` y,
+  en UNA transacción, crea: membresía + `tunnel_assignments` + peer WG +
+  `member_wireguard` (ver §6). Sustituye el invite "simple".
+- `POST /api/team/invite` — variante por OTP que arrastra los mismos datos
+  (túnel + WG) y los aplica al aceptar la invitación.
+- **NUEVO (solo Administrador)** `POST /api/admin/moderators` — alta directa de
+  un Moderador (usuario + workspace + OWNER). No disponible para Moderadores.
 
 ### 4.2 Asignación de túneles
 - `GET  /api/team/assignments?userId=` — túneles asignados a un usuario.
@@ -170,14 +175,39 @@ CREATE TABLE member_wireguard (
 
 ---
 
-## 6. Auto-provisión WireGuard al crear miembro
+## 6. Alta de miembro = túnel-usuario + WireGuard en UN SOLO PASO
 
-Flujo al dar de alta Moderador/Miembro (en "Equipo" o "Usuarios"):
-1. Se crea el usuario (RBAC) — invitación OTP o alta directa por Admin.
-2. Backend genera par de claves WG (o recibe la pública del cliente).
-3. Reusa `/api/wireguard/peer/add` → crea el peer en MikroTik con IP libre.
-4. Construye el `.conf` (Interface + Peer + Endpoint) y lo cifra (AES-256-GCM).
-5. El miembro lo ve en su **Perfil**: QR para móvil + descarga `.conf` para laptop.
+> **Requisito del cliente:** cuando el **Moderador** da de alta o invita a un
+> miembro, en la MISMA acción debe **asignarle su túnel-usuario** y generarle el
+> **acceso WireGuard**, para que el miembro pueda configurar su equipo (móvil/PC)
+> de inmediato. No son pasos separados: el alta los crea juntos.
+
+### Formulario de alta de miembro (Moderador, en "Equipo")
+Campos en un único modal:
+1. **Correo / nombre** del miembro.
+2. **Rol** (View por defecto).
+3. **Túnel(es) a asignar** — selector con los túneles del workspace del Moderador.
+4. **Acceso WireGuard** — generar automáticamente (servidor crea las llaves) o
+   pegar clave pública del cliente.
+
+### Transacción atómica de alta (`POST /api/team/members` ampliado)
+Todo en una sola transacción ACID:
+1. Crea/encuentra el usuario (RBAC) + membresía `MEMBER` en el workspace.
+2. Inserta los `tunnel_assignments` (los túneles seleccionados ↔ ese usuario).
+3. Genera el par de claves WG (o usa la pública dada) → reusa
+   `/api/wireguard/peer/add` para crear el peer en MikroTik con IP libre.
+4. Construye el `.conf` (Interface + Peer + Endpoint del túnel asignado) y lo
+   guarda cifrado en `member_wireguard` (AES-256-GCM).
+5. Si es invitación OTP, el acceso WG se entrega al aceptar; si es alta directa,
+   queda listo de una vez.
+
+### Entrega al miembro (en su **Perfil**)
+- **QR** del `.conf` para escanear desde la app WireGuard del **móvil**.
+- Botón **Descargar `.conf`** para importar en **laptop/PC**.
+- Datos del/los túnel(es) asignados y su estado.
+
+> Nota: el `.conf` se ata al/los túnel(es) asignados — el miembro solo enruta
+> hacia lo que el Moderador le habilitó (aislamiento por asignación).
 
 ---
 
@@ -192,17 +222,18 @@ Flujo al dar de alta Moderador/Miembro (en "Equipo" o "Usuarios"):
 - `POST /api/team/admin/create` (alta directa por Admin con cualquier rol).
 - Reemplazar "Personal y Roles" por el panel RBAC unificado (CRUD completo).
 
-### Fase C — Asignación de túneles + filtrado
+### Fase C — Asignación de túneles + filtrado por rol
 - Tabla `tunnel_assignments` + endpoints.
-- Filtrar `/api/nodes` por rol (Moderador/View solo sus túneles).
-- UI de asignación (Admin/Moderador asignan túneles a usuarios).
+- Filtrar `/api/nodes` por rol (View solo sus túneles asignados).
 
 ### Fase D — Dashboard de administrador
 - `GET /api/dashboard/summary` + vista Dashboard (tarjetas + timeline + VPS).
 
-### Fase E — WireGuard por miembro + Perfil
-- Tabla `member_wireguard` + endpoints de provisión/descarga.
-- Vista Perfil con QR + descarga `.conf`.
+### Fase E — Alta de miembro acoplada (túnel + WireGuard) + Perfil  ★ (requisito clave)
+- Tabla `member_wireguard` + provisión WG.
+- **Modal de alta unificado** (Moderador): correo + rol + **túnel(es)** + **acceso WG**,
+  todo en una transacción (§6).
+- Vista **Perfil** del miembro: QR + descarga `.conf` + túneles asignados.
 
 ---
 
