@@ -19,13 +19,17 @@ SET FOREIGN_KEY_CHECKS = 1;
 
 -- ── 1. Usuarios ──────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS users (
-  id            CHAR(36)      NOT NULL,
-  email         VARCHAR(255)  NOT NULL,
-  password_hash VARCHAR(255)  NOT NULL,
-  name          VARCHAR(120)  NOT NULL DEFAULT '',
-  created_at    BIGINT        NOT NULL,
-  updated_at    BIGINT        NOT NULL,
-  deleted_at    BIGINT        DEFAULT NULL,            -- soft delete
+  id              CHAR(36)      NOT NULL,
+  email           VARCHAR(255)  NOT NULL,
+  password_hash   VARCHAR(255)  NOT NULL,
+  name            VARCHAR(120)  NOT NULL DEFAULT '',
+  email_verified  TINYINT(1)    NOT NULL DEFAULT 0,     -- verificado vía OTP
+  otp_hash        VARCHAR(255)  DEFAULT NULL,           -- HASH del OTP de registro (nunca en claro)
+  otp_expires_at  BIGINT        DEFAULT NULL,
+  otp_attempts    INT           NOT NULL DEFAULT 0,     -- anti fuerza bruta del OTP
+  created_at      BIGINT        NOT NULL,
+  updated_at      BIGINT        NOT NULL,
+  deleted_at      BIGINT        DEFAULT NULL,            -- soft delete
   PRIMARY KEY (id),
   UNIQUE KEY uq_users_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
