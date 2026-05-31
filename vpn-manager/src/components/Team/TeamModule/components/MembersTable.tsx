@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Crown, ShieldCheck, User, ChevronUp, ChevronDown, Trash2, Loader2 } from 'lucide-react';
+import { Crown, ShieldCheck, User, ChevronUp, ChevronDown, Trash2, Loader2, Waypoints, Shield } from 'lucide-react';
 import type { Member, Role } from '../../../../types/account';
 import { ROLE_LABEL } from '../../../../types/account';
-import { canManageRoles, canRemoveMembers, isOwner } from '../../../../utils/permissions';
+import { canManageRoles, canRemoveMembers, isOwner, isModerator } from '../../../../utils/permissions';
+import AssignTunnelsModal from './AssignTunnelsModal';
+import MemberWireGuardModal from './MemberWireGuardModal';
 
 interface MembersTableProps {
   members: Member[];
@@ -29,6 +31,9 @@ export default function MembersTable({
   members, currentRole, currentUserId, busyId, onChangeRole, onRemove,
 }: MembersTableProps) {
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [assignFor, setAssignFor] = useState<Member | null>(null);
+  const [wgFor, setWgFor] = useState<Member | null>(null);
+  const canManage = isModerator(currentRole);
 
   return (
     <div className="card overflow-hidden border border-slate-200 dark:border-slate-800">
@@ -78,6 +83,22 @@ export default function MembersTable({
                     <div className="flex items-center justify-end gap-1.5">
                       {busy && <Loader2 className="w-4 h-4 animate-spin text-slate-400" />}
 
+                      {/* Túneles + WireGuard (moderador, sobre miembros no-OWNER) */}
+                      {canManage && !ownerRow && !busy && (
+                        <>
+                          <button onClick={() => setAssignFor(m)}
+                            title="Asignar túneles" aria-label="Asignar túneles"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors dark:hover:text-indigo-400 dark:hover:bg-indigo-500/10">
+                            <Waypoints className="w-3.5 h-3.5" />
+                          </button>
+                          <button onClick={() => setWgFor(m)}
+                            title="Acceso WireGuard" aria-label="Acceso WireGuard"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-violet-600 hover:bg-violet-50 transition-colors dark:hover:text-violet-400 dark:hover:bg-violet-500/10">
+                            <Shield className="w-3.5 h-3.5" />
+                          </button>
+                        </>
+                      )}
+
                       {/* Promover / degradar (solo OWNER, no sobre sí mismo ni sobre el OWNER) */}
                       {canManageRoles(currentRole) && !ownerRow && !isSelf && !busy && (
                         m.role === 'MEMBER' ? (
@@ -122,6 +143,9 @@ export default function MembersTable({
           </tbody>
         </table>
       </div>
+
+      {assignFor && <AssignTunnelsModal member={assignFor} onClose={() => setAssignFor(null)} />}
+      {wgFor && <MemberWireGuardModal member={wgFor} onClose={() => setWgFor(null)} />}
     </div>
   );
 }

@@ -2,7 +2,7 @@
 //  Servicio de equipo / RBAC (Fase 4) → /api/team
 // ============================================================
 import { get, post, del } from './sessionClient';
-import type { Member, Invitation, Role } from '../types/account';
+import type { Member, Invitation, Role, Assignment, MemberWireguard } from '../types/account';
 
 export const teamApi = {
   listMembers: () => get<{ success: true; members: Member[] }>('/api/team/members'),
@@ -23,4 +23,21 @@ export const teamApi = {
   removeMember: (userId: string) => del(`/api/team/member/${userId}`),
 
   revokeInvitation: (id: string) => post(`/api/team/invitation/${id}/revoke`),
+
+  // ── Asignación de túneles (Fase C) ──
+  listAssignments: () => get<{ success: true; assignments: Assignment[] }>('/api/team/assignments'),
+
+  assignTunnel: (userId: string, tunnelId: string) =>
+    post('/api/team/assignments', { userId, tunnelId }),
+
+  removeAssignment: (id: string) => del(`/api/team/assignments/${id}`),
+
+  // ── WireGuard del miembro (Fase E) ──
+  provisionWireguard: (userId: string) =>
+    post<{ success: true; allowedIp: string; publicKey: string; conf: string | null }>(
+      `/api/team/member/${userId}/wireguard`, { mode: 'generate' }
+    ),
+
+  getMemberWireguard: (userId: string) =>
+    get<{ success: true; wireguard: MemberWireguard }>(`/api/team/member/${userId}/wireguard`),
 };

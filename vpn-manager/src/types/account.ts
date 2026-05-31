@@ -69,6 +69,23 @@ export interface AuditLog {
   user_name: string | null;
 }
 
+/** Asignación de túnel a un miembro. */
+export interface Assignment {
+  id: string;
+  tunnel_id: string;
+  user_id?: string;
+  user_email?: string;
+  user_name?: string;
+  created_at: number;
+}
+
+/** Acceso WireGuard de un miembro. */
+export interface MemberWireguard {
+  allowedIp: string;
+  publicKey: string;
+  conf: string | null;
+}
+
 /** Etiqueta legible por rol. */
 export const ROLE_LABEL: Record<Role, string> = {
   OWNER: 'Propietario',

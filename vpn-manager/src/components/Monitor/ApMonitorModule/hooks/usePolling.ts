@@ -76,7 +76,7 @@ export function usePolling(devices: SavedDevice[], _activeNodeName: string | nul
 
     if (scheduleNext && pollIntervalRef.current > 0) {
       if (Object.keys(pollTimers.current).some(id => id === apId)) {
-        pollTimers.current[apId] = window.setTimeout(() => pollApDirect(apId, true), pollIntervalRef.current);
+        pollTimers.current[apId] = setTimeout(() => pollApDirect(apId, true), pollIntervalRef.current);
       } else {
         delete pollTimers.current[apId];
       }
