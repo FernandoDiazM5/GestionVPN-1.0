@@ -17,13 +17,28 @@
 **Problema:** dar de alta usuarios en dos lugares con dos vocabularios. **Decisión:
 unificar todo en el RBAC** (MySQL), que ya tiene invitaciones, OTP, auditoría y SSE.
 
-### Mapeo de roles (canónico)
-| Rol UI (es) | Rol técnico (RBAC) | Concepto |
-|-------------|--------------------|----------|
-| **Administrador** | `OWNER` | Super-admin de la plataforma |
-| **Moderador** | `CO_MODERATOR` | Gestiona un subconjunto de túneles + su equipo |
-| **View** | `MEMBER` | Solo lectura / conectar-desconectar sus túneles |
+### Modelo de negocio (CONFIRMADO) — SaaS multi-tenant con operador de plataforma
 
+- **Administrador (Sistemas / operador de la plataforma):** TÚ. Das de alta a cada
+  cliente que contrata el servicio creándole un usuario **Moderador**. Tu perfil
+  es acotado: **Dashboard global** + **crear/gestionar Moderadores**. NO gestionas
+  túneles tú mismo (eso es del Moderador).
+- **Moderador (cliente):** dado de alta por el Administrador. Es **dueño de su
+  propio espacio (workspace)** y usa el sistema en **toda su capacidad** (Nodos,
+  Escanear, Usuarios, Equipo, Monitor AP, Ajustes de su perfil). **No puede crear
+  otros Moderadores.** Invita a sus propios miembros (View).
+- **View (miembro del Moderador):** invitado por un Moderador a su workspace; ve
+  los túneles que se le asignan y recibe su acceso WireGuard.
+
+### Mapeo de roles (canónico)
+| Rol UI (es) | Técnico | Ámbito | Concepto |
+|-------------|---------|--------|----------|
+| **Administrador** | `PLATFORM_ADMIN` (flag global) | Toda la plataforma | Operador: dashboard + alta de Moderadores |
+| **Moderador** | `OWNER` de su workspace | Su workspace | Cliente: sistema completo, sin crear Moderadores |
+| **View** | `MEMBER` | Workspace del Moderador | Ve sus túneles asignados + acceso WG |
+
+> El **Administrador es un rol por encima de los workspaces** (no es tenant).
+> Cada **Moderador = OWNER de un workspace nuevo** que el Admin le crea.
 > La pantalla legacy "Personal y Roles" se reemplaza por el panel RBAC.
 > El login legacy ya está unificado (sesión por cookie, Fase 4).
 
@@ -31,28 +46,42 @@ unificar todo en el RBAC** (MySQL), que ya tiene invitaciones, OTP, auditoría y
 
 ## 2. Matriz de permisos y visibilidad
 
-| Vista / Acción | Administrador | Moderador | View |
+| Vista / Acción | Administrador (Sistemas) | Moderador (cliente) | View (miembro) |
 |----------------|:---:|:---:|:---:|
-| **Dashboard** (resumen global) | ✅ | ❌ | ❌ |
-| **Nodos** | Todos | Solo asignados | Solo asignados (solo conectar/revocar) |
-| **Escanear** | ✅ | ✅ | ❌ |
-| **Monitor AP** | ✅ | ✅ | ❌ |
-| **Usuarios** (CRUD personal/roles) | CRUD completo | Invitar/ver su equipo | ❌ |
-| **Equipo** (invitar miembros + WG) | ✅ | ✅ (invita View/Miembro) | Ver su perfil |
-| **Ajustes → Config Global** (VPS MikroTik, túneles) | ✅ | ❌ | ❌ |
+| **Dashboard global** (todos los workspaces) | ✅ | ❌ | ❌ |
+| **Crear/gestionar Moderadores** | ✅ | ❌ | ❌ |
+| **Nodos** | ❌ (no opera túneles) | Todos los de su workspace | Solo asignados (conectar/revocar) |
+| **Escanear** | ❌ | ✅ | ❌ |
+| **Monitor AP** | ❌ | ✅ | ❌ |
+| **Usuarios** (su equipo) | ❌ | ✅ | ❌ |
+| **Equipo** (invitar View + WG) | ❌ | ✅ | Ver su perfil |
+| **Ajustes → Config (VPS, túneles)** | ❌ | ✅ (de su workspace) | ❌ |
 | **Ajustes → Mi perfil** | ✅ | ✅ | ✅ |
-| **Crear Administrador/Moderador/View** | ✅ | Solo View/Miembro | ❌ |
+
+> El Administrador NO usa los módulos de red (Nodos/Escanear/etc.); su trabajo es
+> operar la plataforma. El Moderador SÍ usa todo, dentro de su workspace.
 
 **Visibilidad del sidebar por rol:**
-- **Administrador:** Dashboard · Nodos · Escanear · Usuarios · Equipo · Monitor AP · Ajustes
-- **Moderador:** Nodos · Escanear · Usuarios · Equipo · Monitor AP · Ajustes(perfil)
+- **Administrador:** Dashboard · Moderadores · Mi perfil
+- **Moderador:** Nodos · Escanear · Usuarios · Equipo · Monitor AP · Ajustes(workspace+perfil)
 - **View:** Nodos(sus túneles) · Equipo(perfil) · Ajustes(perfil)
 
 ---
 
 ## 3. Modelo de datos — cambios en MySQL
 
-### 3.1 Asignación de túneles a moderadores/miembros (NUEVO)
+### 3.0 Administrador de plataforma (NUEVO)
+El Administrador (Sistemas) es un rol global, por encima de los workspaces.
+```sql
+ALTER TABLE users ADD COLUMN is_platform_admin TINYINT(1) NOT NULL DEFAULT 0;
+```
+- Se marca al usuario `admin` actual como `is_platform_admin = 1` (seed/migración).
+- En su JWT de sesión se incluye `platform_admin: true` → el frontend muestra
+  Dashboard + Moderadores; el backend exige este flag para `/api/admin/*`.
+- "Crear Moderador" = crear usuario + su workspace + membresía `OWNER`
+  (reusa el helper `buildSessionForLegacyUser`/`createForOwner`, en transacción).
+
+### 3.1 Asignación de túneles a miembros View (NUEVO)
 Para que "el moderador solo vea SUS túneles":
 ```sql
 CREATE TABLE tunnel_assignments (
@@ -177,17 +206,23 @@ Flujo al dar de alta Moderador/Miembro (en "Equipo" o "Usuarios"):
 
 ---
 
-## 8. Decisiones a confirmar antes de implementar
+## 8. Decisiones
 
-1. **¿Despliegue mono-empresa o multi-empresa?** Si es una sola organización,
-   `Administrador = OWNER` único y todos comparten un workspace (recomendado y
-   más simple). Si es SaaS multi-empresa, cada Admin tiene su workspace aislado.
-2. **Alta de moderador:** ¿por invitación OTP (correo) o alta directa con
-   contraseña por el Admin? (El plan soporta ambas; confirmar la preferida.)
-3. **WireGuard:** ¿el sistema genera el par de claves, o el miembro pega su clave
-   pública (como hoy en "Nuevo Administrador")? Generarlas del lado servidor es
-   más cómodo para el usuario final.
-4. **"View" (Miembro):** ¿puede conectar/revocar sus túneles, o es 100% lectura?
+1. ~~¿Mono-empresa o multi-empresa?~~ **RESUELTO: SaaS multi-tenant** con
+   Administrador de plataforma que da de alta Moderadores (cada uno = OWNER de
+   su workspace). Ver §3.0.
+2. **Alta de moderador:** el Administrador crea el Moderador con sus credenciales
+   (alta directa, sin OTP). Recomendado para tu flujo de onboarding. *(confirmar)*
+3. **WireGuard:** el servidor genera el par de claves y entrega `.conf` + QR
+   (más cómodo para el cliente final). *(confirmar)*
+4. **"View" (miembro):** puede conectar/revocar sus túneles asignados (no editar
+   ni crear). *(confirmar)*
+
+> Pendiente menor a confirmar: ¿todos los Moderadores comparten **un mismo router
+> MikroTik** (aislamiento lógico por workspace) o cada uno tiene **su propio
+> router**? Hoy la app apunta a un router. Si es compartido, los túneles se
+> etiquetan por workspace; si es por cliente, cada workspace guarda sus credenciales
+> de router (tabla `workspace_routers` ya existe para esto).
 
 ---
 
