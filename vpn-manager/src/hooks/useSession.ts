@@ -20,14 +20,15 @@ export function useSession(): UseSessionResult {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await accountApi.me();
-      setSession(r.user);
+      // Puente primero: usa la sesión actual de la app (Bearer) para emitir
+      // la cookie RBAC. Evita el 401 cosmético de probar /me sin cookie.
+      const b = await accountApi.bridge();
+      setSession(b.user);
     } catch {
-      // Sin sesión multi-usuario: intenta puente automático desde el login
-      // actual de la app (evita pedir doble login).
+      // Fallback: quizá ya exista una cookie válida (login reciente).
       try {
-        const b = await accountApi.bridge();
-        setSession(b.user);
+        const r = await accountApi.me();
+        setSession(r.user);
       } catch {
         setSession(null);
       }
