@@ -5,13 +5,23 @@
     <link rel="icon" type="image/svg+xml" href="/GestionVPN-1.0/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MikroTik VPN Manager</title>
+    <!-- ── Sistema de tipografía (ver DESIGN_SYSTEM.md) ──
+         Inter = UI / texto · JetBrains Mono = datos técnicos (IP, VRF, MAC, usuarios) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <script>
-      // Anti-FOUC: aplica dark mode antes del primer render de React
-      const stored = localStorage.getItem('vpn_dark_mode');
-      if (stored !== 'false') document.documentElement.classList.add('dark');
+      // Anti-FOUC: aplica dark mode antes del primer render de React.
+      // Claro por defecto; oscuro solo si el usuario lo activó (coincide con useDarkMode).
+      if (localStorage.getItem('vpn_dark_mode') === 'true') {
+        document.documentElement.classList.add('dark');
+      }
     </script>
-    <script type="module" crossorigin src="/GestionVPN-1.0/assets/index-zLYHKSmR.js"></script>
-    <link rel="stylesheet" crossorigin href="/GestionVPN-1.0/assets/index-DteQ7OGL.css">
+    <script type="module" crossorigin src="/GestionVPN-1.0/assets/index-BPAzo8TR.js"></script>
+    <link rel="stylesheet" crossorigin href="/GestionVPN-1.0/assets/index-Bu9KHrF2.css">
   </head>
   <body>
     <div id="root"></div>
