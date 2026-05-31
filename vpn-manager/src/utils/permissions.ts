@@ -20,9 +20,13 @@ export type ModuleId = 'dashboard' | 'moderators' | 'nodes' | 'devices' | 'users
  */
 export function visibleModules(s?: SessionUser | null): ModuleId[] {
   if (!s) return ['nodes'];
-  if (s.platform_admin) return ['dashboard', 'moderators'];
+  // Administrador (Sistemas): super-usuario. Ve la plataforma (dashboard +
+  // moderadores) Y los módulos operativos (administra el router físico).
+  if (s.platform_admin) {
+    return ['dashboard', 'moderators', 'nodes', 'devices', 'users', 'team', 'monitor', 'settings'];
+  }
   if (s.role === 'MEMBER') return ['nodes', 'team', 'settings'];
-  // OWNER / CO_MODERATOR → sistema completo
+  // Moderador (OWNER / CO_MODERATOR) → sistema completo de su workspace
   return ['nodes', 'devices', 'users', 'team', 'monitor', 'settings'];
 }
 
