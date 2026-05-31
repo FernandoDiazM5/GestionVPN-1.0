@@ -31,10 +31,6 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
           auth.setIsAuthenticated(true);
           auth.setCredentials(store.credentials);
         }
-        if (store.managedVpns?.length) {
-          const validVpns = store.managedVpns.filter((v) => !!v.id);
-          // setManagedVpns(validVpns);
-        }
         if (store.scannedSecrets?.length) {
           scanner.setScannedSecrets(store.scannedSecrets);
           scanner.setHasScanned(true);

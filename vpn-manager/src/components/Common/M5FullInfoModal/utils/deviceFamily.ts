@@ -1,4 +1,4 @@
-import type { ScannedDevice, SavedDevice } from '../../../types/devices';
+import type { ScannedDevice, SavedDevice } from '../../../../types/devices';
 
 export function detectFamily(dev: ScannedDevice | SavedDevice): 'ac' | 'm5' | 'unknown' {
   const model = (dev.cachedStats?.deviceModel ?? dev.model ?? '').toUpperCase();

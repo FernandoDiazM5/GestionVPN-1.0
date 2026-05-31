@@ -1,5 +1,5 @@
 import { Radio, Signal, Trash2 } from 'lucide-react';
-import type { SavedDevice, AntennaStats } from '../../../types/devices';
+import type { SavedDevice, AntennaStats } from '../../../../types/devices';
 import { cleanDeviceName } from '../utils/formatters';
 
 interface DeviceHeaderProps {

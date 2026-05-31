@@ -1,7 +1,7 @@
-import type { AntennaStats } from '../../../types/devices';
+import type { AntennaStats } from '../../../../types/devices';
 
 interface RawOutputProps {
-  antennaStats: AntennaStats;
+  antennaStats: AntennaStats | null;
 }
 
 export default function RawOutput({ antennaStats }: RawOutputProps) {

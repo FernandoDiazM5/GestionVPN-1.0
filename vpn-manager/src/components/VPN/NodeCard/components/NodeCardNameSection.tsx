@@ -41,7 +41,7 @@ export function NodeCardNameSection({
               value={nameInput}
               onChange={e => onSetNameInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') onSaveName(); if (e.key === 'Escape') onCancelEdit(); }}
-              className="flex-1 px-2 py-1 text-xs border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300 font-semibold min-w-0 max-w-[150px]"
+              className="flex-1 px-2 py-1 text-xs border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300 font-semibold min-w-0 max-w-[150px] dark:bg-slate-800 dark:border-indigo-500/50 dark:text-slate-100"
             />
             <button onClick={onSaveName} disabled={savingName || !nameInput.trim() || nameInput.trim() === node.nombre_nodo}
               className="p-1 rounded text-emerald-600 hover:bg-emerald-50 disabled:opacity-40">
@@ -54,10 +54,10 @@ export function NodeCardNameSection({
         ) : (
           <div className="flex items-center gap-1.5 group/name">
             {node.service === 'wireguard'
-              ? <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 border border-violet-200 leading-none shrink-0" title="WireGuard">WG</span>
-              : <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 border border-sky-200 leading-none shrink-0" title="SSTP">SSTP</span>
+              ? <span className="badge badge-accent shrink-0" title="WireGuard">WG</span>
+              : <span className="badge badge-info shrink-0" title="SSTP">SSTP</span>
             }
-            <p className="font-semibold text-slate-800 text-xs flex-1 leading-tight truncate max-w-[150px]" title={node.nombre_nodo}>
+            <p className="font-semibold text-slate-800 dark:text-slate-100 text-xs flex-1 leading-tight truncate max-w-[200px]" title={node.nombre_nodo}>
               {node.nombre_nodo}
             </p>
             <button onClick={onStartEdit} title="Editar nombre"
@@ -67,25 +67,29 @@ export function NodeCardNameSection({
           </div>
         )}
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span
-            title={
-              !node.running && !node.disabled && node.service === 'wireguard'
-                ? 'Sin handshake WireGuard reciente'
-                : !node.running && !node.disabled
-                  ? 'Torre no conectada al VPN'
-                  : undefined
-            }
-            className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-md leading-none
-              ${node.running && !node.disabled
-                ? 'bg-emerald-100 text-emerald-700'
-                : node.disabled
-                  ? 'bg-rose-100 text-rose-600'
-                  : 'bg-slate-100 text-slate-500'}`}
-          >
-            {node.disabled ? 'Deshabilitado' : node.running ? 'Conectado' : 'Desconectado'}
-          </span>
+          {node.running && !node.disabled ? (
+            /* Estado normal → discreto (la señal verde ya está en el ícono) */
+            <span className="inline-flex items-center gap-1 text-2xs font-semibold text-slate-400 uppercase tracking-wide">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              Conectado
+            </span>
+          ) : (
+            /* Excepción → badge prominente */
+            <span
+              title={
+                !node.running && !node.disabled && node.service === 'wireguard'
+                  ? 'Sin handshake WireGuard reciente'
+                  : !node.running && !node.disabled
+                    ? 'Torre no conectada al VPN'
+                    : undefined
+              }
+              className={`badge ${node.disabled ? 'badge-danger' : 'badge-warning'}`}
+            >
+              {node.disabled ? 'Deshabilitado' : 'Desconectado'}
+            </span>
+          )}
           {isThisNodeActive && countdown && (
-            <span className="text-[10px] font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-md flex items-center gap-1 leading-none">
+            <span className="badge badge-warning">
               <Clock className="w-2.5 h-2.5" />
               {countdown}
             </span>
@@ -94,7 +98,7 @@ export function NodeCardNameSection({
         {tags.length > 0 && (
           <div className="flex items-center gap-1 flex-wrap mt-0.5">
             {tags.map(t => (
-              <span key={t} className="text-[9px] font-bold px-1.5 py-0.5 rounded-full text-white leading-none"
+              <span key={t} className="text-2xs font-bold px-1.5 py-0.5 rounded-full text-white leading-none"
                 style={{ backgroundColor: tagColor(t) }}>
                 {t}
               </span>

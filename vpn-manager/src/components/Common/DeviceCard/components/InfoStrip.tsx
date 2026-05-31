@@ -1,4 +1,4 @@
-import type { SavedDevice, AntennaStats } from '../../../types/devices';
+import type { SavedDevice, AntennaStats } from '../../../../types/devices';
 
 interface InfoStripProps {
   device: SavedDevice;

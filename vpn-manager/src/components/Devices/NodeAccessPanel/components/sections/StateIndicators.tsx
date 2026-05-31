@@ -1,6 +1,5 @@
-import { AlertCircle, ShieldCheck, ShieldOff, Clock, Bell } from 'lucide-react';
-import { TUNNEL_TIMEOUT_MS } from '../../../../../context';
-import CountdownDisplay from '../shared/CountdownDisplay';
+import { AlertCircle, ShieldCheck, ShieldOff, Bell } from 'lucide-react';
+import { AnimatedCountdown } from '../shared';
 
 interface StateIndicatorsProps {
   errorMsg: string;
@@ -11,7 +10,6 @@ interface StateIndicatorsProps {
   onRenew: () => void;
   onRevokeAll: () => void;
   isRevoking: boolean;
-  setTunnelExpiry: (value: number) => void;
 }
 
 export default function StateIndicators({
@@ -23,42 +21,37 @@ export default function StateIndicators({
   onRenew,
   onRevokeAll,
   isRevoking,
-  setTunnelExpiry,
 }: StateIndicatorsProps) {
   return (
     <>
       {/* ── Error ── */}
       {errorMsg && (
-        <div className="card p-4 flex items-start space-x-3 border-red-200 bg-red-50">
-          <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-          <p className="text-sm text-red-600 font-medium">{errorMsg}</p>
+        <div className="card p-4 flex items-start space-x-3 border-rose-200 bg-rose-50 dark:border-rose-500/30 dark:bg-rose-500/10">
+          <AlertCircle className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
+          <p className="text-sm text-rose-600 dark:text-rose-400 font-medium">{errorMsg}</p>
         </div>
       )}
 
       {/* ── Túnel activo ── */}
       {activeNodeVrf && (
         <>
-          <div className="card p-4 border-emerald-200 bg-gradient-to-r from-emerald-50 to-sky-50 flex items-center justify-between gap-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center shadow-md shadow-emerald-500/30">
+          <div className="card p-4 border-emerald-200 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/10 flex items-center justify-between gap-4 flex-col sm:flex-row">
+            <div className="flex items-center space-x-3 flex-1 min-w-0">
+              <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center shadow-md shadow-emerald-500/30 flex-shrink-0">
                 <ShieldCheck className="w-5 h-5 text-white" />
               </div>
-              <div>
-                <p className="text-sm font-bold text-slate-800">
-                  Acceso abierto: <span className="text-emerald-600">{activeNodeName}</span>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
+                  Acceso abierto: <span className="text-emerald-600 dark:text-emerald-400">{activeNodeName}</span>
                 </p>
-                <div className="flex items-center space-x-2 mt-0.5">
-                  <span className="text-xs text-slate-500 font-mono">{activeNodeVrf}</span>
-                  {tunnelExpiry && (
-                    <span className="text-xs font-bold text-amber-600 flex items-center space-x-1">
-                      <Clock className="w-3 h-3" />
-                      <CountdownDisplay expiry={tunnelExpiry} />
-                    </span>
-                  )}
+                <div className="flex items-center space-x-2 mt-1">
+                  <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">{activeNodeVrf}</span>
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
+            {/* Bloque derecho: reloj + acciones agrupados */}
+            <div className="flex items-center gap-3 shrink-0 w-full sm:w-auto justify-between sm:justify-end">
+              {tunnelExpiry && <AnimatedCountdown expiry={tunnelExpiry} />}
               {showRenewalWarn && (
                 <button onClick={onRenew}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-sm shadow-amber-500/30 animate-pulse transition-all">

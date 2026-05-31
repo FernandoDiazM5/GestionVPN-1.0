@@ -17,11 +17,11 @@ interface UseNodePollingOptions {
 }
 
 export function useNodePolling(options: UseNodePollingOptions = {}) {
-  const { intervalMs = 5000, enabled = true, autoSync = false } = options;
+  const { intervalMs = 5000, enabled = true } = options;
   const [nodes, setNodes] = useState<Node[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchNodes = useCallback(async () => {
     try {

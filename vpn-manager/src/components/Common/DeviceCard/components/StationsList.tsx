@@ -1,5 +1,5 @@
 import { Activity } from 'lucide-react';
-import type { AntennaStats } from '../../../types/devices';
+import type { AntennaStats } from '../../../../types/devices';
 
 interface StationsListProps {
   antennaStats: AntennaStats;

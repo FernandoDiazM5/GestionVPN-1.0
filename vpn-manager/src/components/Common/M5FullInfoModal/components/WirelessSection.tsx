@@ -1,5 +1,5 @@
 import { Wifi } from 'lucide-react';
-import type { AntennaStats } from '../../../types/devices';
+import type { AntennaStats } from '../../../../types/devices';
 import M5Row from './M5Row';
 import M5Section from './M5Section';
 import { formatDBm, formatMHz, formatPercent, formatMbps, formatBool, formatMs } from '../utils/formatters';

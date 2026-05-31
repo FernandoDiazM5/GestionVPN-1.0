@@ -5,10 +5,10 @@ import { API_BASE_URL } from '../../../../config';
 import type { WgPeer } from '../../../../types/api';
 
 interface UseWireGuardPeersProps {
-  credentials: { ip: string; user: string; pass: string } | null;
+  credentials: { ip?: string; user: string; pass?: string } | null | undefined;
   wgLoadedRef: React.MutableRefObject<boolean>;
-  setWgPeers: (peers: WgPeer[]) => void;
-  setPeerColors: (colors: Record<string, string>) => void;
+  setWgPeers: React.Dispatch<React.SetStateAction<WgPeer[]>>;
+  setPeerColors: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   setServerPublicKey: (key: string) => void;
   setServerListenPort: (port: string) => void;
   setServerEndpointIP: (ip: string) => void;
@@ -39,7 +39,6 @@ export function useWireGuardPeers(props: UseWireGuardPeersProps) {
     setWgError,
     setColorPickerAddr,
     setEditingPeerId,
-    setEditingPeerName,
     setSavingPeerName,
     setCopiedPeerId,
     serverEndpointIP,

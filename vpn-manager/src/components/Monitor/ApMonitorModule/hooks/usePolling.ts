@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { PollResult } from '../utils/types';
+import type { PollResult } from '../../../../types/apMonitor';
 import type { SavedDevice } from '../../../../types/devices';
 import { fetchWithTimeout } from '../../../../utils/fetchWithTimeout';
 import { API_BASE_URL } from '../../../../config';
@@ -7,7 +7,7 @@ import { deviceDb } from '../../../../store/deviceDb';
 
 const BASE = `${API_BASE_URL}/api/ap-monitor`;
 
-export function usePolling(devices: SavedDevice[], activeNodeName: string | null) {
+export function usePolling(devices: SavedDevice[], _activeNodeName: string | null) {
   const [pollResults, setPollResults] = useState<Record<string, PollResult>>(() => {
     try {
       const saved = sessionStorage.getItem('apMonitorPollResults');

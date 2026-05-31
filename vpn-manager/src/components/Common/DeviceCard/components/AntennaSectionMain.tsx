@@ -1,5 +1,5 @@
 import { ArrowUp, ArrowDown, Cpu } from 'lucide-react';
-import type { AntennaStats } from '../../../types/devices';
+import type { AntennaStats } from '../../../../types/devices';
 import Bar from './Bar';
 import GaugeChart from './GaugeChart';
 import { signalMeta, ccqColor } from '../utils/colors';

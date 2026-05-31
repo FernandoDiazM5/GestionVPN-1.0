@@ -3,12 +3,11 @@ import {
   Plus, CheckCircle2, Loader2, Eye, EyeOff, AlertCircle, RefreshCw,
   Copy, Check, Info, Minus, Globe, ShieldCheck, X,
 } from 'lucide-react';
-import { useVpn, TUNNEL_TIMEOUT_MS } from '../../../../context';
+import { useVpn } from '../../../../context';
 import { fetchWithTimeout } from '../../../../utils/fetchWithTimeout';
 import { API_BASE_URL } from '../../../../config';
 import { generateSecurePassword, getSubnetConflicts } from '../utils';
 import { ProvisionSteps } from '../components';
-import type { NodeInfo } from '../../../../types/api';
 import type { ProvisionResult } from '../types';
 
 interface NuevoNodoProps {

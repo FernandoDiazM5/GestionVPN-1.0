@@ -14,7 +14,7 @@ interface VpnCardRowProps {
   status: VpnStatus;
   logs: string[];
   uptime: number;
-  logsEndRef: React.RefObject<HTMLDivElement>;
+  logsEndRef: React.RefObject<HTMLDivElement | null>;
   onActivate: () => void;
   onDeactivate: () => void;
   onRemove: () => void;

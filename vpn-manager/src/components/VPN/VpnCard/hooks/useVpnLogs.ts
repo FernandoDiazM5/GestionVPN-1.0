@@ -4,7 +4,7 @@ import type { VpnSecret } from '../types';
 interface UseVpnLogsReturn {
   logs: string[];
   addLog: (msg: string) => void;
-  logsEndRef: React.RefObject<HTMLDivElement>;
+  logsEndRef: React.RefObject<HTMLDivElement | null>;
 }
 
 export function useVpnLogs(vpn: VpnSecret): UseVpnLogsReturn {

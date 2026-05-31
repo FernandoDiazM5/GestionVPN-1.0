@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useVpn } from '../../context';
+import { useVpn } from '../../../context';
 import { useSecretScanning, useSecretManagement } from './hooks';
 import { filterSecrets, calculateTotalPages, getPaginatedSecrets } from './utils';
 import { ScannerHeader, ScannerError, SecretsTable, EmptyState } from './components';
@@ -19,7 +19,7 @@ export default function ScannerModule() {
   const { isManaged, handleToggleManage } = useSecretManagement(managedVpns, setManagedVpns);
 
   const handleScanClick = async () => {
-    const secrets = await handleScan(credentials);
+    const secrets = await handleScan(credentials ?? null);
     if (secrets !== null) {
       setScannedSecrets(secrets);
       setHasScanned(true);

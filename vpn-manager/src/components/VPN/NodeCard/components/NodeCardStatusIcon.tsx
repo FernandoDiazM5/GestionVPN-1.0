@@ -13,11 +13,11 @@ export function NodeCardStatusIcon({ node, isThisNodeActive, isPending }: NodeCa
       <div
         className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0
           ${isThisNodeActive
-            ? 'bg-emerald-500 shadow-sm shadow-emerald-500/40'
+            ? 'bg-emerald-600 shadow-sm shadow-emerald-500/40 ring-2 ring-emerald-300'
             : isPending
               ? 'bg-indigo-500 shadow-sm shadow-indigo-500/40'
               : node.running
-                ? 'bg-sky-500 shadow-sm shadow-sky-500/30'
+                ? 'bg-emerald-500 shadow-sm shadow-emerald-500/30'
                 : 'bg-slate-200'}`}
       >
         {isThisNodeActive ? (

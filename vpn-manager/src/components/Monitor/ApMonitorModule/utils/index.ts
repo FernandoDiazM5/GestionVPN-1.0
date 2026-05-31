@@ -1,8 +1,7 @@
 export { sigColor, ccqColor } from './colors';
 export { fmtDbm, fmtPct, fmtKbps, fmtMbps, fmtFw, fmtUptime, fmtCpu, fmtMem } from './formatters';
+export type { ColDef, ApColDef } from './columnDefs';
 export {
-  ColDef,
-  ApColDef,
   CPE_COL_DEFS,
   DEFAULT_HIDDEN,
   LS_KEY,

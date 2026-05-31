@@ -107,12 +107,12 @@ export default function NodeCard({
         : null;
 
   const rowBg = isThisNodeActive
-    ? 'bg-emerald-50/60'
+    ? 'bg-emerald-50/60 dark:bg-emerald-500/10'
     : isPending
-      ? 'bg-indigo-50/60'
+      ? 'bg-indigo-50/60 dark:bg-indigo-500/10'
       : rowIndex % 2 === 0
-        ? 'bg-white'
-        : 'bg-slate-50/40';
+        ? 'bg-white dark:bg-slate-900'
+        : 'bg-slate-50/40 dark:bg-slate-800/40';
 
   const borderLeft = isThisNodeActive
     ? 'border-l-2 border-l-emerald-400'
@@ -142,7 +142,7 @@ export default function NodeCard({
   return (
     <Fragment>
       {/* ── Fila principal ── */}
-      <tr className={`${rowBg} ${borderLeft} transition-colors hover:bg-indigo-50/30 group`}>
+      <tr className={`${rowBg} ${borderLeft} transition-colors hover:bg-indigo-50/30 dark:hover:bg-indigo-500/10 group`}>
         <NodeCardStatusIcon node={node} isThisNodeActive={isThisNodeActive} isPending={isPending} />
 
         <NodeCardNameSection
@@ -165,39 +165,40 @@ export default function NodeCard({
         {/* Acciones */}
         <td className="px-4 py-3">
           <div className="flex items-center justify-end gap-2">
-            {/* Acceder */}
-            <button
-              disabled={!canActivate || isThisNodeActive}
-              onClick={handleActivate}
-              title={accessBlockReason ?? undefined}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all
-                ${canActivate && !isThisNodeActive
-                  ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm shadow-indigo-500/25 active:scale-[0.97]'
-                  : 'bg-slate-100 text-slate-300 cursor-not-allowed'}`}
-            >
-              {isActivating
-                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                : <Play className="w-3.5 h-3.5" />}
-              <span>{isActivating ? 'Abriendo...' : 'Acceder'}</span>
-            </button>
+            {/* Acceder — tenue en reposo, sólido al hover de la fila */}
+            {!isThisNodeActive && (
+              <button
+                disabled={!canActivate}
+                onClick={handleActivate}
+                title={accessBlockReason ?? undefined}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all
+                  ${canActivate
+                    ? 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white group-hover:shadow-sm active:scale-[0.97] dark:bg-indigo-500/15 dark:text-indigo-300 dark:group-hover:bg-indigo-500 dark:group-hover:text-white'
+                    : 'bg-slate-50 text-slate-300 cursor-not-allowed dark:bg-slate-800 dark:text-slate-600'}`}
+              >
+                {isActivating
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <Play className="w-3.5 h-3.5" />}
+                <span>{isActivating ? 'Abriendo...' : 'Acceder'}</span>
+              </button>
+            )}
 
-            {/* Revocar */}
-            <button
-              disabled={!isThisNodeActive || isPending}
-              onClick={handleDeactivate}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all
-                ${isThisNodeActive && !isPending
-                  ? 'bg-rose-500 hover:bg-rose-600 text-white shadow-sm shadow-rose-500/25 active:scale-[0.97]'
-                  : 'bg-slate-100 text-slate-300 cursor-not-allowed'}`}
-            >
-              {isDeactivating
-                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                : <ShieldOff className="w-3.5 h-3.5" />}
-              <span>{isDeactivating ? 'Revocando...' : 'Revocar'}</span>
-            </button>
+            {/* Revocar — solo en el nodo activo */}
+            {isThisNodeActive && (
+              <button
+                disabled={isPending}
+                onClick={handleDeactivate}
+                className="btn-danger flex items-center gap-1.5 px-3 py-1.5 text-xs disabled:opacity-50"
+              >
+                {isDeactivating
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <ShieldOff className="w-3.5 h-3.5" />}
+                <span>{isDeactivating ? 'Revocando...' : 'Revocar'}</span>
+              </button>
+            )}
 
             {/* Separator */}
-            <div className="w-px h-5 bg-slate-200" />
+            <div className="w-px h-5 bg-slate-200 dark:bg-slate-700" />
 
             {/* Kebab menu */}
             <NodeCardKebabMenu

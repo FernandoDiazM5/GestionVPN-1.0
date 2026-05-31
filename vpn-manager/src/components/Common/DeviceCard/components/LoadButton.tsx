@@ -1,5 +1,5 @@
 import { RefreshCw, Clock } from 'lucide-react';
-import type { SavedDevice, AntennaStats } from '../../../types/devices';
+import type { SavedDevice, AntennaStats } from '../../../../types/devices';
 
 interface LoadButtonProps {
   isLoading: boolean;

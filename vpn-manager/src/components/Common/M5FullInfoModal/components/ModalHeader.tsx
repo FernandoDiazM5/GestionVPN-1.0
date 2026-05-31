@@ -1,5 +1,5 @@
 import { Activity, Check, Copy, X } from 'lucide-react';
-import type { ScannedDevice, SavedDevice } from '../../../types/devices';
+import type { ScannedDevice, SavedDevice } from '../../../../types/devices';
 import { detectFamily } from '../utils/deviceFamily';
 import { headerStyles } from '../utils/styles';
 

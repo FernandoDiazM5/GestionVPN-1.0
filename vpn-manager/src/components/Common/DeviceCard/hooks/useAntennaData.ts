@@ -3,7 +3,7 @@ import { fetchWithTimeout } from '../../../../utils/fetchWithTimeout';
 import type { SavedDevice, AntennaStats } from '../../../../types/devices';
 import { API_BASE_URL } from '../../../../config';
 
-export function useAntennaData(device: SavedDevice, isPreview?: boolean, compact?: boolean) {
+export function useAntennaData(device: SavedDevice, _isPreview?: boolean, compact?: boolean) {
   const [antennaStats, setAntennaStats] = useState<AntennaStats | null>(device.cachedStats ?? null);
   const [isLoadingAntenna, setIsLoadingAntenna] = useState(false);
   const [antennaError, setAntennaError] = useState('');

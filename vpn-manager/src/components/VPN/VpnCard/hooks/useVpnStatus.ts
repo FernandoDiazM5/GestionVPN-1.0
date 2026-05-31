@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { fetchWithTimeout } from '../../../utils/fetchWithTimeout';
-import { API_BASE_URL } from '../../../config';
+import { fetchWithTimeout } from '../../../../utils/fetchWithTimeout';
+import { API_BASE_URL } from '../../../../config';
 import type { VpnSecret, ActivateResponse, DeactivateResponse, VpnStatus } from '../types';
 
 interface UseVpnStatusReturn {

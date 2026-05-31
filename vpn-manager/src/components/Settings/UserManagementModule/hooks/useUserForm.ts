@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { UserInfo, FormState } from '../types';
+import type { UserInfo } from '../types';
 
 export function useUserForm() {
   const [view, setView] = useState<'list' | 'form'>('list');

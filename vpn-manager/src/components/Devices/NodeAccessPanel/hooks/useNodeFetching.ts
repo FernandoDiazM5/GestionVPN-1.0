@@ -3,10 +3,9 @@ import { apiFetch } from '../../../../utils/apiClient';
 import { fetchWithTimeout } from '../../../../utils/fetchWithTimeout';
 import { API_BASE_URL } from '../../../../config';
 import type { NodeInfo } from '../../../../types/api';
-import { useVpn } from '../../../../context';
 
 interface UseNodeFetchingProps {
-  credentials: { ip: string; user: string; pass: string } | null;
+  credentials: { ip?: string; user: string; pass?: string } | null | undefined;
   isReady: boolean;
   hasLoaded: boolean;
   setHasLoaded: (value: boolean) => void;

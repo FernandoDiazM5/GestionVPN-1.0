@@ -1,5 +1,5 @@
 import { Info } from 'lucide-react';
-import type { AntennaStats } from '../../../types/devices';
+import type { AntennaStats } from '../../../../types/devices';
 import ParamRow from './ParamRow';
 import { cleanDeviceName, fmtNetRole } from '../utils/formatters';
 

@@ -1,15 +1,13 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import {
-  Radio, Wifi, RefreshCw, Loader2, X,
+  Radio, RefreshCw, Loader2, X,
   CheckCircle2, Activity, Clock,
-  Server, Users, ZapOff, WifiOff,
+  Users, ZapOff, WifiOff,
   Search,
   AlertTriangle,
 } from 'lucide-react';
-import DeviceCard from '../../Common/DeviceCard';
 import M5FullInfoModal from '../../Common/M5FullInfoModal';
 import { useVpn } from '../../../context';
-import type { SavedDevice } from '../../../types/devices';
 
 import ApGroupCard from './components/ApGroupCard';
 import DeviceCardModal from './components/modals/DeviceCardModal';
@@ -80,7 +78,6 @@ export default function ApMonitorModule() {
   }, []);
 
   useEffect(() => {
-    const currentDevices = polling.pollResultsRef.current;
     if (logic.devices.length === 0 || polling.autoPolledRef.current) return;
     polling.autoPolledRef.current = true;
 

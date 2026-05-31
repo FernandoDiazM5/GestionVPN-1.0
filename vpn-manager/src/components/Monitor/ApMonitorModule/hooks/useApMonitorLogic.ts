@@ -24,7 +24,6 @@ export function useApMonitorLogic(nodes: NodeInfo[], activeNodeName: string | nu
 
   const devicesRef = useRef(devices);
   const nodesRef = useRef(nodes);
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => { devicesRef.current = devices; }, [devices]);
   useEffect(() => { nodesRef.current = nodes; }, [nodes]);

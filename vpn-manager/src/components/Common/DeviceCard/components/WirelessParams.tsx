@@ -1,5 +1,5 @@
 import { Wifi } from 'lucide-react';
-import type { AntennaStats } from '../../../types/devices';
+import type { AntennaStats } from '../../../../types/devices';
 import ParamRow from './ParamRow';
 import { fmtMode, fmtSecurity } from '../utils/formatters';
 

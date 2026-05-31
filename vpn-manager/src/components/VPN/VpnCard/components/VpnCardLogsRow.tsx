@@ -1,6 +1,6 @@
 interface VpnCardLogsRowProps {
   logs: string[];
-  logsEndRef: React.RefObject<HTMLDivElement>;
+  logsEndRef: React.RefObject<HTMLDivElement | null>;
   rowBg: string;
 }
 

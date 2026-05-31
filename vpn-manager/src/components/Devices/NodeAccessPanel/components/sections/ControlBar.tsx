@@ -1,4 +1,4 @@
-import { Pencil, Plus, Download, RefreshCw, Globe } from 'lucide-react';
+import { Pencil, Plus, Upload, RefreshCw, Globe, Waypoints } from 'lucide-react';
 import { apiFetch } from '../../../../../utils/apiClient';
 import { API_BASE_URL } from '../../../../../config';
 
@@ -28,14 +28,11 @@ export default function ControlBar({
   return (
     <div className="card p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div>
-        <h2 className="text-lg font-bold text-slate-800 flex items-center space-x-2">
-          <svg className="w-5 h-5 text-indigo-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="9" />
-            <path d="M12 7v5l3 2" />
-          </svg>
+        <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center space-x-2">
+          <Waypoints className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
           <span>Acceso a Nodos VRF</span>
         </h2>
-        <p className="text-slate-400 text-sm mt-1">
+        <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">
           Abre acceso a APs y CPEs remotos mediante enrutamiento VRF
         </p>
         {/* IP global del servidor SSTP */}
@@ -62,12 +59,12 @@ export default function ControlBar({
                 if (e.key === 'Escape') { setGlobalServerIP(localStorage.getItem('server_public_ip') || ''); setEditingGlobalIP(false); }
               }}
               placeholder="Ej: 213.173.36.232"
-              className="px-2 py-0.5 text-[11px] font-mono border border-indigo-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 w-36"
+              className="px-2 py-0.5 text-[11px] font-mono border border-indigo-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 w-36 dark:bg-slate-800 dark:border-indigo-500/50 dark:text-slate-100"
               autoFocus
             />
           ) : (
             <button onClick={() => setEditingGlobalIP(true)} className="flex items-center gap-1 group">
-              <span className={`text-[11px] font-mono font-semibold ${globalServerIP ? 'text-slate-700' : 'text-slate-400 italic'}`}>
+              <span className={`text-[11px] font-mono font-semibold ${globalServerIP ? 'text-slate-700 dark:text-slate-200' : 'text-slate-400 italic'}`}>
                 {globalServerIP || 'Sin configurar'}
               </span>
               <Pencil className="w-2.5 h-2.5 text-slate-300 group-hover:text-indigo-500 transition-colors" />
@@ -76,27 +73,27 @@ export default function ControlBar({
         </div>
       </div>
       <div className="flex items-center gap-2 flex-wrap">
+        {/* Acción principal del panel → único botón sólido */}
         <button
           onClick={onNewNode}
-          className="px-4 py-2.5 flex items-center space-x-2 rounded-xl text-sm font-bold
-                     bg-emerald-500 hover:bg-emerald-600 text-white shadow-md shadow-emerald-500/25 transition-all active:scale-[0.98]"
+          className="btn-success px-4 py-2.5 flex items-center space-x-2 text-sm"
         >
           <Plus className="w-4 h-4" />
           <span>Nuevo Nodo</span>
         </button>
+        {/* Secundarios → outline */}
         <button
           onClick={onBatchCsv}
-          title="Provisionar múltiples nodos desde CSV"
-          className="px-4 py-2.5 flex items-center space-x-2 rounded-xl text-sm font-bold
-                     bg-violet-500 hover:bg-violet-600 text-white shadow-md shadow-violet-500/25 transition-all active:scale-[0.98]"
+          title="Provisionar múltiples nodos desde un archivo CSV"
+          className="btn-outline px-4 py-2.5 flex items-center space-x-2 text-sm"
         >
-          <Download className="w-4 h-4" />
-          <span>CSV</span>
+          <Upload className="w-4 h-4" />
+          <span>Importar</span>
         </button>
         <button
           onClick={onRefresh}
           disabled={isLoading}
-          className="btn-primary px-6 py-3 flex items-center space-x-2"
+          className="btn-outline px-5 py-2.5 flex items-center space-x-2 text-sm disabled:opacity-50"
         >
           <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
           <span>{isLoading ? 'Cargando...' : hasLoaded ? 'Actualizar Nodos' : 'Cargar Nodos'}</span>

@@ -1,2 +1,2 @@
 export { default } from './VpnCard';
-export type { VpnConnectionInfo } from './types';
+export type { VpnStatus, VpnCardProps } from './types';

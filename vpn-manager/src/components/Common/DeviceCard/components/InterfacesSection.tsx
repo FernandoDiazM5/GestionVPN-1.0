@@ -1,5 +1,5 @@
 import { Database } from 'lucide-react';
-import type { AntennaStats } from '../../../types/devices';
+import type { AntennaStats } from '../../../../types/devices';
 import ParamRow from './ParamRow';
 
 interface InterfacesSectionProps {

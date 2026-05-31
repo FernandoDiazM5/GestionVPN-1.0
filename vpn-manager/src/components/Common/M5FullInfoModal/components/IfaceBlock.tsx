@@ -1,7 +1,7 @@
-import type { AntennaStats } from '../../../types/devices';
+import type { AntennaStats } from '../../../../types/devices';
 import M5Row from './M5Row';
 import { ifaceStyles } from '../utils/styles';
-import { formatPercent, formatMbps, formatBool, formatMeter } from '../utils/formatters';
+import { formatMbps, formatBool, formatMeter } from '../utils/formatters';
 
 type IfaceDetail = NonNullable<AntennaStats['ifaceDetails']>[number];
 

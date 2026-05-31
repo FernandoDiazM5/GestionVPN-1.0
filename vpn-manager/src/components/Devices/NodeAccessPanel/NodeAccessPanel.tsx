@@ -1,7 +1,5 @@
-import { useState, useRef } from 'react';
+import { Bell, X } from 'lucide-react';
 import { useVpn, TUNNEL_TIMEOUT_MS } from '../../../context';
-import type { NodeInfo } from '../../../types/api';
-import { API_BASE_URL } from '../../../config';
 import { deviceDb } from '../../../store/deviceDb';
 import { cpeCache } from '../../../store/cpeCache';
 
@@ -10,7 +8,6 @@ import {
   NuevoNodo,
   EditarNodo,
   EliminarNodo,
-  NuevoAdmin,
   BatchCsvModal,
   ScriptModal,
   HistoryModal,
@@ -39,31 +36,31 @@ import {
 
 export default function NodeAccessPanel() {
   const vpnContext = useVpn();
-  const { credentials, nodes, setNodes, activeNodeVrf, tunnelExpiry, setTunnelExpiry, adminIP, deactivateAllNodes, removeNodeFromState, isReady } = vpnContext;
+  const { credentials, nodes, setNodes, activeNodeVrf, tunnelExpiry, setTunnelExpiry, deactivateAllNodes, removeNodeFromState, isReady } = vpnContext;
 
   // ── Inicializar Hooks
-  const { toasts, addToast } = useToasts();
+  const { toasts, setToasts, addToast } = useToasts();
   const nodeModals = useNodeModals();
-  const { nodeTags, setNodeTags, saveNodeTags } = useNodeTags();
+  const { nodeTags, saveNodeTags } = useNodeTags();
   const serverSettings = useServerSettings();
   const wgState = useWireGuardState();
   const nodeState = useNodeState();
 
   // Extraer valores del nodeState para compatibilidad con JSX
-  const { isLoading, setIsLoading, hasLoaded, setHasLoaded, errorMsg, setErrorMsg, isRevoking, setIsRevoking, search, setSearch, sortMode, setSortMode, showRenewalWarn, setShowRenewalWarn, prevRunningRef, pollingRef } = nodeState;
+  const { isLoading, setIsLoading, hasLoaded, setHasLoaded, errorMsg, setErrorMsg, isRevoking, setIsRevoking, showRenewalWarn, setShowRenewalWarn, prevRunningRef, pollingRef } = nodeState;
 
   // Extraer valores del serverSettings
   const { globalServerIP, setGlobalServerIP, editingGlobalIP, setEditingGlobalIP, serverPublicKey, setServerPublicKey, serverListenPort, setServerListenPort, serverEndpointIP, setServerEndpointIP } = serverSettings;
 
-  // Extraer valores del wgState
-  const { wgPeers, setWgPeers, loadingWg, setLoadingWg, wgError, setWgError, showNuevoAdmin, setShowNuevoAdmin, peersExpanded, setPeersExpanded, peerColors, setPeerColors, colorPickerAddr, setColorPickerAddr, editingPeerId, setEditingPeerId, editingPeerName, setEditingPeerName, savingPeerName, setSavingPeerName, copiedPeerId, setCopiedPeerId, wgLoadedRef } = wgState;
+  // Extraer valores del wgState (solo lo necesario para detectar el VPS;
+  // la gestión de administradores vive ahora en la pestaña Usuarios)
+  const { wgPeers, setWgPeers, loadingWg, setLoadingWg, wgError, setWgError, setPeerColors, setColorPickerAddr, setEditingPeerId, setEditingPeerName, editingPeerName, setSavingPeerName, savingPeerName, setCopiedPeerId, wgLoadedRef } = wgState;
 
   // Extraer valores del nodeModals
   const { showNuevoNodo, setShowNuevoNodo, showBatchCsv, setShowBatchCsv, editNode, setEditNode, deleteNode, setDeleteNode, scriptNode, setScriptNode, historyNode, setHistoryNode, tagNode, setTagNode } = nodeModals;
 
   // ── Constantes
   const VPS_IP = '192.168.21.60';
-  const PEER_COLOR_PALETTE = ['#6366f1', '#10b981', '#0ea5e9', '#f59e0b', '#f43f5e', '#8b5cf6', '#f97316', '#14b8a6', '#ec4899', '#64748b'];
 
   // ── Inicializar hooks de lógica compleja
   const { fetchNodes, handleLoadNodes } = useNodeFetching({
@@ -81,7 +78,7 @@ export default function NodeAccessPanel() {
     addToast,
   });
 
-  const { loadWgPeers, savePeerColor, savePeerName, copyWgConfig } = useWireGuardPeers({
+  const { loadWgPeers } = useWireGuardPeers({
     credentials,
     wgLoadedRef,
     setWgPeers,
@@ -125,33 +122,16 @@ export default function NodeAccessPanel() {
   };
 
 
-  const connectedNodes = nodes.filter(n => n.running);
-  const disconnectedNodes = nodes.filter(n => !n.running);
-  const nodesWithVrf = nodes.filter(n => !!n.nombre_vrf);
   const activeNodeName = activeNodeVrf
     ? nodes.find(n => n.nombre_vrf === activeNodeVrf)?.nombre_nodo ?? activeNodeVrf
     : null;
 
-  // ── Separación VPS vs administradores humanos ───────────────────────────
+  // ── Estado del VPS (la gestión de administradores está en Usuarios) ──
   const vpsPeer = wgPeers.find(p => p.allowedAddress === VPS_IP);
-  const adminPeers = wgPeers.filter(p => p.allowedAddress !== VPS_IP);
   const vpsWgActive = !!vpsPeer?.active;
   const mangleActive = !!activeNodeVrf;
 
-  const q = search.trim().toLowerCase();
-  const baseNodes = q
-    ? nodes.filter(n =>
-      n.nombre_nodo?.toLowerCase().includes(q) ||
-      n.nombre_vrf?.toLowerCase().includes(q) ||
-      n.segmento_lan?.toLowerCase().includes(q) ||
-      n.ppp_user?.toLowerCase().includes(q)
-    )
-    : nodes;
-  const filteredNodes = sortMode === 'connected'
-    ? [...baseNodes].sort((a, b) => (b.running ? 1 : 0) - (a.running ? 1 : 0))
-    : sortMode === 'disconnected'
-      ? [...baseNodes].sort((a, b) => (a.running ? 1 : 0) - (b.running ? 1 : 0))
-      : baseNodes;
+
 
   return (
     <div className="space-y-5">
@@ -178,55 +158,24 @@ export default function NodeAccessPanel() {
         onRenew={() => setTunnelExpiry(Date.now() + TUNNEL_TIMEOUT_MS)}
         onRevokeAll={handleRevokeAll}
         isRevoking={isRevoking}
-        setTunnelExpiry={setTunnelExpiry}
       />
 
-      {/* ── WireGuardSection ── */}
+      {/* ── WireGuardSection (solo VPS Principal) ── */}
       <WireGuardSection
         vpsPeer={vpsPeer}
         vpsWgActive={vpsWgActive}
         mangleActive={mangleActive}
         activeNodeVrf={activeNodeVrf}
-        wgPeers={wgPeers}
-        adminPeers={adminPeers}
         loadingWg={loadingWg}
         wgError={wgError}
-        peerColors={peerColors}
-        serverPublicKey={serverPublicKey}
-        serverListenPort={serverListenPort}
-        serverEndpointIP={serverEndpointIP}
-        setServerEndpointIP={setServerEndpointIP}
-        setServerListenPort={setServerListenPort}
-        peersExpanded={peersExpanded}
-        setPeersExpanded={setPeersExpanded}
-        colorPickerAddr={colorPickerAddr}
-        setColorPickerAddr={setColorPickerAddr}
-        editingPeerId={editingPeerId}
-        setEditingPeerId={setEditingPeerId}
-        editingPeerName={editingPeerName}
-        setEditingPeerName={setEditingPeerName}
-        savingPeerName={savingPeerName}
-        copiedPeerId={copiedPeerId}
         onLoadWgPeers={loadWgPeers}
-        onAddAdmin={() => setShowNuevoAdmin(true)}
-        onSavePeerColor={savePeerColor}
-        onSavePeerName={savePeerName}
-        onCopyConfig={copyWgConfig}
       />
 
       {/* ── NodesListSection ── */}
       <NodesListSection
         nodes={nodes}
         hasLoaded={hasLoaded}
-        search={search}
-        sortMode={sortMode}
-        filteredNodes={filteredNodes}
-        connectedNodes={connectedNodes}
-        disconnectedNodes={disconnectedNodes}
-        nodesWithVrf={nodesWithVrf}
         nodeTags={nodeTags}
-        onSearchChange={setSearch}
-        onSortChange={() => setSortMode(m => m === 'default' ? 'connected' : m === 'connected' ? 'disconnected' : 'default')}
         onExportCsv={exportCsv}
         onEditNode={setEditNode}
         onDeleteNode={setDeleteNode}
@@ -239,13 +188,13 @@ export default function NodeAccessPanel() {
       />
 
       {showNuevoNodo && (
-        <NuevoNodoModal
+        <NuevoNodo
           onClose={() => setShowNuevoNodo(false)}
           onSuccess={() => { setShowNuevoNodo(false); handleLoadNodes(); }}
         />
       )}
       {deleteNode && (
-        <EliminarNodoModal
+        <EliminarNodo
           node={deleteNode}
           onClose={() => setDeleteNode(null)}
           onSuccess={(deletedDeviceIds: string[]) => {
@@ -262,7 +211,7 @@ export default function NodeAccessPanel() {
         />
       )}
       {editNode && (
-        <EditarNodoModal
+        <EditarNodo
           node={editNode}
           onClose={() => setEditNode(null)}
           onSuccess={(newLabel) => {
@@ -272,13 +221,6 @@ export default function NodeAccessPanel() {
             setEditNode(null);
             handleLoadNodes();
           }}
-        />
-      )}
-      {showNuevoAdmin && (
-        <NuevoAdminModal
-          peers={wgPeers}
-          onClose={() => setShowNuevoAdmin(false)}
-          onSuccess={(newPeer) => { setWgPeers(prev => [...prev, newPeer]); setShowNuevoAdmin(false); }}
         />
       )}
       {scriptNode && (

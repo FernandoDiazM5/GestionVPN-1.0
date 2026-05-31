@@ -66,4 +66,5 @@ function saveApColPrefs(hidden: Set<string>) {
   try { localStorage.setItem(AP_LS_KEY, JSON.stringify([...hidden])); } catch { /* */ }
 }
 
-export { ColDef, ApColDef, CPE_COL_DEFS, DEFAULT_HIDDEN, LS_KEY, loadColPrefs, saveColPrefs, AP_COL_DEFS, AP_DEFAULT_HIDDEN, AP_LS_KEY, loadApColPrefs, saveApColPrefs };
+export type { ColDef, ApColDef };
+export { CPE_COL_DEFS, DEFAULT_HIDDEN, LS_KEY, loadColPrefs, saveColPrefs, AP_COL_DEFS, AP_DEFAULT_HIDDEN, AP_LS_KEY, loadApColPrefs, saveApColPrefs };

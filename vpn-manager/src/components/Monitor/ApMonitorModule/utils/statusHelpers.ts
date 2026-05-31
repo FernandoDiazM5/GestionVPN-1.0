@@ -1,5 +1,5 @@
 import type { SavedDevice } from '../../../../types/devices';
-import type { PollResult } from '../types';
+import type { PollResult } from '../../../../types/apMonitor';
 
 type ApStatus = 'online' | 'partial' | 'inactive' | 'connecting';
 

@@ -23,7 +23,7 @@ interface DeviceCardProps {
   compact?: boolean;
 }
 
-export default function DeviceCard({ device, onRemove, onUpdate, isPreview, compact }: DeviceCardProps) {
+export default function DeviceCard({ device, onRemove, isPreview, compact }: DeviceCardProps) {
   const { antennaStats, isLoadingAntenna, antennaError, handleLoadAntenna } = useAntennaData(device, isPreview, compact);
 
   return (

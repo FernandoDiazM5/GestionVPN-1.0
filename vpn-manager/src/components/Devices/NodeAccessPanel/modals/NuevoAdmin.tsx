@@ -20,7 +20,7 @@ export default function NuevoAdmin({ peers, onClose, onSuccess }: NuevoAdminProp
   const [result, setResult] = useState<{ assignedIP: string; message: string } | null>(null);
 
   const usedIPs = peers
-    .map(p => p.address || p.allowedIps)
+    .map(p => p.allowedAddress)
     .filter(a => a?.startsWith('192.168.21.'))
     .map(a => parseInt(a.split('.')[3]))
     .filter(n => !isNaN(n));
@@ -39,7 +39,14 @@ export default function NuevoAdmin({ peers, onClose, onSuccess }: NuevoAdminProp
       const d = await r.json();
       if (!d.success) throw new Error(d.message || 'Error al crear');
       setResult({ assignedIP: d.assignedIP, message: d.message });
-      onSuccess({ name: name.trim() || 'Admin', address: d.assignedIP, publicKey: pubKey.trim(), allowedIps: '', persistentKeepalive: '' });
+      onSuccess({
+        id: d.id ?? d.assignedIP,
+        name: name.trim() || 'Admin',
+        allowedAddress: d.assignedIP,
+        publicKey: pubKey.trim(),
+        lastHandshakeSecs: null,
+        active: false,
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error desconocido');
     }
