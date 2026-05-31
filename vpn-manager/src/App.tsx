@@ -7,6 +7,7 @@ import Sidebar from './components/Layout/Sidebar';
 
 import NodeAccessPanel from './components/Devices/NodeAccessPanel';
 import UserManagementPanel from './components/Users/UserManagementPanel';
+import TeamModule from './components/Team/TeamModule';
 import NetworkDevicesModule from './components/Devices/NetworkDevicesModule';
 import ApMonitorModule from './components/Monitor/ApMonitorModule';
 import SettingsModule from './components/Settings/SettingsModule';
@@ -79,6 +80,8 @@ function AppContent() {
         {activeModule === 'nodes' && <NodeAccessPanel />}
 
         {activeModule === 'users' && <UserManagementPanel />}
+
+        {activeModule === 'team' && <TeamModule />}
 
         {activeModule === 'devices' && <NetworkDevicesModule />}
 

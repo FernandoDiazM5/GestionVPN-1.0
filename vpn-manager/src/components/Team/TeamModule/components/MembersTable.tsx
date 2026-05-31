@@ -1,0 +1,127 @@
+import { useState } from 'react';
+import { Crown, ShieldCheck, User, ChevronUp, ChevronDown, Trash2, Loader2 } from 'lucide-react';
+import type { Member, Role } from '../../../../types/account';
+import { ROLE_LABEL } from '../../../../types/account';
+import { canManageRoles, canRemoveMembers, isOwner } from '../../../../utils/permissions';
+
+interface MembersTableProps {
+  members: Member[];
+  currentRole: Role;
+  currentUserId: string;
+  busyId: string | null;
+  onChangeRole: (userId: string, role: Exclude<Role, 'OWNER'>) => void;
+  onRemove: (member: Member) => void;
+}
+
+const ROLE_ICON: Record<Role, typeof Crown> = {
+  OWNER: Crown,
+  CO_MODERATOR: ShieldCheck,
+  MEMBER: User,
+};
+
+function roleBadgeClass(role: Role) {
+  if (role === 'OWNER') return 'badge badge-warning';
+  if (role === 'CO_MODERATOR') return 'badge badge-info';
+  return 'badge badge-neutral';
+}
+
+export default function MembersTable({
+  members, currentRole, currentUserId, busyId, onChangeRole, onRemove,
+}: MembersTableProps) {
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+
+  return (
+    <div className="card overflow-hidden border border-slate-200 dark:border-slate-800">
+      <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40">
+        <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">Miembros del workspace</h3>
+        <p className="text-2xs text-slate-400 dark:text-slate-500 mt-0.5">{members.length} miembro{members.length !== 1 ? 's' : ''}</p>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/50">
+              <th className="th-cell dark:text-slate-400">Usuario</th>
+              <th className="th-cell dark:text-slate-400">Rol</th>
+              <th className="th-cell text-right dark:text-slate-400">Acciones</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            {members.map(m => {
+              const Icon = ROLE_ICON[m.role];
+              const isSelf = m.user_id === currentUserId;
+              const ownerRow = m.role === 'OWNER';
+              const busy = busyId === m.user_id;
+              return (
+                <tr key={m.user_id} className="hover:bg-indigo-50/30 dark:hover:bg-indigo-500/10 transition-colors group">
+                  {/* Usuario */}
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
+                        <Icon className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-slate-800 dark:text-slate-100 truncate">
+                          {m.name || m.email.split('@')[0]}
+                          {isSelf && <span className="ml-1.5 text-2xs font-medium text-slate-400">(tú)</span>}
+                        </p>
+                        <p className="font-mono text-2xs text-slate-400 dark:text-slate-500 truncate">{m.email}</p>
+                      </div>
+                    </div>
+                  </td>
+                  {/* Rol */}
+                  <td className="px-4 py-3">
+                    <span className={roleBadgeClass(m.role)}>{ROLE_LABEL[m.role]}</span>
+                  </td>
+                  {/* Acciones */}
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-end gap-1.5">
+                      {busy && <Loader2 className="w-4 h-4 animate-spin text-slate-400" />}
+
+                      {/* Promover / degradar (solo OWNER, no sobre sí mismo ni sobre el OWNER) */}
+                      {canManageRoles(currentRole) && !ownerRow && !isSelf && !busy && (
+                        m.role === 'MEMBER' ? (
+                          <button onClick={() => onChangeRole(m.user_id, 'CO_MODERATOR')}
+                            title="Promover a co-moderador"
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-2xs font-bold bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-200 transition-colors dark:bg-sky-500/15 dark:text-sky-300 dark:border-sky-500/30">
+                            <ChevronUp className="w-3 h-3" /> Promover
+                          </button>
+                        ) : (
+                          <button onClick={() => onChangeRole(m.user_id, 'MEMBER')}
+                            title="Degradar a miembro"
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-2xs font-bold bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200 transition-colors dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 dark:hover:bg-slate-700">
+                            <ChevronDown className="w-3 h-3" /> Degradar
+                          </button>
+                        )
+                      )}
+
+                      {/* Remover (moderadores, no al OWNER ni a sí mismo) */}
+                      {canRemoveMembers(currentRole) && !ownerRow && !isSelf && !busy && (
+                        confirmId === m.user_id ? (
+                          <button onClick={() => { onRemove(m); setConfirmId(null); }}
+                            className="btn-danger flex items-center gap-1 px-2.5 py-1.5 text-2xs">
+                            <Trash2 className="w-3 h-3" /> Confirmar
+                          </button>
+                        ) : (
+                          <button onClick={() => setConfirmId(m.user_id)}
+                            title="Remover miembro" aria-label="Remover miembro"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors dark:hover:text-rose-400 dark:hover:bg-rose-500/10">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )
+                      )}
+
+                      {(ownerRow || isSelf) && !busy && (
+                        <span className="text-2xs text-slate-300 dark:text-slate-600">{isOwner(m.role) ? 'Propietario' : '—'}</span>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}

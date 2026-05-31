@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import {
-  Radio, Cpu, Users, Activity, Settings,
+  Radio, Cpu, Users, UsersRound, Activity, Settings,
   LogOut, ChevronLeft, Menu, X, Wifi, Server, Sun, Moon,
 } from 'lucide-react';
 import { useVpn } from '../../context';
 
-type ModuleId = 'nodes' | 'users' | 'devices' | 'monitor' | 'settings';
+type ModuleId = 'nodes' | 'users' | 'team' | 'devices' | 'monitor' | 'settings';
 
 interface NavItem {
   id: ModuleId;
@@ -31,6 +31,7 @@ const NAV: NavGroup[] = [
     category: 'Acceso',
     items: [
       { id: 'users', label: 'Usuarios', icon: Users },
+      { id: 'team', label: 'Equipo', icon: UsersRound },
     ],
   },
   {
