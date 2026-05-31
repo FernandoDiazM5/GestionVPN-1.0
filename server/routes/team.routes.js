@@ -17,6 +17,10 @@ const userRepo = require('../db/repos/userRepo');
 const memberRepo = require('../db/repos/memberRepo');
 const invitationRepo = require('../db/repos/invitationRepo');
 const assignmentRepo = require('../db/repos/assignmentRepo');
+const memberWgRepo = require('../db/repos/memberWgRepo');
+const { generateKeyPair, buildClientConf } = require('../lib/wgkeys');
+const { encrypt, decrypt } = require('../lib/crypto');
+const { connectToMikrotik, safeWrite, writeIdempotent, getErrorMessage } = require('../routeros.service');
 
 const isModeratorRole = (role) => role === 'OWNER' || role === 'CO_MODERATOR';
 
@@ -195,5 +199,78 @@ router.delete('/assignments/:id', requireSession, requireRole('OWNER', 'CO_MODER
     if (!ok) throw new AppError('Asignación no encontrada', 404, 'NOT_FOUND');
     return sendOk(res, { message: 'Asignación eliminada' });
   }));
+
+// ── POST /member/:id/wireguard — provisiona acceso WG al miembro ──
+//  El Moderador genera el peer WireGuard (en MikroTik) para el equipo del
+//  miembro (móvil/PC) y guarda su .conf cifrado. Devuelve el .conf una vez.
+const wgSchema = z.object({
+  mode: z.enum(['generate', 'publicKey']).default('generate'),
+  publicKey: z.string().max(120).optional(),
+});
+router.post('/member/:id/wireguard', requireSession, requireRole('OWNER', 'CO_MODERATOR'),
+  asyncHandler(async (req, res) => {
+    if (!req.mikrotik) throw new AppError('Configura el router MikroTik en Ajustes', 503, 'NO_ROUTER');
+    const { mode, publicKey } = wgSchema.parse(req.body);
+    const member = await memberRepo.findMembership(req.account.workspace_id, req.params.id);
+    if (!member) throw new AppError('El usuario no es miembro', 404, 'NOT_MEMBER');
+    if (mode === 'publicKey' && !publicKey) throw new AppError('Falta la clave pública', 400, 'NO_PUBKEY');
+
+    const keys = mode === 'generate' ? generateKeyPair() : null;
+    const peerPub = mode === 'generate' ? keys.publicKey : publicKey;
+
+    const { ip, user, pass } = req.mikrotik;
+    let api;
+    try {
+      api = await connectToMikrotik(ip, user, pass);
+      const peers = await safeWrite(api, ['/interface/wireguard/peers/print']);
+      const ifaces = await safeWrite(api, ['/interface/wireguard/print']).catch(() => []);
+      const cloud = await safeWrite(api, ['/ip/cloud/print']).catch(() => []);
+      const mgmt = peers.filter(p => p.interface === 'VPN-WG-MGMT');
+      const used = mgmt.map(p => (p['allowed-address'] || '').split('/')[0])
+        .filter(a => a.startsWith('192.168.21.')).map(a => parseInt(a.split('.')[3])).filter(n => !isNaN(n));
+      const nextIp = `192.168.21.${(used.length ? Math.max(...used) : 19) + 1}`;
+      await writeIdempotent(api, ['/interface/wireguard/peers/add',
+        '=interface=VPN-WG-MGMT', `=public-key=${peerPub}`,
+        `=allowed-address=${nextIp}/32`, `=comment=member:${req.params.id}`]);
+      const serverPub = ifaces.find(i => i.name === 'VPN-WG-MGMT')?.['public-key'] || '';
+      const listenPort = parseInt(ifaces.find(i => i.name === 'VPN-WG-MGMT')?.['listen-port'] || '0') || 13231;
+      const publicIp = cloud?.[0]?.['public-address'] || ip;
+      await api.close();
+
+      let conf = null;
+      if (mode === 'generate') {
+        conf = buildClientConf({
+          privateKey: keys.privateKey, address: nextIp,
+          serverPublicKey: serverPub, endpoint: `${publicIp}:${listenPort}`,
+          allowedIps: '192.168.21.0/24',
+        });
+      }
+      await memberWgRepo.upsert({
+        workspaceId: req.account.workspace_id, userId: req.params.id,
+        peerName: `member:${req.params.id}`, allowedIp: nextIp,
+        publicKey: peerPub, configEnc: conf ? encrypt(conf) : null,
+      });
+      return sendOk(res, { allowedIp: nextIp, publicKey: peerPub, conf }, 201);
+    } catch (error) {
+      if (api) try { await api.close(); } catch (_) { }
+      throw new AppError(getErrorMessage(error, ip, user), 502, 'ROUTER_ERROR');
+    }
+  }));
+
+// ── GET /member/:id/wireguard — config del miembro (él o un moderador) ──
+router.get('/member/:id/wireguard', requireSession, asyncHandler(async (req, res) => {
+  const targetId = req.params.id === 'me' ? req.account.sub : req.params.id;
+  if (targetId !== req.account.sub && !isModeratorRole(req.account.role)) {
+    throw new AppError('Permisos insuficientes', 403, 'FORBIDDEN');
+  }
+  const row = await memberWgRepo.getByUser(req.account.workspace_id, targetId);
+  if (!row) throw new AppError('Sin acceso WireGuard configurado', 404, 'NO_WG');
+  return sendOk(res, {
+    wireguard: {
+      allowedIp: row.allowed_ip, publicKey: row.public_key,
+      conf: row.config_enc ? decrypt(row.config_enc) : null,
+    },
+  });
+}));
 
 module.exports = router;
