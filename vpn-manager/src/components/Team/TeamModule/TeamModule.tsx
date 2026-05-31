@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Users, Loader2, LogOut, ShieldCheck } from 'lucide-react';
 import { useSession } from '../../../hooks/useSession';
+import { useWorkspaceEvents } from '../../../hooks/useWorkspaceEvents';
 import { teamApi } from '../../../services/teamApi';
 import { auditApi } from '../../../services/auditApi';
 import { accountApi } from '../../../services/accountApi';
@@ -39,6 +40,15 @@ export default function TeamModule() {
   }, [session]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  // Recarga ligera solo del timeline (para eventos en vivo)
+  const reloadLogs = useCallback(async () => {
+    if (!session) return;
+    try { const l = await auditApi.listLogs(50); setLogs(l.logs); } catch { /* noop */ }
+  }, [session]);
+
+  // SSE: refresca el timeline cuando cualquier miembro ejecuta una acción
+  useWorkspaceEvents(reloadLogs, !!session);
 
   const handleInvite = async (email: string, role: Exclude<Role, 'OWNER'>) => {
     const r = await teamApi.invite(email, role);
@@ -115,8 +125,8 @@ export default function TeamModule() {
         onRemove={handleRemove}
       />
 
-      {/* Auditoría */}
-      <AuditTimeline logs={logs} />
+      {/* Auditoría (tiempo real vía SSE) */}
+      <AuditTimeline logs={logs} live />
 
       {!moderator && (
         <p className="text-xs text-slate-400 dark:text-slate-500 text-center">

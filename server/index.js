@@ -6,6 +6,7 @@ const healthRoutes = require('./routes/health.routes');
 const accountRoutes = require('./routes/account.routes');
 const teamRoutes = require('./routes/team.routes');
 const auditRoutes = require('./routes/audit.routes');
+const eventsRoutes = require('./routes/events.routes');
 const { errorMiddleware } = require('./lib/apiResponse');
 const coreRoutes = require('./routes/core.routes');
 const nodeRoutes = require('./routes/node.routes');
@@ -70,6 +71,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/account', accountRoutes);   // Fase 2: auth multi-usuario (cookies)
 app.use('/api/team', teamRoutes);          // Fase 3: invitaciones y roles (RBAC)
 app.use('/api/audit', auditRoutes);        // Fase 3: auditoría de túneles
+app.use('/api/events', eventsRoutes);      // Fase 4: SSE tiempo real (por workspace)
 
 // Omitir apiRoutes legado que ya fue borrado, registrar los modulares protegidos
 app.use('/api', verifyToken, coreRoutes);

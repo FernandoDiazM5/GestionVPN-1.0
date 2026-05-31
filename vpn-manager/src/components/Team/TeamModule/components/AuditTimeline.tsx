@@ -3,6 +3,7 @@ import type { AuditLog } from '../../../../types/account';
 
 interface AuditTimelineProps {
   logs: AuditLog[];
+  live?: boolean;
 }
 
 function actionMeta(action: string): { icon: typeof Activity; color: string; label: string } {
@@ -22,12 +23,17 @@ function timeAgo(ts: number): string {
   return new Date(ts).toLocaleString('es', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 
-export default function AuditTimeline({ logs }: AuditTimelineProps) {
+export default function AuditTimeline({ logs, live }: AuditTimelineProps) {
   return (
     <div className="card overflow-hidden border border-slate-200 dark:border-slate-800">
       <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 flex items-center gap-2">
         <FileClock className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
         <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">Actividad reciente</h3>
+        {live && (
+          <span className="ml-auto inline-flex items-center gap-1.5 text-2xs font-semibold text-emerald-600 dark:text-emerald-400">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> En vivo
+          </span>
+        )}
       </div>
 
       {logs.length === 0 ? (

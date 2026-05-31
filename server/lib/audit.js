@@ -7,6 +7,7 @@
 // ============================================================
 const auditRepo = require('../db/repos/auditRepo');
 const { clientIp } = require('./rateLimit');
+const sse = require('./sse');
 
 /** Registro directo (no lanza si falla: la auditoría no debe romper la acción). */
 async function recordTunnelLog(account, { tunnelId, action, ip, detail }) {
@@ -19,6 +20,10 @@ async function recordTunnelLog(account, { tunnelId, action, ip, detail }) {
       action,
       ip,
       detail,
+    });
+    // Tiempo real: notifica a todos los miembros del workspace
+    sse.publish(account.workspace_id, 'tunnel', {
+      tunnelId, action, userId: account.sub || null, ts: Date.now(),
     });
   } catch (e) {
     console.warn('[audit] no se pudo registrar la acción:', e.message);
