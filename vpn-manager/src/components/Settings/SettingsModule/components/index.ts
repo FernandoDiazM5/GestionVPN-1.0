@@ -1,4 +1,3 @@
-export { SettingsTabMenu } from './SettingsTabMenu';
 export { SettingsHeader } from './SettingsHeader';
 export { SettingsForm } from './SettingsForm';
 export { SettingsMessages } from './SettingsMessages';
