@@ -3,6 +3,7 @@ const router = express.Router();
 const { connectToMikrotik, safeWrite, getErrorMessage, cleanTunnelRules } = require('../routeros.service');
 const { IPV4_REGEX, CIDR_REGEX, getSubnetHosts, probeUbiquiti, sshExec, parseAirOSStats, parseFullOutput, ANTENNA_CMD, trySshCredentials } = require('../ubiquiti.service');
 const { getDb, encryptPass, decryptPass, getApByUuid, getApIntId, getApGroupIntId } = require('../db.service');
+const { reqWorkspace, ownedGroupIntIds, ownsApUuid, ownsGroupUuid } = require('../lib/tenantScope');
 
 router.post('/device/auto-login', async (req, res) => {
     const { ip, sshCredentials } = req.body;
@@ -74,11 +75,21 @@ router.post('/device/wifi/get', async (req, res) => {
 router.get('/db/devices', async (req, res) => {
     try {
         const db = await getDb();
-        const rows = await db.all(
-            `SELECT a.*, ag.uuid AS ap_group_uuid
-             FROM aps a
-             LEFT JOIN ap_groups ag ON ag.id = a.ap_group_id`
-        );
+        const gids = await ownedGroupIntIds(db, req);   // null = admin (todos)
+        let rows;
+        if (gids === null) {
+            rows = await db.all(
+                `SELECT a.*, ag.uuid AS ap_group_uuid
+                 FROM aps a LEFT JOIN ap_groups ag ON ag.id = a.ap_group_id`);
+        } else if (gids.length === 0) {
+            rows = [];
+        } else {
+            const ph = gids.map(() => '?').join(',');
+            rows = await db.all(
+                `SELECT a.*, ag.uuid AS ap_group_uuid
+                 FROM aps a JOIN ap_groups ag ON ag.id = a.ap_group_id
+                 WHERE a.ap_group_id IN (${ph})`, gids);
+        }
         // Convertir estructura relacional v2 a estructura "SavedDevice" esquelética
         const devices = rows.map(r => ({
             id: r.uuid,
@@ -119,6 +130,14 @@ router.post('/db/devices', async (req, res) => {
         const d = req.body;
         const now = Date.now();
 
+        // Aislamiento: no sobrescribir un AP existente de otro workspace
+        if (d.id) {
+            const existing = await db.get('SELECT id FROM aps WHERE uuid = ?', [d.id]);
+            if (existing && !(await ownsApUuid(db, req, d.id))) {
+                return res.status(404).json({ success: false, message: 'AP no encontrado' });
+            }
+        }
+
         let cpesCount = 0;
         if (d.cachedStats && d.cachedStats.stations) {
             cpesCount = d.cachedStats.stations.length;
@@ -131,20 +150,27 @@ router.post('/db/devices', async (req, res) => {
 
         // Resolve ap_group_id from the nodeId sent by frontend
         // nodeId puede ser: UUID del ap_group, o un valor legacy (ppp_user, mikrotik_id, etc.)
+        const ws = reqWorkspace(req);
         let apGroupId = d.nodeId ? await getApGroupIntId(d.nodeId) : null;
+        // Si el grupo resuelto no pertenece al workspace del solicitante, no permitir adjuntar
+        if (apGroupId && d.nodeId && !(await ownsGroupUuid(db, req, d.nodeId))) {
+            return res.status(404).json({ success: false, message: 'Grupo AP no encontrado' });
+        }
         if (d.nodeId && !apGroupId) {
-            // Fallback: buscar ap_group por nombre (nodeName)
+            // Fallback: buscar ap_group por nombre (nodeName) DENTRO del workspace
             if (d.nodeName) {
-                const byName = await db.get('SELECT id FROM ap_groups WHERE nombre = ?', [d.nodeName]);
+                const byName = ws === null
+                    ? await db.get('SELECT id FROM ap_groups WHERE nombre = ?', [d.nodeName])
+                    : await db.get('SELECT id FROM ap_groups WHERE nombre = ? AND workspace_id = ?', [d.nodeName, ws]);
                 if (byName) {
                     apGroupId = byName.id;
                 } else {
-                    // Auto-crear grupo con el nombre del nodo
+                    // Auto-crear grupo con el nombre del nodo, estampando el workspace
                     const crypto = require('crypto');
                     const newUuid = crypto.randomBytes(8).toString('hex');
                     const result = await db.run(
-                        'INSERT INTO ap_groups (uuid, nombre, descripcion, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
-                        [newUuid, d.nodeName, 'Auto-creado', Date.now(), Date.now()]
+                        'INSERT INTO ap_groups (uuid, nombre, descripcion, workspace_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+                        [newUuid, d.nodeName, 'Auto-creado', ws, Date.now(), Date.now()]
                     );
                     apGroupId = result.lastID;
                 }
@@ -201,6 +227,7 @@ router.put('/db/devices/:id', async (req, res) => {
     try {
         const db = await getDb();
         const uuid = req.params.id; // frontend sends UUID as :id
+        if (!(await ownsApUuid(db, req, uuid))) return res.status(404).json({ success: false, message: 'AP no encontrado' });
         const exists = await db.get('SELECT id FROM aps WHERE uuid = ?', [uuid]);
         if (!exists) return res.status(404).json({ success: false, message: 'AP no encontrado' });
 
@@ -260,6 +287,7 @@ router.delete('/db/devices/:id', async (req, res) => {
     try {
         const db = await getDb();
         const uuid = req.params.id; // frontend sends UUID
+        if (!(await ownsApUuid(db, req, uuid))) return res.status(404).json({ success: false, message: 'AP no encontrado' });
         await db.run('DELETE FROM aps WHERE uuid = ?', [uuid]);
         res.json({ success: true });
     } catch (e) {
@@ -270,6 +298,10 @@ router.delete('/db/devices/:id', async (req, res) => {
 // Limpieza basada en la relación Nodos <-> APs (schema v2)
 router.post('/db/cleanup-orphan-devices', async (req, res) => {
     try {
+        // Mantenimiento global: solo el Administrador de plataforma puede ejecutarlo.
+        if (reqWorkspace(req) !== null) {
+            return res.json({ success: true, devicesDeleted: 0, cpesDeleted: 0, orphanIds: [], message: 'Operación reservada al administrador' });
+        }
         const db = await getDb();
 
         // v2: nodes tiene columnas directas, no JSON data

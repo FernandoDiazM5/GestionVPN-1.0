@@ -112,13 +112,15 @@ CREATE TABLE IF NOT EXISTS torre_ptp_endpoints (
 
 -- ── 7. Grupos de APs ───────────────────────────────────────
 CREATE TABLE IF NOT EXISTS ap_groups (
-    id          INT AUTO_INCREMENT PRIMARY KEY,
-    uuid        VARCHAR(64)  NOT NULL UNIQUE,
-    nombre      VARCHAR(255) NOT NULL,
-    descripcion VARCHAR(512) NOT NULL DEFAULT '',
-    ubicacion   VARCHAR(255) NOT NULL DEFAULT '',
-    created_at  BIGINT NOT NULL DEFAULT 0,
-    updated_at  BIGINT NOT NULL DEFAULT 0
+    id           INT AUTO_INCREMENT PRIMARY KEY,
+    uuid         VARCHAR(64)  NOT NULL UNIQUE,
+    nombre       VARCHAR(255) NOT NULL,
+    descripcion  VARCHAR(512) NOT NULL DEFAULT '',
+    ubicacion    VARCHAR(255) NOT NULL DEFAULT '',
+    workspace_id CHAR(36)     DEFAULT NULL,           -- inquilino dueño (multi-tenant)
+    created_at   BIGINT NOT NULL DEFAULT 0,
+    updated_at   BIGINT NOT NULL DEFAULT 0,
+    KEY idx_ap_groups_workspace (workspace_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ── 8. Access Points ───────────────────────────────────────

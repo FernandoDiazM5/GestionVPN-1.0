@@ -4,6 +4,8 @@ const router  = express.Router();
 const { getDb, encryptPass, decryptPass, getApIntId, getCpeIntId, getApGroupIntId, getNodeByPppUser } = require('./db.service');
 const { pollAp, getDetail, getFullDetail, clearApCache }  = require('./ap.service');
 
+const { reqWorkspace, ownedGroupIntIds, ownedApIntIds, ownsGroupUuid, ownsApUuid, cpeForeign } = require('./lib/tenantScope');
+
 const genUuid = () => crypto.randomBytes(8).toString('hex');
 const isValidMac = (mac) => /^([0-9a-f]{2}:?){5}([0-9a-f]{2})$/i.test(mac);
 
@@ -11,7 +13,16 @@ const isValidMac = (mac) => /^([0-9a-f]{2}:?){5}([0-9a-f]{2})$/i.test(mac);
 router.get('/nodos', async (req, res) => {
     try {
         const db   = await getDb();
-        const rows = await db.all('SELECT * FROM ap_groups ORDER BY created_at DESC');
+        const gids = await ownedGroupIntIds(db, req);   // null = admin (todos)
+        let rows;
+        if (gids === null) {
+            rows = await db.all('SELECT * FROM ap_groups ORDER BY created_at DESC');
+        } else if (gids.length === 0) {
+            rows = [];
+        } else {
+            const ph = gids.map(() => '?').join(',');
+            rows = await db.all(`SELECT * FROM ap_groups WHERE id IN (${ph}) ORDER BY created_at DESC`, gids);
+        }
         const counts = await db.all('SELECT ap_group_id, COUNT(*) as c FROM aps GROUP BY ap_group_id');
         const cm = {}; counts.forEach(r => { cm[r.ap_group_id] = r.c; });
         res.json({ success: true, nodos: rows.map(r => ({ ...r, id: r.uuid, ap_count: cm[r.id] || 0 })) });
@@ -24,8 +35,9 @@ router.post('/nodos', async (req, res) => {
         if (!nombre) return res.status(400).json({ success: false, message: 'Nombre requerido' });
         const db = await getDb();
         const uuid = genUuid();
-        await db.run('INSERT INTO ap_groups (uuid,nombre,descripcion,ubicacion,created_at) VALUES (?,?,?,?,?)',
-            [uuid, nombre, descripcion || '', ubicacion || '', Date.now()]);
+        const ws = reqWorkspace(req);
+        await db.run('INSERT INTO ap_groups (uuid,nombre,descripcion,ubicacion,workspace_id,created_at) VALUES (?,?,?,?,?,?)',
+            [uuid, nombre, descripcion || '', ubicacion || '', ws, Date.now()]);
         res.json({ success: true, id: uuid });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
@@ -35,6 +47,7 @@ router.put('/nodos/:id', async (req, res) => {
         const { nombre, descripcion, ubicacion } = req.body;
         if (!nombre) return res.status(400).json({ success: false, message: 'Nombre requerido' });
         const db = await getDb();
+        if (!(await ownsGroupUuid(db, req, req.params.id))) return res.status(404).json({ success: false, message: 'Grupo no encontrado' });
         await db.run('UPDATE ap_groups SET nombre=?,descripcion=?,ubicacion=?,updated_at=? WHERE uuid=?',
             [nombre, descripcion || '', ubicacion || '', Date.now(), req.params.id]);
         res.json({ success: true });
@@ -44,6 +57,7 @@ router.put('/nodos/:id', async (req, res) => {
 router.delete('/nodos/:id', async (req, res) => {
     try {
         const db = await getDb();
+        if (!(await ownsGroupUuid(db, req, req.params.id))) return res.status(404).json({ success: false, message: 'Grupo no encontrado' });
         const groupIntId = await getApGroupIntId(req.params.id);
         if (!groupIntId) return res.status(404).json({ success: false, message: 'Grupo no encontrado' });
 
@@ -67,6 +81,7 @@ router.delete('/nodos/:id', async (req, res) => {
 router.get('/nodos/:nodeId/aps', async (req, res) => {
     try {
         const db = await getDb();
+        if (!(await ownsGroupUuid(db, req, req.params.nodeId))) return res.json({ success: true, aps: [] });
         const groupIntId = await getApGroupIntId(req.params.nodeId);
         if (!groupIntId) return res.json({ success: true, aps: [] });
         const rows = await db.all('SELECT * FROM aps WHERE ap_group_id=? ORDER BY created_at DESC', groupIntId);
@@ -85,7 +100,8 @@ router.post('/aps', async (req, res) => {
         const port = parseInt(puerto_ssh) || 22;
         const enc  = clave_ssh_plain ? encryptPass(clave_ssh_plain) : '';
 
-        // Resolve ap_group_id from the uuid sent by frontend
+        // Resolve ap_group_id from the uuid sent by frontend (debe pertenecer al workspace)
+        if (!(await ownsGroupUuid(db, req, nodo_id))) return res.status(404).json({ success: false, message: 'Grupo AP no encontrado' });
         const apGroupId = await getApGroupIntId(nodo_id);
         if (!apGroupId) return res.status(404).json({ success: false, message: 'Grupo AP no encontrado' });
 
@@ -126,6 +142,7 @@ router.put('/aps/:id', async (req, res) => {
     try {
         const { ip, usuario_ssh, clave_ssh_plain, puerto_ssh, activo } = req.body;
         const db = await getDb();
+        if (!(await ownsApUuid(db, req, req.params.id))) return res.status(404).json({ success: false, message: 'AP no encontrado' });
         const ap = await db.get('SELECT * FROM aps WHERE uuid=?', req.params.id);
         if (!ap) return res.status(404).json({ success: false, message: 'AP no encontrado' });
         const enc = clave_ssh_plain ? encryptPass(clave_ssh_plain) : ap.clave_ssh_enc;
@@ -139,6 +156,7 @@ router.put('/aps/:id', async (req, res) => {
 router.delete('/aps/:id', async (req, res) => {
     try {
         const db = await getDb();
+        if (!(await ownsApUuid(db, req, req.params.id))) return res.status(404).json({ success: false, message: 'AP no encontrado' });
         clearApCache(req.params.id);
         const apIntId = await getApIntId(req.params.id);
         if (!apIntId) return res.status(404).json({ success: false, message: 'AP no encontrado' });
@@ -154,6 +172,7 @@ router.delete('/aps/:id', async (req, res) => {
 router.post('/aps/:id/refresh', async (req, res) => {
     try {
         const db = await getDb();
+        if (!(await ownsApUuid(db, req, req.params.id))) return res.status(404).json({ success: false, message: 'AP no encontrado' });
         const ap = await db.get('SELECT * FROM aps WHERE uuid=?', req.params.id);
         if (!ap) return res.status(404).json({ success: false, message: 'AP no encontrado' });
         const pass = decryptPass(ap.clave_ssh_enc);
@@ -175,6 +194,7 @@ router.post('/aps/:id/refresh', async (req, res) => {
 router.post('/aps/:id/poll', async (req, res) => {
     try {
         const db = await getDb();
+        if (!(await ownsApUuid(db, req, req.params.id))) return res.status(404).json({ success: false, message: 'AP no encontrado' });
         const ap = await db.get('SELECT * FROM aps WHERE uuid=?', req.params.id);
         if (!ap) return res.status(404).json({ success: false, message: 'AP no encontrado' });
         const pass = decryptPass(ap.clave_ssh_enc);
@@ -279,6 +299,7 @@ router.post('/cpes/:mac/detail', async (req, res) => {
 
         const db = await getDb();
         // ap_id from frontend is a uuid
+        if (!(await ownsApUuid(db, req, ap_id))) return res.status(404).json({ success: false, message: 'AP no encontrado' });
         const ap = await db.get('SELECT * FROM aps WHERE uuid=?', ap_id);
         if (!ap) return res.status(404).json({ success: false, message: 'AP no encontrado' });
         const pass = decryptPass(ap.clave_ssh_enc);
@@ -314,7 +335,16 @@ router.post('/cpes/:mac/detail', async (req, res) => {
 router.get('/cpes', async (req, res) => {
     try {
         const db  = await getDb();
-        const cpes = await db.all('SELECT * FROM cpes ORDER BY last_seen DESC');
+        const apIds = await ownedApIntIds(db, req);     // null = admin (todos)
+        let cpes;
+        if (apIds === null) {
+            cpes = await db.all('SELECT * FROM cpes ORDER BY last_seen DESC');
+        } else if (apIds.length === 0) {
+            cpes = [];
+        } else {
+            const ph = apIds.map(() => '?').join(',');
+            cpes = await db.all(`SELECT * FROM cpes WHERE ap_id IN (${ph}) ORDER BY last_seen DESC`, apIds);
+        }
         res.json({ success: true, cpes });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
@@ -324,6 +354,7 @@ router.get('/historial/:mac', async (req, res) => {
     try {
         const db    = await getDb();
         const limit = parseInt(req.query.limit) || 100;
+        if (await cpeForeign(db, req, req.params.mac.toUpperCase())) return res.json({ success: true, historial: [] });
         const cpeIntId = await getCpeIntId(req.params.mac.toUpperCase());
         if (!cpeIntId) return res.json({ success: true, historial: [] });
         const rows  = await db.all(
@@ -340,6 +371,11 @@ router.post('/poll-direct', async (req, res) => {
         const { apId, ip, port, user, pass, saveHistory, firmware } = req.body;
         if (!apId || !ip) return res.status(400).json({ success: false, message: 'apId e ip requeridos' });
 
+        // Aislamiento: el AP debe pertenecer al workspace del solicitante
+        {
+            const dbg = await getDb();
+            if (!(await ownsApUuid(dbg, req, apId))) return res.status(404).json({ success: false, message: 'AP no encontrado' });
+        }
         // Resolve AP integer id from uuid
         const apIntId = await getApIntId(apId);
 
@@ -446,6 +482,10 @@ router.post('/ap-detail-direct', async (req, res) => {
         if (!ip || !user) return res.status(400).json({ success: false, message: 'ip y user requeridos' });
 
         let actualPass = pass;
+        if (id) {
+            const db = await getDb();
+            if (!(await ownsApUuid(db, req, id))) return res.status(404).json({ success: false, message: 'AP no encontrado' });
+        }
         if (id && !actualPass) {
             const db = await getDb();
             const row = await db.get('SELECT clave_ssh_enc FROM aps WHERE uuid = ?', [id]);
@@ -519,6 +559,10 @@ router.post('/cpes/:mac/detail-direct', async (req, res) => {
 
         const db = await getDb();
         const mac = req.params.mac.toUpperCase();
+        // Aislamiento: no permitir leer un CPE que pertenece a otro workspace,
+        // ni usar como fallback un AP ajeno.
+        if (await cpeForeign(db, req, mac)) return res.status(404).json({ success: false, message: 'CPE no encontrado' });
+        if (apId && !(await ownsApUuid(db, req, apId))) return res.status(404).json({ success: false, message: 'AP no encontrado' });
         let credList = [];
 
         // 1. Credenciales propias del CPE (almacenadas en cpes)
@@ -630,6 +674,7 @@ router.put('/cpes/:mac/credentials', async (req, res) => {
         const { user, pass, port } = req.body;
         if (!user) return res.status(400).json({ success: false, message: 'user requerido' });
         const db = await getDb();
+        if (await cpeForeign(db, req, mac)) return res.status(404).json({ success: false, message: 'CPE no encontrado' });
         const encPass = pass ? encryptPass(pass) : null;
         await db.run(
             `INSERT INTO cpes (mac, usuario_ssh, clave_ssh_enc, puerto_ssh, last_seen)
@@ -650,7 +695,16 @@ router.put('/cpes/:mac/credentials', async (req, res) => {
 router.post('/poll-all-monitor', async (req, res) => {
     try {
         const db  = await getDb();
-        const aps = await db.all('SELECT * FROM aps WHERE is_active = 1');
+        const apIds = await ownedApIntIds(db, req);     // null = admin (todos)
+        let aps;
+        if (apIds === null) {
+            aps = await db.all('SELECT * FROM aps WHERE is_active = 1');
+        } else if (apIds.length === 0) {
+            aps = [];
+        } else {
+            const ph = apIds.map(() => '?').join(',');
+            aps = await db.all(`SELECT * FROM aps WHERE is_active = 1 AND id IN (${ph})`, apIds);
+        }
         let ok = 0, fail = 0;
 
         // B3: Limitar concurrencia a 3 APs simultaneos para no saturar el pool MySQL ni los APs
@@ -712,16 +766,27 @@ router.get('/topology-cpes', async (req, res) => {
     try {
         const db = await getDb();
 
-        // 1. Todos los CPEs con ap_id asignado
-        const cpes = await db.all(`
-            SELECT c.id, c.mac, c.hostname, c.modelo, c.firmware,
-                   c.ip_lan, c.mac_wlan, c.mac_ap, c.ssid_ap,
-                   c.frecuencia_mhz, c.last_seen, c.ap_id,
-                   c.last_stats, c.remote_hostname, c.remote_platform
-            FROM cpes c
-            WHERE c.ap_id IS NOT NULL
-            ORDER BY c.last_seen DESC
-        `);
+        // 1. Todos los CPEs con ap_id asignado (limitado al workspace)
+        const apIds = await ownedApIntIds(db, req);     // null = admin (todos)
+        let cpes;
+        if (apIds === null) {
+            cpes = await db.all(`
+                SELECT c.id, c.mac, c.hostname, c.modelo, c.firmware,
+                       c.ip_lan, c.mac_wlan, c.mac_ap, c.ssid_ap,
+                       c.frecuencia_mhz, c.last_seen, c.ap_id,
+                       c.last_stats, c.remote_hostname, c.remote_platform
+                FROM cpes c WHERE c.ap_id IS NOT NULL ORDER BY c.last_seen DESC`);
+        } else if (apIds.length === 0) {
+            cpes = [];
+        } else {
+            const ph = apIds.map(() => '?').join(',');
+            cpes = await db.all(`
+                SELECT c.id, c.mac, c.hostname, c.modelo, c.firmware,
+                       c.ip_lan, c.mac_wlan, c.mac_ap, c.ssid_ap,
+                       c.frecuencia_mhz, c.last_seen, c.ap_id,
+                       c.last_stats, c.remote_hostname, c.remote_platform
+                FROM cpes c WHERE c.ap_id IN (${ph}) ORDER BY c.last_seen DESC`, apIds);
+        }
 
         if (cpes.length === 0) { return res.json({ success: true, cpes: [] }); }
 
