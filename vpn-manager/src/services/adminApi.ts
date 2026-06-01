@@ -1,7 +1,7 @@
 // ============================================================
 //  Servicio del Administrador de plataforma (Roles v2) → /api/admin
 // ============================================================
-import { get, post } from './sessionClient';
+import { get, post, patch, del } from './sessionClient';
 import type { AdminSummary, Moderator, AuditLog } from '../types/account';
 
 export const adminApi = {
@@ -13,4 +13,12 @@ export const adminApi = {
     post<{ success: true; moderator: { user_id: string; email: string; workspace_id: string } }>(
       '/api/admin/moderators', data
     ),
+
+  updateModerator: (
+    id: string,
+    data: { name?: string; workspaceName?: string; password?: string; disabled?: boolean }
+  ) => patch<{ success: true; message: string }>(`/api/admin/moderators/${id}`, data),
+
+  deleteModerator: (id: string) =>
+    del<{ success: true; message: string }>(`/api/admin/moderators/${id}`),
 };

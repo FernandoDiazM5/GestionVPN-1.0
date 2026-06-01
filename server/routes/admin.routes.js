@@ -51,7 +51,8 @@ router.get('/summary', asyncHandler(async (_req, res) => {
 // ── GET /api/admin/moderators — lista de moderadores (OWNERs) ──
 router.get('/moderators', asyncHandler(async (_req, res) => {
   const moderators = await query(
-    `SELECT u.id AS user_id, u.email, u.name, u.created_at, w.id AS workspace_id, w.name AS workspace_name,
+    `SELECT u.id AS user_id, u.email, u.name, u.created_at, u.disabled_at,
+            w.id AS workspace_id, w.name AS workspace_name,
             (SELECT COUNT(*) FROM workspace_members m2
               WHERE m2.workspace_id = w.id AND m2.deleted_at IS NULL AND m2.role <> 'OWNER') AS miembros
        FROM workspace_members wm
@@ -61,7 +62,65 @@ router.get('/moderators', asyncHandler(async (_req, res) => {
         AND u.deleted_at IS NULL AND u.is_platform_admin = 0
       ORDER BY u.created_at DESC`
   );
-  return sendOk(res, { moderators });
+  return sendOk(res, {
+    moderators: moderators.map(m => ({ ...m, disabled: !!m.disabled_at })),
+  });
+}));
+
+// Localiza un moderador (OWNER, no platform_admin) por user_id o lanza 404.
+async function findModeratorOr404(userId) {
+  const rows = await query(
+    `SELECT u.id, w.id AS workspace_id
+       FROM users u
+       JOIN workspace_members wm ON wm.user_id = u.id AND wm.role = 'OWNER' AND wm.deleted_at IS NULL
+       JOIN workspaces w ON w.id = wm.workspace_id AND w.deleted_at IS NULL
+      WHERE u.id = ? AND u.deleted_at IS NULL AND u.is_platform_admin = 0
+      LIMIT 1`,
+    [userId]
+  );
+  if (!rows.length) throw new AppError('Moderador no encontrado', 404, 'NOT_FOUND');
+  return rows[0];
+}
+
+// ── PATCH /api/admin/moderators/:id — editar nombre / workspace / clave / estado ──
+const patchSchema = z.object({
+  name: z.string().max(120).optional(),
+  workspaceName: z.string().min(1).max(160).optional(),
+  password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres').max(128).optional(),
+  disabled: z.boolean().optional(),
+}).refine(d => Object.keys(d).length > 0, { message: 'Nada que actualizar' });
+
+router.patch('/moderators/:id', asyncHandler(async (req, res) => {
+  const mod = await findModeratorOr404(req.params.id);
+  const { name, workspaceName, password, disabled } = patchSchema.parse(req.body);
+  const now = Date.now();
+
+  if (name !== undefined) {
+    await query('UPDATE users SET name = ?, updated_at = ? WHERE id = ?', [name, now, mod.id]);
+  }
+  if (workspaceName !== undefined) {
+    await query('UPDATE workspaces SET name = ?, updated_at = ? WHERE id = ?', [workspaceName, now, mod.workspace_id]);
+  }
+  if (password !== undefined) {
+    await query('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?', [await bcrypt.hash(password, 10), now, mod.id]);
+  }
+  if (disabled !== undefined) {
+    await query('UPDATE users SET disabled_at = ?, updated_at = ? WHERE id = ?', [disabled ? now : null, now, mod.id]);
+  }
+
+  return sendOk(res, { message: 'Moderador actualizado' });
+}));
+
+// ── DELETE /api/admin/moderators/:id — baja lógica (soft delete) ──
+router.delete('/moderators/:id', asyncHandler(async (req, res) => {
+  const mod = await findModeratorOr404(req.params.id);
+  const now = Date.now();
+  await withTransaction(async (tx) => {
+    await tx.query('UPDATE workspace_members SET deleted_at = ? WHERE workspace_id = ? AND deleted_at IS NULL', [now, mod.workspace_id]);
+    await tx.query('UPDATE workspaces SET deleted_at = ? WHERE id = ?', [now, mod.workspace_id]);
+    await tx.query('UPDATE users SET deleted_at = ?, updated_at = ? WHERE id = ?', [now, now, mod.id]);
+  });
+  return sendOk(res, { message: 'Moderador eliminado' });
 }));
 
 // ── POST /api/admin/moderators — alta directa de un Moderador ──

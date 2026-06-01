@@ -25,6 +25,7 @@ export interface Moderator {
   workspace_id: string;
   workspace_name: string;
   miembros: number;
+  disabled?: boolean;
 }
 
 /** Métricas del dashboard del Administrador. */

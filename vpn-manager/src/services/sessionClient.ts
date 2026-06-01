@@ -36,4 +36,6 @@ export async function apiJson<T = any>(path: string, init?: RequestInit): Promis
 export const get = <T = any>(path: string) => apiJson<T>(path);
 export const post = <T = any>(path: string, data?: unknown) =>
   apiJson<T>(path, { method: 'POST', body: data ? JSON.stringify(data) : undefined });
+export const patch = <T = any>(path: string, data?: unknown) =>
+  apiJson<T>(path, { method: 'PATCH', body: data ? JSON.stringify(data) : undefined });
 export const del = <T = any>(path: string) => apiJson<T>(path, { method: 'DELETE' });

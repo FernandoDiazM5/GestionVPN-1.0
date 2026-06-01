@@ -78,6 +78,7 @@ async function authenticateMysqlUser(login, password) {
   const email = raw.includes('@') ? raw : `${raw}@local.app`;
   const user = await userRepo.findByEmail(email);
   if (!user || !user.password_hash) return null;
+  if (user.disabled_at) return null;   // moderador suspendido → login bloqueado
   const ok = await bcrypt.compare(password, user.password_hash);
   if (!ok) return null;
 

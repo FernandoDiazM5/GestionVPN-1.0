@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS users (
   otp_hash        VARCHAR(255)  DEFAULT NULL,           -- HASH del OTP de registro (nunca en claro)
   otp_expires_at  BIGINT        DEFAULT NULL,
   otp_attempts    INT           NOT NULL DEFAULT 0,     -- anti fuerza bruta del OTP
+  disabled_at     BIGINT        DEFAULT NULL,            -- suspensión (login bloqueado; NULL = activo)
   created_at      BIGINT        NOT NULL,
   updated_at      BIGINT        NOT NULL,
   deleted_at      BIGINT        DEFAULT NULL,            -- soft delete
