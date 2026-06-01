@@ -930,6 +930,27 @@ router.post('/node/scan-stream', async (req, res) => {
         return res.status(400).json({ success: false, message: 'CIDR inválido o muy grande' });
     }
 
+    // Aislamiento: el escaneo deriva de un túnel. Un moderador solo puede
+    // escanear subredes (segmento_lan / lan_subnets) de SUS propios nodos.
+    // El Administrador de plataforma no tiene restricción.
+    const acc = req.account;
+    if (acc && !acc.platform_admin) {
+        try {
+            const db = await getDb();
+            const rows = await db.all('SELECT segmento_lan, lan_subnets FROM nodes WHERE workspace_id = ?', [acc.workspace_id]);
+            const owned = new Set();
+            rows.forEach(r => {
+                if (r.segmento_lan) owned.add(String(r.segmento_lan).trim());
+                try { (JSON.parse(r.lan_subnets || '[]') || []).forEach(s => owned.add(String(s).trim())); } catch (_) { /* noop */ }
+            });
+            if (!owned.has(String(nodeLan).trim())) {
+                return res.status(403).json({ success: false, message: 'La subred no pertenece a ninguno de tus túneles' });
+            }
+        } catch (_) {
+            return res.status(403).json({ success: false, message: 'No autorizado' });
+        }
+    }
+
     // SSE-like streaming over fetch
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
