@@ -32,3 +32,6 @@ yarn-error.log*
 
 # Claude Code settings locales
 .claude/settings.local.json
+
+# Backup SQLite tras migración a MySQL (datos sensibles, no versionar)
+server/_legacy_sqlite/

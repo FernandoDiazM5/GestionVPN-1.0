@@ -96,7 +96,7 @@ function startServer(attempt = 1) {
         console.log(`\n==============================================`);
         console.log(`  Servidor Backend MikroTik API Proxy`);
         console.log(`  http://localhost:${PORT}`);
-        console.log(`  SQLite listo | Intento ${attempt}`);
+        console.log(`  MySQL listo | Intento ${attempt}`);
         console.log(`==============================================\n`);
     });
 

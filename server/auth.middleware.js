@@ -12,7 +12,7 @@ if (fs.existsSync(SECRET_FILE)) {
     fs.writeFileSync(SECRET_FILE, JWT_SECRET, { mode: 0o600 });
 }
 
-// Inyecta credenciales MikroTik desde SQLite (igual para ambos métodos de auth)
+// Inyecta credenciales MikroTik desde MySQL (igual para ambos métodos de auth)
 async function injectMikrotik(req) {
     const mtIp = await getAppSetting('MT_IP');
     const mtUser = await getAppSetting('MT_USER');

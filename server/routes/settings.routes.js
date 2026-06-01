@@ -9,7 +9,7 @@ const { getDb, encryptDevice, decryptDevice, encryptPass, decryptPass, saveNode,
 router.get('/settings/get', async (req, res) => {
     try {
         const db = await getDb();
-        const rows = await db.all('SELECT key, value FROM app_settings');
+        const rows = await db.all('SELECT `key`, value FROM app_settings');
         const settings = {};
         rows.forEach(r => { 
             if (r.key === 'MT_PASS' && r.value) {
@@ -41,7 +41,7 @@ router.post('/settings/save', requireAdmin, async (req, res) => {
             if (finalValue) finalValue = encryptPass(finalValue);
         }
 
-        await db.run('INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at',
+        await db.run('INSERT INTO app_settings (`key`, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(`key`) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at',
             [key, finalValue, Date.now()]);
         res.json({ success: true });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }

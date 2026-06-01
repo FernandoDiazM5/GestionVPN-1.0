@@ -47,7 +47,7 @@ async function ensureMysqlUser({ email, name, password, platformAdmin }) {
 }
 
 async function main() {
-  // 1) SQLite — bootstrap: solo 'admin' con clave 'admin'
+  // 1) vpn_users (MySQL) — bootstrap legacy: solo 'admin' con clave 'admin'
   await initDb();
   const db = await getDb();
   const adminHash = await bcrypt.hash('admin', 10);
@@ -59,7 +59,7 @@ async function main() {
       'admin', adminHash, 'admin', Date.now());
   }
   const del = await db.run("DELETE FROM vpn_users WHERE username <> 'admin'");
-  console.log(`[seed] SQLite: admin asegurado (admin/admin); ${del.changes || 0} usuario(s) legacy eliminados.`);
+  console.log(`[seed] vpn_users: admin asegurado (admin/admin); ${del.changes || 0} usuario(s) legacy eliminados.`);
 
   // 2) MySQL — Administrador + Moderador fernando
   await ensureMysqlUser({ email: 'admin@local.app', name: 'admin', password: 'admin', platformAdmin: true });
