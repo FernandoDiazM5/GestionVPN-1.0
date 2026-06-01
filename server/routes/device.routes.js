@@ -304,10 +304,15 @@ router.post('/db/cleanup-orphan-devices', async (req, res) => {
         }
         const db = await getDb();
 
+        // CPEs huérfanos: sin AP asociado (ap_id NULL) → no atribuibles a ningún
+        // workspace. Se eliminan siempre para evitar incongruencias.
+        const orphanCpes = await db.run('DELETE FROM cpes WHERE ap_id IS NULL');
+        const orphanCpesDeleted = orphanCpes.changes || 0;
+
         // v2: nodes tiene columnas directas, no JSON data
         const validNodes = await db.all('SELECT id, ppp_user, nombre_nodo, nombre_vrf FROM nodes');
         if (validNodes.length === 0) {
-            return res.json({ success: true, devicesDeleted: 0, cpesDeleted: 0, orphanIds: [], message: 'No hay nodos válidos — limpieza abortada por seguridad' });
+            return res.json({ success: true, devicesDeleted: 0, cpesDeleted: 0, orphanCpesDeleted, orphanIds: [], message: 'No hay nodos válidos — limpieza de APs abortada por seguridad' });
         }
 
         // v2: ap_groups connect APs to logical groupings; find APs whose ap_group_id
@@ -322,7 +327,7 @@ router.post('/db/cleanup-orphan-devices', async (req, res) => {
         const orphans = allAPs.filter(ap => !validGroupIds.has(ap.ap_group_id));
 
         if (orphans.length === 0) {
-            return res.json({ success: true, devicesDeleted: 0, cpesDeleted: 0, orphanIds: [], message: 'No se encontraron APs huérfanos' });
+            return res.json({ success: true, devicesDeleted: 0, cpesDeleted: 0, orphanCpesDeleted, orphanIds: [], message: `Sin APs huérfanos${orphanCpesDeleted ? ` · ${orphanCpesDeleted} CPE(s) huérfano(s) eliminado(s)` : ''}` });
         }
 
         const orphanIntIds = orphans.map(d => d.id);
@@ -337,6 +342,7 @@ router.post('/db/cleanup-orphan-devices', async (req, res) => {
             success: true,
             devicesDeleted: devResult.changes,
             cpesDeleted: cpesResult.changes,
+            orphanCpesDeleted,
             orphanIds: orphanUuids,
         });
     } catch (e) {
