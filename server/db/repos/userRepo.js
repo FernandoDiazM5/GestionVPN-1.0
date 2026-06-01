@@ -20,6 +20,20 @@ async function findById(id) {
   return rows[0] || null;
 }
 
+/**
+ * Busca un usuario por su `name` (usado como username de login).
+ * Coincidencia exacta sin distinguir mayúsculas. Si hay varios con el
+ * mismo nombre, devuelve el más antiguo (determinista).
+ */
+async function findByName(name) {
+  if (!name) return null;
+  const rows = await query(
+    'SELECT * FROM users WHERE LOWER(name) = LOWER(?) AND deleted_at IS NULL ORDER BY created_at ASC LIMIT 1',
+    [String(name).trim()]
+  );
+  return rows[0] || null;
+}
+
 /** Inserta un usuario sin verificar (pendiente de OTP). */
 async function createPending({ id, email, passwordHash, name, otpHash, otpExpiresAt }) {
   const now = Date.now();
@@ -49,4 +63,4 @@ async function markVerified(id) {
   );
 }
 
-module.exports = { findByEmail, findById, createPending, setOtp, incOtpAttempts, markVerified };
+module.exports = { findByEmail, findById, findByName, createPending, setOtp, incOtpAttempts, markVerified };

@@ -72,11 +72,16 @@ async function buildSessionForLegacyUser(username) {
  * Permite que Moderadores/Miembros inicien sesión en la app.
  */
 async function authenticateMysqlUser(login, password) {
-  // Acepta email directo o username corto (mapea a <username>@local.app)
-  const raw = String(login || '').toLowerCase();
+  // Acepta: email directo · username corto (<username>@local.app) ·
+  // o el `name` del usuario (lo que el Administrador ve como "usuario").
+  const raw = String(login || '').trim().toLowerCase();
   if (!raw) return null;
   const email = raw.includes('@') ? raw : `${raw}@local.app`;
-  const user = await userRepo.findByEmail(email);
+  let user = await userRepo.findByEmail(email);
+  if (!user && !raw.includes('@')) {
+    // Fallback: login por nombre (ej. moderador "user123" con email real)
+    user = await userRepo.findByName(raw);
+  }
   if (!user || !user.password_hash) return null;
   if (user.disabled_at) return null;   // moderador suspendido → login bloqueado
   const ok = await bcrypt.compare(password, user.password_hash);
