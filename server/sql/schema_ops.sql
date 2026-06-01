@@ -32,9 +32,11 @@ CREATE TABLE IF NOT EXISTS nodes (
     lan_subnets      VARCHAR(2000) NOT NULL DEFAULT '[]',
     protocol         VARCHAR(20)  NOT NULL DEFAULT 'sstp',
     node_number      INT          DEFAULT NULL,
+    workspace_id     CHAR(36)     DEFAULT NULL,           -- inquilino dueño del nodo (multi-tenant)
     created_at       BIGINT       NOT NULL DEFAULT 0,
     updated_at       BIGINT       NOT NULL DEFAULT 0,
-    KEY idx_nodes_nombre_vrf (nombre_vrf)
+    KEY idx_nodes_nombre_vrf (nombre_vrf),
+    KEY idx_nodes_workspace (workspace_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ── 2. Credenciales SSH por nodo ───────────────────────────

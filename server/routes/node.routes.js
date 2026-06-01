@@ -8,19 +8,42 @@ const { getDb, encryptDevice, decryptDevice, encryptPass, decryptPass, saveNode,
 const assignmentRepo = require('../db/repos/assignmentRepo');
 
 /**
- * Filtra los nodos según el rol RBAC (Roles v2). El rol MEMBER (View) solo
- * ve sus túneles asignados; OWNER/CO_MODERATOR y el Admin de plataforma ven todo.
- * Ante error de DB no expone túneles al miembro (seguro por defecto).
+ * Filtra los nodos según el rol RBAC (Roles v2) con aislamiento multi-tenant:
+ *  - Admin de plataforma: ve TODOS los túneles del router.
+ *  - Moderador (OWNER/CO_MODERATOR): solo los nodos de SU workspace
+ *    (nodes.workspace_id = su workspace).
+ *  - View (MEMBER): solo sus túneles asignados, dentro de su workspace.
+ * Ante error de DB no expone túneles (seguro por defecto) para roles no-admin.
  */
 async function filterNodesForRole(req, nodes) {
     const acc = req.account;
-    if (!acc || acc.platform_admin || acc.role !== 'MEMBER') return nodes;
+    if (!acc) return nodes;                 // token legacy sin RBAC
+    if (acc.platform_admin) return nodes;   // Administrador ve todo
+
+    // Conjunto de identificadores (ppp_user / nombre_vrf) que pertenecen al workspace
+    let wsUsers;
     try {
-        const ids = new Set(await assignmentRepo.assignedTunnelIds(acc.workspace_id, acc.sub));
-        return nodes.filter(n => ids.has(n.nombre_vrf) || ids.has(n.ppp_user));
+        const db = await getDb();
+        const rows = await db.all(
+            'SELECT ppp_user, nombre_vrf FROM nodes WHERE workspace_id = ?',
+            [acc.workspace_id]
+        );
+        wsUsers = new Set();
+        rows.forEach(r => { if (r.ppp_user) wsUsers.add(r.ppp_user); if (r.nombre_vrf) wsUsers.add(r.nombre_vrf); });
     } catch (_) {
-        return [];
+        return [];   // sin poder verificar pertenencia → no exponer
     }
+    let scoped = nodes.filter(n => wsUsers.has(n.ppp_user) || wsUsers.has(n.nombre_vrf));
+
+    if (acc.role === 'MEMBER') {
+        try {
+            const ids = new Set(await assignmentRepo.assignedTunnelIds(acc.workspace_id, acc.sub));
+            scoped = scoped.filter(n => ids.has(n.nombre_vrf) || ids.has(n.ppp_user));
+        } catch (_) {
+            return [];
+        }
+    }
+    return scoped;
 }
 
 /** Middleware: solo admin u operator pueden acceder a endpoints de credenciales */
@@ -350,7 +373,8 @@ router.post('/node/provision', async (req, res) => {
                     await saveNode({
                         ppp_user: ifaceName, nombre_nodo: nameUpper, nombre_vrf: vrfName,
                         iface_name: ifaceName, node_number: nodeNumber, lan_subnets: allSubnets,
-                        segmento_lan: allSubnets[0] || '', ip_tunnel: wgPeerIP, protocol: 'wireguard'
+                        segmento_lan: allSubnets[0] || '', ip_tunnel: wgPeerIP, protocol: 'wireguard',
+                        workspace_id: req.account?.workspace_id || null,
                     });
                     await db.run('COMMIT');
                 } catch (txErr) { await db.run('ROLLBACK'); throw txErr; }
@@ -437,7 +461,8 @@ router.post('/node/provision', async (req, res) => {
                     lan_subnets: allSubnets,
                     segmento_lan: allSubnets[0] || '',
                     ip_tunnel: remoteAddress,
-                    protocol: isWG ? 'wireguard' : 'sstp'
+                    protocol: isWG ? 'wireguard' : 'sstp',
+                    workspace_id: req.account?.workspace_id || null,
                 });
 
                 if (!isWG) {

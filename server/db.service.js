@@ -229,9 +229,9 @@ async function saveNode(nodeData) {
 
     await d.run(
         `INSERT INTO nodes (ppp_user, mikrotik_id, nombre_nodo, nombre_vrf, iface_name, segmento_lan,
-            ip_tunnel, server_ip, wg_public_key, label, lan_subnets, protocol, node_number,
+            ip_tunnel, server_ip, wg_public_key, label, lan_subnets, protocol, node_number, workspace_id,
             created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(ppp_user) DO UPDATE SET
             mikrotik_id  = COALESCE(NULLIF(excluded.mikrotik_id, ''), nodes.mikrotik_id),
             nombre_nodo  = excluded.nombre_nodo,
@@ -245,6 +245,7 @@ async function saveNode(nodeData) {
             lan_subnets  = CASE WHEN excluded.lan_subnets != '[]' THEN excluded.lan_subnets ELSE nodes.lan_subnets END,
             protocol     = COALESCE(NULLIF(excluded.protocol, 'sstp'), nodes.protocol),
             node_number  = COALESCE(excluded.node_number, nodes.node_number),
+            workspace_id = COALESCE(nodes.workspace_id, excluded.workspace_id),
             updated_at   = excluded.updated_at`,
         [
             nodeData.ppp_user,
@@ -260,6 +261,7 @@ async function saveNode(nodeData) {
             lanSubnetsJson,
             nodeData.protocol || 'sstp',
             nodeData.node_number != null ? nodeData.node_number : null,
+            nodeData.workspace_id || null,
             now, now
         ]
     );
@@ -280,7 +282,7 @@ async function getNodes() {
     const rows = await d.all(
         `SELECT id, ppp_user, mikrotik_id, nombre_nodo, nombre_vrf, iface_name,
                 segmento_lan, ip_tunnel, label, server_ip, wg_public_key,
-                ppp_password_enc, lan_subnets, protocol, node_number,
+                ppp_password_enc, lan_subnets, protocol, node_number, workspace_id,
                 created_at, updated_at
          FROM nodes ORDER BY id ASC`
     );
@@ -299,6 +301,7 @@ async function getNodes() {
         lan_subnets: r.lan_subnets ? JSON.parse(r.lan_subnets) : [],
         protocol: r.protocol || 'sstp',
         node_number: r.node_number,
+        workspace_id: r.workspace_id,
         created_at: r.created_at,
         updated_at: r.updated_at,
     }));
