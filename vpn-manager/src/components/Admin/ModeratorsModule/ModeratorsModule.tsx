@@ -4,6 +4,8 @@ import {
   Pencil, Trash2, Ban, Power, AlertTriangle,
 } from 'lucide-react';
 import { adminApi } from '../../../services/adminApi';
+import { useWorkspaceSession } from '../../../context/WorkspaceSession';
+import { isPlatformAdmin } from '../../../utils/permissions';
 import type { Moderator } from '../../../types/account';
 
 const inputCls = 'w-full px-3 py-2.5 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 text-slate-700 placeholder:text-slate-400 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500';
@@ -18,14 +20,17 @@ export default function ModeratorsModule() {
   const [deleting, setDeleting] = useState<Moderator | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { session } = useWorkspaceSession();
+  const canAdmin = isPlatformAdmin(session);
 
   const load = async () => {
+    if (!canAdmin) { setLoading(false); return; }   // solo el Administrador consulta /api/admin
     setLoading(true);
     try { const r = await adminApi.listModerators(); setModerators(r.moderators); }
     catch { /* sesión/MySQL */ }
     finally { setLoading(false); }
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [canAdmin]);
 
   const toggleSuspend = async (m: Moderator) => {
     setBusyId(m.user_id); setError(null);

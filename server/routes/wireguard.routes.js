@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { connectToMikrotik, safeWrite, getErrorMessage, writeIdempotent, parseHandshakeSecs } = require('../routeros.service');
 const { getDb } = require('../db.service');
+const { reqWorkspace } = require('../lib/tenantScope');
 
 router.post('/wireguard/peers', async (req, res) => {
     if (!req.mikrotik) return res.status(503).json({ success: false, needsConfig: true, message: 'Configura las credenciales MikroTik en Ajustes antes de continuar.' });
@@ -16,7 +17,7 @@ router.post('/wireguard/peers', async (req, res) => {
         await api.close();
         const mgmtIface = ifaces.find(i => i.name === 'VPN-WG-MGMT');
         const publicIP = cloud?.[0]?.['public-address'] || '';
-        const result = peers
+        let result = peers
             .filter(p => p.interface === 'VPN-WG-MGMT')
             .map(p => {
                 const secs = parseHandshakeSecs(p['last-handshake'] || '');
@@ -29,6 +30,18 @@ router.post('/wireguard/peers', async (req, res) => {
                     active: secs < 300,
                 };
             });
+
+        // Aislamiento multi-tenant: cada moderador solo ve sus peers de gestión.
+        // Admin (ws === null) ve todos. Peers sin dueño → solo admin.
+        const ws = reqWorkspace(req);
+        if (ws !== null) {
+            const db = await getDb();
+            const owners = await db.all('SELECT public_key, workspace_id FROM mgmt_peer_owners');
+            const ownerMap = {};
+            owners.forEach(o => { ownerMap[o.public_key] = o.workspace_id; });
+            result = result.filter(p => ownerMap[p.publicKey] === ws);
+        }
+
         res.json({
             success: true,
             peers: result,
@@ -67,6 +80,21 @@ router.post('/wireguard/peer/add', async (req, res) => {
             `=comment=${name || 'Admin'}`,
         ]);
         await api.close();
+
+        // Atribuir el peer al workspace del moderador que lo creó (aislamiento)
+        try {
+            const db = await getDb();
+            await db.run(
+                `INSERT INTO mgmt_peer_owners (public_key, workspace_id, allowed_address, comment, created_at)
+                 VALUES (?, ?, ?, ?, ?)
+                 ON CONFLICT(public_key) DO UPDATE SET
+                   workspace_id = excluded.workspace_id,
+                   allowed_address = excluded.allowed_address,
+                   comment = excluded.comment`,
+                [publicKey, reqWorkspace(req), `${nextIP}/32`, name || 'Admin', Date.now()]
+            );
+        } catch (e) { console.warn('[WG-PEER-ADD] No se pudo registrar dueño:', e.message); }
+
         res.json({ success: true, assignedIP: nextIP, message: `Administrador creado con IP ${nextIP}` });
     } catch (error) {
         if (api) try { await api.close(); } catch (_) { }
@@ -82,6 +110,20 @@ router.post('/wireguard/peer/edit', async (req, res) => {
     let api;
     try {
         api = await connectToMikrotik(ip, user, pass);
+
+        // Aislamiento: un moderador solo puede editar peers de su workspace
+        const ws = reqWorkspace(req);
+        if (ws !== null) {
+            const peers = await safeWrite(api, ['/interface/wireguard/peers/print']);
+            const target = peers.find(p => p['.id'] === peerId);
+            const db = await getDb();
+            const owner = target ? await db.get('SELECT workspace_id FROM mgmt_peer_owners WHERE public_key = ?', [target['public-key']]) : null;
+            if (!target || !owner || owner.workspace_id !== ws) {
+                await api.close();
+                return res.status(404).json({ success: false, message: 'Peer no encontrado' });
+            }
+        }
+
         await safeWrite(api, ['/interface/wireguard/peers/set', `=.id=${peerId}`, `=comment=${newName}`]);
         await api.close();
         res.json({ success: true });

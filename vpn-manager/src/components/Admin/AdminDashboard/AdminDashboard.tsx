@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { LayoutDashboard, Users, UserCog, Briefcase, Activity, Loader2, RefreshCw } from 'lucide-react';
 import { adminApi } from '../../../services/adminApi';
+import { useWorkspaceSession } from '../../../context/WorkspaceSession';
+import { isPlatformAdmin } from '../../../utils/permissions';
 import type { AdminSummary, AuditLog } from '../../../types/account';
 
 function timeAgo(ts: number): string {
@@ -16,8 +18,11 @@ export default function AdminDashboard() {
   const [recent, setRecent] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const { session } = useWorkspaceSession();
+  const canAdmin = isPlatformAdmin(session);
 
   const load = async () => {
+    if (!canAdmin) { setLoading(false); return; }   // solo el Administrador consulta /api/admin
     setLoading(true); setError(false);
     try {
       const r = await adminApi.summary();
@@ -25,7 +30,7 @@ export default function AdminDashboard() {
     } catch { setError(true); }
     finally { setLoading(false); }
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [canAdmin]);
 
   const cards = summary ? [
     { label: 'Moderadores', value: summary.moderadores, icon: UserCog, color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-100 dark:bg-indigo-500/20' },

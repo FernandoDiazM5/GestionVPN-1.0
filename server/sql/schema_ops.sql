@@ -234,6 +234,18 @@ CREATE TABLE IF NOT EXISTS peer_colors (
     color        VARCHAR(32)  NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ── 14. Dueño (workspace) de cada peer WG de gestión (Usuarios) ─────
+-- Los peers viven en el router (VPN-WG-MGMT); esta tabla los atribuye a
+-- un moderador para aislar la vista "Usuarios" por workspace.
+CREATE TABLE IF NOT EXISTS mgmt_peer_owners (
+    public_key      VARCHAR(255) NOT NULL PRIMARY KEY,
+    workspace_id    CHAR(36)     DEFAULT NULL,
+    allowed_address VARCHAR(64)  NOT NULL DEFAULT '',
+    comment         VARCHAR(255) NOT NULL DEFAULT '',
+    created_at      BIGINT       NOT NULL DEFAULT 0,
+    KEY idx_mgmt_peer_ws (workspace_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ╔══════════════════════════════════════════════════════════╗
 -- ║  VISTAS                                                   ║
 -- ╚══════════════════════════════════════════════════════════╝
