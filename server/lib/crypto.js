@@ -2,7 +2,7 @@
 //  Capa de cifrado AES-256-GCM (Fase 1 — multi-usuario)
 //  Reutiliza la MISMA clave (.db_secret) que db.service.js,
 //  garantizando que las credenciales MikroTik cifradas sean
-//  interoperables entre la capa SQLite (legacy) y la MySQL (RBAC).
+//  interoperables en toda la capa MySQL (operativa + RBAC).
 //
 //  NUNCA almacenar credenciales de router en texto plano.
 // ============================================================

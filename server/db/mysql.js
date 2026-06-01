@@ -1,8 +1,8 @@
 // ============================================================
-//  Capa de acceso MySQL (Fase 1 — multi-usuario / RBAC)
-//  Coexiste con SQLite (db.service.js sigue manejando los
-//  dispositivos/nodos cacheados). MySQL maneja el dominio
-//  multi-tenant: users, workspaces, members, invitations, logs.
+//  Capa de acceso MySQL — pool de conexiones (singleton).
+//  MySQL/MariaDB es la única BD del sistema: dominio operativo
+//  (nodos, APs, CPEs, settings vía db.service.js) + dominio
+//  multi-tenant/RBAC (users, workspaces, members, invitations, logs).
 //
 //  Config por entorno (valores por defecto = XAMPP local):
 //    MYSQL_HOST=127.0.0.1  MYSQL_PORT=3306

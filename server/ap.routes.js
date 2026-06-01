@@ -653,7 +653,7 @@ router.post('/poll-all-monitor', async (req, res) => {
         const aps = await db.all('SELECT * FROM aps WHERE is_active = 1');
         let ok = 0, fail = 0;
 
-        // B3: Limitar concurrencia a 3 APs simultaneos para evitar SQLITE_BUSY
+        // B3: Limitar concurrencia a 3 APs simultaneos para no saturar el pool MySQL ni los APs
         const BATCH_SIZE = 3;
         for (let i = 0; i < aps.length; i += BATCH_SIZE) {
             await Promise.allSettled(aps.slice(i, i + BATCH_SIZE).map(async (ap) => {

@@ -1,7 +1,7 @@
 // ============================================================
-//  Seed de roles (Roles v2) — consolidación de usuarios
-//  - SQLite: solo 'admin' (bootstrap, clave 'admin'); elimina legacy.
-//  - MySQL : admin@local.app (Administrador/platform_admin)
+//  Seed de roles (Roles v2) — consolidación de usuarios (todo en MySQL)
+//  - vpn_users : solo 'admin' (bootstrap legacy, clave 'admin'); elimina resto.
+//  - users(RBAC): admin@local.app (Administrador/platform_admin)
 //            fernando@local.app (Moderador, clave 48523451) — dueño de
 //            su workspace; al ser OWNER ve TODOS los túneles del router.
 //

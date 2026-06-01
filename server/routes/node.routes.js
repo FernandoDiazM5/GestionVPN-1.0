@@ -111,7 +111,7 @@ router.post('/nodes', async (req, res) => {
 
         let nodes = [...sstpNodes, ...wgNodes];
 
-        // --- Merge etiquetas personalizadas desde SQLite (tienen prioridad sobre el comment de MikroTik) ---
+        // --- Merge etiquetas personalizadas desde MySQL (tienen prioridad sobre el comment de MikroTik) ---
         try {
             const db = await getDb();
             const labelRows = await db.all('SELECT ppp_user, label FROM nodes WHERE label IS NOT NULL AND label != \'\'');
@@ -122,7 +122,7 @@ router.post('/nodes', async (req, res) => {
             console.error('[DB] Error merging labels:', dbErr.message);
         }
 
-        // --- Actualizar caché SQLite con el estado actual de MikroTik ---
+        // --- Actualizar caché MySQL con el estado actual de MikroTik ---
         try {
             for (const n of nodes) {
                 // Para WG: ppp_user === ifaceName (VPN-WG-NDx-NOMBRE), iface_name igual
@@ -150,11 +150,11 @@ router.post('/nodes', async (req, res) => {
     } catch (error) {
         if (api) try { await api.close(); } catch (_) { }
 
-        // --- Fallback: retornar nodos desde caché SQLite si MikroTik no responde ---
+        // --- Fallback: retornar nodos desde caché MySQL si MikroTik no responde ---
         try {
             const cached = await getNodes();
             if (cached.length > 0) {
-                console.warn('[DB] MikroTik no disponible — sirviendo nodos desde caché SQLite');
+                console.warn('[DB] MikroTik no disponible — sirviendo nodos desde caché MySQL');
                 const offlineNodes = cached.map(n => ({
                     ...n,
                     running: false,
@@ -342,7 +342,7 @@ router.post('/node/provision', async (req, res) => {
 
             await api.close();
 
-            // SQLite
+            // MySQL
             try {
                 const db = await getDb();
                 await db.run('BEGIN');
@@ -421,7 +421,7 @@ router.post('/node/provision', async (req, res) => {
 
         await api.close();
 
-        // --- Persistir nodo + credenciales en SQLite (transacción atómica) ---
+        // --- Persistir nodo + credenciales en MySQL (transacción atómica) ---
         try {
             const db = await getDb();
             const nodeId = isWG ? ifaceName : pppUser;
@@ -449,13 +449,13 @@ router.post('/node/provision', async (req, res) => {
                 }
 
                 await db.run('COMMIT');
-                console.log(`[DB] Nodo guardado en SQLite: ${nodeId} (${isWG ? 'WG' : 'SSTP'})`);
+                console.log(`[DB] Nodo guardado en MySQL: ${nodeId} (${isWG ? 'WG' : 'SSTP'})`);
             } catch (txErr) {
                 await db.run('ROLLBACK');
                 throw txErr;
             }
         } catch (dbErr) {
-            console.error('[DB] Error guardando nodo en SQLite:', dbErr.message);
+            console.error('[DB] Error guardando nodo en MySQL:', dbErr.message);
         }
 
         res.json({
@@ -603,15 +603,15 @@ router.post('/node/deprovision', async (req, res) => {
 
         await api.close();
 
-        // Paso 8: SQLite cascade (nodes, aps, cpes_conocidos, historial_senal, node_*)
+        // Paso 8: cascade en BD (nodes, aps, cpes, signal_history, node_*)
         let deletedDeviceIds = [];
         try {
             const result = await deleteNode(pppUser);
             deletedDeviceIds = result?.deviceIds || [];
-            steps.push({ step: 8, obj: 'SQLite', name: `${deletedDeviceIds.length} APs + cascadas eliminados`, status: 'ok' });
+            steps.push({ step: 8, obj: 'Base de datos', name: `${deletedDeviceIds.length} APs + cascadas eliminados`, status: 'ok' });
         } catch (dbErr) {
-            console.error('[DB] Error eliminando nodo de SQLite:', dbErr.message);
-            steps.push({ step: 8, obj: 'SQLite', name: `Error: ${dbErr.message}`, status: 'warn' });
+            console.error('[DB] Error eliminando nodo de la BD:', dbErr.message);
+            steps.push({ step: 8, obj: 'Base de datos', name: `Error: ${dbErr.message}`, status: 'warn' });
         }
 
         res.json({ success: true, message: `Nodo eliminado correctamente`, steps, deletedDeviceIds });
@@ -718,7 +718,7 @@ router.post('/node/edit', async (req, res) => {
             steps.push({ step: 1, obj: 'WG Interface (etiqueta)', name: newComment, status: 'ok' });
         }
 
-        // Actualizar label en SQLite (ambos protocolos)
+        // Actualizar label en MySQL (ambos protocolos)
         if (newComment !== undefined && newComment !== null) {
             try {
                 const db = await getDb();
@@ -794,7 +794,7 @@ router.post('/node/edit', async (req, res) => {
         if (steps.length === 0)
             return res.json({ success: false, message: 'Sin cambios para aplicar', steps });
 
-        // --- Actualizar nodo en SQLite ---
+        // --- Actualizar nodo en MySQL ---
         try {
             const effectiveUser = (newPppUser && newPppUser !== pppUser) ? newPppUser : pppUser;
             const updates = { ppp_user: effectiveUser };
@@ -809,9 +809,9 @@ router.post('/node/edit', async (req, res) => {
                 await deleteNode(pppUser);
             }
             await saveNode(updates);
-            console.log(`[DB] Nodo actualizado en SQLite: ${effectiveUser}`);
+            console.log(`[DB] Nodo actualizado en MySQL: ${effectiveUser}`);
         } catch (dbErr) {
-            console.error('[DB] Error actualizando nodo en SQLite:', dbErr.message);
+            console.error('[DB] Error actualizando nodo en MySQL:', dbErr.message);
         }
 
         res.json({ success: true, message: 'Nodo actualizado correctamente', steps });
@@ -1123,7 +1123,7 @@ router.post('/node/wg/set-peer', async (req, res) => {
         const peerOct = serverOct + 1;
         const peerIP = `10.10.251.${peerOct}`;
 
-        // Obtener LAN subnets del nodo desde SQLite
+        // Obtener LAN subnets del nodo desde MySQL
         const db = await getDb();
         const nodeRow = await db.get('SELECT * FROM nodes WHERE ppp_user = ?', [pppUser]);
         let lanSubnets = [];

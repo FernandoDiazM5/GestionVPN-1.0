@@ -78,7 +78,7 @@ router.post('/login', async (req, res) => {
     try {
         const { username, password } = loginSchema.parse(req.body);
 
-        // 1) Usuario legacy (SQLite) por username
+        // 1) Usuario legacy (vpn_users/MySQL) por username
         const row = await getUserByUsername(username).catch(() => null);
         if (row && await bcrypt.compare(password, row.password_hash)) {
             const token = jwt.sign({ id: row.id, username: row.username, role: row.role }, JWT_SECRET, { expiresIn: '24h' });

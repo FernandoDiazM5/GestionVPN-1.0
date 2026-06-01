@@ -1,6 +1,6 @@
 // ============================================================
 //  Puente de sesión (unificación de login) — Fase 4
-//  Convierte un usuario legacy (SQLite, username) en un usuario
+//  Convierte un usuario legacy (vpn_users, username) en un usuario
 //  multi-tenant (MySQL) + su workspace, y devuelve el JWT de sesión.
 //  Reutilizado por /api/account/bridge y por /api/auth/login|setup
 //  para que un único login establezca la sesión RBAC en toda la app.
