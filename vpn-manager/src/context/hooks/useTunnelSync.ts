@@ -53,9 +53,13 @@ export function useTunnelSync(
       })
       .catch(() => {});
 
-    // Conexión SSE
+    // Conexión SSE — autenticación por cookie RBAC (withCredentials).
+    // Solo se añade ?token= si existe un Bearer legacy (compatibilidad).
     const token = getApiToken();
-    const es = new EventSource(`${API_BASE_URL}/api/tunnel/events?token=${encodeURIComponent(token)}`);
+    const url = token
+      ? `${API_BASE_URL}/api/tunnel/events?token=${encodeURIComponent(token)}`
+      : `${API_BASE_URL}/api/tunnel/events`;
+    const es = new EventSource(url, { withCredentials: true });
     es.onmessage = (e) => {
       try {
         const { activeNodeVrf: vrf, tunnelExpiry: expiry } = JSON.parse(e.data);
