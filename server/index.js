@@ -116,9 +116,26 @@ function startServer(attempt = 1) {
     });
 }
 
-initDb()
-    .then(() => startServer())
-    .catch(err => {
-        console.error('[FATAL] Error inicializando DB:', err.message);
-        process.exit(1);
-    });
+// Inicializa la BD con reintentos: si MySQL/XAMPP aún no está arriba, espera y
+// reintenta en vez de morir con un [FATAL] críptico.
+async function bootstrap() {
+    const maxAttempts = 10;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            await initDb();
+            return startServer();
+        } catch (err) {
+            const msg = err.code || err.message || '';
+            const isConn = /ECONNREFUSED|ETIMEDOUT|ENOTFOUND|PROTOCOL_CONNECTION_LOST|ER_GET_CONNECTION_TIMEOUT/i.test(msg);
+            if (isConn && attempt < maxAttempts) {
+                console.warn(`[WARN] MySQL no disponible (intento ${attempt}/${maxAttempts}). ¿Está MySQL/XAMPP iniciado? Reintentando en 3s...`);
+                await new Promise(r => setTimeout(r, 3000));
+                continue;
+            }
+            console.error('[FATAL] No se pudo inicializar la base de datos:', err.message);
+            if (isConn) console.error('       → Inicia MySQL en XAMPP y vuelve a ejecutar el backend.');
+            process.exit(1);
+        }
+    }
+}
+bootstrap();

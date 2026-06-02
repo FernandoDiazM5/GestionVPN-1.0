@@ -149,7 +149,9 @@ CREATE TABLE IF NOT EXISTS member_wireguard (
   peer_name     VARCHAR(120) NOT NULL,
   allowed_ip    VARCHAR(64)  NOT NULL,
   public_key    VARCHAR(120),
-  config_enc    TEXT,                    -- .conf cifrado (AES-256-GCM)
+  server_public_key VARCHAR(120),        -- clave pública del servidor (para re-armar el .conf)
+  endpoint      VARCHAR(255),            -- host:puerto del servidor WG
+  config_enc    TEXT,                    -- .conf cifrado (AES-256-GCM) — solo modo 'generate'
   created_at    BIGINT       NOT NULL,
   PRIMARY KEY (id),
   UNIQUE KEY uq_member_wg (workspace_id, user_id),

@@ -55,6 +55,35 @@ export interface Invitation {
   attempts: number;
   expires_at: number;
   created_at: number;
+  tunnel_id?: string | null;
+}
+
+/** Invitación PENDING vista por el invitado (bandeja in-app). */
+export interface MyInvitation {
+  id: string;
+  workspace_id: string;
+  workspace_name: string;
+  email: string;
+  role: Exclude<Role, 'OWNER'>;
+  tunnel_id: string | null;
+  expires_at: number;
+  created_at: number;
+}
+
+/** Datos del servidor WG devueltos al aceptar (para completar el .conf en el dispositivo). */
+export interface WgServerConfig {
+  allowedIp: string;
+  serverPublicKey: string;
+  endpoint: string;
+  allowedIps: string;
+}
+
+/** Respuesta de aceptar una invitación (pública o in-app). */
+export interface AcceptResult {
+  success: true;
+  user: { id: string; email: string; role: Role; workspace_id: string };
+  tunnel: string | null;
+  wireguard: WgServerConfig | null;
 }
 
 /** Entrada de auditoría (GET /api/audit/logs). */
@@ -84,6 +113,9 @@ export interface Assignment {
 export interface MemberWireguard {
   allowedIp: string;
   publicKey: string;
+  serverPublicKey?: string | null;
+  endpoint?: string | null;
+  allowedIps?: string;
   conf: string | null;
 }
 

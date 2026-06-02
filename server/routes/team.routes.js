@@ -65,11 +65,12 @@ async function provisionMemberWgByPublicKey(mikrotik, { workspaceId, userId, pub
     const listenPort = parseInt(mgmtIface?.['listen-port'] || '0') || 13231;
     const publicIp = cloud?.[0]?.['public-address'] || ip;
     await api.close();
+    const endpoint = `${publicIp}:${listenPort}`;
     await memberWgRepo.upsert({
       workspaceId, userId, peerName: `member:${userId}`, allowedIp: nextIp,
-      publicKey, configEnc: null,
+      publicKey, serverPublicKey: serverPub, endpoint, configEnc: null,
     });
-    return { allowedIp: nextIp, serverPublicKey: serverPub, endpoint: `${publicIp}:${listenPort}`, allowedIps: '192.168.21.0/24' };
+    return { allowedIp: nextIp, serverPublicKey: serverPub, endpoint, allowedIps: '192.168.21.0/24' };
   } catch (e) {
     if (api) try { await api.close(); } catch (_) { /* noop */ }
     throw e;
@@ -377,7 +378,8 @@ router.post('/member/:id/wireguard', requireSession, requireRole('OWNER', 'CO_MO
       await memberWgRepo.upsert({
         workspaceId: req.account.workspace_id, userId: req.params.id,
         peerName: `member:${req.params.id}`, allowedIp: nextIp,
-        publicKey: peerPub, configEnc: conf ? encrypt(conf) : null,
+        publicKey: peerPub, serverPublicKey: serverPub, endpoint: `${publicIp}:${listenPort}`,
+        configEnc: conf ? encrypt(conf) : null,
       });
       return sendOk(res, { allowedIp: nextIp, publicKey: peerPub, conf }, 201);
     } catch (error) {
@@ -397,6 +399,9 @@ router.get('/member/:id/wireguard', requireSession, asyncHandler(async (req, res
   return sendOk(res, {
     wireguard: {
       allowedIp: row.allowed_ip, publicKey: row.public_key,
+      serverPublicKey: row.server_public_key || null,
+      endpoint: row.endpoint || null,
+      allowedIps: '192.168.21.0/24',
       conf: row.config_enc ? decrypt(row.config_enc) : null,
     },
   });
