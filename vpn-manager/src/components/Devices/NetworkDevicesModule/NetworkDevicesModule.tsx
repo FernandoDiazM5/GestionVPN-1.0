@@ -691,29 +691,29 @@ export default function NetworkDevicesModule() {
             <Cpu className="w-5 h-5 text-indigo-500" />
             <span>Dispositivos de Red</span>
           </h2>
-          <p className="text-slate-400 text-sm mt-1">Descubre y gestiona equipos Ubiquiti en las LANs remotas</p>
+          <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">Descubre y gestiona equipos Ubiquiti en las LANs remotas</p>
         </div>
-        <div className="text-sm text-slate-500">
-          <span className="font-bold text-indigo-600">{savedDevices.length}</span> guardados
+        <div className="text-sm text-slate-500 dark:text-slate-400">
+          <span className="font-bold text-indigo-600 dark:text-indigo-400">{savedDevices.length}</span> guardados
         </div>
       </div>
 
       {isTunnelActive ? (
-        <div className="card p-4 border-emerald-200 bg-gradient-to-r from-emerald-50 to-sky-50 flex items-center space-x-3">
+        <div className="card p-4 border-emerald-200 bg-gradient-to-r from-emerald-50 to-sky-50 dark:border-emerald-500/30 dark:from-emerald-500/10 dark:to-sky-500/10 flex items-center space-x-3">
           <div className="w-9 h-9 bg-emerald-500 rounded-xl flex items-center justify-center shadow-md shadow-emerald-500/30 shrink-0">
             <ShieldCheck className="w-5 h-5 text-white" />
           </div>
           <div>
-            <p className="text-sm font-bold text-slate-800">Túnel activo: <span className="text-emerald-600">{activeNodeName}</span></p>
-            <p className="text-xs text-slate-400 mt-0.5">El escaneo se realiza desde este equipo hacia la LAN remota</p>
+            <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Túnel activo: <span className="text-emerald-600 dark:text-emerald-400">{activeNodeName}</span></p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">El escaneo se realiza desde este equipo hacia la LAN remota</p>
           </div>
         </div>
       ) : (
-        <div className="card p-4 border-amber-200 bg-amber-50 flex items-center space-x-3">
+        <div className="card p-4 border-amber-200 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10 flex items-center space-x-3">
           <ShieldOff className="w-5 h-5 text-amber-500 shrink-0" />
           <div>
-            <p className="text-sm font-bold text-amber-700">Sin túnel activo</p>
-            <p className="text-xs text-amber-600 mt-0.5">Activa el acceso a un nodo en la pestaña "Nodos" para poder escanear en tiempo real</p>
+            <p className="text-sm font-bold text-amber-700 dark:text-amber-400">Sin túnel activo</p>
+            <p className="text-xs text-amber-600 dark:text-amber-300/80 mt-0.5">Activa el acceso a un nodo en la pestaña "Nodos" para poder escanear en tiempo real</p>
           </div>
         </div>
       )}
@@ -726,16 +726,16 @@ export default function NetworkDevicesModule() {
 
         {isTunnelActive && activeNode ? (
           <div className="space-y-3">
-            <div className="flex items-center gap-3 px-4 py-3 bg-emerald-50 border border-emerald-100 rounded-xl">
+            <div className="flex items-center gap-3 px-4 py-3 bg-emerald-50 border border-emerald-100 dark:bg-emerald-500/10 dark:border-emerald-500/30 rounded-xl">
               <Radio className="w-4 h-4 text-emerald-500 shrink-0" />
               <div className="min-w-0">
-                <p className="text-sm font-bold text-slate-800 truncate">{activeNode.nombre_nodo}</p>
-                <p className="text-[10px] font-mono text-slate-400 truncate">{activeNode.nombre_vrf}</p>
+                <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{activeNode.nombre_nodo}</p>
+                <p className="text-2xs font-mono text-slate-400 dark:text-slate-500 truncate">{activeNode.nombre_vrf}</p>
               </div>
             </div>
 
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+              <label className="text-2xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-1.5">
                 Subred LAN a escanear
                 {availableSubnets.length > 1 && (
                   <span className="ml-1.5 normal-case font-normal text-slate-300">({availableSubnets.length} disponibles)</span>
@@ -752,9 +752,9 @@ export default function NetworkDevicesModule() {
                   ))}
                 </select>
               ) : availableSubnets.length === 1 ? (
-                <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl">
-                  <span className="font-mono text-sm font-bold text-sky-600">{availableSubnets[0]}</span>
-                  <span className="text-[10px] text-slate-400 ml-1">· {estimateIpCount(availableSubnets[0])} hosts</span>
+                <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-50 border border-slate-200 dark:bg-slate-800 dark:border-slate-700 rounded-xl">
+                  <span className="font-mono text-sm font-bold text-sky-600 dark:text-sky-400">{availableSubnets[0]}</span>
+                  <span className="text-2xs text-slate-400 dark:text-slate-500 ml-1">· {estimateIpCount(availableSubnets[0])} hosts</span>
                 </div>
               ) : (
                 <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-100 rounded-xl">
@@ -766,7 +766,7 @@ export default function NetworkDevicesModule() {
           </div>
         ) : (
           <div>
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+            <label className="text-2xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-1.5">
               Subred LAN (CIDR) — manual
             </label>
             <input
@@ -775,7 +775,7 @@ export default function NetworkDevicesModule() {
               placeholder="ej: 10.5.5.0/24"
               className="input-field w-full text-sm font-mono"
             />
-            <p className="text-[10px] text-slate-400 mt-1">Activa un túnel en la pestaña Nodos para autocompletar la subred.</p>
+            <p className="text-2xs text-slate-400 dark:text-slate-500 mt-1">Activa un túnel en la pestaña Nodos para autocompletar la subred.</p>
           </div>
         )}
 
@@ -857,20 +857,53 @@ export default function NetworkDevicesModule() {
           </div>
         )}
         {scanError && (
-          <div className="flex items-start space-x-2 p-3 bg-rose-50 border border-rose-200 rounded-xl">
+          <div className="flex items-start space-x-2 p-3 bg-rose-50 border border-rose-200 dark:bg-rose-500/10 dark:border-rose-500/30 rounded-xl">
             <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-            <p className="text-xs text-rose-600">{scanError}</p>
+            <p className="text-xs text-rose-600 dark:text-rose-300">{scanError}</p>
           </div>
         )}
         {!isScanning && scannedCount > 0 && scanResults.length === 0 && !scanError && (
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1.5">
-            <p className="text-xs font-semibold text-amber-700">
+          <div className="p-3 bg-amber-50 border border-amber-200 dark:bg-amber-500/10 dark:border-amber-500/30 rounded-xl space-y-1.5">
+            <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">
               Se escanearon {scannedCount} IPs en {effectiveLan} pero ninguna respondió como Ubiquiti airOS
             </p>
-            <p className="text-[10px] text-amber-500">
+            <p className="text-2xs text-amber-500 dark:text-amber-300/80">
               Verifica que el túnel VRF esté activo en la pestaña "Nodos" y que los equipos tengan HTTP habilitado en puerto 80
             </p>
           </div>
+        )}
+
+        {/* Estado: escaneando (skeleton) o idle (aún sin escanear) */}
+        {scanRows.length === 0 && (
+          isScanning ? (
+            <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden divide-y divide-slate-100 dark:divide-slate-800">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="flex items-center gap-3 px-3 py-3">
+                  <div className="skeleton w-5 h-5 rounded-md shrink-0" />
+                  <div className="skeleton h-4 w-12 rounded-full" />
+                  <div className="skeleton h-3 w-28" />
+                  <div className="skeleton h-3 w-40 hidden sm:block" />
+                  <div className="skeleton h-3 w-14 ml-auto" />
+                </div>
+              ))}
+            </div>
+          ) : !scanError && scannedCount === 0 ? (
+            <div className="rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 py-12 flex flex-col items-center text-center gap-3">
+              <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center">
+                <Radio className="w-7 h-7 text-indigo-400" />
+              </div>
+              <div>
+                <p className="text-slate-600 dark:text-slate-300 font-semibold">
+                  {isTunnelActive ? 'Listo para escanear' : 'Sin túnel activo'}
+                </p>
+                <p className="text-2xs text-slate-400 dark:text-slate-500 max-w-xs mt-0.5">
+                  {isTunnelActive
+                    ? `Pulsa “Escanear dispositivos” para descubrir equipos Ubiquiti en ${effectiveLan || 'la subred'}.`
+                    : 'Activa el acceso a un nodo en la pestaña “Nodos” para escanear la LAN remota.'}
+                </p>
+              </div>
+            </div>
+          ) : null
         )}
 
         {scanRows.length > 0 && (
@@ -934,11 +967,11 @@ export default function NetworkDevicesModule() {
               )}
             </div>
 
-            <div className="rounded-xl border border-slate-200 overflow-x-auto">
+            <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-x-auto">
               <div style={{ minWidth: `${minTableWidth}px` }}>
 
                 <div
-                  className="bg-slate-100 border-b border-slate-200 text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider rounded-tl-xl rounded-tr-xl"
+                  className="bg-slate-100 border-b border-slate-200 text-2xs sm:text-xs font-bold text-slate-500 uppercase tracking-wider rounded-tl-xl rounded-tr-xl dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400"
                   style={{ display: 'grid', gridTemplateColumns: gridTemplate }}
                 >
                   <div className="px-3 py-3 text-center">SSH</div>
