@@ -24,12 +24,12 @@ export function NodeCardWgPeerForm({
   if (!showWgPeerForm) return null;
 
   const rowBg = isThisNodeActive
-    ? 'bg-emerald-50/60'
+    ? 'bg-emerald-50/60 dark:bg-emerald-500/10'
     : isPending
-      ? 'bg-indigo-50/60'
+      ? 'bg-indigo-50/60 dark:bg-indigo-500/10'
       : rowIndex % 2 === 0
-        ? 'bg-white'
-        : 'bg-slate-50/40';
+        ? 'bg-white dark:bg-slate-900'
+        : 'bg-slate-50/40 dark:bg-slate-800/40';
 
   return (
     <tr className={rowBg}>
@@ -41,7 +41,7 @@ export function NodeCardWgPeerForm({
             value={wgPeerKey}
             onChange={e => onSetWgPeerKey(e.target.value)}
             placeholder="Pegar aquí la public key del router torre..."
-            className="w-full font-mono text-xs resize-none rounded-lg border border-violet-200 bg-white px-2 py-1.5 text-slate-700 focus:outline-none focus:border-violet-400"
+            className="w-full font-mono text-xs resize-none rounded-lg border border-violet-200 bg-white px-2 py-1.5 text-slate-700 focus:outline-none focus:border-violet-400 dark:bg-slate-800 dark:border-violet-500/40 dark:text-slate-100"
             rows={3}
           />
           <div className="flex gap-2">

@@ -94,7 +94,7 @@ export default function BatchCsvModal({ onClose, onSuccess, nodes }: BatchCsvMod
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"
       onClick={e => e.target === e.currentTarget && !processing && onClose()}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between bg-violet-600 rounded-t-2xl px-5 py-4 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center">
@@ -108,11 +108,11 @@ export default function BatchCsvModal({ onClose, onSuccess, nodes }: BatchCsvMod
           {!processing && <button onClick={onClose} className="p-1.5 text-violet-300 hover:text-white hover:bg-white/10 rounded-lg"><X className="w-4 h-4" /></button>}
         </div>
 
-        <div className="flex border-b border-slate-100 shrink-0">
+        <div className="flex border-b border-slate-100 dark:border-slate-800 shrink-0">
           {(['import', 'export'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`flex-1 py-2.5 text-xs font-bold transition-colors
-                ${tab === t ? 'text-violet-700 border-b-2 border-violet-600 bg-violet-50' : 'text-slate-400 hover:text-slate-600'}`}>
+                ${tab === t ? 'text-violet-700 border-b-2 border-violet-600 bg-violet-50 dark:bg-violet-500/10' : 'text-slate-400 hover:text-slate-600 dark:text-slate-300'}`}>
               {t === 'import' ? 'Importar / Provisionar' : `Exportar (${nodes.length} nodos)`}
             </button>
           ))}
@@ -121,15 +121,15 @@ export default function BatchCsvModal({ onClose, onSuccess, nodes }: BatchCsvMod
         <div className="overflow-y-auto flex-1 p-5 space-y-4">
           {tab === 'export' && (
             <div className="space-y-4">
-              <div className="bg-violet-50 border border-violet-100 rounded-xl p-3">
+              <div className="bg-violet-50 dark:bg-violet-500/10 border border-violet-100 rounded-xl p-3">
                 <p className="text-[10px] font-bold text-violet-600 uppercase tracking-wider mb-1">Columnas exportadas</p>
-                <p className="text-[11px] text-slate-500 font-mono">nombre_nodo, ppp_user, vrf, red_lan, ip_tunel, estado</p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">nombre_nodo, ppp_user, vrf, red_lan, ip_tunel, estado</p>
               </div>
               <div className="space-y-1.5 max-h-64 overflow-y-auto">
                 {nodes.map(n => (
-                  <div key={n.ppp_user} className="flex items-center gap-3 px-3 py-2 rounded-lg border border-slate-100 bg-slate-50 text-xs">
+                  <div key={n.ppp_user} className="flex items-center gap-3 px-3 py-2 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 text-xs">
                     <span className={`w-2 h-2 rounded-full shrink-0 ${n.running ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                    <span className="font-bold text-slate-700 truncate max-w-[120px]">{n.nombre_nodo}</span>
+                    <span className="font-bold text-slate-700 dark:text-slate-200 truncate max-w-[120px]">{n.nombre_nodo}</span>
                     <span className="text-slate-400 font-mono truncate flex-1">{n.ppp_user}</span>
                     <span className="text-sky-600 font-mono">{(n.lan_subnets?.[0] || n.segmento_lan) || '—'}</span>
                   </div>
@@ -144,12 +144,12 @@ export default function BatchCsvModal({ onClose, onSuccess, nodes }: BatchCsvMod
           )}
           {tab === 'import' && !processing && !done && (
             <>
-              <div className="bg-violet-50 border border-violet-100 rounded-xl p-3">
+              <div className="bg-violet-50 dark:bg-violet-500/10 border border-violet-100 rounded-xl p-3">
                 <p className="text-[10px] font-bold text-violet-600 uppercase tracking-wider mb-1">Ejemplo de formato CSV</p>
-                <pre className="text-[11px] text-slate-600 font-mono">ROSMERY,TorreRosmery,Pass123,10.3.0.0/24{'\n'}FIWIS,TorreFiwis,Pass456,10.4.0.0/24,10.5.0.0/24</pre>
+                <pre className="text-[11px] text-slate-600 dark:text-slate-300 font-mono">ROSMERY,TorreRosmery,Pass123,10.3.0.0/24{'\n'}FIWIS,TorreFiwis,Pass456,10.4.0.0/24,10.5.0.0/24</pre>
               </div>
               <div className="flex items-center gap-2">
-                <label className="flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-violet-300 bg-violet-50 hover:bg-violet-100 cursor-pointer transition-colors text-sm text-violet-600 font-medium flex-1 justify-center">
+                <label className="flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-violet-300 bg-violet-50 dark:bg-violet-500/10 hover:bg-violet-100 cursor-pointer transition-colors text-sm text-violet-600 font-medium flex-1 justify-center">
                   <Upload className="w-4 h-4" />
                   <span>Subir archivo CSV</span>
                   <input type="file" accept=".csv,.txt" className="hidden" onChange={e => {
@@ -168,17 +168,17 @@ export default function BatchCsvModal({ onClose, onSuccess, nodes }: BatchCsvMod
               </div>
               <textarea value={csvText} onChange={e => { setCsvText(e.target.value); parseRows(e.target.value); }}
                 placeholder="…o pega aquí el contenido CSV" rows={5}
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-300 font-mono resize-none" />
+                className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-300 font-mono resize-none" />
               {rows.length > 0 && (
                 <div className="space-y-2">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{rows.filter(r => r.valid).length}/{rows.length} filas válidas</p>
                   <div className="space-y-1.5 max-h-48 overflow-y-auto">
                     {rows.map((r, i) => (
-                      <div key={i} className={`flex items-center gap-3 px-3 py-2 rounded-lg border text-xs ${r.valid ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'}`}>
+                      <div key={i} className={`flex items-center gap-3 px-3 py-2 rounded-lg border text-xs ${r.valid ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-100' : 'bg-rose-50 dark:bg-rose-500/10 border-rose-100'}`}>
                         <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 ${r.valid ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}>
                           {r.valid ? '✓' : '✗'}
                         </span>
-                        <span className="font-bold text-slate-700">{r.nombre || '(sin nombre)'}</span>
+                        <span className="font-bold text-slate-700 dark:text-slate-200">{r.nombre || '(sin nombre)'}</span>
                         <span className="text-slate-400">{r.usuario}</span>
                         <span className="text-sky-600 font-mono">{r.subnets.join(', ') || '(sin subred)'}</span>
                       </div>
@@ -194,12 +194,12 @@ export default function BatchCsvModal({ onClose, onSuccess, nodes }: BatchCsvMod
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Progreso de provisionamiento</p>
               {results.map((r, i) => (
                 <div key={i} className={`flex items-center gap-3 px-3 py-2 rounded-lg border text-xs
-                  ${r.status === 'ok' ? 'bg-emerald-50 border-emerald-100' : r.status === 'error' ? 'bg-rose-50 border-rose-100' : r.status === 'processing' ? 'bg-indigo-50 border-indigo-200' : 'bg-slate-50 border-slate-100'}`}>
+                  ${r.status === 'ok' ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-100' : r.status === 'error' ? 'bg-rose-50 dark:bg-rose-500/10 border-rose-100' : r.status === 'processing' ? 'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-200' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-800'}`}>
                   <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0
                     ${r.status === 'ok' ? 'bg-emerald-500 text-white' : r.status === 'error' ? 'bg-rose-500 text-white' : r.status === 'processing' ? 'bg-indigo-500 text-white' : 'bg-slate-200 text-slate-400'}`}>
                     {r.status === 'ok' ? '✓' : r.status === 'error' ? '✗' : r.status === 'processing' ? <Loader2 className="w-3 h-3 animate-spin" /> : i + 1}
                   </span>
-                  <span className="font-bold text-slate-700">{r.nombre}</span>
+                  <span className="font-bold text-slate-700 dark:text-slate-200">{r.nombre}</span>
                   {r.message && <span className="text-slate-400 text-[10px] truncate">{r.message}</span>}
                 </div>
               ))}
@@ -207,12 +207,12 @@ export default function BatchCsvModal({ onClose, onSuccess, nodes }: BatchCsvMod
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-slate-100 shrink-0 bg-slate-50 rounded-b-2xl">
+        <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-slate-100 dark:border-slate-800 shrink-0 bg-slate-50 dark:bg-slate-800/50 rounded-b-2xl">
           {tab === 'export' ? (
-            <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors">Cerrar</button>
+            <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">Cerrar</button>
           ) : !done ? (
             <>
-              <button onClick={onClose} disabled={processing} className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-40">Cancelar</button>
+              <button onClick={onClose} disabled={processing} className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-40">Cancelar</button>
               <button onClick={handleProvision} disabled={rows.filter(r => r.valid).length === 0 || processing}
                 className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold bg-violet-600 text-white hover:bg-violet-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                 {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}

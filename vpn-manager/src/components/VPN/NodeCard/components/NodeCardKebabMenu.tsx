@@ -61,7 +61,7 @@ export function NodeCardKebabMenu({
         <div
           ref={dropdownRef}
           style={kebabCoords}
-          className="fixed w-52 bg-white border border-slate-200 rounded-xl shadow-lg shadow-slate-200/60 z-[9999] py-1 overflow-hidden"
+          className="fixed w-52 bg-white border border-slate-200 rounded-xl shadow-lg shadow-slate-200/60 z-[9999] py-1 overflow-hidden dark:bg-slate-800 dark:border-slate-700 dark:shadow-black/40"
         >
           {/* WireGuard */}
           {node.service === 'wireguard' && !node.wg_public_key && (

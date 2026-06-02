@@ -44,12 +44,12 @@ export function NodeCardSshForm({
   if (!showSshForm) return null;
 
   const rowBg = isThisNodeActive
-    ? 'bg-emerald-50/60'
+    ? 'bg-emerald-50/60 dark:bg-emerald-500/10'
     : isPending
-      ? 'bg-indigo-50/60'
+      ? 'bg-indigo-50/60 dark:bg-indigo-500/10'
       : rowIndex % 2 === 0
-        ? 'bg-white'
-        : 'bg-slate-50/40';
+        ? 'bg-white dark:bg-slate-900'
+        : 'bg-slate-50/40 dark:bg-slate-800/40';
 
   return (
     <tr className={rowBg}>
@@ -80,7 +80,7 @@ export function NodeCardSshForm({
                   placeholder="Usuario (ej: ubnt)"
                   value={cred.user}
                   onChange={e => onUpdateCred(i, 'user', e.target.value)}
-                  className="px-3 py-1.5 text-xs border border-amber-200 bg-white rounded-lg outline-none focus:border-amber-400 font-semibold text-slate-700 w-32 flex-1"
+                  className="px-3 py-1.5 text-xs border border-amber-200 bg-white rounded-lg outline-none focus:border-amber-400 font-semibold text-slate-700 w-32 flex-1 dark:bg-slate-800 dark:border-amber-500/40 dark:text-slate-100"
                 />
                 <input
                   type={showPasswords ? 'text' : 'password'}
@@ -88,7 +88,7 @@ export function NodeCardSshForm({
                   value={cred.pass}
                   onChange={e => onUpdateCred(i, 'pass', e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && onSaveSshCreds()}
-                  className="px-3 py-1.5 text-xs border border-amber-200 bg-white rounded-lg outline-none focus:border-amber-400 font-mono text-slate-700 w-36 flex-1"
+                  className="px-3 py-1.5 text-xs border border-amber-200 bg-white rounded-lg outline-none focus:border-amber-400 font-mono text-slate-700 w-36 flex-1 dark:bg-slate-800 dark:border-amber-500/40 dark:text-slate-100"
                 />
                 {sshCredsArr.length > 1 && (
                   <button onClick={() => onRemoveCred(i)} className="p-1 text-slate-300 hover:text-rose-500 rounded transition-colors shrink-0">

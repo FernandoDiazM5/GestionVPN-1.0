@@ -64,11 +64,11 @@ export default function UserManagementPanel() {
       {/* ── Cabecera ── */}
       <div className="card p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-            <Users className="w-5 h-5 text-indigo-500" />
+          <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+            <Users className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
             <span>Gestión de Usuarios</span>
           </h2>
-          <p className="text-slate-400 text-sm mt-1">
+          <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">
             Administra el acceso de los administradores a la red y monitorea su actividad
           </p>
         </div>
