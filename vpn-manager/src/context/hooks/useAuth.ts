@@ -2,19 +2,10 @@ import { useState, useCallback, useRef } from 'react';
 import type { RouterCredentials } from '../../store/db';
 import { dbService } from '../../store/db';
 import { setApiToken } from '../../utils/apiClient';
-import { credCache, statsCache } from '../../store/deviceDb';
-import { cpeCache } from '../../store/cpeCache';
 import { accountApi } from '../../services/accountApi';
+import { clearUserScopedData } from '../../utils/sessionReset';
 
 const LAST_USER_KEY = 'vpn_last_user';
-
-// Limpia TODOS los datos locales de un usuario (resultados de escaneo en
-// sessionStorage, CPEs/stats/credenciales en IndexedDB). Evita que los datos
-// de un moderador se "filtren" al siguiente que use el mismo navegador.
-async function clearUserScopedData() {
-  try { sessionStorage.clear(); } catch { /* ignore */ }
-  await Promise.allSettled([credCache.clear(), statsCache.clear(), cpeCache.clear()]);
-}
 
 export function useAuth() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
