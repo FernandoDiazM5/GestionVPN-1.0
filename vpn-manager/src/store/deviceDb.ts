@@ -95,6 +95,8 @@ export const statsCache = {
     } catch { /* ignore */ }
     return result;
   },
+
+  async clear() { try { await statsStore.clear(); } catch { /* ignore */ } },
 };
 
 // ── Esqueleto SQLite (Backend) ────────────────────────────────────────────
