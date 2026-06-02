@@ -14,8 +14,8 @@ export default function StatusBadge({
     <div className={`flex items-center gap-2 rounded-lg transition-all duration-300 inline-flex
                     ${size === 'sm' ? 'px-2 py-1' : 'px-3 py-1.5'}
                     ${isActive
-                      ? 'bg-emerald-50 border border-emerald-200'
-                      : 'bg-slate-50 border border-slate-200'}`}>
+                      ? 'bg-emerald-50 border border-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/30'
+                      : 'bg-slate-50 border border-slate-200 dark:bg-slate-800 dark:border-slate-700'}`}>
 
       {/* Indicador visual */}
       <div className="relative flex items-center justify-center flex-shrink-0">
@@ -41,8 +41,8 @@ export default function StatusBadge({
       {/* Texto */}
       <span className={`font-bold ${size === 'sm' ? 'text-xs' : 'text-sm'} ${
         isActive
-          ? 'text-emerald-700'
-          : 'text-slate-500'
+          ? 'text-emerald-700 dark:text-emerald-400'
+          : 'text-slate-500 dark:text-slate-400'
       } transition-colors duration-300 whitespace-nowrap`}>
         {label}
       </span>

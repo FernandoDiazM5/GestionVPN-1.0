@@ -150,11 +150,13 @@ export default function UsersTable({
                   {/* Estado */}
                   <td className="px-4 py-3">
                     {peer.active ? (
-                      <span className="inline-flex items-center gap-1.5 text-2xs font-semibold text-slate-400 uppercase tracking-wide">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Activo
+                      <span className="inline-flex items-center gap-2 text-2xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
+                        <span className="status-live w-1.5 h-1.5 rounded-full bg-emerald-500 text-emerald-500" /> Activo
                       </span>
                     ) : (
-                      <span className="badge badge-neutral">Inactivo</span>
+                      <span className="inline-flex items-center gap-2 badge badge-neutral">
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400 dark:bg-slate-500" /> Inactivo
+                      </span>
                     )}
                   </td>
                   {/* Usuario (editable) */}

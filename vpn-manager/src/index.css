@@ -199,3 +199,21 @@
 @media (prefers-reduced-motion: reduce) {
   .reveal-stagger > * { animation: none; }
 }
+
+/* ── Punto de estado "en vivo" (P2) ──────────────────────────────────────
+   Punto sólido + anillo que se expande/desvanece (ping). ÚSALO SOLO en estados
+   activo/conectado/crítico — no decorativo. El color del anillo = currentColor,
+   así que basta poner text-<color> junto al bg-<color> del punto. */
+.status-live { position: relative; }
+.status-live::after {
+  content: ''; position: absolute; left: 50%; top: 50%;
+  width: 100%; height: 100%; transform: translate(-50%, -50%);
+  border-radius: 9999px; background: currentColor; opacity: 0.5;
+  animation: status-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+@keyframes status-ping {
+  75%, 100% { transform: translate(-50%, -50%) scale(2.6); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .status-live::after { animation: none; }
+}

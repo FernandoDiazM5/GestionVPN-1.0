@@ -63,8 +63,8 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelAc
           <Radio className="w-4 h-4 text-indigo-500 shrink-0" />
           <span className="font-bold text-slate-800">{group.nodeName}</span>
           <div className="flex items-center gap-1.5 ml-2">
-            <span className={`w-2 h-2 rounded-full ${statusColor}`} />
-            <span className="text-[10px] font-bold text-slate-500">{statusLabel}</span>
+            <span className={`w-2 h-2 rounded-full ${statusColor} ${anyOnline ? 'status-live text-emerald-500' : ''}`} />
+            <span className="text-2xs font-bold text-slate-500 dark:text-slate-400">{statusLabel}</span>
           </div>
         </div>
         <div className="flex items-center gap-3 text-xs text-slate-500 shrink-0">
