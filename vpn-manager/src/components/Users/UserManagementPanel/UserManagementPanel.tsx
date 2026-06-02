@@ -125,8 +125,6 @@ export default function UserManagementPanel() {
         setEditingPeerName={setEditingPeerName}
         savingPeerName={savingPeerName}
         copiedPeerId={copiedPeerId}
-        onLoadWgPeers={loadWgPeers}
-        onAddAdmin={() => setShowNuevoAdmin(true)}
         onSavePeerColor={savePeerColor}
         onSavePeerName={savePeerName}
         onCopyConfig={copyWgConfig}
