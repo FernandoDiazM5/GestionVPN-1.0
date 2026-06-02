@@ -40,7 +40,7 @@ export default function ModeratorsModule() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 reveal-stagger">
       <div className="card p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">

@@ -97,7 +97,7 @@ export default function TeamModule() {
   // ── View (MEMBER): bandeja de invitaciones + su propio perfil ──
   if (session.role === 'MEMBER') {
     return (
-      <div className="space-y-5">
+      <div className="space-y-5 reveal-stagger">
         <MyInvitationsInbox onAccepted={onInvitationAccepted} />
         <MemberProfile session={session} />
       </div>
@@ -105,7 +105,7 @@ export default function TeamModule() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 reveal-stagger">
       {/* Invitaciones dirigidas a este usuario (puede ser invitado a otro workspace) */}
       <MyInvitationsInbox onAccepted={onInvitationAccepted} />
 
