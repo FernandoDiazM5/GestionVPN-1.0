@@ -39,8 +39,8 @@ server/_legacy_sqlite/
 # Secretos de cifrado/firma — NUNCA versionar (clave JWT y clave AES de credenciales)
 .jwt_secret
 .db_secret
-**/.jwt_secret
-**/.db_secret
+**/.jwt_secret*
+**/.db_secret*
 
 # Base de datos SQLite legacy (contenía credenciales cifradas)
 **/database.sqlite
