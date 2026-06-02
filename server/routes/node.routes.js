@@ -46,6 +46,24 @@ async function filterNodesForRole(req, nodes) {
     return scoped;
 }
 
+/**
+ * Verifica que el nodo (por ppp_user) pertenezca al workspace del solicitante.
+ * Admin de plataforma y tokens legacy (sin RBAC) no tienen restricción.
+ * Impide que un moderador mute/borre túneles de OTRO workspace por ppp_user.
+ */
+async function nodeBelongsToRequester(req, pppUser) {
+    const acc = req.account;
+    if (!acc || acc.platform_admin) return true;
+    if (!pppUser) return false;
+    try {
+        const db = await getDb();
+        const row = await db.get('SELECT workspace_id FROM nodes WHERE ppp_user = ?', [pppUser]);
+        return !!row && row.workspace_id === acc.workspace_id;
+    } catch (_) {
+        return false;
+    }
+}
+
 /** Middleware: solo admin u operator pueden acceder a endpoints de credenciales */
 function requireOperator(req, res, next) {
     if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'operator')) {
@@ -503,6 +521,7 @@ router.post('/node/deprovision', async (req, res) => {
     const { vrfName, pppUser, protocol } = req.body;
     if (!pppUser)
         return res.status(400).json({ success: false, message: 'pppUser es requerido' });
+    if (!(await nodeBelongsToRequester(req, pppUser))) return res.status(404).json({ success: false, message: 'Nodo no encontrado en tu workspace' });
 
     const isWireGuard = protocol === 'wireguard' || pppUser.startsWith('WG-ND') || pppUser.startsWith('VPN-WG-');
     const hasVrf = !!vrfName;
@@ -691,6 +710,7 @@ router.post('/node/edit', async (req, res) => {
     if (!req.mikrotik) return res.status(503).json({ success: false, needsConfig: true, message: 'Configura las credenciales MikroTik en Ajustes antes de continuar.' });
     const { ip, user, pass } = req.mikrotik;
     const { pppUser, newPppUser, newPassword, newRemoteAddress, newComment, vrfName, addSubnets, removeSubnets } = req.body;
+    if (!(await nodeBelongsToRequester(req, pppUser))) return res.status(404).json({ success: false, message: 'Nodo no encontrado en tu workspace' });
     if (!pppUser) return res.status(400).json({ success: false, message: 'pppUser requerido' });
     const isWG = pppUser.startsWith('WG-ND') || pppUser.startsWith('VPN-WG-');
     const hasVrf = !!vrfName;
@@ -917,6 +937,7 @@ router.post('/node/script', async (req, res) => {
 router.post('/node/label/save', async (req, res) => {
     const { pppUser, label } = req.body;
     if (!pppUser) return res.status(400).json({ success: false, message: 'pppUser requerido' });
+    if (!(await nodeBelongsToRequester(req, pppUser))) return res.status(404).json({ success: false, message: 'Nodo no encontrado en tu workspace' });
     try {
         const db = await getDb();
         await db.run('UPDATE nodes SET label = ? WHERE ppp_user = ?', [label || '', pppUser]);
@@ -1008,6 +1029,7 @@ router.post('/node/scan-stream', async (req, res) => {
 router.post('/node/creds/save', async (req, res) => {
     const { pppUser, pppPassword } = req.body;
     if (!pppUser || !pppPassword) return res.status(400).json({ success: false, message: 'pppUser y pppPassword requeridos' });
+    if (!(await nodeBelongsToRequester(req, pppUser))) return res.status(404).json({ success: false, message: 'Nodo no encontrado en tu workspace' });
     try {
         const db = await getDb();
         const encrypted = encryptPass(pppPassword);
@@ -1034,6 +1056,7 @@ router.post('/node/creds/get', requireOperator, async (req, res) => {
 router.post('/node/ssh-creds/save', async (req, res) => {
     const { pppUser, creds } = req.body;
     if (!pppUser || !Array.isArray(creds)) return res.status(400).json({ success: false, message: 'pppUser y creds[] requeridos' });
+    if (!(await nodeBelongsToRequester(req, pppUser))) return res.status(404).json({ success: false, message: 'Nodo no encontrado en tu workspace' });
     try {
         const db = await getDb();
         const nodeId = await getNodeId(pppUser);
@@ -1093,6 +1116,7 @@ router.get('/node/tags', async (req, res) => {
 router.post('/node/tag/save', async (req, res) => {
     const { pppUser, tags } = req.body;
     if (!pppUser) return res.status(400).json({ success: false, message: 'pppUser requerido' });
+    if (!(await nodeBelongsToRequester(req, pppUser))) return res.status(404).json({ success: false, message: 'Nodo no encontrado en tu workspace' });
     try {
         const db = await getDb();
         const nodeId = await getNodeId(pppUser);
@@ -1121,6 +1145,7 @@ router.post('/node/tag/save', async (req, res) => {
 router.post('/node/history/add', async (req, res) => {
     const { pppUser, event } = req.body;
     if (!pppUser || !event) return res.status(400).json({ success: false, message: 'pppUser y event requeridos' });
+    if (!(await nodeBelongsToRequester(req, pppUser))) return res.status(404).json({ success: false, message: 'Nodo no encontrado en tu workspace' });
     try {
         const db = await getDb();
         const nodeId = await getNodeId(pppUser);
@@ -1151,6 +1176,7 @@ router.post('/node/wg/set-peer', async (req, res) => {
     const { ip, user, pass } = req.mikrotik;
     const { pppUser, cpePublicKey } = req.body;
     if (!pppUser || !cpePublicKey) return res.status(400).json({ success: false, message: 'pppUser y cpePublicKey son requeridos' });
+    if (!(await nodeBelongsToRequester(req, pppUser))) return res.status(404).json({ success: false, message: 'Nodo no encontrado en tu workspace' });
 
     let api;
     try {
