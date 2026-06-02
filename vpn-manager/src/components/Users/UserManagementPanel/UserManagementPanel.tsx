@@ -133,6 +133,7 @@ export default function UserManagementPanel() {
       {/* ── Tabla de usuarios ── */}
       <UsersTable
         peers={adminPeers}
+        loading={loadingWg}
         peerColors={peerColors}
         editingPeerId={editingPeerId}
         editingPeerName={editingPeerName}

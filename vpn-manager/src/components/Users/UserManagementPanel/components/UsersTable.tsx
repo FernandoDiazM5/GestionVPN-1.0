@@ -9,6 +9,7 @@ type StatusFilter = 'all' | 'active' | 'inactive';
 
 interface UsersTableProps {
   peers: WgPeer[];
+  loading?: boolean;
   peerColors: Record<string, string>;
   editingPeerId: string | null;
   editingPeerName: string;
@@ -23,6 +24,7 @@ interface UsersTableProps {
 
 export default function UsersTable({
   peers,
+  loading = false,
   peerColors,
   editingPeerId,
   editingPeerName,
@@ -138,6 +140,17 @@ export default function UsersTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            {loading && peers.length === 0 && [...Array(4)].map((_, i) => (
+              <tr key={`sk-${i}`}>
+                <td className="px-4 py-3"><div className="skeleton w-2.5 h-2.5 rounded-full" /></td>
+                <td className="px-4 py-3"><div className="skeleton h-4 w-16 rounded-full" /></td>
+                <td className="px-4 py-3"><div className="skeleton h-3 w-28" /></td>
+                <td className="px-4 py-3"><div className="skeleton h-3 w-24" /></td>
+                <td className="px-4 py-3"><div className="skeleton h-5 w-10 rounded-full" /></td>
+                <td className="px-4 py-3"><div className="skeleton h-3 w-16" /></td>
+                <td className="px-4 py-3"><div className="skeleton h-7 w-20 ml-auto" /></td>
+              </tr>
+            ))}
             {filtered.map(peer => {
               const color = peerColors[peer.allowedAddress];
               const isEditing = editingPeerId === peer.id;
@@ -207,7 +220,7 @@ export default function UsersTable({
                 </tr>
               );
             })}
-            {filtered.length === 0 && (
+            {!loading && filtered.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-4 py-12 text-center">
                   <div className="flex flex-col items-center gap-2">

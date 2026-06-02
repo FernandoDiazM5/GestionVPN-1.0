@@ -79,6 +79,23 @@ export default function ModeratorsModule() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {loading && moderators.length === 0 && [...Array(4)].map((_, i) => (
+                <tr key={`sk-${i}`}>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="skeleton w-8 h-8 rounded-lg shrink-0" />
+                      <div className="space-y-1.5">
+                        <div className="skeleton h-3 w-28" />
+                        <div className="skeleton h-2.5 w-40" />
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3"><div className="skeleton h-3 w-24" /></td>
+                  <td className="px-4 py-3"><div className="skeleton h-5 w-8 rounded-full" /></td>
+                  <td className="px-4 py-3"><div className="skeleton h-3 w-20" /></td>
+                  <td className="px-4 py-3"><div className="skeleton h-7 w-28 ml-auto" /></td>
+                </tr>
+              ))}
               {moderators.map(m => (
                 <tr key={m.user_id} className={`transition-colors ${m.disabled ? 'opacity-60' : ''} hover:bg-indigo-50/30 dark:hover:bg-indigo-500/10`}>
                   <td className="px-4 py-3">

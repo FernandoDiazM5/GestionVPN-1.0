@@ -142,6 +142,7 @@ export default function TeamModule() {
       {/* Miembros */}
       <MembersTable
         members={members}
+        loading={loadingData}
         currentRole={session.role}
         currentUserId={session.id}
         busyId={busyId}

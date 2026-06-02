@@ -8,6 +8,7 @@ import MemberWireGuardModal from './MemberWireGuardModal';
 
 interface MembersTableProps {
   members: Member[];
+  loading?: boolean;
   currentRole: Role;
   currentUserId: string;
   busyId: string | null;
@@ -28,7 +29,7 @@ function roleBadgeClass(role: Role) {
 }
 
 export default function MembersTable({
-  members, currentRole, currentUserId, busyId, onChangeRole, onRemove,
+  members, loading = false, currentRole, currentUserId, busyId, onChangeRole, onRemove,
 }: MembersTableProps) {
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [assignFor, setAssignFor] = useState<Member | null>(null);
@@ -52,6 +53,18 @@ export default function MembersTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            {loading && members.length === 0 && [...Array(3)].map((_, i) => (
+              <tr key={`sk-${i}`}>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="skeleton w-8 h-8 rounded-lg shrink-0" />
+                    <div className="space-y-1.5"><div className="skeleton h-3 w-28" /><div className="skeleton h-2.5 w-40" /></div>
+                  </div>
+                </td>
+                <td className="px-4 py-3"><div className="skeleton h-5 w-20 rounded-full" /></td>
+                <td className="px-4 py-3"><div className="skeleton h-7 w-16 ml-auto" /></td>
+              </tr>
+            ))}
             {members.map(m => {
               const Icon = ROLE_ICON[m.role];
               const isSelf = m.user_id === currentUserId;

@@ -217,3 +217,18 @@
 @media (prefers-reduced-motion: reduce) {
   .status-live::after { animation: none; }
 }
+
+/* ── Skeleton de carga (P3) — placeholder con shimmer ────────────────────
+   Úsalo mientras llegan datos en vez de un spinner pelado. */
+@keyframes skeleton-shimmer { 100% { background-position: -200% 0; } }
+.skeleton {
+  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 37%, #e2e8f0 63%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  border-radius: 0.5rem;
+}
+.dark .skeleton {
+  background: linear-gradient(90deg, #1e293b 25%, #334155 37%, #1e293b 63%);
+  background-size: 200% 100%;
+}
+@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
