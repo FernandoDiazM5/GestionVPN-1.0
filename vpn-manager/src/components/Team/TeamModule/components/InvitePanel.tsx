@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { UserPlus, Loader2, Mail, X, Clock } from 'lucide-react';
+import { UserPlus, Loader2, Mail, X, Clock, Router } from 'lucide-react';
 import type { Invitation, Role } from '../../../../types/account';
 import { ROLE_LABEL } from '../../../../types/account';
 import { canAssignCoModerator } from '../../../../utils/permissions';
@@ -7,13 +7,16 @@ import { canAssignCoModerator } from '../../../../utils/permissions';
 interface InvitePanelProps {
   currentRole: Role;
   invitations: Invitation[];
-  onInvite: (email: string, role: Exclude<Role, 'OWNER'>) => Promise<string | null>; // devuelve OTP dev o null
+  /** Túneles del workspace para asignar al invitar (nombre_vrf). */
+  tunnels?: { id: string; label: string }[];
+  onInvite: (email: string, role: Exclude<Role, 'OWNER'>, tunnelId?: string) => Promise<string | null>;
   onRevoke: (id: string) => void;
 }
 
-export default function InvitePanel({ currentRole, invitations, onInvite, onRevoke }: InvitePanelProps) {
+export default function InvitePanel({ currentRole, invitations, tunnels = [], onInvite, onRevoke }: InvitePanelProps) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<Exclude<Role, 'OWNER'>>('MEMBER');
+  const [tunnelId, setTunnelId] = useState('');
   const [sending, setSending] = useState(false);
   const [devHint, setDevHint] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -22,9 +25,9 @@ export default function InvitePanel({ currentRole, invitations, onInvite, onRevo
     if (!email.trim()) return;
     setSending(true); setError(null); setDevHint(null);
     try {
-      const dev = await onInvite(email.trim(), role);
-      setEmail('');
-      if (dev) setDevHint(`Invitación creada. En modo dev, revisa la consola del backend para el código OTP de ${email.trim()}.`);
+      const dev = await onInvite(email.trim(), role, tunnelId.trim() || undefined);
+      setEmail(''); setTunnelId('');
+      if (dev) setDevHint(`Invitación creada${tunnelId.trim() ? ` (túnel ${tunnelId.trim()})` : ''}. En modo dev, el código OTP está en la consola del backend para ${email.trim()}.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo invitar');
     } finally {
@@ -66,6 +69,27 @@ export default function InvitePanel({ currentRole, invitations, onInvite, onRevo
         </button>
       </div>
 
+      {/* Túnel a asignar al aceptar (opcional) */}
+      <div>
+        <label className="block text-2xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
+          Túnel a asignar (opcional)
+        </label>
+        <div className="relative">
+          <Router className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input
+            list="invite-tunnels" value={tunnelId} onChange={e => setTunnelId(e.target.value)}
+            placeholder="VRF-NDx-NOMBRE (se asigna y se genera su WireGuard al aceptar)"
+            className="w-full pl-10 pr-3 py-2.5 text-sm font-mono rounded-xl border border-slate-200 bg-white
+                       focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400
+                       text-slate-700 placeholder:text-slate-400 placeholder:font-sans transition-all
+                       dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500"
+          />
+          <datalist id="invite-tunnels">
+            {tunnels.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+          </datalist>
+        </div>
+      </div>
+
       {error && <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">{error}</p>}
       {devHint && <p className="text-xs text-amber-600 dark:text-amber-400">{devHint}</p>}
 
@@ -77,6 +101,7 @@ export default function InvitePanel({ currentRole, invitations, onInvite, onRevo
             <div key={inv.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700">
               <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
               <span className="font-mono text-xs text-slate-600 dark:text-slate-300 truncate flex-1">{inv.email}</span>
+              {inv.tunnel_id && <span className="badge badge-info font-mono">{inv.tunnel_id}</span>}
               <span className="badge badge-neutral">{ROLE_LABEL[inv.role]}</span>
               <button onClick={() => onRevoke(inv.id)} title="Revocar invitación" aria-label="Revocar invitación"
                 className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors dark:hover:text-rose-400 dark:hover:bg-rose-500/10">

@@ -11,6 +11,7 @@ import MembersTable from './components/MembersTable';
 import InvitePanel from './components/InvitePanel';
 import AuditTimeline from './components/AuditTimeline';
 import MemberProfile from './components/MemberProfile';
+import MyInvitationsInbox from './components/MyInvitationsInbox';
 
 export default function TeamModule() {
   const { session, loading, refresh } = useWorkspaceSession();
@@ -49,11 +50,12 @@ export default function TeamModule() {
   // SSE: refresca el timeline cuando cualquier miembro ejecuta una acción
   useWorkspaceEvents(reloadLogs, !!session);
 
-  const handleInvite = async (email: string, role: Exclude<Role, 'OWNER'>) => {
-    const r = await teamApi.invite(email, role);
+  const handleInvite = async (email: string, role: Exclude<Role, 'OWNER'>, tunnelId?: string) => {
+    const r = await teamApi.invite(email, role, tunnelId);
     await loadData();
     return r.dev ? 'dev' : null;
   };
+  const onInvitationAccepted = () => { refresh(); loadData(); };
   const handleRevoke = async (id: string) => { await teamApi.revokeInvitation(id); await loadData(); };
   const handleChangeRole = async (userId: string, role: Exclude<Role, 'OWNER'>) => {
     setBusyId(userId);
@@ -92,13 +94,21 @@ export default function TeamModule() {
     );
   }
 
-  // ── View (MEMBER): ve su propio perfil, no la gestión del equipo ──
+  // ── View (MEMBER): bandeja de invitaciones + su propio perfil ──
   if (session.role === 'MEMBER') {
-    return <MemberProfile session={session} />;
+    return (
+      <div className="space-y-5">
+        <MyInvitationsInbox onAccepted={onInvitationAccepted} />
+        <MemberProfile session={session} />
+      </div>
+    );
   }
 
   return (
     <div className="space-y-5">
+      {/* Invitaciones dirigidas a este usuario (puede ser invitado a otro workspace) */}
+      <MyInvitationsInbox onAccepted={onInvitationAccepted} />
+
       {/* Cabecera */}
       <div className="card p-6">
         <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">

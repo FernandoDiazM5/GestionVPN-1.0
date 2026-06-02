@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Radio, Lock, User, Server, ShieldCheck, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Radio, Lock, User, Server, ShieldCheck, CheckCircle, AlertCircle, Loader2, Mail } from 'lucide-react';
 import { useVpn } from '../../context';
 import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
+import AcceptInvitationForm from './AcceptInvitationForm';
 
 import { API_BASE_URL } from '../../config';
 
 export default function RouterAccess() {
   const { handleLoginSuccess } = useVpn();
+  const [mode, setMode] = useState<'login' | 'accept'>('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
@@ -76,6 +78,11 @@ export default function RouterAccess() {
            <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
         </div>
       );
+  }
+
+  // Pantalla pública de aceptación de invitación (personas nuevas con código)
+  if (mode === 'accept') {
+    return <AcceptInvitationForm onBack={() => setMode('login')} onLoggedIn={handleLoginSuccess} />;
   }
 
   return (
@@ -184,6 +191,13 @@ export default function RouterAccess() {
                 </span>
               </button>
             </form>
+
+            {!needsSetup && (
+              <button onClick={() => setMode('accept')}
+                className="w-full mt-4 text-xs font-semibold text-slate-500 hover:text-indigo-600 flex items-center justify-center gap-1.5">
+                <Mail className="w-3.5 h-3.5" /> ¿Tienes una invitación? Acéptala aquí
+              </button>
+            )}
           </div>
         </div>
 
