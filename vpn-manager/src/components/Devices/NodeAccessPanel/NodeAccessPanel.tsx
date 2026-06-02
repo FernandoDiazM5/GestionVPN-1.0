@@ -2,6 +2,8 @@ import { Bell, X } from 'lucide-react';
 import { useVpn, TUNNEL_TIMEOUT_MS } from '../../../context';
 import { deviceDb } from '../../../store/deviceDb';
 import { cpeCache } from '../../../store/cpeCache';
+import { useWorkspaceSession } from '../../../context/WorkspaceSession';
+import { isPlatformAdmin } from '../../../utils/permissions';
 
 // ── Modales (importados desde ./modals)
 import {
@@ -126,7 +128,11 @@ export default function NodeAccessPanel() {
     ? nodes.find(n => n.nombre_vrf === activeNodeVrf)?.nombre_nodo ?? activeNodeVrf
     : null;
 
-  // ── Estado del VPS (la gestión de administradores está en Usuarios) ──
+  // ── Estado del VPS (infraestructura del router core) ──
+  // Solo lo ve el Administrador: el VPS/WireGuard del servidor es plataforma,
+  // no le compete a un moderador (que ni siquiera ve sus peers de gestión aquí).
+  const { session } = useWorkspaceSession();
+  const showCoreInfra = isPlatformAdmin(session);
   const vpsPeer = wgPeers.find(p => p.allowedAddress === VPS_IP);
   const vpsWgActive = !!vpsPeer?.active;
   const mangleActive = !!activeNodeVrf;
@@ -160,16 +166,18 @@ export default function NodeAccessPanel() {
         isRevoking={isRevoking}
       />
 
-      {/* ── WireGuardSection (solo VPS Principal) ── */}
-      <WireGuardSection
-        vpsPeer={vpsPeer}
-        vpsWgActive={vpsWgActive}
-        mangleActive={mangleActive}
-        activeNodeVrf={activeNodeVrf}
-        loadingWg={loadingWg}
-        wgError={wgError}
-        onLoadWgPeers={loadWgPeers}
-      />
+      {/* ── WireGuardSection (VPS/core) — solo Administrador de plataforma ── */}
+      {showCoreInfra && (
+        <WireGuardSection
+          vpsPeer={vpsPeer}
+          vpsWgActive={vpsWgActive}
+          mangleActive={mangleActive}
+          activeNodeVrf={activeNodeVrf}
+          loadingWg={loadingWg}
+          wgError={wgError}
+          onLoadWgPeers={loadWgPeers}
+        />
+      )}
 
       {/* ── NodesListSection ── */}
       <NodesListSection
