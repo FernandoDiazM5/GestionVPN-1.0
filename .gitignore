@@ -35,3 +35,17 @@ yarn-error.log*
 
 # Backup SQLite tras migración a MySQL (datos sensibles, no versionar)
 server/_legacy_sqlite/
+
+# Secretos de cifrado/firma — NUNCA versionar (clave JWT y clave AES de credenciales)
+.jwt_secret
+.db_secret
+**/.jwt_secret
+**/.db_secret
+
+# Base de datos SQLite legacy (contenía credenciales cifradas)
+**/database.sqlite
+**/database.sqlite-shm
+**/database.sqlite-wal
+
+# Worktrees temporales de agentes (copias completas del repo con secretos)
+.claude/worktrees/
