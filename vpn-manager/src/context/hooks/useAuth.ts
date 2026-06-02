@@ -1,8 +1,10 @@
 import { useState, useCallback, useRef } from 'react';
 import type { RouterCredentials } from '../../store/db';
+import { dbService } from '../../store/db';
 import { setApiToken } from '../../utils/apiClient';
 import { credCache, statsCache } from '../../store/deviceDb';
 import { cpeCache } from '../../store/cpeCache';
+import { accountApi } from '../../services/accountApi';
 
 export function useAuth() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -21,10 +23,17 @@ export function useAuth() {
     setIsAuthenticated(false);
     setCredentials(undefined);
     setApiToken('');
-    // Limpia las cachés locales (IndexedDB) para que en una máquina compartida
-    // los datos de escaneo/dispositivos/CPEs de un moderador no queden visibles
-    // para el siguiente que inicie sesión.
-    await Promise.allSettled([credCache.clear(), statsCache.clear(), cpeCache.clear()]);
+    // Cierra la sesión completa para que NO quede estado obsoleto que dispare 401:
+    //  1) cookie de sesión RBAC en el servidor (/api/account/logout)
+    //  2) credenciales persistidas + clave de cifrado del navegador (clearStore)
+    //  3) cachés locales (escaneo/dispositivos/CPEs) — privacidad en máquina compartida
+    await Promise.allSettled([
+      accountApi.logout(),
+      dbService.clearStore(),
+      credCache.clear(),
+      statsCache.clear(),
+      cpeCache.clear(),
+    ]);
     isLoggingOutRef.current = false;
   }, []);
 
