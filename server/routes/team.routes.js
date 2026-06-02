@@ -21,8 +21,60 @@ const memberWgRepo = require('../db/repos/memberWgRepo');
 const { generateKeyPair, buildClientConf } = require('../lib/wgkeys');
 const { encrypt, decrypt } = require('../lib/crypto');
 const { connectToMikrotik, safeWrite, writeIdempotent, getErrorMessage } = require('../routeros.service');
+const { getAppSetting, decryptPass } = require('../db.service');
 
 const isModeratorRole = (role) => role === 'OWNER' || role === 'CO_MODERATOR';
+
+// Credenciales del router core desde app_settings (las rutas públicas/in-app no
+// pasan por verifyToken, así que se inyectan aquí). Devuelve null si no hay config.
+async function getMikrotik() {
+  const ip = await getAppSetting('MT_IP');
+  const user = await getAppSetting('MT_USER');
+  const passData = await getAppSetting('MT_PASS');
+  if (!ip || !user || !passData) return null;
+  return { ip, user, pass: decryptPass(passData) };
+}
+
+// Crea el peer WireGuard del miembro en el router usando SU clave pública
+// (la clave privada nunca llega al servidor) y guarda la referencia. Devuelve
+// los datos del servidor para que el invitado complete su .conf en el dispositivo.
+async function provisionMemberWgByPublicKey(mikrotik, { workspaceId, userId, publicKey }) {
+  const { ip, user, pass } = mikrotik;
+  let api;
+  try {
+    api = await connectToMikrotik(ip, user, pass);
+    const peers = await safeWrite(api, ['/interface/wireguard/peers/print']);
+    const ifaces = await safeWrite(api, ['/interface/wireguard/print']).catch(() => []);
+    const cloud = await safeWrite(api, ['/ip/cloud/print']).catch(() => []);
+    const mgmt = peers.filter(p => p.interface === 'VPN-WG-MGMT');
+    // Reutiliza el peer si ya existe esa clave pública (idempotente)
+    const existing = mgmt.find(p => p['public-key'] === publicKey);
+    let nextIp;
+    if (existing) {
+      nextIp = (existing['allowed-address'] || '').split('/')[0];
+    } else {
+      const used = mgmt.map(p => (p['allowed-address'] || '').split('/')[0])
+        .filter(a => a.startsWith('192.168.21.')).map(a => parseInt(a.split('.')[3])).filter(n => !isNaN(n));
+      nextIp = `192.168.21.${(used.length ? Math.max(...used) : 19) + 1}`;
+      await writeIdempotent(api, ['/interface/wireguard/peers/add',
+        '=interface=VPN-WG-MGMT', `=public-key=${publicKey}`,
+        `=allowed-address=${nextIp}/32`, `=comment=member:${userId}`]);
+    }
+    const mgmtIface = ifaces.find(i => i.name === 'VPN-WG-MGMT');
+    const serverPub = mgmtIface?.['public-key'] || '';
+    const listenPort = parseInt(mgmtIface?.['listen-port'] || '0') || 13231;
+    const publicIp = cloud?.[0]?.['public-address'] || ip;
+    await api.close();
+    await memberWgRepo.upsert({
+      workspaceId, userId, peerName: `member:${userId}`, allowedIp: nextIp,
+      publicKey, configEnc: null,
+    });
+    return { allowedIp: nextIp, serverPublicKey: serverPub, endpoint: `${publicIp}:${listenPort}`, allowedIps: '192.168.21.0/24' };
+  } catch (e) {
+    if (api) try { await api.close(); } catch (_) { /* noop */ }
+    throw e;
+  }
+}
 
 const router = express.Router();
 
@@ -30,12 +82,17 @@ const INVITE_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 const INVITE_MAX_ATTEMPTS = 5;
 
 const emailSchema = z.string().email('Email inválido').max(255);
-const inviteSchema = z.object({ email: emailSchema, role: z.enum(['MEMBER', 'CO_MODERATOR']).default('MEMBER') });
+const inviteSchema = z.object({
+  email: emailSchema,
+  role: z.enum(['MEMBER', 'CO_MODERATOR']).default('MEMBER'),
+  tunnelId: z.string().max(160).optional(),   // túnel a asignar al aceptar
+});
 const acceptSchema = z.object({
   email: emailSchema,
   otp: z.string().regex(/^\d{6}$/, 'OTP de 6 dígitos'),
   password: z.string().min(8).max(128).optional(),
   name: z.string().max(120).optional(),
+  publicKey: z.string().max(120).optional(),  // clave pública WG del invitado (su privada NO se envía)
 });
 const roleSchema = z.object({ userId: z.string().min(1), role: z.enum(['MEMBER', 'CO_MODERATOR']) });
 
@@ -44,7 +101,7 @@ const genOtp = () => String(crypto.randomInt(100000, 1000000));
 // ── POST /invite  (OWNER, CO_MODERATOR) ──────────────────────
 router.post('/invite', requireSession, requireRole('OWNER', 'CO_MODERATOR'),
   asyncHandler(async (req, res) => {
-    const { email, role } = inviteSchema.parse(req.body);
+    const { email, role, tunnelId } = inviteSchema.parse(req.body);
     const wsId = req.account.workspace_id;
 
     // Un CO_MODERATOR no puede crear otros CO_MODERATOR (solo el OWNER)
@@ -65,16 +122,16 @@ router.post('/invite', requireSession, requireRole('OWNER', 'CO_MODERATOR'),
     const otp = genOtp();
     await invitationRepo.create({
       id: crypto.randomUUID(), workspaceId: wsId, email,
-      otpHash: await bcrypt.hash(otp, 8), role,
+      otpHash: await bcrypt.hash(otp, 8), role, tunnelId: tunnelId || null,
       invitedBy: req.account.sub, expiresAt: Date.now() + INVITE_TTL_MS,
     });
     const delivery = await sendOtp(email, otp, 'invitación al workspace');
-    return sendOk(res, { message: 'Invitación enviada', role, dev: delivery.dev || undefined }, 201);
+    return sendOk(res, { message: 'Invitación enviada', role, tunnelId: tunnelId || null, dev: delivery.dev || undefined }, 201);
   }));
 
 // ── POST /accept  (público, rate-limited) ────────────────────
 router.post('/accept', rl.guard('OTP'), asyncHandler(async (req, res) => {
-  const { email, otp, password, name } = acceptSchema.parse(req.body);
+  const { email, otp, password, name, publicKey } = acceptSchema.parse(req.body);
   const ip = req._clientIp;
 
   const inv = await invitationRepo.findPendingByEmail(email);
@@ -107,14 +164,86 @@ router.post('/accept', rl.guard('OTP'), asyncHandler(async (req, res) => {
       user = { id, email };
     }
     await memberRepo.add(tx, { workspaceId: inv.workspace_id, userId: user.id, role: inv.role, invitedBy: inv.invited_by });
+    // Asigna el túnel adjuntado en la invitación (si lo hay)
+    if (inv.tunnel_id) {
+      await assignmentRepo.add(tx, {
+        workspaceId: inv.workspace_id, tunnelId: inv.tunnel_id, userId: user.id, assignedBy: inv.invited_by,
+      });
+    }
     await invitationRepo.markAccepted(tx, inv.id);
   });
 
   await rl.recordAttempt(ip, 'OTP', email, true);
 
+  // Provisión WireGuard con la clave pública del invitado (best-effort: si el
+  // router no responde, la membresía/túnel quedan igual y se reintenta luego).
+  let wireguard = null;
+  if (publicKey) {
+    const mt = await getMikrotik();
+    if (mt) {
+      try { wireguard = await provisionMemberWgByPublicKey(mt, { workspaceId: inv.workspace_id, userId: user.id, publicKey }); }
+      catch (e) { console.warn('[team/accept] WG no provisionado (router):', e.message); }
+    }
+  }
+
   const token = signSession({ sub: user.id, email, workspace_id: inv.workspace_id, role: inv.role });
   setSessionCookie(res, token);
-  return sendOk(res, { user: { id: user.id, email, role: inv.role, workspace_id: inv.workspace_id } });
+  return sendOk(res, {
+    user: { id: user.id, email, role: inv.role, workspace_id: inv.workspace_id },
+    tunnel: inv.tunnel_id || null,
+    wireguard,   // { allowedIp, serverPublicKey, endpoint, allowedIps } o null
+  });
+}));
+
+// ── GET /my-invitations — invitaciones PENDING para el usuario logueado ──
+router.get('/my-invitations', requireSession, asyncHandler(async (req, res) => {
+  const invitations = await invitationRepo.listPendingForEmail(req.account.email);
+  return sendOk(res, { invitations });
+}));
+
+// ── POST /invitations/:id/accept — aceptar EN LA APP (usuario logueado) ──
+//  Reemplaza al OTP: el usuario ya autenticado acepta y envía su clave pública WG.
+const inAppAcceptSchema = z.object({ publicKey: z.string().max(120).optional() });
+router.post('/invitations/:id/accept', requireSession, asyncHandler(async (req, res) => {
+  const { publicKey } = inAppAcceptSchema.parse(req.body);
+  const inv = await invitationRepo.findById(req.params.id);
+  if (!inv || inv.status !== 'PENDING') throw new AppError('Invitación no encontrada', 404, 'NO_INVITE');
+  if (Date.now() > Number(inv.expires_at)) throw new AppError('La invitación expiró', 410, 'INVITE_EXPIRED');
+  if (String(inv.email).toLowerCase() !== String(req.account.email || '').toLowerCase()) {
+    throw new AppError('Esta invitación no es para tu cuenta', 403, 'FORBIDDEN');
+  }
+  const userId = req.account.sub;
+
+  await withTransaction(async (tx) => {
+    const existing = await memberRepo.findMembership(inv.workspace_id, userId);
+    if (!existing) {
+      await memberRepo.add(tx, { workspaceId: inv.workspace_id, userId, role: inv.role, invitedBy: inv.invited_by });
+    }
+    if (inv.tunnel_id) {
+      await assignmentRepo.add(tx, {
+        workspaceId: inv.workspace_id, tunnelId: inv.tunnel_id, userId, assignedBy: inv.invited_by,
+      });
+    }
+    await invitationRepo.markAccepted(tx, inv.id);
+  });
+
+  let wireguard = null;
+  if (publicKey) {
+    const mt = await getMikrotik();
+    if (mt) {
+      try { wireguard = await provisionMemberWgByPublicKey(mt, { workspaceId: inv.workspace_id, userId, publicKey }); }
+      catch (e) { console.warn('[team/accept-in-app] WG no provisionado:', e.message); }
+    }
+  }
+
+  // Cambia la sesión al workspace recién aceptado
+  const token = signSession({ sub: userId, email: req.account.email, workspace_id: inv.workspace_id, role: inv.role });
+  setSessionCookie(res, token);
+  return sendOk(res, {
+    user: { id: userId, email: req.account.email, role: inv.role, workspace_id: inv.workspace_id },
+    tunnel: inv.tunnel_id || null,
+    wireguard,
+  });
 }));
 
 // ── GET /members  (cualquier miembro) ────────────────────────

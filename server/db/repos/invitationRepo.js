@@ -4,14 +4,31 @@
 // ============================================================
 const { query } = require('../mysql');
 
-async function create({ id, workspaceId, email, otpHash, role, invitedBy, expiresAt }) {
+async function create({ id, workspaceId, email, otpHash, role, invitedBy, expiresAt, tunnelId }) {
   const now = Date.now();
   await query(
     `INSERT INTO invitations
-       (id, workspace_id, email, otp_hash, role, status, invited_by, attempts, expires_at, created_at)
-     VALUES (?,?,?,?,?, 'PENDING', ?, 0, ?, ?)`,
-    [id, workspaceId, email, otpHash, role, invitedBy, expiresAt, now]
+       (id, workspace_id, email, otp_hash, role, status, tunnel_id, invited_by, attempts, expires_at, created_at)
+     VALUES (?,?,?,?,?, 'PENDING', ?, ?, 0, ?, ?)`,
+    [id, workspaceId, email, otpHash, role, tunnelId || null, invitedBy, expiresAt, now]
   );
+}
+
+/** Invitaciones PENDING para un email, con nombre del workspace (bandeja in-app). */
+async function listPendingForEmail(email) {
+  return query(
+    `SELECT i.id, i.workspace_id, i.email, i.role, i.tunnel_id, i.expires_at, i.created_at,
+            w.name AS workspace_name
+       FROM invitations i JOIN workspaces w ON w.id = i.workspace_id
+      WHERE i.email = ? AND i.status = 'PENDING' AND w.deleted_at IS NULL
+      ORDER BY i.created_at DESC`,
+    [email]
+  );
+}
+
+async function findById(id) {
+  const rows = await query('SELECT * FROM invitations WHERE id = ? LIMIT 1', [id]);
+  return rows[0] || null;
 }
 
 /** Última invitación PENDING para un email (en cualquier workspace). */
@@ -61,4 +78,4 @@ async function listPending(workspaceId) {
   );
 }
 
-module.exports = { create, findPendingByEmail, findPending, incAttempts, markAccepted, revoke, listPending };
+module.exports = { create, findPendingByEmail, findPending, findById, listPendingForEmail, incAttempts, markAccepted, revoke, listPending };

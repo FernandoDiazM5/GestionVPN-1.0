@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS invitations (
   otp_hash     VARCHAR(255) NOT NULL,                  -- HASH del OTP, nunca el código en claro
   role         ENUM('CO_MODERATOR','MEMBER') NOT NULL DEFAULT 'MEMBER',
   status       ENUM('PENDING','ACCEPTED','EXPIRED','REVOKED') NOT NULL DEFAULT 'PENDING',
+  tunnel_id    VARCHAR(160) DEFAULT NULL,                -- túnel a asignar al aceptar (nombre_vrf/ppp_user)
   invited_by   CHAR(36)     DEFAULT NULL,
   attempts     INT          NOT NULL DEFAULT 0,        -- anti fuerza bruta (Fase 2)
   expires_at   BIGINT       NOT NULL,
