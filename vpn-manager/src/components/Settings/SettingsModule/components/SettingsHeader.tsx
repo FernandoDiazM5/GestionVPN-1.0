@@ -8,7 +8,7 @@ export function SettingsHeader() {
         <Settings className="w-5 h-5 text-indigo-600" />
       </div>
       <div>
-        <h2 className="text-lg font-bold text-slate-800">{CARD_HEADER.TITLE}</h2>
+        <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">{CARD_HEADER.TITLE}</h2>
         <p className="text-sm text-slate-500 font-medium">{CARD_HEADER.SUBTITLE}</p>
       </div>
     </div>

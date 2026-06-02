@@ -118,7 +118,7 @@ export default function ApMonitorModule() {
 
       <div className="card p-6 flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+          <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
             <Activity className="w-5 h-5 text-indigo-500" />
             <span>Monitor de APs</span>
           </h2>
@@ -215,13 +215,13 @@ export default function ApMonitorModule() {
       )}
 
       {!logic.loading && logic.nodeGroups.length === 0 && (
-        <div className="card border-dashed border-2 border-slate-200 py-16 flex flex-col items-center text-center gap-4">
-          <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center">
+        <div className="card border-dashed border-2 border-slate-200 dark:border-slate-700 py-16 flex flex-col items-center text-center gap-4">
+          <div className="w-14 h-14 bg-indigo-50 dark:bg-indigo-500/10 rounded-2xl flex items-center justify-center">
             <Radio className="w-7 h-7 text-indigo-400" />
           </div>
           <div>
-            <p className="text-slate-500 font-medium">Sin APs guardados</p>
-            <p className="text-slate-400 text-sm mt-1">
+            <p className="text-slate-600 dark:text-slate-300 font-semibold">Sin APs guardados</p>
+            <p className="text-slate-400 dark:text-slate-500 text-sm mt-1 max-w-sm">
               Ve a la pestaña <strong>Escanear</strong>, agrega dispositivos con rol "AP" y vuelve aquí para monitorearlos.
             </p>
           </div>

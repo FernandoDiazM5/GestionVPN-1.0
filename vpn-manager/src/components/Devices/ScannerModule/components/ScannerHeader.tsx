@@ -9,7 +9,7 @@ export default function ScannerHeader({ isScanning, onScan }: ScannerHeaderProps
   return (
     <div className="card p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div>
-        <h2 className="text-lg font-bold text-slate-800 flex items-center space-x-2">
+        <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center space-x-2">
           <Search className="w-5 h-5 text-indigo-500" />
           <span>Escáner PPP Secrets</span>
         </h2>

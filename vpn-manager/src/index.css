@@ -105,7 +105,7 @@
   }
   .btn-ghost {
     @apply text-slate-500 hover:text-slate-800 hover:bg-slate-100
-           rounded-xl transition-all duration-200
+           rounded-xl transition-all duration-200 active:scale-[0.98]
            dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800;
   }
   .input-field {

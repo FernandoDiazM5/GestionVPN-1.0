@@ -140,11 +140,18 @@ export default function ModeratorsModule() {
                 </tr>
               ))}
               {!loading && moderators.length === 0 && (
-                <tr><td colSpan={5} className="px-4 py-12 text-center">
-                  <div className="flex flex-col items-center gap-2">
-                    <UserCog className="w-8 h-8 text-slate-300 dark:text-slate-600" />
-                    <p className="text-slate-400 dark:text-slate-500 font-semibold">Aún no hay moderadores</p>
-                    <p className="text-slate-400 dark:text-slate-500 text-xs">Crea el primero con "Nuevo Moderador"</p>
+                <tr><td colSpan={5} className="px-4 py-14 text-center">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center">
+                      <UserCog className="w-7 h-7 text-indigo-400 dark:text-indigo-400/70" />
+                    </div>
+                    <div>
+                      <p className="text-slate-600 dark:text-slate-300 font-semibold">Aún no hay moderadores</p>
+                      <p className="text-slate-400 dark:text-slate-500 text-xs mt-0.5">Da de alta al primer cliente para que use la plataforma.</p>
+                    </div>
+                    <button onClick={() => setShowCreate(true)} className="btn-success px-4 py-2 flex items-center gap-2 text-sm mt-1">
+                      <UserPlus className="w-4 h-4" /> Nuevo Moderador
+                    </button>
                   </div>
                 </td></tr>
               )}

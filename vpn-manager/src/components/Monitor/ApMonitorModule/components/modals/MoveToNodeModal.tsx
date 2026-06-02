@@ -25,7 +25,7 @@ function MoveToNodeModal({ device, nodes, knownNames, onConfirm, onClose }: {
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5 space-y-4 animate-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-bold text-slate-800 flex items-center gap-2">
+            <h3 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
               <ArrowRightLeft className="w-4 h-4 text-indigo-500" />
               Mover a nodo
             </h3>

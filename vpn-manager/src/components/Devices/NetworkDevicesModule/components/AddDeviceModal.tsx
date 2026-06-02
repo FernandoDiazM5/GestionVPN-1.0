@@ -44,7 +44,7 @@ export function AddDeviceModal({ device, node, existing, onSave, onClose }: AddD
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-5 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-bold text-slate-800">{isEdit ? 'Editar dispositivo' : 'Guardar dispositivo'}</h3>
+            <h3 className="font-bold text-slate-800 dark:text-slate-100">{isEdit ? 'Editar dispositivo' : 'Guardar dispositivo'}</h3>
             <p className="text-xs text-slate-400 mt-0.5">{device.name} · {device.model} · {device.ip}</p>
           </div>
           <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">

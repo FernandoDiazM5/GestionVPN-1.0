@@ -687,7 +687,7 @@ export default function NetworkDevicesModule() {
 
       <div className="card p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-bold text-slate-800 flex items-center space-x-2">
+          <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center space-x-2">
             <Cpu className="w-5 h-5 text-indigo-500" />
             <span>Dispositivos de Red</span>
           </h2>
@@ -719,7 +719,7 @@ export default function NetworkDevicesModule() {
       )}
 
       <div className="card p-5 space-y-4">
-        <h3 className="text-sm font-bold text-slate-700 flex items-center space-x-2">
+        <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200 flex items-center space-x-2">
           <RefreshCw className="w-4 h-4 text-indigo-500" />
           <span>Escanear LAN del nodo</span>
         </h3>

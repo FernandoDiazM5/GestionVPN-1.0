@@ -16,7 +16,7 @@ export function ProvisionFormHeader({ isOpen, onToggle }: ProvisionFormHeaderPro
           <PlusCircle className="w-4.5 h-4.5 text-white" />
         </div>
         <div className="text-left">
-          <h3 className="font-bold text-slate-800 text-sm">Provisionar Nuevo Nodo</h3>
+          <h3 className="font-bold text-slate-800 dark:text-slate-100 text-sm">Provisionar Nuevo Nodo</h3>
           <p className="text-[10px] text-slate-500 mt-0.5">Crear VPN + VRF + Rutas automáticamente</p>
         </div>
       </div>

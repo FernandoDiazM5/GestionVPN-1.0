@@ -92,7 +92,13 @@ export default function MemberProfile({ session }: Props) {
               <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">Mis túneles</h3>
             </div>
             {assignments.length === 0 ? (
-              <p className="py-8 text-center text-sm text-slate-400 dark:text-slate-500">Tu moderador aún no te asignó túneles.</p>
+              <div className="py-10 flex flex-col items-center gap-2 text-center">
+                <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                  <Waypoints className="w-6 h-6 text-slate-300 dark:text-slate-600" />
+                </div>
+                <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Sin túneles asignados</p>
+                <p className="text-2xs text-slate-400 dark:text-slate-500 max-w-xs">Tu moderador aún no te asignó túneles. Cuando lo haga, aparecerán aquí con su acceso.</p>
+              </div>
             ) : (
               <ul className="divide-y divide-slate-100 dark:divide-slate-800">
                 {assignments.map(a => (
