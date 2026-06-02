@@ -6,12 +6,21 @@ const { connectToMikrotik, safeWrite, getErrorMessage, cleanTunnelRules } = requ
 const { IPV4_REGEX, CIDR_REGEX, getSubnetHosts, probeUbiquiti, sshExec, parseAirOSStats, parseFullOutput, ANTENNA_CMD, trySshCredentials } = require('../ubiquiti.service');
 const { getDb, encryptDevice, decryptDevice, encryptPass, decryptPass, saveNode, getNodes, deleteNode } = require('../db.service');
 
+// Credenciales del router core (MikroTik compartido). Son infraestructura de
+// plataforma: solo el Administrador (platform_admin) puede verlas/editarlas.
+// El resto de claves (server_public_ip, wg_endpoint_ip, etc.) son operativas
+// y las usan los moderadores en Nodos/Usuarios.
+const CORE_ROUTER_KEYS = ['MT_IP', 'MT_USER', 'MT_PASS'];
+
 router.get('/settings/get', async (req, res) => {
     try {
         const db = await getDb();
+        const isPlatformAdmin = !!req.account?.platform_admin;
         const rows = await db.all('SELECT `key`, value FROM app_settings');
         const settings = {};
-        rows.forEach(r => { 
+        rows.forEach(r => {
+            // Ocultar las credenciales del router a quien no sea Administrador
+            if (!isPlatformAdmin && CORE_ROUTER_KEYS.includes(r.key)) return;
             if (r.key === 'MT_PASS' && r.value) {
                 settings[r.key] = '********';
             } else {
@@ -32,10 +41,14 @@ const requireAdmin = (req, res, next) => {
 router.post('/settings/save', requireAdmin, async (req, res) => {
     const { key, value } = req.body;
     if (!key) return res.status(400).json({ success: false, message: 'key requerido' });
+    // La configuración del router core solo la modifica el Administrador de plataforma
+    if (CORE_ROUTER_KEYS.includes(key) && !req.account?.platform_admin) {
+        return res.status(403).json({ success: false, message: 'Solo el Administrador puede modificar la configuración del router core.' });
+    }
     try {
         const db = await getDb();
         let finalValue = value ?? '';
-        
+
         if (key === 'MT_PASS') {
             if (finalValue === '********') return res.json({ success: true });
             if (finalValue) finalValue = encryptPass(finalValue);

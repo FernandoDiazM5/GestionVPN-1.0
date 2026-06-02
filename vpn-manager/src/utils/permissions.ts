@@ -14,21 +14,23 @@ export type ModuleId = 'dashboard' | 'moderators' | 'nodes' | 'devices' | 'users
 
 /**
  * Módulos visibles según la sesión (RBAC + plataforma).
- *  - Administrador (Sistemas): solo opera la plataforma (dashboard + moderadores).
- *  - Moderador (OWNER): sistema completo.
- *  - View (MEMBER): solo sus túneles + equipo(perfil) + ajustes(perfil).
+ *  - Administrador (Sistemas): plataforma (dashboard + moderadores) + Ajustes,
+ *    porque la config del router core (MikroTik compartido) es infraestructura
+ *    de plataforma y solo él la gestiona.
+ *  - Moderador (OWNER): sistema operativo de su workspace (sin Ajustes).
+ *  - View (MEMBER): solo sus túneles + su perfil (en Equipo).
  */
 export function visibleModules(s?: SessionUser | null): ModuleId[] {
   if (!s) return ['nodes'];
-  // Administrador (Sistemas): operador de plataforma. Solo gestiona el
-  // dashboard y el alta/gestión de moderadores; NO los módulos operativos
-  // (esos pertenecen a cada Moderador en su propio workspace).
+  // Administrador (Sistemas): operador de plataforma. Dashboard + Moderadores +
+  // Ajustes (única vista que configura el router core compartido).
   if (s.platform_admin) {
-    return ['dashboard', 'moderators'];
+    return ['dashboard', 'moderators', 'settings'];
   }
-  if (s.role === 'MEMBER') return ['nodes', 'team', 'settings'];
-  // Moderador (OWNER / CO_MODERATOR) → sistema completo de su workspace
-  return ['nodes', 'devices', 'users', 'team', 'monitor', 'settings'];
+  if (s.role === 'MEMBER') return ['nodes', 'team'];
+  // Moderador (OWNER / CO_MODERATOR) → sistema operativo de su workspace.
+  // NO ve Ajustes: el router ya viene configurado por el Administrador.
+  return ['nodes', 'devices', 'users', 'team', 'monitor'];
 }
 
 export const canSeeModule = (s: SessionUser | null | undefined, m: ModuleId) => visibleModules(s).includes(m);

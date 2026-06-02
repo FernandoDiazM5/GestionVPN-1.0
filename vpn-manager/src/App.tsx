@@ -22,7 +22,6 @@ function AppContent() {
     isReady,
 
     activeModule,
-    setActiveModule,
   } = useVpn();
 
   const [configAlert, setConfigAlert] = useState<string | null>(null);
@@ -71,17 +70,9 @@ function AppContent() {
           <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
             <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
             <div className="flex-1">
-              <p className="text-sm font-bold text-amber-800">Configuración requerida</p>
-              <p className="text-sm text-amber-700 mt-0.5">{configAlert}</p>
+              <p className="text-sm font-bold text-amber-800">Conexión al router no disponible</p>
+              <p className="text-sm text-amber-700 mt-0.5">{configAlert} El Administrador debe configurar el router core.</p>
             </div>
-            {credentials?.role === 'admin' && (
-              <button
-                onClick={() => { setActiveModule('settings'); setConfigAlert(null); }}
-                className="text-xs font-bold text-amber-700 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors shrink-0"
-              >
-                Ir a Ajustes
-              </button>
-            )}
           </div>
         )}
 
