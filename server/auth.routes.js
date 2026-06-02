@@ -78,8 +78,12 @@ router.post('/login', async (req, res) => {
     try {
         const { username, password } = loginSchema.parse(req.body);
 
+        let dbError = null;
+
         // 1) Usuario legacy (vpn_users/MySQL) por username
-        const row = await getUserByUsername(username).catch(() => null);
+        let row = null;
+        try { row = await getUserByUsername(username); }
+        catch (e) { dbError = e; }
         if (row && await bcrypt.compare(password, row.password_hash)) {
             const token = jwt.sign({ id: row.id, username: row.username, role: row.role }, JWT_SECRET, { expiresIn: '24h' });
             await attachRbacSession(res, row.username);
@@ -87,18 +91,27 @@ router.post('/login', async (req, res) => {
         }
 
         // 2) Usuario multi-tenant (MySQL): Moderador / Miembro por email
-        try {
-            const s = await authenticateMysqlUser(username, password);
-            if (s) {
-                setSessionCookie(res, s.token);
-                const legacyRole = s.user.role === 'MEMBER' ? 'viewer' : 'admin';
-                return res.json({
-                    success: true, message: 'Conectado exitosamente',
-                    token: s.token, user: s.user.email, role: legacyRole,
-                });
-            }
-        } catch (e) {
-            console.warn('[auth] login multi-usuario no disponible:', e.message);
+        if (!dbError) {
+            try {
+                const s = await authenticateMysqlUser(username, password);
+                if (s) {
+                    setSessionCookie(res, s.token);
+                    const legacyRole = s.user.role === 'MEMBER' ? 'viewer' : 'admin';
+                    return res.json({
+                        success: true, message: 'Conectado exitosamente',
+                        token: s.token, user: s.user.email, role: legacyRole,
+                    });
+                }
+            } catch (e) { dbError = e; }
+        }
+
+        // Distinguir BD caída de credenciales inválidas (evita el engañoso "contraseña incorrecta")
+        if (dbError) {
+            console.error('[auth] Base de datos no disponible en login:', dbError.code || dbError.message);
+            return res.status(503).json({
+                success: false, code: 'DB_UNAVAILABLE',
+                message: 'Servicio de base de datos no disponible. Verifica que MySQL (XAMPP) esté iniciado e inténtalo de nuevo.',
+            });
         }
 
         return res.status(401).json({ success: false, message: 'Usuario o contraseña incorrectos' });
