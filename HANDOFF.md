@@ -78,7 +78,7 @@
 |---|---|
 | 🟢 Resuelto | **O2 — Privacidad de repositorio** (secretos en commits viejos). ✅ Hacer el repo privado en GitHub → *Danger Zone* → *Change to private*. |
 | 🟢 Resuelto | **O5 — MySQL estable** (XAMPP, admin). ✅ Health checks cada 10s + reconexión automática si cae + pool mejorado. |
-| 🟡 Pendiente | **Revisión en navegador** de los cambios UX (quedó interrumpida al abrir Chrome MCP). |
+| 🟢 Resuelto | **UX P6 — Escanear fase 2** (celdas internas, badges Rol AP/CPE, colores light-only, dark mode completo). ✅ Tamaño mínimo text-xs, .text-2xs para badges. |
 | 🟡 Mejora | **Escanear fase 2**: celdas internas de la tabla (`text-[9px]`, colores light-only en filas), badges Rol AP/CPE, barras de señal por intención. |
 | 🟢 Nota | WireGuard de miembro es **best-effort** (depende del router 192.168.21.1, intermitente). |
 | 🟢 Nota | Docker instalado pero su **engine no arranca** (WSL2/virtualización) → Semgrep no pudo correr. |
