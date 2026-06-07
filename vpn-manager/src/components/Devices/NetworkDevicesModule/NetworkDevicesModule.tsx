@@ -971,7 +971,7 @@ export default function NetworkDevicesModule() {
               <div style={{ minWidth: `${minTableWidth}px` }}>
 
                 <div
-                  className="bg-slate-100 border-b border-slate-200 text-2xs sm:text-xs font-bold text-slate-500 uppercase tracking-wider rounded-tl-xl rounded-tr-xl dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400"
+                  className="bg-slate-100 border-b border-slate-200 text-xs font-bold text-slate-600 uppercase tracking-wider rounded-tl-xl rounded-tr-xl dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300"
                   style={{ display: 'grid', gridTemplateColumns: gridTemplate }}
                 >
                   <div className="px-3 py-3 text-center">SSH</div>
@@ -1065,22 +1065,22 @@ export default function NetworkDevicesModule() {
 
                         <div className="px-3 py-2.5">
                           {(isAp || isSta) ? (
-                            <span className={`inline-flex text-[10px] font-bold px-1.5 py-0.5 rounded-md
-                            ${isAp ? 'bg-indigo-100 text-indigo-700' : 'bg-violet-100 text-violet-700'}`}>
+                            <span className={`inline-flex text-2xs font-bold px-1.5 py-0.5 rounded-md
+                            ${isAp ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-400' : 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-400'}`}>
                               {isAp ? 'AP' : 'CPE'}
                             </span>
                           ) : rawMode && rawMode !== 'unknown' ? (
-                            <span className="inline-flex text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500">
+                            <span className="inline-flex text-2xs font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 dark:bg-slate-700/50 dark:text-slate-300">
                               {String(rawMode).toUpperCase()}
                             </span>
                           ) : (
                             <span
-                              className="text-[10px] text-slate-300"
+                              className="text-2xs text-slate-400 dark:text-slate-500"
                               title="Modo no detectado"
                             >—</span>
                           )}
                           {freqGhz && (
-                            <p className={`text-[9px] font-bold mt-0.5 ${freq! >= 5000 ? 'text-sky-600' : 'text-amber-600'}`}>
+                            <p className={`text-2xs font-bold mt-0.5 ${freq! >= 5000 ? 'text-sky-600 dark:text-sky-400' : 'text-amber-600 dark:text-amber-400'}`}>
                               {freqGhz}G
                             </p>
                           )}
@@ -1093,20 +1093,20 @@ export default function NetworkDevicesModule() {
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
                             title={`Abrir http://${dev.ip}`}
-                            className="font-mono text-sm font-semibold text-slate-700 hover:text-sky-600 hover:underline truncate block"
+                            className="font-mono text-sm font-semibold text-slate-700 hover:text-sky-600 hover:underline truncate block dark:text-slate-200 dark:hover:text-sky-400"
                           >{dev.ip}</a>
                           {displayMac
-                            ? <p className="font-mono text-[9px] text-slate-400 truncate">{displayMac}</p>
-                            : <p className="text-[9px] text-amber-500">SSH-only</p>
+                            ? <p className="font-mono text-2xs text-slate-500 truncate dark:text-slate-400">{displayMac}</p>
+                            : <p className="text-2xs text-amber-600 dark:text-amber-400 font-semibold">SSH-only</p>
                           }
                         </div>
 
                         <div className="px-3 py-3 min-w-0 pr-3">
                           {displayName && displayName !== dev.ip
-                            ? <p className="text-sm font-bold text-slate-700 truncate" title={displayName}>{displayName}</p>
-                            : <p className="text-sm font-semibold text-slate-400 truncate font-mono" title={dev.ip}>{dev.ip}</p>
+                            ? <p className="text-sm font-bold text-slate-700 truncate dark:text-slate-200" title={displayName}>{displayName}</p>
+                            : <p className="text-sm font-semibold text-slate-500 truncate font-mono dark:text-slate-400" title={dev.ip}>{dev.ip}</p>
                           }
-                          <p className="text-[10px] text-slate-400 truncate" title={displayModel}>{displayModel || '—'}</p>
+                          <p className="text-2xs text-slate-500 truncate dark:text-slate-400" title={displayModel}>{displayModel || '—'}</p>
                         </div>
 
                         {activeConfigCols.map(col => (

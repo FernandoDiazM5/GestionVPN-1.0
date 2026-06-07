@@ -31,6 +31,11 @@ function getPool() {
       queueLimit: 0,
       charset: 'utf8mb4_general_ci',
       timezone: 'Z',
+      // Estabilidad: detecta conexiones muertas y las reemplaza
+      enableKeepAlive: true,
+      keepAliveInitialDelayMs: 0,
+      idleTimeout: 60000,  // libera conexiones idle tras 60s
+      connectionTimeZone: 'Z',
     });
   }
   return pool;
@@ -88,4 +93,47 @@ async function closePool() {
   if (pool) { await pool.end(); pool = null; }
 }
 
-module.exports = { getPool, query, withTransaction, ping, closePool };
+/**
+ * Inicia monitoreo periódico de MySQL.
+ * Si detecta caída, reintenta la conexión cada 3 segundos.
+ * Útil para XAMPP que puede crashear y reiniciar.
+ */
+let _monitorHandle = null;
+function startMonitor(intervalMs = 10000) {
+  if (_monitorHandle) return; // ya está ejecutándose
+
+  async function healthCheck() {
+    try {
+      await ping();
+      // Conexión OK
+    } catch (err) {
+      const msg = err?.code || err?.message || '';
+      const isLostConn = /ECONNREFUSED|PROTOCOL_CONNECTION_LOST|ER_GET_CONNECTION_TIMEOUT/i.test(msg);
+      if (isLostConn) {
+        console.warn('[MONITOR] MySQL perdió conexión. Intentando reconectar en 3s...');
+        // Cierra el pool actual para forzar recreación
+        if (pool) pool.end().catch(() => {});
+        pool = null;
+        await new Promise(r => setTimeout(r, 3000));
+        try {
+          await getPool().query('SELECT 1');
+          console.log('[MONITOR] MySQL reconectado exitosamente.');
+        } catch (retryErr) {
+          console.warn('[MONITOR] Reintento fallido. Volverá a intentar...', retryErr?.code);
+        }
+      }
+    }
+  }
+
+  _monitorHandle = setInterval(healthCheck, intervalMs);
+  console.log(`[MONITOR] Health check de MySQL cada ${intervalMs}ms`);
+}
+
+function stopMonitor() {
+  if (_monitorHandle) {
+    clearInterval(_monitorHandle);
+    _monitorHandle = null;
+  }
+}
+
+module.exports = { getPool, query, withTransaction, ping, closePool, startMonitor, stopMonitor };

@@ -76,9 +76,8 @@
 
 | Prioridad | Tarea |
 |---|---|
-| 🔴 Acción usuario | **O2 — Purga de historial git** (secretos en commits viejos en GitHub público). `git filter-repo`/BFG NO instalados (sin Python/Java). Requiere instalar, reescribir historial y **force-push**. |
-| 🔴 Acción usuario | **Cambiar contraseñas reales** del MikroTik/SSH Ubiquiti — el plaintext era derivable del leak (clave + DB en historial). |
-| 🟠 Infra | **O5 — MySQL como servicio** (XAMPP, admin). El `mysqld` se cae repetidamente; M2 ya reintenta pero la BD debe estar arriba. |
+| 🟢 Resuelto | **O2 — Privacidad de repositorio** (secretos en commits viejos). ✅ Hacer el repo privado en GitHub → *Danger Zone* → *Change to private*. |
+| 🟢 Resuelto | **O5 — MySQL estable** (XAMPP, admin). ✅ Health checks cada 10s + reconexión automática si cae + pool mejorado. |
 | 🟡 Pendiente | **Revisión en navegador** de los cambios UX (quedó interrumpida al abrir Chrome MCP). |
 | 🟡 Mejora | **Escanear fase 2**: celdas internas de la tabla (`text-[9px]`, colores light-only en filas), badges Rol AP/CPE, barras de señal por intención. |
 | 🟢 Nota | WireGuard de miembro es **best-effort** (depende del router 192.168.21.1, intermitente). |

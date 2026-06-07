@@ -47,6 +47,7 @@ const allowedOrigins = process.env.CORS_ORIGINS
 
 const authRoutes = require('./auth.routes');
 const { verifyToken } = require('./auth.middleware');
+const { startMonitor } = require('./db/mysql');
 
 app.use(cors({
     origin: (origin, callback) => {
@@ -98,6 +99,8 @@ function startServer(attempt = 1) {
         console.log(`  http://localhost:${PORT}`);
         console.log(`  MySQL listo | Intento ${attempt}`);
         console.log(`==============================================\n`);
+        // Inicia monitoreo de salud de MySQL cada 10 segundos
+        startMonitor(10000);
     });
 
     server.on('error', (err) => {

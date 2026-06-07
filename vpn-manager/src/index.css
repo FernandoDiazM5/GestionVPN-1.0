@@ -82,6 +82,11 @@
 }
 
 @layer utilities {
+  /* Escala de texto — respeta limites de DESIGN_SYSTEM.md */
+  .text-2xs {
+    @apply text-[11px] leading-tight;
+  }
+
   .card {
     @apply bg-white border border-slate-200 shadow-sm rounded-2xl
            dark:bg-slate-900 dark:border-slate-800;
