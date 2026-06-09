@@ -672,13 +672,36 @@ e2e/
 playwright.config.ts         — chromium-only, webServer auto-levanta Vite
 ```
 
-### Cobertura objetivo
+### Cobertura
 
-| Capa | Inicial (F3) | F4 objetivo |
-|------|--------------|-------------|
-| Backend | 0% | ≥ 60% en `routes/`, `lib/`, `middleware/`, `db/repos/` |
-| Frontend | 0% | ≥ 40% en `components/`, `services/` |
-| E2E | 1 smoke | 3-5 happy paths (login, invitar, reset password) |
+| Capa | Inicial (F3) | Actual (F4) | F8/F11 objetivo |
+|------|--------------|-------------|-----------------|
+| Backend | 0% | **5.4% líneas, 53.8% branches** | ≥ 60% lines tras splits |
+| Frontend | 0% | **~5% líneas, ~50% branches** | ≥ 40% lines |
+| E2E | 1 smoke | 1 smoke | 3-5 happy paths |
+
+### Suites por área (F4)
+
+**Backend (55 tests):**
+- `unit/wgkeys.test.js` (8) — `generateKeyPair`, `buildClientConf` defaults + overrides
+- `unit/crypto.test.js` (5, skip si no hay `.db_secret`) — round-trip AES-256-GCM
+- `unit/passwordResetRepo.test.js` (12) — generación token, lookup hash, single-use, anti-replay
+- `unit/tenantScope.test.js` (19) — RBAC: `reqWorkspace`, `ownedGroupIntIds`, `ownsGroupUuid`, `cpeForeign`
+- `integration/passwordReset.test.js` (8, supertest) — flujo HTTP `/api/auth/password-reset/*` con anti-enumeración
+
+**Frontend (37 tests):**
+- `test/smoke.test.tsx` (4) — canaries jsdom + TL + matchers
+- `test/providers.test.tsx` (1) — wrapper con `VpnProvider` + `WorkspaceSessionProvider`
+- `utils/permissions.test.ts` (18) — RBAC: `visibleModules`, `canSeeModule`, action predicates
+- `services/sessionClient.test.ts` (9) — `auth_expired` dispatch en 401 con USER_DELETED/SESSION_EXPIRED/NO_SESSION, NO en endpoints públicos
+- `components/Users/.../WgConfigModal.test.tsx` (5) — render con .conf vs null, botones, errores
+
+### Bugs reales descubiertos por los tests
+
+| # | Bug | Fix | Test que lo encontró |
+|---|-----|-----|----------------------|
+| 1 | Compatibilidad zod v4 (`err.errors` → `err.issues`) | `auth.routes.js`: `(err.issues || err.errors)` en los 4 catches | `passwordReset.test.js` |
+
 
 ### CI
 

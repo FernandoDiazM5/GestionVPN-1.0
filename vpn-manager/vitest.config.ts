@@ -32,7 +32,8 @@ export default defineConfig({
         'src/vite-env.d.ts',
         'src/main.tsx',
       ],
-      thresholds: { lines: 0, functions: 0, branches: 0, statements: 0 },
+      // Thresholds tras F4 (suaves). F8/F10 los suben.
+      thresholds: { lines: 5, functions: 5, branches: 50, statements: 5 },
     },
   },
 });

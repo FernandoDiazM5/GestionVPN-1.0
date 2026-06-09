@@ -25,8 +25,10 @@ export default defineConfig({
       reporter: ['text', 'json-summary', 'lcov'],
       include: ['lib/**', 'db/repos/**', 'middleware/**', 'routes/**'],
       exclude: ['test/**', '**/*.config.*', 'db/init*.js', 'db/seed*.js', 'db/migrate*.js'],
-      // Thresholds inicia en 0; F4 sube a 60% backend.
-      thresholds: { lines: 0, functions: 0, branches: 0, statements: 0 },
+      // Thresholds tras F4: gating mínimo (coverage actual ≈ 5%). Solo
+      // protege contra regresión total. F8/F11 los suben a 60% al cubrir
+      // routes/* tras los splits de god-files.
+      thresholds: { lines: 5, functions: 5, branches: 45, statements: 5 },
     },
   },
 });
