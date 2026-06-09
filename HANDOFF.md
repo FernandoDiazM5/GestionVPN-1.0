@@ -512,6 +512,58 @@ Los scripts CLI (`db/initRbac.js`, `db/initMultiuser.js`, `db/mapUserMgmtIp.js`,
 
 ---
 
+## 15) 🔒 Seguridad — Headers HTTP y cookies (FASE 2 del REFACTOR_PLAN)
+
+Backend Express con **helmet** + **CORS** + **cookies HttpOnly**, configurado para API-only.
+
+### Headers aplicados por helmet
+
+| Header | Valor | Por qué |
+|--------|-------|---------|
+| `Content-Security-Policy` | `default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'` | Si el JSON de la API llega a renderizar como HTML (atacante intentando inyección), no carga nada |
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains; preload` (solo prod) | Fuerza HTTPS en navegador por 1 año. **Deshabilitado en dev** para no romper `http://localhost` |
+| `X-Frame-Options` | `DENY` | Anti-clickjacking (legacy, complementa `frame-ancestors`) |
+| `X-Content-Type-Options` | `nosniff` | El navegador respeta el `Content-Type` enviado |
+| `Cross-Origin-Resource-Policy` | `same-site` | Permite que el frontend (`:5173`) consuma la API (`:3001`) |
+| `Cross-Origin-Opener-Policy` | _(no enviado)_ | Innecesario para API JSON; activarlo rompe popups OAuth |
+| `Cross-Origin-Embedder-Policy` | _(no enviado)_ | Innecesario para API |
+| `Referrer-Policy` | `no-referrer` | No filtramos URLs internas vía Referer |
+| `X-Powered-By` | _(removido)_ | No anunciamos "Express" |
+
+### Cookies HttpOnly
+
+[server/lib/jwt.js](server/lib/jwt.js)
+
+```js
+{
+  httpOnly: true,                           // anti-XSS: no accesible desde JS
+  sameSite: 'lax',                          // anti-CSRF en navegación normal
+  secure: process.env.NODE_ENV === 'production',  // solo HTTPS en prod
+  path: '/',                                // toda la API
+  maxAge: 8h,                               // JWT_EXPIRES configurable via env
+}
+```
+
+> **`clearSessionCookie` replica los mismos atributos** que el set para que el navegador efectivamente borre la cookie. Sin esto, algunos navegadores dejaban cookie residual.
+
+### Resto de defensas ya en el proyecto
+
+- **CORS allowlist** ([index.js](server/index.js)): `defaultOrigins` + `CORS_ORIGINS` env. Bloquea cross-origin no permitidos (con log estructurado del bloqueo).
+- **Credenciales cifradas en BD** (`crypto.js` AES-256-GCM con `.db_secret`).
+- **Logger con redact** de passwords/tokens/secrets/private_keys (ver §14).
+- **Rate limiting** (`auth_attempts`): 5 fallos en 15 min → 429.
+- **Auth cache LRU** con `USER_DELETED` para deslogueo automático al borrar usuario.
+- **Anti-enumeración** en password reset (mensaje genérico siempre).
+- **Hard-delete cascada** sin dejar peers/mangle huérfanos en MikroTik.
+
+### Pendientes futuros (post-refactor)
+
+- HTTPS real en producción (cert + reverse proxy nginx).
+- Anti-CSRF token explícito en formularios sensibles (sameSite=lax cubre la mayoría pero no el 100%).
+- Auditoría con `semgrep --config p/security-audit` (planeada en FASE 12).
+
+---
+
 ## ⚡ Arranque rápido
 
 1. XAMPP **MySQL** arriba (idealmente como servicio).
