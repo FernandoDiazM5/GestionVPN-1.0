@@ -36,7 +36,7 @@ Refactor **incremental** en 13 fases, manteniendo SIEMPRE la app funcionando. Ca
 | # | Fase | Días | Riesgo | Bloquea a |
 |---|------|------|--------|-----------|
 | **0** ✅ | Preparación: limpieza + CI básico | 1 | 🟢 Bajo | Todas |
-| **1** | Logger estructurado (pino) | 1 | 🟢 Bajo | F4, F9 |
+| **1** ✅ | Logger estructurado (pino) | 1 | 🟢 Bajo | F4, F9 |
 | **2** | Headers de seguridad (helmet) + audit | 0.5 | 🟢 Bajo | — |
 | **3** | Setup completo de testing | 2 | 🟢 Bajo | F4, F5, F6, F7, F8 |
 | **4** | Tests de endpoints críticos | 3 | 🟢 Bajo | F5, F6, F7 |

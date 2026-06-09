@@ -434,6 +434,84 @@ GET    /api/team/wireguard/by-key/:publicKey
 
 ---
 
+## 14) 📋 Logs (FASE 1 del REFACTOR_PLAN)
+
+A partir de la FASE 1, todo el backend usa **`pino`** (logger estructurado JSON con formato pretty en dev) en lugar de `console.*`.
+
+### Niveles
+
+| Nivel | Cuándo usarlo |
+|-------|---------------|
+| `trace` | Debug muy verboso (raw bytes RouterOS, dump SQL). No usado por defecto. |
+| `debug` | Decisiones internas, paths tomados (auto-SSH éxito, idempotente "ya existe", KEEPALIVE OK) |
+| `info`  | Eventos normales (login, invite enviado, mangle creada, server escuchando) |
+| `warn`  | Recuperables (router timeout, retry, OTP malo, monitor MySQL reintento) |
+| `error` | Fallos que afectan al usuario (500, BD caída, hook crash, CONNECT fallo) |
+| `fatal` | Panic imposible de recuperar (port collision, secret missing) |
+
+### Configuración
+
+| Variable env | Default | Efecto |
+|--------------|---------|--------|
+| `NODE_ENV` | `development` | En `production` usa JSON crudo (más rápido + ingest directo) |
+| `LOG_LEVEL` | `debug` en dev / `info` en prod | Filtra por nivel mínimo |
+
+### Convención de uso
+
+```js
+const log = require('./lib/logger').child({ scope: 'mi-modulo' });
+
+log.info({ userId, action }, 'Mensaje corto');
+log.warn({ err: e.message }, 'Operación falló pero seguimos');
+log.error({ err }, 'Error crítico');
+```
+
+> **Patrón:** primer argumento = objeto con datos estructurados, segundo = mensaje en español.
+
+### Redact (campos sensibles ocultados como `[REDACTED]`)
+
+Configurado en [server/lib/logger.js](server/lib/logger.js). Cualquier campo (top-level o anidado) con uno de estos nombres se redacta automáticamente:
+
+```
+password, currentPassword, newPassword, password_hash
+otp, otp_hash, token, secret, secret_key, privateKey
+ppp_password_enc, ssh_pass_enc, clave_ssh_enc, wifi_password_enc, config_enc
+req.headers.authorization, req.headers.cookie
+```
+
+> En modo DEV los OTPs/tokens se ven en consola porque van como `code` o dentro de `resetUrl` (no como `token` separado).
+
+### pino-http: req/res automáticos
+
+`pinoHttp` middleware en [server/index.js](server/index.js) genera:
+- Un `reqId` UUID por cada request (también acepta `x-request-id` del cliente)
+- Log automático al terminar cada response con: `method`, `url`, `statusCode`, `responseTime`
+- Nivel ajustado por status: 2xx/3xx → `info`, 4xx → `warn`, 5xx → `error`
+- Silencia `/api/health` para no inundar el log con polling
+
+Cada ruta puede usar `req.log.info({...})` para que el reqId aparezca automáticamente en sus logs.
+
+### Filtrado en producción
+
+Como el log es JSON, se puede grepear/jq con precisión:
+
+```bash
+# Todos los WARN de routeros
+node index.js | jq 'select(.scope == "routeros" and .level == "warn")'
+
+# Solo errores con duración > 1s
+node index.js | jq 'select(.level == "error" and .responseTime > 1000)'
+
+# Buscar la request con id concreto
+node index.js | jq 'select(.reqId == "abc-123")'
+```
+
+### Excepción: scripts CLI
+
+Los scripts CLI (`db/initRbac.js`, `db/initMultiuser.js`, `db/mapUserMgmtIp.js`, `db/migrateSqliteToMysql.js`, `db/rotateSecrets.js`, `db/seedRoles.js`) **mantienen** `console.*` con formato custom (✓, ✗, indentación) porque están pensados para UX en terminal del operador, no para ingesta automática.
+
+---
+
 ## ⚡ Arranque rápido
 
 1. XAMPP **MySQL** arriba (idealmente como servicio).
