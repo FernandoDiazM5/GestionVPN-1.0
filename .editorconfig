@@ -1,0 +1,29 @@
+# EditorConfig — https://editorconfig.org
+# Estandariza encoding, line-endings e indentación para todos los editores.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# Lockfiles: no formatear (los gestiona el package manager)
+[{package-lock.json,yarn.lock,pnpm-lock.yaml}]
+indent_size = unset
+insert_final_newline = unset
+
+# Markdown: respetar trailing whitespace (dos espacios = <br>)
+[*.md]
+trim_trailing_whitespace = false
+
+# SQL: indent 4 (convención común en DDL/queries largas)
+[*.sql]
+indent_size = 4
+
+# Makefiles: SIEMPRE tab (sintaxis lo exige)
+[{Makefile,*.mk}]
+indent_style = tab
