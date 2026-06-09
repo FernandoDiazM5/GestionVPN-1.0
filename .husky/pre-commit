@@ -1,0 +1,30 @@
+#!/usr/bin/env sh
+# Pre-commit hook (Husky 9)
+#
+# Estrategia:
+#  1) lint-staged: eslint --fix sobre archivos staged del frontend +
+#     node --check sobre archivos staged del backend. RÁPIDO.
+#  2) Si hay archivos *.ts/*.tsx staged → tsc --noEmit full sobre vpn-manager.
+#     tsc no se puede correr por archivo (necesita todo el grafo). LENTO (~5s).
+#
+# Para saltar el hook puntualmente: git commit --no-verify
+
+# 1) lint-staged
+npx lint-staged
+LINT_STATUS=$?
+if [ $LINT_STATUS -ne 0 ]; then
+  echo "❌ lint-staged falló"
+  exit $LINT_STATUS
+fi
+
+# 2) tsc --noEmit si hay cambios en frontend TypeScript
+STAGED_TS=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '^vpn-manager/.*\.(ts|tsx)$' || true)
+if [ -n "$STAGED_TS" ]; then
+  echo "→ tsc --noEmit (vpn-manager)…"
+  (cd vpn-manager && npx tsc --noEmit) || {
+    echo "❌ tsc reportó errores. Corrige antes de commitear."
+    exit 1
+  }
+fi
+
+echo "✅ pre-commit OK"
