@@ -2,8 +2,9 @@
 
 > Documento de migración de contexto entre sesiones.
 > Rama de trabajo: **`dev`** · Remote: `github.com/FernandoDiazM5/GestionVPN-1.0`.
-> Última actualización (2026-06-07 PM ext.): **Ajustes del moderador (perfil + workspace + import/export JSON) + Recuperar contraseña + sync MikroTik al deshabilitar + invitaciones por email + .conf WG server-side** (sesión PM extendida).
-> Sesión AM: multi-usuario con aislamiento por sesión (mangle por-IP), parche `!empty` node-routeros, auditoría (Semgrep+security-review+code-review) y fixes C1–C7.
+> Última actualización (2026-06-09): **REFACTOR_PLAN fases 0-4 ejecutadas** (preparación, logger pino, helmet, setup testing, 92 tests escritos). Ver §17 y `REFACTOR_PLAN.md`.
+> Sesión 2026-06-07 PM: Ajustes del moderador (perfil + workspace + import/export JSON) + Recuperar contraseña + sync MikroTik al deshabilitar + invitaciones por email + .conf WG server-side.
+> Sesión 2026-06-07 AM: multi-usuario con aislamiento por sesión (mangle por-IP), parche `!empty` node-routeros, auditoría (Semgrep+security-review+code-review) y fixes C1–C7.
 > Resumen extendido en `RESUMEN_CONTEXTO_MAESTRO.md`.
 
 ---
@@ -710,6 +711,67 @@ playwright.config.ts         — chromium-only, webServer auto-levanta Vite
 - **backend job:** `node --check` + `npm test` (Vitest)
 - **frontend job:** `tsc --noEmit` + `eslint` + `npm test` (Vitest)
 - E2E NO está en CI todavía (instalación de Chromium pesada — F4 evalúa)
+
+---
+
+## 17) 🛠️ Estado del REFACTOR_PLAN
+
+Sesión 2026-06-09 ejecutó las fases 0-4 del plan de refactor incremental
+(ver [`REFACTOR_PLAN.md`](./REFACTOR_PLAN.md) para el detalle completo).
+
+### Fases completadas
+
+| Fase | Estado | Commits | Resultado |
+|------|--------|---------|-----------|
+| **F0** Preparación | ✅ | 7 | `.editorconfig`, husky + lint-staged pre-commit, GitHub Actions CI, README "Contribuir", ESLint thresholds documentados |
+| **F1** Logger estructurado | ✅ | 8 | `pino@9` + `pino-http@10` + `pino-pretty@11` (dev). [server/lib/logger.js](server/lib/logger.js) con redact de password/token/secret/private_key/cookie/authorization. **0 `console.*`** en código productivo del backend (excepto scripts CLI en `db/init*.js`, `db/seed*.js`, etc.) |
+| **F2** Headers de seguridad | ✅ | 4 | `helmet@8` con CSP API-only (`default-src 'none'`), HSTS solo en prod, COOP/COEP off para no romper CORS, `crossOriginResourcePolicy: same-site`. Cookies con `secure` automático en prod + `sameSite: lax`, helper `cookieBaseOptions()` garantiza que `clearSessionCookie` borra de verdad |
+| **F3** Setup de testing | ✅ | 6 | Vitest 2 (backend + frontend), Supertest, Testing Library, MSW, jsdom, Playwright. Mocks (`routeros`, `mailer`, `mysql`), factories, helper `stubModule` para CJS, render wrapper con providers reales. CI corre Vitest en ambos jobs |
+| **F4** Tests críticos | ✅ | 7 | **92 tests verde** (55 backend + 37 frontend). Suites: `wgkeys`, `crypto`, `passwordResetRepo`, `tenantScope`, `password-reset/*` (supertest), `permissions`, `sessionClient` (auth_expired), `WgConfigModal`. Thresholds suaves (5% lines / 45% branches) — F8/F11 los suben a 60% |
+
+### Fases pendientes
+
+| Fase | Estado | Estimación | Bloquea a |
+|------|--------|------------|-----------|
+| **F5** Unificar API client + contratos Zod compartidos | ⏳ | 3 días 🟠 | F6, F7, F8 |
+| **F6** Split `node.routes.js` (1264 LOC) | ⏳ | 2 días 🟠 | — |
+| **F7** Split `core.routes.js` (935 LOC) | ⏳ | 2 días 🟠 | — |
+| **F8** Split `NetworkDevicesModule.tsx` (1313 LOC) | ⏳ | 3 días 🟠 | F10 |
+| **F9** Health check enriquecido + métricas Prometheus | ⏳ | 1 día 🟢 | — |
+| **F10** Code-splitting frontend (lazy modules) | ⏳ | 1 día 🟢 | — |
+| **F11** Performance MySQL (índices + prepared) | ⏳ | 1 día 🟠 | — |
+| **F12** Audit pass final + docs | ⏳ | 1 día 🟢 | — |
+
+### Bugs reales arreglados durante el refactor
+
+| # | Bug | Fix | Encontrado por |
+|---|-----|-----|----------------|
+| 1 | Compatibilidad zod v4 — `err.errors` ya no existe, ahora es `err.issues`. Los errores de validación caían al return genérico 200 OK silencioso | `(err.issues \|\| err.errors)` en los 4 catches de [auth.routes.js](server/auth.routes.js) | F4 — `passwordReset.test.js > email mal formado → 400` |
+| 2 | `pre-commit` (lint-staged) fallaba en Windows con paths absolutos | `npx eslint --config vpn-manager/eslint.config.js --fix` sin `cd` | F3.3 al commitear tests frontend |
+
+### Decisiones técnicas documentadas
+
+- **Vitest + CJS**: `vi.mock` con destructuring imports no normaliza paths relativos entre archivos. Solución: helper `test/helpers/moduleMock.js` con `stubModule(fromDir, modulePath, exports)` que inyecta en `require.cache` por path absoluto.
+- **Cooldown sessionClient**: 3s entre disparos de `auth_expired`. Tests usan `vi.useFakeTimers({ shouldAdvanceTime: true })` + `advanceTimersByTime(3500)` en `afterEach`.
+- **MSW + endpoints públicos**: tests del `sessionClient` validan explícitamente que `/api/auth/login`, `/api/team/accept` y `/api/auth/password-reset/*` NO disparan `auth_expired` aunque devuelvan códigos de sesión inválida.
+- **ESLint deuda preexistente**: 88 warnings mapeados a fases futuras del REFACTOR_PLAN (`no-explicit-any` → F5, `exhaustive-deps` → F4 (parcial), etc.). Ver [vpn-manager/eslint.config.js](vpn-manager/eslint.config.js).
+- **Scripts CLI mantienen `console.*`**: `db/initRbac.js`, `db/initMultiuser.js`, `db/mapUserMgmtIp.js`, `db/migrateSqliteToMysql.js`, `db/rotateSecrets.js`, `db/seedRoles.js`. Formato custom (✓, ✗, indentación) para UX en terminal — no para ingesta automática.
+
+### Métricas comparativas (antes vs ahora)
+
+| Métrica | Pre-refactor | Post F0-F4 |
+|---------|--------------|------------|
+| Tests automatizados | 0 | **92** |
+| `console.*` en backend productivo | ~80 | **0** (solo scripts CLI documentados) |
+| Headers de seguridad HTTP | Solo CORS | Helmet completo (CSP, X-Frame-Options, HSTS prod, CORP) |
+| Pre-commit gate | Ninguno | `lint-staged` + `tsc --noEmit` |
+| CI | Ninguno | GitHub Actions: tsc + eslint + Vitest backend + Vitest frontend |
+| Logger estructurado | ❌ console | ✅ pino con redact + request-id |
+| `.env`/secrets en logs | Riesgo | Redactado por logger |
+| Cobertura backend | 0% | 5.4% lines, **53.8% branches** |
+| Cobertura frontend | 0% | ~5% lines, ~50% branches |
+| README "Contribuir" | Ninguno | Setup + flujo + scripts + convenciones |
+| Archivos basura en `src/` | `VpnContext.backup.tsx` (412 LOC) | Eliminado |
 
 ---
 
