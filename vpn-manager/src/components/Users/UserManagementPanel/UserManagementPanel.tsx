@@ -1,4 +1,5 @@
-import { Users, UserPlus, RefreshCw, Bell, X, WifiOff } from 'lucide-react';
+import { useState } from 'react';
+import { Users, RefreshCw, Bell, X, WifiOff } from 'lucide-react';
 import { useVpn } from '../../../context';
 import type { WgPeer } from '../../../types/api';
 import {
@@ -7,9 +8,8 @@ import {
   useWireGuardState,
   useWireGuardPeers,
 } from '../../Devices/NodeAccessPanel/hooks';
-import { NuevoAdmin } from '../../Devices/NodeAccessPanel/modals';
-import AdminPeersManager from './components/AdminPeersManager';
 import UsersTable from './components/UsersTable';
+import WgConfigModal from './components/WgConfigModal';
 
 const VPS_IP = '192.168.21.60';
 
@@ -26,13 +26,12 @@ export default function UserManagementPanel() {
 
   const {
     wgPeers, setWgPeers, loadingWg, setLoadingWg, wgError, setWgError,
-    showNuevoAdmin, setShowNuevoAdmin, peersExpanded, setPeersExpanded,
-    peerColors, setPeerColors, colorPickerAddr, setColorPickerAddr,
+    peerColors, setPeerColors, setColorPickerAddr,
     editingPeerId, setEditingPeerId, editingPeerName, setEditingPeerName,
     savingPeerName, setSavingPeerName, copiedPeerId, setCopiedPeerId, wgLoadedRef,
   } = wgState;
 
-  const { loadWgPeers, savePeerColor, savePeerName, copyWgConfig } = useWireGuardPeers({
+  const { loadWgPeers, savePeerName } = useWireGuardPeers({
     credentials,
     wgLoadedRef,
     setWgPeers,
@@ -54,6 +53,9 @@ export default function UserManagementPanel() {
     savingPeerName,
   });
 
+  // Peer cuyo .conf se está mostrando en el modal
+  const [wgModalPeer, setWgModalPeer] = useState<WgPeer | null>(null);
+
   // Solo administradores humanos (excluye el VPS)
   const adminPeers = wgPeers.filter(p => p.allowedAddress !== VPS_IP);
 
@@ -73,13 +75,6 @@ export default function UserManagementPanel() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={() => setShowNuevoAdmin(true)}
-            className="btn-success px-4 py-2.5 flex items-center gap-2 text-sm"
-          >
-            <UserPlus className="w-4 h-4" />
-            <span>Nuevo Administrador</span>
-          </button>
           <button
             onClick={loadWgPeers}
             disabled={loadingWg}
@@ -106,30 +101,6 @@ export default function UserManagementPanel() {
         </div>
       )}
 
-      {/* ── Acceso administrador (bloque movido desde Nodos) ── */}
-      <AdminPeersManager
-        adminPeers={adminPeers}
-        loadingWg={loadingWg}
-        peerColors={peerColors}
-        serverEndpointIP={serverEndpointIP}
-        setServerEndpointIP={setServerEndpointIP}
-        serverListenPort={serverListenPort}
-        setServerListenPort={setServerListenPort}
-        peersExpanded={peersExpanded}
-        setPeersExpanded={setPeersExpanded}
-        colorPickerAddr={colorPickerAddr}
-        setColorPickerAddr={setColorPickerAddr}
-        editingPeerId={editingPeerId}
-        setEditingPeerId={setEditingPeerId}
-        editingPeerName={editingPeerName}
-        setEditingPeerName={setEditingPeerName}
-        savingPeerName={savingPeerName}
-        copiedPeerId={copiedPeerId}
-        onSavePeerColor={savePeerColor}
-        onSavePeerName={savePeerName}
-        onCopyConfig={copyWgConfig}
-      />
-
       {/* ── Tabla de usuarios ── */}
       <UsersTable
         peers={adminPeers}
@@ -143,16 +114,12 @@ export default function UserManagementPanel() {
         onCancelEdit={() => setEditingPeerId(null)}
         onChangeEditName={setEditingPeerName}
         onSavePeerName={savePeerName}
-        onCopyConfig={copyWgConfig}
+        onCopyConfig={setWgModalPeer}
       />
 
-      {/* ── Modal nuevo administrador ── */}
-      {showNuevoAdmin && (
-        <NuevoAdmin
-          peers={wgPeers}
-          onClose={() => setShowNuevoAdmin(false)}
-          onSuccess={(newPeer) => { setWgPeers(prev => [...prev, newPeer]); setShowNuevoAdmin(false); }}
-        />
+      {/* ── Modal con la configuración WireGuard completa ── */}
+      {wgModalPeer && (
+        <WgConfigModal peer={wgModalPeer} onClose={() => setWgModalPeer(null)} />
       )}
 
       {/* ── Toasts ── */}

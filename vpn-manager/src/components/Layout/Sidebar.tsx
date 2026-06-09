@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  Radio, Cpu, Users, UsersRound, Activity, Settings, LayoutDashboard, UserCog,
+  Radio, Cpu, Users, Briefcase, Activity, Settings, LayoutDashboard, UserCog,
   LogOut, ChevronLeft, Menu, X, Wifi, Server, Sun, Moon,
 } from 'lucide-react';
 import { useVpn } from '../../context';
@@ -37,7 +37,7 @@ const NAV: NavGroup[] = [
     category: 'Acceso',
     items: [
       { id: 'users', label: 'Usuarios', icon: Users },
-      { id: 'team', label: 'Equipo', icon: UsersRound },
+      { id: 'team', label: 'Equipo', icon: Briefcase },
     ],
   },
   {

@@ -148,10 +148,10 @@ export default function NodeAccessPanel() {
         setGlobalServerIP={setGlobalServerIP}
         setEditingGlobalIP={setEditingGlobalIP}
         onNewNode={() => setShowNuevoNodo(true)}
-        onBatchCsv={() => setShowBatchCsv(true)}
         onRefresh={handleLoadNodes}
         isLoading={isLoading}
         hasLoaded={hasLoaded}
+        showServerIP={showCoreInfra}
       />
 
       {/* ── StateIndicators ── */}

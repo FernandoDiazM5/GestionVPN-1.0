@@ -29,8 +29,9 @@ export function visibleModules(s?: SessionUser | null): ModuleId[] {
   }
   if (s.role === 'MEMBER') return ['nodes', 'team'];
   // Moderador (OWNER / CO_MODERATOR) → sistema operativo de su workspace.
-  // NO ve Ajustes: el router ya viene configurado por el Administrador.
-  return ['nodes', 'devices', 'users', 'team', 'monitor'];
+  // Ajustes para el moderador = perfil + workspace + import/export (Fase C).
+  // El SettingsModule del Administrador (config del router core) NO se ve.
+  return ['nodes', 'devices', 'users', 'team', 'monitor', 'settings'];
 }
 
 export const canSeeModule = (s: SessionUser | null | undefined, m: ModuleId) => visibleModules(s).includes(m);

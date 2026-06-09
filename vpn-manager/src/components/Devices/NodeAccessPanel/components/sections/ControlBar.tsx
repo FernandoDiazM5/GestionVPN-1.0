@@ -1,4 +1,4 @@
-import { Pencil, Plus, Upload, RefreshCw, Globe, Waypoints } from 'lucide-react';
+import { Pencil, Plus, RefreshCw, Globe, Waypoints } from 'lucide-react';
 import { apiFetch } from '../../../../../utils/apiClient';
 import { API_BASE_URL } from '../../../../../config';
 
@@ -8,10 +8,11 @@ interface ControlBarProps {
   setGlobalServerIP: (ip: string) => void;
   setEditingGlobalIP: (value: boolean) => void;
   onNewNode: () => void;
-  onBatchCsv: () => void;
   onRefresh: () => void;
   isLoading: boolean;
   hasLoaded: boolean;
+  /** Mostrar la IP del servidor SSTP (solo Administrador de plataforma). */
+  showServerIP?: boolean;
 }
 
 export default function ControlBar({
@@ -20,10 +21,10 @@ export default function ControlBar({
   setGlobalServerIP,
   setEditingGlobalIP,
   onNewNode,
-  onBatchCsv,
   onRefresh,
   isLoading,
   hasLoaded,
+  showServerIP = false,
 }: ControlBarProps) {
   return (
     <div className="card p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -35,7 +36,8 @@ export default function ControlBar({
         <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">
           Abre acceso a APs y CPEs remotos mediante enrutamiento VRF
         </p>
-        {/* IP global del servidor SSTP */}
+        {/* IP global del servidor SSTP — solo visible para Administrador de plataforma */}
+        {showServerIP && (
         <div className="flex items-center gap-1.5 mt-2">
           <Globe className="w-3 h-3 text-slate-400" />
           <span className="text-[11px] text-slate-400 font-medium">Servidor SSTP:</span>
@@ -71,6 +73,7 @@ export default function ControlBar({
             </button>
           )}
         </div>
+        )}
       </div>
       <div className="flex items-center gap-2 flex-wrap">
         {/* Acción principal del panel → único botón sólido */}
@@ -82,14 +85,6 @@ export default function ControlBar({
           <span>Nuevo Nodo</span>
         </button>
         {/* Secundarios → outline */}
-        <button
-          onClick={onBatchCsv}
-          title="Provisionar múltiples nodos desde un archivo CSV"
-          className="btn-outline px-4 py-2.5 flex items-center space-x-2 text-sm"
-        >
-          <Upload className="w-4 h-4" />
-          <span>Importar</span>
-        </button>
         <button
           onClick={onRefresh}
           disabled={isLoading}

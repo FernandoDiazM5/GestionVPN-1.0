@@ -1,7 +1,7 @@
 // ============================================================
 //  Servicio de cuenta (Fase 4) → /api/account
 // ============================================================
-import { get, post } from './sessionClient';
+import { get, post, patch } from './sessionClient';
 import { API_BASE_URL } from '../config';
 import { getApiToken } from '../utils/apiClient';
 import type { SessionUser } from '../types/account';
@@ -33,4 +33,23 @@ export const accountApi = {
     post<{ success: true; user: SessionUser }>('/api/account/login', { email, password }),
 
   logout: () => post('/api/account/logout'),
+
+  // ── Ajustes del usuario logueado (Fase C) ───────────────────
+  /** Cambiar contraseña: requiere la actual. */
+  changePassword: (currentPassword: string, newPassword: string) =>
+    patch<{ success: true; message: string }>(
+      '/api/account/password', { currentPassword, newPassword }
+    ),
+
+  /** Solicita el cambio de email: envía OTP al nuevo correo. */
+  requestEmailChange: (newEmail: string) =>
+    patch<{ success: true; message: string; dev?: boolean }>(
+      '/api/account/email/request', { newEmail }
+    ),
+
+  /** Confirma el cambio: OTP + currentPassword. */
+  confirmEmailChange: (newEmail: string, otp: string, currentPassword: string) =>
+    post<{ success: true; message: string; email: string }>(
+      '/api/account/email/confirm', { newEmail, otp, currentPassword }
+    ),
 };

@@ -3,12 +3,40 @@ import { Radio, Lock, User, Server, ShieldCheck, CheckCircle, AlertCircle, Loade
 import { useVpn } from '../../context';
 import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
 import AcceptInvitationForm from './AcceptInvitationForm';
+import PasswordResetRequest from './PasswordResetRequest';
+import PasswordResetConfirm from './PasswordResetConfirm';
 
 import { API_BASE_URL } from '../../config';
 
+type Mode = 'login' | 'accept' | 'reset-request' | 'reset-confirm';
+
 export default function RouterAccess() {
   const { handleLoginSuccess } = useVpn();
-  const [mode, setMode] = useState<'login' | 'accept'>('login');
+  // Parseo de los query params al primer render
+  const urlState = (() => {
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      return {
+        accept: sp.get('accept') === '1',
+        resetToken: sp.get('reset') || '',
+        email: sp.get('email') || '',
+        otp: sp.get('otp') || '',
+      };
+    } catch { return { accept: false, resetToken: '', email: '', otp: '' }; }
+  })();
+  const initialMode: Mode = urlState.resetToken
+    ? 'reset-confirm'
+    : urlState.accept ? 'accept' : 'login';
+  const inviteEmail = urlState.email;
+  const inviteOtp = urlState.otp;
+  const resetToken = urlState.resetToken;
+  const [mode, setMode] = useState<Mode>(initialMode);
+
+  // Limpia los query params al volver al login para que la URL no quede sucia
+  const goToLogin = () => {
+    setMode('login');
+    try { window.history.replaceState({}, '', window.location.pathname); } catch { /* SSR */ }
+  };
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
@@ -82,7 +110,24 @@ export default function RouterAccess() {
 
   // Pantalla pública de aceptación de invitación (personas nuevas con código)
   if (mode === 'accept') {
-    return <AcceptInvitationForm onBack={() => setMode('login')} onLoggedIn={handleLoginSuccess} />;
+    return (
+      <AcceptInvitationForm
+        onBack={goToLogin}
+        onLoggedIn={handleLoginSuccess}
+        prefillEmail={inviteEmail}
+        prefillOtp={inviteOtp}
+      />
+    );
+  }
+
+  // Pantalla pública de recuperación: pedir email
+  if (mode === 'reset-request') {
+    return <PasswordResetRequest onBack={goToLogin} />;
+  }
+
+  // Pantalla pública de recuperación: confirmar con token + nueva contraseña
+  if (mode === 'reset-confirm') {
+    return <PasswordResetConfirm token={resetToken} onBack={goToLogin} onSuccess={goToLogin} />;
   }
 
   return (
@@ -193,10 +238,16 @@ export default function RouterAccess() {
             </form>
 
             {!needsSetup && (
-              <button onClick={() => setMode('accept')}
-                className="w-full mt-4 text-xs font-semibold text-slate-500 hover:text-indigo-600 flex items-center justify-center gap-1.5">
-                <Mail className="w-3.5 h-3.5" /> ¿Tienes una invitación? Acéptala aquí
-              </button>
+              <div className="space-y-2 mt-4">
+                <button onClick={() => setMode('reset-request')}
+                  className="w-full text-xs font-semibold text-slate-500 hover:text-indigo-600 flex items-center justify-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5" /> ¿Olvidaste tu contraseña?
+                </button>
+                <button onClick={() => setMode('accept')}
+                  className="w-full text-xs font-semibold text-slate-500 hover:text-indigo-600 flex items-center justify-center gap-1.5">
+                  <Mail className="w-3.5 h-3.5" /> ¿Tienes una invitación? Acéptala aquí
+                </button>
+              </div>
             )}
           </div>
         </div>

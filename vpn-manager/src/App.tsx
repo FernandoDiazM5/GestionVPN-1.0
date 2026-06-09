@@ -14,6 +14,9 @@ import TeamModule from './components/Team/TeamModule';
 import NetworkDevicesModule from './components/Devices/NetworkDevicesModule';
 import ApMonitorModule from './components/Monitor/ApMonitorModule';
 import SettingsModule from './components/Settings/SettingsModule';
+import ModeratorSettingsModule from './components/Settings/ModeratorSettings/ModeratorSettingsModule';
+import { useWorkspaceSession } from './context/WorkspaceSession';
+import { isPlatformAdmin } from './utils/permissions';
 
 function AppContent() {
   const {
@@ -86,7 +89,7 @@ function AppContent() {
 
         {activeModule === 'monitor' && <ApMonitorModule />}
 
-        {activeModule === 'settings' && <SettingsModule />}
+        {activeModule === 'settings' && <SettingsModuleRouter />}
       </main>
 
     </div>
@@ -94,6 +97,15 @@ function AppContent() {
   );
 }
 
+
+// Decide qué módulo de Ajustes mostrar según el rol:
+//  • platform_admin → SettingsModule (config del router MikroTik core)
+//  • Moderador (OWNER/CO_MOD) → ModeratorSettingsModule (perfil + workspace + I/O)
+function SettingsModuleRouter() {
+  const { session } = useWorkspaceSession();
+  if (isPlatformAdmin(session)) return <SettingsModule />;
+  return <ModeratorSettingsModule />;
+}
 
 export default function App() {
   return (

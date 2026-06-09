@@ -50,8 +50,8 @@ export default function TeamModule() {
   // SSE: refresca el timeline cuando cualquier miembro ejecuta una acción
   useWorkspaceEvents(reloadLogs, !!session);
 
-  const handleInvite = async (email: string, role: Exclude<Role, 'OWNER'>, tunnelId?: string) => {
-    const r = await teamApi.invite(email, role, tunnelId);
+  const handleInvite = async (email: string, role: Exclude<Role, 'OWNER'>, tunnelId?: string, name?: string) => {
+    const r = await teamApi.invite(email, role, tunnelId, name);
     await loadData();
     return r.dev ? 'dev' : null;
   };
@@ -65,6 +65,11 @@ export default function TeamModule() {
   const handleRemove = async (m: Member) => {
     setBusyId(m.user_id);
     try { await teamApi.removeMember(m.user_id); await loadData(); }
+    finally { setBusyId(null); }
+  };
+  const handleSetDisabled = async (userId: string, disabled: boolean) => {
+    setBusyId(userId);
+    try { await teamApi.setMemberDisabled(userId, disabled); await loadData(); }
     finally { setBusyId(null); }
   };
   // ── Estado de carga ──
@@ -148,6 +153,7 @@ export default function TeamModule() {
         busyId={busyId}
         onChangeRole={handleChangeRole}
         onRemove={handleRemove}
+        onSetDisabled={handleSetDisabled}
       />
 
       {/* Auditoría (tiempo real vía SSE) */}

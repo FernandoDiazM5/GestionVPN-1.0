@@ -6,37 +6,52 @@ import type { WgServerConfig } from '../../types/account';
 
 /**
  * Pantalla pública para aceptar una invitación con código (OTP) — para personas
- * nuevas sin cuenta. Recoge email + código + clave + (opcional) clave pública WG.
- * Al aceptar, el backend crea la cuenta, asigna el túnel y provisiona WireGuard;
- * aquí mostramos los datos del servidor para completar el .conf en el dispositivo.
+ * nuevas sin cuenta. Recoge email + código + clave; al aceptar, el backend crea
+ * la cuenta, asigna el túnel, GENERA el par de claves WireGuard server-side y
+ * devuelve el .conf completo listo para pegar en la app WireGuard.
  */
 export default function AcceptInvitationForm({
-  onBack, onLoggedIn,
-}: { onBack: () => void; onLoggedIn: (creds: RouterCredentials) => void }) {
-  const [email, setEmail] = useState('');
-  const [otp, setOtp] = useState('');
+  onBack, onLoggedIn, prefillEmail = '', prefillOtp = '',
+}: {
+  onBack: () => void;
+  onLoggedIn: (creds: RouterCredentials) => void;
+  prefillEmail?: string;
+  prefillOtp?: string;
+}) {
+  const [email, setEmail] = useState(prefillEmail);
+  const [otp, setOtp] = useState(prefillOtp);
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [publicKey, setPublicKey] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [result, setResult] = useState<{ user: { email: string; role: string }; tunnel: string | null; wg: WgServerConfig | null } | null>(null);
+  const [result, setResult] = useState<{ user: { email: string; role: string }; tunnel: string | null; wg: WgServerConfig | null; conf: string | null } | null>(null);
   const [copied, setCopied] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true); setError('');
     try {
-      const r = await teamApi.accept(email.trim(), otp.trim(), password || undefined, name.trim() || undefined, publicKey.trim() || undefined);
-      setResult({ user: r.user, tunnel: r.tunnel, wg: r.wireguard });
+      // No enviamos publicKey: el servidor genera el par completo y nos devuelve
+      // el .conf con la PrivateKey real. El nombre del invitado lo eligió
+      // quien envió la invitación; no se pide aquí.
+      const r = await teamApi.accept(email.trim(), otp.trim(), password || undefined);
+      setResult({ user: r.user, tunnel: r.tunnel, wg: r.wireguard, conf: r.conf });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo aceptar la invitación');
     } finally { setBusy(false); }
   };
 
-  const confTemplate = result?.wg
-    ? `[Interface]\nPrivateKey = <TU CLAVE PRIVADA>\nAddress = ${result.wg.allowedIp}/32\nDNS = 1.1.1.1\n\n[Peer]\nPublicKey = ${result.wg.serverPublicKey}\nEndpoint = ${result.wg.endpoint}\nAllowedIPs = ${result.wg.allowedIps}\nPersistentKeepalive = 25`
-    : '';
+  const conf = result?.conf || '';
+
+  const downloadConf = () => {
+    if (!conf) return;
+    const blob = new Blob([conf], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'wireguard.conf';
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-blue-50 flex items-center justify-center p-4">
@@ -66,17 +81,25 @@ export default function AcceptInvitationForm({
                     <span className="badge badge-info font-mono">{result.tunnel}</span>
                   </p>
                 )}
-                {result.wg ? (
+                {conf ? (
                   <>
-                    <p className="text-2xs text-slate-500">Completa este <strong>.conf</strong> en tu app WireGuard con <strong>tu clave privada</strong>:</p>
-                    <pre className="text-2xs font-mono bg-slate-900 text-slate-100 rounded-lg p-3 overflow-x-auto whitespace-pre">{confTemplate}</pre>
-                    <button onClick={() => { navigator.clipboard.writeText(confTemplate).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }); }}
-                      className="btn-outline px-3 py-1.5 text-xs flex items-center gap-1.5">
-                      <Copy className="w-3.5 h-3.5" /> {copied ? 'Copiado' : 'Copiar configuración'}
-                    </button>
+                    <p className="text-2xs text-slate-500">Tu configuración <strong>.conf</strong> está lista. Pégala o impórtala en tu app WireGuard:</p>
+                    <pre className="text-2xs font-mono bg-slate-900 text-slate-100 rounded-lg p-3 overflow-x-auto whitespace-pre">{conf}</pre>
+                    <div className="flex gap-2">
+                      <button onClick={() => { navigator.clipboard.writeText(conf).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }); }}
+                        className="btn-outline px-3 py-1.5 text-xs flex items-center gap-1.5">
+                        <Copy className="w-3.5 h-3.5" /> {copied ? 'Copiado' : 'Copiar'}
+                      </button>
+                      <button onClick={downloadConf} className="btn-outline px-3 py-1.5 text-xs flex items-center gap-1.5">
+                        <Router className="w-3.5 h-3.5" /> Descargar .conf
+                      </button>
+                    </div>
+                    <p className="text-2xs text-amber-600">⚠️ Guarda este archivo en un lugar seguro. La clave privada NO se mostrará de nuevo.</p>
                   </>
+                ) : result.wg ? (
+                  <p className="text-xs text-slate-500">Acceso WireGuard creado. Consulta los detalles en tu perfil.</p>
                 ) : (
-                  <p className="text-xs text-amber-600">Acceso WireGuard pendiente (sin clave pública o router no disponible). Lo verás en tu perfil al entrar.</p>
+                  <p className="text-xs text-amber-600">Router no disponible. El acceso WireGuard se aprovisionará en cuanto vuelva.</p>
                 )}
                 <button
                   onClick={() => onLoggedIn({ user: result.user.email, token: '', role: result.user.role === 'MEMBER' ? 'viewer' : 'admin' })}
@@ -96,16 +119,11 @@ export default function AcceptInvitationForm({
                   <input required inputMode="numeric" maxLength={6} placeholder="Código de 6 dígitos" value={otp}
                     onChange={e => setOtp(e.target.value.replace(/\D/g, ''))} className="input-field pl-10 font-mono tracking-widest" />
                 </div>
-                <input placeholder="Tu nombre (opcional)" value={name} onChange={e => setName(e.target.value)} className="input-field" />
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input type="password" placeholder="Crea tu contraseña (mín. 8)" value={password} onChange={e => setPassword(e.target.value)} className="input-field pl-10" />
                 </div>
-                <div className="relative">
-                  <Router className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input placeholder="Clave pública WireGuard (opcional)" value={publicKey} onChange={e => setPublicKey(e.target.value)} className="input-field pl-10 font-mono text-xs" />
-                </div>
-                <p className="text-2xs text-slate-400">Genera el par de claves en tu app WireGuard y pega aquí solo la <strong>pública</strong>. La privada nunca se envía.</p>
+                <p className="text-2xs text-slate-400">Al aceptar, generaremos tu configuración WireGuard lista para usar.</p>
                 <button type="submit" disabled={busy || !email.trim() || otp.length !== 6}
                   className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-semibold text-sm disabled:opacity-60 flex items-center justify-center gap-2">
                   {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Aceptar y unirme

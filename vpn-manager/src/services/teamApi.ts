@@ -1,7 +1,7 @@
 // ============================================================
 //  Servicio de equipo / RBAC (Fase 4) → /api/team
 // ============================================================
-import { get, post, del } from './sessionClient';
+import { get, post, patch, del } from './sessionClient';
 import type {
   Member, Invitation, Role, Assignment, MemberWireguard, MyInvitation, AcceptResult,
 } from '../types/account';
@@ -11,13 +11,13 @@ export const teamApi = {
 
   listInvitations: () => get<{ success: true; invitations: Invitation[] }>('/api/team/invitations'),
 
-  invite: (email: string, role: Exclude<Role, 'OWNER'>, tunnelId?: string) =>
+  invite: (email: string, role: Exclude<Role, 'OWNER'>, tunnelId?: string, name?: string) =>
     post<{ success: true; role: Role; tunnelId: string | null; dev?: boolean }>(
-      '/api/team/invite', { email, role, tunnelId }
+      '/api/team/invite', { email, role, tunnelId, name }
     ),
 
-  accept: (email: string, otp: string, password?: string, name?: string, publicKey?: string) =>
-    post<AcceptResult>('/api/team/accept', { email, otp, password, name, publicKey }),
+  accept: (email: string, otp: string, password?: string, publicKey?: string) =>
+    post<AcceptResult>('/api/team/accept', { email, otp, password, publicKey }),
 
   // Bandeja del invitado (usuario ya autenticado) + aceptación in-app
   myInvitations: () => get<{ success: true; invitations: MyInvitation[] }>('/api/team/my-invitations'),
@@ -29,6 +29,12 @@ export const teamApi = {
     post('/api/team/role', { userId, role }),
 
   removeMember: (userId: string) => del(`/api/team/member/${userId}`),
+
+  /** Suspende o reactiva al miembro (sin borrarlo) y sincroniza el peer WG en MikroTik. */
+  setMemberDisabled: (userId: string, disabled: boolean) =>
+    patch<{ success: true; message: string; userId: string; disabled: boolean; router: { updated: number; failed: number; skipped: boolean } }>(
+      `/api/team/member/${userId}`, { disabled }
+    ),
 
   revokeInvitation: (id: string) => post(`/api/team/invitation/${id}/revoke`),
 
@@ -52,4 +58,10 @@ export const teamApi = {
   /** Acceso WireGuard del propio usuario en sesión. */
   myWireguard: () =>
     get<{ success: true; wireguard: MemberWireguard }>('/api/team/member/me/wireguard'),
+
+  /** Conf completa de un peer por su clave pública (solo moderador). */
+  wireguardByKey: (publicKey: string) =>
+    get<{ success: true; wireguard: MemberWireguard & { peerName?: string } }>(
+      `/api/team/wireguard/by-key/${encodeURIComponent(publicKey)}`
+    ),
 };

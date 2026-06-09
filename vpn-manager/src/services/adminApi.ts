@@ -14,6 +14,13 @@ export const adminApi = {
       '/api/admin/moderators', data
     ),
 
+  /** Invita a un nuevo moderador por email (mismo UX que invitar miembro): el
+   *  invitado recibe correo con link, define su contraseña y genera su WG. */
+  inviteModerator: (data: { email: string; name?: string; workspaceName?: string }) =>
+    post<{ success: true; message: string; email: string; workspace_id: string; workspace_name: string; dev?: boolean }>(
+      '/api/admin/invite-moderator', data
+    ),
+
   updateModerator: (
     id: string,
     data: { name?: string; workspaceName?: string; password?: string; disabled?: boolean }

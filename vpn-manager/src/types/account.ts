@@ -45,6 +45,8 @@ export interface Member {
   name: string;
   role: Role;
   joined_at: number;
+  /** Suspendido por el moderador: peer WG en el router quedó =disabled=yes. */
+  disabled?: boolean;
 }
 
 /** Invitación pendiente (GET /api/team/invitations). */
@@ -84,6 +86,8 @@ export interface AcceptResult {
   user: { id: string; email: string; role: Role; workspace_id: string };
   tunnel: string | null;
   wireguard: WgServerConfig | null;
+  /** Contenido completo del .conf con PrivateKey real (si el server generó las claves). */
+  conf: string | null;
 }
 
 /** Entrada de auditoría (GET /api/audit/logs). */

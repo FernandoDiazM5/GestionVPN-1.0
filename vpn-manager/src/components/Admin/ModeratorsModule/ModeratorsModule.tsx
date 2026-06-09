@@ -193,45 +193,70 @@ function ModalShell({ icon, title, danger, busy, onClose, children }: {
   );
 }
 
-// ── Crear ─────────────────────────────────────────────────────────────────
+// ── Crear (Invitar) ───────────────────────────────────────────────────────
+//  Mismo UX que invitar un miembro: solo email, le llega correo con link, el
+//  invitado define su contraseña y genera su WG, y queda como OWNER de su ws.
 function CreateModeratorModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [workspaceName, setWorkspaceName] = useState('');
-  const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState<string | null>(null);
 
   const submit = async () => {
     setBusy(true); setError(null);
     try {
-      await adminApi.createModerator({ email: email.trim(), password, name: name.trim() || undefined, workspaceName: workspaceName.trim() || undefined });
-      onCreated();
+      const r = await adminApi.inviteModerator({
+        email: email.trim(),
+        name: name.trim() || undefined,
+        workspaceName: workspaceName.trim() || undefined,
+      });
+      setSent(r.email);
     } catch (e) { setError(e instanceof Error ? e.message : 'Error'); }
     finally { setBusy(false); }
   };
 
+  if (sent) {
+    return (
+      <ModalShell icon={<UserPlus className="w-4 h-4 text-white" />} title="Invitación enviada" busy={false} onClose={onClose}>
+        <div className="space-y-3">
+          <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4">
+            <p className="text-sm text-emerald-700 dark:text-emerald-300 font-semibold mb-1">✉ Correo enviado</p>
+            <p className="text-xs text-emerald-700 dark:text-emerald-400">
+              Le enviamos un correo a <span className="font-mono">{sent}</span> con el código y un enlace.
+              Al aceptar definirá su contraseña y generará su acceso WireGuard automáticamente.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+          <button onClick={() => { onCreated(); onClose(); }} className="btn-primary px-5 py-2.5 text-sm">Cerrar</button>
+        </div>
+      </ModalShell>
+    );
+  }
+
   return (
     <ModalShell icon={<UserPlus className="w-4 h-4 text-white" />} title="Nuevo Moderador" busy={busy} onClose={onClose}>
+      <p className="text-xs text-slate-500 dark:text-slate-400 -mt-1">
+        Le enviaremos un correo con el código de invitación. El moderador definirá su contraseña
+        y generará su configuración WireGuard al aceptar.
+      </p>
       <div className="relative">
         <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-        <input className={inputCls + ' pl-10'} type="email" placeholder="Correo del moderador" value={email} onChange={e => setEmail(e.target.value)} />
+        <input className={inputCls + ' pl-10'} type="email" placeholder="Correo del moderador" value={email} onChange={e => setEmail(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && email.trim() && submit()} />
       </div>
       <input className={inputCls} placeholder="Nombre (opcional)" value={name} onChange={e => setName(e.target.value)} />
       <div className="relative">
         <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
         <input className={inputCls + ' pl-10'} placeholder="Nombre del workspace (opcional)" value={workspaceName} onChange={e => setWorkspaceName(e.target.value)} />
       </div>
-      <div className="relative">
-        <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-        <input className={inputCls + ' pl-10'} type="password" placeholder="Contraseña (mín. 8)" value={password} onChange={e => setPassword(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && email.trim() && password.length >= 8 && submit()} />
-      </div>
       {error && <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">{error}</p>}
       <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
         <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Cancelar</button>
-        <button onClick={submit} disabled={busy || !email.trim() || password.length < 8} className="btn-primary px-5 py-2.5 flex items-center gap-2 text-sm disabled:opacity-40">
-          {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />} Crear
+        <button onClick={submit} disabled={busy || !email.trim()} className="btn-primary px-5 py-2.5 flex items-center gap-2 text-sm disabled:opacity-40">
+          {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />} Enviar invitación
         </button>
       </div>
     </ModalShell>

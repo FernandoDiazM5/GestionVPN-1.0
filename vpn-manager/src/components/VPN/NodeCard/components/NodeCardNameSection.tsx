@@ -94,6 +94,12 @@ export function NodeCardNameSection({
               {countdown}
             </span>
           )}
+          {/* Visibilidad admin: túnel activo por OTRO usuario (multi-usuario) */}
+          {node.active_by_other && !isThisNodeActive && (
+            <span className="badge badge-info" title={`En uso por ${node.active_by_other}`}>
+              {node.active_by_other}
+            </span>
+          )}
         </div>
         {tags.length > 0 && (
           <div className="flex items-center gap-1 flex-wrap mt-0.5">

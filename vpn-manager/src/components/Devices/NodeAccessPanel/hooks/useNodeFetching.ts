@@ -47,6 +47,24 @@ export function useNodeFetching(props: UseNodeFetchingProps) {
     return Array.isArray(data) ? data as NodeInfo[] : null;
   }, [credentials]);
 
+  // Cache persistente en sessionStorage para sobrevivir cambios de pestaña.
+  // TTL: solo invalida al hacer F5 o cerrar la pestaña. Mientras esté viva la
+  // sesión, los datos se mantienen y solo se refrescan vía botón "Actualizar".
+  const CACHE_KEY = 'vpn_nodes_cache_v1';
+
+  const persistCache = (list: NodeInfo[]) => {
+    try { sessionStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), nodes: list })); } catch { /* ignore */ }
+  };
+
+  const readCache = (): NodeInfo[] | null => {
+    try {
+      const raw = sessionStorage.getItem(CACHE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed?.nodes) ? parsed.nodes as NodeInfo[] : null;
+    } catch { return null; }
+  };
+
   const handleLoadNodes = async () => {
     if (!credentials) return;
     setIsLoading(true);
@@ -60,12 +78,34 @@ export function useNodeFetching(props: UseNodeFetchingProps) {
       });
       setNodes(nodeList);
       setHasLoaded(true);
+      persistCache(nodeList);
     } catch (err: unknown) {
       setErrorMsg(`Error: ${err instanceof Error ? err.message : 'Error desconocido'}`);
     } finally {
       setIsLoading(false);
     }
   };
+
+  // ── Restauración del cache + autoload de primera vez ────────────────
+  // En cada montaje (al cambiar de pestaña y volver) restauramos desde cache.
+  // Si no hay cache, hacemos UN autoload contra el router. El botón "Actualizar"
+  // sigue siendo la única forma de forzar refetch dentro de la sesión.
+  const bootstrapDoneRef = useRef(false);
+  useEffect(() => {
+    if (bootstrapDoneRef.current) return;
+    if (!credentials || !isReady) return;
+    bootstrapDoneRef.current = true;
+    const cached = readCache();
+    if (cached && cached.length) {
+      cached.forEach(n => { prevRunningRef.current[n.ppp_user] = n.running; });
+      setNodes(cached);
+      setHasLoaded(true);
+    } else if (!hasLoaded) {
+      // Autoload de primera vez: el usuario abrió la pestaña sin cache previa
+      void handleLoadNodes();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [credentials, isReady]);
 
   // Polling silencioso cada 60s — detecta desconexiones
   const pollErrorCountRef = useRef(0);
@@ -84,6 +124,7 @@ export function useNodeFetching(props: UseNodeFetchingProps) {
         prevRunningRef.current[n.ppp_user] = n.running;
       });
       setNodes(nodeList);
+      persistCache(nodeList);
       disconnected.forEach(n => {
         addToast(`${n.nombre_nodo} se desconectó del VPN`, 'warn');
         apiFetch(`${API_BASE_URL}/api/node/history/add`, {

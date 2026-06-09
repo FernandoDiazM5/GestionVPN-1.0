@@ -69,6 +69,11 @@ export interface NodeInfo {
   /** null cuando el peer nunca ha hecho handshake */
   wg_last_handshake_secs?: number | null;
   wg_allowed_ips?: string;
+  // ── Multi-usuario (sesiones por usuario) ──
+  /** true si EL USUARIO ACTUAL tiene este túnel activo */
+  running_by_you?: boolean;
+  /** (solo admin) nombre del usuario que lo tiene activo, o null */
+  active_by_other?: string | null;
 }
 
 /** Peer WireGuard devuelto por /api/wireguard/peers */
@@ -88,6 +93,12 @@ export interface TunnelActivateResponse {
   vrf?: string;
   ipCliente?: string;
   deletedCount?: number;
+  /** id de la sesión creada (multi-usuario) */
+  sessionId?: string;
+  /** timestamp Unix ms de expiración de la sesión */
+  tunnelExpiry?: number;
+  /** código de error de negocio (ej. NO_MGMT_IP) */
+  code?: string;
 }
 
 /** Respuesta de /api/tunnel/deactivate */
