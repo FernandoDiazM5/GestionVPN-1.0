@@ -564,6 +564,132 @@ Backend Express con **helmet** + **CORS** + **cookies HttpOnly**, configurado pa
 
 ---
 
+## 16) 🧪 Testing (FASE 3 del REFACTOR_PLAN)
+
+Setup completo de testing en backend, frontend y E2E. FASE 3 deja la infraestructura — FASE 4 escribe los tests reales sobre los endpoints/componentes críticos.
+
+### Stack
+
+| Capa | Tool | Para qué |
+|------|------|----------|
+| Backend | **Vitest 2** | Runner moderno, esm-native, más rápido que Jest |
+| Backend | **Supertest 7** | Llamadas HTTP a Express sin abrir puerto |
+| Frontend | **Vitest 2** | Mismo runner por consistencia |
+| Frontend | **@testing-library/react 16** | Render + queries por rol/text/etc. |
+| Frontend | **jsdom 25** | DOM en Node (rápido, sin browser real) |
+| Frontend | **MSW 2** | Mock fetch a nivel red — los componentes ven una "API" real |
+| E2E | **Playwright 1** | Browser-driven, solo chromium para rapidez |
+
+### Comandos (desde raíz)
+
+```bash
+npm run test:backend        # vitest run en server/
+npm run test:frontend       # vitest run en vpn-manager/
+npm run test:all            # los dos seguidos
+npm run e2e                 # playwright test
+npm run e2e:install         # descarga chromium (1ª vez)
+```
+
+Por workspace:
+
+```bash
+cd server && npm test               # backend
+cd server && npm run test:watch     # modo watch
+cd server && npm run test:coverage  # con reporte v8 (text + lcov)
+
+cd vpn-manager && npm test           # frontend
+cd vpn-manager && npm run test:watch
+cd vpn-manager && npm run test:coverage
+```
+
+### Estructura backend
+
+```
+server/
+├── vitest.config.js         — entorno node, include test/**/*.{test,spec}.js
+└── test/
+    ├── setup.js             — NODE_ENV=test, LOG_LEVEL=silent
+    ├── smoke.test.js        — canary 3 tests
+    ├── mocks/
+    │   ├── routeros.js      — cliente API fake con tabla configurable
+    │   ├── mailer.js        — captura sendOtp/sendInvitation/sendPasswordReset en memoria
+    │   └── mysql.js         — backing store en memoria + parser SELECT mini
+    └── factories/
+        └── index.js         — makeUser, makeWorkspace, makeMembership, makeNode, makeInvitation
+```
+
+**Cómo usar un mock típico:**
+
+```js
+import { vi, beforeEach } from 'vitest';
+vi.mock('../routeros.service', () => require('./mocks/routeros'));
+const { __mock } = require('./mocks/routeros');
+
+beforeEach(() => __mock.reset());
+
+it('lista peers WG', async () => {
+  __mock.setResponse('/interface/wireguard/peers/print', [
+    { '.id': '*1', 'public-key': 'k1', 'allowed-address': '192.168.21.20/32' },
+  ]);
+  // ... ejercer endpoint que llame a safeWrite()
+});
+```
+
+### Estructura frontend
+
+```
+vpn-manager/
+├── vitest.config.ts        — jsdom, plugin React, alias @ → src/
+└── src/test/
+    ├── setup.ts            — shims (matchMedia/IO/RO/scrollTo) + MSW server
+    ├── render.tsx          — renderWithProviders() con VpnProvider + WorkspaceSessionProvider
+    ├── smoke.test.tsx      — canary 4 tests
+    └── providers.test.tsx  — valida que el wrapper monta los Context Providers
+```
+
+**Cómo usar el wrapper:**
+
+```tsx
+import { renderWithProviders, screen } from '@/test/render';
+import { http, HttpResponse } from 'msw';
+import { server } from '@/test/setup';
+
+it('clic en login envía POST /api/auth/login', async () => {
+  server.use(http.post('http://localhost:3001/api/auth/login', () =>
+    HttpResponse.json({ success: true, user: 'admin', token: '...' })
+  ));
+  const { user } = renderWithProviders(<RouterAccess />);
+  await user.click(screen.getByRole('button', { name: /iniciar sesi/i }));
+  // ...
+});
+```
+
+### E2E
+
+```
+e2e/
+└── smoke.spec.ts            — verifica que la app carga
+playwright.config.ts         — chromium-only, webServer auto-levanta Vite
+```
+
+### Cobertura objetivo
+
+| Capa | Inicial (F3) | F4 objetivo |
+|------|--------------|-------------|
+| Backend | 0% | ≥ 60% en `routes/`, `lib/`, `middleware/`, `db/repos/` |
+| Frontend | 0% | ≥ 40% en `components/`, `services/` |
+| E2E | 1 smoke | 3-5 happy paths (login, invitar, reset password) |
+
+### CI
+
+`.github/workflows/ci.yml` ahora corre Vitest en ambos jobs:
+
+- **backend job:** `node --check` + `npm test` (Vitest)
+- **frontend job:** `tsc --noEmit` + `eslint` + `npm test` (Vitest)
+- E2E NO está en CI todavía (instalación de Chromium pesada — F4 evalúa)
+
+---
+
 ## ⚡ Arranque rápido
 
 1. XAMPP **MySQL** arriba (idealmente como servicio).
