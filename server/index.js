@@ -2,6 +2,7 @@ try { require('dotenv').config(); } catch (_) { /* opcional */ }
 const express = require('express');
 const cors    = require('cors');
 const cookieParser = require('cookie-parser');
+const helmet = require('helmet');
 const pinoHttp = require('pino-http');
 const crypto = require('crypto');
 const logger = require('./lib/logger');
@@ -52,6 +53,43 @@ const allowedOrigins = process.env.CORS_ORIGINS
 const authRoutes = require('./auth.routes');
 const { verifyToken } = require('./auth.middleware');
 const { startMonitor } = require('./db/mysql');
+
+// ── Helmet — headers de seguridad HTTP (FASE 2 del REFACTOR_PLAN) ──
+//  Backend API-only: NO sirve HTML, NO sirve estáticos. La CSP es
+//  ultra-restrictiva porque cualquier asset que llegue al cliente vía
+//  esta API sería un bug.
+//
+//  Decisiones justificadas:
+//   • contentSecurityPolicy:
+//       defaultSrc 'none' + frameAncestors 'none' → si un atacante
+//       abre /api/foo en el navegador y consigue inyectar HTML, NO se
+//       cargarán scripts ni se podrá embeber en iframes hostiles.
+//   • hsts: solo en producción. En dev usamos http://localhost — activar
+//       HSTS rompería el dev por max-age en el navegador.
+//   • crossOriginResourcePolicy: 'same-site' (no 'same-origin'), porque
+//       el frontend Vite corre en :5173 y el backend en :3001 (mismo
+//       sitio pero distinto origen). Si fuera 'same-origin' bloquearía
+//       el fetch del SPA.
+//   • crossOriginOpenerPolicy + crossOriginEmbedderPolicy: deshabilitados
+//       (innecesarios para API JSON, rompen integraciones cross-origin).
+//   • xPoweredBy: removido (no filtramos "Express").
+const isProd = process.env.NODE_ENV === 'production';
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'none'"],
+            frameAncestors: ["'none'"],
+            baseUri: ["'none'"],
+            formAction: ["'none'"],
+        },
+    },
+    hsts: isProd ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false,
+    crossOriginResourcePolicy: { policy: 'same-site' },
+    crossOriginOpenerPolicy: false,
+    crossOriginEmbedderPolicy: false,
+    referrerPolicy: { policy: 'no-referrer' },
+}));
+// helmet ya hace app.disable('x-powered-by') vía hidePoweredBy (default on)
 
 app.use(cors({
     origin: (origin, callback) => {
