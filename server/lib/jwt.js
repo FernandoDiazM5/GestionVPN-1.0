@@ -20,20 +20,27 @@ function verifySession(token) {
   return jwt.verify(token, JWT_SECRET);
 }
 
-/** Setea la cookie HttpOnly de sesión. */
-function setSessionCookie(res, token) {
-  res.cookie(COOKIE_NAME, token, {
+// Opciones base reutilizadas por setSessionCookie() y clearSessionCookie().
+// IMPORTANTE: algunos navegadores requieren que clearCookie use los mismos
+// atributos (sameSite/secure/path) que el setCookie original — si no, NO
+// borran la cookie. Mantener ambas en una sola fuente de verdad.
+function cookieBaseOptions() {
+  return {
     httpOnly: true,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
-    maxAge: MAX_AGE_MS,
     path: '/',
-  });
+  };
 }
 
-/** Limpia la cookie de sesión. */
+/** Setea la cookie HttpOnly de sesión. */
+function setSessionCookie(res, token) {
+  res.cookie(COOKIE_NAME, token, { ...cookieBaseOptions(), maxAge: MAX_AGE_MS });
+}
+
+/** Limpia la cookie de sesión (mismos atributos que el set para que efectivamente borre). */
 function clearSessionCookie(res) {
-  res.clearCookie(COOKIE_NAME, { path: '/' });
+  res.clearCookie(COOKIE_NAME, cookieBaseOptions());
 }
 
 module.exports = { COOKIE_NAME, signSession, verifySession, setSessionCookie, clearSessionCookie };
