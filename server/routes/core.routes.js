@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { Worker } = require('worker_threads');
 const path = require('path');
+const log = require('../lib/logger').child({ scope: 'core' });
 
 // ── SSE: clientes suscritos POR USUARIO (aislamiento de eventos) ─────────────
 // Map<userId, Set<res>>. Cada usuario solo recibe SUS eventos de túnel.
@@ -87,7 +88,7 @@ router.post('/connect', async (req, res) => {
     } catch (error) {
         if (api) try { await api.close(); } catch (_) { }
         const msg = getErrorMessage(error, ip, user);
-        console.error(`[CONNECT] Fallo → IP:${ip} usuario:${user} | errno:${JSON.stringify(error?.errno)} code:${error?.code} msg:${error?.message}`);
+        log.error({ ip, user, errno: error?.errno, code: error?.code, err: error?.message }, 'CONNECT fallo');
         res.status(500).json({ success: false, message: msg });
     }
 });
@@ -246,7 +247,7 @@ router.post('/tunnel/activate', async (req, res) => {
         await provisioner.removeMangleIds(apiWrite, oldIds);            // cambio de túnel: cierra el suyo
         if (legacyIds.length) {
             await provisioner.removeMangleIds(apiWrite, legacyIds);     // elimina mangle global legacy
-            console.log(`[TUNNEL-ACTIVATE] ${legacyIds.length} mangle global legacy eliminada(s)`);
+            log.info({ count: legacyIds.length }, 'TUNNEL-ACTIVATE: mangle global legacy eliminada');
         }
         await provisioner.addUserMangle(apiWrite, { userId: acc.sub, mgmtIp, vrfName: targetVRF });
         await apiWrite.close().catch(() => {});
@@ -259,7 +260,7 @@ router.post('/tunnel/activate', async (req, res) => {
         });
 
         await sessionRepo.log({ workspaceId: acc.workspace_id, sessionId, userId: acc.sub, tunnelId: targetVRF, action: prev ? 'SWITCH' : 'ACTIVATE', mgmtIp, statusCode: 200, ipAddress: clientIp });
-        console.log(`[TUNNEL-ACTIVATE] user=${acc.sub} ip=${mgmtIp} → ${targetVRF} (${prev ? 'switch' : 'nuevo'})`);
+        log.info({ userId: acc.sub, mgmtIp, vrf: targetVRF, mode: prev ? 'switch' : 'nuevo' }, 'TUNNEL-ACTIVATE');
 
         // 4) Notificar SOLO a este usuario (sus pestañas)
         emitToUser(acc.sub, targetVRF, expires_at);
@@ -284,7 +285,7 @@ router.post('/tunnel/activate', async (req, res) => {
         } catch (_) {}
         const msg = getErrorMessage(error, ip, user);
         await sessionRepo.log({ workspaceId: acc.workspace_id, userId: acc.sub, tunnelId: targetVRF, action: 'ERROR', statusCode: 500, message: msg, ipAddress: clientIp });
-        console.error('[TUNNEL-ACTIVATE] Error:', error?.message, '| code:', error?.code);
+        log.error({ err: error?.message, code: error?.code }, 'TUNNEL-ACTIVATE Error');
         return res.status(500).json({ success: false, message: msg });
     }
 });
@@ -316,7 +317,7 @@ router.post('/tunnel/deactivate', async (req, res) => {
         // removeMangleIds LANZAN ante fallo → caen al catch sin cerrar la sesión). C1.
         if (session) await sessionRepo.closeSession(session.id);
         await sessionRepo.log({ workspaceId: acc.workspace_id, sessionId: session?.id, userId: acc.sub, tunnelId: session?.tunnel_id || '-', action: 'DEACTIVATE', statusCode: 200, ipAddress: clientIp });
-        console.log(`[TUNNEL-DEACTIVATE] user=${acc.sub} — ${ids.length} mangle(s) eliminada(s)`);
+        log.info({ userId: acc.sub, count: ids.length }, 'TUNNEL-DEACTIVATE: mangles eliminadas');
 
         emitToUser(acc.sub, null, null);
         res.json({ success: true, message: 'Tu acceso fue revocado' });
@@ -359,13 +360,13 @@ router.post('/tunnel/keepalive', async (req, res) => {
 
         await sessionRepo.touch(session.id);   // renueva TTL
         const restored = restoredItems.length > 0;
-        console.log(`[KEEPALIVE] user=${acc.sub} VRF=${targetVRF} — ${restored ? 'RESTAURADO' : 'OK'}`);
+        log.debug({ userId: acc.sub, vrf: targetVRF, restored }, 'KEEPALIVE');
         res.json({ success: true, restored, restoredItems });
     } catch (error) {
         if (apiRead) try { await apiRead.close(); } catch (_) {}
         if (apiWrite) try { await apiWrite.close(); } catch (_) {}
         const msg = getErrorMessage(error, ip, user);
-        console.error('[KEEPALIVE] Error:', error?.message);
+        log.error({ err: error?.message }, 'KEEPALIVE Error');
         res.status(500).json({ success: false, message: msg });
     }
 });
@@ -412,7 +413,7 @@ router.get('/tunnel/status', async (req, res) => {
                     if (a) try { await a.close(); } catch (_) {}
                     if (b) try { await b.close(); } catch (_) {}
                     // No se pudo revocar en el router → NO cerramos la sesión; se reintenta.
-                    console.warn('[TUNNEL-STATUS] expiración: limpieza falló, se mantiene ACTIVE para reintentar:', e?.message);
+                    log.warn({ err: e?.message }, 'TUNNEL-STATUS: limpieza falló al expirar, se mantiene ACTIVE');
                     return res.json({ success: true, activeNodeVrf: session.vrf_name, tunnelExpiry: session.expires_at });
                 }
             }
@@ -425,7 +426,7 @@ router.get('/tunnel/status', async (req, res) => {
 
         return res.json({ success: true, activeNodeVrf: session.vrf_name, tunnelExpiry: session.expires_at });
     } catch (e) {
-        console.warn('[TUNNEL-STATUS] error:', e?.message);
+        log.warn({ err: e?.message }, 'TUNNEL-STATUS error');
         return res.json({ success: true, activeNodeVrf: null, tunnelExpiry: null });
     }
 });
@@ -807,13 +808,13 @@ router.post('/tunnel/repair', async (req, res) => {
         }
 
         await api.close();
-        console.log(`[TUNNEL-REPAIR] pppUser=${pppUser} vrfName=${vrfName} repaired=${repaired}/${steps.length}`);
+        log.info({ pppUser, vrfName, repaired, total: steps.length }, 'TUNNEL-REPAIR');
         res.json({ success: true, steps, repaired });
 
     } catch (error) {
         if (api) try { await api.close(); } catch (_) { }
         const msg = getErrorMessage(error, ip, user);
-        console.error('[TUNNEL-REPAIR] Error:', error?.message);
+        log.error({ err: error?.message }, 'TUNNEL-REPAIR Error');
         res.status(500).json({ success: false, message: msg });
     }
 });
@@ -842,7 +843,7 @@ router.post('/tunnel/mangle-access', async (req, res) => {
         const rawIp = xForwarded ? xForwarded.split(',')[0] : (req.socket?.remoteAddress || '');
         ipCliente = rawIp.trim().replace(/^::ffff:/i, '').trim();
     }
-    console.log(`[MANGLE-ACCESS] ipCliente="${ipCliente}" vrf="${vrfSeleccionado}"`);
+    log.debug({ ipCliente, vrf: vrfSeleccionado }, 'MANGLE-ACCESS request');
 
     if (!ipCliente) {
         return res.status(400).json({ success: false, message: 'No se pudo determinar la IP del operador.' });
@@ -868,27 +869,27 @@ router.post('/tunnel/mangle-access', async (req, res) => {
     try {
         api1 = await connectToMikrotik(ip, user, pass);
         const allMangle = await safeWrite(api1, ['/ip/firewall/mangle/print'], 15000).catch((e) => {
-            console.warn('[MANGLE-ACCESS] print falló:', e?.message);
+            log.warn({ err: e?.message }, 'MANGLE-ACCESS print falló');
             return [];
         });
         const toDelete = allMangle.filter(m =>
             (m.comment === 'ACCESO-DINAMICO' || m.comment === 'ACCESO-ADMIN') && m['.id']
         );
-        console.log(`[MANGLE-ACCESS] Total mangle: ${allMangle.length}, ACCESO-DINAMICO/ACCESO-ADMIN a eliminar: ${toDelete.length}`);
+        log.debug({ total: allMangle.length, toDelete: toDelete.length }, 'MANGLE-ACCESS inventario');
 
         for (const rule of toDelete) {
             try {
                 await safeWrite(api1, ['/ip/firewall/mangle/remove', `=.id=${rule['.id']}`], 10000);
                 deletedCount++;
             } catch (e) {
-                console.warn(`[MANGLE-ACCESS] remove ${rule['.id']} falló:`, e?.message);
+                log.warn({ id: rule['.id'], err: e?.message }, 'MANGLE-ACCESS remove falló');
             }
         }
-        console.log(`[MANGLE-ACCESS] Cleanup terminado (${deletedCount} eliminadas).`);
+        log.debug({ deletedCount }, 'MANGLE-ACCESS Cleanup terminado');
     } catch (error) {
         if (api1) try { await api1.close(); } catch (_) {}
         const msg = getErrorMessage(error, ip, user);
-        console.error('[MANGLE-ACCESS] Error en fase 1 (cleanup):', error?.message || error);
+        log.error({ err: error?.message || String(error) }, 'MANGLE-ACCESS fase 1 cleanup');
         return res.status(500).json({ success: false, message: `Cleanup falló: ${msg}` });
     }
     try { await api1.close(); } catch (_) {}
@@ -902,7 +903,7 @@ router.post('/tunnel/mangle-access', async (req, res) => {
     try {
         api2 = await connectToMikrotik(ip, user, pass);
 
-        console.log(`[MANGLE-ACCESS] Creando regla ACCESO-ADMIN: 192.168.21.0/24 → ${vrf}`);
+        log.debug({ vrf }, 'MANGLE-ACCESS Creando regla ACCESO-ADMIN');
         await writeIdempotent(api2, [
             '/ip/firewall/mangle/add',
             '=chain=prerouting',
@@ -913,7 +914,7 @@ router.post('/tunnel/mangle-access', async (req, res) => {
             '=src-address=192.168.21.0/24',
             '=passthrough=yes',
         ], 12000);
-        console.log(`[MANGLE-ACCESS] Regla ACCESO-ADMIN creada.`);
+        log.info('MANGLE-ACCESS Regla ACCESO-ADMIN creada');
 
         try { await api2.close(); } catch (_) {}
 
@@ -927,7 +928,7 @@ router.post('/tunnel/mangle-access', async (req, res) => {
     } catch (error) {
         if (api2) try { await api2.close(); } catch (_) {}
         const msg = getErrorMessage(error, ip, user);
-        console.error('[MANGLE-ACCESS] Error en fase 2 (add):', error?.message || error);
+        log.error({ err: error?.message || String(error) }, 'MANGLE-ACCESS fase 2 add');
         return res.status(500).json({ success: false, message: `Add falló: ${msg}` });
     }
 });

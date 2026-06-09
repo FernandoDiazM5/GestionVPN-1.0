@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { Worker } = require('worker_threads');
 const path = require('path');
+const log = require('../lib/logger').child({ scope: 'nodes' });
 const { connectToMikrotik, safeWrite, getErrorMessage, cleanTunnelRules, writeIdempotent, parseHandshakeSecs } = require('../routeros.service');
 const { IPV4_REGEX, CIDR_REGEX, getSubnetHosts, probeUbiquiti, sshExec, parseAirOSStats, parseFullOutput, ANTENNA_CMD, trySshCredentials } = require('../ubiquiti.service');
 const { getDb, encryptDevice, decryptDevice, encryptPass, decryptPass, saveNode, getNodes, getNodeByPppUser, getNodeId, deleteNode } = require('../db.service');
@@ -194,7 +195,7 @@ router.post('/nodes', async (req, res) => {
             labelRows.forEach(r => { if (r.label) labelMap[r.ppp_user] = r.label; });
             nodes = nodes.map(n => labelMap[n.ppp_user] ? { ...n, nombre_nodo: labelMap[n.ppp_user] } : n);
         } catch (dbErr) {
-            console.error('[DB] Error merging labels:', dbErr.message);
+            log.error({ err: dbErr.message }, 'DB: merge labels');
         }
 
         // --- Actualizar caché MySQL con el estado actual de MikroTik ---
@@ -218,7 +219,7 @@ router.post('/nodes', async (req, res) => {
                 });
             }
         } catch (dbErr) {
-            console.error('[DB] Error actualizando caché de nodos:', dbErr.message);
+            log.error({ err: dbErr.message }, 'DB: actualizar caché de nodos');
         }
 
         res.json(await annotateSessions(req, await filterNodesForRole(req, nodes)));
@@ -229,7 +230,7 @@ router.post('/nodes', async (req, res) => {
         try {
             const cached = await getNodes();
             if (cached.length > 0) {
-                console.warn('[DB] MikroTik no disponible — sirviendo nodos desde caché MySQL');
+                log.warn('DB: MikroTik no disponible — sirviendo nodos desde caché MySQL');
                 const offlineNodes = cached.map(n => ({
                     ...n,
                     running: false,
@@ -240,7 +241,7 @@ router.post('/nodes', async (req, res) => {
                 return res.json(await annotateSessions(req, await filterNodesForRole(req, offlineNodes)));
             }
         } catch (dbErr) {
-            console.error('[DB] Error leyendo caché de nodos:', dbErr.message);
+            log.error({ err: dbErr.message }, 'DB: leer caché de nodos');
         }
 
         res.status(500).json({ success: false, message: getErrorMessage(error, ip, user) });
@@ -430,7 +431,7 @@ router.post('/node/provision', async (req, res) => {
                     });
                     await db.run('COMMIT');
                 } catch (txErr) { await db.run('ROLLBACK'); throw txErr; }
-            } catch (dbErr) { console.error('[DB] Error guardando nodo WG:', dbErr.message); }
+            } catch (dbErr) { log.error({ err: dbErr.message }, 'DB: guardar nodo WG'); }
 
             return res.json({
                 success: true,
@@ -526,13 +527,13 @@ router.post('/node/provision', async (req, res) => {
                 }
 
                 await db.run('COMMIT');
-                console.log(`[DB] Nodo guardado en MySQL: ${nodeId} (${isWG ? 'WG' : 'SSTP'})`);
+                log.debug({ nodeId, proto: isWG ? 'WG' : 'SSTP' }, 'DB: nodo guardado en MySQL');
             } catch (txErr) {
                 await db.run('ROLLBACK');
                 throw txErr;
             }
         } catch (dbErr) {
-            console.error('[DB] Error guardando nodo en MySQL:', dbErr.message);
+            log.error({ err: dbErr.message }, 'DB: guardar nodo en MySQL');
         }
 
         res.json({
@@ -573,7 +574,7 @@ router.post('/node/deprovision', async (req, res) => {
         const apiRead = await connectToMikrotik(ip, user, pass);
         const safeRead = (cmd) =>
             safeWrite(apiRead, [cmd], 6000).catch(e => {
-                console.warn(`[DEPROVISION][READ] ${cmd} falló:`, e?.message);
+                log.warn({ cmd, err: e?.message }, 'DEPROVISION read falló');
                 return [];
             });
 
@@ -596,7 +597,7 @@ router.post('/node/deprovision', async (req, res) => {
         api = await connectToMikrotik(ip, user, pass);
         const silentRemove = (cmd, id) =>
             safeWrite(api, [cmd, `=.id=${id}`], 10000).catch(e =>
-                console.warn(`[DEPROVISION] ${cmd} id=${id} ignorado:`, e?.message)
+                log.warn({ cmd, id, err: e?.message }, 'DEPROVISION ignorado')
             );
 
         // ── Paso 1: Reglas Mangle (new-routing-mark === vrfName) ─────────────────
@@ -688,7 +689,7 @@ router.post('/node/deprovision', async (req, res) => {
             deletedDeviceIds = result?.deviceIds || [];
             steps.push({ step: 8, obj: 'Base de datos', name: `${deletedDeviceIds.length} APs + cascadas eliminados`, status: 'ok' });
         } catch (dbErr) {
-            console.error('[DB] Error eliminando nodo de la BD:', dbErr.message);
+            log.error({ err: dbErr.message }, 'DB: eliminar nodo de la BD');
             steps.push({ step: 8, obj: 'Base de datos', name: `Error: ${dbErr.message}`, status: 'warn' });
         }
 
@@ -803,7 +804,7 @@ router.post('/node/edit', async (req, res) => {
                 const db = await getDb();
                 await db.run('UPDATE nodes SET label = ? WHERE ppp_user = ?', [newComment, pppUser]);
             } catch (e) {
-                console.error('[DB] Error merging labels during edit:', e.message);
+                log.error({ err: e.message }, 'DB: merge labels durante edit');
             }
         }
 
@@ -888,9 +889,9 @@ router.post('/node/edit', async (req, res) => {
                 await deleteNode(pppUser);
             }
             await saveNode(updates);
-            console.log(`[DB] Nodo actualizado en MySQL: ${effectiveUser}`);
+            log.debug({ pppUser: effectiveUser }, 'DB: nodo actualizado en MySQL');
         } catch (dbErr) {
-            console.error('[DB] Error actualizando nodo en MySQL:', dbErr.message);
+            log.error({ err: dbErr.message }, 'DB: actualizar nodo en MySQL');
         }
 
         res.json({ success: true, message: 'Nodo actualizado correctamente', steps });

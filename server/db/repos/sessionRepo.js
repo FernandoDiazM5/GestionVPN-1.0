@@ -6,6 +6,8 @@
 // ============================================================
 const crypto = require('crypto');
 const { query, withTransaction } = require('../mysql');
+// Renombrado a `logger` porque este módulo expone una función `log()`
+const logger = require('../../lib/logger').child({ scope: 'session-repo' });
 
 const TTL_MS = 30 * 60 * 1000; // 30 min — igual al timeout legacy
 
@@ -119,7 +121,7 @@ async function log({ workspaceId, sessionId, userId, tunnelId, action, mgmtIp, s
        mgmtIp || null, statusCode ?? 200, message || null, ipAddress || null, Date.now()]
     );
   } catch (e) {
-    console.warn('[sessionRepo.log] no se pudo registrar:', e.message);
+    logger.warn({ err: e.message }, 'no se pudo registrar log de sesión');
   }
 }
 

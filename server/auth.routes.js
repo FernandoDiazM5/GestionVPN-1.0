@@ -12,6 +12,7 @@ const passwordResetRepo = require('./db/repos/passwordResetRepo');
 const { sendPasswordReset } = require('./lib/mailer');
 const rl = require('./lib/rateLimit');
 const { invalidateUserCache } = require('./middleware/authJwt');
+const log = require('./lib/logger').child({ scope: 'auth' });
 
 // Establece (si es posible) la sesión RBAC por cookie a partir del login legacy.
 // No rompe el login si MySQL está caído: degrada a solo-Bearer.
@@ -20,7 +21,7 @@ async function attachRbacSession(res, username) {
     const { token } = await buildSessionForLegacyUser(username);
     setSessionCookie(res, token);
   } catch (e) {
-    console.warn('[auth] sesión RBAC no establecida (login continúa con Bearer):', e.message);
+    log.warn({ err: e.message }, 'sesión RBAC no establecida (login continúa con Bearer)');
   }
 }
 
@@ -112,7 +113,7 @@ router.post('/login', async (req, res) => {
 
         // Distinguir BD caída de credenciales inválidas (evita el engañoso "contraseña incorrecta")
         if (dbError) {
-            console.error('[auth] Base de datos no disponible en login:', dbError.code || dbError.message);
+            log.error({ code: dbError.code, err: dbError.message }, 'Base de datos no disponible en login');
             return res.status(503).json({
                 success: false, code: 'DB_UNAVAILABLE',
                 message: 'Servicio de base de datos no disponible. Verifica que MySQL (XAMPP) esté iniciado e inténtalo de nuevo.',
@@ -194,7 +195,7 @@ router.post('/password-reset/request', rl.guard('OTP'), async (req, res) => {
         await passwordResetRepo.create({ userId: user.id, tokenHash: hash, ipAddress: ip });
         // Envío de correo en background (no bloquea el response)
         sendPasswordReset({ email: user.email, token, name: user.name })
-          .catch(e => console.warn('[password-reset] mail falló:', e.message));
+          .catch(e => log.warn({ err: e.message }, 'password-reset: mail falló'));
         await rl.recordAttempt(ip, 'OTP', email, true);
       }
     }
@@ -202,7 +203,7 @@ router.post('/password-reset/request', rl.guard('OTP'), async (req, res) => {
   } catch (err) {
     // Errores de validación → 400, pero sin pistas sobre existencia del email
     if (err.errors) return res.status(400).json({ success: false, message: 'Datos inválidos' });
-    console.error('[password-reset/request] error:', err.message);
+    log.error({ err: err.message }, 'password-reset/request error');
     return res.json(GENERIC_OK); // tampoco filtramos errores internos
   }
 });
@@ -239,7 +240,7 @@ router.post('/password-reset/confirm', rl.guard('OTP'), async (req, res) => {
     });
   } catch (err) {
     if (err.errors) return res.status(400).json({ success: false, message: 'Datos inválidos', errors: err.errors });
-    console.error('[password-reset/confirm] error:', err.message);
+    log.error({ err: err.message }, 'password-reset/confirm error');
     return res.status(500).json({ success: false, message: 'No se pudo restablecer la contraseña' });
   }
 });

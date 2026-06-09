@@ -3,6 +3,7 @@ const router = express.Router();
 const { connectToMikrotik, safeWrite, getErrorMessage, writeIdempotent, parseHandshakeSecs } = require('../routeros.service');
 const { getDb } = require('../db.service');
 const { reqWorkspace } = require('../lib/tenantScope');
+const log = require('../lib/logger').child({ scope: 'wireguard' });
 
 router.post('/wireguard/peers', async (req, res) => {
     if (!req.mikrotik) return res.status(503).json({ success: false, needsConfig: true, message: 'Configura las credenciales MikroTik en Ajustes antes de continuar.' });
@@ -51,7 +52,7 @@ router.post('/wireguard/peers', async (req, res) => {
         });
     } catch (error) {
         if (api) try { await api.close(); } catch (_) { }
-        console.error(`[WG-PEERS] Error → IP:${ip} errno:${error?.errno} code:${error?.code} msg:${error?.message}`);
+        log.error({ ip, errno: error?.errno, code: error?.code, err: error?.message }, 'WG-PEERS fallo');
         res.status(500).json({ success: false, message: getErrorMessage(error, ip, user) });
     }
 });
@@ -93,7 +94,7 @@ router.post('/wireguard/peer/add', async (req, res) => {
                    comment = excluded.comment`,
                 [publicKey, reqWorkspace(req), `${nextIP}/32`, name || 'Admin', Date.now()]
             );
-        } catch (e) { console.warn('[WG-PEER-ADD] No se pudo registrar dueño:', e.message); }
+        } catch (e) { log.warn({ err: e.message }, 'WG-PEER-ADD: no se pudo registrar dueño'); }
 
         res.json({ success: true, assignedIP: nextIP, message: `Administrador creado con IP ${nextIP}` });
     } catch (error) {

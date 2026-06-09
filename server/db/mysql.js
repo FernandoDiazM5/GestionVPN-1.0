@@ -12,6 +12,7 @@
 
 // Carga .env si está disponible (no falla si no existe dotenv)
 try { require('dotenv').config(); } catch (_) { /* opcional */ }
+const log = require('../lib/logger').child({ scope: 'mysql' });
 
 const mysql = require('mysql2/promise');
 
@@ -112,16 +113,16 @@ function startMonitor(intervalMs = 10000) {
       const msg = err?.code || err?.message || '';
       const isLostConn = /ECONNREFUSED|PROTOCOL_CONNECTION_LOST|ER_GET_CONNECTION_TIMEOUT/i.test(msg);
       if (isLostConn) {
-        console.warn('[MONITOR] MySQL perdió conexión. Intentando reconectar en 3s...');
+        log.warn('Monitor: MySQL perdió conexión. Intentando reconectar en 3s');
         // Cierra el pool actual para forzar recreación
         if (pool) pool.end().catch(() => {});
         pool = null;
         await new Promise(r => setTimeout(r, 3000));
         try {
           await getPool().query('SELECT 1');
-          console.log('[MONITOR] MySQL reconectado exitosamente.');
+          log.info('Monitor: MySQL reconectado exitosamente');
         } catch (retryErr) {
-          console.warn('[MONITOR] Reintento fallido. Volverá a intentar...', retryErr?.code);
+          log.warn({ code: retryErr?.code }, 'Monitor: reintento fallido, volverá a intentar');
         }
       }
     } finally {
@@ -130,7 +131,7 @@ function startMonitor(intervalMs = 10000) {
   }
 
   _monitorHandle = setInterval(healthCheck, intervalMs);
-  console.log(`[MONITOR] Health check de MySQL cada ${intervalMs}ms`);
+  log.info({ intervalMs }, 'Health check de MySQL iniciado');
 }
 
 function stopMonitor() {

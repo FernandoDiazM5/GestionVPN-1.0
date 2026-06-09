@@ -24,6 +24,7 @@ const { connectToMikrotik, safeWrite, writeIdempotent, getErrorMessage } = requi
 const { getAppSetting, decryptPass, getDb } = require('../db.service');
 const { removePeersFromRouter } = require('../lib/routerCleanup');
 const { setPeersEnabled, removeUserMangles } = require('../lib/routerPeerState');
+const log = require('../lib/logger').child({ scope: 'team' });
 
 const isModeratorRole = (role) => role === 'OWNER' || role === 'CO_MODERATOR';
 
@@ -204,7 +205,7 @@ router.post('/invite', requireSession, requireRole('OWNER', 'CO_MODERATOR'),
       });
     } catch (e) {
       mailError = e.message || 'No se pudo enviar el correo';
-      console.warn('[team/invite] sendInvitation falló:', mailError);
+      log.warn({ err: mailError, email }, 'team/invite sendInvitation falló');
     }
 
     return sendOk(res, {
@@ -300,7 +301,7 @@ router.post('/accept', rl.guard('OTP'), asyncHandler(async (req, res) => {
         });
       }
     } catch (e) {
-      console.warn('[team/accept] WG no provisionado (router):', e.message);
+      log.warn({ err: e.message }, 'team/accept WG no provisionado (router)');
     }
   }
 
@@ -351,7 +352,7 @@ router.post('/invitations/:id/accept', requireSession, asyncHandler(async (req, 
     const mt = await getMikrotik();
     if (mt) {
       try { wireguard = await provisionMemberWgByPublicKey(mt, { workspaceId: inv.workspace_id, userId, publicKey, role: inv.role }); }
-      catch (e) { console.warn('[team/accept-in-app] WG no provisionado:', e.message); }
+      catch (e) { log.warn({ err: e.message }, 'team/accept-in-app WG no provisionado'); }
     }
   }
 

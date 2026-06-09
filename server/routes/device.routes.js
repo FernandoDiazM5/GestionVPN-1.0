@@ -3,6 +3,7 @@ const router = express.Router();
 const { connectToMikrotik, safeWrite, getErrorMessage, cleanTunnelRules } = require('../routeros.service');
 const { IPV4_REGEX, CIDR_REGEX, getSubnetHosts, probeUbiquiti, sshExec, parseAirOSStats, parseFullOutput, ANTENNA_CMD, trySshCredentials } = require('../ubiquiti.service');
 const { getDb, encryptPass, decryptPass, getApByUuid, getApIntId, getApGroupIntId } = require('../db.service');
+const log = require('../lib/logger').child({ scope: 'device' });
 const { reqWorkspace, ownedGroupIntIds, ownsApUuid, ownsGroupUuid } = require('../lib/tenantScope');
 
 router.post('/device/auto-login', async (req, res) => {
@@ -44,7 +45,7 @@ router.post('/device/antenna', async (req, res) => {
                         : isTimeout ? 'Tiempo de espera SSH agotado'
                         : isUnreach ? 'Host no alcanzable'
                         : msg;
-        console.log(`[SSH] ${deviceIP} → ${friendly}`);
+        log.debug({ deviceIP, friendly }, 'SSH');
         // 200 para errores esperados (auth, red) — 500 solo para errores inesperados del servidor
         res.json({ success: false, message: friendly });
     }
