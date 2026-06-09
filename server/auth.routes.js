@@ -75,7 +75,8 @@ router.post('/setup', async (req, res) => {
             role: 'admin'
         });
     } catch (error) {
-        if (error.errors) return res.status(400).json({ success: false, message: 'Datos inválidos', errors: error.errors });
+        const issues = error.issues || error.errors;
+        if (issues) return res.status(400).json({ success: false, message: 'Datos inválidos', errors: issues });
         res.status(500).json({ success: false, message: error.message });
     }
 });
@@ -122,7 +123,7 @@ router.post('/login', async (req, res) => {
 
         return res.status(401).json({ success: false, message: 'Usuario o contraseña incorrectos' });
     } catch (zodError) {
-        res.status(400).json({ success: false, message: 'Datos de entrada inválidos', errors: zodError.errors });
+        res.status(400).json({ success: false, message: 'Datos de entrada inválidos', errors: zodError.issues || zodError.errors });
     }
 });
 
@@ -202,7 +203,7 @@ router.post('/password-reset/request', rl.guard('OTP'), async (req, res) => {
     return res.json(GENERIC_OK);
   } catch (err) {
     // Errores de validación → 400, pero sin pistas sobre existencia del email
-    if (err.errors) return res.status(400).json({ success: false, message: 'Datos inválidos' });
+    if ((err.issues || err.errors)) return res.status(400).json({ success: false, message: 'Datos inválidos' });
     log.error({ err: err.message }, 'password-reset/request error');
     return res.json(GENERIC_OK); // tampoco filtramos errores internos
   }
@@ -239,7 +240,7 @@ router.post('/password-reset/confirm', rl.guard('OTP'), async (req, res) => {
       message: 'Contraseña actualizada. Ya puedes iniciar sesión con tu nueva clave.',
     });
   } catch (err) {
-    if (err.errors) return res.status(400).json({ success: false, message: 'Datos inválidos', errors: err.errors });
+    if ((err.issues || err.errors)) return res.status(400).json({ success: false, message: 'Datos inválidos', errors: (err.issues || err.errors) });
     log.error({ err: err.message }, 'password-reset/confirm error');
     return res.status(500).json({ success: false, message: 'No se pudo restablecer la contraseña' });
   }
