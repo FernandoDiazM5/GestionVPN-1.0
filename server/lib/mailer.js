@@ -5,6 +5,7 @@
 // ============================================================
 let nodemailer = null;
 try { nodemailer = require('nodemailer'); } catch (_) { /* opcional */ }
+const log = require('./logger').child({ scope: 'mailer' });
 
 let transporter = null;
 function getTransporter() {
@@ -34,7 +35,9 @@ const FROM_DEFAULT = 'MikroTik VPN <no-reply@vpn.local>';
 async function sendOtp(email, code, purpose = 'verificación') {
   const tx = getTransporter();
   if (!tx) {
-    console.log(`\n[mailer:DEV] OTP para ${email} (${purpose}): ${code}\n`);
+    // En modo DEV el OTP NO se considera secreto (no hay correo saliente);
+    // se muestra al operador para facilitar pruebas locales.
+    log.info({ email, purpose, code }, 'OTP (modo DEV — sin SMTP configurado)');
     return { delivered: false, dev: true };
   }
   await tx.sendMail({
@@ -66,11 +69,9 @@ async function sendInvitation({ email, code, inviterName, workspaceName, tunnelI
 
   const tx = getTransporter();
   if (!tx) {
-    console.log(`\n[mailer:DEV] Invitación para ${email}`);
-    console.log(`  ▸ De:        ${inviterName} (workspace "${workspaceName}")`);
-    console.log(`  ▸ Rol:       ${roleLabel}${tunnelId ? `  Túnel: ${tunnelId}` : ''}`);
-    console.log(`  ▸ OTP:       ${code}`);
-    console.log(`  ▸ Link:      ${acceptUrl}\n`);
+    log.info({
+      email, inviterName, workspaceName, roleLabel, tunnelId, code, acceptUrl,
+    }, 'Invitación generada (modo DEV — sin SMTP)');
     return { delivered: false, dev: true };
   }
 
@@ -168,9 +169,9 @@ async function sendPasswordReset({ email, token, name }) {
 
   const tx = getTransporter();
   if (!tx) {
-    console.log(`\n[mailer:DEV] Recuperación de contraseña para ${email}`);
-    console.log(`  ▸ Token (15 min): ${token}`);
-    console.log(`  ▸ Link:           ${resetUrl}\n`);
+    // El token NO se expone como campo separado (redactado por logger). El
+    // operador lo lee del query param `?reset=<token>` dentro de resetUrl.
+    log.info({ email, resetUrl, ttlMin: 15 }, 'Token de reset generado (modo DEV — sin SMTP)');
     return { delivered: false, dev: true };
   }
 

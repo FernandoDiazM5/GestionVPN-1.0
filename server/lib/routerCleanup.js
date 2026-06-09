@@ -8,6 +8,7 @@
 // ============================================================
 const { connectToMikrotik, safeWrite } = require('../routeros.service');
 const { getAppSetting, decryptPass } = require('../db.service');
+const log = require('./logger').child({ scope: 'router-cleanup' });
 
 async function getMikrotikCreds() {
   const ip = await getAppSetting('MT_IP');
@@ -29,7 +30,7 @@ async function removePeersFromRouter(publicKeys) {
   if (!keys.length) return { removed: 0, failed: 0, skipped: true };
   const mt = await getMikrotikCreds();
   if (!mt) {
-    console.warn('[router-cleanup] Router no configurado, peers no eliminados:', keys.length);
+    log.warn({ count: keys.length }, 'Router no configurado, peers no eliminados');
     return { removed: 0, failed: 0, skipped: true };
   }
   let api;
@@ -45,13 +46,13 @@ async function removePeersFromRouter(publicKeys) {
         removed++;
       } catch (e) {
         failed++;
-        console.warn('[router-cleanup] No se pudo remover peer', peer['.id'], e.message);
+        log.warn({ peerId: peer['.id'], err: e.message }, 'No se pudo remover peer');
       }
     }
     await api.close();
   } catch (e) {
     if (api) try { await api.close(); } catch (_) { /* noop */ }
-    console.warn('[router-cleanup] Router inalcanzable:', e.message);
+    log.warn({ err: e.message }, 'Router inalcanzable');
     return { removed, failed: keys.length - removed, skipped: true };
   }
   return { removed, failed, skipped: false };

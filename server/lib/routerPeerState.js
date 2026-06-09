@@ -10,6 +10,7 @@
 const { connectToMikrotik, safeWrite } = require('../routeros.service');
 const { getAppSetting, decryptPass } = require('../db.service');
 const { findUserMangleIds, removeMangleIds } = require('./tunnelProvisioner');
+const log = require('./logger').child({ scope: 'router-peer-state' });
 
 async function getMikrotikCreds() {
   const ip = await getAppSetting('MT_IP');
@@ -30,7 +31,7 @@ async function setPeersEnabled(publicKeys, enabled) {
   if (!keys.length) return { updated: 0, notFound: 0, failed: 0, skipped: true };
   const mt = await getMikrotikCreds();
   if (!mt) {
-    console.warn('[router-peer-state] Router no configurado, peers no sincronizados:', keys.length);
+    log.warn({ count: keys.length }, 'Router no configurado, peers no sincronizados');
     return { updated: 0, notFound: 0, failed: 0, skipped: true };
   }
 
@@ -52,13 +53,13 @@ async function setPeersEnabled(publicKeys, enabled) {
         updated++;
       } catch (e) {
         failed++;
-        console.warn('[router-peer-state] No se pudo actualizar peer', peer['.id'], e.message);
+        log.warn({ peerId: peer['.id'], err: e.message }, 'No se pudo actualizar peer');
       }
     }
     await api.close();
   } catch (e) {
     if (api) try { await api.close(); } catch (_) { /* noop */ }
-    console.warn('[router-peer-state] Router inalcanzable:', e.message);
+    log.warn({ err: e.message }, 'Router inalcanzable');
     return { updated, notFound, failed: keys.length - updated, skipped: true };
   }
 
@@ -84,7 +85,7 @@ async function removeUserMangles(userIds) {
   if (!ids.length) return { removed: 0, failed: 0, skipped: true };
   const mt = await getMikrotikCreds();
   if (!mt) {
-    console.warn('[router-peer-state] Router no configurado, mangles no eliminados:', ids.length);
+    log.warn({ count: ids.length }, 'Router no configurado, mangles no eliminados');
     return { removed: 0, failed: 0, skipped: true };
   }
 
@@ -102,13 +103,13 @@ async function removeUserMangles(userIds) {
         removed += mangleIds.length;
       } catch (e) {
         failed++;
-        console.warn(`[router-peer-state] mangle cleanup user=${userId} falló:`, e.message);
+        log.warn({ userId, err: e.message }, 'mangle cleanup falló');
       }
     }
     await api.close();
   } catch (e) {
     if (api) try { await api.close(); } catch (_) { /* noop */ }
-    console.warn('[router-peer-state] Router inalcanzable (mangle cleanup):', e.message);
+    log.warn({ err: e.message }, 'Router inalcanzable (mangle cleanup)');
     return { removed, failed: ids.length - removed, skipped: true };
   }
 

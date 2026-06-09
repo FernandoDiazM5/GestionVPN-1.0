@@ -15,6 +15,7 @@
 //  El cleanup es por `comment` (no por .id) → no requiere re-leer tras el add.
 // ============================================================
 const { safeWrite, writeIdempotent } = require('../routeros.service');
+const log = require('./logger').child({ scope: 'provisioner' });
 
 const DST_LIST = 'LIST-NET-REMOTE-TOWERS';
 
@@ -90,7 +91,7 @@ async function removeMangleIds(api, ids = []) {
       await safeWrite(api, ['/ip/firewall/mangle/remove', `=.id=${id}`], 10000);
       removed++;
     } catch (e) {
-      console.warn(`[provisioner] remove mangle ${id} falló:`, e?.message);
+      log.warn({ mangleId: id, err: e?.message }, 'remove mangle falló');
       failed.push({ id, error: e?.message });
     }
   }

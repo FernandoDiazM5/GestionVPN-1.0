@@ -58,7 +58,12 @@ function errorMiddleware(err, _req, res, _next) {
   if (err && err.code === 'ER_DUP_ENTRY') {
     return sendError(res, 409, 'El registro ya existe', 'DUPLICATE');
   }
-  console.error('[API] Error no controlado:', err);
+  // logger se importa de forma diferida para evitar ciclos con módulos que
+  // dependen de apiResponse al cargar (raros pero posibles).
+  const log = require('./logger').child({ scope: 'api' });
+  // Si pinoHttp ya marcó req.log con el reqId, lo usamos. Si no, logger raíz.
+  const reqLog = (res?.req?.log) || log;
+  reqLog.error({ err, url: res?.req?.originalUrl, method: res?.req?.method }, 'Error no controlado en middleware');
   return sendError(res, 500, 'Error interno del servidor', 'INTERNAL');
 }
 

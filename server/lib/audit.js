@@ -6,6 +6,7 @@
 //    y existe sesión (req.account). Pensado para rutas de túneles.
 // ============================================================
 const auditRepo = require('../db/repos/auditRepo');
+const log = require('./logger').child({ scope: 'audit' });
 const { clientIp } = require('./rateLimit');
 const sse = require('./sse');
 
@@ -26,7 +27,7 @@ async function recordTunnelLog(account, { tunnelId, action, ip, detail }) {
       tunnelId, action, userId: account.sub || null, ts: Date.now(),
     });
   } catch (e) {
-    console.warn('[audit] no se pudo registrar la acción:', e.message);
+    log.warn({ err: e.message, action, tunnelId }, 'no se pudo registrar la acción');
   }
 }
 
