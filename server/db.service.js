@@ -24,6 +24,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { getPool } = require('./db/mysql');
+const log = require('./lib/logger').child({ scope: 'db-service' });
 
 // ── Directorio de datos y clave de cifrado (sin cambios) ────────────────────
 const DATA_DIR    = process.env.DATA_DIR || __dirname;
@@ -155,7 +156,7 @@ async function initDb() {
             try { await getPool().query(stmt); }
             catch (e) {
                 if (!/already exists|Duplicate/i.test(e.message)) {
-                    console.warn('[DB]', e.message.substring(0, 120));
+                    log.warn({ err: e.message.substring(0, 120) }, 'schema_ops aviso');
                 }
             }
         }
@@ -166,7 +167,7 @@ async function initDb() {
     await getPool().query('DELETE FROM signal_history WHERE timestamp < ?', [thirtyDaysAgo]).catch(() => {});
 
     _initialized = true;
-    console.log('[DB] Base de datos MySQL (operativa) conectada y validada.');
+    log.info('Base de datos MySQL (operativa) conectada y validada');
     return shim;
 }
 
@@ -198,7 +199,7 @@ function decryptPass(stored) {
         dec += decipher.final('utf8');
         return dec;
     } catch (e) {
-        console.warn('[DB] decryptPass failed:', e.message);
+        log.warn({ err: e.message }, 'decryptPass falló');
         return '';
     }
 }
@@ -324,7 +325,7 @@ async function deleteNode(pppUser) {
     const nodeRow = await d.get('SELECT id FROM nodes WHERE ppp_user = ?', [pppUser]);
     if (!nodeRow) return { devicesDeleted: 0, deviceIds: [] };
     await d.run('DELETE FROM nodes WHERE id = ?', [nodeRow.id]);
-    console.log(`[DB] Nodo eliminado (cascade): ${pppUser} — FK limpiaron dependencias`);
+    log.debug({ pppUser }, 'Nodo eliminado (cascade): FK limpiaron dependencias');
     return { devicesDeleted: 0, deviceIds: [] };
 }
 
