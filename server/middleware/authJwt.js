@@ -6,6 +6,7 @@
 const { COOKIE_NAME, verifySession, clearSessionCookie } = require('../lib/jwt');
 const { sendError } = require('../lib/apiResponse');
 const { query } = require('../db/mysql');
+const log = require('../lib/logger').child({ scope: 'auth' });
 
 // Cache LRU minimalista — evita golpear MySQL en CADA request. TTL corto: si
 // el usuario es eliminado, el deslogueo tarda como máximo este intervalo.
@@ -54,7 +55,7 @@ async function requireSession(req, res, next) {
   } catch (e) {
     // Si MySQL falla acá, mejor dejar pasar (degradar) que tirar 500 a todas
     // las rutas autenticadas. El cache evita que esto pase con frecuencia.
-    console.warn('[auth] No se pudo verificar existencia del user:', e.message);
+    log.warn({ err: e.message, userId: account.sub }, 'No se pudo verificar existencia del user (degradando)');
   }
   req.account = account;
   next();

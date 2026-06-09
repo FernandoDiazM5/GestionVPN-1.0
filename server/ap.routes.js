@@ -5,6 +5,7 @@ const { getDb, encryptPass, decryptPass, getApIntId, getCpeIntId, getApGroupIntI
 const { pollAp, getDetail, getFullDetail, clearApCache }  = require('./ap.service');
 
 const { reqWorkspace, ownedGroupIntIds, ownedApIntIds, ownsGroupUuid, ownsApUuid, cpeForeign } = require('./lib/tenantScope');
+const log = require('./lib/logger').child({ scope: 'ap-routes' });
 
 const genUuid = () => crypto.randomBytes(8).toString('hex');
 const isValidMac = (mac) => /^([0-9a-f]{2}:?){5}([0-9a-f]{2})$/i.test(mac);
@@ -122,7 +123,7 @@ router.post('/aps', async (req, res) => {
                 tx_power       = s.txPower         || null;
                 modo_red       = s.networkMode     || '';
             } catch (sshErr) {
-                console.warn('[AP Routes] SSH on register failed:', sshErr.message);
+                log.warn({ err: sshErr.message }, 'SSH on register falló');
             }
         }
 
@@ -284,7 +285,7 @@ router.post('/aps/:id/poll', async (req, res) => {
                         }
                     } catch { /* ignore individual failures */ }
                 }
-            })().catch(err => console.warn('[AP] Auto-enrich error:', err.message));
+            })().catch(err => log.warn({ err: err.message }, 'Auto-enrich error'));
         }
 
         res.json({ success: true, stations: enriched, polledAt: Date.now() });
@@ -411,7 +412,7 @@ router.post('/poll-direct', async (req, res) => {
                 }
             }
         } catch (e) {
-            console.warn('[poll-direct] Error buscando credenciales del nodo:', e.message);
+            log.warn({ err: e.message }, 'poll-direct: error buscando credenciales del nodo');
         }
 
         const stations = await pollAp(apId, ip, parseInt(port) || 22, sshUser, sshPass, firmware || '');
@@ -516,7 +517,7 @@ router.post('/cpes/enrich-batch', async (req, res) => {
                     pass = pass || (apRow.clave_ssh_enc ? decryptPass(apRow.clave_ssh_enc) : '');
                 }
             } catch (e) {
-                console.warn('[enrich-batch] Error leyendo credenciales del AP:', e.message);
+                log.warn({ err: e.message }, 'enrich-batch: error leyendo credenciales del AP');
             }
         }
 
@@ -574,7 +575,7 @@ router.post('/cpes/:mac/detail-direct', async (req, res) => {
                 credList.push({ user: cpeRow.usuario_ssh, pass: cpeRow.clave_ssh_enc ? decryptPass(cpeRow.clave_ssh_enc) : '', port: cpeRow.puerto_ssh || 22 });
             }
         } catch (e) {
-            console.warn('[detail-direct] Error leyendo credenciales propias del CPE:', e.message);
+            log.warn({ err: e.message }, 'detail-direct: error leyendo credenciales propias del CPE');
         }
 
         // 2. Credenciales del AP padre y su nodo (como fallback)
@@ -596,7 +597,7 @@ router.post('/cpes/:mac/detail-direct', async (req, res) => {
                     }
                 }
             } catch (e) {
-                console.warn('[detail-direct] Error buscando credenciales del AP/nodo:', e.message);
+                log.warn({ err: e.message }, 'detail-direct: error buscando credenciales del AP/nodo');
             }
         }
 
@@ -619,7 +620,7 @@ router.post('/cpes/:mac/detail-direct', async (req, res) => {
                 break;
             } catch (e) {
                 lastError = e;
-                console.warn(`[detail-direct] Credencial '${cred.user}' fallida en ${cpe_ip}: ${e.message}`);
+                log.warn({ user: cred.user, ip: cpe_ip, err: e.message }, 'detail-direct: credencial fallida en CPE');
             }
         }
         if (!s) throw lastError || new Error('Sin credenciales validas');

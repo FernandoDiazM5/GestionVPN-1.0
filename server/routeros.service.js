@@ -1,4 +1,5 @@
 const { RouterOSAPI } = require('node-routeros');
+const log = require('./lib/logger').child({ scope: 'routeros' });
 
 // ── Parche node-routeros: manejar la respuesta `!empty` de RouterOS ──────────
 //  RouterOS envía `!empty` (seguido de `!done`) cuando un /print no tiene filas
@@ -18,10 +19,10 @@ try {
             return _origProcessPacket.call(this, packet);
         };
         Channel.prototype.__emptyPatched = true;
-        console.log('[ROUTEROS] Parche !empty aplicado a node-routeros Channel');
+        log.info('Parche !empty aplicado a node-routeros Channel');
     }
 } catch (e) {
-    console.warn('[ROUTEROS] No se pudo aplicar el parche !empty:', e?.message);
+    log.warn({ err: e }, 'No se pudo aplicar el parche !empty');
 }
 
 const connectToMikrotik = async (host, user, password) => {
@@ -29,7 +30,7 @@ const connectToMikrotik = async (host, user, password) => {
     try {
         const api = new RouterOSAPI({ host, user, password, port: 8728, timeout: 8, keepalive: false });
         await api.connect();
-        console.log(`[CONN] Conectado a ${host}:8728 (plain)`);
+        log.debug({ host, port: 8728, mode: 'plain' }, 'Conectado a MikroTik');
         return api;
     } catch (err) {
         const errno = err?.errno;
@@ -38,13 +39,13 @@ const connectToMikrotik = async (host, user, password) => {
         // Si el puerto está filtrado/firewall (SOCKTMOUT/ETIMEDOUT), ambos puertos
         // tendrán el mismo problema y no tiene sentido esperar 8s extra en 8729.
         if (errno !== -4078 && code !== 'ECONNREFUSED') throw err;
-        console.log(`[CONN] 8728 rechazado (ECONNREFUSED), reintentando con SSL 8729...`);
+        log.debug({ host }, '8728 rechazado, reintentando con SSL 8729');
     }
     // ── Intento 2: puerto 8729 (SSL API) — solo si 8728 fue rechazado activamente ─
     try {
         const api = new RouterOSAPI({ host, user, password, port: 8729, tls: { rejectUnauthorized: false }, timeout: 8, keepalive: false });
         await api.connect();
-        console.log(`[CONN] Conectado a ${host}:8729 (SSL)`);
+        log.debug({ host, port: 8729, mode: 'ssl' }, 'Conectado a MikroTik');
         return api;
     } catch (err) {
         throw err;
@@ -121,7 +122,7 @@ const cleanTunnelRules = async (api) => {
     );
     for (const e of toDelete) {
         await safeWrite(api, ['/ip/firewall/mangle/remove', `=.id=${e['.id']}`]).catch(err => {
-            console.error(`[WARN] No se pudo borrar mangle id=${e['.id']}`, err.message);
+            log.warn({ err, mangleId: e['.id'] }, 'No se pudo borrar mangle');
         });
     }
     return toDelete.length;
@@ -147,7 +148,7 @@ const writeIdempotent = async (api, commands, timeoutMs = 8000) => {
             msg.includes('entry already exists') ||
             msg.includes('already exists') ||
             msg.includes('failure: already')) {
-            console.log(`[writeIdempotent] Recurso ya existe (ignorado): ${commands[0]}`);
+            log.debug({ command: commands[0] }, 'Recurso ya existe (ignorado por idempotente)');
             return [];
         }
         throw err;

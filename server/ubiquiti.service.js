@@ -2,6 +2,7 @@ const http = require('http');
 const https = require('https');
 const net = require('net');
 const { Client: SSH2Client } = require('ssh2');
+const log = require('./lib/logger').child({ scope: 'ubiquiti' });
 
 const IPV4_REGEX = /^(25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)(\.(25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)){3}$/;
 const CIDR_REGEX = /^(25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)(\.(25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)){3}\/(3[0-2]|[1-2]\d|\d)$/;
@@ -756,10 +757,10 @@ const trySshCredentials = async (ip, credentialsArray) => {
             // Comando combinado: 5 fuentes de datos en una sola conexión SSH
             const output = await sshExec(ip, 22, cred.user, cred.pass, ANTENNA_CMD, 20000, 8000);
             const stats = parseFullOutput(output);
-            console.log(`[AUTO-SSH] ✓ Éxito en ${ip} usando la clave de: ${cred.user}`);
+            log.debug({ ip, user: cred.user }, 'auto-SSH éxito');
             return { user: cred.user, pass: cred.pass, port: 22, stats };
         } catch (err) {
-            console.log(`[AUTO-SSH] ✗ Falló en ${ip} con ${cred.user} -> ${err.message}`);
+            log.debug({ ip, user: cred.user, err: err.message }, 'auto-SSH falló');
             continue;
         }
     }

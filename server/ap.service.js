@@ -1,4 +1,5 @@
 const { sshExec, parseFullOutput, ANTENNA_CMD, decodeHtmlEntities } = require('./ubiquiti.service');
+const log = require('./lib/logger').child({ scope: 'ap-service' });
 
 // In-memory throughput delta cache: { apId: { mac: { rxBytes, txBytes, ts } } }
 const bytesCache = {};
@@ -147,7 +148,7 @@ const parseWstalist = (output) => {
             };
         }).filter(Boolean);
     } catch (e) {
-        console.warn('[AP Service] parseWstalist error:', e.message, '| raw:', output.slice(0, 200));
+        log.warn({ err: e.message, raw: output.slice(0, 200) }, 'parseWstalist error');
         return [];
     }
 };
