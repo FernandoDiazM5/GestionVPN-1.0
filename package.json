@@ -21,7 +21,7 @@
   },
   "lint-staged": {
     "vpn-manager/src/**/*.{ts,tsx}": [
-      "cd vpn-manager && npx eslint --fix"
+      "npx eslint --config vpn-manager/eslint.config.js --fix"
     ],
     "server/**/*.js": [
       "node --check"
