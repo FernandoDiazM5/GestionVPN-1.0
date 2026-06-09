@@ -15,7 +15,8 @@ const { sendOtp } = require('../lib/mailer');
 const rl = require('../lib/rateLimit');
 const userRepo = require('../db/repos/userRepo');
 const workspaceRepo = require('../db/repos/workspaceRepo');
-const { requireSession } = require('../middleware/authJwt');
+const { requireSession, invalidateUserCache } = require('../middleware/authJwt');
+const { query } = require('../db/mysql');
 const { verifyToken } = require('../auth.middleware');
 const { buildSessionForLegacyUser } = require('../lib/sessionBridge');
 
@@ -202,6 +203,121 @@ router.get('/me', requireSession, asyncHandler(async (req, res) => {
       platform_admin: Number(user.is_platform_admin) === 1,
     },
   });
+}));
+
+// ════════════════════════════════════════════════════════════════════════════
+//  Ajustes del usuario logueado (Fase C)
+// ════════════════════════════════════════════════════════════════════════════
+
+// ── PATCH /password ──────────────────────────────────────────
+//  Cambia la contraseña del usuario en sesión. Requiere la actual.
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1).max(128),
+  newPassword: z.string().min(8, 'Mínimo 8 caracteres').max(128),
+});
+router.patch('/password', requireSession, asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword } = changePasswordSchema.parse(req.body);
+  const user = await userRepo.findById(req.account.sub);
+  if (!user) throw new AppError('Usuario no encontrado', 404, 'NOT_FOUND');
+
+  const ok = await bcrypt.compare(currentPassword, user.password_hash);
+  if (!ok) throw new AppError('La contraseña actual es incorrecta', 401, 'BAD_CURRENT');
+
+  if (currentPassword === newPassword) {
+    throw new AppError('La nueva contraseña debe ser distinta de la actual', 400, 'SAME_PASSWORD');
+  }
+
+  const newHash = await bcrypt.hash(newPassword, 10);
+  await query('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?',
+    [newHash, Date.now(), user.id]);
+  // Invalidar cache de auth: cualquier otra sesión existente del usuario
+  // quedará en 401 USER_DELETED en su próximo request.
+  invalidateUserCache(user.id);
+
+  return sendOk(res, { message: 'Contraseña actualizada' });
+}));
+
+// ── PATCH /email/request ─────────────────────────────────────
+//  Solicita cambio de correo. Envía OTP al NUEVO email (anti-hijack).
+const changeEmailRequestSchema = z.object({
+  newEmail: emailSchema,
+});
+router.patch('/email/request', requireSession, asyncHandler(async (req, res) => {
+  const { newEmail } = changeEmailRequestSchema.parse(req.body);
+  const lc = newEmail.toLowerCase();
+
+  if (lc === String(req.account.email).toLowerCase()) {
+    throw new AppError('El correo nuevo es igual al actual', 400, 'SAME_EMAIL');
+  }
+  // El email destino no debe estar en uso por otro user activo
+  const conflict = await userRepo.findByEmail(lc);
+  if (conflict && conflict.id !== req.account.sub) {
+    throw new AppError('Ese correo ya está registrado', 409, 'EMAIL_TAKEN');
+  }
+
+  // Generar OTP + guardar en otp_hash del usuario actual con TTL 10 min.
+  // Reusamos los campos otp_* del propio usuario (no se mezclan con otros flujos:
+  // el cambio solo se ejecuta cuando el solicitante presenta este OTP).
+  const otp = genOtp();
+  const otpHash = await bcrypt.hash(otp, 8);
+  await query(
+    'UPDATE users SET otp_hash = ?, otp_expires_at = ?, otp_attempts = 0, updated_at = ? WHERE id = ?',
+    [otpHash, Date.now() + OTP_TTL_MS, Date.now(), req.account.sub]
+  );
+
+  const delivery = await sendOtp(lc, otp, 'cambio de correo');
+  return sendOk(res, {
+    message: 'Te enviamos un código al nuevo correo para confirmar el cambio',
+    dev: delivery.dev || undefined,
+  });
+}));
+
+// ── POST /email/confirm ──────────────────────────────────────
+//  Confirma el cambio: valida OTP + contraseña actual + persiste el email nuevo.
+//  Exigimos la contraseña actual como segunda capa (si alguien robó la sesión,
+//  igual no puede cambiar el correo sin la contraseña).
+const changeEmailConfirmSchema = z.object({
+  newEmail: emailSchema,
+  otp: z.string().regex(/^\d{6}$/, 'OTP de 6 dígitos'),
+  currentPassword: z.string().min(1).max(128),
+});
+router.post('/email/confirm', requireSession, asyncHandler(async (req, res) => {
+  const { newEmail, otp, currentPassword } = changeEmailConfirmSchema.parse(req.body);
+  const lc = newEmail.toLowerCase();
+
+  const user = await userRepo.findById(req.account.sub);
+  if (!user) throw new AppError('Usuario no encontrado', 404, 'NOT_FOUND');
+
+  const passOk = await bcrypt.compare(currentPassword, user.password_hash);
+  if (!passOk) throw new AppError('La contraseña actual es incorrecta', 401, 'BAD_CURRENT');
+
+  if (!user.otp_hash || !user.otp_expires_at || Date.now() > Number(user.otp_expires_at)) {
+    throw new AppError('El código expiró, solicita uno nuevo', 410, 'OTP_EXPIRED');
+  }
+  if (user.otp_attempts >= OTP_MAX_ATTEMPTS) {
+    throw new AppError('Demasiados intentos, solicita un código nuevo', 429, 'OTP_LOCKED');
+  }
+  const otpOk = await bcrypt.compare(otp, user.otp_hash);
+  if (!otpOk) {
+    await userRepo.incOtpAttempts(user.id);
+    throw new AppError('Código incorrecto', 401, 'OTP_INVALID');
+  }
+
+  // Re-verificar que el correo no se haya tomado entre el request y el confirm
+  const conflict = await userRepo.findByEmail(lc);
+  if (conflict && conflict.id !== user.id) {
+    throw new AppError('Ese correo ya está registrado', 409, 'EMAIL_TAKEN');
+  }
+
+  await query(
+    'UPDATE users SET email = ?, otp_hash = NULL, otp_expires_at = NULL, updated_at = ? WHERE id = ?',
+    [lc, Date.now(), user.id]
+  );
+  // Invalidar cache: el JWT viejo lleva el email anterior; en próximas requests
+  // el middleware recalculará y el frontend recibirá el nuevo /me.
+  invalidateUserCache(user.id);
+
+  return sendOk(res, { message: 'Correo actualizado', email: lc });
 }));
 
 module.exports = router;

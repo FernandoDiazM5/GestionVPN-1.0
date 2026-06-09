@@ -8,6 +8,7 @@ const teamRoutes = require('./routes/team.routes');
 const auditRoutes = require('./routes/audit.routes');
 const eventsRoutes = require('./routes/events.routes');
 const adminRoutes = require('./routes/admin.routes');
+const workspaceRoutes = require('./routes/workspace.routes');
 const { errorMiddleware } = require('./lib/apiResponse');
 const coreRoutes = require('./routes/core.routes');
 const nodeRoutes = require('./routes/node.routes');
@@ -74,6 +75,7 @@ app.use('/api/team', teamRoutes);          // Fase 3: invitaciones y roles (RBAC
 app.use('/api/audit', auditRoutes);        // Fase 3: auditoría de túneles
 app.use('/api/events', eventsRoutes);      // Fase 4: SSE tiempo real (por workspace)
 app.use('/api/admin', adminRoutes);        // Roles v2: Administrador de plataforma
+app.use('/api/workspace', workspaceRoutes); // Fase C: ajustes + import/export del workspace
 
 // Omitir apiRoutes legado que ya fue borrado, registrar los modulares protegidos
 app.use('/api', verifyToken, coreRoutes);

@@ -4,13 +4,13 @@
 // ============================================================
 const { query } = require('../mysql');
 
-async function create({ id, workspaceId, email, otpHash, role, invitedBy, expiresAt, tunnelId }) {
+async function create({ id, workspaceId, email, name, otpHash, role, invitedBy, expiresAt, tunnelId }) {
   const now = Date.now();
   await query(
     `INSERT INTO invitations
-       (id, workspace_id, email, otp_hash, role, status, tunnel_id, invited_by, attempts, expires_at, created_at)
-     VALUES (?,?,?,?,?, 'PENDING', ?, ?, 0, ?, ?)`,
-    [id, workspaceId, email, otpHash, role, tunnelId || null, invitedBy, expiresAt, now]
+       (id, workspace_id, email, name, otp_hash, role, status, tunnel_id, invited_by, attempts, expires_at, created_at)
+     VALUES (?,?,?,?,?,?, 'PENDING', ?, ?, 0, ?, ?)`,
+    [id, workspaceId, email, name || null, otpHash, role, tunnelId || null, invitedBy, expiresAt, now]
   );
 }
 

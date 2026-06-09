@@ -71,8 +71,9 @@ CREATE TABLE IF NOT EXISTS invitations (
   id           CHAR(36)     NOT NULL,
   workspace_id CHAR(36)     NOT NULL,
   email        VARCHAR(255) NOT NULL,
+  name         VARCHAR(120) DEFAULT NULL,              -- nombre del invitado (lo escribe quien invita)
   otp_hash     VARCHAR(255) NOT NULL,                  -- HASH del OTP, nunca el código en claro
-  role         ENUM('CO_MODERATOR','MEMBER') NOT NULL DEFAULT 'MEMBER',
+  role         ENUM('OWNER','CO_MODERATOR','MEMBER') NOT NULL DEFAULT 'MEMBER',
   status       ENUM('PENDING','ACCEPTED','EXPIRED','REVOKED') NOT NULL DEFAULT 'PENDING',
   tunnel_id    VARCHAR(160) DEFAULT NULL,                -- túnel a asignar al aceptar (nombre_vrf/ppp_user)
   invited_by   CHAR(36)     DEFAULT NULL,
@@ -159,7 +160,24 @@ CREATE TABLE IF NOT EXISTS member_wireguard (
   CONSTRAINT fk_mwg_user FOREIGN KEY (user_id)      REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- ── 7. Intentos de autenticación (rate limiting — Fase 2) ────
+-- ── 7. Recuperación de contraseña (Fase D) ──────────────────
+--  Token criptográfico de 32 bytes hex, almacenado como HASH.
+--  Expira a los 15 min, single-use (used_at), CASCADE al borrar user.
+CREATE TABLE IF NOT EXISTS password_resets (
+  id          CHAR(36)    NOT NULL,
+  user_id     CHAR(36)    NOT NULL,
+  token_hash  VARCHAR(255) NOT NULL,        -- HASH del token (bcrypt)
+  expires_at  BIGINT       NOT NULL,
+  used_at     BIGINT       DEFAULT NULL,
+  ip_address  VARCHAR(64)  DEFAULT NULL,
+  created_at  BIGINT       NOT NULL,
+  PRIMARY KEY (id),
+  KEY idx_pr_user (user_id),
+  KEY idx_pr_expires (expires_at),
+  CONSTRAINT fk_pr_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ── 8. Intentos de autenticación (rate limiting — Fase 2) ────
 CREATE TABLE IF NOT EXISTS auth_attempts (
   id          CHAR(36)    NOT NULL,
   ip_address  VARCHAR(64) NOT NULL,

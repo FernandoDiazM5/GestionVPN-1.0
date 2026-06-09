@@ -24,14 +24,15 @@ async function add(runner, { workspaceId, userId, role, invitedBy }) {
 }
 
 async function listMembers(workspaceId) {
-  return query(
-    `SELECT u.id AS user_id, u.email, u.name, wm.role, wm.created_at AS joined_at
+  const rows = await query(
+    `SELECT u.id AS user_id, u.email, u.name, u.disabled_at, wm.role, wm.created_at AS joined_at
        FROM workspace_members wm
        JOIN users u ON u.id = wm.user_id
       WHERE wm.workspace_id = ? AND wm.deleted_at IS NULL AND u.deleted_at IS NULL
       ORDER BY FIELD(wm.role,'OWNER','CO_MODERATOR','MEMBER'), wm.created_at ASC`,
     [workspaceId]
   );
+  return rows.map(r => ({ ...r, disabled: !!r.disabled_at }));
 }
 
 async function updateRole(workspaceId, userId, role) {

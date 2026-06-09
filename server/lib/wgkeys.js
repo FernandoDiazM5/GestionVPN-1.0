@@ -20,17 +20,17 @@ function generateKeyPair() {
 /**
  * Construye el contenido de un archivo .conf de cliente WireGuard.
  */
-function buildClientConf({ privateKey, address, serverPublicKey, endpoint, allowedIps }) {
+function buildClientConf({ privateKey, address, serverPublicKey, endpoint, allowedIps, dns }) {
   return [
     '[Interface]',
     `PrivateKey = ${privateKey}`,
     `Address = ${address}/32`,
-    'DNS = 1.1.1.1',
+    `DNS = ${dns || '8.8.8.8'}`,
     '',
     '[Peer]',
     `PublicKey = ${serverPublicKey}`,
+    `AllowedIPs = ${allowedIps || '0.0.0.0/0'}`,
     `Endpoint = ${endpoint}`,
-    `AllowedIPs = ${allowedIps || '192.168.21.0/24'}`,
     'PersistentKeepalive = 25',
     '',
   ].join('\n');

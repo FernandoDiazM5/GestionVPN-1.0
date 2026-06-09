@@ -10,8 +10,16 @@ const { z } = require('zod');
 
 const { asyncHandler, AppError, sendOk } = require('../lib/apiResponse');
 const { query, withTransaction } = require('../db/mysql');
-const { requireSession, requirePlatformAdmin } = require('../middleware/authJwt');
+const { requireSession, requirePlatformAdmin, invalidateUserCache } = require('../middleware/authJwt');
 const workspaceRepo = require('../db/repos/workspaceRepo');
+const invitationRepo = require('../db/repos/invitationRepo');
+const userRepo = require('../db/repos/userRepo');
+const { sendInvitation } = require('../lib/mailer');
+const { removePeersFromRouter } = require('../lib/routerCleanup');
+const { setPeersEnabled, removeUserMangles } = require('../lib/routerPeerState');
+
+const INVITE_TTL_MS = 24 * 60 * 60 * 1000; // 24h — igual que team.routes.js
+const genOtp = () => String(crypto.randomInt(100000, 1000000));
 
 const router = express.Router();
 router.use(requireSession, requirePlatformAdmin);
@@ -94,6 +102,8 @@ router.patch('/moderators/:id', asyncHandler(async (req, res) => {
   const mod = await findModeratorOr404(req.params.id);
   const { name, workspaceName, password, disabled } = patchSchema.parse(req.body);
   const now = Date.now();
+  let routerSync = null;
+  let mangleCleanup = null;
 
   if (name !== undefined) {
     await query('UPDATE users SET name = ?, updated_at = ? WHERE id = ?', [name, now, mod.id]);
@@ -105,22 +115,143 @@ router.patch('/moderators/:id', asyncHandler(async (req, res) => {
     await query('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?', [await bcrypt.hash(password, 10), now, mod.id]);
   }
   if (disabled !== undefined) {
-    await query('UPDATE users SET disabled_at = ?, updated_at = ? WHERE id = ?', [disabled ? now : null, now, mod.id]);
+    // 1) Persistir el estado en BD (todos los users del workspace cuando suspendemos,
+    //    solo el OWNER cuando rehabilitamos — los MEMBERs no se reactivan en cadena).
+    if (disabled) {
+      await query(
+        `UPDATE users SET disabled_at = ?, updated_at = ?
+           WHERE id IN (SELECT user_id FROM workspace_members WHERE workspace_id = ?)`,
+        [now, now, mod.workspace_id]
+      );
+    } else {
+      await query('UPDATE users SET disabled_at = NULL, updated_at = ? WHERE id = ?', [now, mod.id]);
+    }
+
+    // 2) Recolectar peers WG del workspace y sincronizar el router (best-effort)
+    const peerRows = await query(
+      'SELECT public_key FROM member_wireguard WHERE workspace_id = ? AND public_key IS NOT NULL',
+      [mod.workspace_id]
+    );
+    const publicKeys = peerRows.map(r => r.public_key);
+    routerSync = await setPeersEnabled(publicKeys, !disabled);
+
+    // 3) Si deshabilitamos: borrar mangles activos + cerrar sesiones + invalidar cache
+    if (disabled) {
+      const memberIds = await query(
+        'SELECT user_id FROM workspace_members WHERE workspace_id = ?',
+        [mod.workspace_id]
+      );
+      const userIds = memberIds.map(r => r.user_id);
+      // Borrar mangle activo en el router (corte inmediato del acceso)
+      mangleCleanup = await removeUserMangles(userIds);
+      // Cerrar sesiones en BD para que keepalive deje de pedir
+      await query(
+        `UPDATE tunnel_user_sessions
+            SET status = 'CLOSED', deactivated_at = ?
+          WHERE workspace_id = ? AND status = 'ACTIVE'`,
+        [now, mod.workspace_id]
+      );
+      userIds.forEach(invalidateUserCache);
+    }
   }
 
-  return sendOk(res, { message: 'Moderador actualizado' });
+  return sendOk(res, {
+    message: 'Moderador actualizado',
+    router: routerSync || undefined,
+    mangle: mangleCleanup || undefined,
+  });
 }));
 
-// ── DELETE /api/admin/moderators/:id — baja lógica (soft delete) ──
+// ── DELETE /api/admin/moderators/:id — HARD DELETE en cascada ──
+//  Elimina TODO lo que pertenece al moderador: workspace, nodos+APs+CPEs+
+//  torres, peers WG, sesiones, invitaciones y miembros (cuando no estén en
+//  otros workspaces). Libera el email para poder reutilizarlo después.
 router.delete('/moderators/:id', asyncHandler(async (req, res) => {
   const mod = await findModeratorOr404(req.params.id);
-  const now = Date.now();
+  const wsId = mod.workspace_id;
+
+  // 0a) Cleanup MikroTik: peers WG del workspace (moderador + miembros)
+  const peerKeyRows = await query(
+    `SELECT public_key FROM mgmt_peer_owners WHERE workspace_id = ?
+     UNION
+     SELECT public_key FROM member_wireguard WHERE workspace_id = ? AND public_key IS NOT NULL`,
+    [wsId, wsId]
+  );
+  const publicKeys = peerKeyRows.map(r => r.public_key).filter(Boolean);
+  const routerCleanup = await removePeersFromRouter(publicKeys);
+
+  // 0b) Cleanup MikroTik: mangles activos de los users del workspace (no dejar huérfanas)
+  const wsUserRows = await query(
+    'SELECT user_id FROM workspace_members WHERE workspace_id = ?',
+    [wsId]
+  );
+  const mangleCleanup = await removeUserMangles(wsUserRows.map(r => r.user_id));
+
   await withTransaction(async (tx) => {
-    await tx.query('UPDATE workspace_members SET deleted_at = ? WHERE workspace_id = ? AND deleted_at IS NULL', [now, mod.workspace_id]);
-    await tx.query('UPDATE workspaces SET deleted_at = ? WHERE id = ?', [now, mod.workspace_id]);
-    await tx.query('UPDATE users SET deleted_at = ?, updated_at = ? WHERE id = ?', [now, now, mod.id]);
+    // 1) Usuarios del workspace (OWNER + MEMBERs) — se usarán al final
+    const memberRows = await tx.query(
+      'SELECT user_id FROM workspace_members WHERE workspace_id = ?',
+      [wsId]
+    );
+    const wsUserIds = memberRows.map(r => r.user_id);
+
+    // 2) Auditoría / sesiones (FK NOT NULL a workspaces → borrar primero)
+    await tx.query('DELETE FROM tunnel_session_logs WHERE workspace_id = ?', [wsId]);
+    await tx.query('DELETE FROM tunnel_user_sessions WHERE workspace_id = ?', [wsId]);
+    await tx.query('DELETE FROM user_mgmt_ips WHERE workspace_id = ?', [wsId]);
+    await tx.query('DELETE FROM tunnel_logs WHERE workspace_id = ?', [wsId]);
+    await tx.query('DELETE FROM tunnel_assignments WHERE workspace_id = ?', [wsId]);
+    await tx.query('DELETE FROM member_wireguard WHERE workspace_id = ?', [wsId]);
+    await tx.query('DELETE FROM workspace_routers WHERE workspace_id = ?', [wsId]);
+    await tx.query('DELETE FROM invitations WHERE workspace_id = ?', [wsId]);
+
+    // 3) Equipos / red — torres y cpes requieren join manual (FK SET NULL)
+    await tx.query(
+      'DELETE t FROM torres t INNER JOIN nodes n ON t.node_id = n.id WHERE n.workspace_id = ?',
+      [wsId]
+    );
+    await tx.query(
+      `DELETE c FROM cpes c
+        WHERE c.ap_id IN (
+          SELECT a.id FROM aps a
+          JOIN ap_groups g ON g.id = a.ap_group_id
+          WHERE g.workspace_id = ?
+        )`,
+      [wsId]
+    );
+    await tx.query('DELETE FROM ap_groups WHERE workspace_id = ?', [wsId]);       // CASCADE → aps, signal_history
+    await tx.query('DELETE FROM nodes WHERE workspace_id = ?', [wsId]);            // CASCADE → node_ssh_creds, node_tags, node_history
+    await tx.query('DELETE FROM mgmt_peer_owners WHERE workspace_id = ?', [wsId]);
+
+    // 4) Membresías y workspace
+    await tx.query('DELETE FROM workspace_members WHERE workspace_id = ?', [wsId]);
+    await tx.query('DELETE FROM workspaces WHERE id = ?', [wsId]);
+
+    // 5) Eliminar SOLO los usuarios que no pertenezcan a otros workspaces.
+    //    Esto cubre al OWNER y libera su email para reutilización.
+    if (wsUserIds.length) {
+      const placeholders = wsUserIds.map(() => '?').join(',');
+      const stillBelong = await tx.query(
+        `SELECT DISTINCT user_id FROM workspace_members WHERE user_id IN (${placeholders})`,
+        wsUserIds
+      );
+      const stillSet = new Set(stillBelong.map(r => r.user_id));
+      const toDelete = wsUserIds.filter(id => !stillSet.has(id));
+      if (toDelete.length) {
+        const ph2 = toDelete.map(() => '?').join(',');
+        await tx.query(`DELETE FROM users WHERE id IN (${ph2})`, toDelete);
+        // Invalida el cache de auth → el próximo request del user borrado
+        // dará 401 USER_DELETED y el frontend lo redirigirá a login.
+        toDelete.forEach(invalidateUserCache);
+      }
+    }
   });
-  return sendOk(res, { message: 'Moderador eliminado' });
+
+  return sendOk(res, {
+    message: 'Moderador eliminado completamente',
+    router: routerCleanup, // peers WG eliminados: { removed, failed, skipped }
+    mangle: mangleCleanup, // reglas mangle eliminadas: { removed, failed, skipped }
+  });
 }));
 
 // ── POST /api/admin/moderators — alta directa de un Moderador ──
@@ -154,6 +285,69 @@ router.post('/moderators', asyncHandler(async (req, res) => {
   return sendOk(res, {
     moderator: { user_id: userId, email, name: name || '', workspace_id: wsId },
     message: 'Moderador creado',
+  }, 201);
+}));
+
+// ── POST /api/admin/invite-moderator — invitación por email (flujo OTP) ──
+//  Mismo UX que invitar un miembro: solo email, le llega un correo con link;
+//  al aceptar, el invitado crea su contraseña y WG, y queda como OWNER de un
+//  workspace nuevo creado vacío para él.
+const inviteModeratorSchema = z.object({
+  email: z.string().email('Email inválido').max(255),
+  name: z.string().max(120).optional(),
+  workspaceName: z.string().max(160).optional(),
+});
+
+router.post('/invite-moderator', asyncHandler(async (req, res) => {
+  const { email, name, workspaceName } = inviteModeratorSchema.parse(req.body);
+
+  // ¿Ya existe un usuario activo con ese email?
+  const existing = await userRepo.findByEmail(email);
+  if (existing) throw new AppError('Ese email ya está registrado', 409, 'EMAIL_TAKEN');
+
+  // ¿Hay invitación PENDING (en cualquier workspace) para este email?
+  const pending = await invitationRepo.findPendingByEmail(email);
+  if (pending) throw new AppError('Ya existe una invitación pendiente para ese email', 409, 'INVITE_PENDING');
+
+  // Crear workspace placeholder + invitación role=OWNER (todo en transacción)
+  const wsName = workspaceName || `Espacio de ${name || email.split('@')[0]}`;
+  const inviteId = crypto.randomUUID();
+  const wsId = crypto.randomUUID();
+  const otp = genOtp();
+  const otpHash = await bcrypt.hash(otp, 8);
+  const now = Date.now();
+
+  await withTransaction(async (tx) => {
+    // owner_id es NOT NULL: usamos al platform_admin como placeholder; en /accept
+    // se actualiza al user_id del invitado cuando se convierte en OWNER real.
+    await tx.query(
+      'INSERT INTO workspaces (id, name, owner_id, created_at, updated_at) VALUES (?,?,?,?,?)',
+      [wsId, wsName, req.account.sub, now, now]
+    );
+    await tx.query(
+      `INSERT INTO invitations
+         (id, workspace_id, email, name, otp_hash, role, status, invited_by, attempts, expires_at, created_at)
+       VALUES (?,?,?,?,?, 'OWNER', 'PENDING', ?, 0, ?, ?)`,
+      [inviteId, wsId, email, name?.trim() || null, otpHash, req.account.sub, now + INVITE_TTL_MS, now]
+    );
+  });
+
+  // Email con link → AcceptInvitationForm (mismo que miembros)
+  const delivery = await sendInvitation({
+    email,
+    code: otp,
+    inviterName: 'El administrador de la plataforma',
+    workspaceName: wsName,
+    tunnelId: null,
+    role: 'OWNER',
+  });
+
+  return sendOk(res, {
+    message: 'Invitación enviada',
+    email,
+    workspace_id: wsId,
+    workspace_name: wsName,
+    dev: delivery.dev || undefined,
   }, 201);
 }));
 

@@ -6,6 +6,40 @@ const { connectToMikrotik, safeWrite, getErrorMessage, cleanTunnelRules, writeId
 const { IPV4_REGEX, CIDR_REGEX, getSubnetHosts, probeUbiquiti, sshExec, parseAirOSStats, parseFullOutput, ANTENNA_CMD, trySshCredentials } = require('../ubiquiti.service');
 const { getDb, encryptDevice, decryptDevice, encryptPass, decryptPass, saveNode, getNodes, getNodeByPppUser, getNodeId, deleteNode } = require('../db.service');
 const assignmentRepo = require('../db/repos/assignmentRepo');
+const sessionRepo = require('../db/repos/sessionRepo');
+
+/**
+ * Anota cada nodo con el estado de sesión POR USUARIO, SIN tocar `running`.
+ *
+ * IMPORTANTE: `running` = conectividad de la TORRE al core (SSTP/WG levantado).
+ * Es independiente de si un usuario activó su acceso de ruteo. NO se sobrescribe,
+ * porque hacerlo ocultaría el estado real de conexión de la torre.
+ *
+ *   - running_by_you: el usuario actual tiene este túnel activo (su mangle)
+ *   - active_by_other: (solo admin) usuario que lo tiene activo, o null
+ */
+async function annotateSessions(req, nodes) {
+    const acc = req.account;
+    if (!acc?.sub || !acc?.workspace_id) return nodes;
+    let activeMap;
+    try {
+        activeMap = await sessionRepo.activeMapForWorkspace(acc.workspace_id);
+    } catch (_) {
+        return nodes; // si falla, no anotamos (no exponemos estado de otros)
+    }
+    const isAdmin = !!acc.platform_admin;
+    return nodes.map(n => {
+        const sess = activeMap.get(n.nombre_vrf) || activeMap.get(n.ppp_user);
+        const mine = !!sess && sess.user_id === acc.sub;
+        return {
+            ...n,
+            running_by_you: mine,
+            // Para no-admin NO se revela que otro lo usa (privacidad). Admin sí lo ve.
+            active_by_other: isAdmin && sess && !mine ? (sess.user_name || sess.user_email || 'otro usuario') : null,
+            // `running` se conserva tal cual (conectividad de la torre) — NO se sobrescribe.
+        };
+    });
+}
 
 /**
  * Filtra los nodos según el rol RBAC (Roles v2) con aislamiento multi-tenant:
@@ -187,7 +221,7 @@ router.post('/nodes', async (req, res) => {
             console.error('[DB] Error actualizando caché de nodos:', dbErr.message);
         }
 
-        res.json(await filterNodesForRole(req, nodes));
+        res.json(await annotateSessions(req, await filterNodesForRole(req, nodes)));
     } catch (error) {
         if (api) try { await api.close(); } catch (_) { }
 
@@ -203,7 +237,7 @@ router.post('/nodes', async (req, res) => {
                     ip_tunnel: n.ip_tunnel || '',
                     cached: true,   // flag para el frontend
                 }));
-                return res.json(await filterNodesForRole(req, offlineNodes));
+                return res.json(await annotateSessions(req, await filterNodesForRole(req, offlineNodes)));
             }
         } catch (dbErr) {
             console.error('[DB] Error leyendo caché de nodos:', dbErr.message);

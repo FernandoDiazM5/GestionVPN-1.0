@@ -26,4 +26,21 @@ async function getByUser(workspaceId, userId) {
   return rows[0] || null;
 }
 
-module.exports = { upsert, getByUser };
+/** Busca por public_key restringido al workspace (anti cross-tenant). */
+async function getByPublicKey(workspaceId, publicKey) {
+  const rows = await query(
+    'SELECT * FROM member_wireguard WHERE workspace_id = ? AND public_key = ? LIMIT 1',
+    [workspaceId, publicKey]
+  );
+  return rows[0] || null;
+}
+
+/** Guarda/reemplaza el .conf cifrado (AES-256-GCM) sin tocar los demás campos. */
+async function updateConfig({ workspaceId, userId, configEnc }) {
+  await query(
+    'UPDATE member_wireguard SET config_enc = ? WHERE workspace_id = ? AND user_id = ?',
+    [configEnc || null, workspaceId, userId]
+  );
+}
+
+module.exports = { upsert, getByUser, getByPublicKey, updateConfig };

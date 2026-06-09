@@ -1,5 +1,29 @@
 const { RouterOSAPI } = require('node-routeros');
 
+// ── Parche node-routeros: manejar la respuesta `!empty` de RouterOS ──────────
+//  RouterOS envía `!empty` (seguido de `!done`) cuando un /print no tiene filas
+//  (ej. tabla mangle vacía). node-routeros v1.6.9 no la conoce: su processPacket
+//  cae en `default`, emite 'unknown' (que LANZA en onUnknown) y CIERRA el canal.
+//  Eso provoca o bien un uncaughtException, o un UNREGISTEREDTAG cuando llega el
+//  `!done` posterior. Aquí simplemente IGNORAMOS `!empty` (sin cerrar): el `!done`
+//  que viene a continuación resuelve la promesa con la data acumulada (= []).
+try {
+    const { Channel } = require('node-routeros/dist/Channel');
+    if (Channel && Channel.prototype && !Channel.prototype.__emptyPatched) {
+        const _origProcessPacket = Channel.prototype.processPacket;
+        Channel.prototype.processPacket = function (packet) {
+            if (Array.isArray(packet) && packet[0] === '!empty') {
+                return; // resultado vacío normal → no cerrar; el !done siguiente resuelve []
+            }
+            return _origProcessPacket.call(this, packet);
+        };
+        Channel.prototype.__emptyPatched = true;
+        console.log('[ROUTEROS] Parche !empty aplicado a node-routeros Channel');
+    }
+} catch (e) {
+    console.warn('[ROUTEROS] No se pudo aplicar el parche !empty:', e?.message);
+}
+
 const connectToMikrotik = async (host, user, password) => {
     // ── Intento 1: puerto 8728 (plain API) ──────────────────────────────────
     try {
@@ -33,11 +57,21 @@ const safeWrite = (api, commands, timeoutMs = 6000) =>
         const timer = setTimeout(() => {
             if (settled) return;
             settled = true;
-            reject(new Error('Sin respuesta del router (posible !empty — tabla vacía o filtro sin resultados)'));
+            reject(new Error('Sin respuesta del router (timeout)'));
         }, timeoutMs);
         api.write(commands).then(
             (result) => { if (!settled) { settled = true; clearTimeout(timer); resolve(result); } },
-            (err)    => { if (!settled) { settled = true; clearTimeout(timer); reject(err); } },
+            (err)    => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                // RouterOS responde `!empty` cuando un /print no tiene filas. node-routeros
+                // (v1.6.9) no lo maneja y lanza UNKNOWNREPLY. Es un resultado VACÍO normal,
+                // NO un fallo → lo normalizamos a []. Cualquier otro error sí se propaga.
+                const isEmpty = err?.errno === 'UNKNOWNREPLY' && /!empty/i.test(err?.message || '');
+                if (isEmpty) return resolve([]);
+                reject(err);
+            },
         );
     });
 

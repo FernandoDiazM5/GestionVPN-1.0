@@ -35,7 +35,6 @@ function getPool() {
       enableKeepAlive: true,
       keepAliveInitialDelayMs: 0,
       idleTimeout: 60000,  // libera conexiones idle tras 60s
-      connectionTimeZone: 'Z',
     });
   }
   return pool;
@@ -99,10 +98,13 @@ async function closePool() {
  * Útil para XAMPP que puede crashear y reiniciar.
  */
 let _monitorHandle = null;
+let _monitorRunning = false;   // C7: evita health checks solapados
 function startMonitor(intervalMs = 10000) {
   if (_monitorHandle) return; // ya está ejecutándose
 
   async function healthCheck() {
+    if (_monitorRunning) return;   // C7: si el check anterior sigue en curso, saltar
+    _monitorRunning = true;
     try {
       await ping();
       // Conexión OK
@@ -122,6 +124,8 @@ function startMonitor(intervalMs = 10000) {
           console.warn('[MONITOR] Reintento fallido. Volverá a intentar...', retryErr?.code);
         }
       }
+    } finally {
+      _monitorRunning = false;
     }
   }
 

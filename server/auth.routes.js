@@ -7,6 +7,11 @@ const { hasUsers, getUserByUsername, createUser } = require('./db.service');
 const { JWT_SECRET } = require('./auth.middleware');
 const { setSessionCookie } = require('./lib/jwt');
 const { buildSessionForLegacyUser, authenticateMysqlUser } = require('./lib/sessionBridge');
+const userRepo = require('./db/repos/userRepo');
+const passwordResetRepo = require('./db/repos/passwordResetRepo');
+const { sendPasswordReset } = require('./lib/mailer');
+const rl = require('./lib/rateLimit');
+const { invalidateUserCache } = require('./middleware/authJwt');
 
 // Establece (si es posible) la sesión RBAC por cookie a partir del login legacy.
 // No rompe el login si MySQL está caído: degrada a solo-Bearer.
@@ -142,6 +147,101 @@ router.post('/refresh', (req, res) => {
     } catch {
         res.status(403).json({ success: false, message: 'Token inválido o expirado' });
     }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+//  Recuperación de contraseña (Fase D)
+//
+//  • Anti-enumeración: SIEMPRE devolvemos 200 OK con mensaje genérico, exista
+//    el email o no. Esto evita que un atacante use el endpoint para descubrir
+//    qué emails están registrados en el sistema.
+//  • Rate limit: el guard de auth_attempts ('OTP') bloquea la IP tras 5 fallos
+//    en 15 min. Aquí se cuenta el "fallo" cuando se llega al tope de tokens
+//    pendientes para el mismo user (anti-flood).
+//  • Token: 32 bytes hex (crypto.randomBytes), guardado SOLO como bcrypt hash.
+//    Expira en 15 min y es single-use.
+// ════════════════════════════════════════════════════════════════════════════
+
+const MAX_PENDING_TOKENS_PER_HOUR = 5;
+const requestResetSchema = z.object({
+  email: z.string().email('Email inválido').max(255),
+});
+const confirmResetSchema = z.object({
+  token: z.string().min(16).max(255),
+  newPassword: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres').max(128),
+});
+const GENERIC_OK = {
+  success: true,
+  message: 'Si el correo está registrado, te enviamos un enlace para restablecer tu contraseña.',
+};
+
+router.post('/password-reset/request', rl.guard('OTP'), async (req, res) => {
+  const ip = req._clientIp;
+  try {
+    const { email } = requestResetSchema.parse(req.body);
+
+    // Lookup silencioso del user. Independientemente del resultado,
+    // devolvemos el mismo mensaje genérico (anti-enumeración).
+    const user = await userRepo.findByEmail(email).catch(() => null);
+
+    if (user) {
+      // Anti-spam: máx 5 tokens emitidos por usuario en la última hora
+      const recent = await passwordResetRepo.countRecent(user.id, 60 * 60 * 1000);
+      if (recent >= MAX_PENDING_TOKENS_PER_HOUR) {
+        await rl.recordAttempt(ip, 'OTP', email, false);
+      } else {
+        const { token, hash } = await passwordResetRepo.generateToken();
+        await passwordResetRepo.create({ userId: user.id, tokenHash: hash, ipAddress: ip });
+        // Envío de correo en background (no bloquea el response)
+        sendPasswordReset({ email: user.email, token, name: user.name })
+          .catch(e => console.warn('[password-reset] mail falló:', e.message));
+        await rl.recordAttempt(ip, 'OTP', email, true);
+      }
+    }
+    return res.json(GENERIC_OK);
+  } catch (err) {
+    // Errores de validación → 400, pero sin pistas sobre existencia del email
+    if (err.errors) return res.status(400).json({ success: false, message: 'Datos inválidos' });
+    console.error('[password-reset/request] error:', err.message);
+    return res.json(GENERIC_OK); // tampoco filtramos errores internos
+  }
+});
+
+router.post('/password-reset/confirm', rl.guard('OTP'), async (req, res) => {
+  const ip = req._clientIp;
+  try {
+    const { token, newPassword } = confirmResetSchema.parse(req.body);
+
+    const found = await passwordResetRepo.findValid(token);
+    if (!found) {
+      await rl.recordAttempt(ip, 'OTP', null, false);
+      return res.status(401).json({
+        success: false, code: 'INVALID_TOKEN',
+        message: 'El enlace es inválido o ya fue usado. Solicita uno nuevo.',
+      });
+    }
+
+    // Actualizar contraseña + marcar token como usado + invalidar el resto
+    const hash = await bcrypt.hash(newPassword, 10);
+    const now = Date.now();
+    const { query } = require('./db/mysql');
+    await query('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?', [hash, now, found.userId]);
+    await passwordResetRepo.markUsed(found.id);
+    await passwordResetRepo.invalidateForUser(found.userId);
+
+    // Por seguridad: invalidar sesiones activas del user (cache de auth)
+    invalidateUserCache(found.userId);
+
+    await rl.recordAttempt(ip, 'OTP', null, true);
+    return res.json({
+      success: true,
+      message: 'Contraseña actualizada. Ya puedes iniciar sesión con tu nueva clave.',
+    });
+  } catch (err) {
+    if (err.errors) return res.status(400).json({ success: false, message: 'Datos inválidos', errors: err.errors });
+    console.error('[password-reset/confirm] error:', err.message);
+    return res.status(500).json({ success: false, message: 'No se pudo restablecer la contraseña' });
+  }
 });
 
 module.exports = router;
