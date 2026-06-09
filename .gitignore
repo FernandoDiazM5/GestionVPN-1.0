@@ -49,3 +49,13 @@ server/_legacy_sqlite/
 
 # Worktrees temporales de agentes (copias completas del repo con secretos)
 .claude/worktrees/
+
+# Playwright (F3 — testing E2E)
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# Coverage de Vitest
+coverage/
+**/coverage/
