@@ -1,0 +1,327 @@
+// ============================================================
+//  routes/nodes/listing.routes.js — listado e inspección de nodos
+//
+//   POST /nodes              → catálogo SSTP+WG con fallback caché MySQL
+//   POST /node/details       → datos para el modal de edición
+//   POST /node/script        → script CPE (SSTP o WG) para copy/paste
+//   POST /node/wg/set-peer   → set/replace del peer WG del CPE
+// ============================================================
+
+const express = require('express');
+const router = express.Router();
+
+const log = require('../../lib/logger').child({ scope: 'nodes:listing' });
+const {
+  connectToMikrotik, safeWrite, getErrorMessage, parseHandshakeSecs,
+} = require('../../routeros.service');
+const { getDb, saveNode, getNodes } = require('../../db.service');
+const { annotateSessions, filterNodesForRole, nodeBelongsToRequester } = require('./_shared');
+
+router.post('/nodes', async (req, res) => {
+  if (!req.mikrotik) return res.status(503).json({ success: false, needsConfig: true, message: 'Configura las credenciales MikroTik en Ajustes antes de continuar.' });
+  const { ip, user, pass } = req.mikrotik;
+  let api;
+  try {
+    api = await connectToMikrotik(ip, user, pass);
+    // SECUENCIAL — RouterOS no soporta comandos paralelos en la misma conexión
+    const secrets    = await safeWrite(api, ['/ppp/secret/print']);
+    const wgIfaces   = await safeWrite(api, ['/interface/wireguard/print']).catch(() => []);
+    const wgPeers    = await safeWrite(api, ['/interface/wireguard/peers/print']).catch(() => []);
+    const vrfs       = await safeWrite(api, ['/ip/vrf/print']);
+    const active     = await safeWrite(api, ['/ppp/active/print']);
+    const sstpIfaces = await safeWrite(api, ['/interface/sstp-server/print']);
+    const routes     = await safeWrite(api, ['/ip/route/print']);
+    await api.close();
+
+    const vrfByInterface = {}; vrfs.forEach(vrf => (vrf.interfaces || '').split(',').forEach(i => { if (i.trim()) vrfByInterface[i.trim()] = vrf.name; }));
+    const sstpIfaceByUser = {}; sstpIfaces.forEach(i => { if (i.user && i.name) sstpIfaceByUser[i.user] = i.name; });
+    const activeByName = {}; active.forEach(s => { if (s.name) activeByName[s.name] = { address: s.address, uptime: s.uptime }; });
+    const sysRoutesByVrf = {}; (routes || []).forEach(r => { if (r['routing-table'] && r['routing-table'] !== 'main' && !r['dst-address']?.endsWith('/32') && r['dst-address'] !== '192.168.21.0/24' && r.dynamic !== 'true') { if (!sysRoutesByVrf[r['routing-table']]) sysRoutesByVrf[r['routing-table']] = []; sysRoutesByVrf[r['routing-table']].push(r['dst-address']); } });
+
+    // ── Nodos SSTP (PPP secrets con service=sstp) ───────────────────────────
+    const sstpNodes = secrets.filter(s => s.service === 'sstp').map(secret => {
+      const name = secret.name || 'Unknown';
+      const session = activeByName[name];
+      const nombreVrf = vrfByInterface[sstpIfaceByUser[name] || ''] || '';
+      return {
+        id: secret['.id'], nombre_nodo: (secret.comment || name).replace(/Torre|torre|-ND\d+/gi, '').trim() || name,
+        ppp_user: name, segmento_lan: secret.routes || (sysRoutesByVrf[nombreVrf]?.[0] || ''), lan_subnets: sysRoutesByVrf[nombreVrf] || [], nombre_vrf: nombreVrf,
+        service: 'sstp', disabled: secret.disabled === 'true' || secret.disabled === true,
+        running: !!session, ip_tunnel: session ? session.address : '', uptime: session ? session.uptime : '',
+      };
+    });
+
+    // ── Nodos WireGuard (interfaces WG-NDx-*, excluyendo VPN-WG-MGMT y otras WG de gestión) ──
+    const wgTorreIfaces = (wgIfaces || []).filter(i => /^WG-ND\d+/i.test(i.name || ''));
+    const wgNodes = wgTorreIfaces.map(iface => {
+      const ifaceName = iface.name;
+      const vrfName = vrfByInterface[ifaceName] || '';
+      const peer = (wgPeers || []).find(p => p.interface === ifaceName);
+      const vrfRoutes = (routes || []).filter(r =>
+        r['routing-table'] === vrfName &&
+        !r['dst-address']?.endsWith('/32') &&
+        r['dst-address'] !== '192.168.21.0/24' &&
+        r.dynamic !== 'true'
+      );
+      const lanSubnets = vrfRoutes.map(r => r['dst-address']).filter(Boolean);
+      const lastHs = peer?.['last-handshake'] || '';
+      const lastHsSecs = parseHandshakeSecs(lastHs);
+      const ifaceRunning = iface.running === 'true' || iface.running === true;
+      // Conectado = peer con handshake reciente; Activo sin peer = interfaz levantada pero sin peer aún
+      const peerConnected = peer && lastHsSecs < 300;
+      const running = ifaceRunning || peerConnected;
+      // Si el comment es solo "NDx" (ej. "ND4" puesto por el provisioning), ignorarlo
+      // y derivar el nombre real del nombre de la interfaz (ej. WG-ND4-TORRESANANTONIO → TORRESANANTONIO)
+      const rawComment = iface.comment || '';
+      const nombre = (rawComment && !/^ND\d+$/i.test(rawComment.trim()))
+        ? rawComment
+        : ifaceName.replace(/^WG-ND\d+-/i, '').replace(/-/g, ' ').trim();
+      return {
+        id: iface['.id'],
+        nombre_nodo: nombre,
+        ppp_user: ifaceName,
+        segmento_lan: lanSubnets[0] || '',
+        lan_subnets: lanSubnets,
+        nombre_vrf: vrfName,
+        service: 'wireguard',
+        disabled: iface.disabled === 'true' || iface.disabled === true,
+        running,
+        ip_tunnel: peer?.['current-endpoint-address'] || '',
+        uptime: running ? lastHs : '',
+        wg_public_key: peer?.['public-key'] || '',
+        wg_listen_port: parseInt(iface['listen-port'] || '0') || 0,
+        wg_last_handshake_secs: isFinite(lastHsSecs) ? lastHsSecs : null,
+        wg_allowed_ips: peer?.['allowed-address'] || '',
+      };
+    });
+
+    let nodes = [...sstpNodes, ...wgNodes];
+
+    // --- Merge etiquetas personalizadas desde MySQL (tienen prioridad sobre el comment de MikroTik) ---
+    try {
+      const db = await getDb();
+      const labelRows = await db.all('SELECT ppp_user, label FROM nodes WHERE label IS NOT NULL AND label != \'\'');
+      const labelMap = {};
+      labelRows.forEach(r => { if (r.label) labelMap[r.ppp_user] = r.label; });
+      nodes = nodes.map(n => labelMap[n.ppp_user] ? { ...n, nombre_nodo: labelMap[n.ppp_user] } : n);
+    } catch (dbErr) {
+      log.error({ err: dbErr.message }, 'DB: merge labels');
+    }
+
+    // --- Actualizar caché MySQL con el estado actual de MikroTik ---
+    try {
+      for (const n of nodes) {
+        // Para WG: ppp_user === ifaceName (VPN-WG-NDx-NOMBRE), iface_name igual
+        // Para SSTP: iface_name se deriva del VRF
+        const ifaceName = n.service === 'wireguard'
+          ? n.ppp_user
+          : (n.nombre_vrf ? n.nombre_vrf.replace(/^VRF-/, 'VPN-SSTP-') : '');
+        await saveNode({
+          ppp_user: n.ppp_user,
+          nombre_nodo: n.nombre_nodo,
+          nombre_vrf: n.nombre_vrf,
+          iface_name: ifaceName,
+          segmento_lan: n.segmento_lan,
+          lan_subnets: n.lan_subnets,
+          ip_tunnel: n.ip_tunnel,
+          protocol: n.service,
+          last_seen: Date.now(),
+        });
+      }
+    } catch (dbErr) {
+      log.error({ err: dbErr.message }, 'DB: actualizar caché de nodos');
+    }
+
+    res.json(await annotateSessions(req, await filterNodesForRole(req, nodes)));
+  } catch (error) {
+    if (api) try { await api.close(); } catch (_) { }
+
+    // --- Fallback: retornar nodos desde caché MySQL si MikroTik no responde ---
+    try {
+      const cached = await getNodes();
+      if (cached.length > 0) {
+        log.warn('DB: MikroTik no disponible — sirviendo nodos desde caché MySQL');
+        const offlineNodes = cached.map(n => ({
+          ...n,
+          running: false,
+          uptime: '',
+          ip_tunnel: n.ip_tunnel || '',
+          cached: true,   // flag para el frontend
+        }));
+        return res.json(await annotateSessions(req, await filterNodesForRole(req, offlineNodes)));
+      }
+    } catch (dbErr) {
+      log.error({ err: dbErr.message }, 'DB: leer caché de nodos');
+    }
+
+    res.status(500).json({ success: false, message: getErrorMessage(error, ip, user) });
+  }
+});
+
+router.post('/node/details', async (req, res) => {
+  if (!req.mikrotik) return res.status(503).json({ success: false, needsConfig: true, message: 'Configura las credenciales MikroTik en Ajustes antes de continuar.' });
+  const { ip, user, pass } = req.mikrotik;
+  const { vrfName, pppUser } = req.body;
+  let api;
+  try {
+    api = await connectToMikrotik(ip, user, pass);
+    // SECUENCIAL — RouterOS no soporta comandos paralelos en la misma conexión
+    const routes   = vrfName ? await safeWrite(api, ['/ip/route/print']) : [];
+    const addrList = vrfName ? await safeWrite(api, ['/ip/firewall/address-list/print']) : [];
+    const secrets  = pppUser ? await safeWrite(api, ['/ppp/secret/print']) : [];
+    const vrfSubnets = routes
+      .filter(r => r['routing-table'] === vrfName && r['dst-address'] !== '192.168.21.0/24')
+      .map(r => r['dst-address']);
+    const lanSubnets = addrList
+      .filter(a => a.list === 'LIST-NET-REMOTE-TOWERS' && vrfSubnets.includes(a.address))
+      .map(a => a.address);
+    const secret = secrets.find(s => s.name === pppUser);
+    const isWG = pppUser && (pppUser.startsWith('WG-ND') || pppUser.startsWith('VPN-WG-'));
+
+    const db = await getDb();
+    const nodeRow = await db.get('SELECT * FROM nodes WHERE ppp_user = ?', [pppUser]);
+    let ipTunnel = '';
+    if (nodeRow) {
+      ipTunnel = nodeRow.ip_tunnel || '';
+    }
+
+    await api.close();
+    res.json({
+      success: true,
+      lanSubnets: lanSubnets.length > 0 ? lanSubnets : vrfSubnets,
+      remoteAddress: isWG ? ipTunnel : (secret?.['remote-address'] || ipTunnel || ''),
+      currentPppUser: isWG ? pppUser : (secret?.name || pppUser || ''),
+      pppPassword: '********',   // Nunca enviar la contraseña real al frontend
+    });
+  } catch (error) {
+    if (api) try { await api.close(); } catch (_) { }
+    res.status(500).json({ success: false, message: getErrorMessage(error, ip, user) });
+  }
+});
+
+router.post('/node/script', async (req, res) => {
+  const { pppUser, pppPassword, serverPublicIP } = req.body;
+  if (!pppUser || !serverPublicIP)
+    return res.status(400).json({ success: false, message: 'pppUser y serverPublicIP son requeridos' });
+
+  const isWG = pppUser.startsWith('WG-ND') || pppUser.startsWith('VPN-WG-');
+
+  if (isWG) {
+    let ipTunnel = '';
+    let serverPublicKey = '<CLAVE_PUBLICA_SERVIDOR>';
+    let wgPort = 13300;
+    let wgNodeNum = 0;
+
+    try {
+      const db = await getDb();
+      const nodeRow = await db.get('SELECT * FROM nodes WHERE ppp_user = ?', [pppUser]);
+      if (nodeRow) {
+        ipTunnel = nodeRow.ip_tunnel || '';
+        // Derive node number from interface name pattern (WG-NDx-NAME)
+        wgNodeNum = parseInt(pppUser.match(/ND(\d+)/)?.[1] || '0');
+      }
+      if (req.mikrotik) {
+        const { ip, user, pass } = req.mikrotik;
+        const api = await connectToMikrotik(ip, user, pass);
+        const info = await safeWrite(api, ['/interface/wireguard/print', `?name=${pppUser}`]);
+        if (info && info.length > 0) {
+          serverPublicKey = info[0]['public-key'] || serverPublicKey;
+          wgPort = parseInt(info[0]['listen-port'] || '0') || (13300 + parseInt(wgNodeNum));
+        }
+        await api.close();
+      } else {
+        wgPort = 13300 + parseInt(wgNodeNum);
+      }
+    } catch (_) { /* derivar lo que se pueda — script lleva placeholders */ }
+
+    const peerOct = parseInt((ipTunnel || '10.10.251.2').split('.')[3] ?? '2');
+    const blockBase30 = peerOct - 2;
+    const tunnelNet30 = `10.10.251.${blockBase30}/30`;
+
+    const script = `/interface wireguard add name=WG-CORE-ISP mtu=1420 comment="Conexion al Servidor Core"
+/ip address add address=${ipTunnel || `10.10.251.${wgNodeNum * 4 - 2}`}/30 interface=WG-CORE-ISP network=10.10.251.${blockBase30} comment="IP WG Cliente ND${wgNodeNum}"
+/interface wireguard peers add interface=WG-CORE-ISP public-key="${serverPublicKey}" endpoint-address=${serverPublicIP} endpoint-port=${wgPort} allowed-address=192.168.21.0/24,${tunnelNet30} persistent-keepalive=25s comment="Conexion al Servidor Core"
+/ip route add dst-address=192.168.21.0/24 distance=20 gateway=WG-CORE-ISP comment="Retorno hacia Administracion/Software"
+`;
+    const cpeSteps = [
+      { title: 'Crear interfaz WireGuard', cmd: `/interface wireguard add name=WG-CORE-ISP mtu=1420 comment="Conexion al Servidor Core"` },
+      { title: 'Asignar IP al túnel (/30)', cmd: `/ip address add address=${ipTunnel || `10.10.251.${wgNodeNum * 4 - 2}`}/30 interface=WG-CORE-ISP network=10.10.251.${blockBase30} comment="IP WG Cliente ND${wgNodeNum}"` },
+      { title: 'Agregar peer (servidor Core)', cmd: `/interface wireguard peers add interface=WG-CORE-ISP public-key="${serverPublicKey}" endpoint-address=${serverPublicIP} endpoint-port=${wgPort} allowed-address=192.168.21.0/24,${tunnelNet30} persistent-keepalive=25s comment="Conexion al Servidor Core"` },
+      { title: 'Ruta de retorno hacia administración', cmd: `/ip route add dst-address=192.168.21.0/24 distance=20 gateway=WG-CORE-ISP comment="Retorno hacia Administracion/Software"` },
+    ];
+    return res.json({ success: true, script, cpeSteps });
+  }
+
+  if (!pppPassword) return res.status(400).json({ success: false, message: 'pppPassword es requerido para SSTP' });
+  // Si sstp-out1 ya existe, solo actualiza sus parámetros (evita crear interfaz dinámica duplicada DR).
+  // Si no existe, la crea desde cero.
+  const script = `/interface sstp-client
+:if ([find name=sstp-out1] = "") do={
+  add authentication=mschap2 connect-to=${serverPublicIP} disabled=no http-proxy=0.0.0.0 name=sstp-out1 profile=default-encryption tls-version=only-1.2 user=${pppUser} password=${pppPassword}
+} else={
+  set [find name=sstp-out1] connect-to=${serverPublicIP} disabled=no user=${pppUser} password=${pppPassword}
+}`;
+  const cpeSteps = [
+    { title: 'Configurar Cliente SSTP', cmd: `/interface sstp-client\n:if ([find name=sstp-out1] = "") do={\n  add authentication=mschap2 connect-to=${serverPublicIP} disabled=no http-proxy=0.0.0.0 name=sstp-out1 profile=default-encryption tls-version=only-1.2 user=${pppUser} password=${pppPassword}\n} else={\n  set [find name=sstp-out1] connect-to=${serverPublicIP} disabled=no user=${pppUser} password=${pppPassword}\n}` },
+  ];
+  res.json({ success: true, script, cpeSteps });
+});
+
+// POST /node/wg/set-peer — Agrega o actualiza el peer CPE en un nodo WireGuard existente
+router.post('/node/wg/set-peer', async (req, res) => {
+  if (!req.mikrotik) return res.status(503).json({ success: false, needsConfig: true, message: 'Configura las credenciales MikroTik primero.' });
+  const { ip, user, pass } = req.mikrotik;
+  const { pppUser, cpePublicKey } = req.body;
+  if (!pppUser || !cpePublicKey) return res.status(400).json({ success: false, message: 'pppUser y cpePublicKey son requeridos' });
+  if (!(await nodeBelongsToRequester(req, pppUser))) return res.status(404).json({ success: false, message: 'Nodo no encontrado en tu workspace' });
+
+  let api;
+  try {
+    api = await connectToMikrotik(ip, user, pass);
+
+    // Leer IPs de la interfaz WG para calcular peerIP
+    const allAddrs = (await safeWrite(api, ['/ip/address/print'])) || [];
+    const wgAddr = allAddrs.find(a => a.interface === pppUser && (a.address || '').startsWith('10.10.251.'));
+    if (!wgAddr) {
+      await api.close();
+      return res.status(404).json({ success: false, message: `No se encontró IP WireGuard para ${pppUser}` });
+    }
+    // Server IP es .X en la dirección, peer IP es .X+1
+    // Ej: address=10.10.251.1/30 → serverOct=1 → peerOct=2
+    const serverOct = parseInt((wgAddr.address || '').split('/')[0].split('.')[3]);
+    const peerOct = serverOct + 1;
+    const peerIP = `10.10.251.${peerOct}`;
+
+    // Obtener LAN subnets del nodo desde MySQL
+    const db = await getDb();
+    const nodeRow = await db.get('SELECT * FROM nodes WHERE ppp_user = ?', [pppUser]);
+    let lanSubnets = [];
+    if (nodeRow) {
+      if (nodeRow.segmento_lan) lanSubnets = [nodeRow.segmento_lan];
+    }
+    const allowedAddress = [`${peerIP}/32`, ...lanSubnets].join(',');
+
+    // Eliminar peer existente si hay uno en esta interfaz
+    const existingPeers = (await safeWrite(api, ['/interface/wireguard/peers/print']).catch(() => [])) || [];
+    const peerToRemove = existingPeers.find(p => p.interface === pppUser);
+    if (peerToRemove) {
+      await safeWrite(api, ['/interface/wireguard/peers/remove', `=.id=${peerToRemove['.id']}`]);
+    }
+
+    // Agregar nuevo peer con la clave del CPE
+    await safeWrite(api, ['/interface/wireguard/peers/add',
+      `=interface=${pppUser}`,
+      `=public-key=${cpePublicKey}`,
+      `=allowed-address=${allowedAddress}`,
+      `=comment=Cliente`,
+    ]);
+
+    await api.close();
+    res.json({ success: true, message: `Peer CPE configurado: ${peerIP} + ${lanSubnets.join(', ')}`, peerIP, allowedAddress });
+  } catch (error) {
+    if (api) try { await api.close(); } catch (_) { }
+    res.status(500).json({ success: false, message: getErrorMessage(error, ip, user, pass) });
+  }
+});
+
+module.exports = router;

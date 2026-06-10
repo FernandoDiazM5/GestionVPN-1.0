@@ -2,7 +2,7 @@
 
 > Documento de migración de contexto entre sesiones.
 > Rama de trabajo: **`dev`** · Remote: `github.com/FernandoDiazM5/GestionVPN-1.0`.
-> Última actualización (2026-06-09 PM): **REFACTOR_PLAN fases 0-5 ejecutadas** (F5: monorepo npm workspaces + `@gestionvpn/contracts` con schemas Zod compartidos backend↔frontend + `apiClient` Bearer eliminado). Ver §17 y §18.
+> Última actualización (2026-06-09 PM): **REFACTOR_PLAN fases 0-6 ejecutadas** (F5: monorepo + `@gestionvpn/contracts`; F6: `node.routes.js` 1264 LOC → 8 archivos < 472 LOC en `routes/nodes/`). Ver §17, §18 y §19.
 > Sesión 2026-06-07 PM: Ajustes del moderador (perfil + workspace + import/export JSON) + Recuperar contraseña + sync MikroTik al deshabilitar + invitaciones por email + .conf WG server-side.
 > Sesión 2026-06-07 AM: multi-usuario con aislamiento por sesión (mangle por-IP), parche `!empty` node-routeros, auditoría (Semgrep+security-review+code-review) y fixes C1–C7.
 > Resumen extendido en `RESUMEN_CONTEXTO_MAESTRO.md`.
@@ -729,12 +729,12 @@ Sesión 2026-06-09 ejecutó las fases 0-4 del plan de refactor incremental
 | **F3** Setup de testing | ✅ | 6 | Vitest 2 (backend + frontend), Supertest, Testing Library, MSW, jsdom, Playwright. Mocks (`routeros`, `mailer`, `mysql`), factories, helper `stubModule` para CJS, render wrapper con providers reales. CI corre Vitest en ambos jobs |
 | **F4** Tests críticos | ✅ | 7 | **92 tests verde** (55 backend + 37 frontend). Suites: `wgkeys`, `crypto`, `passwordResetRepo`, `tenantScope`, `password-reset/*` (supertest), `permissions`, `sessionClient` (auth_expired), `WgConfigModal`. Thresholds suaves (5% lines / 45% branches) — F8/F11 los suben a 60% |
 | **F5** Contracts compartidos + Bearer kill | ✅ | — | Monorepo npm workspaces; `packages/contracts` con schemas Zod (Auth, Account, Team, Admin, Workspace); backend importa schemas centralizados (5 routes migrados); frontend re-exporta tipos desde contracts; `auth.routes.js` usa `sendOk`/`sendError`; `apiFetch` ya no inyecta `Bearer` — sesión = cookie HttpOnly. **92 tests siguen verdes.** Ver §18 |
+| **F6** Split `node.routes.js` | ✅ | — | `routes/node.routes.js` (1264 LOC) → `routes/nodes/{index,_shared,listing,provision,editing,tags,credentials,history,scan}.routes.js` (max **472 LOC**). Helpers comunes (`annotateSessions`, `filterNodesForRole`, `nodeBelongsToRequester`, `requireOperator`) en `_shared.js`. **92 tests siguen verdes.** Ver §19 |
 
 ### Fases pendientes
 
 | Fase | Estado | Estimación | Bloquea a |
 |------|--------|------------|-----------|
-| **F6** Split `node.routes.js` (1264 LOC) | ⏳ | 2 días 🟠 | — |
 | **F7** Split `core.routes.js` (935 LOC) | ⏳ | 2 días 🟠 | — |
 | **F8** Split `NetworkDevicesModule.tsx` (1313 LOC) | ⏳ | 3 días 🟠 | F10 |
 | **F9** Health check enriquecido + métricas Prometheus | ⏳ | 1 día 🟢 | — |
@@ -897,6 +897,89 @@ Toda la API responde una de estas dos formas (via `lib/apiResponse.js`):
 | `Authorization: Bearer` en frontend | sí (`apiClient` + 1 servicio) | **no** (cookie HttpOnly) |
 | Endpoints `auth.routes.js` con `res.status().json()` manual | 7 | 0 (usan `sendOk`/`sendError`) |
 | Tests verdes | 92 | **92** (sin regresión) |
+
+---
+
+## 19) 🧩 Split de `node.routes.js` (FASE 6)
+
+El monolito de 1264 LOC se descompone en 7 sub-routers por responsabilidad,
+un compositor (`index.js`) y un módulo de helpers (`_shared.js`). El
+montaje en `server/index.js` cambió de `require('./routes/node.routes')` a
+`require('./routes/nodes')` — Node resuelve `routes/nodes/index.js`.
+
+### Estructura
+
+```
+server/routes/nodes/
+├── index.js                  ← compositor: router.use(sub-router) ×7  (24 LOC)
+├── _shared.js                ← annotateSessions, filterNodesForRole,
+│                               nodeBelongsToRequester, requireOperator  (119 LOC)
+├── listing.routes.js         ← POST /nodes, /node/details, /node/script,
+│                               /node/wg/set-peer                         (327 LOC)
+├── provision.routes.js       ← POST /node/next, /node/provision,
+│                               /node/deprovision                         (472 LOC)
+├── editing.routes.js         ← POST /node/edit, /node/label/save         (190 LOC)
+├── tags.routes.js            ← GET /node/tags, POST /node/tag/save        (61 LOC)
+├── credentials.routes.js     ← POST /node/{creds,ssh-creds}/{save,get}    (85 LOC)
+├── history.routes.js         ← POST /node/history/{add,get}                (42 LOC)
+└── scan.routes.js            ← POST /node/scan-stream (Worker SSE)       (101 LOC)
+```
+
+### Regla operativa
+
+- **Helpers compartidos viven en `_shared.js`.** Si tienes que pasar el mismo
+  helper a 2 sub-routers, ese helper pertenece aquí. Cada sub-router lo importa
+  con `require('./_shared')`.
+- **Cada sub-router agrupa por responsabilidad**, no por verbo HTTP. Tags es un
+  feature, credentials es un feature — no "los GET" y "los POST".
+- **El compositor no contiene lógica.** Solo monta sub-routers. Si necesitas
+  middleware adicional para todo el grupo (ej. `requireSession`), va en
+  `server/index.js` al montar — no aquí.
+- **Las rutas siguen siendo absolutas a `/api`** porque el compositor se monta
+  en `app.use('/api', verifyToken, nodeRoutes)`. Una nueva ruta `/node/foo` se
+  agrega en el sub-router temático correspondiente, no requiere cambios en `index.js`.
+
+### Para añadir una ruta nueva de "nodos"
+
+1. Elige el sub-router temático (o crea uno nuevo si la responsabilidad no encaja).
+2. Define el handler con el patrón estándar de Express + RouterOS:
+   ```js
+   router.post('/node/foo', async (req, res) => {
+     if (!req.mikrotik) return res.status(503).json({ success: false, needsConfig: true, … });
+     const { ip, user, pass } = req.mikrotik;
+     // Guarda multi-tenant (si la ruta muta el nodo):
+     if (!(await nodeBelongsToRequester(req, req.body.pppUser))) {
+       return res.status(404).json({ success: false, message: 'Nodo no encontrado en tu workspace' });
+     }
+     let api;
+     try {
+       api = await connectToMikrotik(ip, user, pass);
+       // …safeWrite(api, [...])
+       await api.close();
+       res.json({ success: true, … });
+     } catch (error) {
+       if (api) try { await api.close(); } catch (_) {}
+       res.status(500).json({ success: false, message: getErrorMessage(error, ip, user) });
+     }
+   });
+   ```
+3. Si creaste un sub-router nuevo, móntalo en `nodes/index.js` con `router.use(require('./<nuevo>.routes'))`.
+4. Agrega la nueva ruta al script `check:backend` en el `package.json` del root.
+
+### Métricas pre/post F6
+
+| Métrica | Pre-F6 | Post-F6 |
+|---------|--------|---------|
+| LOC archivo más grande (server) | 1264 (`node.routes.js`) | **472** (`provision.routes.js`) |
+| LOC archivos > 300 | 1 | 2 (`listing` 327, `provision` 472) |
+| Sub-routers en `routes/nodes/` | 0 | 7 + compositor + shared |
+| Rutas en un solo archivo | 18 | repartidas por responsabilidad |
+| Tests verdes | 92 | **92** (sin regresión) |
+
+> `provision.routes.js` (472 LOC) está naturalmente sobre el umbral porque la
+> ruta `/node/provision` orquesta 10 pasos atómicos en RouterOS (SSTP+WG en una
+> sola transacción lógica). Partirla más mezclaría niveles de abstracción —
+> mejor mantenerla densa pero localizada.
 
 ---
 

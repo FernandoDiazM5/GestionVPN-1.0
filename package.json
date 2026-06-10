@@ -16,7 +16,7 @@
   "scripts": {
     "prepare": "husky",
     "build:contracts": "npm run build --workspace=@gestionvpn/contracts",
-    "check:backend": "cd server && node --check index.js && node -e \"['./auth.routes.js','./routes/account.routes.js','./routes/admin.routes.js','./routes/team.routes.js','./routes/workspace.routes.js','./routes/core.routes.js','./routes/node.routes.js','./routes/wireguard.routes.js','./routes/settings.routes.js','./routes/device.routes.js','./routes/events.routes.js','./routes/audit.routes.js','./routes/health.routes.js'].forEach(f=>require('child_process').execSync('node --check '+f,{stdio:'inherit'}));\"",
+    "check:backend": "cd server && node --check index.js && node -e \"['./auth.routes.js','./routes/account.routes.js','./routes/admin.routes.js','./routes/team.routes.js','./routes/workspace.routes.js','./routes/core.routes.js','./routes/nodes/index.js','./routes/nodes/_shared.js','./routes/nodes/listing.routes.js','./routes/nodes/provision.routes.js','./routes/nodes/editing.routes.js','./routes/nodes/tags.routes.js','./routes/nodes/credentials.routes.js','./routes/nodes/history.routes.js','./routes/nodes/scan.routes.js','./routes/wireguard.routes.js','./routes/settings.routes.js','./routes/device.routes.js','./routes/events.routes.js','./routes/audit.routes.js','./routes/health.routes.js'].forEach(f=>require('child_process').execSync('node --check '+f,{stdio:'inherit'}));\"",
     "check:frontend": "cd vpn-manager && npx tsc --noEmit",
     "lint:frontend": "cd vpn-manager && npx eslint .",
     "check:all": "npm run check:backend && npm run check:frontend && npm run lint:frontend",

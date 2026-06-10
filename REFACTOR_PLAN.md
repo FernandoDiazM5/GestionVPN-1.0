@@ -41,7 +41,7 @@ Refactor **incremental** en 13 fases, manteniendo SIEMPRE la app funcionando. Ca
 | **3** ✅ | Setup completo de testing | 2 | 🟢 Bajo | F4, F5, F6, F7, F8 |
 | **4** ✅ | Tests de endpoints críticos | 3 | 🟢 Bajo | F5, F6, F7 |
 | **5** ✅ | Unificar API client + contratos Zod compartidos | 3 | 🟠 Medio | F6, F7, F8 |
-| **6** | Split `node.routes.js` | 2 | 🟠 Medio | — |
+| **6** ✅ | Split `node.routes.js` | 2 | 🟠 Medio | — |
 | **7** | Split `core.routes.js` | 2 | 🟠 Medio | — |
 | **8** | Split `NetworkDevicesModule.tsx` | 3 | 🟠 Medio | F10 |
 | **9** | Health check enriquecido + métricas Prometheus | 1 | 🟢 Bajo | — |
