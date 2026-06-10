@@ -27,28 +27,89 @@ function classifyError(err) {
     return 'unknown';
 }
 
-// ── Parche node-routeros: manejar la respuesta `!empty` de RouterOS ──────────
-//  RouterOS envía `!empty` (seguido de `!done`) cuando un /print no tiene filas
-//  (ej. tabla mangle vacía). node-routeros v1.6.9 no la conoce: su processPacket
-//  cae en `default`, emite 'unknown' (que LANZA en onUnknown) y CIERRA el canal.
-//  Eso provoca o bien un uncaughtException, o un UNREGISTEREDTAG cuando llega el
-//  `!done` posterior. Aquí simplemente IGNORAMOS `!empty` (sin cerrar): el `!done`
-//  que viene a continuación resuelve la promesa con la data acumulada (= []).
+// ── Parches a node-routeros v1.6.9 ──────────────────────────────────────────
+//  La librería tiene dos sitios que lanzan SÍNCRONAMENTE desde el callback del
+//  socket (fuera del contexto de la Promise de write), escapando al event loop
+//  como uncaughtException:
+//
+//    1. Channel.processPacket  → reply desconocido → emit('unknown') → throw
+//       Casos vistos en producción: '!empty' (cuando un /print no tiene filas),
+//       cualquier `!xxx` que la librería no conozca, packets corruptos.
+//       Cuando esto ocurre, el backend cae y arrastra el puerto 3001
+//       (el handler de uncaughtException evita process.exit pero la sesión
+//       queda colgada hasta el timeout de safeWrite).
+//
+//    2. Receiver.sendTagData → tag desconocido → throw UNREGISTEREDTAG
+//       Race entre close() y datos en vuelo: si RouterOS contesta a un tag
+//       que ya cerramos, este throw mata el callback de socket.
+//
+//  Estrategia: redirigir ambos casos a `emit('trap', { message })` para que
+//  la promesa del write rechace ordenadamente en lugar de lanzar al loop.
+const KNOWN_REPLIES = new Set(['!re', '!done', '!trap', '!fatal']);
 try {
     const { Channel } = require('node-routeros/dist/Channel');
-    if (Channel && Channel.prototype && !Channel.prototype.__emptyPatched) {
+    if (Channel && Channel.prototype && !Channel.prototype.__rosPatched) {
         const _origProcessPacket = Channel.prototype.processPacket;
         Channel.prototype.processPacket = function (packet) {
-            if (Array.isArray(packet) && packet[0] === '!empty') {
-                return; // resultado vacío normal → no cerrar; el !done siguiente resuelve []
+            const reply = Array.isArray(packet) ? packet[0] : null;
+
+            // !empty (RouterOS responde así cuando un /print no tiene filas):
+            // no cerrar el canal; el `!done` que viene a continuación resuelve [].
+            if (reply === '!empty') return;
+
+            // Cualquier otro reply desconocido: convertir a trap sintético en lugar
+            // de dejar que el switch caiga al default → emit('unknown') → throw.
+            if (typeof reply === 'string' && reply.startsWith('!') && !KNOWN_REPLIES.has(reply)) {
+                log.warn({ reply }, 'Reply desconocido — convertido a trap');
+                this.trapped = true;
+                this.emit('trap', { message: `UNKNOWNREPLY: ${reply}` });
+                try { this.close(); } catch (_) { /* close() ya removió listeners */ }
+                return;
             }
+
             return _origProcessPacket.call(this, packet);
         };
-        Channel.prototype.__emptyPatched = true;
-        log.info('Parche !empty aplicado a node-routeros Channel');
+        Channel.prototype.__rosPatched = true;
+        log.info('Parches a node-routeros Channel aplicados (replies desconocidos)');
     }
 } catch (e) {
-    log.warn({ err: e }, 'No se pudo aplicar el parche !empty');
+    log.warn({ err: e }, 'No se pudo parchar Channel.processPacket');
+}
+
+try {
+    const { Receiver } = require('node-routeros/dist/connector/Receiver');
+    if (Receiver && Receiver.prototype && !Receiver.prototype.__rosPatched) {
+        const _origSendTagData = Receiver.prototype.sendTagData;
+        Receiver.prototype.sendTagData = function (currentTag) {
+            const tag = this.tags.get(currentTag);
+            if (!tag) {
+                // UNREGISTEREDTAG (RouterOS contestó a un tag ya cerrado) —
+                // la librería original lanzaba aquí. Descartar y limpiar.
+                log.debug({ currentTag }, 'sendTagData: tag ya cerrado, descartando packet');
+                this.currentPacket = [];
+                this.currentTag = null;
+                this.currentReply = null;
+                return;
+            }
+            return _origSendTagData.call(this, currentTag);
+        };
+        Receiver.prototype.__rosPatched = true;
+        log.info('Parche a node-routeros Receiver aplicado (UNREGISTEREDTAG)');
+    }
+} catch (e) {
+    log.warn({ err: e }, 'No se pudo parchar Receiver.sendTagData');
+}
+
+// Adjunta un handler 'error' al EventEmitter de RouterOSAPI para que un fallo
+// del socket TCP DESPUÉS del connect (server FIN-ACK, RST, idle drop) no escape
+// como uncaughtException. Sin esto, Node 18+ tira el proceso aunque el handler
+// global lo absorba — el ruido en logs y la sesión rota igual quedan.
+function attachErrorGuard(api, host) {
+    api.on('error', (err) => {
+        metrics.routerosErrorsTotal.inc({ type: classifyError(err) });
+        log.warn({ host, err: err?.message, code: err?.code }, 'RouterOSAPI emitió error tras connect');
+    });
+    return api;
 }
 
 const connectToMikrotik = async (host, user, password) => {
@@ -57,7 +118,7 @@ const connectToMikrotik = async (host, user, password) => {
         const api = new RouterOSAPI({ host, user, password, port: 8728, timeout: 8, keepalive: false });
         await api.connect();
         log.debug({ host, port: 8728, mode: 'plain' }, 'Conectado a MikroTik');
-        return api;
+        return attachErrorGuard(api, host);
     } catch (err) {
         const errno = err?.errno;
         const code = err?.code;
@@ -72,7 +133,7 @@ const connectToMikrotik = async (host, user, password) => {
         const api = new RouterOSAPI({ host, user, password, port: 8729, tls: { rejectUnauthorized: false }, timeout: 8, keepalive: false });
         await api.connect();
         log.debug({ host, port: 8729, mode: 'ssl' }, 'Conectado a MikroTik');
-        return api;
+        return attachErrorGuard(api, host);
     } catch (err) {
         metrics.routerosErrorsTotal.inc({ type: classifyError(err) });
         throw err;
