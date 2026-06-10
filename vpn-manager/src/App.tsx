@@ -1,20 +1,31 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { Server, AlertTriangle } from 'lucide-react';
 import { VpnProvider, useVpn } from './context';
 
 import RouterAccess from './components/Auth/RouterAccess';
 import Sidebar from './components/Layout/Sidebar';
 import { WorkspaceSessionProvider } from './context/WorkspaceSession';
+import ModuleSkeleton from './components/Common/ModuleSkeleton';
 
-import AdminDashboard from './components/Admin/AdminDashboard/AdminDashboard';
-import ModeratorsModule from './components/Admin/ModeratorsModule/ModeratorsModule';
-import NodeAccessPanel from './components/Devices/NodeAccessPanel';
-import UserManagementPanel from './components/Users/UserManagementPanel';
-import TeamModule from './components/Team/TeamModule';
-import NetworkDevicesModule from './components/Devices/NetworkDevicesModule';
-import ApMonitorModule from './components/Monitor/ApMonitorModule';
-import SettingsModule from './components/Settings/SettingsModule';
-import ModeratorSettingsModule from './components/Settings/ModeratorSettings/ModeratorSettingsModule';
+// ── Code-splitting (FASE 10 del REFACTOR_PLAN) ─────────────────────
+//  Cada módulo se carga bajo demanda en su propio chunk. Esto baja el
+//  bundle inicial del monolítico ~1090 KB a algo proporcional al login
+//  + layout + módulo activo.
+//
+//  Sidebar, ModuleSkeleton y RouterAccess siguen siendo eagerly imported
+//  porque son universales: el sidebar se ve en TODOS los módulos y el
+//  skeleton es el fallback de Suspense, no tiene sentido lazify-arlos
+//  (fallback de un fallback = pantalla blanca momentánea).
+const AdminDashboard            = lazy(() => import('./components/Admin/AdminDashboard/AdminDashboard'));
+const ModeratorsModule          = lazy(() => import('./components/Admin/ModeratorsModule/ModeratorsModule'));
+const NodeAccessPanel           = lazy(() => import('./components/Devices/NodeAccessPanel'));
+const UserManagementPanel       = lazy(() => import('./components/Users/UserManagementPanel'));
+const TeamModule                = lazy(() => import('./components/Team/TeamModule'));
+const NetworkDevicesModule      = lazy(() => import('./components/Devices/NetworkDevicesModule'));
+const ApMonitorModule           = lazy(() => import('./components/Monitor/ApMonitorModule'));
+const SettingsModule            = lazy(() => import('./components/Settings/SettingsModule'));
+const ModeratorSettingsModule   = lazy(() => import('./components/Settings/ModeratorSettings/ModeratorSettingsModule'));
+
 import { useWorkspaceSession } from './context/WorkspaceSession';
 import { isPlatformAdmin } from './utils/permissions';
 
@@ -64,11 +75,7 @@ function AppContent() {
       {/* Contenido */}
       <main className="flex-1 min-w-0 max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in slide-in-from-bottom-3 duration-400">
 
-        {activeModule === 'dashboard' && <AdminDashboard />}
-
-        {activeModule === 'moderators' && <ModeratorsModule />}
-
-        {/* Banner: MikroTik no configurado (solo en módulos operativos) */}
+        {/* Banner: MikroTik no configurado (solo en módulos operativos) — no es lazy. */}
         {configAlert && !['settings', 'dashboard', 'moderators'].includes(activeModule) && (
           <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
             <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
@@ -79,17 +86,19 @@ function AppContent() {
           </div>
         )}
 
-        {activeModule === 'nodes' && <NodeAccessPanel />}
-
-        {activeModule === 'users' && <UserManagementPanel />}
-
-        {activeModule === 'team' && <TeamModule />}
-
-        {activeModule === 'devices' && <NetworkDevicesModule />}
-
-        {activeModule === 'monitor' && <ApMonitorModule />}
-
-        {activeModule === 'settings' && <SettingsModuleRouter />}
+        {/* Suspense único — se reusa al cambiar de módulo. La key fuerza un nuevo
+            boundary cuando cambia activeModule para que el skeleton aparezca
+            limpio aunque el chunk anterior ya estuviera resuelto. */}
+        <Suspense key={activeModule} fallback={<ModuleSkeleton />}>
+          {activeModule === 'dashboard'   && <AdminDashboard />}
+          {activeModule === 'moderators'  && <ModeratorsModule />}
+          {activeModule === 'nodes'       && <NodeAccessPanel />}
+          {activeModule === 'users'       && <UserManagementPanel />}
+          {activeModule === 'team'        && <TeamModule />}
+          {activeModule === 'devices'     && <NetworkDevicesModule />}
+          {activeModule === 'monitor'     && <ApMonitorModule />}
+          {activeModule === 'settings'    && <SettingsModuleRouter />}
+        </Suspense>
       </main>
 
     </div>
