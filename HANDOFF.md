@@ -27,7 +27,7 @@
 6. **Pase UX P1–P6** + optimización visual de la vista **Escanear**.
 7. **🆕 Multi-usuario con aislamiento por sesión** (sesión 2026-06-07) — ver §7.
 
-**Estado de salud:** `tsc 0` · `node --check ✓`. ⚠️ **Bug activo:** `POST /api/wireguard/peers` da 500 y tira el backend (puerto 3001 abajo) — sin capturar el stack aún (ver §5).
+**Estado de salud:** `tsc 0` · `node --check ✓` · backend **62 tests verdes** (55 + 7 del parche routeros). Bug del crash de `POST /api/wireguard/peers` **resuelto** (ver §13.6).
 
 ---
 
@@ -83,11 +83,10 @@
 
 | Prioridad | Tarea |
 |---|---|
-| 🔴 **ACTIVO** | **Crash `POST /api/wireguard/peers`** → 500 + tira el backend (3001 abajo) al abrir "Usuarios". Plan: reproducir server-side (script con `getAppSetting('MT_*')`+`decryptPass`, ejecutar `/interface/wireguard/print` y `/interface/wireguard/peers/print`) para capturar el stack. Verificar si es otro throw síncrono de node-routeros no cubierto por el parche `!empty`, o si `index.js` no contiene el error (no entra en `SAFE_CODES`). |
 | 🟠 Seguridad | **V1 — `register-my-ip`** valida que el peer exista pero NO que sea del usuario → un MEMBER puede reclamar una IP de gestión ajena sin dueño. Fix: exigir `comment=member:<user_id>` == `req.account.sub`, o que el moderador asigne. |
 | 🟡 Limpieza | Quitar `adminIP` hardcodeado (`useNodeManagement.ts`, ya no se usa) · warning MySQL2 `keepAliveInitialDelayMs` · job batch de expiración (hoy perezoso en `/tunnel/status`) · escaneo atado al `mgmt_ip` del solicitante. |
 | 🟡 Mejora | **Fase 5 (opcional):** aislamiento de firewall por-IP + acotar regla "Admin MGMT libre" (defensa en profundidad; hoy el ruteo ya aísla). Dockerfile `USER` no-root (Semgrep S1). |
-| 🟢 Resuelto | O2 repo privado · O5 MySQL estable · UX P6 · **multi-usuario activación (verificado)** · parche `!empty` · fixes C1–C7. |
+| 🟢 Resuelto | O2 repo privado · O5 MySQL estable · UX P6 · **multi-usuario activación (verificado)** · parche `!empty` · fixes C1–C7 · **crash `POST /api/wireguard/peers` (parche generalizado a replies desconocidos + UNREGISTEREDTAG + handler 'error' en RouterOSAPI — ver §13.6)**. |
 | 🟢 Nota | Config MikroTik `v2.rsc` SIN mangle global (baseline limpio multi-usuario). Peer `peer27` de prueba con public-key placeholder `abcdEFGH...` (borrable). |
 
 **Scripts:** `cd server && npm run init:rbac | init:multiuser | migrate:sqlite | seed:roles` · `node db/rotateSecrets.js` · `node db/mapUserMgmtIp.js <email> <ip>`.
@@ -432,6 +431,8 @@ GET    /api/team/wireguard/by-key/:publicKey
 - **HMR de Vite** a veces no recarga hooks iniciales — `Ctrl+Shift+R` si la pantalla viene de un link especial (`?accept=1`, `?reset=...`).
 - **`patch` no importado en `teamApi.ts`** → ReferenceError runtime. Fix: agregar `patch` al import desde `sessionClient`.
 - **Backend colgado en SMTP** → agregados timeouts en `getTransporter()` (10s/10s/15s) y `try/catch` alrededor de `sendInvitation` en `team.routes.js` para no bloquear si Gmail falla.
+- **6. Crash `POST /api/wireguard/peers` (commit `2f5f257`)**:
+  el handler abría `/interface/wireguard/peers/print`, `/interface/wireguard/print` y `/ip/cloud/print`. Cuando RouterOS devolvía cualquier reply que node-routeros v1.6.9 no conocía (no `!re`/`!done`/`!trap`/`!fatal`/`!empty`), `Channel.processPacket` emitía `'unknown'` → `onUnknown` lanzaba `RosException('UNKNOWNREPLY')` **síncronamente** desde el callback del socket TCP, fuera del contexto de la Promise de `write()`. El throw escapaba al event loop como `uncaughtException`; el handler global de `index.js` evitaba `process.exit` pero la conexión `api` quedaba semi-rota y el endpoint colgaba hasta el timeout de `safeWrite`. Caso paralelo: `Receiver.sendTagData` lanzaba `UNREGISTEREDTAG` si RouterOS contestaba a un tag ya cerrado (race entre `Channel.close` y datos en vuelo). Fix en [server/routeros.service.js](server/routeros.service.js): generalizar el parche `!empty` a CUALQUIER `!xxx` desconocido → convertir a `emit('trap', { message: 'UNKNOWNREPLY: <reply>' })` para que `safeWrite` rechace ordenadamente; parchar `Receiver.sendTagData` para descartar packets sin tag en lugar de lanzar; agregar handler `'error'` en el `RouterOSAPI` EventEmitter (Node 18+ tira el proceso si emite `'error'` sin handler). 7 tests nuevos en [routerosPatches.test.js](server/test/unit/routerosPatches.test.js) cubren ambos modos.
 
 ---
 
