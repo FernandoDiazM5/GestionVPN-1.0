@@ -18,7 +18,6 @@ import { DeviceStatusPanel } from './DeviceStatusPanel';
 
 interface DeviceTableRowProps {
   dev: ScannedDevice;
-  devId: string;
   isSaved: boolean;
   rowIdx: number;
   sshStatus: SshAuthStatus | undefined;
@@ -38,7 +37,7 @@ interface DeviceTableRowProps {
 }
 
 function DeviceTableRowImpl({
-  dev, devId, isSaved, rowIdx, sshStatus, isExpanded,
+  dev, isSaved, rowIdx, sshStatus, isExpanded,
   activeConfigCols, gridTemplate, selectedNode, savedDevice,
   onToggleExpand, onOpenM5Detail, onSyncToSaved,
   onOpenSavedView, onOpenScanView, onDirectSave, onOpenAddModal, onRefreshStats,

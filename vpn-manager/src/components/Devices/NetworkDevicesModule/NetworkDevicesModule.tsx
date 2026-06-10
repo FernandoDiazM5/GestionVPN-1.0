@@ -83,7 +83,10 @@ export default function NetworkDevicesModule() {
     savedDevices: library.savedDevices,
     nodeSshCreds, setNodeSshCreds,
   });
-  scanRef.current = scan;
+  // Asignar el ref en effect (no durante render — anti-pattern en strict mode R19).
+  // Seguro porque los wrappers de `library` solo se invocan dentro de handlers de
+  // eventos (post-mount), nunca durante el render inicial.
+  useEffect(() => { scanRef.current = scan; });
 
   const list = useDeviceList({ scanResults: scan.scanResults, savedIds: library.savedIds });
 
@@ -109,7 +112,10 @@ export default function NetworkDevicesModule() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-seleccionar el nodo activo + autocompletar su subred
+  // Auto-seleccionar el nodo activo + autocompletar su subred. Es un efecto de
+  // SINCRONIZACIÓN de estado derivado (prop externo del context → state local) y
+  // condicional, así que no se puede expresar como useMemo.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (activeNodeVrf && nodes.length > 0) {
       const active = nodes.find(n => n.nombre_vrf === activeNodeVrf);
@@ -122,19 +128,24 @@ export default function NetworkDevicesModule() {
       }
     }
   }, [activeNodeVrf, nodes]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
-  // Reset scan results cuando cambia el nodo seleccionado (otro origen)
+  // Reset scan results cuando cambia el nodo seleccionado (otro origen).
+  // NO incluimos `scan` en deps: es un objeto que se recrea cada render, lo que
+  // dispararía el effect constantemente. Los setters de React son estables, así
+  // que extraerlos a variables locales evita la dep falsa.
   const prevSelectedNodeIdRef = useRef<string | null>(null);
+  const { setScanResults: resetScanResults, setSshStatus: resetSshStatus } = scan;
   useEffect(() => {
     const newId = selectedNode?.id ?? null;
     if (prevSelectedNodeIdRef.current !== null && newId !== prevSelectedNodeIdRef.current) {
-      scan.setScanResults([]);
-      scan.setSshStatus({});
+      resetScanResults([]);
+      resetSshStatus({});
       setNodeSshCreds([]);
       try { sessionStorage.removeItem(SESSION_SCAN_KEY); } catch { /* ignore */ }
     }
     prevSelectedNodeIdRef.current = newId;
-  }, [selectedNode, scan]);
+  }, [selectedNode, resetScanResults, resetSshStatus]);
 
   const availableSubnets: string[] = useMemo(() => {
     if (!activeNode) return [];
@@ -145,6 +156,13 @@ export default function NetworkDevicesModule() {
   }, [activeNode]);
 
   // ── Handlers de fila (cierran sobre setters del orquestador) ──────
+  // Desestructuramos `scan` y `library` para depender SOLO de las funciones
+  // internas (memoizadas con useCallback dentro de cada hook). Los objetos
+  // `scan` y `library` se recrean en cada render, así que usar `[scan]` o
+  // `[library]` como dep dispararía effects/handlers en cada repintado.
+  const { setScanResults } = scan;
+  const { handleRemoveDevice, handleUpdateDevice, showToast, handleDirectSave, handleAddDevice } = library;
+
   const toggleExpand = useCallback((ip: string) => {
     setExpandedRows(prev => {
       const next = new Set(prev);
@@ -165,9 +183,9 @@ export default function NetworkDevicesModule() {
       frequency: dev.cachedStats?.frequency ?? savedDev.frequency,
       lastSeen: Date.now(),
     };
-    library.handleUpdateDevice(updated);
-    library.showToast('Stats actualizadas en el dispositivo guardado');
-  }, [library]);
+    handleUpdateDevice(updated);
+    showToast('Stats actualizadas en el dispositivo guardado');
+  }, [handleUpdateDevice, showToast]);
 
   const handleOpenScanView = useCallback((dev: ScannedDevice) => {
     const devId = dev.mac ? dev.mac.replace(/:/g, '') : dev.ip.replace(/\./g, '');
@@ -193,18 +211,18 @@ export default function NetworkDevicesModule() {
   }, [selectedNode]);
 
   const handleRefreshStats = useCallback((ip: string, freshStats: AntennaStats) => {
-    scan.setScanResults(prev => prev.map(r => r.ip === ip ? { ...r, cachedStats: freshStats } : r));
-  }, [scan]);
+    setScanResults(prev => prev.map(r => r.ip === ip ? { ...r, cachedStats: freshStats } : r));
+  }, [setScanResults]);
 
   const handleRemoveDeviceUnified = useCallback(async (id: string) => {
-    await library.handleRemoveDevice(id);
+    await handleRemoveDevice(id);
     if (viewingDevice?.id === id) setViewingDevice(null);
-  }, [library, viewingDevice]);
+  }, [handleRemoveDevice, viewingDevice]);
 
   const handleUpdateDeviceUnified = useCallback(async (updated: SavedDevice) => {
-    await library.handleUpdateDevice(updated);
+    await handleUpdateDevice(updated);
     if (viewingDevice?.id === updated.id) setViewingDevice(updated);
-  }, [library, viewingDevice]);
+  }, [handleUpdateDevice, viewingDevice]);
 
   // ── Derivados de UI ────────────────────────────────────────────────
   const isTunnelActive = !!activeNodeVrf;
@@ -373,7 +391,7 @@ export default function NetworkDevicesModule() {
               onSyncToSaved={handleSyncToSaved}
               onOpenSavedView={setViewingDevice}
               onOpenScanView={handleOpenScanView}
-              onDirectSave={library.handleDirectSave}
+              onDirectSave={handleDirectSave}
               onOpenAddModal={setAddingDevice}
               onRefreshStats={handleRefreshStats}
             />
@@ -390,7 +408,7 @@ export default function NetworkDevicesModule() {
         <AddDeviceModal
           device={addingDevice}
           node={selectedNode}
-          onSave={library.handleAddDevice}
+          onSave={handleAddDevice}
           onClose={() => setAddingDevice(null)}
         />
       )}
@@ -411,7 +429,7 @@ export default function NetworkDevicesModule() {
             sshPort: editingDevice.sshPort,
             routerPort: editingDevice.routerPort,
           }}
-          onSave={(d) => { library.handleAddDevice(d); setEditingDevice(null); }}
+          onSave={(d) => { handleAddDevice(d); setEditingDevice(null); }}
           onClose={() => setEditingDevice(null)}
         />
       )}

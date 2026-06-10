@@ -46,7 +46,12 @@ export function useDeviceScan(input: UseDeviceScanInput) {
   // Cancelar reader si el componente se desmonta a mitad de scan
   useEffect(() => () => { readerRef.current?.cancel(); }, []);
 
-  // Hidratar desde sessionStorage al montar (sobrevive a refresh dentro del túnel actual)
+  // Hidratar desde sessionStorage al montar (sobrevive a refresh dentro del túnel actual).
+  // Es un efecto de UNA SOLA VEZ: sincronizamos el state de React con un almacén
+  // externo. El plugin react-hooks/set-state-in-effect lo advierte como cascada,
+  // pero aquí ES el patrón correcto (no hay lazy init equivalente con 5 estados
+  // interdependientes).
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     try {
       const cached = sessionStorage.getItem(SESSION_SCAN_KEY);
@@ -69,6 +74,7 @@ export function useDeviceScan(input: UseDeviceScanInput) {
       }
     } catch { /* sessionStorage corrupto → ignorar */ }
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Reset COMPLETO al cambiar de túnel activo (otro VRF = otra LAN = otro escaneo)
   const lastActiveNodeRef = useRef<string | null>(activeNodeVrf);
@@ -87,7 +93,10 @@ export function useDeviceScan(input: UseDeviceScanInput) {
     }
   }, [activeNodeVrf]);
 
-  // Barra de progreso animada durante "discovering" (estimación basada en CIDR)
+  // Barra de progreso animada durante "discovering" (estimación basada en CIDR).
+  // Effect → setInterval → setState es el patrón canónico de animaciones derivadas
+  // de tiempo. Suprimimos la advertencia genérica del plugin.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (scanState.phase !== 'discovering') {
       setDiscoveryProgress(0);
@@ -104,6 +113,7 @@ export function useDeviceScan(input: UseDeviceScanInput) {
     }, msPerIp);
     return () => clearInterval(timer);
   }, [scanState.phase, effectiveLan]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Persistir en sessionStorage cuando el scan termina con resultados
   useEffect(() => {

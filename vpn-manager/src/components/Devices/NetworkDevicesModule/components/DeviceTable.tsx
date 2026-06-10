@@ -99,11 +99,12 @@ function DeviceTableImpl(props: DeviceTableProps) {
         </div>
 
         {/* Body */}
-        {sortedRows.map(({ dev, isSaved, devId }, rowIdx) => (
+        {sortedRows.map(({ dev, isSaved, devId }, rowIdx) => {
+          const savedDevice = isSaved ? (savedDevices.find(s => s.id === devId) ?? null) : null;
+          return (
           <DeviceTableRow
             key={dev.ip}
             dev={dev}
-            devId={devId}
             isSaved={isSaved}
             rowIdx={rowIdx}
             sshStatus={sshStatus[dev.ip]}
@@ -111,7 +112,7 @@ function DeviceTableImpl(props: DeviceTableProps) {
             activeConfigCols={activeConfigCols}
             gridTemplate={gridTemplate}
             selectedNode={selectedNode}
-            savedDevice={isSaved ? (savedDevices.find(s => s.id === devId) ?? null) : null}
+            savedDevice={savedDevice}
             onToggleExpand={toggleExpand}
             onOpenM5Detail={onOpenM5Detail}
             onSyncToSaved={onSyncToSaved}
@@ -121,7 +122,8 @@ function DeviceTableImpl(props: DeviceTableProps) {
             onOpenAddModal={onOpenAddModal}
             onRefreshStats={onRefreshStats}
           />
-        ))}
+          );
+        })}
       </div>
     </div>
   );
