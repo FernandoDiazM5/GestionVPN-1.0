@@ -9,7 +9,9 @@
     "init:rbac": "node db/initRbac.js",
     "init:multiuser": "node db/initMultiuser.js",
     "migrate:sqlite": "node db/migrateSqliteToMysql.js",
+    "migrate:perf": "node db/migratePerf.js",
     "seed:roles": "node db/seedRoles.js",
+    "analyze:queries": "node tools/analyze-queries.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"

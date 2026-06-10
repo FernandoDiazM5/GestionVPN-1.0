@@ -18,7 +18,22 @@ const mysql = require('mysql2/promise');
 
 let pool = null;
 
-/** Devuelve el pool de conexiones (singleton). */
+/**
+ * Devuelve el pool de conexiones (singleton).
+ *
+ * Tuning explícito (FASE 11):
+ *   • connectTimeout — cuánto esperamos abrir el socket TCP al servidor MySQL.
+ *     Si XAMPP/MariaDB está iniciándose o la red se cuelga, sin este límite el
+ *     primer request quedaría colgado hasta el TCP-RST del kernel (~75s en Linux).
+ *   • keepAliveInitialDelayMs — 5s evita el warning de mysql2 cuando el OS no
+ *     soporta delay 0 (visto en Windows). 5s es invisible para el caso normal
+ *     y permite reciclar conexiones zombi en pocos segundos.
+ *   • maxIdle — el pool puede tener N conexiones idle. Con connectionLimit=10
+ *     y MAX_IDLE=5 evitamos retener 10 sockets abiertos en horarios bajos
+ *     (libera ficheros + descriptors del lado MySQL).
+ *   • idleTimeout — cuánto vive una idle conn antes de cerrarla. 60s sirve para
+ *     el patrón del proyecto (polling cada 30s sobre /api/health y nodes).
+ */
 function getPool() {
   if (!pool) {
     pool = mysql.createPool({
@@ -32,13 +47,31 @@ function getPool() {
       queueLimit: 0,
       charset: 'utf8mb4_general_ci',
       timezone: 'Z',
-      // Estabilidad: detecta conexiones muertas y las reemplaza
+      connectTimeout: Number(process.env.MYSQL_CONNECT_TIMEOUT_MS || 10000),
       enableKeepAlive: true,
-      keepAliveInitialDelayMs: 0,
-      idleTimeout: 60000,  // libera conexiones idle tras 60s
+      keepAliveInitialDelayMs: Number(process.env.MYSQL_KEEPALIVE_DELAY_MS || 5000),
+      idleTimeout: Number(process.env.MYSQL_IDLE_TIMEOUT_MS || 60000),
+      maxIdle: Number(process.env.MYSQL_MAX_IDLE || 5),
     });
   }
   return pool;
+}
+
+// Timeout para acquire de conexión. mysql2 no expone `acquireTimeout` real
+// en el pool (queda esperando indefinidamente si todas las conns están en uso),
+// así que envolvemos getConnection() con Promise.race.
+const ACQUIRE_TIMEOUT_MS = Number(process.env.MYSQL_ACQUIRE_TIMEOUT_MS || 8000);
+
+async function acquireConnection() {
+  return await Promise.race([
+    getPool().getConnection(),
+    new Promise((_, reject) =>
+      setTimeout(
+        () => reject(Object.assign(new Error('MySQL acquire timeout'), { code: 'ER_GET_CONNECTION_TIMEOUT' })),
+        ACQUIRE_TIMEOUT_MS,
+      ),
+    ),
+  ]);
 }
 
 /**
@@ -62,7 +95,7 @@ async function query(sql, params = []) {
  *   });
  */
 async function withTransaction(fn) {
-  const conn = await getPool().getConnection();
+  const conn = await acquireConnection();
   try {
     await conn.beginTransaction();
     const tx = {
