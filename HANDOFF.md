@@ -2,7 +2,7 @@
 
 > Documento de migración de contexto entre sesiones.
 > Rama de trabajo: **`dev`** · Remote: `github.com/FernandoDiazM5/GestionVPN-1.0`.
-> Última actualización (2026-06-10): **REFACTOR_PLAN fases 0-8 ejecutadas** (F5: monorepo + `@gestionvpn/contracts`; F6: `node.routes.js` → 8 archivos; F7: `core.routes.js` → 7 archivos; F8: `NetworkDevicesModule.tsx` **1313 LOC → 433** + 4 hooks + 5 componentes nuevos). Ver §17, §18, §19, §20 y §21.
+> Última actualización (2026-06-10): **REFACTOR_PLAN fases 0-8 ejecutadas** (F5: monorepo + `@gestionvpn/contracts`; F6: `node.routes.js` → 8 archivos; F7: `core.routes.js` → 7 archivos; F8: `NetworkDevicesModule.tsx` **1313 LOC → 433** + 4 hooks + 5 componentes nuevos + fixup `5c19cb6` resolvió 2 bugs de perf y 2 anti-patterns). Ver §17, §18, §19, §20 y §21.
 > Sesión 2026-06-07 PM: Ajustes del moderador (perfil + workspace + import/export JSON) + Recuperar contraseña + sync MikroTik al deshabilitar + invitaciones por email + .conf WG server-side.
 > Sesión 2026-06-07 AM: multi-usuario con aislamiento por sesión (mangle por-IP), parche `!empty` node-routeros, auditoría (Semgrep+security-review+code-review) y fixes C1–C7.
 > Resumen extendido en `RESUMEN_CONTEXTO_MAESTRO.md`.
@@ -731,7 +731,7 @@ Sesión 2026-06-09 ejecutó las fases 0-4 del plan de refactor incremental
 | **F5** Contracts compartidos + Bearer kill | ✅ | — | Monorepo npm workspaces; `packages/contracts` con schemas Zod (Auth, Account, Team, Admin, Workspace); backend importa schemas centralizados (5 routes migrados); frontend re-exporta tipos desde contracts; `auth.routes.js` usa `sendOk`/`sendError`; `apiFetch` ya no inyecta `Bearer` — sesión = cookie HttpOnly. **92 tests siguen verdes.** Ver §18 |
 | **F6** Split `node.routes.js` | ✅ | — | `routes/node.routes.js` (1264 LOC) → `routes/nodes/{index,_shared,listing,provision,editing,tags,credentials,history,scan}.routes.js` (max **472 LOC**). Helpers comunes (`annotateSessions`, `filterNodesForRole`, `nodeBelongsToRequester`, `requireOperator`) en `_shared.js`. **92 tests siguen verdes.** Ver §19 |
 | **F7** Split `core.routes.js` | ✅ | — | `routes/core.routes.js` (935 LOC) → `routes/core/{index,_shared,connection,ppp,interface,tunnel,tunnel-repair}.routes.js` (max **430 LOC**). Registry SSE singleton + helpers (`emitToUser`, `canUseTunnel`, `clientIpOf`) en `_shared.js`. **92 tests siguen verdes.** Ver §20 |
-| **F8** Split `NetworkDevicesModule.tsx` | ✅ | — | Monolito 1313 LOC → **433** (orquestador) + 4 hooks (`useDeviceScan`, `useDeviceList`, `useColumnPrefs`, `useDeviceLibrary`) + 5 componentes (`ScanControls`, `ScanProgressBanner`, `DeviceFilters`, `DeviceTable`, `DeviceTableRow` memoizado). Virtualización con `@tanstack/react-virtual` queda para F10. **92 tests siguen verdes** + ESLint warnings bajaron de 130 → 120. Ver §21 |
+| **F8** Split `NetworkDevicesModule.tsx` | ✅ | — | Monolito 1313 LOC → **433** (orquestador) + 4 hooks (`useDeviceScan`, `useDeviceList`, `useColumnPrefs`, `useDeviceLibrary`) + 5 componentes (`ScanControls`, `ScanProgressBanner`, `DeviceFilters`, `DeviceTable`, `DeviceTableRow` memoizado). Virtualización con `@tanstack/react-virtual` queda para F10. **92 tests siguen verdes** + ESLint warnings bajaron 130 → **115** (tras fixup `5c19cb6`). Ver §21 |
 
 ### Fases pendientes
 
@@ -1124,14 +1124,34 @@ de la tabla. Solo la fila cuyo `sshStatus` cambió se actualiza.
 
 ### Métricas pre/post F8
 
-| Métrica | Pre-F8 | Post-F8 |
-|---------|--------|---------|
-| LOC `NetworkDevicesModule.tsx` | **1313** | **433** (-67%) |
-| Archivos en el módulo | 13 | **17** (+4 hooks nuevos) |
-| Hooks especializados | 1 (useNodeSelection) | **5** |
-| Componentes memoizados | 0 | **5** (Row, Table, Filters, Banner, Controls) |
-| ESLint warnings (todo el frontend) | 130 | **120** |
-| Tests verdes | 92 | **92** (sin regresión) |
+| Métrica | Pre-F8 | Post-F8 (b35fff4) | Tras fixup (5c19cb6) |
+|---------|--------|-------------------|----------------------|
+| LOC `NetworkDevicesModule.tsx` | **1313** | 433 | 433 |
+| Archivos en el módulo | 13 | 17 | 17 |
+| Hooks especializados | 1 | 5 | 5 |
+| Componentes memoizados | 0 | 5 | 5 |
+| ESLint warnings (todo el frontend) | 130 | 120 | **115** |
+| Effects con dep inestable | n/a | 1 (`[scan]`) | **0** |
+| Handlers con identidad inestable | n/a | 4 | **0** |
+| Tests verdes | 92 | 92 | **92** |
+
+### Fixup commit `5c19cb6` — bugs de perf encontrados en code-review
+
+El commit inicial `b35fff4` introdujo 2 bugs reales + 2 anti-patterns que
+el code-review detectó:
+
+| # | Tipo | Hallazgo | Fix |
+|---|------|----------|-----|
+| 1 | 🔴 Bug perf | `useEffect(reset, [selectedNode, scan])` — `scan` se recrea cada render → effect disparaba en cada repintado | Desestructurar `{setScanResults, setSshStatus} = scan` (setters estables) y depender de ellos |
+| 2 | 🔴 Bug perf | `handleRefreshStats`, `handleSyncToSaved`, `handleRemoveDeviceUnified`, `handleUpdateDeviceUnified` con dep `[scan]`/`[library]` → identidad inestable rompía memoización de `DeviceTable` | Desestructurar al inicio del bloque de handlers; depender solo de funciones internas memoizadas con `useCallback` dentro de cada hook |
+| 3 | 🟡 Anti-pattern R19 | `scanRef.current = scan` durante render | Mover a `useEffect(() => { scanRef.current = scan; })` |
+| 4 | 🟡 Lint | Prop `devId` declarado en `DeviceTableRow` pero sin uso | Eliminar del interface + call site |
+| 5-7 | 🟢 Plugin advertencias legítimas | `react-hooks/set-state-in-effect` en 3 effects válidos (hidrar sessionStorage, animar progress bar, sync de estado derivado) | Suprimir con `/* eslint-disable */`/`enable */` + comentario explicativo |
+
+**Regla aprendida:** cuando un hook custom retorna un objeto con varios setters,
+depender del objeto entero en un `useEffect`/`useCallback` rompe la memoización.
+Siempre desestructurar y depender de las piezas estables (setters de React lo son
+por contrato).
 
 ---
 
