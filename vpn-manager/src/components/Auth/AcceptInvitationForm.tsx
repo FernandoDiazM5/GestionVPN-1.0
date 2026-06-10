@@ -34,7 +34,7 @@ export default function AcceptInvitationForm({
       // el .conf con la PrivateKey real. El nombre del invitado lo eligió
       // quien envió la invitación; no se pide aquí.
       const r = await teamApi.accept(email.trim(), otp.trim(), password || undefined);
-      setResult({ user: r.user, tunnel: r.tunnel, wg: r.wireguard, conf: r.conf });
+      setResult({ user: r.user, tunnel: r.tunnel, wg: r.wireguard, conf: r.conf ?? null });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo aceptar la invitación');
     } finally { setBusy(false); }
