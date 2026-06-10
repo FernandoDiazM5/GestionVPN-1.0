@@ -1476,6 +1476,46 @@ Documentación viva relacionada:
 
 ---
 
+### Fix urgente — contracts dual package CJS+ESM (post-Q1/M1)
+
+Cuando se agregaron las nuevas notificaciones a contracts, el dev server de Vite empezó a tirar:
+
+```
+Uncaught SyntaxError: The requested module '/GestionVPN-1.0/@fs/.../packages/contracts/dist/index.js'
+does not provide an export named 'ROLE_LABEL' (at account.ts:24:10)
+```
+
+**Causa raíz:** `@gestionvpn/contracts` se compilaba sólo como **CommonJS** (`module: "commonjs"`). Vite necesita ESM para hacer named imports estáticos de **valores runtime** (como `ROLE_LABEL`). Los named imports de `type` se borraban antes (TypeScript los elimina), pero `ROLE_LABEL` SÍ es runtime y disparaba el error.
+
+**Fix:** dual package — CJS para el backend (`require`), ESM para el frontend (Vite). Estructura nueva:
+
+```
+packages/contracts/
+├── tsconfig.json          ← base (editor, lint)
+├── tsconfig.cjs.json      ← module: commonjs → dist/cjs/
+├── tsconfig.esm.json      ← module: esnext + moduleResolution: bundler → dist/esm/
+└── package.json
+    ├── main:     ./dist/cjs/index.js
+    ├── module:   ./dist/esm/index.js
+    ├── types:    ./dist/cjs/index.d.ts
+    └── exports[".":
+        ├── types:   ./dist/cjs/index.d.ts
+        ├── import:  ./dist/esm/index.js  ← Vite va por aquí
+        └── require: ./dist/cjs/index.js  ← Node va por aquí
+       ]
+```
+
+`npm run build:contracts` ahora corre `clean → build:cjs → build:esm → postbuild`. El `postbuild` escribe un `package.json` con `"type"` correcto en cada subcarpeta (`commonjs` y `module` respectivamente) para que Node respete el formato.
+
+**Side-benefit grande:** `TeamModule` bajó de **415 KB → 127 KB raw** (-69%) y de **85 KB → 35 KB gzip** (-59%). El bundle ESM permite tree-shaking real desde el frontend; antes Vite tenía que incluir el CJS entero porque no podía determinar exports estáticamente.
+
+**Reglas operativas tras este fix:**
+- Cualquier cambio en `packages/contracts/src/` → `npm run build:contracts` desde la raíz.
+- Backend (`require('@gestionvpn/contracts')`) y frontend (`import { X } from '@gestionvpn/contracts'`) consumen automáticamente el formato correcto vía el `exports` map.
+- El `tsconfig.json` base se mantiene como `module: "commonjs"` para que editores/IDE inferieran el formato más usado. Los dos derivados manejan el output real.
+
+---
+
 ## 26) 🔔 Notificaciones por usuario (Q1)
 
 Primera feature del backlog post-refactor. Permite al usuario recibir email y/o Telegram cuando ocurren ciertos eventos. Cubre dos casos hoy y deja la base preparada para M1 (bot interactivo).
