@@ -6,6 +6,7 @@ const helmet = require('helmet');
 const pinoHttp = require('pino-http');
 const crypto = require('crypto');
 const logger = require('./lib/logger');
+const metrics = require('./lib/metrics');
 const healthRoutes = require('./routes/health.routes');
 const accountRoutes = require('./routes/account.routes');
 const teamRoutes = require('./routes/team.routes');
@@ -132,6 +133,28 @@ app.use(pinoHttp({
         res: (res) => ({ statusCode: res.statusCode }),
     },
 }));
+
+// ── Métricas HTTP (FASE 9) ────────────────────────────────────────
+//  Mide latencia + cuenta requests por método/ruta/status.
+//  Se evalúa en res.on('finish') para capturar el statusCode real.
+//  Excluye /api/health y /metrics para no contaminar el histograma
+//  con polling de monitoring (mismo criterio que pinoHttp).
+app.use((req, res, next) => {
+    if (req.url.startsWith('/api/health') || req.url === '/metrics') return next();
+    const start = process.hrtime.bigint();
+    res.on('finish', () => {
+        const durSec = Number(process.hrtime.bigint() - start) / 1e9;
+        // route.path es '/foo/:id' si la ruta matcheó un router Express;
+        // si no (404, error temprano), usamos el pathname crudo sin query.
+        const route = (req.route && req.route.path)
+            ? `${req.baseUrl || ''}${req.route.path}`
+            : (req.originalUrl || req.url).split('?')[0];
+        const labels = { method: req.method, route, status: String(res.statusCode) };
+        metrics.httpRequestsTotal.inc(labels);
+        metrics.httpRequestDurationSeconds.observe(labels, durSec);
+    });
+    next();
+});
 
 // Montar rutas públicas e integradas
 app.use('/api/health', healthRoutes);
