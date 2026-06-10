@@ -43,7 +43,7 @@ Refactor **incremental** en 13 fases, manteniendo SIEMPRE la app funcionando. Ca
 | **5** ✅ | Unificar API client + contratos Zod compartidos | 3 | 🟠 Medio | F6, F7, F8 |
 | **6** ✅ | Split `node.routes.js` | 2 | 🟠 Medio | — |
 | **7** ✅ | Split `core.routes.js` | 2 | 🟠 Medio | — |
-| **8** | Split `NetworkDevicesModule.tsx` | 3 | 🟠 Medio | F10 |
+| **8** ✅ | Split `NetworkDevicesModule.tsx` | 3 | 🟠 Medio | F10 |
 | **9** | Health check enriquecido + métricas Prometheus | 1 | 🟢 Bajo | — |
 | **10** | Code-splitting frontend (lazy modules) | 1 | 🟢 Bajo | — |
 | **11** | Performance MySQL (índices + prepared) | 1 | 🟠 Medio | — |

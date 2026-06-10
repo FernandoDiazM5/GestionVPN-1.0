@@ -2,7 +2,7 @@
 
 > Documento de migración de contexto entre sesiones.
 > Rama de trabajo: **`dev`** · Remote: `github.com/FernandoDiazM5/GestionVPN-1.0`.
-> Última actualización (2026-06-09 PM): **REFACTOR_PLAN fases 0-7 ejecutadas** (F5: monorepo + `@gestionvpn/contracts`; F6: `node.routes.js` → 8 archivos `routes/nodes/`; F7: `core.routes.js` 935 LOC → 7 archivos < 430 LOC en `routes/core/`). Ver §17, §18, §19 y §20.
+> Última actualización (2026-06-10): **REFACTOR_PLAN fases 0-8 ejecutadas** (F5: monorepo + `@gestionvpn/contracts`; F6: `node.routes.js` → 8 archivos; F7: `core.routes.js` → 7 archivos; F8: `NetworkDevicesModule.tsx` **1313 LOC → 433** + 4 hooks + 5 componentes nuevos). Ver §17, §18, §19, §20 y §21.
 > Sesión 2026-06-07 PM: Ajustes del moderador (perfil + workspace + import/export JSON) + Recuperar contraseña + sync MikroTik al deshabilitar + invitaciones por email + .conf WG server-side.
 > Sesión 2026-06-07 AM: multi-usuario con aislamiento por sesión (mangle por-IP), parche `!empty` node-routeros, auditoría (Semgrep+security-review+code-review) y fixes C1–C7.
 > Resumen extendido en `RESUMEN_CONTEXTO_MAESTRO.md`.
@@ -731,12 +731,12 @@ Sesión 2026-06-09 ejecutó las fases 0-4 del plan de refactor incremental
 | **F5** Contracts compartidos + Bearer kill | ✅ | — | Monorepo npm workspaces; `packages/contracts` con schemas Zod (Auth, Account, Team, Admin, Workspace); backend importa schemas centralizados (5 routes migrados); frontend re-exporta tipos desde contracts; `auth.routes.js` usa `sendOk`/`sendError`; `apiFetch` ya no inyecta `Bearer` — sesión = cookie HttpOnly. **92 tests siguen verdes.** Ver §18 |
 | **F6** Split `node.routes.js` | ✅ | — | `routes/node.routes.js` (1264 LOC) → `routes/nodes/{index,_shared,listing,provision,editing,tags,credentials,history,scan}.routes.js` (max **472 LOC**). Helpers comunes (`annotateSessions`, `filterNodesForRole`, `nodeBelongsToRequester`, `requireOperator`) en `_shared.js`. **92 tests siguen verdes.** Ver §19 |
 | **F7** Split `core.routes.js` | ✅ | — | `routes/core.routes.js` (935 LOC) → `routes/core/{index,_shared,connection,ppp,interface,tunnel,tunnel-repair}.routes.js` (max **430 LOC**). Registry SSE singleton + helpers (`emitToUser`, `canUseTunnel`, `clientIpOf`) en `_shared.js`. **92 tests siguen verdes.** Ver §20 |
+| **F8** Split `NetworkDevicesModule.tsx` | ✅ | — | Monolito 1313 LOC → **433** (orquestador) + 4 hooks (`useDeviceScan`, `useDeviceList`, `useColumnPrefs`, `useDeviceLibrary`) + 5 componentes (`ScanControls`, `ScanProgressBanner`, `DeviceFilters`, `DeviceTable`, `DeviceTableRow` memoizado). Virtualización con `@tanstack/react-virtual` queda para F10. **92 tests siguen verdes** + ESLint warnings bajaron de 130 → 120. Ver §21 |
 
 ### Fases pendientes
 
 | Fase | Estado | Estimación | Bloquea a |
 |------|--------|------------|-----------|
-| **F8** Split `NetworkDevicesModule.tsx` (1313 LOC) | ⏳ | 3 días 🟠 | F10 |
 | **F9** Health check enriquecido + métricas Prometheus | ⏳ | 1 día 🟢 | — |
 | **F10** Code-splitting frontend (lazy modules) | ⏳ | 1 día 🟢 | — |
 | **F11** Performance MySQL (índices + prepared) | ⏳ | 1 día 🟠 | — |
@@ -1048,6 +1048,89 @@ la MISMA instancia. Probado y funcionando con keepalive multi-usuario.
 | LOC max en core/ | n/a | **430** (`tunnel.routes.js`) |
 | Sub-routers en `routes/core/` | 0 | 5 + compositor + shared |
 | Rutas en un solo archivo | 15 | repartidas por responsabilidad |
+| Tests verdes | 92 | **92** (sin regresión) |
+
+---
+
+## 21) 🧱 Split de `NetworkDevicesModule.tsx` (FASE 8)
+
+El monolito frontend de 1313 LOC (18 useState, 9 useEffect, escaneo SSE,
+auth SSH, filtros, tabla con resize y sort, modales, CRUD biblioteca local)
+se descompone en 4 hooks + 5 componentes + orquestador adelgazado.
+
+### Estructura final
+
+```
+vpn-manager/src/components/Devices/NetworkDevicesModule/
+├── NetworkDevicesModule.tsx        ← orquestador adelgazado          (433 LOC)
+├── hooks/
+│   ├── useDeviceScan.ts            ← escaneo SSE + auth SSH          (354 LOC)
+│   ├── useDeviceList.ts            ← search + filter + sort           (108 LOC)
+│   ├── useColumnPrefs.ts           ← visibles + ancho + gridTemplate   (91 LOC)
+│   ├── useDeviceLibrary.ts         ← savedDevices CRUD + toast        (211 LOC)
+│   └── useNodeSelection.ts         ← ya existía                        (11 LOC)
+├── components/
+│   ├── ScanControls.tsx            ← selector subnet + botón scan     (118 LOC)
+│   ├── ScanProgressBanner.tsx      ← progreso + error + empty         (107 LOC)
+│   ├── DeviceFilters.tsx           ← search + SSID + counter           (63 LOC)
+│   ├── DeviceTable.tsx             ← header + body                    (130 LOC)
+│   ├── DeviceTableRow.tsx          ← fila memoizada                   (234 LOC)
+│   ├── DeviceStatusPanel.tsx       ← ya existía                       (371 LOC)
+│   ├── SshDataModal.tsx            ← ya existía                       (233 LOC)
+│   ├── AddDeviceModal.tsx          ← ya existía                       (140 LOC)
+│   ├── DeviceCardModal.tsx         ← ya existía                        (28 LOC)
+│   ├── ColumnPicker.tsx            ← ya existía                       (112 LOC)
+│   └── RawBlock.tsx                ← ya existía                        (32 LOC)
+├── constants.ts                    ← ya existía
+├── types.ts                        ← ya existía
+└── utils/                          ← ya existía
+```
+
+### Decisión clave: el ciclo scan ↔ library
+
+`useDeviceScan` necesita `savedDevices` (para anteponer creds SSH ya
+validadas durante la fase de auth). `useDeviceLibrary` necesita
+`setScanResults` y `setSshStatus` (para reflejar enriquecimientos del SSH
+post-guardado en la tabla en vivo).
+
+**Solución:** un `useRef<ReturnType<typeof useDeviceScan> | null>` que se
+asigna después de instanciar el scan. `useDeviceLibrary` recibe wrappers
+estables `(updater) => scanRef.current?.setScanResults(updater)` que
+delegan al scan real. No hay re-renders cruzados porque los setters de
+React son referencialmente estables.
+
+### Regla operativa para añadir features
+
+- **Lógica nueva → un hook.** Si necesita estado + efecto + handlers, NO
+  lo metas en el orquestador; crea `hooks/useTuFeature.ts`.
+- **UI nueva → un componente memoizado en `components/`.** `memo()` con
+  comparador custom si recibe muchos props (ver `DeviceTableRow`).
+- **El orquestador NO conoce detalles de scan/filtros/tabla.** Pasa
+  setters y handlers; los hijos manejan el cómo.
+
+### Tabla memoizada — semántica
+
+`DeviceTableRow` está envuelto en `memo(impl, customCompare)`. Solo
+re-renderiza si cambian: `dev`, `isSaved`, `sshStatus`, `isExpanded`,
+`savedDevice`, `selectedNode`, `activeConfigCols`, `gridTemplate`, `rowIdx`.
+
+Esto evita que una actualización de progreso de scan (que ocurre cada
+~150ms en `setScannedCount` o `setSshStatus[ip]`) repinte las 100+ filas
+de la tabla. Solo la fila cuyo `sshStatus` cambió se actualiza.
+
+> Virtualización (`@tanstack/react-virtual`) queda para **FASE 10**.
+> Con la memoización + el grid CSS actual, scroll fluido se mantiene
+> hasta ~300 filas. Más allá, F10 cambiará el body a virtualizado.
+
+### Métricas pre/post F8
+
+| Métrica | Pre-F8 | Post-F8 |
+|---------|--------|---------|
+| LOC `NetworkDevicesModule.tsx` | **1313** | **433** (-67%) |
+| Archivos en el módulo | 13 | **17** (+4 hooks nuevos) |
+| Hooks especializados | 1 (useNodeSelection) | **5** |
+| Componentes memoizados | 0 | **5** (Row, Table, Filters, Banner, Controls) |
+| ESLint warnings (todo el frontend) | 130 | **120** |
 | Tests verdes | 92 | **92** (sin regresión) |
 
 ---
