@@ -24,6 +24,7 @@ const sessionRepo = require('../../db/repos/sessionRepo');
 const mgmtIpRepo = require('../../db/repos/mgmtIpRepo');
 const memberWgRepo = require('../../db/repos/memberWgRepo');
 const { getDb } = require('../../db.service');
+const notifier = require('../../lib/notifier');
 const provisioner = require('../../lib/tunnelProvisioner');
 const {
   addSseClient, removeSseClient, emitToUser, clientIpOf, canUseTunnel,
@@ -99,6 +100,14 @@ router.post('/tunnel/activate', async (req, res) => {
     // 4) Notificar SOLO a este usuario (sus pestañas)
     emitToUser(acc.sub, targetVRF, expires_at);
 
+    // Q1 — notificación al usuario (email + Telegram según sus prefs).
+    // Best-effort; cualquier error queda en notification_log sin tirar el endpoint.
+    notifier.notify({
+      userId: acc.sub,
+      event: 'TUNNEL_ACTIVATED',
+      payload: { tunnelId: targetVRF, vrf: targetVRF, expiresAt: expires_at, ip: clientIp },
+    }).catch((err) => log.warn({ err: err.message }, 'notify TUNNEL_ACTIVATED falló'));
+
     return res.json({
       success: true,
       message: `Acceso abierto a ${targetVRF}`,
@@ -154,6 +163,16 @@ router.post('/tunnel/deactivate', async (req, res) => {
     log.info({ userId: acc.sub, count: ids.length }, 'TUNNEL-DEACTIVATE: mangles eliminadas');
 
     emitToUser(acc.sub, null, null);
+
+    // Q1 — notif al usuario (solo si había sesión real, no en idempotent no-op)
+    if (session) {
+      notifier.notify({
+        userId: acc.sub,
+        event: 'TUNNEL_DEACTIVATED',
+        payload: { tunnelId: session.tunnel_id, vrf: session.vrf_name, ip: clientIp },
+      }).catch((err) => log.warn({ err: err.message }, 'notify TUNNEL_DEACTIVATED falló'));
+    }
+
     res.json({ success: true, message: 'Tu acceso fue revocado' });
   } catch (error) {
     if (apiRead) try { await apiRead.close(); } catch (_) {}

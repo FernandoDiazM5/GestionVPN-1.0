@@ -54,6 +54,7 @@ const allowedOrigins = process.env.CORS_ORIGINS
 const authRoutes = require('./auth.routes');
 const { verifyToken } = require('./auth.middleware');
 const { startMonitor } = require('./db/mysql');
+const expirationJob = require('./lib/expirationJob');
 
 // ── Helmet — headers de seguridad HTTP (FASE 2 del REFACTOR_PLAN) ──
 //  Backend API-only: NO sirve HTML, NO sirve estáticos. La CSP es
@@ -209,6 +210,7 @@ function startServer(attempt = 1) {
         logger.info({ port: PORT, attempt }, 'Servidor backend MikroTik API Proxy escuchando');
         // Inicia monitoreo de salud de MySQL cada 10 segundos
         startMonitor(10000);
+        expirationJob.start();
     });
 
     server.on('error', (err) => {

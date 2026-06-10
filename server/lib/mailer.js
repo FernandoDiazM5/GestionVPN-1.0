@@ -292,4 +292,28 @@ async function verifySmtp() {
   return result;
 }
 
-module.exports = { sendOtp, sendInvitation, sendPasswordReset, verifySmtp };
+/**
+ * Envío genérico para notificaciones (Q1). Devuelve { delivered, dev, error }.
+ * En dev (sin SMTP) imprime resumen y marca dev=true sin throwear — el caller
+ * (lib/notifier.js) registra el resultado en notification_log.
+ */
+async function sendGeneric({ to, subject, html, text }) {
+  if (!to || !subject) return { delivered: false, error: 'to y subject requeridos' };
+  const tx = getTransporter();
+  if (!tx) {
+    log.debug({ to, subject }, 'sendGeneric en modo DEV (sin SMTP)');
+    return { delivered: false, dev: true };
+  }
+  try {
+    await sendAndCount(tx, 'notification', {
+      from: process.env.SMTP_FROM || FROM_DEFAULT,
+      to, subject, html, text: text || subject,
+    });
+    return { delivered: true };
+  } catch (err) {
+    log.warn({ err: err.message, to }, 'sendGeneric falló');
+    return { delivered: false, error: err.message };
+  }
+}
+
+module.exports = { sendOtp, sendInvitation, sendPasswordReset, sendGeneric, verifySmtp };

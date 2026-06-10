@@ -3,6 +3,11 @@
 // ============================================================
 import { get, post, patch } from './sessionClient';
 import type { SessionUser } from '../types/account';
+import type {
+  NotificationPreferences,
+  NotificationStatus,
+  TelegramLinkStartResponse,
+} from '@gestionvpn/contracts';
 
 export const accountApi = {
   me: () => get<{ success: true; user: SessionUser }>('/api/account/me'),
@@ -41,4 +46,17 @@ export const accountApi = {
     post<{ success: true; message: string; email: string }>(
       '/api/account/email/confirm', { newEmail, otp, currentPassword }
     ),
+
+  // ── Notificaciones (Q1) ─────────────────────────────────────
+  getNotifications: () =>
+    get<{ success: true } & NotificationStatus>('/api/account/notifications'),
+
+  updateNotifications: (prefs: NotificationPreferences) =>
+    patch<{ success: true; message: string }>('/api/account/notifications', prefs),
+
+  startTelegramLink: () =>
+    post<TelegramLinkStartResponse>('/api/account/telegram/link/start'),
+
+  unlinkTelegram: () =>
+    post<{ success: true; message: string }>('/api/account/telegram/unlink'),
 };

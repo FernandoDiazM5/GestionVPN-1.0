@@ -319,4 +319,51 @@ router.post('/email/confirm', requireSession, asyncHandler(async (req, res) => {
   return sendOk(res, { message: 'Correo actualizado', email: lc });
 }));
 
+// ──────────────────────────────────────────────────────────────────────────
+//  Q1 — Notificaciones por usuario
+// ──────────────────────────────────────────────────────────────────────────
+const notificationRepo = require('../db/repos/notificationRepo');
+const telegram = require('../lib/telegram');
+const { NotificationPreferencesSchema } = require('@gestionvpn/contracts');
+
+router.get('/notifications', requireSession, asyncHandler(async (req, res) => {
+  const sub = await notificationRepo.getOrDefault(req.account.sub);
+  return sendOk(res, {
+    channels: sub.channels,
+    eventTypes: sub.event_types,
+    paused: sub.paused,
+    telegramLinked: !!sub.telegram_chat_id,
+    telegramBotConfigured: telegram.isConfigured(),
+  });
+}));
+
+router.patch('/notifications', requireSession, asyncHandler(async (req, res) => {
+  const { channels, eventTypes, paused } = NotificationPreferencesSchema.parse(req.body);
+  await notificationRepo.updatePreferences({
+    userId: req.account.sub,
+    channels, eventTypes, paused,
+  });
+  return sendOk(res, { message: 'Preferencias actualizadas' });
+}));
+
+// Vinculación con Telegram — flujo de 2 pasos:
+//   1) Cliente pide código (POST /telegram/link/start) → recibe { code, expiresAt }.
+//   2) Usuario abre el bot, manda /link CODE — el bot llama al endpoint
+//      público (handle por webhook o long-polling) que confirma.
+//
+//  En esta primera entrega solo exponemos el step 1 + un endpoint admin para
+//  confirmar manualmente con chatId (útil hasta tener el bot en línea).
+router.post('/telegram/link/start', requireSession, asyncHandler(async (req, res) => {
+  if (!telegram.isConfigured()) {
+    throw new AppError(503, 'TELEGRAM_NOT_CONFIGURED', 'El bot de Telegram no está habilitado en este servidor.');
+  }
+  const { code, expiresAt } = await notificationRepo.generateTelegramLinkCode(req.account.sub);
+  return sendOk(res, { code, expiresAt });
+}));
+
+router.post('/telegram/unlink', requireSession, asyncHandler(async (req, res) => {
+  await notificationRepo.unlinkTelegram(req.account.sub);
+  return sendOk(res, { message: 'Telegram desvinculado' });
+}));
+
 module.exports = router;

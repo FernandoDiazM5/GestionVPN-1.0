@@ -10,6 +10,7 @@
     "init:multiuser": "node db/initMultiuser.js",
     "migrate:sqlite": "node db/migrateSqliteToMysql.js",
     "migrate:perf": "node db/migratePerf.js",
+    "migrate:notifications": "node db/migrateNotifications.js",
     "seed:roles": "node db/seedRoles.js",
     "analyze:queries": "node tools/analyze-queries.js",
     "test": "vitest run",

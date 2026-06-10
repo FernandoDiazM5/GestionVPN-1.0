@@ -1476,6 +1476,108 @@ Documentación viva relacionada:
 
 ---
 
+## 26) 🔔 Notificaciones por usuario (Q1)
+
+Primera feature del backlog post-refactor. Permite al usuario recibir email y/o Telegram cuando ocurren ciertos eventos. Cubre dos casos hoy y deja la base preparada para M1 (bot interactivo).
+
+### Eventos cubiertos
+
+| Evento | Disparado por |
+|--------|---------------|
+| `TUNNEL_ACTIVATED` | `POST /api/tunnel/activate` (hook en handler) |
+| `TUNNEL_DEACTIVATED` | `POST /api/tunnel/deactivate` (solo si había sesión real) |
+| `SESSION_EXPIRED` | Job batch — antes era lazy en `/tunnel/status`, ahora corre cada 60s |
+
+### Arquitectura
+
+```
+                    notifier.notify({userId, event, payload})
+                                  │
+                                  ▼
+            notificationRepo.getOrDefault(userId)
+              ├── paused? → skip
+              └── event ∈ event_types? → skip si no
+                                  │
+                                  ▼
+                  ┌───────────────┴───────────────┐
+                  ▼                               ▼
+       channels.email                  channels.telegram
+       ▼                               ▼
+       mailer.sendGeneric              telegram.sendMessage
+       (HTML + texto)                  (HTML, fetch a api.telegram.org)
+                  │                               │
+                  └──────────► notification_log ◄─┘
+                          (append-only, no throw)
+```
+
+### Archivos clave
+
+| Archivo | Para qué |
+|---------|----------|
+| [server/sql/schema_notifications.sql](server/sql/schema_notifications.sql) | 2 tablas: `notification_subscriptions` (1 fila/usuario, JSON canales+eventos), `notification_log` (append-only). |
+| [server/db/migrateNotifications.js](server/db/migrateNotifications.js) | Idempotente — `npm run migrate:notifications`. |
+| [server/db/repos/notificationRepo.js](server/db/repos/notificationRepo.js) | `getOrDefault`, `updatePreferences`, `generateTelegramLinkCode` (6 chars TTL 15min), `confirmTelegramLink`, `unlinkTelegram`, `log`. |
+| [server/lib/notifier.js](server/lib/notifier.js) | `notify({userId, event, payload})` y `buildMessage(event, payload)`. Templates por evento (HTML + texto), respetando huso `America/Lima`. |
+| [server/lib/telegram.js](server/lib/telegram.js) | Cliente Telegram Bot API — solo `sendMessage` (HTTP POST con timeout 8s y AbortController). `isConfigured()` revisa `TELEGRAM_BOT_TOKEN`. |
+| [server/lib/expirationJob.js](server/lib/expirationJob.js) | setInterval cada 60s. `sessionRepo.findExpired()` → `closeSession` → `notify('SESSION_EXPIRED')`. Configurable con `EXPIRATION_JOB_ENABLED` y `EXPIRATION_JOB_INTERVAL_MS`. |
+| [server/lib/mailer.js](server/lib/mailer.js) | Helper nuevo `sendGeneric({to, subject, html, text})`. En DEV (sin SMTP) marca `dev: true` sin throw. |
+| [packages/contracts/src/notifications.ts](packages/contracts/src/notifications.ts) | Zod schemas + tipos compartidos: `NotificationEvent`, `NotificationChannels`, `NotificationPreferences`, `NotificationStatus`, `TelegramLinkStartResponse`. |
+| [vpn-manager/.../tabs/NotificationsTab.tsx](vpn-manager/src/components/Settings/ModeratorSettings/tabs/NotificationsTab.tsx) | UI completa: pausa global, toggle por canal, toggle por evento, flujo de vinculación con Telegram. |
+
+### Endpoints
+
+```
+GET    /api/account/notifications              → { channels, eventTypes, paused, telegramLinked, telegramBotConfigured }
+PATCH  /api/account/notifications              → { channels, eventTypes, paused }
+POST   /api/account/telegram/link/start        → { code, expiresAt }  (TTL 15 min)
+POST   /api/account/telegram/unlink            → {}
+```
+
+El bot (cuando vivo en producción) hará `/link CODE` desde Telegram y llamará a `notificationRepo.confirmTelegramLink({code, chatId})` internamente — ese hook viene en M1 cuando se enchufa el bot interactivo. Por ahora la UI solo expone "start": el operador puede usar `confirmTelegramLink` manualmente para pruebas.
+
+### Variables `.env` nuevas
+
+```bash
+# Telegram (Q1 / M1). Sin esto, telegram.sendMessage devuelve { skipped: true }
+# y el notifier registra status='skipped' en notification_log.
+TELEGRAM_BOT_TOKEN=
+
+# Job de expiración (Q1 — antes lazy)
+EXPIRATION_JOB_ENABLED=true
+EXPIRATION_JOB_INTERVAL_MS=60000
+```
+
+### Tests
+
+`test/unit/notifier.test.js` (9 tests, sin BD ni red):
+- skip si `paused`
+- skip si evento no está en `event_types`
+- dispatch a ambos canales cuando ambos habilitados
+- mailer falla + telegram OK → ambos quedan en `notification_log` con status correcto
+- solo telegram → no llama al mailer
+- telegram skipped (sin token) → status `skipped`, no `failed`
+- 3 tests del `buildMessage` por evento
+
+**Total: 71 backend + 37 frontend = 108 verdes.**
+
+### Decisiones documentadas
+
+- **Sin tabla por defecto**: `getOrDefault(userId)` devuelve una sub "fantasma" en memoria con defaults — solo se inserta cuando el usuario guarda preferencias por primera vez. Evita backfill innecesario y row count constante por usuario.
+- **`buildMessage` centralizado**: el caller (handlers de túnel + job) NO arma el mensaje. Pasa solo `event` y `payload`. Si querés cambiar el wording de los emails de "Túnel activado" lo cambiás en un solo sitio.
+- **Telegram envía HTML, no Markdown**: HTML escapa `<`/`>` automáticamente; Markdown V2 obliga a escapar manualmente `_*[]()~\`>#+-=|{}!.` Es trampa.
+- **No bloqueamos handlers de túnel si la notif falla**: `notifier.notify(...).catch(...)` desde el handler — la notif es secundaria al flujo de túnel.
+- **Job de expiración no toca el router**: solo cierra en BD + notifica. El mangle del usuario se limpia cuando el usuario active otro túnel (ya lo hace `tunnel/activate` por contrato). Mantener responsabilidades separadas.
+
+### Pendiente para M1
+
+Bot Telegram interactivo:
+- Long-polling con `getUpdates` o webhook
+- Comando `/link CODE` → `confirmTelegramLink`
+- Comando `/activar VRF-X` → reusa `POST /api/tunnel/activate` (con sesión del usuario detrás de un token rotatorio en el chat)
+- Comando `/status` → muestra túneles activos del usuario
+
+---
+
 ## ⚡ Arranque rápido
 
 1. XAMPP **MySQL** arriba (idealmente como servicio).

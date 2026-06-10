@@ -9,3 +9,4 @@ export * from './account';
 export * from './team';
 export * from './admin';
 export * from './workspace';
+export * from './notifications';

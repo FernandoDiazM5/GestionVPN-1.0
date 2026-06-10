@@ -1,14 +1,16 @@
 import { useState } from 'react';
-import { Settings as SettingsIcon, User, Briefcase, Database } from 'lucide-react';
+import { Settings as SettingsIcon, User, Briefcase, Database, Bell } from 'lucide-react';
 import ProfileTab from './tabs/ProfileTab';
 import WorkspaceTab from './tabs/WorkspaceTab';
 import ImportExportTab from './tabs/ImportExportTab';
+import NotificationsTab from './tabs/NotificationsTab';
 
-type TabId = 'profile' | 'workspace' | 'import-export';
+type TabId = 'profile' | 'workspace' | 'notifications' | 'import-export';
 
 const TABS: { id: TabId; label: string; icon: typeof User; description: string }[] = [
   { id: 'profile',       label: 'Perfil',           icon: User,      description: 'Tu correo y contraseña' },
   { id: 'workspace',     label: 'Workspace',        icon: Briefcase, description: 'Nombre de tu espacio' },
+  { id: 'notifications', label: 'Notificaciones',   icon: Bell,      description: 'Email y Telegram' },
   { id: 'import-export', label: 'Respaldo y datos', icon: Database,  description: 'Exportar / importar JSON' },
 ];
 
@@ -72,6 +74,7 @@ export default function ModeratorSettingsModule() {
         <div>
           {tab === 'profile'       && <ProfileTab />}
           {tab === 'workspace'     && <WorkspaceTab />}
+          {tab === 'notifications' && <NotificationsTab />}
           {tab === 'import-export' && <ImportExportTab />}
         </div>
       </div>
