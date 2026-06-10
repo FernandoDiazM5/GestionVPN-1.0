@@ -55,6 +55,7 @@ const authRoutes = require('./auth.routes');
 const { verifyToken } = require('./auth.middleware');
 const { startMonitor } = require('./db/mysql');
 const expirationJob = require('./lib/expirationJob');
+const telegramBot = require('./lib/telegramBot');
 
 // ── Helmet — headers de seguridad HTTP (FASE 2 del REFACTOR_PLAN) ──
 //  Backend API-only: NO sirve HTML, NO sirve estáticos. La CSP es
@@ -199,6 +200,18 @@ app.use('/api/ap-monitor', verifyToken, apRoutes);
 // ── Middleware de error central (estandariza respuestas) ─────────────────────
 app.use(errorMiddleware);
 
+// ── Shutdown limpio (drena long-polls y jobs antes de cerrar) ────────────────
+function gracefulShutdown(signal) {
+    return () => {
+        logger.info({ signal }, 'Shutdown — drenando bot y jobs');
+        try { telegramBot.stop(); } catch (_) {}
+        try { expirationJob.stop(); } catch (_) {}
+        setTimeout(() => process.exit(0), 500);
+    };
+}
+process.once('SIGTERM', gracefulShutdown('SIGTERM'));
+process.once('SIGINT', gracefulShutdown('SIGINT'));
+
 // ── Inicia el servidor con reintentos si el puerto sigue ocupado ─────────────
 function startServer(attempt = 1) {
     const maxAttempts = 10;
@@ -211,6 +224,7 @@ function startServer(attempt = 1) {
         // Inicia monitoreo de salud de MySQL cada 10 segundos
         startMonitor(10000);
         expirationJob.start();
+        telegramBot.start();
     });
 
     server.on('error', (err) => {

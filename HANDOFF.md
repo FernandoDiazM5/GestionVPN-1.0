@@ -1570,11 +1570,104 @@ EXPIRATION_JOB_INTERVAL_MS=60000
 
 ### Pendiente para M1
 
-Bot Telegram interactivo:
-- Long-polling con `getUpdates` o webhook
-- Comando `/link CODE` → `confirmTelegramLink`
-- Comando `/activar VRF-X` → reusa `POST /api/tunnel/activate` (con sesión del usuario detrás de un token rotatorio en el chat)
-- Comando `/status` → muestra túneles activos del usuario
+✅ **M1 implementado** en commit posterior — ver §27.
+
+---
+
+## 27) 🤖 Bot Telegram interactivo (M1)
+
+Construido sobre Q1: el bot detecta al usuario por su `telegram_chat_id` ya vinculado en `notification_subscriptions`. Sin código de auth adicional — Telegram autentica el chat desde su lado, nuestro sistema confía en esa identidad.
+
+### Comandos
+
+| Comando | Estado de auth | Qué hace |
+|---------|----------------|----------|
+| `/start` | Sin vinculación → instrucciones · vinculado → saluda | Mensaje de bienvenida |
+| `/help` | Cualquiera | Lista de comandos disponibles (varía si está vinculado) |
+| `/link CODE` | Sin vinculación | Confirma el código de 6 chars hex generado en `Ajustes → Notificaciones → Vincular` |
+| `/unlink` | Requiere vinculación | Borra `telegram_chat_id` de la sub |
+| `/status` | Requiere vinculación | Túnel activo (si hay): VRF, expiración |
+| `/tuneles` | Requiere vinculación | Lista hasta 30 túneles disponibles (MEMBER → solo asignados; OWNER/CO_MOD → todos del workspace) |
+| `/activar VRF-X` | Requiere vinculación | Devuelve **deep-link** `APP_BASE_URL?activate=VRF-X` |
+| `/desactivar` | Requiere vinculación | Devuelve deep-link `APP_BASE_URL?deactivate=1` |
+
+### Decisión clave: deep-links en lugar de mutación directa
+
+**El bot no activa túneles directamente.** Las razones:
+
+1. **Auth débil vs fuerte**: la cookie HttpOnly `vpn_session` del navegador tiene `sameSite=lax` + `secure` + `8h` TTL, validada por `verifyToken` con cache LRU. Telegram solo nos da que `chat_id == 123456`. Aceptar mutación con esa única señal degrada el modelo de auth.
+
+2. **Confirmación humana**: activar un túnel toca el router (mangle + VRF). Un comando suelto en un chat puede ejecutarse por error (autocompletado en móvil). El deep-link obliga a abrir el panel, ver el estado, confirmar.
+
+3. **Reuso del flujo existente**: `tunnel.routes.js` ya valida ownership, multi-tenant, expira sesiones, audita. Replicar eso desde el bot duplicaría lógica de seguridad.
+
+El frontend acepta `?activate=VRF-X` y `?deactivate=1` como query params (pendiente UI hook — el bot ya genera los URLs, el handler del query es trivial cuando se sume).
+
+### Arquitectura: long-polling
+
+```
+┌─────────────────────────────────────────┐
+│        api.telegram.org/bot{TOKEN}      │
+└────────────────────┬────────────────────┘
+                     │ getUpdates?timeout=25&offset=N
+                     ▼
+        ┌────────────────────────┐
+        │  lib/telegramBot.js    │
+        │  while (_running) {    │
+        │    updates = await get │
+        │    for (u of updates)  │
+        │      handleMessage(u)  │
+        │    _offset = u.id+1    │
+        │  }                     │
+        └───────────┬────────────┘
+                    │ chat_id → notification_subscriptions
+                    ▼
+            ┌───────────────────┐
+            │  user_id resuelto │
+            └───────┬───────────┘
+                    │
+        ┌───────────┼───────────┬────────────┐
+        ▼           ▼           ▼            ▼
+   sessionRepo  userRepo  workspace_members  nodes
+   (/status)    (saludo)  (rol y ws)        (/tuneles)
+```
+
+`update_id` se guarda **en memoria** (`_offset`). Si el server reinicia, los updates entre reinicio se pierden — aceptable para comandos interactivos (el usuario reenvía). Para producción con HA migrar a persistencia (`app_settings.telegram_last_update_id`).
+
+### Archivos clave
+
+| Archivo | Para qué |
+|---------|----------|
+| [server/lib/telegramBot.js](server/lib/telegramBot.js) | Loop + dispatcher de 8 comandos. `start()`, `stop()`, `handleMessage()` (exportado para tests). |
+| [server/lib/telegram.js](server/lib/telegram.js) | Cliente `sendMessage` ya existente (Q1). |
+| [server/db/repos/notificationRepo.js](server/db/repos/notificationRepo.js) | `confirmTelegramLink`, `unlinkTelegram` — reusados. |
+| [server/index.js](server/index.js) | `telegramBot.start()` al arrancar listen + `SIGTERM`/`SIGINT` graceful shutdown. |
+| [server/test/unit/telegramBot.test.js](server/test/unit/telegramBot.test.js) | 20 tests del dispatcher (auth, comandos, deep-links). |
+
+### Variables `.env`
+
+```bash
+TELEGRAM_BOT_TOKEN=          # required — sin esto el bot no arranca
+TELEGRAM_BOT_ENABLED=true    # false para opt-out aunque haya token
+APP_BASE_URL=                # para los deep-links de /activar y /desactivar
+```
+
+### Decisiones documentadas adicionales
+
+- **`allowed_updates=["message"]`** en `getUpdates` — solo escuchamos mensajes de texto. Telegram tiene también `callback_query` (botones inline), `edited_message`, etc. No los necesitamos hoy; cuando agreguemos botones inline para confirmaciones tipo "¿Activar VRF-X? Sí/No", se amplía.
+- **`POLL_TIMEOUT_SEC = 25`** — un poco bajo el máximo de 50s para que el `AbortController` del shutdown abra ventana en máximo 25s.
+- **Errores en handler son aislados**: `handleMessage(u).catch(...)` por update; un fallo en `/tuneles` no para el loop.
+- **Comando con `@BotName`**: en grupos, Telegram entrega `/start@MyVpnBot` — el dispatcher hace `.split('@')[0]` para normalizar.
+
+### Estado del backlog tras M1
+
+| | Hecho | Pendiente |
+|---|---|---|
+| Quick wins | **Q5** · **Q1** | Q2 · Q3 · Q4 |
+| Mid-size | **M1** | M2 · M3 · M4 · M5 |
+| Grandes | — | L1-L4 |
+
+Tests totales: **91 backend + 37 frontend = 128 verdes**.
 
 ---
 
