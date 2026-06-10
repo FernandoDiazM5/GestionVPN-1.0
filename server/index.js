@@ -156,6 +156,27 @@ app.use((req, res, next) => {
     next();
 });
 
+// ── GET /metrics — formato Prometheus (FASE 9) ────────────────────
+//  Sin auth porque es un endpoint interno (igual que /api/health).
+//  Por defecto SOLO loopback puede leerlo; en despliegues donde
+//  Prometheus corre en otra IP, exportar METRICS_ALLOW_REMOTE=1
+//  o restringir el acceso a nivel red/firewall.
+const METRICS_ALLOW_REMOTE = process.env.METRICS_ALLOW_REMOTE === '1';
+app.get('/metrics', async (req, res) => {
+    if (!METRICS_ALLOW_REMOTE) {
+        const ip = req.ip || req.socket?.remoteAddress || '';
+        const isLoopback = ip === '::1' || ip === '127.0.0.1' || ip === '::ffff:127.0.0.1';
+        if (!isLoopback) return res.status(403).send('Forbidden');
+    }
+    try {
+        res.set('Content-Type', metrics.register.contentType);
+        res.send(await metrics.register.metrics());
+    } catch (err) {
+        logger.error({ err }, 'Falló la exposición de /metrics');
+        res.status(500).send('metrics error');
+    }
+});
+
 // Montar rutas públicas e integradas
 app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
