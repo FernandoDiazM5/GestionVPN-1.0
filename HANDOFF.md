@@ -2,7 +2,7 @@
 
 > Documento de migración de contexto entre sesiones.
 > Rama de trabajo: **`dev`** · Remote: `github.com/FernandoDiazM5/GestionVPN-1.0`.
-> Última actualización (2026-06-10): **REFACTOR_PLAN fases 0-8 ejecutadas** (F5: monorepo + `@gestionvpn/contracts`; F6: `node.routes.js` → 8 archivos; F7: `core.routes.js` → 7 archivos; F8: `NetworkDevicesModule.tsx` **1313 LOC → 433** + 4 hooks + 5 componentes nuevos + fixup `5c19cb6` resolvió 2 bugs de perf y 2 anti-patterns). Ver §17, §18, §19, §20 y §21.
+> Última actualización (2026-06-10): **REFACTOR_PLAN fases 0-9 ejecutadas** (F5: monorepo + `@gestionvpn/contracts`; F6: `node.routes.js` → 8 archivos; F7: `core.routes.js` → 7 archivos; F8: `NetworkDevicesModule.tsx` **1313 LOC → 433** + 4 hooks + 5 componentes nuevos + fixup `5c19cb6` resolvió 2 bugs de perf y 2 anti-patterns; F9: observabilidad — `/api/health` enriquecido (mysql+routeros+smtp) + `GET /metrics` Prometheus + counters de auth/routeros/mailer). Ver §17, §18, §19, §20, §21 y §22.
 > Sesión 2026-06-07 PM: Ajustes del moderador (perfil + workspace + import/export JSON) + Recuperar contraseña + sync MikroTik al deshabilitar + invitaciones por email + .conf WG server-side.
 > Sesión 2026-06-07 AM: multi-usuario con aislamiento por sesión (mangle por-IP), parche `!empty` node-routeros, auditoría (Semgrep+security-review+code-review) y fixes C1–C7.
 > Resumen extendido en `RESUMEN_CONTEXTO_MAESTRO.md`.
@@ -732,12 +732,12 @@ Sesión 2026-06-09 ejecutó las fases 0-4 del plan de refactor incremental
 | **F6** Split `node.routes.js` | ✅ | — | `routes/node.routes.js` (1264 LOC) → `routes/nodes/{index,_shared,listing,provision,editing,tags,credentials,history,scan}.routes.js` (max **472 LOC**). Helpers comunes (`annotateSessions`, `filterNodesForRole`, `nodeBelongsToRequester`, `requireOperator`) en `_shared.js`. **92 tests siguen verdes.** Ver §19 |
 | **F7** Split `core.routes.js` | ✅ | — | `routes/core.routes.js` (935 LOC) → `routes/core/{index,_shared,connection,ppp,interface,tunnel,tunnel-repair}.routes.js` (max **430 LOC**). Registry SSE singleton + helpers (`emitToUser`, `canUseTunnel`, `clientIpOf`) en `_shared.js`. **92 tests siguen verdes.** Ver §20 |
 | **F8** Split `NetworkDevicesModule.tsx` | ✅ | — | Monolito 1313 LOC → **433** (orquestador) + 4 hooks (`useDeviceScan`, `useDeviceList`, `useColumnPrefs`, `useDeviceLibrary`) + 5 componentes (`ScanControls`, `ScanProgressBanner`, `DeviceFilters`, `DeviceTable`, `DeviceTableRow` memoizado). Virtualización con `@tanstack/react-virtual` queda para F10. **92 tests siguen verdes** + ESLint warnings bajaron 130 → **115** (tras fixup `5c19cb6`). Ver §21 |
+| **F9** Observabilidad — health + Prometheus | ✅ | — | `prom-client@15`, [server/lib/metrics.js](server/lib/metrics.js) (registry + counters/histogram), middleware HTTP en [server/index.js](server/index.js) (latencia por método/ruta/status, excluye `/api/health` y `/metrics`), `GET /metrics` formato Prometheus (loopback-only por defecto; `METRICS_ALLOW_REMOTE=1` para scrape remoto), `GET /api/health` enriquecido (`mysql` + `routeros` + `smtp`) con cascada de status. **92 tests siguen verdes.** Ver §22 |
 
 ### Fases pendientes
 
 | Fase | Estado | Estimación | Bloquea a |
 |------|--------|------------|-----------|
-| **F9** Health check enriquecido + métricas Prometheus | ⏳ | 1 día 🟢 | — |
 | **F10** Code-splitting frontend (lazy modules) | ⏳ | 1 día 🟢 | — |
 | **F11** Performance MySQL (índices + prepared) | ⏳ | 1 día 🟠 | — |
 | **F12** Audit pass final + docs | ⏳ | 1 día 🟢 | — |
@@ -1152,6 +1152,96 @@ el code-review detectó:
 depender del objeto entero en un `useEffect`/`useCallback` rompe la memoización.
 Siempre desestructurar y depender de las piezas estables (setters de React lo son
 por contrato).
+
+---
+
+## 22) 📡 Observabilidad — Health + Métricas Prometheus (FASE 9)
+
+Backend expone dos endpoints sin auth para monitoring externo (`pino-http`
+los silencia para no inundar logs).
+
+### `GET /api/health` — snapshot agregado
+
+Devuelve los tres sistemas críticos en cascada. **El status global degrada así**: `mysql.down → status=down (HTTP 503)` · cualquier otro check `down/stale/error → status=degraded (HTTP 200)` · todo verde → `status=ok`.
+
+```jsonc
+{
+  "success": true,
+  "status": "ok",            // ok | degraded | down
+  "version": "1.0.0",
+  "uptime_s": 1234,
+  "checks": {
+    "mysql":    { "status": "ok",      "latency_ms": 4 },
+    "routeros": { "status": "ok",      "last_write_ago_s": 12 },
+    "smtp":     { "status": "ok",      "configured": true, "latency_ms": 180 }
+  }
+}
+```
+
+| Check | Cómo se decide |
+|-------|----------------|
+| `mysql` | `SELECT 1` (mismo `ping()` del monitor). `latency_ms` y `error` (code mysql2) si falla. |
+| `routeros` | Timestamp `_lastSafeWriteOkAt` de `routeros.service.js` (cualquier `safeWrite` OK lo refresca). `ok` ≤ 60s · `stale` ≤ 5min · `down` > 5min · `unknown` si el backend nunca tocó el router. Umbrales por env `HEALTH_ROUTEROS_OK_MAX_S` (default 60) y `HEALTH_ROUTEROS_STALE_MAX_S` (default 300). |
+| `smtp` | `transporter.verify()` con timeout (`SMTP_VERIFY_TIMEOUT_MS`, default 4s) **cacheado** `SMTP_VERIFY_TTL_MS` (default 45s) para no abrir conexión SMTP en cada poll. `skipped` cuando no hay `SMTP_HOST`. |
+
+Endpoint legacy `GET /api/health/db` se conserva por compat (ping mínimo a MySQL).
+
+### `GET /metrics` — formato Prometheus
+
+Loopback-only por defecto (devuelve 403 a IPs remotas). Exportar `METRICS_ALLOW_REMOTE=1` cuando Prometheus corra en otra IP — o restringir por firewall.
+
+| Métrica | Tipo | Labels | Notas |
+|---------|------|--------|-------|
+| `nodejs_*` | varios | — | Defaults de `prom-client`: CPU, memoria, event loop lag, GC. Útil para detectar leaks y saturación. |
+| `http_requests_total` | counter | `method`, `route`, `status` | Excluye `/api/health` y `/metrics`. `route` = `req.baseUrl + req.route.path` cuando Express matchea (cardinalidad acotada en `/foo/:id`); fallback al pathname sin querystring en 404/early-error. |
+| `http_request_duration_seconds` | histogram | `method`, `route`, `status` | Buckets 1ms → 5s. |
+| `auth_fails_total` | counter | `reason` | `bad_credentials`, `db_unavailable`, `validation`, `no_token`, `invalid_token`, `expired_token`, `reset_token_invalid`. Sin email/IP/user_id. |
+| `routeros_writes_total` | counter | `status` | `ok` o `error`. Ratio `errors / total` separa "router mudo" de "router que responde mal". |
+| `routeros_errors_total` | counter | `type` | `timeout`, `refused`, `login`, `network`, `unknown`. `!empty` NO cuenta — es resultado vacío válido. |
+| `mail_sent_total` | counter | `kind`, `status` | `kind`: `otp`/`invitation`/`password_reset`. `status`: `ok`/`error`/`dev` (sin SMTP). |
+
+Label global: `service="gestionvpn-backend"`. Todo en snake_case con sufijo de unidad (`_total`, `_seconds`).
+
+### Ejemplo scrape config (Prometheus)
+
+```yaml
+# prometheus.yml
+scrape_configs:
+  - job_name: 'gestionvpn-backend'
+    metrics_path: /metrics
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['127.0.0.1:3001']
+    # Para scrape remoto: poner METRICS_ALLOW_REMOTE=1 en el backend
+    # y restringir el acceso a esta IP a nivel firewall/red.
+```
+
+### Reglas de cardinalidad (no las rompas)
+
+- **Nada de `user_id`, `email`, `ip`** como label — explotan la cardinalidad y son PII.
+- **`route` viene del matcher de Express**, no del `req.url` crudo, para que `/api/team/member/abc-123` y `/api/team/member/def-456` colapsen a la misma serie.
+- **Etiquetas categóricas con dominio cerrado** (`reason`, `type`, `kind`, `status`) — si agregas una nueva categoría, documéntala aquí.
+
+### Variables de entorno F9
+
+```bash
+METRICS_ALLOW_REMOTE=0              # 1 = permite /metrics fuera de loopback
+HEALTH_ROUTEROS_OK_MAX_S=60         # umbral routeros 'ok'
+HEALTH_ROUTEROS_STALE_MAX_S=300     # umbral routeros 'stale'
+SMTP_VERIFY_TIMEOUT_MS=4000         # timeout transporter.verify() en /api/health
+SMTP_VERIFY_TTL_MS=45000            # cache del resultado de verify (evita abrir SMTP en cada poll)
+```
+
+### Métricas pre/post F9
+
+| Métrica | Pre-F9 | Post-F9 |
+|---------|--------|---------|
+| Endpoint de health | `GET /api/health/db` (mysql ping mínimo) | `GET /api/health` (mysql + routeros + smtp con cascada) |
+| Exposición Prometheus | ❌ | `GET /metrics` con 4 counters + 1 histogram + defaults Node |
+| Cardinalidad acotada | n/a | sí — categorías cerradas, sin PII |
+| `verify SMTP` por hit | n/a | cacheado 45s (no abre socket en cada poll) |
+| Status code en `/api/health` con BD caída | 500 | **503** (legible por liveness probes) |
+| Tests verdes | 92 | **92** (sin regresión) |
 
 ---
 
