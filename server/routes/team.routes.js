@@ -6,6 +6,15 @@ const express = require('express');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { z } = require('zod');
+const {
+  InviteRequestSchema,
+  AcceptRequestSchema,
+  InAppAcceptRequestSchema,
+  ChangeRoleRequestSchema,
+  MemberPatchRequestSchema,
+  MemberWireguardProvisionSchema,
+  AssignmentCreateSchema,
+} = require('@gestionvpn/contracts');
 
 const { asyncHandler, AppError, sendOk } = require('../lib/apiResponse');
 const { withTransaction, query } = require('../db/mysql');
@@ -135,20 +144,10 @@ const router = express.Router();
 const INVITE_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 const INVITE_MAX_ATTEMPTS = 5;
 
-const emailSchema = z.string().email('Email inválido').max(255);
-const inviteSchema = z.object({
-  email: emailSchema,
-  name: z.string().max(120).optional(),       // nombre del invitado (lo conoce quien invita)
-  role: z.enum(['MEMBER', 'CO_MODERATOR']).default('MEMBER'),
-  tunnelId: z.string().max(160).optional(),   // túnel a asignar al aceptar
-});
-const acceptSchema = z.object({
-  email: emailSchema,
-  otp: z.string().regex(/^\d{6}$/, 'OTP de 6 dígitos'),
-  password: z.string().min(8).max(128).optional(),
-  publicKey: z.string().max(120).optional(),  // clave pública WG del invitado (su privada NO se envía)
-});
-const roleSchema = z.object({ userId: z.string().min(1), role: z.enum(['MEMBER', 'CO_MODERATOR']) });
+// Schemas centralizados en @gestionvpn/contracts (F5).
+const inviteSchema = InviteRequestSchema;
+const acceptSchema = AcceptRequestSchema;
+const roleSchema = ChangeRoleRequestSchema;
 
 const genOtp = () => String(crypto.randomInt(100000, 1000000));
 
@@ -323,7 +322,7 @@ router.get('/my-invitations', requireSession, asyncHandler(async (req, res) => {
 
 // ── POST /invitations/:id/accept — aceptar EN LA APP (usuario logueado) ──
 //  Reemplaza al OTP: el usuario ya autenticado acepta y envía su clave pública WG.
-const inAppAcceptSchema = z.object({ publicKey: z.string().max(120).optional() });
+const inAppAcceptSchema = InAppAcceptRequestSchema;
 router.post('/invitations/:id/accept', requireSession, asyncHandler(async (req, res) => {
   const { publicKey } = inAppAcceptSchema.parse(req.body);
   const inv = await invitationRepo.findById(req.params.id);
@@ -396,9 +395,7 @@ router.post('/role', requireSession, requireRole('OWNER'),
 //  Suspende sin borrar: pone disabled_at, sincroniza =disabled= en el peer WG
 //  del MikroTik, cierra la sesión activa del usuario e invalida su cache de auth.
 //  Al rehabilitar, solo limpia disabled_at + re-habilita el peer.
-const memberPatchSchema = z.object({
-  disabled: z.boolean(),
-}).refine(d => Object.keys(d).length > 0, { message: 'Nada que actualizar' });
+const memberPatchSchema = MemberPatchRequestSchema;
 
 router.patch('/member/:userId', requireSession, requireRole('OWNER', 'CO_MODERATOR'),
   asyncHandler(async (req, res) => {
@@ -542,9 +539,7 @@ router.get('/assignments', requireSession, asyncHandler(async (req, res) => {
 // ── POST /assignments — asignar túnel a miembro (Moderador) ──
 router.post('/assignments', requireSession, requireRole('OWNER', 'CO_MODERATOR'),
   asyncHandler(async (req, res) => {
-    const { userId, tunnelId } = z.object({
-      userId: z.string().min(1), tunnelId: z.string().min(1).max(160),
-    }).parse(req.body);
+    const { userId, tunnelId } = AssignmentCreateSchema.parse(req.body);
     const member = await memberRepo.findMembership(req.account.workspace_id, userId);
     if (!member) throw new AppError('El usuario no es miembro del workspace', 404, 'NOT_MEMBER');
     await assignmentRepo.add(null, {
@@ -564,10 +559,7 @@ router.delete('/assignments/:id', requireSession, requireRole('OWNER', 'CO_MODER
 // ── POST /member/:id/wireguard — provisiona acceso WG al miembro ──
 //  El Moderador genera el peer WireGuard (en MikroTik) para el equipo del
 //  miembro (móvil/PC) y guarda su .conf cifrado. Devuelve el .conf una vez.
-const wgSchema = z.object({
-  mode: z.enum(['generate', 'publicKey']).default('generate'),
-  publicKey: z.string().max(120).optional(),
-});
+const wgSchema = MemberWireguardProvisionSchema;
 router.post('/member/:id/wireguard', requireSession, requireRole('OWNER', 'CO_MODERATOR'),
   asyncHandler(async (req, res) => {
     if (!req.mikrotik) throw new AppError('Configura el router MikroTik en Ajustes', 503, 'NO_ROUTER');

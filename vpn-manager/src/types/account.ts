@@ -1,94 +1,39 @@
 // ============================================================
-//  Tipos del sistema multi-usuario (Fase 4) — espejo del backend
-//  Endpoints: /api/account, /api/team, /api/audit
+//  Tipos del sistema multi-tenant — espejo del backend.
+//
+//  Tras FASE 5: los tipos viven en @gestionvpn/contracts y aquí
+//  los re-exportamos para no romper imports existentes. Cambiar
+//  un campo en contracts rompe ambos lados en tsc (no más drift).
 // ============================================================
 
-export type Role = 'OWNER' | 'CO_MODERATOR' | 'MEMBER';
+export type {
+  Role,
+  SessionUser,
+} from '@gestionvpn/contracts';
 
-/** Usuario de la sesión actual (GET /api/account/me). */
-export interface SessionUser {
-  id: string;
-  email: string;
-  name?: string;
-  role: Role;
-  workspace_id: string;
-  /** Administrador de plataforma (Sistemas) — opera la plataforma. */
-  platform_admin?: boolean;
-}
+export type {
+  Member,
+  Invitation,
+  MyInvitation,
+  WgServerConfig,
+  AcceptResponse,
+  Assignment,
+  MemberWireguard,
+} from '@gestionvpn/contracts';
 
-/** Moderador (OWNER de un workspace) visto por el Administrador. */
-export interface Moderator {
-  user_id: string;
-  email: string;
-  name: string;
-  created_at: number;
-  workspace_id: string;
-  workspace_name: string;
-  miembros: number;
-  disabled?: boolean;
-}
+export { ROLE_LABEL } from '@gestionvpn/contracts';
 
-/** Métricas del dashboard del Administrador. */
-export interface AdminSummary {
-  workspaces: number;
-  usuarios: number;
-  moderadores: number;
-  comoderadores: number;
-  miembros: number;
-  acciones_24h: number;
-}
+export type {
+  Moderator,
+  AdminSummary,
+} from '@gestionvpn/contracts';
 
-/** Miembro del workspace (GET /api/team/members). */
-export interface Member {
-  user_id: string;
-  email: string;
-  name: string;
-  role: Role;
-  joined_at: number;
-  /** Suspendido por el moderador: peer WG en el router quedó =disabled=yes. */
-  disabled?: boolean;
-}
+// Alias retro-compatible: el frontend antes llamaba al sobre "AcceptResult".
+// Mantener el nombre evita tocar todos los servicios/componentes que lo usan.
+export type { AcceptResponse as AcceptResult } from '@gestionvpn/contracts';
 
-/** Invitación pendiente (GET /api/team/invitations). */
-export interface Invitation {
-  id: string;
-  email: string;
-  role: Exclude<Role, 'OWNER'>;
-  attempts: number;
-  expires_at: number;
-  created_at: number;
-  tunnel_id?: string | null;
-}
-
-/** Invitación PENDING vista por el invitado (bandeja in-app). */
-export interface MyInvitation {
-  id: string;
-  workspace_id: string;
-  workspace_name: string;
-  email: string;
-  role: Exclude<Role, 'OWNER'>;
-  tunnel_id: string | null;
-  expires_at: number;
-  created_at: number;
-}
-
-/** Datos del servidor WG devueltos al aceptar (para completar el .conf en el dispositivo). */
-export interface WgServerConfig {
-  allowedIp: string;
-  serverPublicKey: string;
-  endpoint: string;
-  allowedIps: string;
-}
-
-/** Respuesta de aceptar una invitación (pública o in-app). */
-export interface AcceptResult {
-  success: true;
-  user: { id: string; email: string; role: Role; workspace_id: string };
-  tunnel: string | null;
-  wireguard: WgServerConfig | null;
-  /** Contenido completo del .conf con PrivateKey real (si el server generó las claves). */
-  conf: string | null;
-}
+// ── Tipos auxiliares del frontend que NO están en contracts ──
+// (no son contrato de API: solo viven en el cliente)
 
 /** Entrada de auditoría (GET /api/audit/logs). */
 export interface AuditLog {
@@ -102,30 +47,3 @@ export interface AuditLog {
   user_email: string | null;
   user_name: string | null;
 }
-
-/** Asignación de túnel a un miembro. */
-export interface Assignment {
-  id: string;
-  tunnel_id: string;
-  user_id?: string;
-  user_email?: string;
-  user_name?: string;
-  created_at: number;
-}
-
-/** Acceso WireGuard de un miembro. */
-export interface MemberWireguard {
-  allowedIp: string;
-  publicKey: string;
-  serverPublicKey?: string | null;
-  endpoint?: string | null;
-  allowedIps?: string;
-  conf: string | null;
-}
-
-/** Etiqueta legible por rol. */
-export const ROLE_LABEL: Record<Role, string> = {
-  OWNER: 'Propietario',
-  CO_MODERATOR: 'Co-moderador',
-  MEMBER: 'Miembro',
-};

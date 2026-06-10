@@ -17,7 +17,11 @@
 //     en BD y el operador puede reintentar con un import idempotente.
 // ============================================================
 const express = require('express');
-const { z } = require('zod');
+const {
+  WorkspaceRenameRequestSchema,
+  ImportRequestSchema,
+  EXPORT_VERSION,
+} = require('@gestionvpn/contracts');
 
 const { asyncHandler, AppError, sendOk } = require('../lib/apiResponse');
 const { query, withTransaction } = require('../db/mysql');
@@ -25,14 +29,10 @@ const { requireSession, requireRole } = require('../middleware/authJwt');
 
 const router = express.Router();
 
-// Versión del schema de export. Si cambias campos, súbela y agrega migración
-// en el import (al leer un .json viejo).
-const EXPORT_VERSION = '1.0.0';
-
 // ──────────────────────────────────────────────────────────────
 //  PATCH /name — renombrar el workspace
 // ──────────────────────────────────────────────────────────────
-const renameSchema = z.object({ name: z.string().min(1).max(160) });
+const renameSchema = WorkspaceRenameRequestSchema;
 
 router.patch('/name', requireSession, requireRole('OWNER'),
   asyncHandler(async (req, res) => {
@@ -145,42 +145,7 @@ router.get('/export', requireSession, requireRole('OWNER'),
 // ──────────────────────────────────────────────────────────────
 //  POST /import — importa un JSON (dryRun + apply)
 // ──────────────────────────────────────────────────────────────
-const importSchema = z.object({
-  payload: z.object({
-    version: z.string(),
-    workspace: z.object({ name: z.string().max(160).optional() }).optional(),
-    members: z.array(z.object({
-      email: z.string().email(),
-      name: z.string().optional().nullable(),
-      role: z.enum(['OWNER', 'CO_MODERATOR', 'MEMBER']),
-      disabled: z.boolean().optional(),
-    })).optional(),
-    tunnels: z.array(z.object({
-      ppp_user: z.string(),
-      nombre_nodo: z.string().optional(),
-      nombre_vrf: z.string().optional(),
-      iface_name: z.string().optional(),
-      segmento_lan: z.string().optional(),
-      ip_tunnel: z.string().optional(),
-      ppp_password_enc: z.string().nullable().optional(),
-      label: z.string().optional(),
-      server_ip: z.string().optional(),
-      lan_subnets: z.string().optional(),
-      protocol: z.string().optional(),
-      mikrotik_id: z.string().optional(),
-      ssh_creds: z.array(z.any()).optional(),
-    })).optional(),
-    ap_groups: z.array(z.object({
-      uuid: z.string(),
-      nombre: z.string(),
-      descripcion: z.string().optional(),
-      ubicacion: z.string().optional(),
-      aps: z.array(z.any()).optional(),
-    })).optional(),
-  }).passthrough(),
-  conflict: z.enum(['skip', 'overwrite']).default('skip'),
-  dryRun: z.boolean().default(true),
-});
+const importSchema = ImportRequestSchema;
 
 router.post('/import', requireSession, requireRole('OWNER'),
   asyncHandler(async (req, res) => {

@@ -28,8 +28,8 @@ export function useSession(): UseSessionResult {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      // Puente primero: usa la sesión actual de la app (Bearer) para emitir
-      // la cookie RBAC. Evita el 401 cosmético de probar /me sin cookie.
+      // Puente primero: re-emite la cookie RBAC tomando como base la sesión
+      // activa. Evita el 401 cosmético de probar /me sin cookie tras un reload.
       const b = await accountApi.bridge();
       applySession(b.user);
     } catch {

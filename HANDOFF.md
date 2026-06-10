@@ -2,7 +2,7 @@
 
 > Documento de migración de contexto entre sesiones.
 > Rama de trabajo: **`dev`** · Remote: `github.com/FernandoDiazM5/GestionVPN-1.0`.
-> Última actualización (2026-06-09): **REFACTOR_PLAN fases 0-4 ejecutadas** (preparación, logger pino, helmet, setup testing, 92 tests escritos). Ver §17 y `REFACTOR_PLAN.md`.
+> Última actualización (2026-06-09 PM): **REFACTOR_PLAN fases 0-5 ejecutadas** (F5: monorepo npm workspaces + `@gestionvpn/contracts` con schemas Zod compartidos backend↔frontend + `apiClient` Bearer eliminado). Ver §17 y §18.
 > Sesión 2026-06-07 PM: Ajustes del moderador (perfil + workspace + import/export JSON) + Recuperar contraseña + sync MikroTik al deshabilitar + invitaciones por email + .conf WG server-side.
 > Sesión 2026-06-07 AM: multi-usuario con aislamiento por sesión (mangle por-IP), parche `!empty` node-routeros, auditoría (Semgrep+security-review+code-review) y fixes C1–C7.
 > Resumen extendido en `RESUMEN_CONTEXTO_MAESTRO.md`.
@@ -728,12 +728,12 @@ Sesión 2026-06-09 ejecutó las fases 0-4 del plan de refactor incremental
 | **F2** Headers de seguridad | ✅ | 4 | `helmet@8` con CSP API-only (`default-src 'none'`), HSTS solo en prod, COOP/COEP off para no romper CORS, `crossOriginResourcePolicy: same-site`. Cookies con `secure` automático en prod + `sameSite: lax`, helper `cookieBaseOptions()` garantiza que `clearSessionCookie` borra de verdad |
 | **F3** Setup de testing | ✅ | 6 | Vitest 2 (backend + frontend), Supertest, Testing Library, MSW, jsdom, Playwright. Mocks (`routeros`, `mailer`, `mysql`), factories, helper `stubModule` para CJS, render wrapper con providers reales. CI corre Vitest en ambos jobs |
 | **F4** Tests críticos | ✅ | 7 | **92 tests verde** (55 backend + 37 frontend). Suites: `wgkeys`, `crypto`, `passwordResetRepo`, `tenantScope`, `password-reset/*` (supertest), `permissions`, `sessionClient` (auth_expired), `WgConfigModal`. Thresholds suaves (5% lines / 45% branches) — F8/F11 los suben a 60% |
+| **F5** Contracts compartidos + Bearer kill | ✅ | — | Monorepo npm workspaces; `packages/contracts` con schemas Zod (Auth, Account, Team, Admin, Workspace); backend importa schemas centralizados (5 routes migrados); frontend re-exporta tipos desde contracts; `auth.routes.js` usa `sendOk`/`sendError`; `apiFetch` ya no inyecta `Bearer` — sesión = cookie HttpOnly. **92 tests siguen verdes.** Ver §18 |
 
 ### Fases pendientes
 
 | Fase | Estado | Estimación | Bloquea a |
 |------|--------|------------|-----------|
-| **F5** Unificar API client + contratos Zod compartidos | ⏳ | 3 días 🟠 | F6, F7, F8 |
 | **F6** Split `node.routes.js` (1264 LOC) | ⏳ | 2 días 🟠 | — |
 | **F7** Split `core.routes.js` (935 LOC) | ⏳ | 2 días 🟠 | — |
 | **F8** Split `NetworkDevicesModule.tsx` (1313 LOC) | ⏳ | 3 días 🟠 | F10 |
@@ -772,6 +772,131 @@ Sesión 2026-06-09 ejecutó las fases 0-4 del plan de refactor incremental
 | Cobertura frontend | 0% | ~5% lines, ~50% branches |
 | README "Contribuir" | Ninguno | Setup + flujo + scripts + convenciones |
 | Archivos basura en `src/` | `VpnContext.backup.tsx` (412 LOC) | Eliminado |
+
+---
+
+## 18) 📦 Contratos API compartidos — `@gestionvpn/contracts` (FASE 5)
+
+A partir de la FASE 5 hay **un único set de schemas Zod** que tanto backend
+(`require()`) como frontend (`import`) consumen. Cambiar un campo en el paquete
+rompe ambos lados en `tsc` — fin del drift silencioso.
+
+### Estructura del monorepo
+
+```
+ProyectoVPN_3.0/                    ← root (npm workspaces)
+├── package.json                    ← workspaces: ["packages/*", "server", "vpn-manager"]
+├── packages/
+│   └── contracts/
+│       ├── package.json            ← name: "@gestionvpn/contracts"
+│       ├── tsconfig.json           ← target ES2022, module commonjs, declaration
+│       ├── src/
+│       │   ├── index.ts            ← re-export *
+│       │   ├── common.ts           ← Role, Email, Password, Otp, ApiSuccess/Error
+│       │   ├── auth.ts             ← Login, Setup, PasswordReset (request/confirm)
+│       │   ├── account.ts          ← Register, Verify, Resend, Login, ChangePassword, ChangeEmail
+│       │   ├── team.ts             ← Invite, Accept, MemberPatch, WireguardProvision, Assignment
+│       │   ├── admin.ts            ← CreateModerator, ModeratorPatch, InviteModerator
+│       │   └── workspace.ts        ← Rename, ExportPayload, ImportRequest, ImportPlan
+│       └── dist/                   ← generado por tsc (.js + .d.ts)
+├── server/                         ← workspace
+└── vpn-manager/                    ← workspace
+```
+
+### Comandos
+
+```bash
+# Compilar el paquete (genera dist/)
+cd packages/contracts && npm run build
+# Watch mode mientras se edita
+cd packages/contracts && npm run build:watch
+# Desde el root, atajo:
+npm run build:contracts
+```
+
+### Cómo añadir un endpoint nuevo (workflow F5)
+
+1. **Define el schema en `packages/contracts/src/<dominio>.ts`**:
+   ```ts
+   export const FooRequestSchema = z.object({
+     bar: z.string().min(1).max(160),
+   });
+   export type FooRequest = z.infer<typeof FooRequestSchema>;
+   ```
+2. **`npm run build:contracts`** — emite `.js` + `.d.ts` en `dist/`.
+3. **Backend** (`server/routes/foo.routes.js`):
+   ```js
+   const { FooRequestSchema } = require('@gestionvpn/contracts');
+   const { asyncHandler, AppError, sendOk } = require('../lib/apiResponse');
+
+   router.post('/foo', requireSession, asyncHandler(async (req, res) => {
+     const { bar } = FooRequestSchema.parse(req.body);   // ⇒ AppError 422 si falla
+     // …lógica…
+     return sendOk(res, { result: '…' });                // ⇒ { success: true, result: '…' }
+   }));
+   ```
+4. **Frontend** (`vpn-manager/src/services/fooApi.ts`):
+   ```ts
+   import { post } from './sessionClient';
+   import type { FooRequest } from '@gestionvpn/contracts';
+
+   export const fooApi = {
+     create: (input: FooRequest) =>
+       post<{ success: true; result: string }>('/api/foo', input),
+   };
+   ```
+
+### Respuestas estandarizadas
+
+Toda la API responde una de estas dos formas (via `lib/apiResponse.js`):
+
+```jsonc
+// éxito
+{ "success": true, "message": "…opcional", "<...campos>": "…" }
+// error
+{ "success": false, "code": "MAQUINA", "message": "Texto legible" }
+```
+
+`asyncHandler(fn)` envuelve los handlers y delega errores al
+`errorMiddleware`, que traduce automáticamente:
+
+- `AppError` → su `{ status, code, message }`.
+- `ZodError` → `422 VALIDATION_ERROR`.
+- `ER_DUP_ENTRY` (MySQL) → `409 DUPLICATE`.
+- Resto → `500 INTERNAL` + log estructurado.
+
+`auth.routes.js` (legacy, sin `asyncHandler`) ahora también usa `sendOk`/`sendError` para uniformidad.
+
+### Eliminación de `Authorization: Bearer` en el frontend
+
+- `vpn-manager/src/utils/apiClient.ts` ya **NO** inyecta `Authorization: Bearer`.
+  La sesión viaja en la cookie HttpOnly `vpn_session`, que el navegador envía
+  sola gracias a `credentials: 'include'`.
+- `setApiToken` / `getApiToken` quedan como NO-OP por compatibilidad (siguen
+  importándose desde un par de archivos legacy).
+- `useAuth.ts`, `useTunnelSync.ts` y `accountApi.bridge()` ya no manipulan el token.
+- EventSource del túnel se autentica con `withCredentials: true` (cookie), sin `?token=`.
+
+> **Backend Bearer kept as fallback:** `auth.middleware.js verifyToken` sigue
+> aceptando `Authorization: Bearer …` después de probar la cookie. No lo usa
+> el frontend, pero se mantiene para integraciones externas (scripts CLI,
+> webhooks). Decisión consciente — eliminarlo es trivial cuando aparezca un
+> caso de negocio para hacerlo (no rompería al frontend).
+
+### Tipos del frontend
+
+`vpn-manager/src/types/account.ts` ahora es **un re-export** desde `@gestionvpn/contracts`. Los tipos `Member`, `Invitation`, `Moderator`, `AdminSummary`, `Role`, `SessionUser`, `Assignment`, `MemberWireguard`, `WgServerConfig`, `AcceptResult` (alias de `AcceptResponse`) y `ROLE_LABEL` viven en el paquete compartido.
+
+### Métricas pre/post F5
+
+| Métrica | Pre-F5 | Post-F5 |
+|---------|--------|---------|
+| Schemas Zod inline en routes | ~18 definiciones | 0 (todas importadas) |
+| Paquetes compartidos | 0 | 1 (`@gestionvpn/contracts`) |
+| Source-of-truth de tipos | duplicado backend↔frontend | único (`contracts/src/`) |
+| `Authorization: Bearer` en frontend | sí (`apiClient` + 1 servicio) | **no** (cookie HttpOnly) |
+| Endpoints `auth.routes.js` con `res.status().json()` manual | 7 | 0 (usan `sendOk`/`sendError`) |
+| Tests verdes | 92 | **92** (sin regresión) |
 
 ---
 

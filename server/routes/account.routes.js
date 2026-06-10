@@ -7,6 +7,16 @@ const express = require('express');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { z } = require('zod');
+const {
+  EmailSchema,
+  RegisterRequestSchema,
+  VerifyRequestSchema,
+  ResendRequestSchema,
+  AccountLoginRequestSchema,
+  ChangePasswordRequestSchema,
+  ChangeEmailRequestSchema,
+  ChangeEmailConfirmSchema,
+} = require('@gestionvpn/contracts');
 
 const { asyncHandler, AppError, sendOk } = require('../lib/apiResponse');
 const { withTransaction } = require('../db/mysql');
@@ -25,14 +35,12 @@ const router = express.Router();
 const OTP_TTL_MS = 10 * 60 * 1000;   // 10 min
 const OTP_MAX_ATTEMPTS = 5;
 
-const emailSchema = z.string().email('Email inválido').max(255);
-const registerSchema = z.object({
-  email: emailSchema,
-  password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres').max(128),
-  name: z.string().max(120).optional(),
-});
-const verifySchema = z.object({ email: emailSchema, otp: z.string().regex(/^\d{6}$/, 'OTP de 6 dígitos') });
-const loginSchema = z.object({ email: emailSchema, password: z.string().min(1).max(128) });
+// Schemas centralizados en @gestionvpn/contracts (F5).
+// Aliases locales sin duplicar definiciones — mismo comportamiento Zod.
+const emailSchema = EmailSchema;
+const registerSchema = RegisterRequestSchema;
+const verifySchema = VerifyRequestSchema;
+const loginSchema = AccountLoginRequestSchema;
 
 function genOtp() {
   return String(crypto.randomInt(100000, 1000000)); // 6 dígitos
@@ -114,7 +122,7 @@ router.post('/verify', rl.guard('OTP'), asyncHandler(async (req, res) => {
 
 // ── POST /resend ─────────────────────────────────────────────
 router.post('/resend', asyncHandler(async (req, res) => {
-  const { email } = z.object({ email: emailSchema }).parse(req.body);
+  const { email } = ResendRequestSchema.parse(req.body);
   const user = await userRepo.findByEmail(email);
   if (!user || user.email_verified) return sendOk(res, { message: 'Si la cuenta existe, se envió un código' });
   const otp = genOtp();
@@ -211,10 +219,7 @@ router.get('/me', requireSession, asyncHandler(async (req, res) => {
 
 // ── PATCH /password ──────────────────────────────────────────
 //  Cambia la contraseña del usuario en sesión. Requiere la actual.
-const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1).max(128),
-  newPassword: z.string().min(8, 'Mínimo 8 caracteres').max(128),
-});
+const changePasswordSchema = ChangePasswordRequestSchema;
 router.patch('/password', requireSession, asyncHandler(async (req, res) => {
   const { currentPassword, newPassword } = changePasswordSchema.parse(req.body);
   const user = await userRepo.findById(req.account.sub);
@@ -239,9 +244,7 @@ router.patch('/password', requireSession, asyncHandler(async (req, res) => {
 
 // ── PATCH /email/request ─────────────────────────────────────
 //  Solicita cambio de correo. Envía OTP al NUEVO email (anti-hijack).
-const changeEmailRequestSchema = z.object({
-  newEmail: emailSchema,
-});
+const changeEmailRequestSchema = ChangeEmailRequestSchema;
 router.patch('/email/request', requireSession, asyncHandler(async (req, res) => {
   const { newEmail } = changeEmailRequestSchema.parse(req.body);
   const lc = newEmail.toLowerCase();
@@ -276,11 +279,7 @@ router.patch('/email/request', requireSession, asyncHandler(async (req, res) => 
 //  Confirma el cambio: valida OTP + contraseña actual + persiste el email nuevo.
 //  Exigimos la contraseña actual como segunda capa (si alguien robó la sesión,
 //  igual no puede cambiar el correo sin la contraseña).
-const changeEmailConfirmSchema = z.object({
-  newEmail: emailSchema,
-  otp: z.string().regex(/^\d{6}$/, 'OTP de 6 dígitos'),
-  currentPassword: z.string().min(1).max(128),
-});
+const changeEmailConfirmSchema = ChangeEmailConfirmSchema;
 router.post('/email/confirm', requireSession, asyncHandler(async (req, res) => {
   const { newEmail, otp, currentPassword } = changeEmailConfirmSchema.parse(req.body);
   const lc = newEmail.toLowerCase();

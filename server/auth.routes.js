@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
-const { z } = require('zod');
 const bcrypt = require('bcryptjs');
 const { hasUsers, getUserByUsername, createUser } = require('./db.service');
 const { JWT_SECRET } = require('./auth.middleware');
@@ -13,6 +12,13 @@ const { sendPasswordReset } = require('./lib/mailer');
 const rl = require('./lib/rateLimit');
 const { invalidateUserCache } = require('./middleware/authJwt');
 const log = require('./lib/logger').child({ scope: 'auth' });
+const { sendOk, sendError } = require('./lib/apiResponse');
+const {
+  LoginRequestSchema,
+  SetupRequestSchema,
+  PasswordResetRequestSchema,
+  PasswordResetConfirmSchema,
+} = require('@gestionvpn/contracts');
 
 // Establece (si es posible) la sesión RBAC por cookie a partir del login legacy.
 // No rompe el login si MySQL está caído: degrada a solo-Bearer.
@@ -25,23 +31,18 @@ async function attachRbacSession(res, username) {
   }
 }
 
-const loginSchema = z.object({
-    username: z.string().min(1, "El usuario es requerido"),
-    password: z.string().min(1, "La contraseña es requerida")
-});
-
-const setupSchema = z.object({
-    username: z.string().min(1),
-    password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres")
-});
+// Schemas Zod centralizados en @gestionvpn/contracts (F5). Aliases locales
+// para mantener legibilidad sin tocar el resto del handler.
+const loginSchema = LoginRequestSchema;
+const setupSchema = SetupRequestSchema;
 
 // Endpoint para estado inicial (saber si hay que mostrar pantalla de Setup o Login)
 router.get('/status', async (req, res) => {
     try {
         const configured = await hasUsers();
-        res.json({ success: true, needsSetup: !configured });
+        return sendOk(res, { needsSetup: !configured });
     } catch (e) {
-        res.status(500).json({ success: false, message: e.message });
+        return sendError(res, 500, e.message, 'INTERNAL');
     }
 });
 
@@ -50,7 +51,7 @@ router.post('/setup', async (req, res) => {
     try {
         const configured = await hasUsers();
         if (configured) {
-            return res.status(403).json({ success: false, message: 'La aplicación ya fue inicializada. Inicie sesión.' });
+            return sendError(res, 403, 'La aplicación ya fue inicializada. Inicie sesión.', 'ALREADY_SETUP');
         }
 
         const { username, password } = setupSchema.parse(req.body);
@@ -67,17 +68,16 @@ router.post('/setup', async (req, res) => {
 
         await attachRbacSession(res, username);
 
-        res.json({
-            success: true,
+        return sendOk(res, {
             message: 'Administrador creado y logueado exitosamente',
             token,
             user: username,
-            role: 'admin'
+            role: 'admin',
         });
     } catch (error) {
         const issues = error.issues || error.errors;
-        if (issues) return res.status(400).json({ success: false, message: 'Datos inválidos', errors: issues });
-        res.status(500).json({ success: false, message: error.message });
+        if (issues) return res.status(400).json({ success: false, message: 'Datos inválidos', code: 'VALIDATION_ERROR', errors: issues });
+        return sendError(res, 500, error.message, 'INTERNAL');
     }
 });
 
@@ -94,7 +94,7 @@ router.post('/login', async (req, res) => {
         if (row && await bcrypt.compare(password, row.password_hash)) {
             const token = jwt.sign({ id: row.id, username: row.username, role: row.role }, JWT_SECRET, { expiresIn: '24h' });
             await attachRbacSession(res, row.username);
-            return res.json({ success: true, message: 'Conectado exitosamente', token, user: row.username, role: row.role });
+            return sendOk(res, { message: 'Conectado exitosamente', token, user: row.username, role: row.role });
         }
 
         // 2) Usuario multi-tenant (MySQL): Moderador / Miembro por email
@@ -104,8 +104,8 @@ router.post('/login', async (req, res) => {
                 if (s) {
                     setSessionCookie(res, s.token);
                     const legacyRole = s.user.role === 'MEMBER' ? 'viewer' : 'admin';
-                    return res.json({
-                        success: true, message: 'Conectado exitosamente',
+                    return sendOk(res, {
+                        message: 'Conectado exitosamente',
                         token: s.token, user: s.user.email, role: legacyRole,
                     });
                 }
@@ -115,28 +115,29 @@ router.post('/login', async (req, res) => {
         // Distinguir BD caída de credenciales inválidas (evita el engañoso "contraseña incorrecta")
         if (dbError) {
             log.error({ code: dbError.code, err: dbError.message }, 'Base de datos no disponible en login');
-            return res.status(503).json({
-                success: false, code: 'DB_UNAVAILABLE',
-                message: 'Servicio de base de datos no disponible. Verifica que MySQL (XAMPP) esté iniciado e inténtalo de nuevo.',
-            });
+            return sendError(
+                res, 503,
+                'Servicio de base de datos no disponible. Verifica que MySQL (XAMPP) esté iniciado e inténtalo de nuevo.',
+                'DB_UNAVAILABLE'
+            );
         }
 
-        return res.status(401).json({ success: false, message: 'Usuario o contraseña incorrectos' });
+        return sendError(res, 401, 'Usuario o contraseña incorrectos', 'BAD_CREDENTIALS');
     } catch (zodError) {
-        res.status(400).json({ success: false, message: 'Datos de entrada inválidos', errors: zodError.issues || zodError.errors });
+        return res.status(400).json({ success: false, message: 'Datos de entrada inválidos', code: 'VALIDATION_ERROR', errors: zodError.issues || zodError.errors });
     }
 });
 
 // Obtener datos del JWT activo
 router.get('/me', require('./auth.middleware').verifyToken, (req, res) => {
-    res.json({ success: true, user: req.user.username, role: req.user.role });
+    return sendOk(res, { user: req.user.username, role: req.user.role });
 });
 
 // Refresh token — emite un nuevo JWT si el actual es válido
 router.post('/refresh', (req, res) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ success: false, message: 'Token requerido' });
+        return sendError(res, 401, 'Token requerido', 'NO_TOKEN');
     }
     try {
         const decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
@@ -145,9 +146,9 @@ router.post('/refresh', (req, res) => {
             JWT_SECRET,
             { expiresIn: '24h' }
         );
-        res.json({ success: true, token, expiresIn: 86400 });
+        return sendOk(res, { token, expiresIn: 86400 });
     } catch {
-        res.status(403).json({ success: false, message: 'Token inválido o expirado' });
+        return sendError(res, 403, 'Token inválido o expirado', 'INVALID_TOKEN');
     }
 });
 
@@ -165,13 +166,8 @@ router.post('/refresh', (req, res) => {
 // ════════════════════════════════════════════════════════════════════════════
 
 const MAX_PENDING_TOKENS_PER_HOUR = 5;
-const requestResetSchema = z.object({
-  email: z.string().email('Email inválido').max(255),
-});
-const confirmResetSchema = z.object({
-  token: z.string().min(16).max(255),
-  newPassword: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres').max(128),
-});
+const requestResetSchema = PasswordResetRequestSchema;
+const confirmResetSchema = PasswordResetConfirmSchema;
 const GENERIC_OK = {
   success: true,
   message: 'Si el correo está registrado, te enviamos un enlace para restablecer tu contraseña.',
@@ -203,7 +199,7 @@ router.post('/password-reset/request', rl.guard('OTP'), async (req, res) => {
     return res.json(GENERIC_OK);
   } catch (err) {
     // Errores de validación → 400, pero sin pistas sobre existencia del email
-    if ((err.issues || err.errors)) return res.status(400).json({ success: false, message: 'Datos inválidos' });
+    if ((err.issues || err.errors)) return sendError(res, 400, 'Datos inválidos', 'VALIDATION_ERROR');
     log.error({ err: err.message }, 'password-reset/request error');
     return res.json(GENERIC_OK); // tampoco filtramos errores internos
   }
@@ -217,10 +213,7 @@ router.post('/password-reset/confirm', rl.guard('OTP'), async (req, res) => {
     const found = await passwordResetRepo.findValid(token);
     if (!found) {
       await rl.recordAttempt(ip, 'OTP', null, false);
-      return res.status(401).json({
-        success: false, code: 'INVALID_TOKEN',
-        message: 'El enlace es inválido o ya fue usado. Solicita uno nuevo.',
-      });
+      return sendError(res, 401, 'El enlace es inválido o ya fue usado. Solicita uno nuevo.', 'INVALID_TOKEN');
     }
 
     // Actualizar contraseña + marcar token como usado + invalidar el resto
@@ -235,14 +228,11 @@ router.post('/password-reset/confirm', rl.guard('OTP'), async (req, res) => {
     invalidateUserCache(found.userId);
 
     await rl.recordAttempt(ip, 'OTP', null, true);
-    return res.json({
-      success: true,
-      message: 'Contraseña actualizada. Ya puedes iniciar sesión con tu nueva clave.',
-    });
+    return sendOk(res, { message: 'Contraseña actualizada. Ya puedes iniciar sesión con tu nueva clave.' });
   } catch (err) {
-    if ((err.issues || err.errors)) return res.status(400).json({ success: false, message: 'Datos inválidos', errors: (err.issues || err.errors) });
+    if ((err.issues || err.errors)) return res.status(400).json({ success: false, message: 'Datos inválidos', code: 'VALIDATION_ERROR', errors: (err.issues || err.errors) });
     log.error({ err: err.message }, 'password-reset/confirm error');
-    return res.status(500).json({ success: false, message: 'No se pudo restablecer la contraseña' });
+    return sendError(res, 500, 'No se pudo restablecer la contraseña', 'INTERNAL');
   }
 });
 

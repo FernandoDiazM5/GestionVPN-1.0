@@ -7,6 +7,11 @@ const express = require('express');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { z } = require('zod');
+const {
+  CreateModeratorRequestSchema,
+  ModeratorPatchRequestSchema,
+  InviteModeratorRequestSchema,
+} = require('@gestionvpn/contracts');
 
 const { asyncHandler, AppError, sendOk } = require('../lib/apiResponse');
 const { query, withTransaction } = require('../db/mysql');
@@ -91,12 +96,7 @@ async function findModeratorOr404(userId) {
 }
 
 // ── PATCH /api/admin/moderators/:id — editar nombre / workspace / clave / estado ──
-const patchSchema = z.object({
-  name: z.string().max(120).optional(),
-  workspaceName: z.string().min(1).max(160).optional(),
-  password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres').max(128).optional(),
-  disabled: z.boolean().optional(),
-}).refine(d => Object.keys(d).length > 0, { message: 'Nada que actualizar' });
+const patchSchema = ModeratorPatchRequestSchema;
 
 router.patch('/moderators/:id', asyncHandler(async (req, res) => {
   const mod = await findModeratorOr404(req.params.id);
@@ -255,12 +255,7 @@ router.delete('/moderators/:id', asyncHandler(async (req, res) => {
 }));
 
 // ── POST /api/admin/moderators — alta directa de un Moderador ──
-const createSchema = z.object({
-  email: z.string().email('Email inválido').max(255),
-  password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres').max(128),
-  name: z.string().max(120).optional(),
-  workspaceName: z.string().max(160).optional(),
-});
+const createSchema = CreateModeratorRequestSchema;
 
 router.post('/moderators', asyncHandler(async (req, res) => {
   const { email, password, name, workspaceName } = createSchema.parse(req.body);
@@ -292,11 +287,7 @@ router.post('/moderators', asyncHandler(async (req, res) => {
 //  Mismo UX que invitar un miembro: solo email, le llega un correo con link;
 //  al aceptar, el invitado crea su contraseña y WG, y queda como OWNER de un
 //  workspace nuevo creado vacío para él.
-const inviteModeratorSchema = z.object({
-  email: z.string().email('Email inválido').max(255),
-  name: z.string().max(120).optional(),
-  workspaceName: z.string().max(160).optional(),
-});
+const inviteModeratorSchema = InviteModeratorRequestSchema;
 
 router.post('/invite-moderator', asyncHandler(async (req, res) => {
   const { email, name, workspaceName } = inviteModeratorSchema.parse(req.body);

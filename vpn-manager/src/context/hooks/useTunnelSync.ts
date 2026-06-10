@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react';
 import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
-import { getApiToken } from '../../utils/apiClient';
 import { API_BASE_URL } from '../../config';
 import { BROADCAST_TUNNEL_SYNC } from '../constants';
 
@@ -54,12 +53,8 @@ export function useTunnelSync(
       .catch(() => {});
 
     // Conexión SSE — autenticación por cookie RBAC (withCredentials).
-    // Solo se añade ?token= si existe un Bearer legacy (compatibilidad).
-    const token = getApiToken();
-    const url = token
-      ? `${API_BASE_URL}/api/tunnel/events?token=${encodeURIComponent(token)}`
-      : `${API_BASE_URL}/api/tunnel/events`;
-    const es = new EventSource(url, { withCredentials: true });
+    // Tras F5 ya no se usa Bearer en el frontend; la cookie cubre la sesión.
+    const es = new EventSource(`${API_BASE_URL}/api/tunnel/events`, { withCredentials: true });
     es.onmessage = (e) => {
       try {
         const { activeNodeVrf: vrf, tunnelExpiry: expiry } = JSON.parse(e.data);

@@ -13,6 +13,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@gestionvpn/contracts": "*",
     "clsx": "^2.1.1",
     "localforage": "^1.10.0",
     "lucide-react": "^0.577.0",
@@ -21,6 +22,7 @@
     "react-dom": "^19.2.4",
     "tailwind-merge": "^3.5.0",
     "uuid": "^10.0.0",
+    "zod": "^4.3.6",
     "zustand": "^4.5.7"
   },
   "devDependencies": {
