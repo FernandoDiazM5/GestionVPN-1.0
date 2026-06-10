@@ -28,6 +28,7 @@ const ModeratorSettingsModule   = lazy(() => import('./components/Settings/Moder
 
 import { useWorkspaceSession } from './context/WorkspaceSession';
 import { isPlatformAdmin } from './utils/permissions';
+import { useDeepLinks, PENDING_ACTIVATE_KEY, PENDING_DEACTIVATE_KEY } from './context/hooks/useDeepLinks';
 
 function AppContent() {
   const {
@@ -36,9 +37,27 @@ function AppContent() {
     isReady,
 
     activeModule,
+    setActiveModule,
   } = useVpn();
 
   const [configAlert, setConfigAlert] = useState<string | null>(null);
+
+  // M1 — captura deep-links del bot (?activate=VRF-X / ?deactivate=1)
+  // ANTES de chequear auth: si el usuario no está logueado, la acción
+  // queda guardada en sessionStorage y se ejecuta tras el login.
+  useDeepLinks();
+
+  // Tras login, si hay una acción pendiente del bot, navegar al módulo nodes
+  // (donde NodeAccessPanel la consume y dispara). El módulo del módulo activo
+  // anterior se descarta. NO consumimos aquí — solo cambiamos de módulo.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    try {
+      const hasPending = sessionStorage.getItem(PENDING_ACTIVATE_KEY)
+                      || sessionStorage.getItem(PENDING_DEACTIVATE_KEY);
+      if (hasPending && activeModule !== 'nodes') setActiveModule('nodes');
+    } catch { /* sessionStorage no disponible */ }
+  }, [isAuthenticated, activeModule, setActiveModule]);
 
   useEffect(() => {
     const handler = (e: Event) => {

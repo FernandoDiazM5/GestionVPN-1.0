@@ -22,7 +22,10 @@ import {
   StateIndicators,
   WireGuardSection,
   NodesListSection,
+  DeepLinkBanner,
 } from './components';
+import { fetchWithTimeout } from '../../../utils/fetchWithTimeout';
+import { API_BASE_URL } from '../../../config';
 
 // ── Custom Hooks
 import {
@@ -123,6 +126,37 @@ export default function NodeAccessPanel() {
     setIsRevoking(false);
   };
 
+  // ── M1 closer — handler para los deep-links del bot Telegram ──
+  // El banner DeepLinkBanner muestra confirmación; al hacer click "Activar
+  // ahora" llamamos a /api/tunnel/activate con el VRF objetivo. No reusamos
+  // NodeCard porque puede no estar montado todavía (lista vacía) y el deep
+  // link siempre referencia VRF por nombre, no por intId.
+  const handleDeepActivate = async (targetVRF: string) => {
+    try {
+      addToast(`Activando ${targetVRF}…`, 'info');
+      const res = await fetchWithTimeout(`${API_BASE_URL}/api/tunnel/activate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetVRF }),
+      }, 25_000);
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || `Error HTTP ${res.status}`);
+      }
+      addToast(`Túnel ${targetVRF} activado`, 'info');
+      // Actualiza la lista para que la UI refleje running_by_you
+      void fetchNodes();
+    } catch (err) {
+      addToast(`No se pudo activar: ${err instanceof Error ? err.message : 'error'}`, 'warn');
+    }
+  };
+
+  const handleDeepDeactivate = async () => {
+    addToast('Desactivando túnel…', 'info');
+    await handleRevokeAll();
+    addToast('Túnel desactivado', 'info');
+  };
+
 
   const activeNodeName = activeNodeVrf
     ? nodes.find(n => n.nombre_vrf === activeNodeVrf)?.nombre_nodo ?? activeNodeVrf
@@ -141,6 +175,9 @@ export default function NodeAccessPanel() {
 
   return (
     <div className="space-y-5">
+      {/* ── DeepLinkBanner — confirmación para acciones del bot Telegram (M1) ── */}
+      <DeepLinkBanner onActivate={handleDeepActivate} onDeactivate={handleDeepDeactivate} />
+
       {/* ── ControlBar ── */}
       <ControlBar
         globalServerIP={globalServerIP}

@@ -1576,6 +1576,8 @@ EXPIRATION_JOB_INTERVAL_MS=60000
 
 ## 27) 🤖 Bot Telegram interactivo (M1)
 
+> 👤 **Para usuarios finales:** [MANUAL_USUARIO.md](./MANUAL_USUARIO.md) — guía paso a paso (no técnica) con capturas del flujo de vinculación, ejemplos de cada comando, troubleshooting y FAQ. Compártelo con los moderadores y miembros.
+
 Construido sobre Q1: el bot detecta al usuario por su `telegram_chat_id` ya vinculado en `notification_subscriptions`. Sin código de auth adicional — Telegram autentica el chat desde su lado, nuestro sistema confía en esa identidad.
 
 ### Comandos
@@ -1658,6 +1660,17 @@ APP_BASE_URL=                # para los deep-links de /activar y /desactivar
 - **`POLL_TIMEOUT_SEC = 25`** — un poco bajo el máximo de 50s para que el `AbortController` del shutdown abra ventana en máximo 25s.
 - **Errores en handler son aislados**: `handleMessage(u).catch(...)` por update; un fallo en `/tuneles` no para el loop.
 - **Comando con `@BotName`**: en grupos, Telegram entrega `/start@MyVpnBot` — el dispatcher hace `.split('@')[0]` para normalizar.
+
+### Closer M1 — deep-link end-to-end
+
+El bot envía URLs `APP_BASE_URL?activate=VRF-X` y `?deactivate=1`. El frontend las procesa así:
+
+1. [vpn-manager/src/context/hooks/useDeepLinks.ts](vpn-manager/src/context/hooks/useDeepLinks.ts) — al primer mount de `App.tsx` lee los query params, los guarda en `sessionStorage` (`pending_tunnel_activate`, `pending_tunnel_deactivate`), limpia el URL con `history.replaceState` para evitar re-dispare al refrescar. **sessionStorage sobrevive al flujo de login** — si el usuario no estaba autenticado, la acción se conserva.
+2. [App.tsx](vpn-manager/src/App.tsx) — tras autenticarse, si hay un flag pendiente, cambia automáticamente `activeModule` a `'nodes'`.
+3. [components/Devices/NodeAccessPanel/components/DeepLinkBanner.tsx](vpn-manager/src/components/Devices/NodeAccessPanel/components/DeepLinkBanner.tsx) — banner azul que muestra `"El bot de Telegram solicitó activar VRF-X — Activar ahora / Cancelar"`. El `useEffect` consume el flag UNA vez al montar (no se re-dispara con refresh).
+4. `NodeAccessPanel.handleDeepActivate(targetVRF)` y `handleDeepDeactivate()` ejecutan `POST /api/tunnel/activate` o `deactivateAllNodes()` con toast del progreso.
+
+Esto cierra el círculo M1: el bot **no** muta directamente, el usuario **confirma con un click** desde la sesión segura del panel.
 
 ### Estado del backlog tras M1
 
