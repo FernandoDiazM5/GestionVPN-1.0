@@ -2,7 +2,7 @@
 
 > Documento de migración de contexto entre sesiones.
 > Rama de trabajo: **`dev`** · Remote: `github.com/FernandoDiazM5/GestionVPN-1.0`.
-> Última actualización (2026-06-09 PM): **REFACTOR_PLAN fases 0-6 ejecutadas** (F5: monorepo + `@gestionvpn/contracts`; F6: `node.routes.js` 1264 LOC → 8 archivos < 472 LOC en `routes/nodes/`). Ver §17, §18 y §19.
+> Última actualización (2026-06-09 PM): **REFACTOR_PLAN fases 0-7 ejecutadas** (F5: monorepo + `@gestionvpn/contracts`; F6: `node.routes.js` → 8 archivos `routes/nodes/`; F7: `core.routes.js` 935 LOC → 7 archivos < 430 LOC en `routes/core/`). Ver §17, §18, §19 y §20.
 > Sesión 2026-06-07 PM: Ajustes del moderador (perfil + workspace + import/export JSON) + Recuperar contraseña + sync MikroTik al deshabilitar + invitaciones por email + .conf WG server-side.
 > Sesión 2026-06-07 AM: multi-usuario con aislamiento por sesión (mangle por-IP), parche `!empty` node-routeros, auditoría (Semgrep+security-review+code-review) y fixes C1–C7.
 > Resumen extendido en `RESUMEN_CONTEXTO_MAESTRO.md`.
@@ -730,12 +730,12 @@ Sesión 2026-06-09 ejecutó las fases 0-4 del plan de refactor incremental
 | **F4** Tests críticos | ✅ | 7 | **92 tests verde** (55 backend + 37 frontend). Suites: `wgkeys`, `crypto`, `passwordResetRepo`, `tenantScope`, `password-reset/*` (supertest), `permissions`, `sessionClient` (auth_expired), `WgConfigModal`. Thresholds suaves (5% lines / 45% branches) — F8/F11 los suben a 60% |
 | **F5** Contracts compartidos + Bearer kill | ✅ | — | Monorepo npm workspaces; `packages/contracts` con schemas Zod (Auth, Account, Team, Admin, Workspace); backend importa schemas centralizados (5 routes migrados); frontend re-exporta tipos desde contracts; `auth.routes.js` usa `sendOk`/`sendError`; `apiFetch` ya no inyecta `Bearer` — sesión = cookie HttpOnly. **92 tests siguen verdes.** Ver §18 |
 | **F6** Split `node.routes.js` | ✅ | — | `routes/node.routes.js` (1264 LOC) → `routes/nodes/{index,_shared,listing,provision,editing,tags,credentials,history,scan}.routes.js` (max **472 LOC**). Helpers comunes (`annotateSessions`, `filterNodesForRole`, `nodeBelongsToRequester`, `requireOperator`) en `_shared.js`. **92 tests siguen verdes.** Ver §19 |
+| **F7** Split `core.routes.js` | ✅ | — | `routes/core.routes.js` (935 LOC) → `routes/core/{index,_shared,connection,ppp,interface,tunnel,tunnel-repair}.routes.js` (max **430 LOC**). Registry SSE singleton + helpers (`emitToUser`, `canUseTunnel`, `clientIpOf`) en `_shared.js`. **92 tests siguen verdes.** Ver §20 |
 
 ### Fases pendientes
 
 | Fase | Estado | Estimación | Bloquea a |
 |------|--------|------------|-----------|
-| **F7** Split `core.routes.js` (935 LOC) | ⏳ | 2 días 🟠 | — |
 | **F8** Split `NetworkDevicesModule.tsx` (1313 LOC) | ⏳ | 3 días 🟠 | F10 |
 | **F9** Health check enriquecido + métricas Prometheus | ⏳ | 1 día 🟢 | — |
 | **F10** Code-splitting frontend (lazy modules) | ⏳ | 1 día 🟢 | — |
@@ -980,6 +980,75 @@ server/routes/nodes/
 > ruta `/node/provision` orquesta 10 pasos atómicos en RouterOS (SSTP+WG en una
 > sola transacción lógica). Partirla más mezclaría niveles de abstracción —
 > mejor mantenerla densa pero localizada.
+
+---
+
+## 20) ⚙️ Split de `core.routes.js` (FASE 7)
+
+El monolito de 935 LOC (15 rutas de conectividad RouterOS + túnel multi-usuario)
+se descompone en 5 sub-routers temáticos, un compositor y un módulo de helpers.
+El montaje en `server/index.js` cambió de `require('./routes/core.routes')` a
+`require('./routes/core')`.
+
+### Estructura
+
+```
+server/routes/core/
+├── index.js                     ← compositor: router.use(sub-router) ×5  (24 LOC)
+├── _shared.js                   ← registry SSE singleton + helpers          (83 LOC)
+│                                  • sseClientsByUser (Map<userId, Set<res>>)
+│                                  • addSseClient / removeSseClient / emitToUser
+│                                  • clientIpOf, canUseTunnel
+├── connection.routes.js         ← POST /connect, /diagnose                 (61 LOC)
+├── ppp.routes.js                ← POST /secrets, /active                    (55 LOC)
+├── interface.routes.js          ← POST /interface/{activate,deactivate}     (59 LOC)
+├── tunnel.routes.js             ← POST /tunnel/{activate, deactivate,       (430 LOC)
+│                                              keepalive, register-my-ip,
+│                                              mangle-access},
+│                                  GET  /tunnel/{events, status, my-mgmt-ip}
+└── tunnel-repair.routes.js      ← POST /tunnel/repair (7 pasos atómicos)  (357 LOC)
+```
+
+### Decisión clave: singleton SSE en `_shared.js`
+
+`tunnel/activate` (escribe eventos) y `tunnel/events` (lee eventos) DEBEN compartir
+el mismo `Map<userId, Set<res>>`. Si cada sub-router creara su propio Map, los
+eventos nunca llegarían al frontend — silencio absoluto en el panel.
+
+Solución: el Map vive en `_shared.js` como singleton del módulo. Express/Node
+cachean el `require()` por path absoluto, así que todas las importaciones reciben
+la MISMA instancia. Probado y funcionando con keepalive multi-usuario.
+
+### Regla operativa
+
+- **Helpers de RBAC + SSE viven en `_shared.js`.** Si necesitas `emitToUser` en
+  otro sub-router (ej. un `/tunnel/something-new` que cambie estado), impórtalo
+  desde aquí. **NO** lo redefinas localmente.
+- **`tunnel-repair.routes.js` está aislado porque es muy denso (~357 LOC).**
+  Mezclar con `tunnel.routes.js` confundiría niveles de abstracción: el primero
+  reconstruye estructura, el segundo gestiona sesiones por usuario.
+- **`tunnel.routes.js` se queda en 430 LOC** porque las 3 rutas críticas
+  (activate / deactivate / mangle-access) tienen flujos complejos con conexiones
+  separadas por fase, contención de errores y telemetría. Partirla más mezclaría
+  el "happy path" con el manejo de error.
+
+### Para añadir una ruta nueva al "core"
+
+1. Elige el sub-router temático (o crea uno nuevo si la responsabilidad no encaja).
+2. Si la ruta necesita el SSE: importa `emitToUser` desde `./_shared`.
+3. Si la ruta valida acceso a un VRF: importa `canUseTunnel` desde `./_shared`.
+4. Si creaste un sub-router nuevo, móntalo en `core/index.js` con `router.use(require('./<nuevo>.routes'))`.
+5. Actualiza el script `check:backend` en el `package.json` del root con la nueva ruta.
+
+### Métricas pre/post F7
+
+| Métrica | Pre-F7 | Post-F7 |
+|---------|--------|---------|
+| LOC archivo más grande (server) | 935 (`core.routes.js`) | **472** (`nodes/provision.routes.js`) — F6 sigue mandando |
+| LOC max en core/ | n/a | **430** (`tunnel.routes.js`) |
+| Sub-routers en `routes/core/` | 0 | 5 + compositor + shared |
+| Rutas en un solo archivo | 15 | repartidas por responsabilidad |
+| Tests verdes | 92 | **92** (sin regresión) |
 
 ---
 
