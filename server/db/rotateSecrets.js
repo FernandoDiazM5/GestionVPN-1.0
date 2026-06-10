@@ -21,16 +21,18 @@ const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..');
 const SECRET_FILE = path.join(DATA_DIR, '.db_secret');
 
 // AES-256-GCM con clave explícita (mismo formato que db.service: JSON {iv,data,tag} hex)
+// authTagLength=16: ver db.service.js — blindaje contra tags truncados.
+const GCM_OPTS = { authTagLength: 16 };
 function dec(stored, key) {
   if (!stored) return null;
   const { iv, data, tag } = JSON.parse(stored);
-  const d = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(iv, 'hex'));
+  const d = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(iv, 'hex'), GCM_OPTS);
   d.setAuthTag(Buffer.from(tag, 'hex'));
   return d.update(data, 'hex', 'utf8') + d.final('utf8');
 }
 function enc(plain, key) {
   const iv = crypto.randomBytes(12);
-  const c = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const c = crypto.createCipheriv('aes-256-gcm', key, iv, GCM_OPTS);
   let e = c.update(plain, 'utf8', 'hex'); e += c.final('hex');
   return JSON.stringify({ iv: iv.toString('hex'), data: e, tag: c.getAuthTag().toString('hex') });
 }

@@ -1,0 +1,14 @@
+node_modules/
+dist/
+build/
+coverage/
+vpn-manager/dist/
+**/test/
+**/*.test.ts
+**/*.test.tsx
+**/*.test.js
+**/*.spec.ts
+**/*.spec.tsx
+e2e/
+.claude/
+packages/contracts/dist/

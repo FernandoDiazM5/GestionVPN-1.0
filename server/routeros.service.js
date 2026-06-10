@@ -130,6 +130,11 @@ const connectToMikrotik = async (host, user, password) => {
     }
     // ── Intento 2: puerto 8729 (SSL API) — solo si 8728 fue rechazado activamente ─
     try {
+        // rejectUnauthorized:false intencional — RouterOS sirve la API SSL con un
+        // certificado autofirmado de fábrica (sin CA pública). Fuera del scope
+        // del software emitir certs reales; los operadores podrían instalar uno
+        // manualmente, pero no es el flujo soportado.
+        // nosemgrep: bypass-tls-verification
         const api = new RouterOSAPI({ host, user, password, port: 8729, tls: { rejectUnauthorized: false }, timeout: 8, keepalive: false });
         await api.connect();
         log.debug({ host, port: 8729, mode: 'ssl' }, 'Conectado a MikroTik');

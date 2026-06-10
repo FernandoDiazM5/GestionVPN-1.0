@@ -55,6 +55,10 @@ const getSubnetHosts = (cidr) => {
 const probeStatusCgi = (deviceIP, port, useHttps) => {
     return new Promise((resolve) => {
         const lib = useHttps ? https : http;
+        // rejectUnauthorized:false intencional — airOS sirve HTTPS con cert
+        // autofirmado de fábrica. Igual que RouterOS: emitir certs reales
+        // queda fuera del scope del software.
+        // nosemgrep: bypass-tls-verification
         const req = lib.request({
             hostname: deviceIP, port, path: '/status.cgi', method: 'GET', timeout: 2000,
             headers: { Accept: 'application/json, */*', Connection: 'close' }, rejectUnauthorized: false,

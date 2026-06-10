@@ -180,10 +180,16 @@ async function getDb() {
 // CIFRADO AES-256-GCM (sin cambios)
 // ══════════════════════════════════════════════════════════════════════════
 
+// authTagLength = 16 obliga a que el tag sea de 128 bits (longitud máxima de
+// GCM). Sin esto, Node acepta tags truncados de hasta 4 bytes — un atacante
+// podría intentar bypasses con tags más cortos. Defensa en profundidad
+// (encryptPass siempre escribe 16 bytes; aquí blindamos la validación).
+const GCM_OPTS = { authTagLength: 16 };
+
 function encryptPass(plaintext) {
     if (!plaintext) return null;
     const iv = crypto.randomBytes(12);
-    const cipher = crypto.createCipheriv('aes-256-gcm', ENCRYPTION_KEY, iv);
+    const cipher = crypto.createCipheriv('aes-256-gcm', ENCRYPTION_KEY, iv, GCM_OPTS);
     let enc = cipher.update(plaintext, 'utf8', 'hex');
     enc += cipher.final('hex');
     return JSON.stringify({ iv: iv.toString('hex'), data: enc, tag: cipher.getAuthTag().toString('hex') });
@@ -193,7 +199,7 @@ function decryptPass(stored) {
     if (!stored) return '';
     try {
         const { iv, data, tag } = JSON.parse(stored);
-        const decipher = crypto.createDecipheriv('aes-256-gcm', ENCRYPTION_KEY, Buffer.from(iv, 'hex'));
+        const decipher = crypto.createDecipheriv('aes-256-gcm', ENCRYPTION_KEY, Buffer.from(iv, 'hex'), GCM_OPTS);
         decipher.setAuthTag(Buffer.from(tag, 'hex'));
         let dec = decipher.update(data, 'hex', 'utf8');
         dec += decipher.final('utf8');
