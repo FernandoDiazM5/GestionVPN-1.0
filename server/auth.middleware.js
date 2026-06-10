@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const fs = require('fs');
 const { getAppSetting, decryptPass } = require('./db.service');
+const metrics = require('./lib/metrics');
 
 const SECRET_FILE = `${process.env.DATA_DIR || __dirname}/.jwt_secret`;
 let JWT_SECRET;
@@ -46,6 +47,7 @@ const verifyToken = async (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = (authHeader && authHeader.split(' ')[1]) || req.query.token;
     if (!token) {
+        metrics.authFailsTotal.inc({ reason: 'no_token' });
         return res.status(401).json({ success: false, message: 'Acceso Denegado: Token no provisto.' });
     }
     try {
@@ -60,6 +62,7 @@ const verifyToken = async (req, res, next) => {
         await injectMikrotik(req);
         next();
     } catch (err) {
+        metrics.authFailsTotal.inc({ reason: 'expired_token' });
         return res.status(403).json({ success: false, message: 'Token de sesión expirado.', logout: true });
     }
 };

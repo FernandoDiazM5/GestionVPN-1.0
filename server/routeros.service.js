@@ -1,5 +1,31 @@
 const { RouterOSAPI } = require('node-routeros');
 const log = require('./lib/logger').child({ scope: 'routeros' });
+const metrics = require('./lib/metrics');
+
+// ── Health signal para /api/health (FASE 9) ─────────────────────────────────
+//  Marca el instante (ms epoch) del último safeWrite resuelto OK.
+//  /api/health lo compara con Date.now() y traduce a:
+//    ok    < 60s   · stale < 5min  · down ≥ 5min  · unknown si nunca
+let _lastSafeWriteOkAt = null;
+const getLastSafeWriteOkAt = () => _lastSafeWriteOkAt;
+
+// Clasificador de errores para la métrica routeros_errors_total{type}.
+// Distinguir entre timeout, refused, login y network ayuda a diagnosticar
+// caída de red vs router apagado vs credenciales rotadas.
+function classifyError(err) {
+    const code = err?.code;
+    const errno = err?.errno;
+    const msg = (err?.message || '').toLowerCase();
+    if (errno === -4039 || errno === 'SOCKTMOUT' || code === 'ETIMEDOUT'
+        || err?.name === 'TimeoutError' || msg.includes('timed out')
+        || msg.includes('sin respuesta')) return 'timeout';
+    if (errno === -4078 || code === 'ECONNREFUSED' || msg.includes('connection refused')) return 'refused';
+    if (errno === 'CANTLOGIN' || msg.includes('invalid user name or password')
+        || msg.includes('cannot log in') || msg.includes('cantlogin')) return 'login';
+    if (code === 'ENOTFOUND' || code === 'EHOSTUNREACH' || code === 'ENETUNREACH'
+        || code === 'ECONNRESET' || code === 'EPIPE') return 'network';
+    return 'unknown';
+}
 
 // ── Parche node-routeros: manejar la respuesta `!empty` de RouterOS ──────────
 //  RouterOS envía `!empty` (seguido de `!done`) cuando un /print no tiene filas
@@ -48,6 +74,7 @@ const connectToMikrotik = async (host, user, password) => {
         log.debug({ host, port: 8729, mode: 'ssl' }, 'Conectado a MikroTik');
         return api;
     } catch (err) {
+        metrics.routerosErrorsTotal.inc({ type: classifyError(err) });
         throw err;
     }
 };
@@ -58,10 +85,21 @@ const safeWrite = (api, commands, timeoutMs = 6000) =>
         const timer = setTimeout(() => {
             if (settled) return;
             settled = true;
-            reject(new Error('Sin respuesta del router (timeout)'));
+            const err = new Error('Sin respuesta del router (timeout)');
+            metrics.routerosErrorsTotal.inc({ type: 'timeout' });
+            metrics.routerosWritesTotal.inc({ status: 'error' });
+            reject(err);
         }, timeoutMs);
         api.write(commands).then(
-            (result) => { if (!settled) { settled = true; clearTimeout(timer); resolve(result); } },
+            (result) => {
+                if (!settled) {
+                    settled = true;
+                    clearTimeout(timer);
+                    _lastSafeWriteOkAt = Date.now();
+                    metrics.routerosWritesTotal.inc({ status: 'ok' });
+                    resolve(result);
+                }
+            },
             (err)    => {
                 if (settled) return;
                 settled = true;
@@ -70,7 +108,13 @@ const safeWrite = (api, commands, timeoutMs = 6000) =>
                 // (v1.6.9) no lo maneja y lanza UNKNOWNREPLY. Es un resultado VACÍO normal,
                 // NO un fallo → lo normalizamos a []. Cualquier otro error sí se propaga.
                 const isEmpty = err?.errno === 'UNKNOWNREPLY' && /!empty/i.test(err?.message || '');
-                if (isEmpty) return resolve([]);
+                if (isEmpty) {
+                    _lastSafeWriteOkAt = Date.now();
+                    metrics.routerosWritesTotal.inc({ status: 'ok' });
+                    return resolve([]);
+                }
+                metrics.routerosErrorsTotal.inc({ type: classifyError(err) });
+                metrics.routerosWritesTotal.inc({ status: 'error' });
                 reject(err);
             },
         );
@@ -168,4 +212,4 @@ const parseHandshakeSecs = (str) => {
     return total || Infinity;
 };
 
-module.exports = { connectToMikrotik, safeWrite, getErrorMessage, cleanTunnelRules, writeIdempotent, parseHandshakeSecs };
+module.exports = { connectToMikrotik, safeWrite, getErrorMessage, cleanTunnelRules, writeIdempotent, parseHandshakeSecs, getLastSafeWriteOkAt };

@@ -13,6 +13,7 @@ const rl = require('./lib/rateLimit');
 const { invalidateUserCache } = require('./middleware/authJwt');
 const log = require('./lib/logger').child({ scope: 'auth' });
 const { sendOk, sendError } = require('./lib/apiResponse');
+const metrics = require('./lib/metrics');
 const {
   LoginRequestSchema,
   SetupRequestSchema,
@@ -115,6 +116,7 @@ router.post('/login', async (req, res) => {
         // Distinguir BD caída de credenciales inválidas (evita el engañoso "contraseña incorrecta")
         if (dbError) {
             log.error({ code: dbError.code, err: dbError.message }, 'Base de datos no disponible en login');
+            metrics.authFailsTotal.inc({ reason: 'db_unavailable' });
             return sendError(
                 res, 503,
                 'Servicio de base de datos no disponible. Verifica que MySQL (XAMPP) esté iniciado e inténtalo de nuevo.',
@@ -122,8 +124,10 @@ router.post('/login', async (req, res) => {
             );
         }
 
+        metrics.authFailsTotal.inc({ reason: 'bad_credentials' });
         return sendError(res, 401, 'Usuario o contraseña incorrectos', 'BAD_CREDENTIALS');
     } catch (zodError) {
+        metrics.authFailsTotal.inc({ reason: 'validation' });
         return res.status(400).json({ success: false, message: 'Datos de entrada inválidos', code: 'VALIDATION_ERROR', errors: zodError.issues || zodError.errors });
     }
 });
@@ -137,6 +141,7 @@ router.get('/me', require('./auth.middleware').verifyToken, (req, res) => {
 router.post('/refresh', (req, res) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        metrics.authFailsTotal.inc({ reason: 'no_token' });
         return sendError(res, 401, 'Token requerido', 'NO_TOKEN');
     }
     try {
@@ -148,6 +153,7 @@ router.post('/refresh', (req, res) => {
         );
         return sendOk(res, { token, expiresIn: 86400 });
     } catch {
+        metrics.authFailsTotal.inc({ reason: 'invalid_token' });
         return sendError(res, 403, 'Token inválido o expirado', 'INVALID_TOKEN');
     }
 });
@@ -213,6 +219,7 @@ router.post('/password-reset/confirm', rl.guard('OTP'), async (req, res) => {
     const found = await passwordResetRepo.findValid(token);
     if (!found) {
       await rl.recordAttempt(ip, 'OTP', null, false);
+      metrics.authFailsTotal.inc({ reason: 'reset_token_invalid' });
       return sendError(res, 401, 'El enlace es inválido o ya fue usado. Solicita uno nuevo.', 'INVALID_TOKEN');
     }
 

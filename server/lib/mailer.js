@@ -6,6 +6,19 @@
 let nodemailer = null;
 try { nodemailer = require('nodemailer'); } catch (_) { /* opcional */ }
 const log = require('./logger').child({ scope: 'mailer' });
+const metrics = require('./metrics');
+
+// Wrapper de tx.sendMail que cuenta la métrica mail_sent_total{kind,status}.
+// 'dev' = sin SMTP, 'ok' = enviado, 'error' = falló (excepción se re-lanza).
+async function sendAndCount(tx, kind, payload) {
+    try {
+        await tx.sendMail(payload);
+        metrics.mailSentTotal.inc({ kind, status: 'ok' });
+    } catch (err) {
+        metrics.mailSentTotal.inc({ kind, status: 'error' });
+        throw err;
+    }
+}
 
 let transporter = null;
 function getTransporter() {
@@ -38,9 +51,10 @@ async function sendOtp(email, code, purpose = 'verificación') {
     // En modo DEV el OTP NO se considera secreto (no hay correo saliente);
     // se muestra al operador para facilitar pruebas locales.
     log.info({ email, purpose, code }, 'OTP (modo DEV — sin SMTP configurado)');
+    metrics.mailSentTotal.inc({ kind: 'otp', status: 'dev' });
     return { delivered: false, dev: true };
   }
-  await tx.sendMail({
+  await sendAndCount(tx, 'otp', {
     from: process.env.SMTP_FROM || FROM_DEFAULT,
     to: email,
     subject: `Tu código de ${purpose}: ${code}`,
@@ -72,6 +86,7 @@ async function sendInvitation({ email, code, inviterName, workspaceName, tunnelI
     log.info({
       email, inviterName, workspaceName, roleLabel, tunnelId, code, acceptUrl,
     }, 'Invitación generada (modo DEV — sin SMTP)');
+    metrics.mailSentTotal.inc({ kind: 'invitation', status: 'dev' });
     return { delivered: false, dev: true };
   }
 
@@ -137,7 +152,7 @@ async function sendInvitation({ email, code, inviterName, workspaceName, tunnelI
   </table>
 </body></html>`;
 
-  await tx.sendMail({
+  await sendAndCount(tx, 'invitation', {
     from: process.env.SMTP_FROM || FROM_DEFAULT,
     to: email,
     subject,
@@ -172,6 +187,7 @@ async function sendPasswordReset({ email, token, name }) {
     // El token NO se expone como campo separado (redactado por logger). El
     // operador lo lee del query param `?reset=<token>` dentro de resetUrl.
     log.info({ email, resetUrl, ttlMin: 15 }, 'Token de reset generado (modo DEV — sin SMTP)');
+    metrics.mailSentTotal.inc({ kind: 'password_reset', status: 'dev' });
     return { delivered: false, dev: true };
   }
 
@@ -225,7 +241,7 @@ async function sendPasswordReset({ email, token, name }) {
   </table>
 </body></html>`;
 
-  await tx.sendMail({
+  await sendAndCount(tx, 'password_reset', {
     from: process.env.SMTP_FROM || FROM_DEFAULT,
     to: email,
     subject,
@@ -235,4 +251,45 @@ async function sendPasswordReset({ email, token, name }) {
   return { delivered: true, dev: false, resetUrl };
 }
 
-module.exports = { sendOtp, sendInvitation, sendPasswordReset };
+// ── verifySmtp — usado por /api/health (FASE 9) ──────────────────────────────
+//  Llama a transporter.verify() con timeout corto y cachea el resultado por
+//  VERIFY_TTL_MS (45s por defecto). Sin cache, cada hit a /api/health
+//  abriría una conexión SMTP — y monitoring lo golpea cada pocos segundos.
+//
+//  Devuelve { status: 'ok' | 'error' | 'skipped', configured, latency_ms?, error? }
+//    skipped → no hay SMTP_HOST en env (modo DEV).
+const VERIFY_TTL_MS = Number(process.env.SMTP_VERIFY_TTL_MS || 45_000);
+const VERIFY_TIMEOUT_MS = Number(process.env.SMTP_VERIFY_TIMEOUT_MS || 4_000);
+let _verifyCache = null; // { result, expiresAt }
+
+async function verifySmtp() {
+  const now = Date.now();
+  if (_verifyCache && _verifyCache.expiresAt > now) return _verifyCache.result;
+
+  const tx = getTransporter();
+  if (!tx) {
+    const result = { status: 'skipped', configured: false };
+    _verifyCache = { result, expiresAt: now + VERIFY_TTL_MS };
+    return result;
+  }
+
+  const start = process.hrtime.bigint();
+  let result;
+  try {
+    await Promise.race([
+      tx.verify(),
+      new Promise((_, reject) => setTimeout(
+        () => reject(new Error('verify timeout')), VERIFY_TIMEOUT_MS,
+      )),
+    ]);
+    const latency_ms = Math.round(Number(process.hrtime.bigint() - start) / 1e6);
+    result = { status: 'ok', configured: true, latency_ms };
+  } catch (err) {
+    const latency_ms = Math.round(Number(process.hrtime.bigint() - start) / 1e6);
+    result = { status: 'error', configured: true, latency_ms, error: err?.message || 'unknown' };
+  }
+  _verifyCache = { result, expiresAt: now + VERIFY_TTL_MS };
+  return result;
+}
+
+module.exports = { sendOtp, sendInvitation, sendPasswordReset, verifySmtp };
