@@ -2,7 +2,7 @@
 
 > Documento de migración de contexto entre sesiones.
 > Rama de trabajo: **`dev`** · Remote: `github.com/FernandoDiazM5/GestionVPN-1.0`.
-> Última actualización (2026-06-10): **REFACTOR_PLAN fases 0-10 ejecutadas** (F5: monorepo + `@gestionvpn/contracts`; F6: `node.routes.js` → 8 archivos; F7: `core.routes.js` → 7 archivos; F8: `NetworkDevicesModule.tsx` **1313 LOC → 433** + 4 hooks + 5 componentes nuevos + fixup `5c19cb6` resolvió 2 bugs de perf y 2 anti-patterns; F9: observabilidad — `/api/health` enriquecido (mysql+routeros+smtp) + `GET /metrics` Prometheus + counters de auth/routeros/mailer; F10: code-splitting frontend — bundle inicial **1090 → 248 KB raw (-77%)** + `npm run analyze` con visualizer). Bug del crash de `POST /api/wireguard/peers` resuelto. Ver §17, §18, §19, §20, §21, §22 y §23.
+> Última actualización (2026-06-10): **REFACTOR_PLAN fases 0-11 ejecutadas** (F5: monorepo + `@gestionvpn/contracts`; F6: `node.routes.js` → 8 archivos; F7: `core.routes.js` → 7 archivos; F8: `NetworkDevicesModule.tsx` **1313 LOC → 433** + 4 hooks + 5 componentes nuevos + fixup `5c19cb6` resolvió 2 bugs de perf y 2 anti-patterns; F9: observabilidad — `/api/health` enriquecido (mysql+routeros+smtp) + `GET /metrics` Prometheus + counters de auth/routeros/mailer; F10: code-splitting frontend — bundle inicial **1090 → 248 KB raw (-77%)** + `npm run analyze` con visualizer; F11: MySQL performance — pool con timeouts explícitos + 8 índices compuestos en `schema_perf_indexes.sql` + `npm run analyze:queries` con `EXPLAIN` sobre 13 queries del hot path). Bug del crash de `POST /api/wireguard/peers` resuelto. Ver §17, §18, §19, §20, §21, §22, §23 y §24.
 > Sesión 2026-06-07 PM: Ajustes del moderador (perfil + workspace + import/export JSON) + Recuperar contraseña + sync MikroTik al deshabilitar + invitaciones por email + .conf WG server-side.
 > Sesión 2026-06-07 AM: multi-usuario con aislamiento por sesión (mangle por-IP), parche `!empty` node-routeros, auditoría (Semgrep+security-review+code-review) y fixes C1–C7.
 > Resumen extendido en `RESUMEN_CONTEXTO_MAESTRO.md`.
@@ -735,12 +735,12 @@ Sesión 2026-06-09 ejecutó las fases 0-4 del plan de refactor incremental
 | **F8** Split `NetworkDevicesModule.tsx` | ✅ | — | Monolito 1313 LOC → **433** (orquestador) + 4 hooks (`useDeviceScan`, `useDeviceList`, `useColumnPrefs`, `useDeviceLibrary`) + 5 componentes (`ScanControls`, `ScanProgressBanner`, `DeviceFilters`, `DeviceTable`, `DeviceTableRow` memoizado). Virtualización con `@tanstack/react-virtual` queda para F10. **92 tests siguen verdes** + ESLint warnings bajaron 130 → **115** (tras fixup `5c19cb6`). Ver §21 |
 | **F9** Observabilidad — health + Prometheus | ✅ | — | `prom-client@15`, [server/lib/metrics.js](server/lib/metrics.js) (registry + counters/histogram), middleware HTTP en [server/index.js](server/index.js) (latencia por método/ruta/status, excluye `/api/health` y `/metrics`), `GET /metrics` formato Prometheus (loopback-only por defecto; `METRICS_ALLOW_REMOTE=1` para scrape remoto), `GET /api/health` enriquecido (`mysql` + `routeros` + `smtp`) con cascada de status. **92 tests siguen verdes.** Ver §22 |
 | **F10** Code-splitting frontend | ✅ | — | `React.lazy()` para 10 vistas (9 módulos + RouterAccess). [components/Common/ModuleSkeleton.tsx](vpn-manager/src/components/Common/ModuleSkeleton.tsx) como Suspense fallback compartido. `rollup-plugin-visualizer` + `npm run analyze` (dist/stats.html). **Bundle inicial: 1090 KB → 248 KB raw (-77%) · 252 KB → 77 KB gzip (-69%).** 45 chunks separados por módulo. **99 tests (62 backend + 37 frontend) verdes.** Ver §23 |
+| **F11** Performance MySQL | ✅ | — | Pool con tuning explícito ([server/db/mysql.js](server/db/mysql.js) — `connectTimeout`/`maxIdle`/`keepAliveInitialDelayMs`/`acquireConnection` con `Promise.race`). [tools/analyze-queries.js](server/tools/analyze-queries.js) corre `EXPLAIN` sobre 13 queries del hot path (`npm run analyze:queries`). 8 índices compuestos nuevos en [sql/schema_perf_indexes.sql](server/sql/schema_perf_indexes.sql), idempotente ([db/migratePerf.js](server/db/migratePerf.js) → `npm run migrate:perf`) — cubren `tunnel_logs` (timeline ws + por túnel), `tunnel_user_sessions` (ACTIVE listing + current de un user + expirados), `tunnel_session_logs` (que NO tenía índice por ws), `invitations` (por email+status) y `password_resets` (activos por user). Auditoría de placeholders: 0 SQL injection — todas las concatenaciones son cláusulas `IN (?,?,...)` o keys hardcoded. **99 tests verdes (sin regresión).** Ver §24 |
 
 ### Fases pendientes
 
 | Fase | Estado | Estimación | Bloquea a |
 |------|--------|------------|-----------|
-| **F11** Performance MySQL (índices + prepared) | ⏳ | 1 día 🟠 | — |
 | **F12** Audit pass final + docs | ⏳ | 1 día 🟢 | — |
 
 ### Bugs reales arreglados durante el refactor
@@ -1330,6 +1330,90 @@ Los 105 archivos que importan iconos lo hacen con destructuring (`import { Serve
 3. Añadirlo al switch dentro del `<Suspense>` único.
 4. **No** crear un Suspense por módulo — el de App.tsx es el correcto.
 5. Si el módulo arrastra > 200 KB raw, evaluarlo en `npm run analyze` para detectar dependencias pesadas que podrían splittearse (ej. `TeamModule` con qrcode).
+
+---
+
+## 24) 🗃️ Performance MySQL — pool + índices + analyze (FASE 11)
+
+### Pool con tuning explícito
+
+[server/db/mysql.js](server/db/mysql.js) — `mysql.createPool` con timeouts configurables por env:
+
+| Variable env | Default | Para qué |
+|--------------|---------|----------|
+| `MYSQL_POOL` | 10 | `connectionLimit` — máx conns concurrentes |
+| `MYSQL_CONNECT_TIMEOUT_MS` | 10000 | Tiempo max para abrir socket TCP. Sin esto, si XAMPP/MariaDB se cuelga, esperamos hasta el TCP-RST del kernel (~75s) |
+| `MYSQL_ACQUIRE_TIMEOUT_MS` | 8000 | `acquireConnection()` (wrap propio sobre `getConnection`) hace `Promise.race` con timeout. mysql2 no expone `acquireTimeout` real — sin este wrap una fuga de conn deja pedidos colgados indefinidamente |
+| `MYSQL_KEEPALIVE_DELAY_MS` | 5000 | `keepAliveInitialDelayMs`. 0 dispara warning oficial en algunos OS (visto en Windows) |
+| `MYSQL_MAX_IDLE` | 5 | Pool keeps max N idle conns — libera sockets en horarios bajos |
+| `MYSQL_IDLE_TIMEOUT_MS` | 60000 | Idle conn que no se reusa en 60s se cierra |
+
+`withTransaction(fn)` ahora usa `acquireConnection()` internamente — un deadlock o fuga ya no cuelga el endpoint para siempre.
+
+### Script `analyze-queries`
+
+```bash
+cd server && npm run analyze:queries          # texto legible
+cd server && npm run analyze:queries -- --json  # JSON para máquina
+```
+
+Corre `EXPLAIN` sobre 13 queries del hot path y marca:
+- `type=ALL` → full scan
+- `Using filesort` → ordenamiento en RAM tras scanear
+- `Using temporary` → tabla temporal
+- `key=null` → sin índice
+
+Sale `1` si alguna tiene warnings. Útil para CI tras una migración: si añades una query y este sale rojo, falta un índice.
+
+Queries cubiertas (todas con parámetros de muestra que no devuelven filas pero generan el mismo plan):
+
+```
+sessionRepo.currentForUser          → /tunnel/status
+sessionRepo.listActiveByWorkspace   → SSE multi-tenant
+sessionRepo.findExpired             → job perezoso
+auditRepo.list / list (por túnel)   → /api/team/logs
+memberRepo.findMembership           → cada request (auth)
+memberRepo.listMembers              → /api/team/members
+mgmtIpRepo.getMgmtIpForUser         → /tunnel/activate
+mgmt_peer_owners (listado por ws)   → /api/wireguard/peers
+auth_attempts (rate limit)          → login/OTP/password-reset
+signal_history (CPE timeline)       → ap-monitor
+signal_history (24h por AP)         → ap-monitor dashboard
+nodes (filterNodesForRole)          → /api/nodes
+```
+
+### 8 índices compuestos nuevos
+
+[server/sql/schema_perf_indexes.sql](server/sql/schema_perf_indexes.sql) — aplicar con `npm run migrate:perf` (idempotente; chequea `information_schema.STATISTICS` antes de cada CREATE).
+
+| Índice | Tabla | Justificación |
+|--------|-------|---------------|
+| `idx_tl_ws_created` | `tunnel_logs` | `WHERE ws=? ORDER BY created_at DESC LIMIT N` — antes filesort; ahora rango + recorrido inverso del árbol |
+| `idx_tl_ws_tunnel_created` | `tunnel_logs` | `WHERE ws=? AND tunnel_id=? ORDER BY created_at DESC` — para timeline de UN túnel |
+| `idx_tus_ws_status_activated` | `tunnel_user_sessions` | `WHERE ws=? AND status='ACTIVE' ORDER BY activated_at DESC` — extiende el existente `idx_tus_ws_status` con la columna de orden |
+| `idx_tus_ws_user_status_activated` | `tunnel_user_sessions` | `WHERE ws=? AND user_id=? AND status='ACTIVE' ORDER BY activated_at DESC LIMIT 1` — current de un user (hot path: `/tunnel/status`, SSE) |
+| `idx_tus_status_expires` | `tunnel_user_sessions` | `WHERE status='ACTIVE' AND expires_at < ?` — job perezoso de expiración |
+| `idx_tsl_ws_created` | `tunnel_session_logs` | **No tenía índice por workspace_id** — cada lectura era full scan |
+| `idx_inv_email_status_created` | `invitations` | `WHERE email=? AND status='PENDING' ORDER BY created_at DESC LIMIT 1` |
+| `idx_pr_user_active` | `password_resets` | `WHERE user_id=? AND used_at IS NULL AND expires_at > ?` |
+
+**Principio:** la columna del `ORDER BY` va al final del compuesto. MySQL puede recorrer el árbol B+ en orden inverso sin filesort.
+
+### Auditoría de prepared statements
+
+Búsqueda exhaustiva (`db.(get|all|run|query)\([^)]*\$\{`) muestra que **toda interpolación encontrada es segura**:
+- Cláusulas `IN (?,?,...)` donde los placeholders se generan desde `array.map(() => '?').join(',')` — no se interpola valor del usuario.
+- `UPDATE ... SET ${sets.join(', ')}` donde cada elemento de `sets` es una cadena literal hardcoded (`'columna = ?'`).
+- `auditRepo.js` arma SQL incremental con texto literal: `sql += ' AND tl.tunnel_id = ?'`.
+
+**Cero SQL injection, cero placeholders faltantes.** El commit 5 del plan F11 ("convertir queries restantes a prepared statements") no aplica a este código — ya estaba bien.
+
+### Regla operativa para añadir queries
+
+1. **Inputs del usuario SIEMPRE como `?` en `params`.** Nunca interpolar con `${var}`.
+2. Si el query es `WHERE col_a = ? AND col_b = ? ORDER BY col_c DESC`, asegurar que existe el índice compuesto `(col_a, col_b, col_c)`. Correr `npm run analyze:queries` para confirmar.
+3. Para listas dinámicas `IN (...)`: generar los `?` con `arr.map(() => '?').join(',')` y pasar el array como params. Es el único uso aceptable de interpolación en SQL.
+4. Si la query es nueva y caliente, agrégala a `tools/analyze-queries.js` antes del primer release.
 
 ---
 
