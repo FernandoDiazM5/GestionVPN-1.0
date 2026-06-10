@@ -2,7 +2,7 @@
 
 > Documento de migración de contexto entre sesiones.
 > Rama de trabajo: **`dev`** · Remote: `github.com/FernandoDiazM5/GestionVPN-1.0`.
-> Última actualización (2026-06-10): **REFACTOR_PLAN fases 0-11 ejecutadas** (F5: monorepo + `@gestionvpn/contracts`; F6: `node.routes.js` → 8 archivos; F7: `core.routes.js` → 7 archivos; F8: `NetworkDevicesModule.tsx` **1313 LOC → 433** + 4 hooks + 5 componentes nuevos + fixup `5c19cb6` resolvió 2 bugs de perf y 2 anti-patterns; F9: observabilidad — `/api/health` enriquecido (mysql+routeros+smtp) + `GET /metrics` Prometheus + counters de auth/routeros/mailer; F10: code-splitting frontend — bundle inicial **1090 → 248 KB raw (-77%)** + `npm run analyze` con visualizer; F11: MySQL performance — pool con timeouts explícitos + 8 índices compuestos en `schema_perf_indexes.sql` + `npm run analyze:queries` con `EXPLAIN` sobre 13 queries del hot path). Bug del crash de `POST /api/wireguard/peers` resuelto. Ver §17, §18, §19, §20, §21, §22, §23 y §24.
+> Última actualización (2026-06-10): **REFACTOR_PLAN COMPLETO — fases 0-12 ejecutadas** (F5: monorepo + `@gestionvpn/contracts`; F6: `node.routes.js` → 8 archivos; F7: `core.routes.js` → 7 archivos; F8: `NetworkDevicesModule.tsx` **1313 LOC → 433** + 4 hooks + 5 componentes nuevos + fixup `5c19cb6` resolvió 2 bugs de perf y 2 anti-patterns; F9: observabilidad — `/api/health` enriquecido (mysql+routeros+smtp) + `GET /metrics` Prometheus + counters de auth/routeros/mailer; F10: code-splitting frontend — bundle inicial **1090 → 248 KB raw (-77%)** + `npm run analyze` con visualizer; F11: MySQL performance — pool con timeouts explícitos + 8 índices compuestos en `schema_perf_indexes.sql` + `npm run analyze:queries` con `EXPLAIN` sobre 13 queries del hot path; **F12: audit final** — `npm audit --omit=dev` 0 vulns en prod, `semgrep` 0 findings en 588 archivos tras fix de 2 `gcm-no-tag-length` + 2 `nosemgrep` justificados, [ARQUITECTURA.md](./ARQUITECTURA.md) nuevo con 8 diagramas Mermaid). Bug del crash de `POST /api/wireguard/peers` resuelto. Ver §17, §18, §19, §20, §21, §22, §23, §24 y §25.
 > Sesión 2026-06-07 PM: Ajustes del moderador (perfil + workspace + import/export JSON) + Recuperar contraseña + sync MikroTik al deshabilitar + invitaciones por email + .conf WG server-side.
 > Sesión 2026-06-07 AM: multi-usuario con aislamiento por sesión (mangle por-IP), parche `!empty` node-routeros, auditoría (Semgrep+security-review+code-review) y fixes C1–C7.
 > Resumen extendido en `RESUMEN_CONTEXTO_MAESTRO.md`.
@@ -736,12 +736,11 @@ Sesión 2026-06-09 ejecutó las fases 0-4 del plan de refactor incremental
 | **F9** Observabilidad — health + Prometheus | ✅ | — | `prom-client@15`, [server/lib/metrics.js](server/lib/metrics.js) (registry + counters/histogram), middleware HTTP en [server/index.js](server/index.js) (latencia por método/ruta/status, excluye `/api/health` y `/metrics`), `GET /metrics` formato Prometheus (loopback-only por defecto; `METRICS_ALLOW_REMOTE=1` para scrape remoto), `GET /api/health` enriquecido (`mysql` + `routeros` + `smtp`) con cascada de status. **92 tests siguen verdes.** Ver §22 |
 | **F10** Code-splitting frontend | ✅ | — | `React.lazy()` para 10 vistas (9 módulos + RouterAccess). [components/Common/ModuleSkeleton.tsx](vpn-manager/src/components/Common/ModuleSkeleton.tsx) como Suspense fallback compartido. `rollup-plugin-visualizer` + `npm run analyze` (dist/stats.html). **Bundle inicial: 1090 KB → 248 KB raw (-77%) · 252 KB → 77 KB gzip (-69%).** 45 chunks separados por módulo. **99 tests (62 backend + 37 frontend) verdes.** Ver §23 |
 | **F11** Performance MySQL | ✅ | — | Pool con tuning explícito ([server/db/mysql.js](server/db/mysql.js) — `connectTimeout`/`maxIdle`/`keepAliveInitialDelayMs`/`acquireConnection` con `Promise.race`). [tools/analyze-queries.js](server/tools/analyze-queries.js) corre `EXPLAIN` sobre 13 queries del hot path (`npm run analyze:queries`). 8 índices compuestos nuevos en [sql/schema_perf_indexes.sql](server/sql/schema_perf_indexes.sql), idempotente ([db/migratePerf.js](server/db/migratePerf.js) → `npm run migrate:perf`) — cubren `tunnel_logs` (timeline ws + por túnel), `tunnel_user_sessions` (ACTIVE listing + current de un user + expirados), `tunnel_session_logs` (que NO tenía índice por ws), `invitations` (por email+status) y `password_resets` (activos por user). Auditoría de placeholders: 0 SQL injection — todas las concatenaciones son cláusulas `IN (?,?,...)` o keys hardcoded. **99 tests verdes (sin regresión).** Ver §24 |
+| **F12** Audit pass final + docs | ✅ | — | `npm audit --omit=dev` → **0 vulnerabilidades en prod** (eliminado `uuid` sin usar del frontend). `semgrep p/security-audit` → **0 findings** en 588 archivos. `semgrep p/nodejs + p/react + p/typescript + p/javascript` → **0 findings** (tras fix: `{ authTagLength: 16 }` en createDecipheriv AES-256-GCM × 2 + `// nosemgrep: bypass-tls-verification` en 2 lugares donde rejectUnauthorized:false es intencional — certs autofirmados de RouterOS y airOS). [ARQUITECTURA.md](./ARQUITECTURA.md) nuevo con 8 diagramas Mermaid (sistema, monorepo, backend splits, frontend lazy, multi-tenant, multi-user sessions, observabilidad, MySQL perf). CLAUDE.md actualizado con convenciones post-refactor (contracts, code-splitting, testing, audit). **99 tests verdes (sin regresión).** Ver §25 |
 
-### Fases pendientes
+### ✅ Plan completo — fases 0-12 cerradas
 
-| Fase | Estado | Estimación | Bloquea a |
-|------|--------|------------|-----------|
-| **F12** Audit pass final + docs | ⏳ | 1 día 🟢 | — |
+**Sin pendientes del REFACTOR_PLAN**. Próximos esfuerzos son nuevas features sobre la base estabilizada.
 
 ### Bugs reales arreglados durante el refactor
 
@@ -1414,6 +1413,68 @@ Búsqueda exhaustiva (`db.(get|all|run|query)\([^)]*\$\{`) muestra que **toda in
 2. Si el query es `WHERE col_a = ? AND col_b = ? ORDER BY col_c DESC`, asegurar que existe el índice compuesto `(col_a, col_b, col_c)`. Correr `npm run analyze:queries` para confirmar.
 3. Para listas dinámicas `IN (...)`: generar los `?` con `arr.map(() => '?').join(',')` y pasar el array como params. Es el único uso aceptable de interpolación en SQL.
 4. Si la query es nueva y caliente, agrégala a `tools/analyze-queries.js` antes del primer release.
+
+---
+
+## 25) 🔒 Auditoría final — semgrep + npm audit (FASE 12)
+
+### `npm audit` — vulnerabilidades de deps
+
+```bash
+# server
+cd server && npm audit --omit=dev   → found 0 vulnerabilities
+
+# vpn-manager
+cd vpn-manager && npm audit --omit=dev   → found 0 vulnerabilities
+```
+
+**0 vulnerabilidades en producción** en ambos workspaces. Las 6 restantes con `npm audit` total son devDeps (`vite`/`vitest`/`esbuild` cadena interna) — requieren upgrade breaking de Vitest 2→3 para resolver. **Fuera del scope** (rompe los 99 tests existentes y la mejora real es nula en CI/runtime).
+
+**Cleanup hecho en F12:** removido `uuid@10.0.0` + `@types/uuid` del vpn-manager. No se usaba en `src/`. Eliminó la única vuln moderate del bundle de producción.
+
+### `semgrep` — análisis estático
+
+Imagen oficial Docker:
+```bash
+docker run --rm -v "${PWD}:/src" -w /src semgrep/semgrep \
+  semgrep --config p/security-audit --config p/nodejs --config p/react \
+  --config p/typescript --config p/javascript --metrics=off .
+```
+
+| Ruleset | Reglas corridas | Findings | Resultado |
+|---------|-----------------|----------|-----------|
+| `p/security-audit` | 40 | 0 | ✅ |
+| `p/nodejs + p/react + p/typescript + p/javascript` | 74 | 4 → **0** tras fix | ✅ |
+
+### Findings y fixes (F12.3)
+
+| # | Regla | Sitio | Severidad | Fix aplicado |
+|---|-------|-------|-----------|--------------|
+| 1 | `gcm-no-tag-length` | [db.service.js:186-196](server/db.service.js) | ERROR | `crypto.createCipheriv` y `createDecipheriv` con cuarto arg `{ authTagLength: 16 }`. Node ya valida que el tag sea exactamente 128 bits — blindaje contra tags truncados. Formato wire compatible (`encryptPass` siempre escribió 16 bytes); el round-trip test de `crypto.test.js` lo confirma. |
+| 2 | `gcm-no-tag-length` | [db/rotateSecrets.js:27](server/db/rotateSecrets.js) | ERROR | Mismo fix — opciones GCM extraídas a constante local. |
+| 3 | `bypass-tls-verification` | [routeros.service.js:133](server/routeros.service.js) | WARNING | `// nosemgrep: bypass-tls-verification` + justificación: RouterOS sirve la API SSL en puerto 8729 con cert autofirmado de fábrica. Emitir certs reales queda fuera del scope del software. |
+| 4 | `bypass-tls-verification` | [ubiquiti.service.js:58](server/ubiquiti.service.js) | WARNING | Análogo — airOS HTTPS interno con cert autofirmado. |
+
+**Re-scan tras fixes: 0 findings.**
+
+### `.semgrepignore`
+
+Excluye `node_modules/`, `dist/`, `**/test/`, `**/*.test.*`, `**/*.spec.*`, `e2e/`, `.claude/`, `packages/contracts/dist/`. Los tests no se scanean porque generan ruido (mocks, fixtures con valores deliberadamente débiles).
+
+### Convenciones documentadas para futuro
+
+| Convención | Dónde |
+|------------|-------|
+| `AES-256-GCM` con `{ authTagLength: 16 }` siempre | F12 |
+| Cualquier `rejectUnauthorized: false` o similar requiere `// nosemgrep: <regla>` + comentario justificativo | F12 |
+| `npm audit --omit=dev` debe ser 0 en cada release | F12 |
+| Semgrep en CI: ambos rulesets deben quedar en 0 findings | F12 |
+| 99 tests verdes como **pre-condición** de cualquier merge a `dev`/`main` | F4-F12 |
+
+Documentación viva relacionada:
+- [ARQUITECTURA.md](./ARQUITECTURA.md) — 8 diagramas Mermaid del estado post-refactor (sistema, monorepo, splits backend, lazy frontend, multi-tenant, multi-usuario, observabilidad, MySQL perf).
+- [vpn-manager/CLAUDE.md](./vpn-manager/CLAUDE.md) — convenciones de UI + convenciones post-refactor (contracts, code-splitting, testing, audit).
+- [REFACTOR_PLAN.md](./REFACTOR_PLAN.md) — plan original, ya ejecutado al 100%.
 
 ---
 

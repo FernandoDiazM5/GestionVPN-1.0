@@ -75,3 +75,48 @@ Tokens semánticos en `tailwind.config.js` (`brand`, `success`, …) y variables
 - **No modificar lógica al refactorizar UI** salvo petición explícita.
 - Barrel exports (`index.ts`) por carpeta.
 - Rutas relativas: cuidado con la profundidad desde `components/sections/` (5 niveles a `src/`).
+
+## Convenciones post-refactor (fases 0-12)
+
+### Contratos API (F5) — `@gestionvpn/contracts`
+
+Tipos compartidos backend↔frontend en `packages/contracts/`. **Cambiar un campo aquí rompe ambos lados en `tsc`** — esa es la garantía.
+
+```ts
+// vpn-manager/src/types/account.ts (re-export)
+export type { Member, Role, AcceptResponse } from '@gestionvpn/contracts';
+```
+
+Tras editar un schema: `npm run build:contracts` (genera `.d.ts`).
+
+### Code-splitting (F10) — lazy modules
+
+Cualquier módulo nuevo se agrega así en `App.tsx`:
+
+```tsx
+const Nuevo = lazy(() => import('./components/<Dom>/<Nombre>/<Nombre>'));
+// dentro del <Suspense> ÚNICO existente — NO crear uno por módulo
+{activeModule === 'nuevo' && <Nuevo />}
+```
+
+Suspense fallback: `ModuleSkeleton` (compartido). RouterAccess tiene Suspense propio porque es el flujo público.
+
+Si tu módulo supera 200 KB raw, validar en `npm run analyze` qué arrastra.
+
+### Testing (F3 + F4)
+
+- Vitest globals (`describe`/`it`/`expect`) — están tipados via `vitest/globals` en `tsconfig.app.json`. **No importar de `'vitest'` con `require()`** (rompe el run).
+- Wrapper de testing: `renderWithProviders` (en `src/test/render.tsx`) monta `VpnProvider` + `WorkspaceSessionProvider` reales.
+- MSW para mocks de fetch — el `server` global está en `src/test/setup.ts`.
+
+### Build production (F10)
+
+- `npm run build` debe pasar antes de commit (lo cubre `pre-commit` con `tsc --noEmit`).
+- `npm run analyze` → `dist/stats.html` con treemap (gzip + brotli).
+- Bundle inicial objetivo: < 250 KB raw / < 80 KB gzip.
+
+### Auditoría (F12)
+
+- `npm audit --omit=dev` debe ser 0 vulnerabilidades en producción.
+- Semgrep en CI: `p/security-audit` + `p/javascript` + `p/typescript` + `p/react` deben quedar en 0 findings (ver `.semgrepignore` para exclusiones legítimas).
+- Cualquier bypass intencional (ej. `rejectUnauthorized: false` en certs internos) requiere `// nosemgrep: <regla>` + comentario justificativo.
