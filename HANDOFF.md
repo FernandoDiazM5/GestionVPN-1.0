@@ -2,7 +2,7 @@
 
 > Documento de migración de contexto entre sesiones.
 > Rama de trabajo: **`dev`** · Remote: `github.com/FernandoDiazM5/GestionVPN-1.0`.
-> Última actualización (2026-06-10): **REFACTOR_PLAN fases 0-9 ejecutadas** (F5: monorepo + `@gestionvpn/contracts`; F6: `node.routes.js` → 8 archivos; F7: `core.routes.js` → 7 archivos; F8: `NetworkDevicesModule.tsx` **1313 LOC → 433** + 4 hooks + 5 componentes nuevos + fixup `5c19cb6` resolvió 2 bugs de perf y 2 anti-patterns; F9: observabilidad — `/api/health` enriquecido (mysql+routeros+smtp) + `GET /metrics` Prometheus + counters de auth/routeros/mailer). Ver §17, §18, §19, §20, §21 y §22.
+> Última actualización (2026-06-10): **REFACTOR_PLAN fases 0-10 ejecutadas** (F5: monorepo + `@gestionvpn/contracts`; F6: `node.routes.js` → 8 archivos; F7: `core.routes.js` → 7 archivos; F8: `NetworkDevicesModule.tsx` **1313 LOC → 433** + 4 hooks + 5 componentes nuevos + fixup `5c19cb6` resolvió 2 bugs de perf y 2 anti-patterns; F9: observabilidad — `/api/health` enriquecido (mysql+routeros+smtp) + `GET /metrics` Prometheus + counters de auth/routeros/mailer; F10: code-splitting frontend — bundle inicial **1090 → 248 KB raw (-77%)** + `npm run analyze` con visualizer). Bug del crash de `POST /api/wireguard/peers` resuelto. Ver §17, §18, §19, §20, §21, §22 y §23.
 > Sesión 2026-06-07 PM: Ajustes del moderador (perfil + workspace + import/export JSON) + Recuperar contraseña + sync MikroTik al deshabilitar + invitaciones por email + .conf WG server-side.
 > Sesión 2026-06-07 AM: multi-usuario con aislamiento por sesión (mangle por-IP), parche `!empty` node-routeros, auditoría (Semgrep+security-review+code-review) y fixes C1–C7.
 > Resumen extendido en `RESUMEN_CONTEXTO_MAESTRO.md`.
@@ -734,12 +734,12 @@ Sesión 2026-06-09 ejecutó las fases 0-4 del plan de refactor incremental
 | **F7** Split `core.routes.js` | ✅ | — | `routes/core.routes.js` (935 LOC) → `routes/core/{index,_shared,connection,ppp,interface,tunnel,tunnel-repair}.routes.js` (max **430 LOC**). Registry SSE singleton + helpers (`emitToUser`, `canUseTunnel`, `clientIpOf`) en `_shared.js`. **92 tests siguen verdes.** Ver §20 |
 | **F8** Split `NetworkDevicesModule.tsx` | ✅ | — | Monolito 1313 LOC → **433** (orquestador) + 4 hooks (`useDeviceScan`, `useDeviceList`, `useColumnPrefs`, `useDeviceLibrary`) + 5 componentes (`ScanControls`, `ScanProgressBanner`, `DeviceFilters`, `DeviceTable`, `DeviceTableRow` memoizado). Virtualización con `@tanstack/react-virtual` queda para F10. **92 tests siguen verdes** + ESLint warnings bajaron 130 → **115** (tras fixup `5c19cb6`). Ver §21 |
 | **F9** Observabilidad — health + Prometheus | ✅ | — | `prom-client@15`, [server/lib/metrics.js](server/lib/metrics.js) (registry + counters/histogram), middleware HTTP en [server/index.js](server/index.js) (latencia por método/ruta/status, excluye `/api/health` y `/metrics`), `GET /metrics` formato Prometheus (loopback-only por defecto; `METRICS_ALLOW_REMOTE=1` para scrape remoto), `GET /api/health` enriquecido (`mysql` + `routeros` + `smtp`) con cascada de status. **92 tests siguen verdes.** Ver §22 |
+| **F10** Code-splitting frontend | ✅ | — | `React.lazy()` para 10 vistas (9 módulos + RouterAccess). [components/Common/ModuleSkeleton.tsx](vpn-manager/src/components/Common/ModuleSkeleton.tsx) como Suspense fallback compartido. `rollup-plugin-visualizer` + `npm run analyze` (dist/stats.html). **Bundle inicial: 1090 KB → 248 KB raw (-77%) · 252 KB → 77 KB gzip (-69%).** 45 chunks separados por módulo. **99 tests (62 backend + 37 frontend) verdes.** Ver §23 |
 
 ### Fases pendientes
 
 | Fase | Estado | Estimación | Bloquea a |
 |------|--------|------------|-----------|
-| **F10** Code-splitting frontend (lazy modules) | ⏳ | 1 día 🟢 | — |
 | **F11** Performance MySQL (índices + prepared) | ⏳ | 1 día 🟠 | — |
 | **F12** Audit pass final + docs | ⏳ | 1 día 🟢 | — |
 
@@ -1243,6 +1243,93 @@ SMTP_VERIFY_TTL_MS=45000            # cache del resultado de verify (evita abrir
 | `verify SMTP` por hit | n/a | cacheado 45s (no abre socket en cada poll) |
 | Status code en `/api/health` con BD caída | 500 | **503** (legible por liveness probes) |
 | Tests verdes | 92 | **92** (sin regresión) |
+
+---
+
+## 23) ⚡ Performance frontend — code-splitting (FASE 10)
+
+### Arquitectura lazy
+
+Cada módulo principal se carga **bajo demanda en su propio chunk** vía `React.lazy()` + `Suspense`. Lo que va en el bundle inicial ahora es solo: React + ReactDOM, los contexts, el sidebar, el logger HTTP y el `ModuleSkeleton`. El resto se descarga al primer acceso del usuario.
+
+```
+vpn-manager/src/
+├── App.tsx                         ← lazy() para 10 vistas
+└── components/Common/
+    └── ModuleSkeleton.tsx          ← Suspense fallback compartido
+```
+
+| Componente | Carga |
+|------------|-------|
+| `Sidebar`, `ModuleSkeleton` | **Eager** — universales |
+| `RouterAccess` (+ AcceptInvitationForm, PasswordResetRequest, PasswordResetConfirm) | Lazy — solo flujo no autenticado |
+| `AdminDashboard`, `ModeratorsModule` | Lazy — solo `platform_admin` |
+| `NodeAccessPanel`, `NetworkDevicesModule`, `ApMonitorModule`, `TeamModule`, `UserManagementPanel` | Lazy — solo moderadores |
+| `SettingsModule`, `ModeratorSettingsModule` | Lazy — solo al abrir Ajustes |
+
+### Decisión clave: Suspense único con `key={activeModule}`
+
+En lugar de un Suspense por módulo, hay **uno solo** envolviendo el switch en App.tsx. La `key={activeModule}` fuerza un nuevo boundary al cambiar de módulo: si el usuario salta a un chunk no resuelto, el skeleton aparece inmediatamente (no la vista anterior congelada).
+
+`RouterAccess` tiene su **propio Suspense con fallback minimalista** (no `ModuleSkeleton`) porque el flujo público debe sentirse instantáneo y la silueta de cards del skeleton sería disonante.
+
+### `ModuleSkeleton` — fallback compartido
+
+```tsx
+<ModuleSkeleton rows={4} withHeader label="Cargando módulo" />
+```
+
+Reusa la clase `.skeleton` del `index.css` (shimmer + dark mode + `prefers-reduced-motion`). `role="status"` + `aria-live="polite"` para lectores de pantalla. Memoizado (`memo`) — no provoca re-renders por cambios fuera de sus props.
+
+### Analizador de bundle — `npm run analyze`
+
+```bash
+cd vpn-manager
+npm run analyze     # → dist/stats.html (treemap interactivo gzip + brotli)
+```
+
+Internamente: `cross-env ANALYZE=1 npm run build` → activa `rollup-plugin-visualizer`. Abrir `dist/stats.html` en el navegador.
+
+### Métricas pre/post F10
+
+| Métrica | Pre-F10 (monolítico) | Post-F10 (split) |
+|---------|----------------------|-------------------|
+| **Bundle inicial JS** | **1090 KB raw / 252 KB gzip** | **248 KB raw / 77 KB gzip** |
+| Reducción inicial | — | **-77% raw · -69% gzip** |
+| Chunks JS totales | 1 | **45** |
+| Warning Vite "chunk > 500 KB" | ⚠️ sí | ✅ no (solo `TeamModule` lo activa, pero es lazy) |
+| Suspense fallback | n/a | `ModuleSkeleton` compartido |
+| Bundle visualizer | n/a | `dist/stats.html` con `npm run analyze` |
+| `npm run build` pasa | ❌ (TS errors en src/test) | ✅ (con `vitest/globals` en types) |
+| Tests verdes | 92 | **99** (62 backend + 37 frontend) |
+
+### Tamaño de cada chunk de módulo
+
+| Chunk | Raw | Gzip | Notas |
+|-------|-----|------|-------|
+| `index.js` (inicial) | 248 KB | 77 KB | React + contexts + sidebar + ModuleSkeleton |
+| `TeamModule` | 415 KB | 85 KB | Arrastra `qrcode` y los modales de WG — candidato a split adicional en futuro |
+| `NodeAccessPanel` | 127 KB | 27 KB | El más usado tras login |
+| `NetworkDevicesModule` | 86 KB | 20 KB | Tras F8 ya estaba liviano por hooks/componentes |
+| `ApMonitorModule` | 62 KB | 15 KB | |
+| `ModeratorSettingsModule` | 25 KB | 6 KB | |
+| `RouterAccess` | 23 KB | 5 KB | Solo flujo público |
+| `ModeratorsModule` | 19 KB | 4 KB | |
+| `UserManagementPanel` | 18 KB | 5 KB | |
+| `SettingsModule` | 6 KB | 2 KB | |
+| `AdminDashboard` | 4.5 KB | 1.6 KB | |
+
+### `lucide-react` — ya tree-shakeable
+
+Los 105 archivos que importan iconos lo hacen con destructuring (`import { Server, Mail } from 'lucide-react'`), que es el patrón tree-shakeable por defecto. Rollup ya extrae chunks compartidos para iconos usados en múltiples módulos lazy (ver `trash-2-*.js`, `info-*.js`, etc.). **No hubo que reescribir nada** — el commit 8 del plan original no aplica.
+
+### Regla operativa para añadir un módulo nuevo
+
+1. Crearlo bajo `components/<Dominio>/<Nombre>/<Nombre>.tsx` con `export default`.
+2. En `App.tsx`: `const Nuevo = lazy(() => import('./components/<Dominio>/<Nombre>/<Nombre>'));`
+3. Añadirlo al switch dentro del `<Suspense>` único.
+4. **No** crear un Suspense por módulo — el de App.tsx es el correcto.
+5. Si el módulo arrastra > 200 KB raw, evaluarlo en `npm run analyze` para detectar dependencias pesadas que podrían splittearse (ej. `TeamModule` con qrcode).
 
 ---
 
