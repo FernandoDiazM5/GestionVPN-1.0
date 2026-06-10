@@ -2,7 +2,6 @@ import { useState, useEffect, lazy, Suspense } from 'react';
 import { Server, AlertTriangle } from 'lucide-react';
 import { VpnProvider, useVpn } from './context';
 
-import RouterAccess from './components/Auth/RouterAccess';
 import Sidebar from './components/Layout/Sidebar';
 import { WorkspaceSessionProvider } from './context/WorkspaceSession';
 import ModuleSkeleton from './components/Common/ModuleSkeleton';
@@ -16,6 +15,7 @@ import ModuleSkeleton from './components/Common/ModuleSkeleton';
 //  porque son universales: el sidebar se ve en TODOS los módulos y el
 //  skeleton es el fallback de Suspense, no tiene sentido lazify-arlos
 //  (fallback de un fallback = pantalla blanca momentánea).
+const RouterAccess              = lazy(() => import('./components/Auth/RouterAccess'));
 const AdminDashboard            = lazy(() => import('./components/Admin/AdminDashboard/AdminDashboard'));
 const ModeratorsModule          = lazy(() => import('./components/Admin/ModeratorsModule/ModeratorsModule'));
 const NodeAccessPanel           = lazy(() => import('./components/Devices/NodeAccessPanel'));
@@ -63,7 +63,25 @@ function AppContent() {
   }
 
   if (!isAuthenticated || !credentials) {
-    return <RouterAccess />;
+    // Fallback liviano para el chunk de auth (RouterAccess + sus 3
+    // sub-componentes: AcceptInvitationForm, PasswordResetRequest,
+    // PasswordResetConfirm). El ModuleSkeleton de la app autenticada
+    // se vería raro aquí: este flujo es público y debe sentirse instantáneo.
+    return (
+      <Suspense
+        fallback={
+          <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-blue-50">
+            <div className="flex flex-col items-center space-y-4">
+              <div className="p-4 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-500/30 animate-pulse">
+                <Server className="w-8 h-8 text-white" />
+              </div>
+            </div>
+          </div>
+        }
+      >
+        <RouterAccess />
+      </Suspense>
+    );
   }
 
   return (
