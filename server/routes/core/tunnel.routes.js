@@ -22,6 +22,8 @@ const { connectToMikrotik, safeWrite, getErrorMessage, writeIdempotent } = requi
 const { IPV4_REGEX } = require('../../ubiquiti.service');
 const sessionRepo = require('../../db/repos/sessionRepo');
 const mgmtIpRepo = require('../../db/repos/mgmtIpRepo');
+const memberWgRepo = require('../../db/repos/memberWgRepo');
+const { getDb } = require('../../db.service');
 const provisioner = require('../../lib/tunnelProvisioner');
 const {
   addSseClient, removeSseClient, emitToUser, clientIpOf, canUseTunnel,
@@ -276,8 +278,19 @@ router.get('/tunnel/my-mgmt-ip', async (req, res) => {
 });
 
 // ── POST /tunnel/register-my-ip — el usuario declara SU IP de gestión ─────────
-//  Seguridad: se valida que exista un peer con esa IP en VPN-WG-MGMT antes de
-//  guardar (no se permite mapear una IP arbitraria). source='manual'.
+//
+//  Validación de ownership por rol (Q5 — antes solo verificaba existencia
+//  del peer, dejando que un MEMBER reclamara IP de otro usuario):
+//
+//   • platform_admin → cualquier peer del router.
+//   • OWNER / CO_MODERATOR → el peer debe pertenecer al workspace del usuario
+//     (mgmt_peer_owners.workspace_id === acc.workspace_id). El moderador
+//     administra sus propios peers; aceptar cualquiera del workspace es ok.
+//   • MEMBER → el peer.public-key DEBE coincidir con su member_wireguard
+//     (que se crea solo cuando el OWNER lo invita). Sin coincidencia, 403.
+//
+//  Anti-replay: aun pasando la validación, el UNIQUE de mgmt_ip en
+//  user_mgmt_ips impide colisiones (un usuario, una IP).
 router.post('/tunnel/register-my-ip', async (req, res) => {
   if (!req.mikrotik) return res.status(503).json({ success: false, needsConfig: true, message: 'Configura las credenciales MikroTik en Ajustes antes de continuar.' });
   const { ip, user, pass } = req.mikrotik;
@@ -300,9 +313,37 @@ router.post('/tunnel/register-my-ip', async (req, res) => {
     if (!peer) {
       return res.status(404).json({ success: false, message: `No existe un peer de gestión con IP ${cleanIp}. Crea tu WireGuard primero.` });
     }
+
+    // ── Q5: validación de ownership por rol ──────────────────────────────────
+    const peerKey = peer['public-key'] || '';
+    if (!acc.platform_admin) {
+      const isMember = acc.role === 'MEMBER';
+      if (isMember) {
+        // MEMBER: el peer debe ser EL SUYO (creado al aceptar la invitación).
+        const myWg = await memberWgRepo.getByUser(acc.workspace_id, acc.sub);
+        if (!myWg || !myWg.public_key || myWg.public_key !== peerKey) {
+          log.warn({ userId: acc.sub, requestedIp: cleanIp, peerKey: peerKey.slice(0, 8) + '…' },
+            'register-my-ip: MEMBER intentó reclamar IP de peer ajeno');
+          return res.status(403).json({ success: false, code: 'NOT_YOUR_PEER', message: 'Ese peer no te pertenece. Pide al moderador que te asigne uno.' });
+        }
+      } else {
+        // OWNER / CO_MODERATOR: el peer debe pertenecer al workspace.
+        const db = await getDb();
+        const owner = await db.get(
+          'SELECT workspace_id FROM mgmt_peer_owners WHERE public_key = ?',
+          [peerKey]
+        );
+        if (!owner || owner.workspace_id !== acc.workspace_id) {
+          log.warn({ userId: acc.sub, role: acc.role, requestedIp: cleanIp, peerKey: peerKey.slice(0, 8) + '…' },
+            'register-my-ip: moderador intentó reclamar peer fuera de su workspace');
+          return res.status(403).json({ success: false, code: 'PEER_FOREIGN_WORKSPACE', message: 'Ese peer no pertenece a tu workspace.' });
+        }
+      }
+    }
+
     await mgmtIpRepo.upsert({
       workspaceId: acc.workspace_id, userId: acc.sub,
-      mgmtIp: cleanIp, publicKey: peer['public-key'] || null, source: 'manual',
+      mgmtIp: cleanIp, publicKey: peerKey || null, source: 'manual',
     });
     res.json({ success: true, mgmtIp: cleanIp });
   } catch (error) {
