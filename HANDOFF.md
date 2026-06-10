@@ -5,7 +5,6 @@
 > Última actualización (2026-06-10): **REFACTOR_PLAN COMPLETO — fases 0-12 ejecutadas** (F5: monorepo + `@gestionvpn/contracts`; F6: `node.routes.js` → 8 archivos; F7: `core.routes.js` → 7 archivos; F8: `NetworkDevicesModule.tsx` **1313 LOC → 433** + 4 hooks + 5 componentes nuevos + fixup `5c19cb6` resolvió 2 bugs de perf y 2 anti-patterns; F9: observabilidad — `/api/health` enriquecido (mysql+routeros+smtp) + `GET /metrics` Prometheus + counters de auth/routeros/mailer; F10: code-splitting frontend — bundle inicial **1090 → 248 KB raw (-77%)** + `npm run analyze` con visualizer; F11: MySQL performance — pool con timeouts explícitos + 8 índices compuestos en `schema_perf_indexes.sql` + `npm run analyze:queries` con `EXPLAIN` sobre 13 queries del hot path; **F12: audit final** — `npm audit --omit=dev` 0 vulns en prod, `semgrep` 0 findings en 588 archivos tras fix de 2 `gcm-no-tag-length` + 2 `nosemgrep` justificados, [ARQUITECTURA.md](./ARQUITECTURA.md) nuevo con 8 diagramas Mermaid). Bug del crash de `POST /api/wireguard/peers` resuelto. Ver §17, §18, §19, §20, §21, §22, §23, §24 y §25.
 > Sesión 2026-06-07 PM: Ajustes del moderador (perfil + workspace + import/export JSON) + Recuperar contraseña + sync MikroTik al deshabilitar + invitaciones por email + .conf WG server-side.
 > Sesión 2026-06-07 AM: multi-usuario con aislamiento por sesión (mangle por-IP), parche `!empty` node-routeros, auditoría (Semgrep+security-review+code-review) y fixes C1–C7.
-> Resumen extendido en `RESUMEN_CONTEXTO_MAESTRO.md`.
 
 ---
 
