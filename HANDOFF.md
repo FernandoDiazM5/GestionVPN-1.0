@@ -1719,6 +1719,15 @@ EXPIRATION_JOB_ENABLED=true
 EXPIRATION_JOB_INTERVAL_MS=60000
 ```
 
+### Defensa contra "tablas no migradas"
+
+Cuando un operador olvida correr `npm run migrate:notifications`, el flujo no debe explotar con 500 opaco. Estrategia tras esta sesión:
+
+- **Lectura** (`GET /api/account/notifications`): `notificationRepo.getByUser` envuelve el query en try/catch; si detecta `ER_NO_SUCH_TABLE` o `doesn't exist`, devuelve `null` y emite UN warning en el log (`warnOnceNoTable`). `getOrDefault` cae al default — el frontend ve los defaults y la tab Notificaciones carga sin error.
+- **Mutaciones** (`PATCH /notifications`, `POST /telegram/link/start`, `POST /telegram/unlink`): try/catch en el handler con helper `asNotMigratedIfNeeded(err)` → `503 NOTIFICATIONS_NOT_MIGRATED` con mensaje accionable *"Tablas de notificaciones no creadas — el Administrador debe correr `npm run migrate:notifications`."*
+
+Bug capturado al revisar este caso: `AppError(503, 'TELEGRAM_NOT_CONFIGURED', '...')` estaba con orden invertido (mismo bug que Q3) — corregido a `AppError(message, 503, code)`. Regla de §28 aplica: *mensaje, status, code*.
+
 ### Tests
 
 `test/unit/notifier.test.js` (9 tests, sin BD ni red):

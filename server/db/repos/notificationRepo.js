@@ -6,9 +6,22 @@
 // ============================================================
 const crypto = require('crypto');
 const { query } = require('../mysql');
+const logger = require('../../lib/logger').child({ scope: 'notification-repo' });
 
 const DEFAULT_CHANNELS = { email: true, telegram: false };
 const DEFAULT_EVENTS = ['TUNNEL_ACTIVATED', 'TUNNEL_DEACTIVATED', 'SESSION_EXPIRED'];
+
+// Detecta el error "tabla no existe" — útil para devolver defaults en lugar
+// de 500 si el operador olvidó correr `npm run migrate:notifications`.
+function isNoTableErr(err) {
+  return err && (err.code === 'ER_NO_SUCH_TABLE' || /doesn['’]t exist/i.test(err.message || ''));
+}
+let _warnedNoTable = false;
+function warnOnceNoTable() {
+  if (_warnedNoTable) return;
+  _warnedNoTable = true;
+  logger.warn('Tablas notification_* aún no existen. Corre `cd server && npm run migrate:notifications`. Mientras tanto se sirven defaults.');
+}
 
 function parse(json, fallback) {
   try { return JSON.parse(json); } catch { return fallback; }
@@ -30,11 +43,16 @@ function normalize(row) {
 }
 
 async function getByUser(userId) {
-  const rows = await query(
-    'SELECT * FROM notification_subscriptions WHERE user_id = ? LIMIT 1',
-    [userId]
-  );
-  return normalize(rows[0] || null);
+  try {
+    const rows = await query(
+      'SELECT * FROM notification_subscriptions WHERE user_id = ? LIMIT 1',
+      [userId]
+    );
+    return normalize(rows[0] || null);
+  } catch (err) {
+    if (isNoTableErr(err)) { warnOnceNoTable(); return null; }
+    throw err;
+  }
 }
 
 /** Devuelve la sub o una sub "fantasma" con defaults (sin insertar). */

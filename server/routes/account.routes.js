@@ -326,7 +326,18 @@ const notificationRepo = require('../db/repos/notificationRepo');
 const telegram = require('../lib/telegram');
 const { NotificationPreferencesSchema } = require('@gestionvpn/contracts');
 
+/** Convierte ER_NO_SUCH_TABLE en un 503 con mensaje accionable. */
+function asNotMigratedIfNeeded(err) {
+  if (err && (err.code === 'ER_NO_SUCH_TABLE' || /doesn['’]t exist/i.test(err.message || ''))) {
+    return new AppError('Tablas de notificaciones no creadas — el Administrador debe correr `npm run migrate:notifications`.', 503, 'NOTIFICATIONS_NOT_MIGRATED');
+  }
+  return err;
+}
+
 router.get('/notifications', requireSession, asyncHandler(async (req, res) => {
+  // getOrDefault ya es defensivo (devuelve default si las tablas faltan),
+  // así que este endpoint sirve 200 incluso sin migrar — el frontend ve
+  // los defaults y puede mostrarlos sin error.
   const sub = await notificationRepo.getOrDefault(req.account.sub);
   return sendOk(res, {
     channels: sub.channels,
@@ -339,10 +350,12 @@ router.get('/notifications', requireSession, asyncHandler(async (req, res) => {
 
 router.patch('/notifications', requireSession, asyncHandler(async (req, res) => {
   const { channels, eventTypes, paused } = NotificationPreferencesSchema.parse(req.body);
-  await notificationRepo.updatePreferences({
-    userId: req.account.sub,
-    channels, eventTypes, paused,
-  });
+  try {
+    await notificationRepo.updatePreferences({
+      userId: req.account.sub,
+      channels, eventTypes, paused,
+    });
+  } catch (err) { throw asNotMigratedIfNeeded(err); }
   return sendOk(res, { message: 'Preferencias actualizadas' });
 }));
 
@@ -355,14 +368,17 @@ router.patch('/notifications', requireSession, asyncHandler(async (req, res) => 
 //  confirmar manualmente con chatId (útil hasta tener el bot en línea).
 router.post('/telegram/link/start', requireSession, asyncHandler(async (req, res) => {
   if (!telegram.isConfigured()) {
-    throw new AppError(503, 'TELEGRAM_NOT_CONFIGURED', 'El bot de Telegram no está habilitado en este servidor.');
+    throw new AppError('El bot de Telegram no está habilitado en este servidor.', 503, 'TELEGRAM_NOT_CONFIGURED');
   }
-  const { code, expiresAt } = await notificationRepo.generateTelegramLinkCode(req.account.sub);
-  return sendOk(res, { code, expiresAt });
+  let r;
+  try { r = await notificationRepo.generateTelegramLinkCode(req.account.sub); }
+  catch (err) { throw asNotMigratedIfNeeded(err); }
+  return sendOk(res, { code: r.code, expiresAt: r.expiresAt });
 }));
 
 router.post('/telegram/unlink', requireSession, asyncHandler(async (req, res) => {
-  await notificationRepo.unlinkTelegram(req.account.sub);
+  try { await notificationRepo.unlinkTelegram(req.account.sub); }
+  catch (err) { throw asNotMigratedIfNeeded(err); }
   return sendOk(res, { message: 'Telegram desvinculado' });
 }));
 
