@@ -84,7 +84,7 @@
 |---|---|
 | 🟡 Limpieza | Quitar `adminIP` hardcodeado (`useNodeManagement.ts`, ya no se usa) · warning MySQL2 `keepAliveInitialDelayMs` (mitigado en F11) · job batch de expiración (hoy perezoso en `/tunnel/status`) · escaneo atado al `mgmt_ip` del solicitante. |
 | 🟡 Mejora | **Fase 5 (opcional):** aislamiento de firewall por-IP + acotar regla "Admin MGMT libre" (defensa en profundidad; hoy el ruteo ya aísla). Dockerfile `USER` no-root (Semgrep S1). |
-| 🟢 Resuelto | O2 repo privado · O5 MySQL estable · UX P6 · **multi-usuario activación (verificado)** · parche `!empty` · fixes C1–C7 · **crash `POST /api/wireguard/peers` (ver §13.6)** · **V1 `register-my-ip` ownership por rol** · **Q1 Notificaciones (§26)** · **M1 Bot Telegram (§27)** · **Q3 Diagnóstico ping/trace (§28)** · **Job de expiración batch**. |
+| 🟢 Resuelto | O2 repo privado · O5 MySQL estable · UX P6 · **multi-usuario activación (verificado)** · parche `!empty` · fixes C1–C7 · **crash `POST /api/wireguard/peers` (ver §13.6)** · **V1 `register-my-ip` ownership por rol** · **Q1 Notificaciones (§26)** · **M1 Bot Telegram (§27)** · **Q3 Diagnóstico ping/trace (§28)** · **Q4 Export auditoría CSV/JSON (§29)** · **Job de expiración batch**. |
 | 🟢 Nota | Config MikroTik `v2.rsc` SIN mangle global (baseline limpio multi-usuario). Peer `peer27` de prueba con public-key placeholder `abcdEFGH...` (borrable). |
 
 **Scripts:** `cd server && npm run init:rbac | init:multiuser | migrate:sqlite | seed:roles` · `node db/rotateSecrets.js` · `node db/mapUserMgmtIp.js <email> <ip>`.
@@ -1537,6 +1537,74 @@ POST  /api/diagnostics/traceroute  { target }
 - Persistir el rate limit en Redis si el backend escala a múltiples instancias (hoy in-memory por proceso).
 - Permitir guardar perfiles de target (CPEs frecuentemente diagnosticados).
 - Métricas Prometheus: `vpn_diagnostics_total{type, status}` para detectar abuso y operativa.
+
+---
+
+## 29) 📤 Export de bitácora — CSV / JSON (Q4)
+
+Último quick win del cuarteto. Cierra el flujo "el cliente pide el reporte mensual" sin que el operador tenga que dumpear MySQL.
+
+### UX flow
+
+1. En el módulo **Equipo** → tarjeta **Actividad reciente** (AuditTimeline) → botón **Exportar** (esquina superior derecha del card).
+2. Dropdown con:
+   - Selector de rango: **Últimos 7 días / 30 días / 90 días / Todo el historial** (default 30 días — el rango más usado para reportes).
+   - Botones **CSV** (primario) y **JSON**.
+3. Click → descarga directa (Content-Disposition + nombre con fechas: `audit-2026-05-11_2026-06-10.csv`).
+4. El CSV abre directo en Excel/Numbers (BOM UTF-8 → encoding detectado correctamente).
+
+### Endpoints
+
+```
+POST /api/audit/export
+  body: { from?, to?, tunnelId?, action?, format: 'csv' | 'json' }
+  csv  → text/csv; charset=utf-8 + Content-Disposition: attachment
+  json → application/json con { rows, meta }
+```
+
+- `from`/`to` = epoch ms. Defaults: ahora-30d / ahora.
+- `tunnelId` y `action` opcionales (filtros adicionales).
+- `format` opcional, default `csv`.
+- Validación: `to < from` → `422 BAD_RANGE`. Format fuera de `'csv'|'json'` → `422 VALIDATION_ERROR` (zod).
+
+### Rate limit
+
+**1 export cada 5 s por usuario** (in-memory `Map<userId, lastTs>`). Cada export puede leer hasta 10 000 filas — un dashboard mal hecho que repita queries podría saturar el pool MySQL. Más allá del 5º hit consecutivo, `429 EXPORT_RATE_LIMITED`.
+
+### Archivos clave
+
+| Archivo | Para qué |
+|---------|----------|
+| [packages/contracts/src/audit.ts](packages/contracts/src/audit.ts) | `AuditExportRequestSchema` (zod) + `AuditExportRow` + `AuditExportJsonResponse`. |
+| [server/db/repos/auditRepo.js](server/db/repos/auditRepo.js) | Nuevo `listForExport(workspaceId, { from, to, tunnelId, action, maxRows })`. Sin paginación: techo configurable (default 10 000, máximo absoluto 50 000). Usa `idx_tl_ws_created` de F11 — barato incluso con millones de filas. |
+| [server/lib/csv.js](server/lib/csv.js) | Serializer RFC 4180-ish (sin deps): `escapeField`, `rowToCsv`, `toCsv` (generator). Maneja `","`, `'\n'`, `'\r'`, `'"'` duplicado, null/undefined → vacío. |
+| [server/routes/audit.routes.js](server/routes/audit.routes.js) | Endpoint `POST /export`. CSV: stream `res.write` línea por línea con BOM UTF-8. JSON: `res.end(JSON.stringify({ rows, meta }))`. |
+| [vpn-manager/src/services/auditApi.ts](vpn-manager/src/services/auditApi.ts) | `exportLogs()` con fetch directo (necesita `Content-Disposition` y body binario) + helper `downloadBlob` para disparar el download. |
+| [vpn-manager/.../components/AuditTimeline.tsx](vpn-manager/src/components/Team/TeamModule/components/AuditTimeline.tsx) | Botón **Exportar** + dropdown inline con selector de rango y 2 botones (CSV / JSON). |
+
+### Tests
+
+20 nuevos en backend (`csv.test.js` + `auditExport.test.js`):
+
+**csv.test.js (14)** — escape de comas, comillas duplicadas, newline, CR, null/undefined → vacío, números sin comillas. Generator `toCsv` con/sin header, vacío.
+
+**auditExport.test.js (6)** — 200 + Content-Disposition + BOM en CSV, escape de campos con coma+comillas en el endpoint, JSON con meta correcto, rango inválido `to<from` → `422 BAD_RANGE`, format `'pdf'` → `422 VALIDATION_ERROR`, rate limit 429 al 2º hit en <5s.
+
+**Total: 118 backend + 37 frontend = 155 verdes.**
+
+### Decisiones documentadas
+
+- **BOM UTF-8 al inicio del CSV** — sin esto Excel asume Windows-1252 y los acentos se ven como mojibake. El BOM es 3 bytes (`\xEF\xBB\xBF`); para Excel/Numbers es la convención esperada para detectar UTF-8.
+- **Stream `res.write` por fila** — no acumulamos 10 000 filas en RAM. La memoria del backend queda lineal con el tamaño de UNA fila, no del export entero.
+- **Sin librería de CSV** — `lib/csv.js` son 30 LOC, cubre RFC 4180 con tests. Agregar `papaparse` o similar sería 50 KB de deps para algo que ya tenemos.
+- **Sin PDF nativo** — el CSV abre directo en Excel; si el cliente necesita PDF, lo hace desde Excel "Imprimir → Guardar como PDF". Agregar `puppeteer` o `pdfkit` al backend sería excesivo para un export reactivo (más deps, más superficie de ataque, más bundle).
+- **JSON también disponible** — útil cuando el cliente integra con su propio sistema y no quiere parsear CSV. El JSON viene con `meta` (from/to/tunnelId/action/count) para que el consumidor pueda mostrar el header sin recalcular.
+
+### Pendiente / mejoras futuras
+
+- **Export de `tunnel_session_logs` y `signal_history`** — mismo patrón, otros datasets. Cada uno suma ~20 LOC.
+- **Rangos custom** — hoy el UI ofrece presets. Cuando el cliente pida "del 1 de marzo al 15 de marzo", agregar date pickers `<input type="date">`.
+- **Streaming chunked sobre miles de filas** — hoy el `listForExport` carga el resultado entero en memoria del backend antes de stream. Si crece a >100k filas, migrar a `query.stream()` de `mysql2` con cursor.
 
 ---
 

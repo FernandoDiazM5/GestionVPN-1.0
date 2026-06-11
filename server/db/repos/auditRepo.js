@@ -29,4 +29,29 @@ async function list(workspaceId, { limit = 100, tunnelId = null } = {}) {
   return query(sql, params);
 }
 
-module.exports = { log, list };
+/**
+ * Lista para EXPORT (Q4) — sin LIMIT (techo configurable), filtros de rango,
+ * acción y túnel. Misma forma de fila que list() para reutilizar tipos.
+ *
+ * NO se pagina: el caller (export endpoint) controla el techo con `maxRows`.
+ * El índice idx_tl_ws_created hace que el filtro por created_at sea barato
+ * incluso con miles de filas.
+ */
+async function listForExport(workspaceId, { from, to, tunnelId = null, action = null, maxRows = 10000 } = {}) {
+  const params = [workspaceId];
+  let sql =
+    `SELECT tl.id, tl.tunnel_id, tl.action, tl.ip_address, tl.detail, tl.created_at,
+            tl.user_id, u.email AS user_email, u.name AS user_name
+       FROM tunnel_logs tl
+       LEFT JOIN users u ON u.id = tl.user_id
+      WHERE tl.workspace_id = ?`;
+  if (from != null) { sql += ' AND tl.created_at >= ?'; params.push(Number(from)); }
+  if (to != null)   { sql += ' AND tl.created_at <= ?'; params.push(Number(to)); }
+  if (tunnelId)     { sql += ' AND tl.tunnel_id = ?'; params.push(tunnelId); }
+  if (action)       { sql += ' AND tl.action = ?'; params.push(action); }
+  sql += ' ORDER BY tl.created_at DESC LIMIT ?';
+  params.push(Math.min(Number(maxRows) || 10000, 50000));
+  return query(sql, params);
+}
+
+module.exports = { log, list, listForExport };
