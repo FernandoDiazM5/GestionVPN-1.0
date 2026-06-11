@@ -12,3 +12,4 @@ export * from './workspace';
 export * from './notifications';
 export * from './diagnostics';
 export * from './audit';
+export * from './dashboard';

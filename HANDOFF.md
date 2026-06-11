@@ -84,7 +84,7 @@
 |---|---|
 | 🟡 Limpieza | Quitar `adminIP` hardcodeado (`useNodeManagement.ts`, ya no se usa) · warning MySQL2 `keepAliveInitialDelayMs` (mitigado en F11) · job batch de expiración (hoy perezoso en `/tunnel/status`) · escaneo atado al `mgmt_ip` del solicitante. |
 | 🟡 Mejora | **Fase 5 (opcional):** aislamiento de firewall por-IP + acotar regla "Admin MGMT libre" (defensa en profundidad; hoy el ruteo ya aísla). Dockerfile `USER` no-root (Semgrep S1). |
-| 🟢 Resuelto | O2 repo privado · O5 MySQL estable · UX P6 · **multi-usuario activación (verificado)** · parche `!empty` · fixes C1–C7 · **crash `POST /api/wireguard/peers` (ver §13.6)** · **V1 `register-my-ip` ownership por rol** · **Q1 Notificaciones (§26)** · **M1 Bot Telegram (§27)** · **Q3 Diagnóstico ping/trace (§28)** · **Q4 Export auditoría CSV/JSON (§29)** · **Job de expiración batch**. |
+| 🟢 Resuelto | O2 repo privado · O5 MySQL estable · UX P6 · **multi-usuario activación (verificado)** · parche `!empty` · fixes C1–C7 · **crash `POST /api/wireguard/peers` (ver §13.6)** · **V1 `register-my-ip` ownership por rol** · **Q1 Notificaciones (§26)** · **M1 Bot Telegram (§27)** · **Q3 Diagnóstico ping/trace (§28)** · **Q4 Export auditoría CSV/JSON (§29)** · **Q2 Dashboard métricas (§30)** · **Job de expiración batch**. |
 | 🟢 Nota | Config MikroTik `v2.rsc` SIN mangle global (baseline limpio multi-usuario). Peer `peer27` de prueba con public-key placeholder `abcdEFGH...` (borrable). |
 
 **Scripts:** `cd server && npm run init:rbac | init:multiuser | migrate:sqlite | seed:roles` · `node db/rotateSecrets.js` · `node db/mapUserMgmtIp.js <email> <ip>`.
@@ -1605,6 +1605,94 @@ POST /api/audit/export
 - **Export de `tunnel_session_logs` y `signal_history`** — mismo patrón, otros datasets. Cada uno suma ~20 LOC.
 - **Rangos custom** — hoy el UI ofrece presets. Cuando el cliente pida "del 1 de marzo al 15 de marzo", agregar date pickers `<input type="date">`.
 - **Streaming chunked sobre miles de filas** — hoy el `listForExport` carga el resultado entero en memoria del backend antes de stream. Si crece a >100k filas, migrar a `query.stream()` de `mysql2` con cursor.
+
+---
+
+## 30) 📈 Dashboard de métricas en vivo (Q2)
+
+Cierra el círculo de observabilidad: las métricas Prometheus ya estaban en `/metrics` desde F9, pero solo un operador con Prometheus/Grafana podía verlas. Ahora el `platform_admin` las ve desde el panel mismo, con polling 10s y sparklines.
+
+### Arquitectura
+
+```
+prom-client registry (in-memory)
+   ↑   inc() desde middleware HTTP + auth + routeros + mailer
+   │
+lib/dashboardMetrics.js
+   ├─ snapshot()        → suma counters, calcula percentiles del histograma
+   ├─ takeSample()      → guarda 1 punto/min en buffer circular (60 puntos)
+   ├─ start()/stop()    → setInterval — arranca desde index.js junto al monitor
+   │
+routes/dashboard.routes.js
+   └─ GET /api/dashboard/metrics  (solo platform_admin → 403 NOT_PLATFORM_ADMIN)
+       │
+       ▼
+frontend MetricsPanel.tsx
+   ├─ useEffect → polling 10s
+   ├─ 4 KpiCards (Requests/min · Latencia p95 · Auth fails/h · RouterOS error %)
+   └─ Sparkline.tsx (SVG inline, 0 deps)
+```
+
+### Lo que se visualiza
+
+- **4 KPI cards** con sparkline embebida (área + línea) en la esquina superior derecha.
+- **Breakdowns** por etiqueta cuando hay datos: errores RouterOS por tipo, auth fails por motivo, mails por kind.
+- **Uptime** del proceso en el header del panel.
+- **Indicador "En vivo"** con dot verde pulsando.
+
+### Endpoint
+
+```
+GET /api/dashboard/metrics
+  → 200 { success, current, history }
+  → 403 NOT_PLATFORM_ADMIN si el usuario no es admin de plataforma
+```
+
+`current` (snapshot ACTUAL — totales acumulados, no derivadas):
+- `httpRequests`, `httpErrors` (5xx)
+- `authFails` + `authFailsByReason`
+- `routerosErrors` + `routerosErrorsByType` + `routerosWrites` + `routerosOkRatio` (0..1)
+- `mailSent` + `mailByKind`
+- `latencyP50s`, `latencyP95s`, `latencyP99s` (segundos, calculados con interpolación lineal en buckets)
+- `uptimeMs` (process uptime)
+
+`history` (buffer circular de 60 puntos — 1/min):
+- Cada `DashboardSample` trae solo los counters relevantes para sparkline (httpRequests, httpErrors, authFails, routerosErrors/Writes, latencyP95s).
+
+### Decisiones documentadas
+
+- **Sin Recharts ni libs de chart** — `Sparkline.tsx` son 80 LOC de SVG inline. Agregar Recharts serían ~150 KB raw / ~45 KB gzip; para gráficos de panel admin esto es overkill. Si más adelante necesitamos legends/tooltips ricos, evaluar entonces.
+- **No persiste el histórico** — el buffer circular vive en RAM del proceso. Si reinicia, se pierde la última hora del sparkline. Consistente con `prom-client` (in-memory). Para histórico real → scrape externo con Prometheus.
+- **Solo platform_admin** — las métricas globales no son negocio del moderador. Los counters cruzan workspaces y exponer eso violaría aislamiento multi-tenant.
+- **Polling cada 10s en el frontend, sampling cada 60s en el backend** — el polling busca actualizar "ahora" rápido (el dashboard reacciona al instante); el sampling es para llenar el sparkline a un costo bajo (60 muestras/h = 1 query/min al registry, no tiene impacto).
+- **Interpolación lineal de percentiles** — `prom-client` no expone percentiles directos en JS (solo en el formato Prometheus). La interpolación entre buckets acumulativos es la fórmula estándar para dashboards; no es exacta para SLO billing, pero para "¿está la API rápida?" es la respuesta correcta.
+
+### Archivos clave
+
+| Archivo | Para qué |
+|---------|----------|
+| [packages/contracts/src/dashboard.ts](packages/contracts/src/dashboard.ts) | `DashboardMetricsResponse` y `DashboardSample` — tipos compartidos. |
+| [server/lib/dashboardMetrics.js](server/lib/dashboardMetrics.js) | Aggregator + percentile calculator + buffer circular + sampler. |
+| [server/routes/dashboard.routes.js](server/routes/dashboard.routes.js) | `GET /api/dashboard/metrics` con guard `platform_admin`. |
+| [server/test/unit/dashboardMetrics.test.js](server/test/unit/dashboardMetrics.test.js) | 8 tests: counters base, agregación por label, ratio routeros, percentiles vacío/cortos/mezclados, history append. |
+| [vpn-manager/src/components/Common/Sparkline.tsx](vpn-manager/src/components/Common/Sparkline.tsx) | Componente reusable. Memoizado. Acepta `data: number[]`, ancho/alto, color via `currentColor`. Maneja arrays vacíos / 1 punto / series planas / negativos. |
+| [vpn-manager/src/services/dashboardApi.ts](vpn-manager/src/services/dashboardApi.ts) | `dashboardApi.metrics()`. |
+| [vpn-manager/src/components/Admin/AdminDashboard/MetricsPanel.tsx](vpn-manager/src/components/Admin/AdminDashboard/MetricsPanel.tsx) | Componente principal con polling 10s, 4 KpiCards + breakdowns. |
+
+### Tests
+
+8 nuevos en `dashboardMetrics.test.js`:
+- 4 de `snapshot` de counters: totales 0 sin eventos, suma por etiqueta `status` y 5xx separados, `authFailsByReason` agrupado, `routerosOkRatio` 1 → 0.5 → 1.
+- 3 de percentiles del histograma: vacío → 0, 1ms × 100 → p50 ≈ 0.001, mezcla 90×10ms + 10×100ms → p50 ≤ 0.025 y 0.025 < p95 ≤ 0.1.
+- 1 de `takeSample` / `history` append.
+
+**Total: 126 backend + 37 frontend = 163 verdes.**
+
+### Pendiente / mejoras futuras
+
+- **Histórico persistido** — escribir los snapshots a una tabla `metrics_snapshots(ts, json)` para sobrevivir reinicios. ~30 LOC. Hoy basta con que Prometheus haga scrape externo.
+- **Alertas dentro del panel** — si `routerosOkRatio < 0.9` por 5 min, mostrar banner amarillo arriba del dashboard (reutiliza la lógica del notifier).
+- **Métricas de negocio** — `tunnels_active`, `members_total`, `subnets_scanned_total`. Hoy las cards de arriba del AdminDashboard usan `/api/admin/summary` con MySQL puro; podría unificarse.
 
 ---
 

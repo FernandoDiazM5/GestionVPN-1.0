@@ -4,6 +4,7 @@ import { adminApi } from '../../../services/adminApi';
 import { useWorkspaceSession } from '../../../context/WorkspaceSession';
 import { isPlatformAdmin } from '../../../utils/permissions';
 import type { AdminSummary, AuditLog } from '../../../types/account';
+import MetricsPanel from './MetricsPanel';
 
 function timeAgo(ts: number): string {
   const s = Math.floor((Date.now() - ts) / 1000);
@@ -74,6 +75,9 @@ export default function AdminDashboard() {
               </div>
             ))}
           </div>
+
+          {/* Q2 — métricas en vivo del backend (Prometheus → JSON) */}
+          <MetricsPanel />
 
           {/* Actividad reciente (global) */}
           <div className="card overflow-hidden border border-slate-200 dark:border-slate-800">
