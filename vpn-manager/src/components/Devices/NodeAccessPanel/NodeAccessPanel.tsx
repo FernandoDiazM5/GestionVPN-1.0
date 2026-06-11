@@ -6,6 +6,7 @@ import { useWorkspaceSession } from '../../../context/WorkspaceSession';
 import { isPlatformAdmin } from '../../../utils/permissions';
 
 // ── Modales (importados desde ./modals)
+import { useState } from 'react';
 import {
   NuevoNodo,
   EditarNodo,
@@ -14,7 +15,9 @@ import {
   ScriptModal,
   HistoryModal,
   TagModal,
+  DiagnosticsModal,
 } from './modals';
+import type { NodeInfo } from '../../../types/api';
 
 // ── Componentes (nuevos)
 import {
@@ -63,6 +66,10 @@ export default function NodeAccessPanel() {
 
   // Extraer valores del nodeModals
   const { showNuevoNodo, setShowNuevoNodo, showBatchCsv, setShowBatchCsv, editNode, setEditNode, deleteNode, setDeleteNode, scriptNode, setScriptNode, historyNode, setHistoryNode, tagNode, setTagNode } = nodeModals;
+
+  // Modal de diagnóstico (Q3) — local; no merece entrar a useNodeModals porque
+  // sólo se abre/cierra desde NodeCard y no es parte del lifecycle de nodos.
+  const [diagnoseNode, setDiagnoseNode] = useState<NodeInfo | null>(null);
 
   // ── Constantes
   const VPS_IP = '192.168.21.60';
@@ -227,6 +234,7 @@ export default function NodeAccessPanel() {
         onScriptNode={setScriptNode}
         onRenameNode={(node, newName) => setNodes(prev => prev.map(n => n.ppp_user === node.ppp_user ? { ...n, nombre_nodo: newName } : n))}
         onHistoryNode={setHistoryNode}
+        onDiagnoseNode={setDiagnoseNode}
         onTagClick={setTagNode}
         onRefreshNodes={fetchNodes}
         isLoading={isLoading}
@@ -283,6 +291,13 @@ export default function NodeAccessPanel() {
           currentTags={nodeTags[tagNode.ppp_user] || []}
           onSave={(tags) => saveNodeTags(tagNode.ppp_user, tags)}
           onClose={() => setTagNode(null)}
+        />
+      )}
+      {diagnoseNode && (
+        <DiagnosticsModal
+          initialTarget={diagnoseNode.ip_tunnel || ''}
+          nodeName={diagnoseNode.nombre_nodo}
+          onClose={() => setDiagnoseNode(null)}
         />
       )}
 

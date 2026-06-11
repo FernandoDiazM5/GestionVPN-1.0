@@ -30,6 +30,7 @@ export default function NodeCard({
   onHistory,
   tags = [],
   onTagClick,
+  onDiagnose,
 }: NodeCardProps) {
   const {
     isActivating,
@@ -139,6 +140,11 @@ export default function NodeCard({
     setShowKebab(false);
   };
 
+  const handleDiagnoseClick = () => {
+    onDiagnose?.();
+    setShowKebab(false);
+  };
+
   return (
     <Fragment>
       {/* ── Fila principal ── */}
@@ -219,6 +225,7 @@ export default function NodeCard({
               onTagClick={onTagClick}
               onHistory={onHistory}
               onDelete={onDelete}
+              onDiagnose={onDiagnose ? handleDiagnoseClick : undefined}
             />
           </div>
         </td>

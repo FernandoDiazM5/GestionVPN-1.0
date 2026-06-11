@@ -12,6 +12,7 @@ export interface NodeCardProps {
   onHistory?: () => void;
   tags?: string[];
   onTagClick?: () => void;
+  onDiagnose?: () => void;
 }
 
 export interface SshCred {

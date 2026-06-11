@@ -20,6 +20,7 @@ const nodeRoutes = require('./routes/nodes');
 const deviceRoutes = require('./routes/device.routes');
 const wireguardRoutes = require('./routes/wireguard.routes');
 const settingsRoutes = require('./routes/settings.routes');
+const diagnosticsRoutes = require('./routes/diagnostics.routes');
 const apRoutes  = require('./ap.routes');
 const { initDb } = require('./db.service');
 
@@ -195,6 +196,7 @@ app.use('/api', verifyToken, nodeRoutes);
 app.use('/api', verifyToken, deviceRoutes);
 app.use('/api', verifyToken, wireguardRoutes);
 app.use('/api', verifyToken, settingsRoutes);
+app.use('/api', verifyToken, diagnosticsRoutes);
 app.use('/api/ap-monitor', verifyToken, apRoutes);
 
 // ── Middleware de error central (estandariza respuestas) ─────────────────────

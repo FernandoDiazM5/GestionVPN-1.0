@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom';
-import { MoreVertical, KeyRound, Wrench, Pencil, FileCode, Tag, History, Trash2, Loader2 } from 'lucide-react';
+import { MoreVertical, KeyRound, Wrench, Pencil, FileCode, Tag, History, Trash2, Loader2, Network } from 'lucide-react';
 import type { NodeInfo } from '../../../../types/api';
 
 interface NodeCardKebabMenuProps {
@@ -20,6 +20,7 @@ interface NodeCardKebabMenuProps {
   onTagClick?: () => void;
   onHistory?: () => void;
   onDelete?: () => void;
+  onDiagnose?: () => void;
 }
 
 export function NodeCardKebabMenu({
@@ -40,6 +41,7 @@ export function NodeCardKebabMenu({
   onTagClick,
   onHistory,
   onDelete,
+  onDiagnose,
 }: NodeCardKebabMenuProps) {
   return (
     <div ref={kebabRef} className="relative">
@@ -134,6 +136,14 @@ export function NodeCardKebabMenu({
           >
             <History className="w-3.5 h-3.5 text-sky-400 shrink-0" />
             <span>Historial de conexión</span>
+          </button>
+
+          <button
+            onClick={() => { onDiagnose?.(); }}
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 transition-colors text-left"
+          >
+            <Network className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+            <span>Diagnosticar (ping/trace)</span>
           </button>
 
           {/* Divisor + Eliminar */}

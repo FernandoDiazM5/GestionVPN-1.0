@@ -10,3 +10,4 @@ export * from './team';
 export * from './admin';
 export * from './workspace';
 export * from './notifications';
+export * from './diagnostics';

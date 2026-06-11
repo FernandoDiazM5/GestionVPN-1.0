@@ -18,6 +18,7 @@ interface NodesTableProps {
   onRenameNode: (node: NodeInfo, newName: string) => void;
   onHistoryNode: (node: NodeInfo) => void;
   onTagClick: (node: NodeInfo) => void;
+  onDiagnoseNode: (node: NodeInfo) => void;
 }
 
 export default function NodesTable({
@@ -33,6 +34,7 @@ export default function NodesTable({
   onRenameNode,
   onHistoryNode,
   onTagClick,
+  onDiagnoseNode,
 }: NodesTableProps) {
   
   const SortIcon = ({ columnKey }: { columnKey: SortKey }) => {
@@ -95,6 +97,7 @@ export default function NodesTable({
               onRename={(newName) => onRenameNode(node, newName)}
               onHistory={() => onHistoryNode(node)}
               onTagClick={() => onTagClick(node)}
+              onDiagnose={() => onDiagnoseNode(node)}
               tags={nodeTags[node.ppp_user] || []}
             />
           ))}

@@ -6,3 +6,4 @@ export { default as BatchCsvModal } from './BatchCsvModal';
 export { default as ScriptModal } from './ScriptModal';
 export { default as HistoryModal } from './HistoryModal';
 export { default as TagModal } from './TagModal';
+export { default as DiagnosticsModal } from './DiagnosticsModal';

@@ -84,7 +84,7 @@
 |---|---|
 | 🟡 Limpieza | Quitar `adminIP` hardcodeado (`useNodeManagement.ts`, ya no se usa) · warning MySQL2 `keepAliveInitialDelayMs` (mitigado en F11) · job batch de expiración (hoy perezoso en `/tunnel/status`) · escaneo atado al `mgmt_ip` del solicitante. |
 | 🟡 Mejora | **Fase 5 (opcional):** aislamiento de firewall por-IP + acotar regla "Admin MGMT libre" (defensa en profundidad; hoy el ruteo ya aísla). Dockerfile `USER` no-root (Semgrep S1). |
-| 🟢 Resuelto | O2 repo privado · O5 MySQL estable · UX P6 · **multi-usuario activación (verificado)** · parche `!empty` · fixes C1–C7 · **crash `POST /api/wireguard/peers` (ver §13.6)** · **V1 `register-my-ip` ownership por rol (MEMBER → peer suyo · OWNER/CO_MOD → peer de su workspace · platform_admin → cualquiera)**. |
+| 🟢 Resuelto | O2 repo privado · O5 MySQL estable · UX P6 · **multi-usuario activación (verificado)** · parche `!empty` · fixes C1–C7 · **crash `POST /api/wireguard/peers` (ver §13.6)** · **V1 `register-my-ip` ownership por rol** · **Q1 Notificaciones (§26)** · **M1 Bot Telegram (§27)** · **Q3 Diagnóstico ping/trace (§28)** · **Job de expiración batch**. |
 | 🟢 Nota | Config MikroTik `v2.rsc` SIN mangle global (baseline limpio multi-usuario). Peer `peer27` de prueba con public-key placeholder `abcdEFGH...` (borrable). |
 
 **Scripts:** `cd server && npm run init:rbac | init:multiuser | migrate:sqlite | seed:roles` · `node db/rotateSecrets.js` · `node db/mapUserMgmtIp.js <email> <ip>`.
@@ -1473,6 +1473,70 @@ Documentación viva relacionada:
 - [ARQUITECTURA.md](./ARQUITECTURA.md) — 8 diagramas Mermaid del estado post-refactor (sistema, monorepo, splits backend, lazy frontend, multi-tenant, multi-usuario, observabilidad, MySQL perf).
 - [vpn-manager/CLAUDE.md](./vpn-manager/CLAUDE.md) — convenciones de UI + convenciones post-refactor (contracts, code-splitting, testing, audit).
 - [REFACTOR_PLAN.md](./REFACTOR_PLAN.md) — plan original, ya ejecutado al 100%.
+
+---
+
+## 28) 🔧 Diagnóstico de red — ping / traceroute (Q3)
+
+> Cierra el ciclo de soporte: hoy el operador abre SSH al MikroTik manualmente cuando algo no responde. Ahora puede lanzar ping/traceroute desde el panel, con autenticación, rate-limit y log estructurado.
+
+### UX flow
+
+1. En la lista de nodos (NodeAccessPanel), abre el **kebab** del nodo → **Diagnosticar (ping/trace)**.
+2. Aparece `DiagnosticsModal` con dos tabs (**Ping** / **Traceroute**) y el campo *Destino* precargado con `ip_tunnel` del nodo.
+3. Cambia el target si necesitas probar otra IP (ej. un CPE detrás del túnel).
+4. **Ejecutar** dispara la consulta. El comando **se ejecuta en el router central**, no en el navegador — así el path de red coincide con el que usan los túneles reales.
+5. Resultados:
+   - **Ping**: 4 cards de stat (Enviados / Recibidos / Pérdida / RTT prom.) + tabla por seq con host/tiempo/TTL/tamaño. Pérdida `>0` colorea en rojo; sin pérdida, verde.
+   - **Traceroute**: tabla con cada hop (número, dirección, RTT, pérdida). Hops sin respuesta muestran `* * *` y timeout en rojo.
+
+### Endpoints
+
+```
+POST  /api/diagnostics/ping        { target, count? }
+POST  /api/diagnostics/traceroute  { target }
+```
+
+- `target` validado con Zod: IPv4 dotted (`192.168.50.1`) o hostname (`cpe-norte.local`). CIDR rechazado.
+- `count` opcional 1-10 (default 4).
+- Bajo el capó: `/tool/ping count=N` y `/tool/traceroute count=1 timeout=2s max-hops=20` vía RouterOS API.
+
+### Rate limit
+
+5 requests cada 10 s **por user_id** (en memoria, sin persistir). 6.º request → `429 RATE_LIMITED`. Evita abuso del usuario logueado; un ataque DDoS real se mitiga con address-list en el router, no acá.
+
+### Códigos de error
+
+| HTTP | code | Cuándo |
+|------|------|--------|
+| 401 | `NO_SESSION` | `req.account` ausente (debería filtrar el middleware antes, defensa adicional) |
+| 422 | `VALIDATION_ERROR` | target inválido (zod) |
+| 429 | `RATE_LIMITED` | Demasiados diagnósticos en ventana 10 s |
+| 503 | `NEEDS_CONFIG` | MikroTik no configurado en Ajustes |
+| 500 | `PING_FAILED` / `TRACE_FAILED` | Error en RouterOS (router caído, etc.) |
+
+### Archivos clave
+
+| Archivo | Para qué |
+|---------|----------|
+| [packages/contracts/src/diagnostics.ts](packages/contracts/src/diagnostics.ts) | Zod + tipos compartidos. `DiagnosticsTargetSchema` (IPv4 OR hostname), `DiagnosticsPingRequest/Response`, `DiagnosticsTraceRequest/Response`. |
+| [server/routes/diagnostics.routes.js](server/routes/diagnostics.routes.js) | Endpoints + rate limit + parser de la salida de RouterOS. `summarize(rows)` calcula `lossPct`, `min/avg/max ms`. Traceroute agrupa por hop desde `address-N`/`rtt-N`/`loss-N`/`status-N`. |
+| [server/test/unit/diagnostics.test.js](server/test/unit/diagnostics.test.js) | 7 tests: parser ping (3/4 OK), zod inválido, sin mikrotik (503), sin sesión (401), rate limit (429 en el 6º hit), trace agrupado, trace con hop timeout. |
+| [vpn-manager/src/services/diagnosticsApi.ts](vpn-manager/src/services/diagnosticsApi.ts) | `ping()` y `traceroute()` con tipos del contracts. |
+| [vpn-manager/src/components/Devices/NodeAccessPanel/modals/DiagnosticsModal.tsx](vpn-manager/src/components/Devices/NodeAccessPanel/modals/DiagnosticsModal.tsx) | Modal con tabs, stats coloreadas, tablas. Cierra con click fuera, Enter ejecuta. |
+| `NodeCard` + `NodesTable` + `NodesListSection` | Cadena de props `onDiagnoseNode → onDiagnose` hasta el botón "Diagnosticar" en el kebab. |
+
+### Bug capturado por los tests
+
+`AppError(message, status, code)` — el constructor recibe el mensaje primero. El handler inicial llamaba `AppError(503, 'NEEDS_CONFIG', 'Configura...')` (orden invertido), lo que dejaba `status` con el string `'NEEDS_CONFIG'` y `res.status('NEEDS_CONFIG')` rompía Express → todo error caía como `500 INTERNAL` opaco. Los tests `rechaza sin mikrotik (503)`, `rechaza sin sesión (401)` y `rate-limit (429)` fallaron al primer correr con `expected 500 to be …`, marcando el bug. Fix: invertir args.
+
+**Regla operativa:** todo `throw new AppError(...)` debe leerse "mensaje, status, code" — coincide con cómo se mostraría: *"Sesión inválida, 401, NO_SESSION"*.
+
+### Pendiente / mejoras futuras
+
+- Persistir el rate limit en Redis si el backend escala a múltiples instancias (hoy in-memory por proceso).
+- Permitir guardar perfiles de target (CPEs frecuentemente diagnosticados).
+- Métricas Prometheus: `vpn_diagnostics_total{type, status}` para detectar abuso y operativa.
 
 ---
 

@@ -16,6 +16,7 @@ interface NodesListSectionProps {
   onRenameNode: (node: NodeInfo, newName: string) => void;
   onHistoryNode: (node: NodeInfo) => void;
   onTagClick: (node: NodeInfo) => void;
+  onDiagnoseNode: (node: NodeInfo) => void;
   onRefreshNodes: () => void;
   isLoading: boolean;
 }
@@ -31,6 +32,7 @@ export default function NodesListSection({
   onRenameNode,
   onHistoryNode,
   onTagClick,
+  onDiagnoseNode,
   onRefreshNodes,
   isLoading,
 }: NodesListSectionProps) {
@@ -138,6 +140,7 @@ export default function NodesListSection({
             onEditNode={onEditNode}
             onDeleteNode={onDeleteNode}
             onScriptNode={onScriptNode}
+            onDiagnoseNode={onDiagnoseNode}
             onRenameNode={onRenameNode}
             onHistoryNode={onHistoryNode}
             onTagClick={onTagClick}
