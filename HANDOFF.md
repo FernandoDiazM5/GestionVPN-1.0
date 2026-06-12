@@ -3,7 +3,7 @@
 > Documento de migración de contexto entre sesiones.
 > Rama de trabajo: **`dev`** · Remote: `github.com/FernandoDiazM5/GestionVPN-1.0`.
 >
-> **Estado actual (2026-06-12):** REFACTOR_PLAN cerrado (F0-F12) · 5 features quick-wins entregados (Q1-Q5) · 2 mid-size (M1, M5) · iter2 del bot Telegram + reposición "Asignar túneles" + fix crítico `user_mgmt_ips` (§32) · UX MEMBER endurecida (§33) · Workspace unificado + email en peers WG + multi-asignar + QR en aceptar invitación (§34) · **Columna Alias editable en peers WG + bloqueo de edición del "Usuario" para preservar trazabilidad MikroTik (§35) · Fix crítico bot Telegram: el MEMBER veía "No tienes túneles asignados" pese a tener asignaciones porque el query filtraba solo por `ppp_user` (§36)**. Plan completo abajo.
+> **Estado actual (2026-06-12):** REFACTOR_PLAN cerrado (F0-F12) · 5 features quick-wins entregados (Q1-Q5) · 2 mid-size (M1, M5) · iter2 del bot Telegram + reposición "Asignar túneles" + fix crítico `user_mgmt_ips` (§32) · UX MEMBER endurecida (§33) · Workspace unificado + email en peers WG + multi-asignar + QR en aceptar invitación (§34) · Columna Alias editable en peers WG + bloqueo de edición del "Usuario" para preservar trazabilidad MikroTik (§35) · Fix crítico bot Telegram: match dual VRF/PPP en asignaciones del MEMBER (§36) · **Auditoría exhaustiva del módulo Escanear con skills `react-ui-expert` + `vercel-react-best-practices`: 21 mejoras en 5 commits (§37 perf+robustez · §38 UX+features)**. Plan completo abajo.
 >
 > ### 🧱 Refactor (F0-F12) — Plan completo ejecutado
 > - **F5** Monorepo + `@gestionvpn/contracts` con Zod compartido.
@@ -23,6 +23,9 @@
 > - **M5 (§31)** — Monitoreo proactivo: job cada 5min lee `/ppp/active`, anti-flap con counter en BD (3 fallos × 5min = 15min de gracia), cooldown 30min, notifica al OWNER `NODE_DOWN` / `NODE_RECOVERED`.
 > - **iter2 multi-usuario (§32, commit `b441cbc`)** — Bot Telegram ejecuta `/activar` y `/desactivar` directamente (antes solo deep-link); selección por lista numerada con TTL 15 min vía nuevo `lib/tunnelService.js` compartido con HTTP. Botón "Asignar túneles" reincorporado a la tabla de Equipo (solo MEMBER) + endpoint ligero `/api/team/workspace-tunnels` para picker. Fix crítico: provisión de peer WG ahora inserta `user_mgmt_ips` automáticamente — antes el MEMBER recibía 409 NO_MGMT_IP al activar.
 > - **UX MEMBER (§33)** — La vista "Acceso a Nodos VRF" se reduce a "Acceder" para el MEMBER: se ocultan "Nuevo Nodo", "Exportar", el kebab de fila (Verificar/SSH/Editar/Script/Etiquetas/Historial/Diagnosticar/Eliminar) y el lápiz de renombrar. Se habilita el módulo "Ajustes" para el MEMBER reutilizando `ModeratorSettingsModule` con tabs filtradas: **Perfil** (contraseña + correo, sin cambios) y **Notificaciones** en `memberMode` — solo vincular/desvincular Telegram (sin email, eventos, pausa ni botón Guardar). Backend sin cambios (los endpoints `/account/*` ya solo exigen `requireSession`).
+> - **Auditoría Escanear — performance + robustez (§37)** — Tres commits encadenados (`4e872f5` + `09b7c5c` + `1fc502b`) con 12 cambios guiados por las reglas vercel: race condition en `setSavedDevices` cerrada con functional setState, listeners `mousemove` on-demand (solo durante resize), `gridTemplate` como CSS variable `--cols-tpl` para que el resize-drag no invalide todas las filas memoizadas, `Map<id, SavedDevice>` para lookup O(1), `useDeferredValue` en la búsqueda, `motion-safe:` en animaciones infinitas, click-away con `touchstart`, cancelación del reader SSE si cambia la subred mientras hay scan in-flight, lazy init de `useState` con `loadCachedScan()` para hidratar `sessionStorage` sin disparar 5 setStates al montar, y wrapper `SCAN_CACHE_VERSION` para descartar payloads de schemas viejos. Resultado: resize fluido con 50+ filas, race cerrada, 1 render menos al mount, sin renombrar APIs públicas.
+> - **Auditoría Escanear — UX + features (§38)** — Dos commits (`a3e1caf` + `f1dd8cb`) con 9 cambios visibles para el usuario: SSH "failed" distinguido del "no probado" con paletas distintas + `role="status"` para screen readers, default sort por **señal desc**, `colWidths` persistido en localStorage, footer con contador SIEMPRE visible, chips para cada filtro activo (search/SSID/rol) con limpieza individual, filtro nuevo **"Solo APs / Solo CPEs / Solo desconocidos"** con normalización `mode='master'→'ap'`, tooltip nativo en headers truncados, **botón "Exportar CSV"** con 26 columnas + BOM UTF-8 para Excel + escape RFC 4180, **botón "Guardar N"** verde que aparece solo si hay candidatos con SSH OK no guardados (Promise.allSettled, confirmación si N>5), zebra simplificado a blanco/slate con `border-l-2` indicador (indigo=guardado · emerald=hasStats · transparent). NetworkDevicesModule chunk: 86 → 95 KB raw / 20 → 23 KB gzip (+8 KB acumulado, casi todo del `exportCsv.ts` + bulk save handler).
+>
 > - **Workspace unificado + mejoras de peers (§34)** — Cuatro cambios encadenados:
 >   1. **Sidebar consolida "Usuarios" + "Equipo" → un solo ítem "Workspace"**. El antiguo `UserManagementPanel` (peers WG) ahora vive como sub-tab dentro de `TeamModule`. Header del módulo muestra **nombre del workspace + tarjeta Propietario + tarjeta Tú** con badge de rol. Para esto se enriquecieron `/account/me` y `/account/bridge` con `workspace_name` (JOIN con `workspaces`), y `SessionUser` en `@gestionvpn/contracts` añade `workspace_name?: string`. MEMBER ve solo la tab "Usuarios" (sin switch — "Usuarios VPN" es de moderador).
 >   2. **Tabla "Usuarios VPN" con columna Email + column picker**. `/api/wireguard/peers` ahora hace LEFT JOIN con `member_wireguard` y `user_mgmt_ips` (por `public_key` y por `mgmt_ip`) para anexar el email del owner del peer; `WgPeer.email?: string` añadido al tipo. La tabla reescrita ofrece 7 columnas (Estado/Usuario fijas, Email/IP/Protocolo/Clave pública/Último acceso toggleables) con dropdown "Columnas" persistido en `localStorage` bajo `vpn_users_visible_cols`. Búsqueda extendida a email; sort por email; celdas Email/IP/PubKey con copy-on-click vía componente `<CopyableCell>` reutilizable.
@@ -38,10 +41,10 @@
 > - **Bot Telegram `/tuneles` y `/activar` no veían las asignaciones del MEMBER (§36)** — El MEMBER recibía "No tienes túneles asignados" pese a que el panel HTTP sí los listaba. Causa raíz: mismatch entre clave usada para guardar y clave usada para leer. `AssignTunnelsModal` envía `nombre_vrf || ppp_user` como `tunnel_id` (casi siempre el VRF tipo `VRF-ND4-TORREVIC`). El HTTP `routes/nodes/_shared.js:80` filtraba bien con `ids.has(n.nombre_vrf) || ids.has(n.ppp_user)`, pero `lib/telegramBot.js:fetchUserTunnels` filtraba solo por `ppp_user IN(...)`. Fix: match dual `WHERE (nombre_vrf IN (...) OR ppp_user IN (...))` + test de regresión que asigna `'VRF-HOUSENET'` y verifica que matchea al nodo con `ppp_user: 'housenet'`.
 >
 > ### ✅ Tests
-> - **142 backend** (14 archivos) + **36 frontend** (5 archivos) = **178 tests verdes**. Tras §36 hay +1 test de regresión en `telegramBot.test.js` (asignación guardada como nombre_vrf, no ppp_user) que sube el conteo backend a 142. El frontend bajó de 37 a 36 en §34 al consolidar 2 tests de `users` como módulo navegable en 1 cuádruple.
+> - **142 backend** (14 archivos) + **36 frontend** (5 archivos) = **178 tests verdes**. La auditoría §37-§38 de Escanear NO añade tests nuevos (las mejoras son refactor/UX sin lógica de negocio); el conteo se mantiene desde §36.
 >
 > ### 📚 Secciones de referencia
-> §17–25: REFACTOR_PLAN ejecutado. §26 notificaciones. §27 bot Telegram. §28 ping/trace. §29 export. §30 dashboard. §31 monitoreo. §32 iter2 multi-usuario. §33 UX MEMBER endurecida. §34 Workspace unificado + peers WG mejorados. §35 Alias humano + bloqueo Usuario. §36 Fix bot — match dual VRF/PPP.
+> §17–25: REFACTOR_PLAN ejecutado. §26 notificaciones. §27 bot Telegram. §28 ping/trace. §29 export. §30 dashboard. §31 monitoreo. §32 iter2 multi-usuario. §33 UX MEMBER endurecida. §34 Workspace unificado + peers WG mejorados. §35 Alias humano + bloqueo Usuario. §36 Fix bot — match dual VRF/PPP. §37 Escanear — perf + robustez. §38 Escanear — UX + features.
 >
 > Sesión 2026-06-07 PM: Ajustes del moderador (perfil + workspace + import/export JSON) + Recuperar contraseña + sync MikroTik al deshabilitar + invitaciones por email + .conf WG server-side.
 > Sesión 2026-06-07 AM: multi-usuario con aislamiento por sesión (mangle por-IP), parche `!empty` node-routeros, auditoría (Semgrep+security-review+code-review) y fixes C1–C7.
@@ -66,7 +69,7 @@
 6. **Pase UX P1–P6** + optimización visual de la vista **Escanear**.
 7. **🆕 Multi-usuario con aislamiento por sesión** (sesión 2026-06-07) — ver §7.
 
-**Estado de salud (2026-06-12 madrugada):** `tsc 0` · `node --check ✓` · **178 tests verdes** (142 backend + 36 frontend). El backend sumó +1 con el test de regresión §36 del bot Telegram (asignación por nombre_vrf vs ppp_user). El frontend cayó de 37 a 36 en §34 al consolidar los tests de `users` como módulo navegable. 6 jobs concurrentes en producción (`startMonitor` MySQL, `expirationJob`, `telegramBot`, `dashboardMetrics` sampler, `monitoringJob`). 0 vulnerabilidades npm en prod, 0 findings `semgrep`. Bundle inicial frontend 248 KB / 78 KB gzip; `TeamModule` 119 KB / 30 KB gzip (−19 KB tras §35 al limpiar el rename de Usuario deprecado); `UserManagementPanel` separado en chunk lazy de 25 KB / 7 KB gzip (+7 KB por columna Alias). MySQL: tabla `peer_aliases` creada automáticamente en `initDb()` desde `schema_ops.sql` — verificada con INSERT/READ/DELETE in vivo. Sin pendientes del REFACTOR_PLAN; backlog quick-wins (Q1-Q5) y 2 mid-size (M1, M5) entregados. **Último commit en `dev`: `b441cbc` — iter2 multi-usuario (§32);** trabajo de §33, §34, §35 y §36 aún sin commitear.
+**Estado de salud (2026-06-12 mañana):** `tsc 0` (`--noEmit` + build estricto) · `node --check ✓` · **178 tests verdes** (142 backend + 36 frontend) · 6 commits limpios en `dev` desde el último HANDOFF. 6 jobs concurrentes en producción (`startMonitor` MySQL, `expirationJob`, `telegramBot`, `dashboardMetrics` sampler, `monitoringJob`). 0 vulnerabilidades npm en prod, 0 findings `semgrep`. Bundles relevantes: **inicial 248 KB / 78 KB gzip** (sin cambios); `TeamModule` 119 KB / 30 KB gzip; `UserManagementPanel` lazy 25 KB / 7 KB gzip; **`NetworkDevicesModule` 95 KB / 23 KB gzip** (+9 KB acumulado tras §37-§38: `exportCsv.ts` + bulk save + chips + filtros + zebra). MySQL: tabla `peer_aliases` creada automáticamente en `initDb()` desde `schema_ops.sql`. Sin pendientes del REFACTOR_PLAN; backlog quick-wins (Q1-Q5) y 2 mid-size (M1, M5) entregados. **Últimos commits en `dev`:** `f1dd8cb` (export CSV + bulk save + zebra T4) · `a3e1caf` (filtro rol + footer + chips + tooltip header) · `1fc502b` (cancel reader on cambio subred + lazy init sessionStorage + schema versionado) · `09b7c5c` (deferred search + reduced motion + touch click-away + cache estimateIpCount) · `4e872f5` (race + listeners + CSS var + Map + SSH UX + sort + widths persist) · `02458f4` (§33-§36 trabajo previo).
 
 ---
 
@@ -126,7 +129,7 @@
 | 🟡 Limpieza | Quitar `adminIP` hardcodeado (`useNodeManagement.ts`, ya no se usa) · warning MySQL2 `keepAliveInitialDelayMs` (mitigado en F11) · escaneo atado al `mgmt_ip` del solicitante. |
 | 🟡 Mejora | **Fase 5 (opcional):** aislamiento de firewall por-IP + acotar regla "Admin MGMT libre" (defensa en profundidad; hoy el ruteo ya aísla). Dockerfile `USER` no-root (Semgrep S1). |
 | 🟡 Próximo backlog | **M2** API pública con tokens scoped · **M3** Webhooks salientes · **M4** Speed test desde antena (iperf3 SSH) · **L1** Reportes SLA computados desde `tunnel_session_logs` + `monitoring_state` · **L2** Diagnóstico con LLM · **L3** PWA móvil instalable · **L4** Predicción de degradación con tendencia de `signal_history`. |
-| 🟢 Resuelto | O2 repo privado · O5 MySQL estable · UX P6 · **multi-usuario activación (verificado)** · parche `!empty` · fixes C1–C7 · **crash `POST /api/wireguard/peers` (ver §13.6)** · **V1 `register-my-ip` ownership por rol** · **Q1 Notificaciones (§26)** · **M1 Bot Telegram (§27)** · **Q3 Diagnóstico ping/trace (§28)** · **Q4 Export auditoría CSV/JSON (§29)** · **Q2 Dashboard métricas (§30)** · **M5 Monitoreo proactivo (§31)** · **Job de expiración batch** · **iter2 bot directo + asignar túneles UI + fix `user_mgmt_ips` auto (§32)** · **UX MEMBER endurecida — solo "Acceder" + Ajustes con Telegram (§33)** · **Workspace unificado + Email en peers + multi-asignar túneles + QR en aceptar invitación (§34)** · **Alias humano + bloqueo edición Usuario (§35)** · **Fix bot Telegram: match dual VRF/PPP en asignaciones del MEMBER (§36)**. |
+| 🟢 Resuelto | O2 repo privado · O5 MySQL estable · UX P6 · **multi-usuario activación (verificado)** · parche `!empty` · fixes C1–C7 · **crash `POST /api/wireguard/peers` (ver §13.6)** · **V1 `register-my-ip` ownership por rol** · **Q1 Notificaciones (§26)** · **M1 Bot Telegram (§27)** · **Q3 Diagnóstico ping/trace (§28)** · **Q4 Export auditoría CSV/JSON (§29)** · **Q2 Dashboard métricas (§30)** · **M5 Monitoreo proactivo (§31)** · **Job de expiración batch** · **iter2 bot directo + asignar túneles UI + fix `user_mgmt_ips` auto (§32)** · **UX MEMBER endurecida — solo "Acceder" + Ajustes con Telegram (§33)** · **Workspace unificado + Email en peers + multi-asignar túneles + QR en aceptar invitación (§34)** · **Alias humano + bloqueo edición Usuario (§35)** · **Fix bot Telegram: match dual VRF/PPP en asignaciones del MEMBER (§36)** · **Auditoría Escanear: 12 fixes de perf+robustez (§37) + 9 mejoras UX+features (§38)**. |
 | 🟢 Nota | Config MikroTik `v2.rsc` SIN mangle global (baseline limpio multi-usuario). Peer `peer27` de prueba con public-key placeholder `abcdEFGH...` (borrable). |
 
 **Scripts:**
@@ -2646,6 +2649,253 @@ El test simula el caso exacto del bug: asignación guardada como `VRF-HOUSENET` 
 
 - **Auditar otros lectores de `tunnel_assignments`.** Hay otros usos en `routes/core/_shared.js:65` y `routes/nodes/_shared.js:79`. El segundo ya hace el match dual; el primero hay que revisarlo (puede tener el mismo bug latente).
 - **Normalización de `tunnel_id`.** Para una sesión futura: definir si `nombre_vrf` o `ppp_user` es la clave canónica, migrar `tunnel_assignments` para que todos los registros usen la misma, y simplificar los filtros a `IN (...)` único.
+
+---
+
+## 37) 🔬 Auditoría Escanear — performance + race + robustez
+
+Sesión 2026-06-12 mañana. Tras pedido del usuario "analiza mi vista escanear: errores, optimizaciones, lógica, UX". Auditoría completa de `NetworkDevicesModule` aplicando dos lentes (skills):
+
+- **`react-ui-expert`** — portales, click-away, accesibilidad, scroll listeners.
+- **`vercel-react-best-practices`** — 70 reglas de performance categorizadas (re-render, bundle, event listeners, JS perf, etc).
+
+Salió un reporte con 13 hallazgos priorizados. Esta sección cubre los **12 técnicos** (perf + race + robustez); §38 cubre los **9 UX + features**. Todo aplicado en 3 commits.
+
+### Commits
+
+| Commit | Cambios |
+|---|---|
+| `4e872f5` | B1 race · P1 listeners on-demand · P2 CSS variable · P3 Map lookup · U3 SSH UX · T2 default sort · F1 widths persist |
+| `09b7c5c` | U5 deferred search · U7 motion-safe · B5 touch click-away · P6 cache estimateIpCount (+ fix paralelo en UsersTable touch) |
+| `1fc502b` | B2 cancel reader on cambio subred · P4 lazy init sessionStorage · P5 schema versionado (+ fix replace_all bug introducido en `09b7c5c`) |
+
+### B1 — Race en `useDeviceLibrary.handleAddDevice` (functional setState)
+
+**Antes:** `setSavedDevices(current)` donde `current` cerró sobre `savedDevices` capturado del closure. Si llegaban 2 saves cercanos (manual + enriquecimiento SSH en background), el segundo pisaba al primero.
+
+**Fix:** `setSavedDevices(prev => ...)` con el merge dentro del updater. `merged` y `wasExisting` se exportan vía variables locales del scope que el updater cierra (idempotente bajo StrictMode).
+
+### P1 — Listeners `mousemove`/`mouseup` on-demand (`client-event-listeners`)
+
+[useColumnPrefs.ts](vpn-manager/src/components/Devices/NetworkDevicesModule/hooks/useColumnPrefs.ts) registraba ambos en `window` toda la vida del componente. Cada movimiento del mouse pagaba dispatch (early return barato pero medible). Ahora se registran solo entre el `mousedown` del grip y el `mouseup`, con cleanup defensivo en unmount si el componente se desmonta a mitad de un drag.
+
+### P2 — `gridTemplate` como CSS variable `--cols-tpl` (`rerender-defer-reads`)
+
+**Antes:** `gridTemplate` pasaba como prop a `DeviceTable` y a cada `DeviceTableRow`. El comparador del `memo` incluía `prev.gridTemplate === next.gridTemplate`, así que durante un drag de resize **todas las filas re-renderizaban en cada movimiento del mouse**. Con 50+ filas se notaba.
+
+**Fix:** el contenedor padre setea la variable CSS `--cols-tpl: <gridTemplate>` y header + filas usan `grid-template-columns: var(--cols-tpl)`. Solo el contenedor re-renderiza durante el resize; las filas (memo estable) quedan inmunes. Bonus: borró `gridTemplate` del comparador y `colWidths` de las props (era prop muerta).
+
+### P3 — `savedById: Map<string, SavedDevice>` (`js-set-map-lookups`)
+
+**Antes:** [DeviceTable.tsx](vpn-manager/src/components/Devices/NetworkDevicesModule/components/DeviceTable.tsx) hacía `savedDevices.find(s => s.id === devId)` por cada fila. O(n × m) con 30 filas × 100 saved = 3000 comparaciones por render.
+
+**Fix:** `useMemo(() => new Map(savedDevices.map(d => [d.id, d])), [savedDevices])` dentro de `DeviceTable`. Lookup O(1).
+
+### P4 — Lazy init de `useState` para hidratar `sessionStorage` (`rerender-derived-state-no-effect`)
+
+**Antes:** un `useEffect(() => { /* read sessionStorage; 5× setState */ }, [])` con `/* eslint-disable react-hooks/set-state-in-effect */` suprimido. Disparaba 1 render extra al montar.
+
+**Fix:** función `loadCachedScan()` síncrona + `useState(loadCachedScan)` con lazy initializer. Cada `useState(cached?.field ?? default)`. Sin effect, sin advertencias suprimidas.
+
+### P5 — Schema versionado en `sessionStorage` (`client-localstorage-schema`)
+
+**Antes:** se guardaba `{ results, allIPs, count, debug, sshStatus }` directo sin versión. Si `ScannedDevice` cambiaba de shape, un `JSON.parse` exitoso de payload viejo inyectaba datos malformados.
+
+**Fix:** constante `SCAN_CACHE_VERSION = 1` exportada del módulo + interface `CachedScanPayload` con campo `v`. `loadCachedScan` descarta cuando `parsed.v !== SCAN_CACHE_VERSION`. Tipos defensivos por campo (verifica `Array.isArray`, `typeof === 'number'`, etc) + backfill de `sshStatus` derivado de `dev.cachedStats` si vino vacío en payloads previos.
+
+### P6 — Cachear `estimateIpCount` con `useMemo`
+
+[ScanProgressBanner.tsx](vpn-manager/src/components/Devices/NetworkDevicesModule/components/ScanProgressBanner.tsx) llamaba `estimateIpCount(effectiveLan)` 4 veces por render (denominador de progreso + label + 2 veces en barra/header). Ahora `const totalIps = useMemo(() => estimateIpCount(effectiveLan), [effectiveLan])` arriba del componente y se reusa.
+
+### U5 — `useDeferredValue` en búsqueda (`rerender-use-deferred-value`)
+
+[useDeviceList.ts](vpn-manager/src/components/Devices/NetworkDevicesModule/hooks/useDeviceList.ts):
+
+```ts
+const deferredSearch = useDeferredValue(searchQuery);
+// El filter consume `deferredSearch` (no `searchQuery`).
+```
+
+React puede bajar la prioridad del recálculo del filter cuando hay typing rápido, manteniendo el input responsivo.
+
+### U7 — `prefers-reduced-motion` en animaciones infinitas
+
+[ScanProgressBanner.tsx](vpn-manager/src/components/Devices/NetworkDevicesModule/components/ScanProgressBanner.tsx) + [DeviceTableRow.tsx](vpn-manager/src/components/Devices/NetworkDevicesModule/components/DeviceTableRow.tsx): cambio mínimo `animate-spin` → `motion-safe:animate-spin`, `animate-in fade-in slide-in-from-top-2` → `motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-2`. CLAUDE.md lo exigía; ahora se cumple en este módulo.
+
+### B5 — Click-away con `touchstart` + listeners on-demand
+
+[ColumnPicker.tsx](vpn-manager/src/components/Devices/NetworkDevicesModule/components/ColumnPicker.tsx) (y bonus en [UsersTable.tsx](vpn-manager/src/components/Users/UserManagementPanel/components/UsersTable.tsx)) escuchaban solo `mousedown`. En móvil/tablet el dropdown no se cerraba al tocar fuera. Fix:
+- Añadir `touchstart` con `{ passive: true }`.
+- Los listeners ahora viven solo cuando el dropdown está abierto (en lugar de toda la vida del componente).
+
+### B2 — Cancelar reader si cambia subred mientras hay scan in-flight
+
+Antes el reset solo se disparaba en cambio de `activeNodeVrf`. Si el usuario cambiaba la subred (`effectiveLan`) durante el scan, el reader del SSE viejo seguía emitiendo chunks que pisaban `scanResults` con datos de la LAN vieja.
+
+**Fix:** nuevo effect que detecta cambio de `effectiveLan`, cancela el reader vigente y resetea `scanState` al estado `idle`. NO resetea `scanResults` (a diferencia del cambio de VRF) — el usuario puede querer comparar resultados entre subredes manualmente.
+
+### Reglas operativas reforzadas
+
+- **`gridTemplate` y otras props que cambien durante interacciones continuas (drag/resize) deben pasar por CSS variable**, no como prop. Las filas memoizadas son baratas; las props que invalidan su `memo` durante un drag son caras.
+- **Functional setState (`setX(prev => ...)`) es la regla por defecto cuando hay flujos async**. Cierra clases enteras de races con cero costo y resulta más fácil de leer.
+- **Sessions/local storage = siempre versionar el payload**. Bumpear `*_CACHE_VERSION` es el flag para invalidar caches viejos sin migración explícita.
+- **Listeners globales (`mousemove`, `touchstart`, scroll) deben ser on-demand cuando el caso lo permite**. El patrón es: `useEffect(() => { if (!open) return; document.add...(); return () => ...; }, [open])` en lugar de montar siempre.
+
+---
+
+## 38) ✨ Auditoría Escanear — UX + features
+
+Continuación de §37. Aplica los 9 hallazgos UX y de funcionalidad de la auditoría, ya con código que el usuario percibe directamente.
+
+### Commits
+
+| Commit | Cambios |
+|---|---|
+| `a3e1caf` | F5 filtro rol · U4 footer permanente + chips · T1 tooltip header truncado |
+| `f1dd8cb` | F2 exportar CSV · F3 bulk save · T4 zebra simplificado |
+
+### U3 — SSH "failed" distinguido de "no probado" (en `4e872f5`)
+
+**Antes:** el fail mostraba `<X />` slate-300 sobre fondo slate-100. Visualmente **idéntico** a "no probado" (div vacío). El usuario no sabía si el SSH se intentó o no.
+
+**Ahora 4 estados visualmente distintos:**
+- **Pending** → spinner indigo en card bordeada (antes era spinner suelto sin contexto).
+- **Success** → check emerald sólido (igual que antes).
+- **Failed** → X **rose** en card bordeada rose (nuevo color).
+- **Undefined** → card con `border-dashed` slate (nuevo placeholder).
+
+Bonus a11y: cada estado lleva `role="status"` y `aria-label` para screen readers.
+
+### T2 — Default sort por señal desc (en `4e872f5`)
+
+[useDeviceList.ts](vpn-manager/src/components/Devices/NetworkDevicesModule/hooks/useDeviceList.ts):
+
+```ts
+const DEFAULT_SORT: { key: string; dir: SortDir } = { key: 'signal', dir: 'desc' };
+const [sortConfig, setSortConfig] = useState(DEFAULT_SORT);
+```
+
+Antes era `null` y los items aparecían en orden de descubrimiento (semi-aleatorio según speed del SSH probe). Ahora cuando la tabla termina de auth, los dispositivos con mejor señal aparecen arriba; los sin stats van al fondo por el sentinel `?? -999`. El usuario sigue pudiendo hacer click en cualquier header para sobreescribir el orden.
+
+### F1 — `colWidths` persistido en `localStorage` (en `4e872f5`)
+
+Nueva key `COL_WIDTHS_STORAGE_KEY = 'vpn_diag_col_widths_v1'`. Función `loadColWidths()` sanity-checkea (solo entries `number` entre 50 y 1000 px). `useEffect([colWidths])` persiste con `removeItem` si queda vacío para no acumular basura.
+
+### U4 — Footer permanente + chips de filtros activos (en `a3e1caf`)
+
+**Antes:** [DeviceFilters.tsx](vpn-manager/src/components/Devices/NetworkDevicesModule/components/DeviceFilters.tsx) mostraba "X de Y" SOLO cuando había filtro activo. Sin filtro no había contador visible.
+
+**Ahora:** layout en 2 líneas:
+1. **Línea 1:** search + select rol + select SSID.
+2. **Línea 2:** chips de filtros activos (uno por filtro, ej. `"VRF-X"` con icono Radio, click para limpiar) + spacer + contador en formato `<X> / <Y> dispositivos` cuando hay filtro, o `<Y> dispositivos` cuando no.
+
+Componente local `<FilterChip>` reutilizable. Iconos por tipo de filtro (Radio para AP, Cpu para CPE, HelpCircle para desconocido).
+
+### F5 — Filtro por rol (AP/CPE/Desconocido) (en `a3e1caf`)
+
+Nuevo tipo exportado `export type RoleFilter = '' | 'ap' | 'sta' | 'unknown'` y helper:
+
+```ts
+function normalizeRole(dev: ScannedDevice): 'ap' | 'sta' | 'unknown' {
+  const raw = dev.cachedStats?.mode || dev.role;
+  if (raw === 'ap' || raw === 'master') return 'ap';
+  if (raw === 'sta') return 'sta';
+  return 'unknown';
+}
+```
+
+`'master'` (modo viejo de algunos firmwares Ubiquiti) se mapea a `'ap'` para no fragmentar la lista. El `<select>` ofrece "Todos los roles / Solo APs / Solo CPEs / Solo desconocidos". El filtro se compone con search + SSID + sort.
+
+### T1 — `title` en headers truncados (en `a3e1caf`)
+
+[DeviceTable.tsx](vpn-manager/src/components/Devices/NetworkDevicesModule/components/DeviceTable.tsx): cuando el grid es denso, los `<th>` con `min-w-0 overflow-hidden` truncan a "CPU", "PISO I" etc. Ahora cada `<th>` lleva `title={col.label}` con el label completo para el tooltip nativo.
+
+### F2 — Exportar CSV (en `f1dd8cb`)
+
+Nuevo archivo [utils/exportCsv.ts](vpn-manager/src/components/Devices/NetworkDevicesModule/utils/exportCsv.ts) con:
+
+- **26 columnas** del scan: IP, MAC, Rol, Nombre, Modelo, Firmware, SSID, AP padre, Frecuencia, Canal, Ancho canal, Señal, Piso ruido, CCQ, TX/RX rate, Distancia, TX power, CPU%, RAM%, Uptime, AP MAC remoto, Seguridad, Modo red, SSH usuario, Guardado.
+- **BOM UTF-8** inicial via `String.fromCharCode(0xFEFF)` (literal en fuente disparaba `no-irregular-whitespace`).
+- **Escape RFC 4180**: celdas con coma, comilla o newline se rodean de `"` y las comillas internas se duplican `""`.
+- Nombre del archivo: `scan-<nombre_nodo>-YYYY-MM-DD.csv`. Caracteres no `[a-z0-9_-]` del nodo se sanitizan con `_`.
+
+Botón "Exportar" gris (outline) al lado del column picker. Exporta `sortedRows` (lo que el usuario ve tras filtros y sort, NO el dataset completo sin filtrar).
+
+### F3 — Bulk save de dispositivos con SSH OK (en `f1dd8cb`)
+
+Memo en el orquestador:
+
+```ts
+const bulkSaveCandidates = useMemo(() =>
+  list.sortedRows.filter(r =>
+    !r.isSaved && scan.sshStatus[r.dev.ip] === 'success' && !!r.dev.cachedStats
+  ),
+  [list.sortedRows, scan.sshStatus]
+);
+```
+
+Botón **"Guardar N"** en verde sólido (única acción primaria del header) que aparece **solo** cuando `bulkSaveCandidates.length > 0 && selectedNode`. Click:
+1. Si `length > 5`, `window.confirm(...)` con el conteo y el nombre del nodo.
+2. `Promise.allSettled(candidates.map(r => handleDirectSave(r.dev, selectedNode)))`.
+3. Cuenta `failed = results.filter(r => r.status === 'rejected').length` y muestra toast: "Guardados N" o "Guardados X · Y fallaron".
+
+Spinner mientras `bulkSaving=true`.
+
+### T4 — Zebra simplificado + indicador lateral (en `f1dd8cb`)
+
+**Antes:** [DeviceTableRow.tsx](vpn-manager/src/components/Devices/NetworkDevicesModule/components/DeviceTableRow.tsx) mezclaba 3 paletas de fondo:
+- `bg-indigo-50/20 ↔ bg-indigo-50/40` para guardados (zebra par/impar).
+- `bg-emerald-50/25 ↔ bg-emerald-50/50` para con stats.
+- `bg-white ↔ bg-slate-50/60` para neutros.
+
+Con 50+ filas en scroll el ojo perdía la pista (3 colores rotando × 2 paridades = 6 fondos).
+
+**Ahora:**
+- Fondo único zebra `bg-white dark:bg-slate-900` / `bg-slate-50/60 dark:bg-slate-800/40` (sin estado, solo paridad).
+- `border-l-2` indicador lateral:
+  - `border-l-indigo-400` para guardado
+  - `border-l-emerald-400` para has stats sin guardar
+  - `border-l-transparent` para neutro
+- `hover-bg` matiza según el estado lateral (`hover:bg-indigo-50/40` si guardado, etc).
+
+Resultado: zebra estable que rastrea filas + indicador semántico claro a la izquierda.
+
+### Métricas pre/post §37-§38
+
+| Métrica | Pre | Post |
+|---------|-----|------|
+| `NetworkDevicesModule` chunk | 86 KB raw / 20 KB gzip | **95 KB raw / 23 KB gzip** (+9 KB) |
+| Filtros disponibles | Search + SSID | **Search + SSID + Rol** + chips de affordance |
+| Botones de header de tabla | ColumnPicker | **Exportar + Guardar N (condicional) + ColumnPicker** |
+| Estados SSH visualmente distintos | 2 (success / failed-igual-a-noProbado) | **4** (pending / success / failed / undef) |
+| Sort default | none (orden de descubrimiento) | **señal desc** |
+| Anchos de columna persistidos | ❌ | ✅ `localStorage` |
+| Cache scan en `sessionStorage` | Sin versionado | **versionado v=1** |
+| Cancelación reader on cambio subred | ❌ (race latente) | ✅ |
+| Listeners mousemove vivos | Toda la vida del componente | **Solo durante drag** |
+| Lookup saved en tabla | O(n × m) | **O(1) via Map** |
+| Re-renders de filas durante resize | Todas las visibles | **Cero** (CSS variable) |
+| Race en handleAddDevice | Stale closure | **Cerrada** (functional setState) |
+
+### Reglas operativas reforzadas (post-§38)
+
+- **Cualquier botón nuevo en el header de la tabla compite con ColumnPicker por espacio.** El orden actual es: `Guardar N` (verde sólido, condicional) → `Exportar` (outline) → `ColumnPicker` (outline). Si llega un 4to, mover a un kebab dedicado.
+- **Chips de filtros activos son la affordance principal de "limpiar".** El usuario debería poder ver de un vistazo qué filtros tiene puestos sin abrir menus.
+- **El BOM UTF-8 NUNCA literal en código fuente** — usar `String.fromCharCode(0xFEFF)`. ESLint `no-irregular-whitespace` bloquea el literal y con razón (caracteres invisibles en código son malos).
+- **Bulk operations = `Promise.allSettled` + feedback parcial.** Si Promise.all aborta a la primera, el usuario pierde contexto sobre qué se guardó.
+- **`role="status"` y `aria-label` en cada chip de estado SSH** son requeridos por CLAUDE.md y el lente react-ui-expert.
+
+### Pendiente / mejoras futuras (auditoría original — no aplicadas)
+
+Los siguientes hallazgos están documentados pero **no se implementaron en esta sesión** porque son cambios visuales más grandes que ameritan revisión con captura previa, o features mayores:
+
+- **U1** Acción sticky-right + densidad toggle.
+- **U2** Kebab para acciones secundarias.
+- **T3** Indicador de fila expandida en scroll.
+- **T5** Modo lectura: ocultar Nombre con muchas columnas.
+- **F4** Comparar con scan anterior (diff).
+
+Ver explicación detallada de cada uno al usuario en el chat de la sesión 2026-06-12 mañana.
 
 ---
 
