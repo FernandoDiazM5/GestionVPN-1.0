@@ -7,13 +7,21 @@ export function ColumnPicker({ visibleCols, onChange }: ColumnPickerProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
+  // Cierre al click/touch fuera del dropdown. Solo escucha eventos si el
+  // dropdown está abierto — evita event dispatch innecesario cuando está
+  // cerrado (que es 99% del tiempo). Incluye touchstart para móvil/tablet.
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
+    if (!open) return;
+    const handler = (e: MouseEvent | TouchEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
     document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
+    document.addEventListener('touchstart', handler, { passive: true });
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('touchstart', handler);
+    };
+  }, [open]);
 
   const visibleSet = new Set(visibleCols);
   const hiddenCols = COLUMN_DEFS.filter(c => !visibleSet.has(c.key));

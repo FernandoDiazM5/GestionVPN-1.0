@@ -78,7 +78,7 @@ function DeviceTableRowImpl({
           {sshStatus === 'pending' && (
             <div role="status" aria-label="Probando SSH" title="Probando SSH..."
               className="w-5 h-5 rounded-md bg-indigo-50 flex items-center justify-center border border-indigo-200 dark:bg-indigo-500/10 dark:border-indigo-500/30">
-              <Loader2 className="w-3 h-3 text-indigo-500 animate-spin" />
+              <Loader2 className="w-3 h-3 text-indigo-500 motion-safe:animate-spin" />
             </div>
           )}
           {sshStatus === 'success' && (

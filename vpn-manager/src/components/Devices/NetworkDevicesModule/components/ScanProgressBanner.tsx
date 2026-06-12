@@ -6,7 +6,7 @@
 //  y el caso "se escanearon X IPs pero ninguna era Ubiquiti".
 // ============================================================
 
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { CheckCircle2, Loader2, Info, AlertCircle } from 'lucide-react';
 import type { ScanState } from '../types';
 import { estimateIpCount } from '../constants';
@@ -26,17 +26,21 @@ function ScanProgressBannerImpl({
   scannedCount, scanResultsCount,
 }: ScanProgressBannerProps) {
   const isScanning = scanState.phase === 'discovering' || scanState.phase === 'authenticating';
+  // Antes se llamaba 4 veces por render (denominador de progreso + label + 2
+  // veces en barra/header). El CIDR es estable mientras dure un escaneo,
+  // así que un useMemo con `effectiveLan` como dep es suficiente.
+  const totalIps = useMemo(() => totalIps, [effectiveLan]);
 
   return (
     <>
       {scanState.phase !== 'idle' && (
-        <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3 animate-in fade-in slide-in-from-top-2">
+        <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-2">
           <div className="flex justify-between items-center text-[11px] font-bold text-slate-600 uppercase tracking-widest">
             <span className="flex items-center space-x-2">
               {scanState.phase === 'done' ? (
                 <CheckCircle2 className="w-4 h-4 text-emerald-500" />
               ) : (
-                <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
+                <Loader2 className="w-4 h-4 motion-safe:animate-spin text-indigo-500" />
               )}
               <span>
                 {scanState.phase === 'discovering' ? 'Buscando dispositivos en la red...' :
@@ -46,7 +50,7 @@ function ScanProgressBannerImpl({
             </span>
             {scanState.phase === 'discovering' && (
               <span className="text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-md font-mono">
-                {discoveryProgress} / {estimateIpCount(effectiveLan)} IPs
+                {discoveryProgress} / {totalIps} IPs
               </span>
             )}
             {scanState.phase === 'authenticating' && (
@@ -60,7 +64,7 @@ function ScanProgressBannerImpl({
             {scanState.phase === 'discovering' && (
               <div
                 className="h-full transition-all duration-150 ease-out bg-indigo-500"
-                style={{ width: `${(discoveryProgress / Math.max(1, estimateIpCount(effectiveLan))) * 100}%` }}
+                style={{ width: `${(discoveryProgress / Math.max(1, totalIps)) * 100}%` }}
               />
             )}
             {scanState.phase === 'authenticating' && (

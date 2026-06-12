@@ -112,13 +112,17 @@ export default function UsersTable({
   // Cierra el dropdown al click fuera
   useEffect(() => {
     if (!showColPicker) return;
-    const onClick = (e: MouseEvent) => {
+    const onClick = (e: MouseEvent | TouchEvent) => {
       if (colPickerRef.current && !colPickerRef.current.contains(e.target as Node)) {
         setShowColPicker(false);
       }
     };
     document.addEventListener('mousedown', onClick);
-    return () => document.removeEventListener('mousedown', onClick);
+    document.addEventListener('touchstart', onClick, { passive: true });
+    return () => {
+      document.removeEventListener('mousedown', onClick);
+      document.removeEventListener('touchstart', onClick);
+    };
   }, [showColPicker]);
 
   const toggleCol = (id: ColId) => {

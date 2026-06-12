@@ -6,7 +6,7 @@
 //  query y SSID, y ordenados por la columna elegida.
 // ============================================================
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useDeferredValue } from 'react';
 import type { ScannedDevice } from '../../../../types/devices';
 
 type SortDir = 'asc' | 'desc';
@@ -53,9 +53,14 @@ export function useDeviceList({ scanResults, savedIds }: UseDeviceListInput) {
     [scanRows]
   );
 
-  // Filtro por search query (IP/nombre/SSID/MAC) + SSID seleccionado
+  // Filtro por search query (IP/nombre/SSID/MAC) + SSID seleccionado.
+  // useDeferredValue separa el typing del input del recálculo del filter:
+  // React puede mantener el input fluido mientras el filtrado de miles de
+  // filas corre en una transición de baja prioridad. Patrón vercel
+  // rerender-use-deferred-value.
+  const deferredSearch = useDeferredValue(searchQuery);
   const filteredRows = useMemo(() => {
-    const q = searchQuery.toLowerCase().trim();
+    const q = deferredSearch.toLowerCase().trim();
     const ssidFilter = filterSSID.toLowerCase();
     return scanRows.filter(({ dev }) => {
       const ssid = (dev.cachedStats?.essid ?? dev.essid ?? '').toLowerCase();
@@ -66,7 +71,7 @@ export function useDeviceList({ scanResults, savedIds }: UseDeviceListInput) {
       const matchesSSID = !ssidFilter || ssid === ssidFilter;
       return matchesSearch && matchesSSID;
     });
-  }, [scanRows, searchQuery, filterSSID]);
+  }, [scanRows, deferredSearch, filterSSID]);
 
   // Ordenamiento por la columna elegida (sin clonar si no hay sort)
   const sortedRows = useMemo(() => {
