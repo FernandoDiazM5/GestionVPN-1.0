@@ -18,7 +18,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
-  CheckCircle2, Cpu, ShieldCheck, ShieldOff, RefreshCw, Radio,
+  CheckCircle2, Cpu, ShieldCheck, ShieldOff, RefreshCw, Radio, Download, Save, Loader2,
 } from 'lucide-react';
 
 import { useVpn } from '../../../context';
@@ -30,6 +30,7 @@ import { AddDeviceModal } from './components/AddDeviceModal';
 import { DeviceCardModal } from './components/DeviceCardModal';
 import { SshDataModal } from './components/SshDataModal';
 import { ColumnPicker } from './components/ColumnPicker';
+import { exportScanToCsv } from './utils/exportCsv';
 import { ScanControls } from './components/ScanControls';
 import { ScanProgressBanner } from './components/ScanProgressBanner';
 import { DeviceFilters } from './components/DeviceFilters';
@@ -170,6 +171,40 @@ export default function NetworkDevicesModule() {
       return next;
     });
   }, []);
+
+  // Candidatos para "Guardar todos con stats": filas visibles que tienen
+  // SSH OK y aún no están guardadas. Se calcula sobre `sortedRows` (lo
+  // visible tras filtros) para que el botón refleje lo que el usuario ve.
+  const bulkSaveCandidates = useMemo(() => {
+    return list.sortedRows.filter(r =>
+      !r.isSaved && scan.sshStatus[r.dev.ip] === 'success' && !!r.dev.cachedStats
+    );
+  }, [list.sortedRows, scan.sshStatus]);
+
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const handleBulkSave = useCallback(async () => {
+    if (!selectedNode || bulkSaveCandidates.length === 0 || bulkSaving) return;
+    if (bulkSaveCandidates.length > 5) {
+      const ok = window.confirm(
+        `Vas a guardar ${bulkSaveCandidates.length} dispositivos en la biblioteca local del nodo ${selectedNode.nombre_nodo}. ¿Continuar?`
+      );
+      if (!ok) return;
+    }
+    setBulkSaving(true);
+    // Promise.allSettled — si uno falla, los demás siguen. handleDirectSave
+    // es idempotente, podríamos relanzar si quisiéramos retry. Por ahora
+    // solo contamos ok/fail.
+    const results = await Promise.allSettled(
+      bulkSaveCandidates.map(r => handleDirectSave(r.dev, selectedNode))
+    );
+    const failed = results.filter(r => r.status === 'rejected').length;
+    setBulkSaving(false);
+    if (failed > 0) {
+      showToast(`Guardados ${results.length - failed}. ${failed} fallaron.`);
+    } else {
+      showToast(`Guardados ${results.length} dispositivos`);
+    }
+  }, [selectedNode, bulkSaveCandidates, bulkSaving, handleDirectSave, showToast]);
 
   const handleSyncToSaved = useCallback((dev: ScannedDevice, savedDev: SavedDevice) => {
     const updated: SavedDevice = {
@@ -360,7 +395,34 @@ export default function NetworkDevicesModule() {
                   </>
                 )}
               </p>
-              <ColumnPicker visibleCols={colPrefs.visibleCols} onChange={colPrefs.saveVisibleCols} />
+              <div className="flex items-center gap-1.5">
+                {/* Bulk save — solo aparece si hay candidatos visibles con SSH OK */}
+                {bulkSaveCandidates.length > 0 && selectedNode && (
+                  <button
+                    onClick={handleBulkSave}
+                    disabled={bulkSaving}
+                    title={`Guardar los ${bulkSaveCandidates.length} dispositivos visibles con SSH OK en la biblioteca del nodo`}
+                    aria-label={`Guardar ${bulkSaveCandidates.length} dispositivos con stats`}
+                    className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm shadow-emerald-500/20 transition-all active:scale-[0.97] disabled:opacity-50"
+                  >
+                    {bulkSaving
+                      ? <Loader2 className="w-3.5 h-3.5 motion-safe:animate-spin" />
+                      : <Save className="w-3.5 h-3.5" />}
+                    <span>Guardar {bulkSaveCandidates.length}</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => exportScanToCsv(list.sortedRows, selectedNode?.nombre_nodo)}
+                  disabled={list.sortedRows.length === 0}
+                  title="Exportar la tabla visible (con filtros aplicados) a CSV"
+                  aria-label="Exportar a CSV"
+                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 border border-slate-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-slate-500"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Exportar</span>
+                </button>
+                <ColumnPicker visibleCols={colPrefs.visibleCols} onChange={colPrefs.saveVisibleCols} />
+              </div>
             </div>
 
             <DeviceFilters

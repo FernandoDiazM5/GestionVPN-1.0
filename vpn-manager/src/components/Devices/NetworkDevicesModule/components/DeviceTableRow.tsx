@@ -56,17 +56,29 @@ function DeviceTableRowImpl({
   const displayModel = dev.cachedStats?.deviceModel || dev.model;
   const displayMac = dev.cachedStats?.wlanMac || dev.mac;
 
+  // Zebra simplificado — fondo único blanco/slate, el estado del device se
+  // comunica con un border-l-2 lateral (indigo=guardado, emerald=hasStats,
+  // transparente=neutro). Esto recupera el efecto zebra que rastrea filas en
+  // listas largas (que antes se rompía cuando mezclaban 3 paletas).
+  const stateBorder = isSaved
+    ? 'border-l-2 border-l-indigo-400'
+    : hasStats
+      ? 'border-l-2 border-l-emerald-400'
+      : 'border-l-2 border-l-transparent';
+  const stateBg = rowIdx % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/60 dark:bg-slate-800/40';
+  const hoverBg = isSaved
+    ? 'hover:bg-indigo-50/40 dark:hover:bg-indigo-500/10'
+    : hasStats
+      ? 'hover:bg-emerald-50/40 dark:hover:bg-emerald-500/10'
+      : 'hover:bg-slate-50 dark:hover:bg-slate-800/60';
+
   return (
     <Fragment>
       <div
         style={{ display: 'grid', gridTemplateColumns: 'var(--cols-tpl)' }}
-        className={`items-center border-b transition-colors
-          ${isSaved
-            ? `${rowIdx % 2 === 0 ? 'bg-indigo-50/20' : 'bg-indigo-50/40'} hover:bg-indigo-50/70 border-indigo-100`
-            : hasStats
-              ? `${rowIdx % 2 === 0 ? 'bg-emerald-50/25' : 'bg-emerald-50/50'} hover:bg-emerald-50/70 border-emerald-100`
-              : `${rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'} hover:bg-slate-50/80 border-slate-100`}
-          ${isExpanded ? 'border-b-indigo-200' : ''}`}
+        className={`items-center border-b border-slate-100 dark:border-slate-800 transition-colors
+          ${stateBg} ${hoverBg} ${stateBorder}
+          ${isExpanded ? 'border-b-indigo-200 dark:border-b-indigo-500/40' : ''}`}
       >
         {/* SSH status — 4 estados visualmente distintos:
             • pending  → spinner indigo
