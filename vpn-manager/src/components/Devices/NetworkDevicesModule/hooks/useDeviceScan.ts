@@ -29,15 +29,60 @@ interface UseDeviceScanInput {
   setNodeSshCreds: (creds: ScanCred[]) => void;
 }
 
+// Schema del payload en sessionStorage. Bump SCAN_CACHE_VERSION si el shape
+// de ScannedDevice cambia de forma incompatible — al hidratar descartamos
+// payloads viejos en lugar de inyectar datos malformados. Patrón vercel
+// `client-localstorage-schema`.
+const SCAN_CACHE_VERSION = 1;
+
+interface CachedScanPayload {
+  v: number;
+  results: ScannedDevice[];
+  allIPs: string[];
+  count: number;
+  debug: string;
+  sshStatus: Record<string, SshAuthStatus>;
+}
+
+function loadCachedScan(): CachedScanPayload | null {
+  try {
+    const raw = sessionStorage.getItem(SESSION_SCAN_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed?.v !== SCAN_CACHE_VERSION) return null;          // schema viejo
+    if (!Array.isArray(parsed.results) || parsed.results.length === 0) return null;
+    // Backfill defensivo del sshStatus si vino vacío en payloads previos.
+    const sshStatus = (parsed.sshStatus && typeof parsed.sshStatus === 'object')
+      ? parsed.sshStatus as Record<string, SshAuthStatus>
+      : Object.fromEntries(
+          (parsed.results as Array<{ ip: string; cachedStats?: unknown }>).map(
+            dev => [dev.ip, (dev.cachedStats ? 'success' : 'failed') as SshAuthStatus]
+          )
+        );
+    return {
+      v: SCAN_CACHE_VERSION,
+      results: parsed.results,
+      allIPs: Array.isArray(parsed.allIPs) ? parsed.allIPs : [],
+      count: typeof parsed.count === 'number' ? parsed.count : 0,
+      debug: typeof parsed.debug === 'string' ? parsed.debug : '',
+      sshStatus,
+    };
+  } catch { return null; }
+}
+
 export function useDeviceScan(input: UseDeviceScanInput) {
   const { activeNodeVrf, nodes, effectiveLan, savedDevices, nodeSshCreds, setNodeSshCreds } = input;
 
-  const [scanResults, setScanResults] = useState<ScannedDevice[]>([]);
-  const [allScannedIPs, setAllScannedIPs] = useState<string[]>([]);
-  const [scannedCount, setScannedCount] = useState(0);
-  const [debugMsg, setDebugMsg] = useState('');
+  // Lazy init desde sessionStorage — patrón vercel `rerender-derived-state-no-effect`.
+  // Antes era un useEffect con [] que disparaba 5 setStates en cascada al montar
+  // (1 render extra). Ahora cada useState recibe su valor inicial directo.
+  const [cached] = useState(loadCachedScan);
+  const [scanResults, setScanResults] = useState<ScannedDevice[]>(cached?.results ?? []);
+  const [allScannedIPs, setAllScannedIPs] = useState<string[]>(cached?.allIPs ?? []);
+  const [scannedCount, setScannedCount] = useState(cached?.count ?? 0);
+  const [debugMsg, setDebugMsg] = useState(cached?.debug ?? '');
   const [scanError, setScanError] = useState('');
-  const [sshStatus, setSshStatus] = useState<Record<string, SshAuthStatus>>({});
+  const [sshStatus, setSshStatus] = useState<Record<string, SshAuthStatus>>(cached?.sshStatus ?? {});
   const [discoveryProgress, setDiscoveryProgress] = useState(0);
   const [scanState, setScanState] = useState<ScanState>({ phase: 'idle', current: 0, total: 0 });
 
@@ -45,36 +90,6 @@ export function useDeviceScan(input: UseDeviceScanInput) {
 
   // Cancelar reader si el componente se desmonta a mitad de scan
   useEffect(() => () => { readerRef.current?.cancel(); }, []);
-
-  // Hidratar desde sessionStorage al montar (sobrevive a refresh dentro del túnel actual).
-  // Es un efecto de UNA SOLA VEZ: sincronizamos el state de React con un almacén
-  // externo. El plugin react-hooks/set-state-in-effect lo advierte como cascada,
-  // pero aquí ES el patrón correcto (no hay lazy init equivalente con 5 estados
-  // interdependientes).
-  /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => {
-    try {
-      const cached = sessionStorage.getItem(SESSION_SCAN_KEY);
-      if (!cached) return;
-      const { results, allIPs, count, debug, sshStatus: cachedStatus } = JSON.parse(cached);
-      if (Array.isArray(results) && results.length > 0) {
-        setScanResults(results);
-        setAllScannedIPs(allIPs ?? []);
-        setScannedCount(count ?? 0);
-        setDebugMsg(debug ?? '');
-        if (cachedStatus && typeof cachedStatus === 'object') {
-          setSshStatus(cachedStatus as Record<string, SshAuthStatus>);
-        } else {
-          const derived: Record<string, SshAuthStatus> = {};
-          (results as Array<{ ip: string; cachedStats?: unknown }>).forEach(dev => {
-            derived[dev.ip] = dev.cachedStats ? 'success' : 'failed';
-          });
-          setSshStatus(derived);
-        }
-      }
-    } catch { /* sessionStorage corrupto → ignorar */ }
-  }, []);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Reset COMPLETO al cambiar de túnel activo (otro VRF = otra LAN = otro escaneo)
   const lastActiveNodeRef = useRef<string | null>(activeNodeVrf);
@@ -92,6 +107,22 @@ export function useDeviceScan(input: UseDeviceScanInput) {
       lastActiveNodeRef.current = activeNodeVrf;
     }
   }, [activeNodeVrf]);
+
+  // Cancelar reader si la subred cambia mientras hay scan in-flight. Antes el
+  // reader del scan anterior seguía emitiendo chunks que pisaban scanResults
+  // con datos de la LAN vieja. NO resetea results (a diferencia del cambio de
+  // VRF) — el usuario puede querer comparar entre subredes manualmente.
+  const lastLanRef = useRef<string>(effectiveLan);
+  useEffect(() => {
+    if (effectiveLan !== lastLanRef.current) {
+      if (readerRef.current) {
+        readerRef.current.cancel().catch(() => { });
+        readerRef.current = null;
+        setScanState({ phase: 'idle', current: 0, total: 0 });
+      }
+      lastLanRef.current = effectiveLan;
+    }
+  }, [effectiveLan]);
 
   // Barra de progreso animada durante "discovering" (estimación basada en CIDR).
   // Effect → setInterval → setState es el patrón canónico de animaciones derivadas
@@ -115,13 +146,20 @@ export function useDeviceScan(input: UseDeviceScanInput) {
   }, [scanState.phase, effectiveLan]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // Persistir en sessionStorage cuando el scan termina con resultados
+  // Persistir en sessionStorage cuando el scan termina con resultados.
+  // Wrapeamos el payload con `v: SCAN_CACHE_VERSION` para que un upgrade
+  // futuro pueda descartar limpiamente los datos del schema viejo.
   useEffect(() => {
     if (scanState.phase === 'done' && scanResults.length > 0) {
-      sessionStorage.setItem(SESSION_SCAN_KEY, JSON.stringify({
-        results: scanResults, allIPs: allScannedIPs, count: scannedCount, debug: debugMsg,
+      const payload: CachedScanPayload = {
+        v: SCAN_CACHE_VERSION,
+        results: scanResults,
+        allIPs: allScannedIPs,
+        count: scannedCount,
+        debug: debugMsg,
         sshStatus,
-      }));
+      };
+      sessionStorage.setItem(SESSION_SCAN_KEY, JSON.stringify(payload));
       const t = setTimeout(() => setScanState({ phase: 'idle', current: 0, total: 0 }), 3000);
       return () => clearTimeout(t);
     }

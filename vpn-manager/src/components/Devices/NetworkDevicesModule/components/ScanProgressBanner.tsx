@@ -29,7 +29,7 @@ function ScanProgressBannerImpl({
   // Antes se llamaba 4 veces por render (denominador de progreso + label + 2
   // veces en barra/header). El CIDR es estable mientras dure un escaneo,
   // así que un useMemo con `effectiveLan` como dep es suficiente.
-  const totalIps = useMemo(() => totalIps, [effectiveLan]);
+  const totalIps = useMemo(() => estimateIpCount(effectiveLan), [effectiveLan]);
 
   return (
     <>
