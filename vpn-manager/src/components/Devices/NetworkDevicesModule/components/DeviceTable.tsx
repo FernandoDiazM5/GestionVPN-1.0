@@ -89,9 +89,13 @@ function DeviceTableImpl(props: DeviceTableProps) {
           {activeConfigCols.map(col => (
             <div
               key={col.key}
+              title={col.label}
               className="px-3 py-3 min-w-0 overflow-hidden select-none flex items-center gap-1 hover:text-slate-700 relative group"
             >
-              <span className="cursor-pointer flex items-center gap-1 flex-1 min-w-0 truncate" onClick={() => toggleSort(col.key)}>
+              <span
+                className="cursor-pointer flex items-center gap-1 flex-1 min-w-0 truncate"
+                onClick={() => toggleSort(col.key)}
+              >
                 {col.label}
                 {sortConfig?.key === col.key && <span className="text-indigo-600">{sortConfig.dir === 'asc' ? '↑' : '↓'}</span>}
               </span>

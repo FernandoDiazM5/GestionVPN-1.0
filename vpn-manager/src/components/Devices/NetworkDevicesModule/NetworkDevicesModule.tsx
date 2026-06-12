@@ -368,6 +368,8 @@ export default function NetworkDevicesModule() {
               setSearchQuery={list.setSearchQuery}
               filterSSID={list.filterSSID}
               setFilterSSID={list.setFilterSSID}
+              filterRole={list.filterRole}
+              setFilterRole={list.setFilterRole}
               uniqueSSIDs={list.uniqueSSIDs}
               filteredCount={list.sortedRows.length}
               totalCount={list.scanRows.length}

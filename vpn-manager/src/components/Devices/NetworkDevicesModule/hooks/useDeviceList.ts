@@ -10,11 +10,21 @@ import { useState, useMemo, useCallback, useDeferredValue } from 'react';
 import type { ScannedDevice } from '../../../../types/devices';
 
 type SortDir = 'asc' | 'desc';
+/** Filtros mutuamente excluyentes por rol del device. `''` = todos. */
+export type RoleFilter = '' | 'ap' | 'sta' | 'unknown';
 
 export interface DeviceRow {
   dev: ScannedDevice;
   isSaved: boolean;
   devId: string;
+}
+
+/** Normaliza el modo crudo (cachedStats.mode || dev.role) a 3 categorías. */
+function normalizeRole(dev: ScannedDevice): 'ap' | 'sta' | 'unknown' {
+  const raw = dev.cachedStats?.mode || dev.role;
+  if (raw === 'ap' || raw === 'master') return 'ap';
+  if (raw === 'sta') return 'sta';
+  return 'unknown';
 }
 
 interface UseDeviceListInput {
@@ -31,6 +41,7 @@ const DEFAULT_SORT: { key: string; dir: SortDir } = { key: 'signal', dir: 'desc'
 export function useDeviceList({ scanResults, savedIds }: UseDeviceListInput) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterSSID, setFilterSSID] = useState('');
+  const [filterRole, setFilterRole] = useState<RoleFilter>('');
   const [sortConfig, setSortConfig] = useState<{ key: string; dir: SortDir } | null>(DEFAULT_SORT);
 
   const toggleSort = useCallback((key: string) => {
@@ -69,9 +80,10 @@ export function useDeviceList({ scanResults, savedIds }: UseDeviceListInput) {
       const mac = (dev.cachedStats?.wlanMac ?? dev.mac ?? '').toLowerCase();
       const matchesSearch = !q || ip.includes(q) || name.includes(q) || ssid.includes(q) || mac.includes(q);
       const matchesSSID = !ssidFilter || ssid === ssidFilter;
-      return matchesSearch && matchesSSID;
+      const matchesRole = !filterRole || normalizeRole(dev) === filterRole;
+      return matchesSearch && matchesSSID && matchesRole;
     });
-  }, [scanRows, deferredSearch, filterSSID]);
+  }, [scanRows, deferredSearch, filterSSID, filterRole]);
 
   // Ordenamiento por la columna elegida (sin clonar si no hay sort)
   const sortedRows = useMemo(() => {
@@ -110,6 +122,7 @@ export function useDeviceList({ scanResults, savedIds }: UseDeviceListInput) {
   return {
     searchQuery, setSearchQuery,
     filterSSID, setFilterSSID,
+    filterRole, setFilterRole,
     sortConfig, toggleSort,
     scanRows,
     filteredRows,
