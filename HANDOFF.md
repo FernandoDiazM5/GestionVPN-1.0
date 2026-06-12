@@ -3,7 +3,7 @@
 > Documento de migración de contexto entre sesiones.
 > Rama de trabajo: **`dev`** · Remote: `github.com/FernandoDiazM5/GestionVPN-1.0`.
 >
-> **Estado actual (2026-06-12):** REFACTOR_PLAN cerrado (F0-F12) · 5 features quick-wins entregados (Q1-Q5) · 2 mid-size (M1, M5). Plan completo abajo.
+> **Estado actual (2026-06-12):** REFACTOR_PLAN cerrado (F0-F12) · 5 features quick-wins entregados (Q1-Q5) · 2 mid-size (M1, M5) · **iter2 del bot Telegram + reposición "Asignar túneles" + fix crítico `user_mgmt_ips` (§32)**. Plan completo abajo.
 >
 > ### 🧱 Refactor (F0-F12) — Plan completo ejecutado
 > - **F5** Monorepo + `@gestionvpn/contracts` con Zod compartido.
@@ -21,17 +21,19 @@
 > - **Q4 (§29)** — Export auditoría CSV/JSON con filtros de rango (7d/30d/90d/todo), BOM UTF-8 para Excel, stream por fila, rate-limit 1/5s.
 > - **Q2 (§30)** — Dashboard métricas en vivo: aggregator del registry Prometheus + sparklines SVG inline (sin libs), polling 10s, 4 KpiCards + breakdowns por etiqueta.
 > - **M5 (§31)** — Monitoreo proactivo: job cada 5min lee `/ppp/active`, anti-flap con counter en BD (3 fallos × 5min = 15min de gracia), cooldown 30min, notifica al OWNER `NODE_DOWN` / `NODE_RECOVERED`.
+> - **iter2 multi-usuario (§32, commit `b441cbc`)** — Bot Telegram ejecuta `/activar` y `/desactivar` directamente (antes solo deep-link); selección por lista numerada con TTL 15 min vía nuevo `lib/tunnelService.js` compartido con HTTP. Botón "Asignar túneles" reincorporado a la tabla de Equipo (solo MEMBER) + endpoint ligero `/api/team/workspace-tunnels` para picker. Fix crítico: provisión de peer WG ahora inserta `user_mgmt_ips` automáticamente — antes el MEMBER recibía 409 NO_MGMT_IP al activar.
 >
 > ### 🛠️ Bugs resueltos en esta serie
 > - **`POST /api/wireguard/peers` crash** — `node-routeros` lanzaba síncronamente desde el callback del socket; parche generalizado a replies desconocidos + UNREGISTEREDTAG + handler `'error'` en `RouterOSAPI` (§13.6).
 > - **`@gestionvpn/contracts` "no export named ROLE_LABEL"** — dual package CJS+ESM. Side-benefit: TeamModule −69%.
 > - **`/api/account/notifications` 500** — defensa ante `ER_NO_SUCH_TABLE` cuando faltaba la migración; lecturas devuelven defaults, mutaciones devuelven `503 NOTIFICATIONS_NOT_MIGRATED` accionable. Bug del orden de args en `AppError(message, status, code)` corregido (mismo bug que Q3, regla operativa §28).
+> - **`/api/tunnel/activate` 409 NO_MGMT_IP en MEMBERs (§32)** — `provisionMemberWgByPublicKey` y `POST /member/:id/wireguard` creaban el peer en el router pero olvidaban poblar `user_mgmt_ips`. El MEMBER quedaba sin poder activar ningún túnel sin que el operador corriera el script CLI `mapUserMgmtIp.js`. Ahora ambos provisionadores hacen `mgmtIpRepo.upsert({ source: 'auto-provision' })` tras el peer.
 >
 > ### ✅ Tests
-> - **135 backend** (14 archivos) + **37 frontend** (5 archivos) = **172 tests verdes** sin regresión a lo largo de toda la serie.
+> - **141 backend** (14 archivos) + **37 frontend** (5 archivos) = **178 tests verdes** sin regresión a lo largo de toda la serie (+6 nuevos en `telegramBot.test.js` cubriendo lista numerada, número plano con/sin pending, `/cancelar`, errores del service).
 >
 > ### 📚 Secciones de referencia
-> §17–25: REFACTOR_PLAN ejecutado. §26 notificaciones. §27 bot Telegram. §28 ping/trace. §29 export. §30 dashboard. §31 monitoreo.
+> §17–25: REFACTOR_PLAN ejecutado. §26 notificaciones. §27 bot Telegram. §28 ping/trace. §29 export. §30 dashboard. §31 monitoreo. §32 iter2 multi-usuario.
 >
 > Sesión 2026-06-07 PM: Ajustes del moderador (perfil + workspace + import/export JSON) + Recuperar contraseña + sync MikroTik al deshabilitar + invitaciones por email + .conf WG server-side.
 > Sesión 2026-06-07 AM: multi-usuario con aislamiento por sesión (mangle por-IP), parche `!empty` node-routeros, auditoría (Semgrep+security-review+code-review) y fixes C1–C7.
@@ -56,7 +58,7 @@
 6. **Pase UX P1–P6** + optimización visual de la vista **Escanear**.
 7. **🆕 Multi-usuario con aislamiento por sesión** (sesión 2026-06-07) — ver §7.
 
-**Estado de salud (2026-06-12):** `tsc 0` · `node --check ✓` · **172 tests verdes** (135 backend en 14 archivos + 37 frontend). 6 jobs concurrentes en producción (`startMonitor` MySQL, `expirationJob`, `telegramBot`, `dashboardMetrics` sampler, `monitoringJob`). 0 vulnerabilidades npm en prod, 0 findings `semgrep`. Bundle inicial frontend 248 KB / 78 KB gzip. Sin pendientes del REFACTOR_PLAN; backlog quick-wins (Q1-Q5) y 2 mid-size (M1, M5) entregados.
+**Estado de salud (2026-06-12 tarde):** `tsc 0` · `node --check ✓` · **178 tests verdes** (141 backend en 14 archivos + 37 frontend). 6 jobs concurrentes en producción (`startMonitor` MySQL, `expirationJob`, `telegramBot`, `dashboardMetrics` sampler, `monitoringJob`). 0 vulnerabilidades npm en prod, 0 findings `semgrep`. Bundle inicial frontend 248 KB / 78 KB gzip. Sin pendientes del REFACTOR_PLAN; backlog quick-wins (Q1-Q5) y 2 mid-size (M1, M5) entregados. **Último commit en `dev`: `b441cbc` — iter2 multi-usuario (§32).**
 
 ---
 
@@ -116,7 +118,7 @@
 | 🟡 Limpieza | Quitar `adminIP` hardcodeado (`useNodeManagement.ts`, ya no se usa) · warning MySQL2 `keepAliveInitialDelayMs` (mitigado en F11) · escaneo atado al `mgmt_ip` del solicitante. |
 | 🟡 Mejora | **Fase 5 (opcional):** aislamiento de firewall por-IP + acotar regla "Admin MGMT libre" (defensa en profundidad; hoy el ruteo ya aísla). Dockerfile `USER` no-root (Semgrep S1). |
 | 🟡 Próximo backlog | **M2** API pública con tokens scoped · **M3** Webhooks salientes · **M4** Speed test desde antena (iperf3 SSH) · **L1** Reportes SLA computados desde `tunnel_session_logs` + `monitoring_state` · **L2** Diagnóstico con LLM · **L3** PWA móvil instalable · **L4** Predicción de degradación con tendencia de `signal_history`. |
-| 🟢 Resuelto | O2 repo privado · O5 MySQL estable · UX P6 · **multi-usuario activación (verificado)** · parche `!empty` · fixes C1–C7 · **crash `POST /api/wireguard/peers` (ver §13.6)** · **V1 `register-my-ip` ownership por rol** · **Q1 Notificaciones (§26)** · **M1 Bot Telegram (§27)** · **Q3 Diagnóstico ping/trace (§28)** · **Q4 Export auditoría CSV/JSON (§29)** · **Q2 Dashboard métricas (§30)** · **M5 Monitoreo proactivo (§31)** · **Job de expiración batch**. |
+| 🟢 Resuelto | O2 repo privado · O5 MySQL estable · UX P6 · **multi-usuario activación (verificado)** · parche `!empty` · fixes C1–C7 · **crash `POST /api/wireguard/peers` (ver §13.6)** · **V1 `register-my-ip` ownership por rol** · **Q1 Notificaciones (§26)** · **M1 Bot Telegram (§27)** · **Q3 Diagnóstico ping/trace (§28)** · **Q4 Export auditoría CSV/JSON (§29)** · **Q2 Dashboard métricas (§30)** · **M5 Monitoreo proactivo (§31)** · **Job de expiración batch** · **iter2 bot directo + asignar túneles UI + fix `user_mgmt_ips` auto (§32)**. |
 | 🟢 Nota | Config MikroTik `v2.rsc` SIN mangle global (baseline limpio multi-usuario). Peer `peer27` de prueba con public-key placeholder `abcdEFGH...` (borrable). |
 
 **Scripts:**
@@ -1983,6 +1985,8 @@ Bug capturado al revisar este caso: `AppError(503, 'TELEGRAM_NOT_CONFIGURED', '.
 
 ## 27) 🤖 Bot Telegram interactivo (M1)
 
+> ⚠️ **Actualización iter2 (§32):** desde el commit `b441cbc`, `/activar` y `/desactivar` ejecutan la acción real (vía `lib/tunnelService.js`) — ya NO devuelven deep-link. `/activar` sin args muestra lista numerada con TTL 15 min; el usuario responde con el número. Esta sección documenta el modelo M1 original; las diferencias del iter2 están en §32.
+
 > 👤 **Para usuarios finales:** [MANUAL_USUARIO.md](./MANUAL_USUARIO.md) — guía paso a paso (no técnica) con capturas del flujo de vinculación, ejemplos de cada comando, troubleshooting y FAQ. Compártelo con los moderadores y miembros.
 
 Construido sobre Q1: el bot detecta al usuario por su `telegram_chat_id` ya vinculado en `notification_subscriptions`. Sin código de auth adicional — Telegram autentica el chat desde su lado, nuestro sistema confía en esa identidad.
@@ -2088,6 +2092,97 @@ Esto cierra el círculo M1: el bot **no** muta directamente, el usuario **confir
 | Grandes | — | L1-L4 |
 
 Tests totales: **91 backend + 37 frontend = 128 verdes**.
+
+---
+
+## 32) 🔁 iter2 multi-usuario — bot directo + asignar túneles UI + fix `user_mgmt_ips` (commit `b441cbc`)
+
+Sesión 2026-06-12 tarde. Tres cambios relacionados, un solo commit. El hilo conductor: pulir la experiencia multi-usuario después de que Q1/M1 dejaran la base.
+
+### A) Bot Telegram iter2 — `/activar` y `/desactivar` ejecutan acción real
+
+Antes (M1, ver §27): los comandos de mutación devolvían un deep-link `?activate=VRF-X` al panel. Decisión consciente para evitar mutar con auth débil (Telegram chat_id). El usuario pidió cambiar el flujo: que el bot active directo, con confirmación humana vía lista numerada en vez del deep-link.
+
+**Nuevo flujo:**
+
+```
+Tú: /activar
+Bot: Elige un túnel para activar (responde con el número)
+     1) VRF-ND1-HOUSENET — Casa
+     2) VRF-ND4-TORREVIC — Torre Victorino
+     ...
+     La selección expira en 15 min. Envía /cancelar para descartar.
+
+Tú: 2
+Bot: ⏳ Activando VRF-ND4-TORREVIC…
+Bot: ✅ Acceso abierto a VRF-ND4-TORREVIC
+     IP de gestión: 192.168.21.20
+     Expira en: 30 min
+```
+
+Atajos: `/activar VRF-NAME` (directo), `/activar 2` (por número con pending), `/desactivar` (siempre directo — solo 1 túnel/usuario activo).
+
+**Decisión clave — un service compartido:** la activación es lógica densa (auth, fail-closed en RouterOS, sesión en BD, SSE emit, notif). Duplicarla en el bot dobla la superficie de bugs. Solución: extraje el cuerpo del handler a [server/lib/tunnelService.js](server/lib/tunnelService.js) con firma neutra `{ account, targetVRF, mikrotik, clientIp }`. El HTTP route `POST /tunnel/activate` ahora son 20 LOC delegando al service. El bot consume el mismo service. Un solo camino, un solo conjunto de invariantes.
+
+`canUseTunnel(req, vrf)` en `_shared.js` se desdobló: el bot necesita una versión sin `req`, así que añadí `canUseTunnelForAccount(acc, vrf)` y el wrapper HTTP delega a esa.
+
+**Para que el bot sin `req` sepa las creds del MikroTik**, reusa el patrón de `monitoringJob.js` (§31): `getAppSetting('MT_IP/USER/PASS')` + `decryptPass()`. Sin sesión HTTP, sin middleware.
+
+**Selección numérica — estado in-memory por chat:** `pendingSelections: Map<chatId, { tunnels, expiresAt }>` con TTL 15 min. Lazy cleanup al acceder. Si el backend reinicia, las pendientes se pierden — aceptable, el usuario reenvía `/activar`. `handleMessage` ahora trata números planos como comando cuando hay pending viva para ese chat; sin pending, los números se ignoran (preserva la regla "solo `/...` se procesa").
+
+**Tests añadidos (6 nuevos en [telegramBot.test.js](server/test/unit/telegramBot.test.js)):** activate directo OK + error del service, lista numerada genera pending, número plano con pending activa, número fuera de rango → mensaje, número sin pending se ignora, `/cancelar` limpia, deactivate directo + sin sesión idempotente.
+
+### B) Reposición del botón "Asignar túneles" + picker
+
+Fase B4 (ver línea 261) eliminó *"Asignar túneles"* de la tabla de Equipo con la idea de que las invitaciones lo asignaran dinámicamente. Pero la Fase B1 también quitó el campo *"Túnel a asignar"* del InvitePanel, dejando el flujo huérfano: un MEMBER nuevo se queda con 0 asignaciones y sin UI para arreglarlo. El `AssignTunnelsModal.tsx` quedó vivo pero desconectado.
+
+**Lo que añadí:**
+- Botón con icono `Waypoints` en [MembersTable.tsx](vpn-manager/src/components/Team/TeamModule/components/MembersTable.tsx) **solo para `role === 'MEMBER'`** — los CO_MODERATOR/OWNER ya ven todos los túneles del workspace por contrato de RBAC, no tiene sentido asignarles.
+- Modal mejorado: input texto libre → `<select>` con túneles del workspace, filtrando los ya asignados. Muestra `nombre_vrf — nombre_nodo` para que el operador no tenga que recordar IDs.
+- Nuevo endpoint `GET /api/team/workspace-tunnels` (OWNER/CO_MOD) — lectura ligera de MySQL puro (`SELECT ppp_user, nombre_vrf, nombre_nodo FROM nodes WHERE workspace_id = ?`), sin tocar RouterOS. Service: `teamApi.listWorkspaceTunnels()`.
+
+### C) Fix crítico — `user_mgmt_ips` se llena solo al provisionar peer
+
+**El bug:** en `provisionMemberWgByPublicKey` (al aceptar invitación) y en `POST /member/:id/wireguard` (provisión manual del moderador), el código:
+1. ✅ Creaba el peer en MikroTik con `192.168.21.X`.
+2. ✅ Insertaba en `member_wireguard`.
+3. ✅ Insertaba en `mgmt_peer_owners` (atribución multi-tenant).
+4. ❌ **Nunca insertaba en `user_mgmt_ips`** — que es la tabla que `tunnelService.activateTunnel` lee para resolver la IP del usuario server-side.
+
+Resultado: el MEMBER tenía peer funcional en el router, ".conf" descargable, conexión WireGuard activa — pero recibía `409 NO_MGMT_IP` al pulsar **Acceder** en cualquier túnel. El frontend mostraba *"Ve a la sección WireGuard y registra tu IP, o pide al moderador que te asigne una"* — pero esa sección no existía en la UI; el endpoint `POST /tunnel/register-my-ip` quedaba como huérfano (cero callers en `src/`).
+
+El workaround histórico era `node db/mapUserMgmtIp.js <email> <ip>` (script CLI), documentado en §3 línea 119 — pero requería que el operador se acordara y supiera la IP exacta.
+
+**Fix de raíz** ([server/routes/team.routes.js](server/routes/team.routes.js)): ambas funciones que provisionan peer ahora llaman a `mgmtIpRepo.upsert({ workspaceId, userId, mgmtIp: nextIp, publicKey, source: 'auto-provision' })` justo después de poblar `member_wireguard` y `mgmt_peer_owners`. Idempotente por `UNIQUE(workspace,user)`. Si la IP ya está reclamada por otro (`uq_umi_ip`), se loguea `warn` y **no bloquea** la provisión — el operador puede limpiar manualmente sin perder el peer recién creado.
+
+**Para MEMBERs ya provisionados antes de este fix:** un toque del script `mapUserMgmtIp.js` los pone al día. En esta sesión lo apliqué a `fernandodiazm.5@gmail.com → 192.168.21.64`.
+
+### Métricas pre/post §32
+
+| Métrica | Pre-§32 | Post-§32 |
+|---------|---------|----------|
+| Activación túnel desde Telegram | Solo deep-link al panel | Directo (lista numerada + número plano + `/activar VRF`) |
+| `cmdDesactivar` | Deep-link | Directo |
+| Service compartido HTTP↔Bot | `tunnel.routes.js` 491 LOC con lógica inline | +`lib/tunnelService.js` (164 LOC) · route adelgazado a ~30 LOC para activate/deactivate |
+| Botón "Asignar túneles" en MembersTable | ❌ | ✅ (solo `MEMBER`) |
+| Picker en `AssignTunnelsModal` | Input texto libre | `<select>` con túneles del workspace + filtrado |
+| Nuevos endpoints | — | `GET /api/team/workspace-tunnels` |
+| Mapeo `user_mgmt_ips` al provisionar peer | Manual (CLI) | Automático con `source: 'auto-provision'` |
+| Tests backend | 135 | **141** (+6 bot, sin regresión) |
+
+### Reglas operativas reforzadas (post-§32)
+
+- **Lógica de túnel = un solo lugar.** Cualquier nuevo origen de activación (cron, webhook, CLI) debe llamar a `lib/tunnelService` — no replicar el cuerpo.
+- **Auth del bot ≠ auth HTTP.** El bot construye un `account` plano desde `notification_subscriptions.telegram_chat_id → user_id → workspace_members + users.is_platform_admin`. Si en el futuro se añade scope adicional al JWT (ej. permisos finos), espejarlo en `buildAccount()` del bot.
+- **`provisionMemberWgByPublicKey` es la fuente única de mapeo IP→user.** Si en el futuro un flujo nuevo crea peers (ej. importación masiva), DEBE llamar a `mgmtIpRepo.upsert` o el usuario quedará bloqueado al activar.
+- **Numbered selections siempre TTL + clear-after-consume.** Si añades más comandos con flujo de selección (ej. `/asignar`), reutiliza el patrón de `pendingSelections` con su propio mapa o uno compartido.
+
+### Pendiente / mejoras futuras
+
+- **UI de "register-my-ip"**: aún sin caller en frontend. Hoy queda como salida de emergencia para casos donde el operador necesita que el MEMBER auto-declare su IP (auditoría de regresión: peer creado por proceso externo). Si se añade, debe coexistir con `auto-provision` (`source: 'manual'` vs `source: 'auto-provision'`).
+- **Persistencia de `pendingSelections`**: hoy in-memory; si el backend reinicia mientras un usuario tiene una lista pendiente, debe re-enviar `/activar`. Para multi-instancia eventual, mover a Redis o `app_settings` por chat.
+- **Bot iter3 — confirmación con botones inline**: Telegram tiene `callback_query` (botones que devuelven `data`). Cambiar `allowed_updates=["message"]` a `["message","callback_query"]` y devolver un teclado inline tras `/activar` para "tap-to-select" sin teclear el número.
+- **Volver a habilitar `tunnel_id` en InvitePanel** (Fase B1 lo quitó): hoy el moderador invita y luego abre el modal nuevo. Si lo añadimos al invite, la asignación inicial vuelve a ser un paso.
 
 ---
 
