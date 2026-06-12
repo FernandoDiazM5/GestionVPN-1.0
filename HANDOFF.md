@@ -2,7 +2,37 @@
 
 > Documento de migración de contexto entre sesiones.
 > Rama de trabajo: **`dev`** · Remote: `github.com/FernandoDiazM5/GestionVPN-1.0`.
-> Última actualización (2026-06-10): **REFACTOR_PLAN COMPLETO — fases 0-12 ejecutadas** (F5: monorepo + `@gestionvpn/contracts`; F6: `node.routes.js` → 8 archivos; F7: `core.routes.js` → 7 archivos; F8: `NetworkDevicesModule.tsx` **1313 LOC → 433** + 4 hooks + 5 componentes nuevos + fixup `5c19cb6` resolvió 2 bugs de perf y 2 anti-patterns; F9: observabilidad — `/api/health` enriquecido (mysql+routeros+smtp) + `GET /metrics` Prometheus + counters de auth/routeros/mailer; F10: code-splitting frontend — bundle inicial **1090 → 248 KB raw (-77%)** + `npm run analyze` con visualizer; F11: MySQL performance — pool con timeouts explícitos + 8 índices compuestos en `schema_perf_indexes.sql` + `npm run analyze:queries` con `EXPLAIN` sobre 13 queries del hot path; **F12: audit final** — `npm audit --omit=dev` 0 vulns en prod, `semgrep` 0 findings en 588 archivos tras fix de 2 `gcm-no-tag-length` + 2 `nosemgrep` justificados, [ARQUITECTURA.md](./ARQUITECTURA.md) nuevo con 8 diagramas Mermaid). Bug del crash de `POST /api/wireguard/peers` resuelto. Ver §17, §18, §19, §20, §21, §22, §23, §24 y §25.
+>
+> **Estado actual (2026-06-12):** REFACTOR_PLAN cerrado (F0-F12) · 5 features quick-wins entregados (Q1-Q5) · 2 mid-size (M1, M5). Plan completo abajo.
+>
+> ### 🧱 Refactor (F0-F12) — Plan completo ejecutado
+> - **F5** Monorepo + `@gestionvpn/contracts` con Zod compartido.
+> - **F6** `node.routes.js` → 8 archivos. **F7** `core.routes.js` → 7 archivos.
+> - **F8** `NetworkDevicesModule.tsx` 1313 → 433 LOC + 4 hooks + 5 componentes (fixup `5c19cb6` resolvió 2 bugs de perf + 2 anti-patterns).
+> - **F9** Observabilidad: `/api/health` enriquecido (mysql+routeros+smtp) + `GET /metrics` Prometheus + counters auth/routeros/mailer.
+> - **F10** Code-splitting frontend: bundle inicial **1090 → 248 KB raw (−77%)** · TeamModule **415 → 127 KB (−69%)** tras dual-package ESM. `npm run analyze` con visualizer.
+> - **F11** MySQL performance: pool con timeouts explícitos + 8 índices compuestos (`schema_perf_indexes.sql`) + `npm run analyze:queries` con `EXPLAIN` sobre 13 queries del hot path.
+> - **F12** Audit final: `npm audit --omit=dev` 0 vulns en prod, `semgrep` 0 findings tras fix de `gcm-no-tag-length` + 2 `nosemgrep` justificados. [ARQUITECTURA.md](./ARQUITECTURA.md) con 8 diagramas Mermaid.
+>
+> ### 🚀 Features post-refactor
+> - **Q5 (V1 seguridad)** — `register-my-ip` valida ownership por rol (MEMBER → peer suyo; OWNER/CO_MOD → peer del workspace; admin → cualquiera). Cierra hueco anti-spoofing.
+> - **Q1 + M1 (§26-27)** — Notificaciones email + Telegram bot interactivo (long-polling con 8 comandos + deep-links `?activate=VRF-X` + banner de confirmación). [MANUAL_USUARIO.md](./MANUAL_USUARIO.md) guía no técnica de 9 secciones para el usuario final.
+> - **Q3 (§28)** — Diagnóstico ping/traceroute desde el panel (RouterOS-side), rate-limit 5/10s, modal con tabs y stats coloreadas.
+> - **Q4 (§29)** — Export auditoría CSV/JSON con filtros de rango (7d/30d/90d/todo), BOM UTF-8 para Excel, stream por fila, rate-limit 1/5s.
+> - **Q2 (§30)** — Dashboard métricas en vivo: aggregator del registry Prometheus + sparklines SVG inline (sin libs), polling 10s, 4 KpiCards + breakdowns por etiqueta.
+> - **M5 (§31)** — Monitoreo proactivo: job cada 5min lee `/ppp/active`, anti-flap con counter en BD (3 fallos × 5min = 15min de gracia), cooldown 30min, notifica al OWNER `NODE_DOWN` / `NODE_RECOVERED`.
+>
+> ### 🛠️ Bugs resueltos en esta serie
+> - **`POST /api/wireguard/peers` crash** — `node-routeros` lanzaba síncronamente desde el callback del socket; parche generalizado a replies desconocidos + UNREGISTEREDTAG + handler `'error'` en `RouterOSAPI` (§13.6).
+> - **`@gestionvpn/contracts` "no export named ROLE_LABEL"** — dual package CJS+ESM. Side-benefit: TeamModule −69%.
+> - **`/api/account/notifications` 500** — defensa ante `ER_NO_SUCH_TABLE` cuando faltaba la migración; lecturas devuelven defaults, mutaciones devuelven `503 NOTIFICATIONS_NOT_MIGRATED` accionable. Bug del orden de args en `AppError(message, status, code)` corregido (mismo bug que Q3, regla operativa §28).
+>
+> ### ✅ Tests
+> - **135 backend** (14 archivos) + **37 frontend** (5 archivos) = **172 tests verdes** sin regresión a lo largo de toda la serie.
+>
+> ### 📚 Secciones de referencia
+> §17–25: REFACTOR_PLAN ejecutado. §26 notificaciones. §27 bot Telegram. §28 ping/trace. §29 export. §30 dashboard. §31 monitoreo.
+>
 > Sesión 2026-06-07 PM: Ajustes del moderador (perfil + workspace + import/export JSON) + Recuperar contraseña + sync MikroTik al deshabilitar + invitaciones por email + .conf WG server-side.
 > Sesión 2026-06-07 AM: multi-usuario con aislamiento por sesión (mangle por-IP), parche `!empty` node-routeros, auditoría (Semgrep+security-review+code-review) y fixes C1–C7.
 
@@ -26,7 +56,7 @@
 6. **Pase UX P1–P6** + optimización visual de la vista **Escanear**.
 7. **🆕 Multi-usuario con aislamiento por sesión** (sesión 2026-06-07) — ver §7.
 
-**Estado de salud:** `tsc 0` · `node --check ✓` · backend **62 tests verdes** (55 + 7 del parche routeros). Bug del crash de `POST /api/wireguard/peers` **resuelto** (ver §13.6).
+**Estado de salud (2026-06-12):** `tsc 0` · `node --check ✓` · **172 tests verdes** (135 backend en 14 archivos + 37 frontend). 6 jobs concurrentes en producción (`startMonitor` MySQL, `expirationJob`, `telegramBot`, `dashboardMetrics` sampler, `monitoringJob`). 0 vulnerabilidades npm en prod, 0 findings `semgrep`. Bundle inicial frontend 248 KB / 78 KB gzip. Sin pendientes del REFACTOR_PLAN; backlog quick-wins (Q1-Q5) y 2 mid-size (M1, M5) entregados.
 
 ---
 
@@ -82,12 +112,18 @@
 
 | Prioridad | Tarea |
 |---|---|
-| 🟡 Limpieza | Quitar `adminIP` hardcodeado (`useNodeManagement.ts`, ya no se usa) · warning MySQL2 `keepAliveInitialDelayMs` (mitigado en F11) · job batch de expiración (hoy perezoso en `/tunnel/status`) · escaneo atado al `mgmt_ip` del solicitante. |
+| 🔴 **Antes de levantar** (una vez) | **Correr migraciones nuevas**: `cd server && npm run migrate:notifications && npm run migrate:monitoring`. Sin esto los flujos Q1/M5 caen en defensa (devuelven defaults o no envían alertas), pero el panel sigue funcionando. |
+| 🟡 Limpieza | Quitar `adminIP` hardcodeado (`useNodeManagement.ts`, ya no se usa) · warning MySQL2 `keepAliveInitialDelayMs` (mitigado en F11) · escaneo atado al `mgmt_ip` del solicitante. |
 | 🟡 Mejora | **Fase 5 (opcional):** aislamiento de firewall por-IP + acotar regla "Admin MGMT libre" (defensa en profundidad; hoy el ruteo ya aísla). Dockerfile `USER` no-root (Semgrep S1). |
+| 🟡 Próximo backlog | **M2** API pública con tokens scoped · **M3** Webhooks salientes · **M4** Speed test desde antena (iperf3 SSH) · **L1** Reportes SLA computados desde `tunnel_session_logs` + `monitoring_state` · **L2** Diagnóstico con LLM · **L3** PWA móvil instalable · **L4** Predicción de degradación con tendencia de `signal_history`. |
 | 🟢 Resuelto | O2 repo privado · O5 MySQL estable · UX P6 · **multi-usuario activación (verificado)** · parche `!empty` · fixes C1–C7 · **crash `POST /api/wireguard/peers` (ver §13.6)** · **V1 `register-my-ip` ownership por rol** · **Q1 Notificaciones (§26)** · **M1 Bot Telegram (§27)** · **Q3 Diagnóstico ping/trace (§28)** · **Q4 Export auditoría CSV/JSON (§29)** · **Q2 Dashboard métricas (§30)** · **M5 Monitoreo proactivo (§31)** · **Job de expiración batch**. |
 | 🟢 Nota | Config MikroTik `v2.rsc` SIN mangle global (baseline limpio multi-usuario). Peer `peer27` de prueba con public-key placeholder `abcdEFGH...` (borrable). |
 
-**Scripts:** `cd server && npm run init:rbac | init:multiuser | migrate:sqlite | seed:roles` · `node db/rotateSecrets.js` · `node db/mapUserMgmtIp.js <email> <ip>`.
+**Scripts:**
+- **Init/migración:** `cd server && npm run init:rbac | init:multiuser | migrate:perf | migrate:notifications | migrate:monitoring | seed:roles`.
+- **Análisis:** `npm run analyze:queries` (EXPLAIN sobre el hot path).
+- **Frontend:** `cd vpn-manager && npm run analyze` (treemap del bundle en `dist/stats.html`).
+- **Misc:** `node db/rotateSecrets.js` · `node db/mapUserMgmtIp.js <email> <ip>`.
 
 ---
 
