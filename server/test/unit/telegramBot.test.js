@@ -34,11 +34,24 @@ const mysqlMocks = stubModule(__dirname, '../../db/mysql', {
   withTransaction: vi.fn(),
 });
 
+const tunnelServiceMocks = stubModule(__dirname, '../../lib/tunnelService', {
+  activateTunnel: vi.fn(),
+  deactivateTunnel: vi.fn(),
+});
+
+const dbServiceMocks = stubModule(__dirname, '../../db.service', {
+  getAppSetting: vi.fn().mockResolvedValue('placeholder'),
+  decryptPass: vi.fn().mockReturnValue('decrypted'),
+  getDb: vi.fn(),
+});
+
 const bot = require('../../lib/telegramBot');
 
 beforeEach(() => {
   vi.clearAllMocks();
   telegramMocks.sendMessage.mockResolvedValue({ ok: true });
+  // pendingSelections es singleton del módulo; aislamos cada test.
+  bot._pendingSelections.clear();
 });
 
 function getReplyText() {
@@ -185,23 +198,94 @@ describe('handleMessage — con auth', () => {
     expect(getReplyText()).toContain('No tienes túneles');
   });
 
-  it('/activar VRF-X → deep-link con activate=VRF-X', async () => {
-    process.env.APP_BASE_URL = 'https://panel.example.com/app/';
+  it('/activar VRF-X → activa directo vía tunnelService', async () => {
+    tunnelServiceMocks.activateTunnel.mockResolvedValue({
+      ok: true, vrf: 'VRF-A', mgmtIp: '192.168.21.20',
+      sessionId: 's1', expiresAt: Date.now() + 30 * 60 * 1000, switched: false,
+    });
     await bot.handleMessage({ chat: { id: 1 }, text: '/activar VRF-A' });
-    const text = getReplyText();
-    expect(text).toContain('https://panel.example.com/app/?activate=VRF-A');
-    expect(text).toContain('seguridad');
+    expect(tunnelServiceMocks.activateTunnel).toHaveBeenCalledWith(
+      expect.objectContaining({ targetVRF: 'VRF-A' })
+    );
+    // Replies: "⏳ Activando..." + "✅ Acceso abierto..."
+    const last = telegramMocks.sendMessage.mock.calls.at(-1)[0].text;
+    expect(last).toContain('Acceso abierto');
+    expect(last).toContain('VRF-A');
+    expect(last).toContain('192.168.21.20');
   });
 
-  it('/activar sin argumento → muestra uso', async () => {
+  it('/activar VRF-X con error del service → reporta', async () => {
+    tunnelServiceMocks.activateTunnel.mockResolvedValue({
+      ok: false, code: 409, message: 'IP de gestión no registrada',
+    });
+    await bot.handleMessage({ chat: { id: 1 }, text: '/activar VRF-A' });
+    const last = telegramMocks.sendMessage.mock.calls.at(-1)[0].text;
+    expect(last).toContain('No se pudo activar');
+    expect(last).toContain('IP de gestión');
+  });
+
+  it('/activar sin argumento → lista numerada (pending)', async () => {
     await bot.handleMessage({ chat: { id: 1 }, text: '/activar' });
-    expect(getReplyText()).toContain('Uso');
+    const text = getReplyText();
+    expect(text).toContain('Elige un túnel');
+    expect(text).toMatch(/1\).*VRF-A/);
+    expect(text).toMatch(/2\).*VRF-B/);
+    expect(bot._pendingSelections.has(1)).toBe(true);
   });
 
-  it('/desactivar → deep-link', async () => {
-    process.env.APP_BASE_URL = 'https://panel.example.com/app/';
+  it('número plano con pending → activa ese índice', async () => {
+    // Setup pending
+    await bot.handleMessage({ chat: { id: 1 }, text: '/activar' });
+    tunnelServiceMocks.activateTunnel.mockResolvedValue({
+      ok: true, vrf: 'VRF-B', mgmtIp: '192.168.21.20',
+      sessionId: 's1', expiresAt: Date.now() + 30 * 60 * 1000, switched: false,
+    });
+    await bot.handleMessage({ chat: { id: 1 }, text: '2' });
+    expect(tunnelServiceMocks.activateTunnel).toHaveBeenCalledWith(
+      expect.objectContaining({ targetVRF: 'VRF-B' })
+    );
+    expect(bot._pendingSelections.has(1)).toBe(false); // consumido
+  });
+
+  it('número fuera de rango → mensaje de error', async () => {
+    await bot.handleMessage({ chat: { id: 1 }, text: '/activar' });
+    await bot.handleMessage({ chat: { id: 1 }, text: '9' });
+    const last = telegramMocks.sendMessage.mock.calls.at(-1)[0].text;
+    expect(last).toContain('fuera de rango');
+    expect(tunnelServiceMocks.activateTunnel).not.toHaveBeenCalled();
+  });
+
+  it('número plano SIN pending → se ignora (no es comando)', async () => {
+    await bot.handleMessage({ chat: { id: 1 }, text: '5' });
+    expect(telegramMocks.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('/cancelar limpia la selección pendiente', async () => {
+    await bot.handleMessage({ chat: { id: 1 }, text: '/activar' });
+    expect(bot._pendingSelections.has(1)).toBe(true);
+    await bot.handleMessage({ chat: { id: 1 }, text: '/cancelar' });
+    expect(bot._pendingSelections.has(1)).toBe(false);
+    const last = telegramMocks.sendMessage.mock.calls.at(-1)[0].text;
+    expect(last).toContain('cancelada');
+  });
+
+  it('/desactivar ejecuta directo vía tunnelService', async () => {
+    tunnelServiceMocks.deactivateTunnel.mockResolvedValue({
+      ok: true, hadSession: true, tunnelId: 'tunnel-a', vrf: 'VRF-A',
+    });
     await bot.handleMessage({ chat: { id: 1 }, text: '/desactivar' });
-    expect(getReplyText()).toContain('deactivate=1');
+    expect(tunnelServiceMocks.deactivateTunnel).toHaveBeenCalled();
+    const last = telegramMocks.sendMessage.mock.calls.at(-1)[0].text;
+    expect(last).toContain('desactivado');
+  });
+
+  it('/desactivar sin sesión → mensaje idempotente', async () => {
+    tunnelServiceMocks.deactivateTunnel.mockResolvedValue({
+      ok: true, hadSession: false,
+    });
+    await bot.handleMessage({ chat: { id: 1 }, text: '/desactivar' });
+    const last = telegramMocks.sendMessage.mock.calls.at(-1)[0].text;
+    expect(last).toContain('No tenías túnel activo');
   });
 
   it('/unlink → desvincula y avisa', async () => {

@@ -42,14 +42,13 @@ function clientIpOf(req) {
 }
 
 /**
- * ¿Puede el usuario autenticado usar (activar) este VRF?
- *  - platform_admin: cualquiera.
- *  - OWNER/CO_MOD: nodos de su workspace.
- *  - MEMBER: solo túneles asignados (tunnel_assignments).
- * @returns {Promise<{ok:boolean, code?:number, msg?:string, node?:object}>}
+ * Versión "pura" — acepta un account directo en lugar de req.
+ * Reusada por tunnelService (bot Telegram + HTTP route).
+ *
+ * @param {object} acc — { sub, workspace_id, role, platform_admin }
+ * @param {string} vrfName
  */
-async function canUseTunnel(req, vrfName) {
-  const acc = req.account;
+async function canUseTunnelForAccount(acc, vrfName) {
   if (!acc) return { ok: false, code: 401, msg: 'No autenticado' };
   if (acc.platform_admin) return { ok: true, node: null };
   let node;
@@ -74,10 +73,19 @@ async function canUseTunnel(req, vrfName) {
   return { ok: true, node };
 }
 
+/**
+ * ¿Puede el usuario autenticado usar (activar) este VRF? — wrapper HTTP.
+ * @returns {Promise<{ok:boolean, code?:number, msg?:string, node?:object}>}
+ */
+async function canUseTunnel(req, vrfName) {
+  return canUseTunnelForAccount(req?.account, vrfName);
+}
+
 module.exports = {
   addSseClient,
   removeSseClient,
   emitToUser,
   clientIpOf,
   canUseTunnel,
+  canUseTunnelForAccount,
 };

@@ -24,163 +24,46 @@ const sessionRepo = require('../../db/repos/sessionRepo');
 const mgmtIpRepo = require('../../db/repos/mgmtIpRepo');
 const memberWgRepo = require('../../db/repos/memberWgRepo');
 const { getDb } = require('../../db.service');
-const notifier = require('../../lib/notifier');
 const provisioner = require('../../lib/tunnelProvisioner');
+const tunnelService = require('../../lib/tunnelService');
 const {
-  addSseClient, removeSseClient, emitToUser, clientIpOf, canUseTunnel,
+  addSseClient, removeSseClient, emitToUser, clientIpOf,
 } = require('./_shared');
 
-// ── POST /tunnel/activate — Multi-usuario: 1 túnel activo por usuario ─────────
-//  Crea UNA mangle por IP de gestión del usuario (no por toda la /24).
-//  Coexiste con las de otros usuarios → activaciones simultáneas aisladas.
+// ── POST /tunnel/activate — delega en lib/tunnelService (compartido con bot M1)
 router.post('/tunnel/activate', async (req, res) => {
   if (!req.mikrotik) return res.status(503).json({ success: false, needsConfig: true, message: 'Configura las credenciales MikroTik en Ajustes antes de continuar.' });
-  const { ip, user, pass } = req.mikrotik;
-  const acc = req.account;
-  const { targetVRF } = req.body;
-  const clientIp = clientIpOf(req);
-
-  // ── Validaciones de identidad y entrada ───────────────────────────────────
-  if (!acc?.sub || !acc?.workspace_id) return res.status(401).json({ success: false, message: 'Sesión inválida' });
-  if (!targetVRF) return res.status(400).json({ success: false, message: 'targetVRF requerido' });
-
-  // 1) Permiso sobre el VRF (workspace / asignación)
-  const perm = await canUseTunnel(req, targetVRF);
-  if (!perm.ok) {
-    await sessionRepo.log({ workspaceId: acc.workspace_id, userId: acc.sub, tunnelId: targetVRF, action: 'ERROR', statusCode: perm.code, message: perm.msg, ipAddress: clientIp });
-    return res.status(perm.code).json({ success: false, message: perm.msg });
+  const result = await tunnelService.activateTunnel({
+    account: req.account,
+    targetVRF: req.body?.targetVRF,
+    mikrotik: req.mikrotik,
+    clientIp: clientIpOf(req),
+  });
+  if (!result.ok) {
+    const body = { success: false, message: result.message };
+    if (result.code === 409) body.code = 'NO_MGMT_IP';
+    return res.status(result.code).json(body);
   }
-
-  // 2) IP de gestión del usuario (SERVER-SIDE — nunca del body → anti-spoofing)
-  const mgmtIp = await mgmtIpRepo.getMgmtIpForUser(acc.workspace_id, acc.sub);
-  if (!mgmtIp) {
-    return res.status(409).json({ success: false, code: 'NO_MGMT_IP', message: 'Tu dispositivo de gestión (WireGuard) no está registrado. Contacta al moderador.' });
-  }
-  if (!IPV4_REGEX.test(mgmtIp)) {
-    return res.status(500).json({ success: false, message: `IP de gestión inválida en BD: "${mgmtIp}"` });
-  }
-
-  let apiRead, apiWrite;
-  try {
-    const prev = await sessionRepo.getActiveByUser(acc.workspace_id, acc.sub);
-
-    // ── Fase A (conexión de LECTURA): validar VRF + hallar mangle previa del usuario ──
-    apiRead = await connectToMikrotik(ip, user, pass);
-    const vrfOk = await provisioner.vrfExists(apiRead, targetVRF);
-    if (!vrfOk) {
-      await apiRead.close().catch(() => {});
-      await sessionRepo.log({ workspaceId: acc.workspace_id, userId: acc.sub, tunnelId: targetVRF, action: 'ERROR', statusCode: 400, message: 'VRF inexistente', ipAddress: clientIp });
-      return res.status(400).json({ success: false, message: `El VRF ${targetVRF} no existe en el router` });
-    }
-    const oldIds = await provisioner.findUserMangleIds(apiRead, acc.sub);
-    // Auto-sanado: detectar mangle GLOBAL legacy (single-user) para eliminarla.
-    const legacyIds = await provisioner.findLegacyGlobalMangleIds(apiRead);
-    await apiRead.close().catch(() => {});
-
-    // ── Fase B (conexión de ESCRITURA): remover previa del usuario + legacy global + crear nueva ──
-    apiWrite = await connectToMikrotik(ip, user, pass);
-    await provisioner.removeMangleIds(apiWrite, oldIds);            // cambio de túnel: cierra el suyo
-    if (legacyIds.length) {
-      await provisioner.removeMangleIds(apiWrite, legacyIds);     // elimina mangle global legacy
-      log.info({ count: legacyIds.length }, 'TUNNEL-ACTIVATE: mangle global legacy eliminada');
-    }
-    await provisioner.addUserMangle(apiWrite, { userId: acc.sub, mgmtIp, vrfName: targetVRF });
-    await apiWrite.close().catch(() => {});
-
-    // 3) Crear la nueva sesión (la transacción cierra cualquier ACTIVE previa
-    //    del usuario internamente — C5: sin doble cierre redundante).
-    const { id: sessionId, expires_at } = await sessionRepo.createSession({
-      workspaceId: acc.workspace_id, userId: acc.sub,
-      tunnelId: targetVRF, vrfName: targetVRF, mgmtIp,
-    });
-
-    await sessionRepo.log({ workspaceId: acc.workspace_id, sessionId, userId: acc.sub, tunnelId: targetVRF, action: prev ? 'SWITCH' : 'ACTIVATE', mgmtIp, statusCode: 200, ipAddress: clientIp });
-    log.info({ userId: acc.sub, mgmtIp, vrf: targetVRF, mode: prev ? 'switch' : 'nuevo' }, 'TUNNEL-ACTIVATE');
-
-    // 4) Notificar SOLO a este usuario (sus pestañas)
-    emitToUser(acc.sub, targetVRF, expires_at);
-
-    // Q1 — notificación al usuario (email + Telegram según sus prefs).
-    // Best-effort; cualquier error queda en notification_log sin tirar el endpoint.
-    notifier.notify({
-      userId: acc.sub,
-      event: 'TUNNEL_ACTIVATED',
-      payload: { tunnelId: targetVRF, vrf: targetVRF, expiresAt: expires_at, ip: clientIp },
-    }).catch((err) => log.warn({ err: err.message }, 'notify TUNNEL_ACTIVATED falló'));
-
-    return res.json({
-      success: true,
-      message: `Acceso abierto a ${targetVRF}`,
-      vrf: targetVRF,
-      ipCliente: mgmtIp,
-      sessionId,
-      tunnelExpiry: expires_at,
-    });
-  } catch (error) {
-    if (apiRead) try { await apiRead.close(); } catch (_) {}
-    if (apiWrite) try { await apiWrite.close(); } catch (_) {}
-    // Contención: limpiar cualquier mangle parcial del usuario (conexión fresca)
-    try {
-      const a = await connectToMikrotik(ip, user, pass);
-      const ids = await provisioner.findUserMangleIds(a, acc.sub).catch(() => []);
-      await a.close().catch(() => {});
-      if (ids.length) { const b = await connectToMikrotik(ip, user, pass); await provisioner.removeMangleIds(b, ids); await b.close().catch(() => {}); }
-    } catch (_) { /* limpieza best-effort */ }
-    const msg = getErrorMessage(error, ip, user);
-    await sessionRepo.log({ workspaceId: acc.workspace_id, userId: acc.sub, tunnelId: targetVRF, action: 'ERROR', statusCode: 500, message: msg, ipAddress: clientIp });
-    log.error({ err: error?.message, code: error?.code }, 'TUNNEL-ACTIVATE Error');
-    return res.status(500).json({ success: false, message: msg });
-  }
+  return res.json({
+    success: true,
+    message: `Acceso abierto a ${result.vrf}`,
+    vrf: result.vrf,
+    ipCliente: result.mgmtIp,
+    sessionId: result.sessionId,
+    tunnelExpiry: result.expiresAt,
+  });
 });
 
-// ── POST /tunnel/deactivate — cierra SOLO la sesión del usuario actual ────────
+// ── POST /tunnel/deactivate — delega en lib/tunnelService
 router.post('/tunnel/deactivate', async (req, res) => {
   if (!req.mikrotik) return res.status(503).json({ success: false, needsConfig: true, message: 'Configura las credenciales MikroTik en Ajustes antes de continuar.' });
-  const { ip, user, pass } = req.mikrotik;
-  const acc = req.account;
-  const clientIp = clientIpOf(req);
-  if (!acc?.sub || !acc?.workspace_id) return res.status(401).json({ success: false, message: 'Sesión inválida' });
-
-  let apiRead, apiWrite;
-  try {
-    const session = await sessionRepo.getActiveByUser(acc.workspace_id, acc.sub);
-
-    // Idempotente: aunque no haya sesión en BD, intentamos limpiar la mangle del usuario.
-    apiRead = await connectToMikrotik(ip, user, pass);
-    const ids = await provisioner.findUserMangleIds(apiRead, acc.sub);
-    await apiRead.close().catch(() => {});
-
-    if (ids.length) {
-      apiWrite = await connectToMikrotik(ip, user, pass);
-      await provisioner.removeMangleIds(apiWrite, ids);
-      await apiWrite.close().catch(() => {});
-    }
-
-    // Solo se llega aquí si la mangle se eliminó con éxito (findUserMangleIds y
-    // removeMangleIds LANZAN ante fallo → caen al catch sin cerrar la sesión). C1.
-    if (session) await sessionRepo.closeSession(session.id);
-    await sessionRepo.log({ workspaceId: acc.workspace_id, sessionId: session?.id, userId: acc.sub, tunnelId: session?.tunnel_id || '-', action: 'DEACTIVATE', statusCode: 200, ipAddress: clientIp });
-    log.info({ userId: acc.sub, count: ids.length }, 'TUNNEL-DEACTIVATE: mangles eliminadas');
-
-    emitToUser(acc.sub, null, null);
-
-    // Q1 — notif al usuario (solo si había sesión real, no en idempotent no-op)
-    if (session) {
-      notifier.notify({
-        userId: acc.sub,
-        event: 'TUNNEL_DEACTIVATED',
-        payload: { tunnelId: session.tunnel_id, vrf: session.vrf_name, ip: clientIp },
-      }).catch((err) => log.warn({ err: err.message }, 'notify TUNNEL_DEACTIVATED falló'));
-    }
-
-    res.json({ success: true, message: 'Tu acceso fue revocado' });
-  } catch (error) {
-    if (apiRead) try { await apiRead.close(); } catch (_) {}
-    if (apiWrite) try { await apiWrite.close(); } catch (_) {}
-    // La sesión NO se cerró: el acceso sigue vigente. El usuario debe reintentar. (C1)
-    await sessionRepo.log({ workspaceId: acc.workspace_id, userId: acc.sub, tunnelId: '-', action: 'ERROR', statusCode: 500, message: `deactivate falló: ${error?.message}`, ipAddress: clientIp });
-    res.status(500).json({ success: false, message: `No se pudo revocar el acceso (router sin responder). Reintenta. Detalle: ${getErrorMessage(error, ip, user)}` });
-  }
+  const result = await tunnelService.deactivateTunnel({
+    account: req.account,
+    mikrotik: req.mikrotik,
+    clientIp: clientIpOf(req),
+  });
+  if (!result.ok) return res.status(result.code).json({ success: false, message: result.message });
+  res.json({ success: true, message: 'Tu acceso fue revocado' });
 });
 
 // ── POST /tunnel/keepalive — recrea la mangle DEL USUARIO si falta + renueva TTL ──

@@ -27,6 +27,7 @@ const memberRepo = require('../db/repos/memberRepo');
 const invitationRepo = require('../db/repos/invitationRepo');
 const assignmentRepo = require('../db/repos/assignmentRepo');
 const memberWgRepo = require('../db/repos/memberWgRepo');
+const mgmtIpRepo = require('../db/repos/mgmtIpRepo');
 const { generateKeyPair, buildClientConf } = require('../lib/wgkeys');
 const { encrypt, decrypt } = require('../lib/crypto');
 const { connectToMikrotik, safeWrite, writeIdempotent, getErrorMessage } = require('../routeros.service');
@@ -132,6 +133,15 @@ async function provisionMemberWgByPublicKey(mikrotik, { workspaceId, userId, pub
          comment = excluded.comment`,
       [publicKey, workspaceId, `${nextIp}/32`, peerComment, Date.now()]
     );
+    // Mapeo user→IP usado por tunnelService.activateTunnel (sin esto: 409 NO_MGMT_IP).
+    // Idempotente — UNIQUE (workspace,user) permite reusar el mismo peer.
+    try {
+      await mgmtIpRepo.upsert({ workspaceId, userId, mgmtIp: nextIp, publicKey, source: 'auto-provision' });
+    } catch (e) {
+      // uq_umi_ip → la IP ya estaba reclamada por otro usuario.
+      // No bloqueamos la provisión; el operador puede limpiar con mapUserMgmtIp.js.
+      log.warn({ err: e?.message, userId, mgmtIp: nextIp }, 'user_mgmt_ips upsert falló (no bloqueante)');
+    }
     return { allowedIp: nextIp, serverPublicKey: serverPub, endpoint, allowedIps: '192.168.21.0/24' };
   } catch (e) {
     if (api) try { await api.close(); } catch (_) { /* noop */ }
@@ -525,6 +535,22 @@ router.post('/invitation/:id/revoke', requireSession, requireRole('OWNER', 'CO_M
     return sendOk(res, { message: 'Invitación revocada' });
   }));
 
+// ── GET /workspace-tunnels — lista de túneles del workspace (ligero, sin RouterOS) ──
+//  Util para el picker del modal "Asignar túneles". Lee de MySQL directo, ms.
+//  Acceso: moderadores (OWNER/CO_MOD).
+router.get('/workspace-tunnels', requireSession, requireRole('OWNER', 'CO_MODERATOR'),
+  asyncHandler(async (req, res) => {
+    const wsId = req.account.workspace_id;
+    const rows = await query(
+      `SELECT ppp_user, nombre_vrf, nombre_nodo
+         FROM nodes
+        WHERE workspace_id = ?
+        ORDER BY nombre_vrf`,
+      [wsId]
+    );
+    return sendOk(res, { tunnels: rows });
+  }));
+
 // ── GET /assignments — asignaciones de túneles ──────────────
 //  Moderador (OWNER/CO_MOD): todas las del workspace.
 //  View (MEMBER): solo las suyas.
@@ -618,6 +644,15 @@ router.post('/member/:id/wireguard', requireSession, requireRole('OWNER', 'CO_MO
            comment = excluded.comment`,
         [peerPub, req.account.workspace_id, `${nextIp}/32`, peerComment, Date.now()]
       );
+      // Mapeo user→IP para tunnelService (sin esto: 409 NO_MGMT_IP al activar).
+      try {
+        await mgmtIpRepo.upsert({
+          workspaceId: req.account.workspace_id, userId: req.params.id,
+          mgmtIp: nextIp, publicKey: peerPub, source: 'auto-provision',
+        });
+      } catch (e) {
+        log.warn({ err: e?.message, userId: req.params.id, mgmtIp: nextIp }, 'user_mgmt_ips upsert falló (no bloqueante)');
+      }
       return sendOk(res, { allowedIp: nextIp, publicKey: peerPub, conf }, 201);
     } catch (error) {
       if (api) try { await api.close(); } catch (_) { }

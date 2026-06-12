@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Crown, ShieldCheck, User, ChevronUp, ChevronDown, Trash2, Loader2, Shield, PowerOff, Power } from 'lucide-react';
+import { Crown, ShieldCheck, User, ChevronUp, ChevronDown, Trash2, Loader2, Shield, PowerOff, Power, Waypoints } from 'lucide-react';
 import type { Member, Role } from '../../../../types/account';
 import { ROLE_LABEL } from '../../../../types/account';
 import { canManageRoles, canRemoveMembers, isOwner, isModerator } from '../../../../utils/permissions';
 import MemberWireGuardModal from './MemberWireGuardModal';
+import AssignTunnelsModal from './AssignTunnelsModal';
 
 interface MembersTableProps {
   members: Member[];
@@ -35,6 +36,7 @@ export default function MembersTable({
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [confirmDisableId, setConfirmDisableId] = useState<string | null>(null);
   const [wgFor, setWgFor] = useState<Member | null>(null);
+  const [assignFor, setAssignFor] = useState<Member | null>(null);
   const canManage = isModerator(currentRole);
 
   return (
@@ -118,6 +120,15 @@ export default function MembersTable({
                         </button>
                       )}
 
+                      {/* Asignar túneles — solo MEMBER. CO_MOD/OWNER ya ven todos. */}
+                      {canManage && m.role === 'MEMBER' && !busy && (
+                        <button onClick={() => setAssignFor(m)}
+                          title="Asignar túneles" aria-label="Asignar túneles"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors dark:hover:text-indigo-400 dark:hover:bg-indigo-500/10">
+                          <Waypoints className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+
                       {/* Habilitar / Deshabilitar (sincroniza peer WG en MikroTik) */}
                       {canManage && !ownerRow && !isSelf && !busy && (
                         m.disabled ? (
@@ -186,6 +197,7 @@ export default function MembersTable({
       </div>
 
       {wgFor && <MemberWireGuardModal member={wgFor} onClose={() => setWgFor(null)} />}
+      {assignFor && <AssignTunnelsModal member={assignFor} onClose={() => setAssignFor(null)} />}
     </div>
   );
 }

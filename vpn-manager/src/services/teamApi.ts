@@ -46,6 +46,12 @@ export const teamApi = {
 
   removeAssignment: (id: string) => del(`/api/team/assignments/${id}`),
 
+  /** Túneles del workspace (lectura ligera de MySQL, sin RouterOS). Picker del modal. */
+  listWorkspaceTunnels: () =>
+    get<{ success: true; tunnels: Array<{ ppp_user: string; nombre_vrf: string | null; nombre_nodo: string | null }> }>(
+      '/api/team/workspace-tunnels'
+    ),
+
   // ── WireGuard del miembro (Fase E) ──
   provisionWireguard: (userId: string) =>
     post<{ success: true; allowedIp: string; publicKey: string; conf: string | null }>(
