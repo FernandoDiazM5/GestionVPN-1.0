@@ -178,6 +178,7 @@ router.post('/bridge', verifyToken, asyncHandler(async (req, res) => {
   // Ya hay sesión RBAC (cookie o Bearer RBAC) → reemítela tal cual.
   if (req.account?.sub && req.account?.workspace_id) {
     const u = await userRepo.findById(req.account.sub);
+    const ws = await workspaceRepo.findById(req.account.workspace_id);
     const token = signSession({
       sub: req.account.sub, email: req.account.email,
       workspace_id: req.account.workspace_id, role: req.account.role,
@@ -188,6 +189,7 @@ router.post('/bridge', verifyToken, asyncHandler(async (req, res) => {
       user: {
         id: req.account.sub, email: req.account.email, name: u?.name,
         role: req.account.role, workspace_id: req.account.workspace_id,
+        workspace_name: ws?.name,
         platform_admin: !!req.account.platform_admin,
       },
     });
@@ -204,10 +206,16 @@ router.post('/bridge', verifyToken, asyncHandler(async (req, res) => {
 router.get('/me', requireSession, asyncHandler(async (req, res) => {
   const user = await userRepo.findById(req.account.sub);
   if (!user) throw new AppError('Usuario no encontrado', 404, 'NOT_FOUND');
+  // workspace_name viaja en el header del módulo Workspace unificado;
+  // para platform_admin no aplica (no es miembro de un workspace).
+  const ws = req.account.workspace_id
+    ? await workspaceRepo.findById(req.account.workspace_id)
+    : null;
   return sendOk(res, {
     user: {
       id: user.id, email: user.email, name: user.name,
       role: req.account.role, workspace_id: req.account.workspace_id,
+      workspace_name: ws?.name,
       platform_admin: Number(user.is_platform_admin) === 1,
     },
   });

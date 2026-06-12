@@ -234,6 +234,19 @@ CREATE TABLE IF NOT EXISTS peer_colors (
     color        VARCHAR(32)  NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ── 13b. Alias humano de cada peer WG (Usuarios VPN) ─────────────
+-- El "Usuario" del peer es el comment de RouterOS y se preserva inmutable
+-- (cambiarlo rompe la trazabilidad MikroTik). El alias vive solo en la
+-- BD del panel y permite al moderador anotar "PC casa", "Celular personal",
+-- etc. Aislado por workspace para defensa en profundidad.
+CREATE TABLE IF NOT EXISTS peer_aliases (
+    workspace_id  CHAR(36)     NOT NULL,
+    peer_address  VARCHAR(64)  NOT NULL,
+    alias         VARCHAR(120) NOT NULL,
+    updated_at    BIGINT       NOT NULL DEFAULT 0,
+    PRIMARY KEY (workspace_id, peer_address)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ── 14. Dueño (workspace) de cada peer WG de gestión (Usuarios) ─────
 -- Los peers viven en el router (VPN-WG-MGMT); esta tabla los atribuye a
 -- un moderador para aislar la vista "Usuarios" por workspace.

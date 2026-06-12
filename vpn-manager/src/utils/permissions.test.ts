@@ -64,17 +64,18 @@ describe('visibleModules', () => {
     expect(mods).not.toContain('team');
   });
 
-  it('MEMBER: solo "nodes" + "team" (su propio perfil)', () => {
-    expect(visibleModules(u({ role: 'MEMBER' }))).toEqual(['nodes', 'team']);
+  it('MEMBER: "nodes" + "team" + "settings" (perfil + vincular Telegram)', () => {
+    expect(visibleModules(u({ role: 'MEMBER' }))).toEqual(['nodes', 'team', 'settings']);
   });
 
   it('OWNER: módulos del workspace + settings (sin dashboard ni moderators)', () => {
     const mods = visibleModules(u({ role: 'OWNER' }));
     expect(mods).toContain('nodes');
-    expect(mods).toContain('users');
     expect(mods).toContain('team');
     expect(mods).toContain('monitor');
     expect(mods).toContain('settings');
+    // 'users' (Gestión WG) se unificó como tab dentro de 'team' — ya no es módulo navegable.
+    expect(mods).not.toContain('users');
     expect(mods).not.toContain('dashboard');
     expect(mods).not.toContain('moderators');
   });
@@ -87,12 +88,13 @@ describe('visibleModules', () => {
 });
 
 describe('canSeeModule', () => {
-  it('MEMBER NO puede ver "users" (gestión de peers WG)', () => {
+  // Desde §34 'users' dejó de ser un módulo navegable: la Gestión de Usuarios WG
+  // se unificó como tab "Usuarios VPN" dentro del módulo 'team' (Workspace).
+  it('Nadie ve "users" como módulo independiente (unificado en team)', () => {
     expect(canSeeModule(u({ role: 'MEMBER' }), 'users')).toBe(false);
-  });
-
-  it('OWNER SÍ puede ver "users"', () => {
-    expect(canSeeModule(u({ role: 'OWNER' }), 'users')).toBe(true);
+    expect(canSeeModule(u({ role: 'OWNER' }), 'users')).toBe(false);
+    expect(canSeeModule(u({ role: 'CO_MODERATOR' }), 'users')).toBe(false);
+    expect(canSeeModule(u({ platform_admin: true }), 'users')).toBe(false);
   });
 
   it('platform_admin NO ve "team" (no es operador de workspace)', () => {

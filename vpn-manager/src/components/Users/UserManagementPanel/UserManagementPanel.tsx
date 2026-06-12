@@ -13,7 +13,12 @@ import WgConfigModal from './components/WgConfigModal';
 
 const VPS_IP = '192.168.21.60';
 
-export default function UserManagementPanel() {
+interface UserManagementPanelProps {
+  /** Embedido como tab del módulo Workspace: oculta su header propio. */
+  embedded?: boolean;
+}
+
+export default function UserManagementPanel({ embedded = false }: UserManagementPanelProps = {}) {
   const { credentials } = useVpn();
   const { toasts, setToasts } = useToasts();
   const serverSettings = useServerSettings();
@@ -24,14 +29,18 @@ export default function UserManagementPanel() {
     serverEndpointIP, setServerEndpointIP,
   } = serverSettings;
 
+  // El hook conserva la interfaz heredada (editingPeerName/savingPeerName se
+  // creó para el rename de Usuario, hoy bloqueado). Las propagamos al hook
+  // pero ya no se consumen en el render — el alias usa su propio estado local
+  // en `UsersTable`.
   const {
     wgPeers, setWgPeers, loadingWg, setLoadingWg, wgError, setWgError,
     peerColors, setPeerColors, setColorPickerAddr,
-    editingPeerId, setEditingPeerId, editingPeerName, setEditingPeerName,
+    setEditingPeerId, editingPeerName, setEditingPeerName,
     savingPeerName, setSavingPeerName, copiedPeerId, setCopiedPeerId, wgLoadedRef,
   } = wgState;
 
-  const { loadWgPeers, savePeerName } = useWireGuardPeers({
+  const { loadWgPeers, savePeerAlias } = useWireGuardPeers({
     credentials,
     wgLoadedRef,
     setWgPeers,
@@ -59,22 +68,13 @@ export default function UserManagementPanel() {
   // Solo administradores humanos (excluye el VPS)
   const adminPeers = wgPeers.filter(p => p.allowedAddress !== VPS_IP);
 
-  const startEdit = (peer: WgPeer) => { setEditingPeerId(peer.id); setEditingPeerName(peer.name); setColorPickerAddr(null); };
-
   return (
     <div className="space-y-5">
       {/* ── Cabecera ── */}
-      <div className="card p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-            <Users className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
-            <span>Gestión de Usuarios</span>
-          </h2>
-          <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">
-            Administra el acceso de los administradores a la red y monitorea su actividad
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
+      {/* En modo embedded el header del módulo Workspace ya da contexto;
+          solo dejamos una mini-barra con el botón "Actualizar". */}
+      {embedded ? (
+        <div className="flex items-center justify-end">
           <button
             onClick={loadWgPeers}
             disabled={loadingWg}
@@ -84,7 +84,29 @@ export default function UserManagementPanel() {
             <span>Actualizar</span>
           </button>
         </div>
-      </div>
+      ) : (
+        <div className="card p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+              <Users className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
+              <span>Gestión de Usuarios</span>
+            </h2>
+            <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">
+              Administra el acceso de los administradores a la red y monitorea su actividad
+            </p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={loadWgPeers}
+              disabled={loadingWg}
+              className="btn-outline px-4 py-2.5 flex items-center gap-2 text-sm disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${loadingWg ? 'animate-spin' : ''}`} />
+              <span>Actualizar</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Error de conexión ── */}
       {wgError && !loadingWg && (
@@ -106,15 +128,9 @@ export default function UserManagementPanel() {
         peers={adminPeers}
         loading={loadingWg}
         peerColors={peerColors}
-        editingPeerId={editingPeerId}
-        editingPeerName={editingPeerName}
-        savingPeerName={savingPeerName}
         copiedPeerId={copiedPeerId}
-        onStartEdit={startEdit}
-        onCancelEdit={() => setEditingPeerId(null)}
-        onChangeEditName={setEditingPeerName}
-        onSavePeerName={savePeerName}
         onCopyConfig={setWgModalPeer}
+        onSaveAlias={savePeerAlias}
       />
 
       {/* ── Modal con la configuración WireGuard completa ── */}

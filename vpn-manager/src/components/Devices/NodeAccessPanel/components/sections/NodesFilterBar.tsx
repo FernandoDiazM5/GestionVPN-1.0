@@ -6,6 +6,8 @@ interface NodesFilterBarProps {
   onExportCsv: () => void;
   resultCount: number;
   totalCount: number;
+  /** Permite mostrar el botón Exportar. Falso para MEMBER. */
+  canExport?: boolean;
 }
 
 export default function NodesFilterBar({
@@ -14,6 +16,7 @@ export default function NodesFilterBar({
   onExportCsv,
   resultCount,
   totalCount,
+  canExport = true,
 }: NodesFilterBarProps) {
   return (
     <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50/50 to-white dark:border-slate-800 dark:from-slate-800/30 dark:to-slate-900 flex items-center gap-3">
@@ -56,11 +59,13 @@ export default function NodesFilterBar({
       </div>
 
       {/* Exportar inventario (acción de tabla, distinta del importar del header) */}
-      <button onClick={onExportCsv} title="Exportar inventario visible a CSV"
-        className="btn-outline flex items-center gap-1.5 px-3 py-2.5 text-xs shrink-0">
-        <Download className="w-4 h-4" />
-        <span>Exportar</span>
-      </button>
+      {canExport && (
+        <button onClick={onExportCsv} title="Exportar inventario visible a CSV"
+          className="btn-outline flex items-center gap-1.5 px-3 py-2.5 text-xs shrink-0">
+          <Download className="w-4 h-4" />
+          <span>Exportar</span>
+        </button>
+      )}
     </div>
   );
 }

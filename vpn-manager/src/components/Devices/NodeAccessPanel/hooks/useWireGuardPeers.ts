@@ -131,6 +131,33 @@ export function useWireGuardPeers(props: UseWireGuardPeersProps) {
     setSavingPeerName(false);
   };
 
+  /**
+   * Guarda el alias humano de un peer (anotación libre, "PC casa", etc).
+   * No toca MikroTik — solo BD del panel, aislado por workspace en server-side.
+   * Optimista: actualiza el state local antes de la confirmación; si el server
+   * rechaza, recarga peers para volver al estado real.
+   */
+  const savePeerAlias = async (peerAddress: string, alias: string): Promise<boolean> => {
+    const trimmed = alias.trim();
+    setWgPeers(prev => prev.map(p =>
+      p.allowedAddress === peerAddress ? { ...p, alias: trimmed || undefined } : p
+    ));
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/api/wireguard/peer/alias/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ peerAddress, alias: trimmed }),
+      });
+      const d = await res.json();
+      if (!d.success) throw new Error(d.message || 'save failed');
+      return true;
+    } catch {
+      // Rollback ligero: recarga peers para sincronizar con server.
+      loadWgPeers();
+      return false;
+    }
+  };
+
   const copyWgConfig = (peer: WgPeer) => {
     const endpoint = serverEndpointIP && serverListenPort
       ? `${serverEndpointIP}:${serverListenPort}`
@@ -152,5 +179,5 @@ export function useWireGuardPeers(props: UseWireGuardPeersProps) {
     });
   };
 
-  return { loadWgPeers, savePeerColor, savePeerName, copyWgConfig };
+  return { loadWgPeers, savePeerColor, savePeerName, savePeerAlias, copyWgConfig };
 }

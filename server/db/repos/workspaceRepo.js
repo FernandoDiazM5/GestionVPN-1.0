@@ -39,4 +39,13 @@ async function findMembershipByUser(userId) {
   return rows[0] || null;
 }
 
-module.exports = { createForOwner, findMembershipByUser };
+/** Workspace por id (no devuelve los borrados). */
+async function findById(workspaceId) {
+  const rows = await query(
+    'SELECT id, name FROM workspaces WHERE id = ? AND deleted_at IS NULL LIMIT 1',
+    [workspaceId]
+  );
+  return rows[0] || null;
+}
+
+module.exports = { createForOwner, findMembershipByUser, findById };

@@ -3,7 +3,7 @@
 > Documento de migración de contexto entre sesiones.
 > Rama de trabajo: **`dev`** · Remote: `github.com/FernandoDiazM5/GestionVPN-1.0`.
 >
-> **Estado actual (2026-06-12):** REFACTOR_PLAN cerrado (F0-F12) · 5 features quick-wins entregados (Q1-Q5) · 2 mid-size (M1, M5) · **iter2 del bot Telegram + reposición "Asignar túneles" + fix crítico `user_mgmt_ips` (§32)**. Plan completo abajo.
+> **Estado actual (2026-06-12):** REFACTOR_PLAN cerrado (F0-F12) · 5 features quick-wins entregados (Q1-Q5) · 2 mid-size (M1, M5) · iter2 del bot Telegram + reposición "Asignar túneles" + fix crítico `user_mgmt_ips` (§32) · UX MEMBER endurecida (§33) · Workspace unificado + email en peers WG + multi-asignar + QR en aceptar invitación (§34) · **Columna Alias editable en peers WG + bloqueo de edición del "Usuario" para preservar trazabilidad MikroTik (§35) · Fix crítico bot Telegram: el MEMBER veía "No tienes túneles asignados" pese a tener asignaciones porque el query filtraba solo por `ppp_user` (§36)**. Plan completo abajo.
 >
 > ### 🧱 Refactor (F0-F12) — Plan completo ejecutado
 > - **F5** Monorepo + `@gestionvpn/contracts` con Zod compartido.
@@ -22,18 +22,26 @@
 > - **Q2 (§30)** — Dashboard métricas en vivo: aggregator del registry Prometheus + sparklines SVG inline (sin libs), polling 10s, 4 KpiCards + breakdowns por etiqueta.
 > - **M5 (§31)** — Monitoreo proactivo: job cada 5min lee `/ppp/active`, anti-flap con counter en BD (3 fallos × 5min = 15min de gracia), cooldown 30min, notifica al OWNER `NODE_DOWN` / `NODE_RECOVERED`.
 > - **iter2 multi-usuario (§32, commit `b441cbc`)** — Bot Telegram ejecuta `/activar` y `/desactivar` directamente (antes solo deep-link); selección por lista numerada con TTL 15 min vía nuevo `lib/tunnelService.js` compartido con HTTP. Botón "Asignar túneles" reincorporado a la tabla de Equipo (solo MEMBER) + endpoint ligero `/api/team/workspace-tunnels` para picker. Fix crítico: provisión de peer WG ahora inserta `user_mgmt_ips` automáticamente — antes el MEMBER recibía 409 NO_MGMT_IP al activar.
+> - **UX MEMBER (§33)** — La vista "Acceso a Nodos VRF" se reduce a "Acceder" para el MEMBER: se ocultan "Nuevo Nodo", "Exportar", el kebab de fila (Verificar/SSH/Editar/Script/Etiquetas/Historial/Diagnosticar/Eliminar) y el lápiz de renombrar. Se habilita el módulo "Ajustes" para el MEMBER reutilizando `ModeratorSettingsModule` con tabs filtradas: **Perfil** (contraseña + correo, sin cambios) y **Notificaciones** en `memberMode` — solo vincular/desvincular Telegram (sin email, eventos, pausa ni botón Guardar). Backend sin cambios (los endpoints `/account/*` ya solo exigen `requireSession`).
+> - **Workspace unificado + mejoras de peers (§34)** — Cuatro cambios encadenados:
+>   1. **Sidebar consolida "Usuarios" + "Equipo" → un solo ítem "Workspace"**. El antiguo `UserManagementPanel` (peers WG) ahora vive como sub-tab dentro de `TeamModule`. Header del módulo muestra **nombre del workspace + tarjeta Propietario + tarjeta Tú** con badge de rol. Para esto se enriquecieron `/account/me` y `/account/bridge` con `workspace_name` (JOIN con `workspaces`), y `SessionUser` en `@gestionvpn/contracts` añade `workspace_name?: string`. MEMBER ve solo la tab "Usuarios" (sin switch — "Usuarios VPN" es de moderador).
+>   2. **Tabla "Usuarios VPN" con columna Email + column picker**. `/api/wireguard/peers` ahora hace LEFT JOIN con `member_wireguard` y `user_mgmt_ips` (por `public_key` y por `mgmt_ip`) para anexar el email del owner del peer; `WgPeer.email?: string` añadido al tipo. La tabla reescrita ofrece 7 columnas (Estado/Usuario fijas, Email/IP/Protocolo/Clave pública/Último acceso toggleables) con dropdown "Columnas" persistido en `localStorage` bajo `vpn_users_visible_cols`. Búsqueda extendida a email; sort por email; celdas Email/IP/PubKey con copy-on-click vía componente `<CopyableCell>` reutilizable.
+>   3. **AssignTunnelsModal — multi-selección + "Todos"**. El antiguo `<select>` de 1 túnel se reemplazó por lista de checkboxes con buscador (VRF/nodo/PPP), botones contextuales "Todos / Todos visibles (N) / Ninguno / Limpiar", asignación en lote vía `Promise.allSettled` con feedback parcial (`5 asignados · 1 fallaron`). Backend sin cambios (se reusa `teamApi.assignTunnel` N veces). Modal pasó de `max-w-md` a `max-w-lg` con `max-h-[90vh] + overflow-y-auto` para workspaces con muchos túneles.
+>   4. **QR de WireGuard en `AcceptInvitationForm`**. El flujo público de aceptación ya generaba el `.conf` server-side pero solo lo mostraba como texto + Copiar/Descargar. Ahora se genera un QR (`QRCode.toDataURL(conf, { margin: 1, width: 220 })`) y se renderiza arriba del bloque del .conf con hint "📱 Escanea con WireGuard móvil". `qrcode` ya estaba instalado (lo usa `MemberWireGuardModal` desde la fase E del moderador); solo faltaba aplicarlo a este flujo.
+> - **Alias humano de peers WG (§35)** — La columna "Usuario" en la tabla "Usuarios VPN" mostraba el `comment` de MikroTik y la UI permitía editarla inline. Eso rompía la trazabilidad: al renombrar el peer desde el panel, el moderador después no podía identificarlo en el router. **El "Usuario" pasa a ser read-only** (tooltip explica por qué). Se agrega **nueva columna "Alias"** editable inline para anotaciones humanas ("PC casa", "Laptop gestión", "Celular Personal") que viven en BD del panel, no en MikroTik. Nueva tabla `peer_aliases (workspace_id, peer_address, alias, updated_at)` aislada por workspace + endpoint `POST /api/wireguard/peer/alias/save` (con DELETE implícito si `alias=''`). El JOIN en `GET /api/wireguard/peers` enriquece cada peer con `alias?`. Patrón optimista en frontend con rollback automático si el server rechaza. Subcomponente `<AliasCell>` con 3 estados visuales: sin alias = botón sutil "+ Agregar alias", con alias = `Tag + texto + lápiz en hover`, editando = `input + check + X`.
 >
 > ### 🛠️ Bugs resueltos en esta serie
 > - **`POST /api/wireguard/peers` crash** — `node-routeros` lanzaba síncronamente desde el callback del socket; parche generalizado a replies desconocidos + UNREGISTEREDTAG + handler `'error'` en `RouterOSAPI` (§13.6).
 > - **`@gestionvpn/contracts` "no export named ROLE_LABEL"** — dual package CJS+ESM. Side-benefit: TeamModule −69%.
 > - **`/api/account/notifications` 500** — defensa ante `ER_NO_SUCH_TABLE` cuando faltaba la migración; lecturas devuelven defaults, mutaciones devuelven `503 NOTIFICATIONS_NOT_MIGRATED` accionable. Bug del orden de args en `AppError(message, status, code)` corregido (mismo bug que Q3, regla operativa §28).
 > - **`/api/tunnel/activate` 409 NO_MGMT_IP en MEMBERs (§32)** — `provisionMemberWgByPublicKey` y `POST /member/:id/wireguard` creaban el peer en el router pero olvidaban poblar `user_mgmt_ips`. El MEMBER quedaba sin poder activar ningún túnel sin que el operador corriera el script CLI `mapUserMgmtIp.js`. Ahora ambos provisionadores hacen `mgmtIpRepo.upsert({ source: 'auto-provision' })` tras el peer.
+> - **Bot Telegram `/tuneles` y `/activar` no veían las asignaciones del MEMBER (§36)** — El MEMBER recibía "No tienes túneles asignados" pese a que el panel HTTP sí los listaba. Causa raíz: mismatch entre clave usada para guardar y clave usada para leer. `AssignTunnelsModal` envía `nombre_vrf || ppp_user` como `tunnel_id` (casi siempre el VRF tipo `VRF-ND4-TORREVIC`). El HTTP `routes/nodes/_shared.js:80` filtraba bien con `ids.has(n.nombre_vrf) || ids.has(n.ppp_user)`, pero `lib/telegramBot.js:fetchUserTunnels` filtraba solo por `ppp_user IN(...)`. Fix: match dual `WHERE (nombre_vrf IN (...) OR ppp_user IN (...))` + test de regresión que asigna `'VRF-HOUSENET'` y verifica que matchea al nodo con `ppp_user: 'housenet'`.
 >
 > ### ✅ Tests
-> - **141 backend** (14 archivos) + **37 frontend** (5 archivos) = **178 tests verdes** sin regresión a lo largo de toda la serie (+6 nuevos en `telegramBot.test.js` cubriendo lista numerada, número plano con/sin pending, `/cancelar`, errores del service).
+> - **142 backend** (14 archivos) + **36 frontend** (5 archivos) = **178 tests verdes**. Tras §36 hay +1 test de regresión en `telegramBot.test.js` (asignación guardada como nombre_vrf, no ppp_user) que sube el conteo backend a 142. El frontend bajó de 37 a 36 en §34 al consolidar 2 tests de `users` como módulo navegable en 1 cuádruple.
 >
 > ### 📚 Secciones de referencia
-> §17–25: REFACTOR_PLAN ejecutado. §26 notificaciones. §27 bot Telegram. §28 ping/trace. §29 export. §30 dashboard. §31 monitoreo. §32 iter2 multi-usuario.
+> §17–25: REFACTOR_PLAN ejecutado. §26 notificaciones. §27 bot Telegram. §28 ping/trace. §29 export. §30 dashboard. §31 monitoreo. §32 iter2 multi-usuario. §33 UX MEMBER endurecida. §34 Workspace unificado + peers WG mejorados. §35 Alias humano + bloqueo Usuario. §36 Fix bot — match dual VRF/PPP.
 >
 > Sesión 2026-06-07 PM: Ajustes del moderador (perfil + workspace + import/export JSON) + Recuperar contraseña + sync MikroTik al deshabilitar + invitaciones por email + .conf WG server-side.
 > Sesión 2026-06-07 AM: multi-usuario con aislamiento por sesión (mangle por-IP), parche `!empty` node-routeros, auditoría (Semgrep+security-review+code-review) y fixes C1–C7.
@@ -58,7 +66,7 @@
 6. **Pase UX P1–P6** + optimización visual de la vista **Escanear**.
 7. **🆕 Multi-usuario con aislamiento por sesión** (sesión 2026-06-07) — ver §7.
 
-**Estado de salud (2026-06-12 tarde):** `tsc 0` · `node --check ✓` · **178 tests verdes** (141 backend en 14 archivos + 37 frontend). 6 jobs concurrentes en producción (`startMonitor` MySQL, `expirationJob`, `telegramBot`, `dashboardMetrics` sampler, `monitoringJob`). 0 vulnerabilidades npm en prod, 0 findings `semgrep`. Bundle inicial frontend 248 KB / 78 KB gzip. Sin pendientes del REFACTOR_PLAN; backlog quick-wins (Q1-Q5) y 2 mid-size (M1, M5) entregados. **Último commit en `dev`: `b441cbc` — iter2 multi-usuario (§32).**
+**Estado de salud (2026-06-12 madrugada):** `tsc 0` · `node --check ✓` · **178 tests verdes** (142 backend + 36 frontend). El backend sumó +1 con el test de regresión §36 del bot Telegram (asignación por nombre_vrf vs ppp_user). El frontend cayó de 37 a 36 en §34 al consolidar los tests de `users` como módulo navegable. 6 jobs concurrentes en producción (`startMonitor` MySQL, `expirationJob`, `telegramBot`, `dashboardMetrics` sampler, `monitoringJob`). 0 vulnerabilidades npm en prod, 0 findings `semgrep`. Bundle inicial frontend 248 KB / 78 KB gzip; `TeamModule` 119 KB / 30 KB gzip (−19 KB tras §35 al limpiar el rename de Usuario deprecado); `UserManagementPanel` separado en chunk lazy de 25 KB / 7 KB gzip (+7 KB por columna Alias). MySQL: tabla `peer_aliases` creada automáticamente en `initDb()` desde `schema_ops.sql` — verificada con INSERT/READ/DELETE in vivo. Sin pendientes del REFACTOR_PLAN; backlog quick-wins (Q1-Q5) y 2 mid-size (M1, M5) entregados. **Último commit en `dev`: `b441cbc` — iter2 multi-usuario (§32);** trabajo de §33, §34, §35 y §36 aún sin commitear.
 
 ---
 
@@ -118,7 +126,7 @@
 | 🟡 Limpieza | Quitar `adminIP` hardcodeado (`useNodeManagement.ts`, ya no se usa) · warning MySQL2 `keepAliveInitialDelayMs` (mitigado en F11) · escaneo atado al `mgmt_ip` del solicitante. |
 | 🟡 Mejora | **Fase 5 (opcional):** aislamiento de firewall por-IP + acotar regla "Admin MGMT libre" (defensa en profundidad; hoy el ruteo ya aísla). Dockerfile `USER` no-root (Semgrep S1). |
 | 🟡 Próximo backlog | **M2** API pública con tokens scoped · **M3** Webhooks salientes · **M4** Speed test desde antena (iperf3 SSH) · **L1** Reportes SLA computados desde `tunnel_session_logs` + `monitoring_state` · **L2** Diagnóstico con LLM · **L3** PWA móvil instalable · **L4** Predicción de degradación con tendencia de `signal_history`. |
-| 🟢 Resuelto | O2 repo privado · O5 MySQL estable · UX P6 · **multi-usuario activación (verificado)** · parche `!empty` · fixes C1–C7 · **crash `POST /api/wireguard/peers` (ver §13.6)** · **V1 `register-my-ip` ownership por rol** · **Q1 Notificaciones (§26)** · **M1 Bot Telegram (§27)** · **Q3 Diagnóstico ping/trace (§28)** · **Q4 Export auditoría CSV/JSON (§29)** · **Q2 Dashboard métricas (§30)** · **M5 Monitoreo proactivo (§31)** · **Job de expiración batch** · **iter2 bot directo + asignar túneles UI + fix `user_mgmt_ips` auto (§32)**. |
+| 🟢 Resuelto | O2 repo privado · O5 MySQL estable · UX P6 · **multi-usuario activación (verificado)** · parche `!empty` · fixes C1–C7 · **crash `POST /api/wireguard/peers` (ver §13.6)** · **V1 `register-my-ip` ownership por rol** · **Q1 Notificaciones (§26)** · **M1 Bot Telegram (§27)** · **Q3 Diagnóstico ping/trace (§28)** · **Q4 Export auditoría CSV/JSON (§29)** · **Q2 Dashboard métricas (§30)** · **M5 Monitoreo proactivo (§31)** · **Job de expiración batch** · **iter2 bot directo + asignar túneles UI + fix `user_mgmt_ips` auto (§32)** · **UX MEMBER endurecida — solo "Acceder" + Ajustes con Telegram (§33)** · **Workspace unificado + Email en peers + multi-asignar túneles + QR en aceptar invitación (§34)** · **Alias humano + bloqueo edición Usuario (§35)** · **Fix bot Telegram: match dual VRF/PPP en asignaciones del MEMBER (§36)**. |
 | 🟢 Nota | Config MikroTik `v2.rsc` SIN mangle global (baseline limpio multi-usuario). Peer `peer27` de prueba con public-key placeholder `abcdEFGH...` (borrable). |
 
 **Scripts:**
@@ -2183,6 +2191,461 @@ El workaround histórico era `node db/mapUserMgmtIp.js <email> <ip>` (script CLI
 - **Persistencia de `pendingSelections`**: hoy in-memory; si el backend reinicia mientras un usuario tiene una lista pendiente, debe re-enviar `/activar`. Para multi-instancia eventual, mover a Redis o `app_settings` por chat.
 - **Bot iter3 — confirmación con botones inline**: Telegram tiene `callback_query` (botones que devuelven `data`). Cambiar `allowed_updates=["message"]` a `["message","callback_query"]` y devolver un teclado inline tras `/activar` para "tap-to-select" sin teclear el número.
 - **Volver a habilitar `tunnel_id` en InvitePanel** (Fase B1 lo quitó): hoy el moderador invita y luego abre el modal nuevo. Si lo añadimos al invite, la asignación inicial vuelve a ser un paso.
+
+---
+
+## 33) 🔒 UX MEMBER endurecida — solo "Acceder" en Nodos + Ajustes con vincular Telegram
+
+Sesión 2026-06-12 noche. Cinco cambios de superficie en la vista del **MEMBER (View)**, todos en frontend: el documento de cambios `CAMBIOS_.docx` del usuario marcó cinco elementos visuales con flechas rojas que un MEMBER no debía ver en `Acceso a Nodos VRF`, más la ausencia del módulo "Ajustes" para poder vincular su Telegram.
+
+### El problema
+
+Antes de §33, el MEMBER (rol `MEMBER` del workspace, sin `is_platform_admin`) entraba a `NodeAccessPanel` y veía exactamente lo mismo que el OWNER salvo la lista filtrada de túneles: botón **"Nuevo Nodo"**, botón **"Exportar"**, lápiz para **renombrar nodo**, y el **kebab de fila** con 8 acciones (Verificar y reparar, Credenciales SSH, Editar nodo, Script de configuración, Gestionar etiquetas, Historial de conexión, Diagnosticar ping/trace, Eliminar nodo). El backend ya rechazaba esas mutaciones por `nodeBelongsToRequester` + `filterNodesForRole`, pero la UI quedaba **engañosa**: el MEMBER podía hacer click en "Eliminar nodo" sobre un túnel que técnicamente sí ve (el de su asignación) y recibir un 403 después de la confirmación. Trampa UX, no trampa de seguridad.
+
+Adicionalmente, el menú lateral le ocultaba "Ajustes" (`permissions.ts` listaba solo `['nodes', 'team']` para MEMBER), así que **no había UI para vincular Telegram**. El bot Telegram iter2 (§32) ya hace todo el flujo de activación/desactivación, pero requiere que el usuario ejecute `/link <code>` con un código que solo se genera desde el panel — sin Ajustes, el MEMBER no podía obtener ese código sin pedírselo al moderador.
+
+### El cambio
+
+**Patrón único, propagado por la cadena de componentes:**
+
+```ts
+// NodeAccessPanel.tsx — un único punto de decisión
+const canManageNodes = isPlatformAdmin(session) || session?.role !== 'MEMBER';
+```
+
+Esa flag viaja como prop opcional (con default `true` para no romper call-sites) a cuatro componentes:
+
+| Componente | Prop | Cuando es `false` |
+|---|---|---|
+| [ControlBar.tsx](vpn-manager/src/components/Devices/NodeAccessPanel/components/sections/ControlBar.tsx) | `canCreateNode` | Oculta `<button>Nuevo Nodo</button>` (queda solo "Actualizar Nodos") |
+| [NodesFilterBar.tsx](vpn-manager/src/components/Devices/NodeAccessPanel/components/sections/NodesFilterBar.tsx) | `canExport` | Oculta el botón "Exportar" del search bar |
+| [NodeCard.tsx](vpn-manager/src/components/VPN/NodeCard/NodeCard.tsx) | `canManage` | Oculta el `<div>` separador + `<NodeCardKebabMenu>` completo |
+| [NodeCardNameSection.tsx](vpn-manager/src/components/VPN/NodeCard/components/NodeCardNameSection.tsx) | `canEditName` | Oculta el `<Pencil>` que aparece al hover sobre el nombre del nodo |
+
+Resultado para el MEMBER: la fila de la tabla queda con **solo el botón "Acceder"** (que se transforma en "Revocar" cuando el túnel está activo, sin cambio). Cero superficie de mutación visible.
+
+**Módulo Ajustes habilitado, reusando lo del moderador:**
+
+```ts
+// permissions.ts
+if (s.role === 'MEMBER') return ['nodes', 'team', 'settings'];
+```
+
+`App.tsx → SettingsModuleRouter` ya devuelve `ModeratorSettingsModule` para todo lo que no sea `platform_admin`, así que el routing ya funcionaba; solo faltaba listarlo en `visibleModules`. Para no exponer al MEMBER las tabs de "Workspace" e "Import/Export" (que son del moderador OWNER/CO_MOD), `ModeratorSettingsModule` filtra el array de tabs:
+
+```tsx
+const isMember = session?.role === 'MEMBER';
+const MEMBER_TAB_IDS: TabId[] = ['profile', 'notifications'];
+const tabs = useMemo(
+  () => (isMember ? ALL_TABS.filter(t => MEMBER_TAB_IDS.includes(t.id)) : ALL_TABS),
+  [isMember],
+);
+```
+
+El cuerpo de cada tab usa los mismos `<ProfileTab />` y `<NotificationsTab />` del moderador, sin duplicar componentes.
+
+**`NotificationsTab` en `memberMode`:**
+
+La tab completa del moderador tiene pausa global + canal Email + canal Telegram + 5 checkboxes de eventos + botón Guardar. Para el MEMBER el doc del usuario fue claro: *"solo tendrá habilitado la opcion de vincular con telegram para que los miembro pueda activar los tuneles y desactivarlo"*. Decisión: una sola prop `memberMode?: boolean` que early-returns un render compacto con **solo el canal Telegram + el panel del código `/link <code>`** cuando está vinculando:
+
+```tsx
+if (memberMode) {
+  return (
+    <div className="space-y-5">
+      {/* Header simple */}
+      {/* Canal Telegram (mismo ChannelRow del moderador, extraído a const) */}
+      {/* Panel del linkCode si está abierto */}
+    </div>
+  );
+}
+// resto: render normal del moderador
+```
+
+El `ChannelRow` de Telegram se extrae a `const telegramRow` antes del primer `return` para reusarlo en ambas ramas sin duplicar JSX. El callback de `unlink` reusa el endpoint existente `POST /account/telegram/unlink` (`requireSession`, sin gate de rol).
+
+### Backend — sin cambios
+
+Verifiqué `account.routes.js`:
+
+```js
+router.patch('/password',           requireSession, ...);
+router.patch('/email/request',      requireSession, ...);
+router.post('/email/confirm',       requireSession, ...);
+router.get('/notifications',        requireSession, ...);
+router.patch('/notifications',      requireSession, ...);
+router.post('/telegram/link/start', requireSession, ...);
+router.post('/telegram/unlink',     requireSession, ...);
+```
+
+Todos usan `requireSession` sin verificar rol. El MEMBER ya podía cambiar contraseña, correo y vincular Telegram — simplemente no había UI. No tocamos backend.
+
+### Métricas pre/post §33
+
+| Métrica | Pre-§33 | Post-§33 |
+|---------|---------|----------|
+| Botones de mutación visibles en `NodeAccessPanel` para MEMBER | 11 (Nuevo Nodo + Exportar + Pencil + 8× kebab) | **0** (solo "Acceder"/"Revocar") |
+| Módulo "Ajustes" en sidebar para MEMBER | ❌ | ✅ |
+| Tabs disponibles en Ajustes para MEMBER | n/a | **Perfil** + **Notificaciones (memberMode)** |
+| `NotificationsTab` MEMBER — items visibles | n/a | Header + canal Telegram + linkCode |
+| Tests | 178 | **178** (37 frontend tras actualizar `permissions.test.ts` para reflejar `MEMBER → ['nodes','team','settings']`) |
+| Endpoints backend nuevos | — | **0** (todo era reusable) |
+
+### Reglas operativas reforzadas
+
+- **`canManage` se calcula una sola vez** en `NodeAccessPanel` y baja por props con default `true`. No replicar la condición en cada componente hijo: si mañana el patrón se aplica también a `TeamModule` o `UserManagementPanel`, extraerlo a `usePermissions()` o `useCanManageNodes()`.
+- **Las tabs filtradas de Ajustes se controlan en `MEMBER_TAB_IDS`.** Si en el futuro alguna tab nueva (ej. "Mis tokens API" para M2) debe aparecerle al MEMBER, agregarla a esa lista. Nunca se filtra "del lado del contenido" (renderizar la tab y mostrar mensaje vacío) — eso es ruido visual.
+- **`NotificationsTab` `memberMode` es una vista comprimida, no un permiso.** Si el moderador quiere ver lo mismo que el MEMBER por algún motivo, basta con pasar `memberMode={true}`. No reemplaza la auth.
+- **Backend ya estaba bien.** Confirmar siempre antes de "agregar guardas de rol" en endpoints — la mayoría de `requireSession` son intencionales porque la auth solo necesita identidad, no rol. La superficie de UI es la que decide qué ofrecer.
+
+### Pendiente / mejoras futuras
+
+- **Verificación manual con sesión real de MEMBER.** Logear con `fernandodiazm.5@gmail.com / frank12345` (FIWIS) o cualquier MEMBER asignado a un workspace; confirmar visualmente que (a) la tabla de nodos solo tiene "Acceder", (b) "Ajustes" aparece en el sidebar entre "Equipo" y nada más, (c) Notificaciones solo muestra Telegram. Cuando el moderador entra como OWNER no debe notar diferencia.
+- **`MyInvitationsInbox` / `AcceptInvitationForm`.** Esos flujos son del MEMBER recién invitado; revisar si tienen botones de mutación equivalentes que también deban ocultarse (no estaban en `CAMBIOS_.docx`, pero el patrón aplica).
+- **Tests E2E del MEMBER.** Hoy hay 37 unitarios frontend; ninguno valida específicamente que el MEMBER no vea el kebab. Podría añadirse un test que monte `NodesTable` con `canManage={false}` y verifique `queryByRole('button', { name: /más acciones/i })` → null.
+- **CO_MODERATOR.** El derivado `session?.role !== 'MEMBER'` deja a CO_MOD igual que OWNER. Si en el futuro CO_MOD tiene un subset de mutaciones (ej. sin eliminar nodos), agregar otra prop por acción (`canDeleteNode` separado de `canEditNode`).
+
+---
+
+## 34) 🧩 Workspace unificado + peers WG enriquecidos + multi-asignar túneles + QR en aceptar invitación
+
+Sesión 2026-06-12 madrugada. Cuatro cambios encadenados sobre la experiencia del moderador y del invitado público. Trabajados en un solo bloque porque comparten un hilo conductor: **bajar la fricción de gestión de gente en el workspace**.
+
+### A) Sidebar consolidado — "Workspace" reemplaza "Usuarios" + "Equipo"
+
+Antes había dos ítems en la categoría `Acceso` del sidebar: **Usuarios** (peers WireGuard del router) y **Equipo** (miembros del workspace). El usuario reportó que conceptualmente eran lo mismo — gente con acceso al workspace — y debían vivir bajo un único módulo con sub-tabs.
+
+**Cambios:**
+
+- [Sidebar.tsx](vpn-manager/src/components/Layout/Sidebar.tsx:37) — el grupo `Acceso` ahora tiene un único ítem: `{ id: 'team', label: 'Workspace', icon: Briefcase }`. Se quitó el item `users` y el import del icono `Users`.
+- [permissions.ts](vpn-manager/src/utils/permissions.ts:34) — OWNER/CO_MOD ya no listan `'users'` en `visibleModules`. El tipo `ModuleId` mantiene `'users'` como variante válida por compatibilidad con URLs viejas (el efecto en `Sidebar` redirige automáticamente al primer módulo permitido).
+- [App.tsx](vpn-manager/src/App.tsx:131) — quitada la rama `activeModule === 'users' && <UserManagementPanel />`. `UserManagementPanel` deja de ser `lazy()` desde `App` y se importa desde `TeamModule` como dependencia de la sub-tab.
+- [permissions.test.ts](vpn-manager/src/utils/permissions.test.ts) — los 2 tests previos sobre `canSeeModule(..., 'users')` se consolidan en uno que valida que **ningún rol** ve `'users'` (MEMBER + OWNER + CO_MOD + admin).
+
+### B) `TeamModule` reescrito como contenedor con header workspace + tabs
+
+[TeamModule.tsx](vpn-manager/src/components/Team/TeamModule/TeamModule.tsx) ahora es un orquestador que recibe `session`, carga `members` + `invitations` + `logs` (igual que antes) y renderiza:
+
+```
+┌─────────────────────────────────────────────┐
+│ 💼 <workspace_name>                          │
+│    Workspace                                 │
+│                                              │
+│  👑 PROPIETARIO         👤 TÚ                │
+│  fernando               fernando_celular     │
+│  fernando@local.app     fernando@.5@gmail.com│
+│                         [PROPIETARIO]        │
+└─────────────────────────────────────────────┘
+
+┌──────────────────┬──────────────────┐
+│ 👥 Usuarios       │ 🌐 Usuarios VPN  │
+│ Miembros del ws   │ Peers WireGuard  │
+└──────────────────┴──────────────────┘
+
+[contenido del tab activo]
+```
+
+- **Header** muestra `session.workspace_name` (campo nuevo — ver C) + 2 tarjetas `<PersonRow>`: **Propietario** (derivado de `members.find(m => m.role === 'OWNER')`) y **Tú** (`session.email + session.name + ROLE_LABEL[session.role]`).
+- **Switch de tabs** con `<TabButton>` estilo pill (indigo cuando activo, ghost cuando no). El tab `members` mantiene el contenido legacy (InvitePanel + MembersTable + AuditTimeline); el tab `vpn` monta `<UserManagementPanel embedded />` dentro de un `<Suspense>` propio.
+- **MEMBER no ve tabs** — el módulo renderiza el header + `MyInvitationsInbox` + `MemberProfile`, manteniendo el comportamiento previo del `TeamModule`. La tab "Usuarios VPN" es gestión, no aplica.
+
+`UserManagementPanel` se carga vía `lazy(() => import('../../Users/UserManagementPanel'))` para que el chunk (~18 KB / 5 KB gzip) solo se descargue cuando el moderador abre la segunda tab. El `TeamModule` quedó en 138 KB / 38 KB gzip (subida de 11 KB sobre el 127 KB previo de la fase F10, justificada por el header y los sub-componentes).
+
+### C) `workspace_name` en `SessionUser` — cross-stack
+
+El header del módulo necesitaba el nombre del workspace, que no estaba expuesto al frontend. Solución mínima:
+
+- [contracts/account.ts](packages/contracts/src/account.ts:69) — `SessionUser.workspace_name?: string` (opcional para no romper consumidores viejos).
+- [workspaceRepo.js](server/db/repos/workspaceRepo.js) — nuevo `findById(workspaceId)` que devuelve `{ id, name }` (no devuelve borrados).
+- [account.routes.js](server/routes/account.routes.js:204) — `/me` y `/bridge` incluyen `workspace_name` en la respuesta. `findMembershipByUser` ya hacía el JOIN; solo había que propagarlo.
+- [sessionBridge.js](server/lib/sessionBridge.js:60) — `buildSessionForLegacyUser` y `authenticateMysqlUser` propagan `workspace_name` desde la membresía que ya consultan.
+- `npm run build:contracts` regenerado (dual package CJS+ESM).
+
+El admin de plataforma (sin `workspace_id`) recibe `workspace_name: undefined`; la UI lo trata como "Mi workspace" pero ese caso no aplica porque el admin no ve el módulo `team`.
+
+### D) `UsersTable` enriquecido — columna Email + column picker + copy-on-click
+
+Imagen del usuario: la tabla de "Usuarios VPN" debía mostrar a qué email corresponde cada peer. Adicionalmente, hacer la tabla "más útil" — interpretación: ofrecer un selector de columnas (column picker), patrón ya usado en `NetworkDevicesModule`.
+
+**Backend ([wireguard.routes.js](server/routes/wireguard.routes.js:46)):** tras el filtro por workspace, se hacen dos consultas auxiliares:
+
+```js
+const mwRows  = await db.all(`SELECT mw.public_key, u.email
+                                FROM member_wireguard mw
+                                JOIN users u ON u.id = mw.user_id`);
+const umiRows = await db.all(`SELECT umi.public_key, umi.mgmt_ip, u.email
+                                FROM user_mgmt_ips umi
+                                JOIN users u ON u.id = umi.user_id`);
+```
+
+Se construyen dos mapas (`emailByPk` y `emailByIp`) y cada peer se enriquece con `email: emailByPk[publicKey] || emailByIp[allowedAddress] || undefined`. Cobertura:
+- **Peer creado por aceptar invitación** (`provisionMemberWgByPublicKey` o el modo `generate`) → match en `member_wireguard` por public_key.
+- **Peer mapeado vía `mapUserMgmtIp.js`** (script CLI) o por `register-my-ip` → match en `user_mgmt_ips`.
+- **Peer legacy del moderador sin owner explícito** → `email: undefined`, la UI muestra `—`.
+
+Cambio aditivo: no rompe a clientes que no entiendan `email` (lo ignoran).
+
+**Tipo:** `WgPeer.email?: string` añadido en [types/api.ts](vpn-manager/src/types/api.ts:80) con docstring explicando el origen.
+
+**Tabla ([UsersTable.tsx](vpn-manager/src/components/Users/UserManagementPanel/components/UsersTable.tsx)):** reescrita con array `COLUMNS` declarativo y `Set<ColId>` para visibles:
+
+| Columna | Default | Ocultable |
+|---|---|---|
+| Color (estructural) | ✅ | n/a |
+| Estado | ✅ | ❌ fija |
+| Usuario (con rename inline) | ✅ | ❌ fija |
+| **Email** (nuevo) | ✅ | ✅ |
+| IP | ✅ | ✅ |
+| Protocolo | ✅ | ✅ |
+| Clave pública (truncada `abcdefgh…uvwxyz`) | ❌ | ✅ |
+| Último acceso | ✅ | ✅ |
+| Acciones (estructural) | ✅ | n/a |
+
+- **Column picker** = botón "Columnas" con dropdown de checkboxes. Las fijas aparecen disabled con flag `fija`. Persistencia en `localStorage['vpn_users_visible_cols']` con defensa contra storage corrupto (siempre fuerza required).
+- **Búsqueda** ampliada a email; sort por email alfabético (sin email → al fondo con sentinel `'￿'`).
+- **`<CopyableCell>`** — componente local reutilizable: muestra texto + icono opcional + ícono copy en hover, click copia al clipboard y muestra check verde 1.5s. Falla silenciosa si clipboard está bloqueado (http no-localhost). Usado para email, IP y public-key.
+- **Helper `truncatePubKey`** — muestra primeros 8 + últimos 6 con `…` en medio; al copiar, copia la pública completa (no la truncada).
+- Footer añade contador "**N de 7 columnas visibles**".
+
+### E) `AssignTunnelsModal` — multi-selección + "Todos"
+
+[AssignTunnelsModal.tsx](vpn-manager/src/components/Team/TeamModule/components/AssignTunnelsModal.tsx) antes era un `<select>` clásico: 1 click = 1 asignación. Usuario reportó que en workspaces con 10+ túneles esto era infernal.
+
+**Cambios:**
+
+- `<select>` → lista de **checkboxes** (`<ul>` con `<input type="checkbox">` por túnel) dentro de un contenedor `max-h-64 overflow-y-auto`.
+- **Buscador** sobre `nombre_vrf`, `nombre_nodo` y `ppp_user`.
+- Botones contextuales: **"Todos"** (sin filtro) / **"Todos visibles (N)"** (con filtro — preserva selecciones ocultas por el filtro) / **"Ninguno"** (cuando todos visibles ya seleccionados) / **"Limpiar"** (cuando hay selecciones no-visibles).
+- Botón principal con texto dinámico: **"Asignar"** / **"Asignar 1 túnel"** / **"Asignar N túneles"**.
+- **Asignación en lote** vía `Promise.allSettled(ids.map(id => teamApi.assignTunnel(member.user_id, id)))`. Backend sin cambios — se reusa el endpoint existente N veces.
+- **Feedback parcial**: si alguno falla, banner amber "`5 asignados · 1 fallaron`" + el mensaje del primer error capturado. Si todo OK, no se muestra banner (la lista de "Asignados" abajo confirma visualmente).
+- Modal pasó de `max-w-md` a `max-w-lg` + `max-h-[90vh]` con body en `overflow-y-auto` para no romper en workspaces grandes.
+
+### F) QR de WireGuard en `AcceptInvitationForm`
+
+[AcceptInvitationForm.tsx](vpn-manager/src/components/Auth/AcceptInvitationForm.tsx) es la pantalla pública donde un invitado mete su email + OTP + contraseña, el backend crea su cuenta y genera el .conf server-side. La pantalla mostraba el .conf como texto + botones Copiar/Descargar — pero el caso de uso #1 del invitado es escanearlo desde su móvil para meterlo en la app WireGuard.
+
+**Cambios mínimos:**
+
+- Import de `QRCode from 'qrcode'` (la dependencia ya estaba en `package.json: ^1.5.4`; la usaba `MemberWireGuardModal` desde la Fase E del moderador). Import de `Smartphone` de lucide.
+- `useState<string | null>` para `qr` (dataURL).
+- `useEffect` que genera el QR cuando `conf` está disponible — copiando el patrón exacto del modal del moderador para mantener consistencia: `QRCode.toDataURL(conf, { margin: 1, width: 220 }).then(setQr).catch(() => setQr(null))`.
+- Render: card blanca con `border-slate-200` + shadow conteniendo `<img src={qr} width={220} height={220} />` + hint "📱 Escanea con WireGuard móvil (iOS / Android)". Mientras genera, spinner pequeño.
+- Texto del aviso actualizado: "Escanea el QR desde la app WireGuard móvil, **o** pégala/impórtala manualmente" — refleja las 3 vías (QR / copiar / descargar .conf).
+
+WireGuard mobile (iOS y Android) escanea el `.conf` completo como QR sin transformación adicional, por eso `QRCode.toDataURL(conf, …)` directo funciona.
+
+### Métricas pre/post §34
+
+| Métrica | Pre-§34 | Post-§34 |
+|---------|---------|----------|
+| Items en sidebar para OWNER/CO_MOD (sección Acceso) | 2 (Usuarios + Equipo) | **1** (Workspace) |
+| Header del módulo Workspace | "Equipo / email / badge ROL" | **Nombre workspace + tarjeta Propietario + tarjeta Tú con badge** |
+| Endpoint `/account/me` campos | 6 | **7** (+`workspace_name`) |
+| `WgPeer` campos | 6 | **7** (+`email?`) |
+| Columnas configurables en `UsersTable` | 0 (6 columnas fijas) | **5 toggleables / 2 fijas** (con persistencia localStorage) |
+| Patrón de selección en `AssignTunnelsModal` | `<select>` 1 a la vez | **Multi-checkbox + búsqueda + Todos/Ninguno + asignación en lote** |
+| QR en `AcceptInvitationForm` | ❌ | ✅ (mismo patrón que `MemberWireGuardModal`) |
+| Tests frontend | 37 | **36** (fusión de 2 tests de `users` como módulo navegable en uno cuádruple) |
+| Bundle inicial | 248 KB / 78 KB gzip | **248 KB / 78 KB gzip** (sin cambio) |
+| Chunk `TeamModule` | 127 KB / ~34 KB gzip (F10) | **138 KB / 38 KB gzip** (+11 KB por header + tabs + sub-componentes) |
+| Chunk `UserManagementPanel` lazy | — | **18 KB / 5 KB gzip** (separado, carga solo al abrir Usuarios VPN) |
+
+### Reglas operativas reforzadas
+
+- **El JOIN para enriquecer peers vive en `/api/wireguard/peers`.** Si en el futuro hay otra fuente de mapeo IP→user (ej. importación masiva), debe poblar `member_wireguard` o `user_mgmt_ips` para aparecer en la columna Email. No hay un tercer camino.
+- **Las columnas requeridas (`status`, `name`) no pueden ocultarse por contrato del column picker.** Si una nueva columna nace como "estructural" (ej. avatar), márcala con `required: true` en `COLUMNS` para que el dropdown la deshabilite.
+- **Asignaciones en lote = `Promise.allSettled`, no `Promise.all`.** El usuario espera que un fallo aislado no aborte el resto; reportar parcial. Si en el futuro se añade endpoint server-side `POST /api/team/assignments/bulk`, sustituir el loop por una llamada — pero mantener el feedback parcial.
+- **QR de WireGuard = `margin: 1, width: 220`, sin más.** No transformar el `.conf` antes de generar el QR; la app móvil espera el archivo crudo. Si el QR sale ilegible, el problema es la resolución del display del PC, no el código.
+- **`workspace_name` es siempre opcional.** Frontend que lo lea debe usar `session.workspace_name || 'Mi workspace'` como default — los admins de plataforma no lo tienen y los moderadores legacy podrían no haber pasado por el nuevo `/me` aún (caché).
+
+### Pendiente / mejoras futuras
+
+- **Endpoint `POST /api/team/assignments/bulk`** que reciba un array de `tunnel_id` y los procese en una transacción. Hoy el loop frontend dispara N requests; un workspace con 50 túneles dispara 50 conexiones HTTP. No urgente — la latencia típica es ~100ms × N, aceptable para casos normales.
+- **Filtros guardados en el column picker.** Hoy las columnas se persisten, pero los chips de estado (Todos/Activos/Inactivos) no — al recargar siempre vuelve a "Todos". Si el moderador trabaja con un filtro fijo, sería útil persistirlo también.
+- **QR para `MemberWireGuardModal` ya existe**, pero la consistencia visual entre los dos modales podría mejorarse extrayendo un `<WireGuardQrBlock conf={conf} />` compartido (incluye QR + spinner + hint + botones). Hoy hay duplicación menor.
+- **Header del Workspace para más de 1 moderador.** Hoy `<PersonRow>` solo muestra al OWNER. Si el workspace tiene CO_MODs, no aparecen. Podría reemplazarse por una lista colapsable "Moderadores (N)" con avatares.
+- **Quitar `'users'` del tipo `ModuleId`.** Hoy queda como tipo válido por compatibilidad, pero ya nadie lo navega. Si en una sesión futura se confirma que no hay deep-links viejos, se puede limpiar para reducir superficie.
+
+---
+
+## 35) 🏷️ Alias humano de peers WG + bloqueo de edición del "Usuario"
+
+Sesión 2026-06-12 madrugada (continuación). Cambio focal sobre la tabla "Usuarios VPN" reportado por el usuario tras §34: la columna "Usuario" (el `comment` del peer en MikroTik) permitía edición inline desde la UI, pero **al renombrarlo desde el panel se pierde la trazabilidad en el router** — el moderador después no puede identificar el peer en RouterOS porque el comment ya no coincide con lo que el sistema documentó originalmente.
+
+### El problema
+
+`UsersTable` renderizaba la columna "Usuario" con un lápiz en hover que disparaba `onSavePeerName` → `POST /api/wireguard/peer/edit` → `safeWrite(api, ['/interface/wireguard/peers/set', '=numbers=.id', '=comment=<nuevo>'])`. Funcionaba técnicamente, pero el moderador quería poder anotar "PC casa", "Celular", etc. sin tocar el comment que él (o el flujo de invitación) puso inicialmente.
+
+### El cambio
+
+**Backend:**
+
+1. Nueva tabla en [schema_ops.sql](server/sql/schema_ops.sql:232):
+
+```sql
+CREATE TABLE IF NOT EXISTS peer_aliases (
+    workspace_id  CHAR(36)     NOT NULL,
+    peer_address  VARCHAR(64)  NOT NULL,
+    alias         VARCHAR(120) NOT NULL,
+    updated_at    BIGINT       NOT NULL DEFAULT 0,
+    PRIMARY KEY (workspace_id, peer_address)
+);
+```
+
+Se crea automáticamente en `initDb()` por el reader idempotente que ya existe. Aislada por workspace para defensa en profundidad (admin escribe sobre `workspace_id = ''`).
+
+2. Endpoint nuevo en [wireguard.routes.js](server/routes/wireguard.routes.js): `POST /api/wireguard/peer/alias/save` con body `{ peerAddress, alias }`. Si `alias` está vacío hace `DELETE` (volver a sin alias). Si tiene contenido hace `UPSERT` con `ON CONFLICT (workspace_id, peer_address) DO UPDATE SET alias = excluded.alias, updated_at = excluded.updated_at`. Max 120 chars validado server-side.
+
+3. `GET /api/wireguard/peers` ahora hace un tercer LEFT JOIN (después de email):
+
+```js
+const aliasRows = ws !== null
+  ? await db.all('SELECT peer_address, alias FROM peer_aliases WHERE workspace_id = ?', [ws])
+  : await db.all('SELECT peer_address, alias FROM peer_aliases');
+const aliasByIp = {};
+aliasRows.forEach(r => { if (r.peer_address && r.alias) aliasByIp[r.peer_address] = r.alias; });
+result = result.map(p => ({ ...p, alias: aliasByIp[p.allowedAddress] || undefined }));
+```
+
+Cambio aditivo: si el alias no existe, `alias` queda `undefined` y la UI muestra el botón "+ Agregar alias".
+
+**Tipos:** [api.ts](vpn-manager/src/types/api.ts:80) — `WgPeer.alias?: string` con docstring que aclara: vive solo en BD del panel, no toca MikroTik.
+
+**Frontend:**
+
+1. **Columna "Usuario" → read-only.** [UsersTable.tsx](vpn-manager/src/components/Users/UserManagementPanel/components/UsersTable.tsx) elimina el lápiz y todas las props `editingPeerId`/`editingPeerName`/`savingPeerName`/`onStartEdit`/`onCancelEdit`/`onChangeEditName`/`onSavePeerName`. Queda como un `<span>` con `title="Identificador MikroTik (no editable). Usa el alias para anotar el equipo."`. El `savePeerName` permanece como dead code documentado en `useWireGuardPeers` por si en el futuro reactivan el rename desde otra ruta.
+
+2. **Nueva columna "Alias"** (8va columna, visible por defecto, toggleable desde el column picker). Sort por alias funciona alfabético con sentinel `'￿'` para meter los sin-alias al fondo. Búsqueda extendida a alias también.
+
+3. **Subcomponente `<AliasCell>` con tres estados visuales** (mismo archivo):
+
+```
+sin alias     → [+] Agregar alias    (botón sutil, opacidad baja)
+con alias     → 🏷  PC casa  [✏]    (lápiz aparece en hover)
+editando      → [input    ] [✓] [✕]  (Enter commit, Escape cancel)
+```
+
+Placeholder del input: *"PC casa, Laptop gestión…"*. `maxLength={120}` matchea el límite del backend.
+
+4. **Estado de edición vive local en `UsersTable`** (`editingAliasAddr`, `draftAlias`, `savingAliasAddr`) — no contamina props del hook ni del padre. El optimistic update vive en `useWireGuardPeers.savePeerAlias(peerAddress, alias): Promise<boolean>`:
+
+```js
+setWgPeers(prev => prev.map(p =>
+  p.allowedAddress === peerAddress ? { ...p, alias: trimmed || undefined } : p
+));
+try { /* POST */ }
+catch { loadWgPeers(); return false; }   // rollback recargando
+```
+
+Si el server rechaza, se recarga la lista entera para volver al estado real (no es invasivo — el moderador ya hace clicks de "Actualizar" frecuentemente).
+
+### Métricas pre/post §35
+
+| Métrica | Pre-§35 | Post-§35 |
+|---------|---------|----------|
+| Columna "Usuario" en `UsersTable` | Editable inline (rompe trazabilidad) | **Read-only** con tooltip |
+| Columna "Alias" | ❌ | **Visible por defecto + toggleable** |
+| Estados visuales del alias | n/a | **3** (sin / con / editando) |
+| Tabla nueva en BD | — | `peer_aliases` (PK compuesta workspace_id + peer_address) |
+| Endpoints nuevos | — | `POST /api/wireguard/peer/alias/save` |
+| Bundle `TeamModule` | 138 KB / 38 KB gzip | **119 KB / 30 KB gzip** (−19 KB por limpieza del rename deprecado) |
+| Bundle `UserManagementPanel` lazy | 18 KB / 5 KB gzip | **25 KB / 7 KB gzip** (+7 KB por `<AliasCell>` + estado) |
+| Tests | 36 frontend | **36 frontend** (sin regresión; el patrón se cubre por el código que ya teníamos) |
+
+### Reglas operativas reforzadas
+
+- **El `comment` del peer en MikroTik es inmutable desde la UI a partir de §35.** Si una sesión futura necesita renombrarlo (ej. corrección manual de un peer roto), usar `mikrotik /interface/wireguard/peers/set numbers=X comment=Y` directamente desde Winbox/CLI — no la UI.
+- **`peer_aliases.workspace_id = ''` para platform_admin.** El alias del admin no es estrictamente necesario hoy (el admin no entra a `team`), pero el campo está reservado por consistencia con `peer_colors` y para futuro.
+- **Alias vacío = DELETE.** Si el moderador edita y borra todo el contenido, al guardar se hace `DELETE` en BD. No hay botón "borrar alias" separado.
+- **Hook `useWireGuardPeers.savePeerName` queda como dead code temporal.** Si en una sesión futura se confirma que no se reactivará, sumar tarea de limpieza para borrarlo (también `editingPeerName/savingPeerName` en `useWireGuardState`).
+
+### Pendiente / mejoras futuras
+
+- **Importar/exportar alias en JSON** dentro del moderador (Ajustes → Respaldo y datos). Hoy el moderador que migra de workspace pierde sus anotaciones. La key natural es `peer_address` (la IP) que es estable; bastaría con un endpoint `GET /api/wireguard/peer/aliases` que ya casi existe (el JOIN lo hace, falta exponerlo crudo).
+- **Buscar por alias en filtros pre-existentes.** Hoy la búsqueda de `UsersTable` incluye alias; los chips Todos/Activos/Inactivos no lo combinan. Considerar un chip extra "Sin alias" cuando el moderador quiera identificar peers que aún no anotó.
+- **Validación de unicidad opcional.** Hoy el alias es texto libre; dos peers podrían llamarse "PC casa". Si causa confusión, añadir warning frontend (`UsersTable` ya tiene todos los peers en memoria, basta con un useMemo para detectar colisiones).
+
+---
+
+## 36) 🐛 Fix bot Telegram — el MEMBER veía "No tienes túneles asignados" pese a tenerlos
+
+Sesión 2026-06-12 madrugada (continuación). El usuario reportó que como MEMBER, al hacer `/tuneles` o `/activar` en el bot, recibía "No tienes túneles asignados" aunque el moderador le había compartido dos túneles y los veía perfectamente en el panel HTTP.
+
+### Causa raíz
+
+Mismatch entre la clave usada al **guardar** la asignación y la clave usada al **leerla** en el bot.
+
+| Componente | Identificador que usa |
+|---|---|
+| `AssignTunnelsModal.tsx` (modal del moderador, §32 + §34) | `nombre_vrf \|\| ppp_user` → casi siempre el VRF (ej. `VRF-ND4-TORREVIC`) |
+| `tunnel_assignments.tunnel_id` (BD) | Lo que reciba el endpoint — guarda literalmente lo enviado |
+| **HTTP `GET /api/nodes` (panel del MEMBER)** | ✅ `routes/nodes/_shared.js:80` filtra por `ids.has(n.nombre_vrf) \|\| ids.has(n.ppp_user)` — match dual desde el día 1 |
+| **Bot Telegram `/tuneles` y `/activar`** | ❌ `lib/telegramBot.js:fetchUserTunnels` filtraba con `WHERE ppp_user IN (...)` — solo PPP |
+
+El bot, al recibir como ID `VRF-ND4-TORREVIC` desde `assignedTunnelIds`, intentaba matchearlo contra `nodes.ppp_user` que en BD tiene `torrevic` (o similar). El `IN(...)` devolvía 0 filas y el bot reportaba "No tienes túneles asignados".
+
+Por qué el panel HTTP sí funcionaba: el filtro de `_shared.js` ya hacía el match dual desde el commit `b441cbc` (§32) — pero el bot, al delegarse el listado a `fetchUserTunnels` en `lib/telegramBot.js` también añadido en §32, replicó el query con solo `ppp_user IN`. Bug latente que solo se manifestó cuando el moderador empezó a asignar túneles desde la UI nueva de §34 (multi-select con `nombre_vrf` como clave).
+
+### El fix
+
+Una sola query en [server/lib/telegramBot.js:137](server/lib/telegramBot.js):
+
+```diff
++ const placeholders = ids.map(() => '?').join(',');
+  tunnels = await query(
+    `SELECT ppp_user, nombre_vrf, nombre_nodo FROM nodes
+-     WHERE workspace_id = ? AND ppp_user IN (${ids.map(() => '?').join(',')})`,
+-   [wsId, ...ids]
++     WHERE workspace_id = ?
++       AND (nombre_vrf IN (${placeholders}) OR ppp_user IN (${placeholders}))`,
++   [wsId, ...ids, ...ids]
+  );
+```
+
+Mismo patrón que `routes/nodes/_shared.js:80` ya usa para el filtro HTTP. Los `...ids, ...ids` (params duplicados) son intencionales: hay dos placeholders independientes (uno por `IN`).
+
+### Test de regresión
+
+Añadido en [server/test/unit/telegramBot.test.js](server/test/unit/telegramBot.test.js):
+
+```js
+it('/tuneles MEMBER → matchea asignación guardada como nombre_vrf (no solo ppp_user)', async () => {
+  mysqlMocks.query.mockImplementation(async (sql, params) => {
+    if (/workspace_members/i.test(sql)) return [{ workspace_id: 'ws1', role: 'MEMBER' }];
+    if (/nombre_vrf IN/i.test(sql) && /ppp_user IN/i.test(sql)) {
+      // Si el código solo enviara params para ppp_user, los placeholders de
+      // nombre_vrf quedarían sin valor y MySQL fallaría.
+      expect(params).toEqual(['ws1', 'VRF-HOUSENET', 'VRF-HOUSENET']);
+      return [{ ppp_user: 'housenet', nombre_vrf: 'VRF-HOUSENET', nombre_nodo: 'Casa' }];
+    }
+    return [];
+  });
+  assignmentRepoMocks.assignedTunnelIds.mockResolvedValue(['VRF-HOUSENET']);
+  await bot.handleMessage({ chat: { id: 1 }, text: '/tuneles' });
+  expect(getReplyText()).toContain('VRF-HOUSENET');
+});
+```
+
+El test simula el caso exacto del bug: asignación guardada como `VRF-HOUSENET` (no `housenet`), nodo en BD con `ppp_user: 'housenet'`. Si alguien en el futuro vuelve a filtrar solo por `ppp_user`, este test rompe explícitamente.
+
+### Métricas pre/post §36
+
+| Métrica | Pre-§36 | Post-§36 |
+|---------|---------|----------|
+| `/tuneles` del bot para MEMBER con asignaciones por VRF | ❌ "No tienes túneles asignados" | ✅ Lista correcta |
+| `/activar` con número plano para MEMBER | ❌ Sin pending (lista vacía) | ✅ Selección numerada funciona |
+| Match query del bot | Solo `ppp_user IN(...)` | **`nombre_vrf IN(...) OR ppp_user IN(...)`** |
+| Tests del bot | 26 verdes | **27 verdes** (+1 regresión) |
+
+### Reglas operativas reforzadas
+
+- **Filtro de asignaciones MEMBER = `nombre_vrf OR ppp_user`, donde sea.** Si en el futuro un nuevo flujo lee `tunnel_assignments` (ej. webhook, cron, batch), debe replicar el match dual. El campo `tunnel_id` en BD acepta ambos formatos y no hay forma de saber cuál vendrá.
+- **Considerar migración para normalizar `tunnel_id`.** El path correcto a largo plazo sería decidir un identificador único (probablemente `nombre_vrf`, que es lo que ya domina) y migrar las filas existentes. Mientras tanto, el match dual es el contrato. Si se hace la migración, **debe** ir acompañada de UPDATE para reescribir `tunnel_assignments.tunnel_id` consistente, no solo cambiar el lado de lectura.
+
+### Pendiente / mejoras futuras
+
+- **Auditar otros lectores de `tunnel_assignments`.** Hay otros usos en `routes/core/_shared.js:65` y `routes/nodes/_shared.js:79`. El segundo ya hace el match dual; el primero hay que revisarlo (puede tener el mismo bug latente).
+- **Normalización de `tunnel_id`.** Para una sesión futura: definir si `nombre_vrf` o `ppp_user` es la clave canónica, migrar `tunnel_assignments` para que todos los registros usen la misma, y simplificar los filtros a `IN (...)` único.
 
 ---
 

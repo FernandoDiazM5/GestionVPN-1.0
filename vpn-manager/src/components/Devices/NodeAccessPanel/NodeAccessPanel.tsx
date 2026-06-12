@@ -4,6 +4,7 @@ import { deviceDb } from '../../../store/deviceDb';
 import { cpeCache } from '../../../store/cpeCache';
 import { useWorkspaceSession } from '../../../context/WorkspaceSession';
 import { isPlatformAdmin } from '../../../utils/permissions';
+// MEMBER → solo "Acceder" en la fila + sin "Nuevo Nodo" / "Exportar" / kebab.
 
 // ── Modales (importados desde ./modals)
 import { useState } from 'react';
@@ -174,6 +175,7 @@ export default function NodeAccessPanel() {
   // no le compete a un moderador (que ni siquiera ve sus peers de gestión aquí).
   const { session } = useWorkspaceSession();
   const showCoreInfra = isPlatformAdmin(session);
+  const canManageNodes = isPlatformAdmin(session) || session?.role !== 'MEMBER';
   const vpsPeer = wgPeers.find(p => p.allowedAddress === VPS_IP);
   const vpsWgActive = !!vpsPeer?.active;
   const mangleActive = !!activeNodeVrf;
@@ -196,6 +198,7 @@ export default function NodeAccessPanel() {
         isLoading={isLoading}
         hasLoaded={hasLoaded}
         showServerIP={showCoreInfra}
+        canCreateNode={canManageNodes}
       />
 
       {/* ── StateIndicators ── */}
@@ -238,6 +241,7 @@ export default function NodeAccessPanel() {
         onTagClick={setTagNode}
         onRefreshNodes={fetchNodes}
         isLoading={isLoading}
+        canManage={canManageNodes}
       />
 
       {showNuevoNodo && (

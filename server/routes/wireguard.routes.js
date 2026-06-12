@@ -35,12 +35,53 @@ router.post('/wireguard/peers', async (req, res) => {
         // Aislamiento multi-tenant: cada moderador solo ve sus peers de gestión.
         // Admin (ws === null) ve todos. Peers sin dueño → solo admin.
         const ws = reqWorkspace(req);
+        const db = await getDb();
         if (ws !== null) {
-            const db = await getDb();
             const owners = await db.all('SELECT public_key, workspace_id FROM mgmt_peer_owners');
             const ownerMap = {};
             owners.forEach(o => { ownerMap[o.public_key] = o.workspace_id; });
             result = result.filter(p => ownerMap[p.publicKey] === ws);
+        }
+
+        // Enriquecer cada peer con el email del usuario dueño cuando exista
+        // mapeo en member_wireguard (peer del MEMBER) o en user_mgmt_ips
+        // (asignación de IP de gestión). Si no hay match → email queda
+        // undefined y la UI muestra "—".
+        if (result.length > 0) {
+            const mwRows = await db.all(
+              `SELECT mw.public_key, u.email
+                 FROM member_wireguard mw
+                 JOIN users u ON u.id = mw.user_id`
+            );
+            const umiRows = await db.all(
+              `SELECT umi.public_key, umi.mgmt_ip, u.email
+                 FROM user_mgmt_ips umi
+                 JOIN users u ON u.id = umi.user_id`
+            );
+            const emailByPk = {};
+            const emailByIp = {};
+            mwRows.forEach(r => { if (r.public_key && r.email) emailByPk[r.public_key] = r.email; });
+            umiRows.forEach(r => {
+              if (r.public_key && r.email) emailByPk[r.public_key] = emailByPk[r.public_key] || r.email;
+              if (r.mgmt_ip   && r.email) emailByIp[r.mgmt_ip]   = emailByIp[r.mgmt_ip]   || r.email;
+            });
+            result = result.map(p => ({
+              ...p,
+              email: emailByPk[p.publicKey] || emailByIp[p.allowedAddress] || undefined,
+            }));
+        }
+
+        // Alias humano del peer (anotación libre del moderador: "PC casa",
+        // "Celular Personal", etc). Vive en BD del panel — el comment del
+        // peer en MikroTik queda intacto para preservar la trazabilidad.
+        // Aislado por workspace; admin (ws null) ve todos los alias.
+        if (result.length > 0) {
+            const aliasRows = ws !== null
+              ? await db.all('SELECT peer_address, alias FROM peer_aliases WHERE workspace_id = ?', [ws])
+              : await db.all('SELECT peer_address, alias FROM peer_aliases');
+            const aliasByIp = {};
+            aliasRows.forEach(r => { if (r.peer_address && r.alias) aliasByIp[r.peer_address] = r.alias; });
+            result = result.map(p => ({ ...p, alias: aliasByIp[p.allowedAddress] || undefined }));
         }
 
         res.json({
@@ -154,6 +195,43 @@ router.get('/wireguard/peer/colors', async (req, res) => {
         rows.forEach(r => { colors[r.peer_address] = r.color; });
         res.json({ success: true, colors });
     } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+// ─────────────────────────────────────────────────────────────
+//  Alias de peer (anotación libre del moderador, no toca MikroTik)
+//  Body: { peerAddress, alias }
+//   - alias '' o undefined → borra la entrada (volver a sin alias).
+//   - Aislado por workspace. Admin (ws null) escribe sobre workspace_id = ''.
+// ─────────────────────────────────────────────────────────────
+router.post('/wireguard/peer/alias/save', async (req, res) => {
+    const { peerAddress, alias } = req.body || {};
+    if (!peerAddress || typeof peerAddress !== 'string') {
+        return res.status(400).json({ success: false, message: 'peerAddress requerido' });
+    }
+    const trimmed = (alias || '').trim();
+    if (trimmed.length > 120) {
+        return res.status(400).json({ success: false, message: 'alias máximo 120 caracteres' });
+    }
+    const ws = reqWorkspace(req) ?? '';
+    try {
+        const db = await getDb();
+        if (!trimmed) {
+            await db.run('DELETE FROM peer_aliases WHERE workspace_id = ? AND peer_address = ?', [ws, peerAddress]);
+        } else {
+            await db.run(
+                `INSERT INTO peer_aliases (workspace_id, peer_address, alias, updated_at)
+                 VALUES (?, ?, ?, ?)
+                 ON CONFLICT(workspace_id, peer_address) DO UPDATE SET
+                   alias = excluded.alias,
+                   updated_at = excluded.updated_at`,
+                [ws, peerAddress, trimmed, Date.now()]
+            );
+        }
+        res.json({ success: true, alias: trimmed || null });
+    } catch (e) {
+        log.error({ err: e?.message }, 'PEER-ALIAS save fallo');
         res.status(500).json({ success: false, message: e.message });
     }
 });

@@ -19,6 +19,8 @@ interface NodesTableProps {
   onHistoryNode: (node: NodeInfo) => void;
   onTagClick: (node: NodeInfo) => void;
   onDiagnoseNode: (node: NodeInfo) => void;
+  /** Permite mostrar el kebab de acciones por fila. Falso para MEMBER. */
+  canManage?: boolean;
 }
 
 export default function NodesTable({
@@ -35,6 +37,7 @@ export default function NodesTable({
   onHistoryNode,
   onTagClick,
   onDiagnoseNode,
+  canManage = true,
 }: NodesTableProps) {
   
   const SortIcon = ({ columnKey }: { columnKey: SortKey }) => {
@@ -99,6 +102,7 @@ export default function NodesTable({
               onTagClick={() => onTagClick(node)}
               onDiagnose={() => onDiagnoseNode(node)}
               tags={nodeTags[node.ppp_user] || []}
+              canManage={canManage}
             />
           ))}
           {nodes.length === 0 && (

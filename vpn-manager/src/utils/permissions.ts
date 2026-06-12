@@ -27,11 +27,17 @@ export function visibleModules(s?: SessionUser | null): ModuleId[] {
   if (s.platform_admin) {
     return ['dashboard', 'moderators', 'settings'];
   }
-  if (s.role === 'MEMBER') return ['nodes', 'team'];
+  // MEMBER: nodos + equipo + ajustes (perfil + vincular Telegram).
+  // El ModeratorSettingsModule filtra tabs según el rol — el MEMBER solo
+  // ve "Perfil" (cambiar contraseña/correo) y "Notificaciones" (solo Telegram).
+  if (s.role === 'MEMBER') return ['nodes', 'team', 'settings'];
   // Moderador (OWNER / CO_MODERATOR) → sistema operativo de su workspace.
   // Ajustes para el moderador = perfil + workspace + import/export (Fase C).
   // El SettingsModule del Administrador (config del router core) NO se ve.
-  return ['nodes', 'devices', 'users', 'team', 'monitor', 'settings'];
+  // 'users' (Gestión WG) se unificó dentro de 'team' como una tab — el item del
+  // sidebar ya no existe. El ModuleId se mantiene como tipo válido por si una
+  // URL vieja lo referencia, pero ningún flujo navegable apunta ahí.
+  return ['nodes', 'devices', 'team', 'monitor', 'settings'];
 }
 
 export const canSeeModule = (s: SessionUser | null | undefined, m: ModuleId) => visibleModules(s).includes(m);

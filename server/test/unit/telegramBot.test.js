@@ -187,6 +187,27 @@ describe('handleMessage — con auth', () => {
     expect(text).not.toContain('VRF-B');
   });
 
+  // Regresión: el `tunnel_id` en `tunnel_assignments` suele ser el `nombre_vrf`
+  // (el modal de asignar usa `nombre_vrf || ppp_user`). El bot debe matchear
+  // por ese campo además del `ppp_user`, igual que `routes/nodes/_shared.js`.
+  it('/tuneles MEMBER → matchea asignación guardada como nombre_vrf (no solo ppp_user)', async () => {
+    mysqlMocks.query.mockImplementation(async (sql, params) => {
+      if (/notification_subscriptions/i.test(sql)) return [{ user_id: 'u1' }];
+      if (/workspace_members/i.test(sql)) return [{ workspace_id: 'ws1', role: 'MEMBER' }];
+      if (/nombre_vrf IN/i.test(sql) && /ppp_user IN/i.test(sql)) {
+        // Simula el match dual: los params incluyen `VRF-HOUSENET` 2 veces
+        // (una para cada IN). Si el código solo enviara params para ppp_user,
+        // el placeholder de nombre_vrf quedaría sin valor y MySQL fallaría.
+        expect(params).toEqual(['ws1', 'VRF-HOUSENET', 'VRF-HOUSENET']);
+        return [{ ppp_user: 'housenet', nombre_vrf: 'VRF-HOUSENET', nombre_nodo: 'Casa' }];
+      }
+      return [];
+    });
+    assignmentRepoMocks.assignedTunnelIds.mockResolvedValue(['VRF-HOUSENET']);
+    await bot.handleMessage({ chat: { id: 1 }, text: '/tuneles' });
+    expect(getReplyText()).toContain('VRF-HOUSENET');
+  });
+
   it('/tuneles MEMBER sin asignaciones', async () => {
     mysqlMocks.query.mockImplementation(async (sql) => {
       if (/notification_subscriptions/i.test(sql)) return [{ user_id: 'u1' }];

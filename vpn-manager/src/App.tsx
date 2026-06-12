@@ -19,7 +19,8 @@ const RouterAccess              = lazy(() => import('./components/Auth/RouterAcc
 const AdminDashboard            = lazy(() => import('./components/Admin/AdminDashboard/AdminDashboard'));
 const ModeratorsModule          = lazy(() => import('./components/Admin/ModeratorsModule/ModeratorsModule'));
 const NodeAccessPanel           = lazy(() => import('./components/Devices/NodeAccessPanel'));
-const UserManagementPanel       = lazy(() => import('./components/Users/UserManagementPanel'));
+// UserManagementPanel ya no es un módulo independiente: el TeamModule lo
+// monta como sub-tab "Usuarios VPN" dentro del módulo Workspace.
 const TeamModule                = lazy(() => import('./components/Team/TeamModule'));
 const NetworkDevicesModule      = lazy(() => import('./components/Devices/NetworkDevicesModule'));
 const ApMonitorModule           = lazy(() => import('./components/Monitor/ApMonitorModule'));
@@ -130,7 +131,6 @@ function AppContent() {
           {activeModule === 'dashboard'   && <AdminDashboard />}
           {activeModule === 'moderators'  && <ModeratorsModule />}
           {activeModule === 'nodes'       && <NodeAccessPanel />}
-          {activeModule === 'users'       && <UserManagementPanel />}
           {activeModule === 'team'        && <TeamModule />}
           {activeModule === 'devices'     && <NetworkDevicesModule />}
           {activeModule === 'monitor'     && <ApMonitorModule />}

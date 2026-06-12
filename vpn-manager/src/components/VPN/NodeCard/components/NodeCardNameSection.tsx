@@ -15,6 +15,8 @@ interface NodeCardNameSectionProps {
   onSaveName: () => void;
   onCancelEdit: () => void;
   onStartEdit: () => void;
+  /** Permite renombrar inline (lápiz). Falso para MEMBER. */
+  canEditName?: boolean;
 }
 
 export function NodeCardNameSection({
@@ -30,6 +32,7 @@ export function NodeCardNameSection({
   onSaveName,
   onCancelEdit,
   onStartEdit,
+  canEditName = true,
 }: NodeCardNameSectionProps) {
   return (
     <td className="px-4 py-3 min-w-[160px]">
@@ -60,10 +63,12 @@ export function NodeCardNameSection({
             <p className="font-semibold text-slate-800 dark:text-slate-100 text-xs flex-1 leading-tight truncate max-w-[200px]" title={node.nombre_nodo}>
               {node.nombre_nodo}
             </p>
-            <button onClick={onStartEdit} title="Editar nombre"
-              className="opacity-0 group-hover/name:opacity-100 p-0.5 rounded text-slate-400 hover:text-indigo-600 transition-opacity shrink-0">
-              <Pencil className="w-2.5 h-2.5" />
-            </button>
+            {canEditName && (
+              <button onClick={onStartEdit} title="Editar nombre"
+                className="opacity-0 group-hover/name:opacity-100 p-0.5 rounded text-slate-400 hover:text-indigo-600 transition-opacity shrink-0">
+                <Pencil className="w-2.5 h-2.5" />
+              </button>
+            )}
           </div>
         )}
         <div className="flex items-center gap-1.5 flex-wrap">

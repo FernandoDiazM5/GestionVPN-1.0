@@ -13,6 +13,8 @@ interface ControlBarProps {
   hasLoaded: boolean;
   /** Mostrar la IP del servidor SSTP (solo Administrador de plataforma). */
   showServerIP?: boolean;
+  /** Permitir crear nodos. Falso para MEMBER (solo visualiza). */
+  canCreateNode?: boolean;
 }
 
 export default function ControlBar({
@@ -25,6 +27,7 @@ export default function ControlBar({
   isLoading,
   hasLoaded,
   showServerIP = false,
+  canCreateNode = true,
 }: ControlBarProps) {
   return (
     <div className="card p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -77,13 +80,15 @@ export default function ControlBar({
       </div>
       <div className="flex items-center gap-2 flex-wrap">
         {/* Acción principal del panel → único botón sólido */}
-        <button
-          onClick={onNewNode}
-          className="btn-success px-4 py-2.5 flex items-center space-x-2 text-sm"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Nuevo Nodo</span>
-        </button>
+        {canCreateNode && (
+          <button
+            onClick={onNewNode}
+            className="btn-success px-4 py-2.5 flex items-center space-x-2 text-sm"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Nuevo Nodo</span>
+          </button>
+        )}
         {/* Secundarios → outline */}
         <button
           onClick={onRefresh}

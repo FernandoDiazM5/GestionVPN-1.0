@@ -31,6 +31,7 @@ export default function NodeCard({
   tags = [],
   onTagClick,
   onDiagnose,
+  canManage = true,
 }: NodeCardProps) {
   const {
     isActivating,
@@ -164,6 +165,7 @@ export default function NodeCard({
           onSaveName={saveNodeName}
           onCancelEdit={cancelEditName}
           onStartEdit={startEditName}
+          canEditName={canManage}
         />
 
         <NodeCardStatusRow node={node} />
@@ -203,30 +205,33 @@ export default function NodeCard({
               </button>
             )}
 
-            {/* Separator */}
-            <div className="w-px h-5 bg-slate-200 dark:bg-slate-700" />
-
-            {/* Kebab menu */}
-            <NodeCardKebabMenu
-              node={node}
-              showKebab={showKebab}
-              kebabCoords={kebabCoords}
-              kebabRef={kebabRef}
-              dropdownRef={dropdownRef}
-              logs={logs}
-              isRepairing={isRepairing}
-              isPending={isPending}
-              onHandleKebabClick={handleKebabClick}
-              onToggleWgPeerForm={handleWgPeerClick}
-              onHandleRepair={handleRepairClick}
-              onOpenSshForm={handleOpenSshForm}
-              onEdit={onEdit}
-              onScript={onScript}
-              onTagClick={onTagClick}
-              onHistory={onHistory}
-              onDelete={onDelete}
-              onDiagnose={onDiagnose ? handleDiagnoseClick : undefined}
-            />
+            {/* Separator + kebab — solo si el rol puede gestionar.
+                MEMBER solo ve "Acceder" / "Revocar". */}
+            {canManage && (
+              <>
+                <div className="w-px h-5 bg-slate-200 dark:bg-slate-700" />
+                <NodeCardKebabMenu
+                  node={node}
+                  showKebab={showKebab}
+                  kebabCoords={kebabCoords}
+                  kebabRef={kebabRef}
+                  dropdownRef={dropdownRef}
+                  logs={logs}
+                  isRepairing={isRepairing}
+                  isPending={isPending}
+                  onHandleKebabClick={handleKebabClick}
+                  onToggleWgPeerForm={handleWgPeerClick}
+                  onHandleRepair={handleRepairClick}
+                  onOpenSshForm={handleOpenSshForm}
+                  onEdit={onEdit}
+                  onScript={onScript}
+                  onTagClick={onTagClick}
+                  onHistory={onHistory}
+                  onDelete={onDelete}
+                  onDiagnose={onDiagnose ? handleDiagnoseClick : undefined}
+                />
+              </>
+            )}
           </div>
         </td>
       </tr>

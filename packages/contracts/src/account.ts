@@ -65,6 +65,8 @@ export interface SessionUser {
   name?: string;
   role: Role;
   workspace_id: string;
+  /** Nombre legible del workspace (para headers de UI). */
+  workspace_name?: string;
   /** Administrador de plataforma (Sistemas) — opera la plataforma. */
   platform_admin?: boolean;
 }

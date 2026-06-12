@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  Radio, Cpu, Users, Briefcase, Activity, Settings, LayoutDashboard, UserCog,
+  Radio, Cpu, Briefcase, Activity, Settings, LayoutDashboard, UserCog,
   LogOut, ChevronLeft, Menu, X, Wifi, Server, Sun, Moon,
 } from 'lucide-react';
 import { useVpn } from '../../context';
@@ -36,8 +36,9 @@ const NAV: NavGroup[] = [
   {
     category: 'Acceso',
     items: [
-      { id: 'users', label: 'Usuarios', icon: Users },
-      { id: 'team', label: 'Equipo', icon: Briefcase },
+      // 'Workspace' unifica los antiguos "Usuarios" (WG peers) y "Equipo"
+      // (miembros del workspace) en una sola vista con sub-tabs.
+      { id: 'team', label: 'Workspace', icon: Briefcase },
     ],
   },
   {

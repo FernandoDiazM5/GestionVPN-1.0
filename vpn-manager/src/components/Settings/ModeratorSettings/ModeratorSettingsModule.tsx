@@ -1,18 +1,25 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Settings as SettingsIcon, User, Briefcase, Database, Bell } from 'lucide-react';
 import ProfileTab from './tabs/ProfileTab';
 import WorkspaceTab from './tabs/WorkspaceTab';
 import ImportExportTab from './tabs/ImportExportTab';
 import NotificationsTab from './tabs/NotificationsTab';
+import { useWorkspaceSession } from '../../../context/WorkspaceSession';
 
 type TabId = 'profile' | 'workspace' | 'notifications' | 'import-export';
 
-const TABS: { id: TabId; label: string; icon: typeof User; description: string }[] = [
+interface TabDef { id: TabId; label: string; icon: typeof User; description: string }
+
+const ALL_TABS: TabDef[] = [
   { id: 'profile',       label: 'Perfil',           icon: User,      description: 'Tu correo y contraseña' },
   { id: 'workspace',     label: 'Workspace',        icon: Briefcase, description: 'Nombre de tu espacio' },
   { id: 'notifications', label: 'Notificaciones',   icon: Bell,      description: 'Email y Telegram' },
   { id: 'import-export', label: 'Respaldo y datos', icon: Database,  description: 'Exportar / importar JSON' },
 ];
+
+// MEMBER: solo perfil + notificaciones (sin workspace ni import/export).
+// El moderador (OWNER/CO_MOD) ve todo.
+const MEMBER_TAB_IDS: TabId[] = ['profile', 'notifications'];
 
 /**
  * Ajustes del Moderador (Fase C).
@@ -22,6 +29,12 @@ const TABS: { id: TabId; label: string; icon: typeof User; description: string }
  * datos del workspace propio.
  */
 export default function ModeratorSettingsModule() {
+  const { session } = useWorkspaceSession();
+  const isMember = session?.role === 'MEMBER';
+  const tabs = useMemo<TabDef[]>(
+    () => (isMember ? ALL_TABS.filter(t => MEMBER_TAB_IDS.includes(t.id)) : ALL_TABS),
+    [isMember],
+  );
   const [tab, setTab] = useState<TabId>('profile');
 
   return (
@@ -35,7 +48,9 @@ export default function ModeratorSettingsModule() {
           <div>
             <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">Ajustes</h2>
             <p className="text-slate-400 dark:text-slate-500 text-sm">
-              Gestiona tu perfil, el workspace y los respaldos
+              {isMember
+                ? 'Gestiona tu perfil y vincula Telegram para activar túneles desde el bot'
+                : 'Gestiona tu perfil, el workspace y los respaldos'}
             </p>
           </div>
         </div>
@@ -45,7 +60,7 @@ export default function ModeratorSettingsModule() {
       <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-5">
         {/* Sidebar de tabs */}
         <div className="space-y-1">
-          {TABS.map(t => {
+          {tabs.map(t => {
             const Icon = t.icon;
             const active = tab === t.id;
             return (
@@ -73,9 +88,9 @@ export default function ModeratorSettingsModule() {
         {/* Contenido */}
         <div>
           {tab === 'profile'       && <ProfileTab />}
-          {tab === 'workspace'     && <WorkspaceTab />}
-          {tab === 'notifications' && <NotificationsTab />}
-          {tab === 'import-export' && <ImportExportTab />}
+          {tab === 'workspace'     && !isMember && <WorkspaceTab />}
+          {tab === 'notifications' && <NotificationsTab memberMode={isMember} />}
+          {tab === 'import-export' && !isMember && <ImportExportTab />}
         </div>
       </div>
     </div>

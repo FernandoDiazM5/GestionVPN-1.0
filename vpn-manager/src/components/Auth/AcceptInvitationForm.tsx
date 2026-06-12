@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { Mail, KeyRound, Lock, ArrowLeft, Loader2, Check, Copy, Router, ShieldCheck } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Mail, KeyRound, Lock, ArrowLeft, Loader2, Check, Copy, Router, ShieldCheck, Smartphone } from 'lucide-react';
+import QRCode from 'qrcode';
 import { teamApi } from '../../services/teamApi';
 import type { RouterCredentials } from '../../store/db';
 import type { WgServerConfig } from '../../types/account';
@@ -25,6 +26,7 @@ export default function AcceptInvitationForm({
   const [error, setError] = useState('');
   const [result, setResult] = useState<{ user: { email: string; role: string }; tunnel: string | null; wg: WgServerConfig | null; conf: string | null } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [qr, setQr] = useState<string | null>(null);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,6 +43,14 @@ export default function AcceptInvitationForm({
   };
 
   const conf = result?.conf || '';
+
+  // Genera el QR del .conf en cuanto está disponible, mismo patrón que
+  // MemberWireGuardModal. WireGuard móvil (iOS/Android) escanea el .conf
+  // completo como QR sin transformación adicional.
+  useEffect(() => {
+    if (!conf) { setQr(null); return; }
+    QRCode.toDataURL(conf, { margin: 1, width: 220 }).then(setQr).catch(() => setQr(null));
+  }, [conf]);
 
   const downloadConf = () => {
     if (!conf) return;
@@ -83,7 +93,27 @@ export default function AcceptInvitationForm({
                 )}
                 {conf ? (
                   <>
-                    <p className="text-2xs text-slate-500">Tu configuración <strong>.conf</strong> está lista. Pégala o impórtala en tu app WireGuard:</p>
+                    <p className="text-2xs text-slate-500">
+                      Tu configuración <strong>.conf</strong> está lista. Escanea el QR desde la app WireGuard
+                      móvil, o pégala/impórtala manualmente:
+                    </p>
+
+                    {/* QR para WireGuard móvil */}
+                    {qr ? (
+                      <div className="flex flex-col items-center gap-2 py-2">
+                        <div className="bg-white p-2 rounded-xl border border-slate-200 shadow-sm">
+                          <img src={qr} alt="QR de configuración WireGuard" width={220} height={220} className="block" />
+                        </div>
+                        <p className="text-2xs text-slate-500 flex items-center gap-1.5">
+                          <Smartphone className="w-3 h-3" /> Escanea con WireGuard móvil (iOS / Android)
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center py-6">
+                        <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+                      </div>
+                    )}
+
                     <pre className="text-2xs font-mono bg-slate-900 text-slate-100 rounded-lg p-3 overflow-x-auto whitespace-pre">{conf}</pre>
                     <div className="flex gap-2">
                       <button onClick={() => { navigator.clipboard.writeText(conf).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }); }}

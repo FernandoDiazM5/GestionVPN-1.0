@@ -31,7 +31,12 @@ const ALL_EVENTS: NotificationEvent[] = [
   'NODE_DOWN', 'NODE_RECOVERED',
 ];
 
-export default function NotificationsTab() {
+interface NotificationsTabProps {
+  /** Modo MEMBER: solo muestra vincular/desvincular Telegram (sin email, eventos, pausa ni guardar). */
+  memberMode?: boolean;
+}
+
+export default function NotificationsTab({ memberMode = false }: NotificationsTabProps = {}) {
   const [status, setStatus] = useState<NotificationStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -104,6 +109,75 @@ export default function NotificationsTab() {
     }
   }
 
+  // Para MEMBER: solo mostramos la fila de Telegram y el flujo de vincular.
+  // El bot Telegram es el camino canónico del MEMBER para activar/desactivar
+  // sus túneles asignados (ver §32 del HANDOFF).
+  const telegramRow = (
+    <ChannelRow
+      icon={Send}
+      title="Telegram"
+      desc={status.telegramLinked ? 'Vinculado ✓' : status.telegramBotConfigured ? 'No vinculado' : 'Bot no disponible en este servidor'}
+      checked={status.channels.telegram}
+      disabled={!status.telegramBotConfigured || !status.telegramLinked}
+      onChange={(v) => update('channels', { ...status.channels, telegram: v })}
+      extra={
+        status.telegramBotConfigured && !status.telegramLinked ? (
+          <button onClick={startLink} className="btn-outline text-xs">Vincular</button>
+        ) : status.telegramLinked ? (
+          <button onClick={unlink} className="btn-outline text-xs text-rose-600 border-rose-200"><X className="w-3.5 h-3.5" /> Desvincular</button>
+        ) : null
+      }
+    />
+  );
+
+  // Render compacto para MEMBER — únicamente Telegram + el código de vinculación.
+  if (memberMode) {
+    return (
+      <div className="space-y-5">
+        <div className="card p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 flex items-center justify-center">
+            <Bell className="w-5 h-5 text-emerald-600" />
+          </div>
+          <div>
+            <p className="font-semibold text-slate-800 dark:text-slate-100">Notificaciones activas</p>
+            <p className="text-xs text-slate-500">Recibes según los canales y eventos elegidos.</p>
+          </div>
+        </div>
+
+        <div className="card p-5 space-y-4">
+          <h3 className="font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+            <Send className="w-4 h-4 text-indigo-500" /> Canales
+          </h3>
+          <p className="text-xs text-slate-500">
+            Vincula tu Telegram para activar y desactivar tus túneles desde el bot.
+          </p>
+          {telegramRow}
+
+          {linkCode && (
+            <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-500/10 p-4 space-y-2">
+              <p className="text-sm text-indigo-800 dark:text-indigo-200">
+                Abre el bot de Telegram y envíale el comando:
+              </p>
+              <div className="flex items-center gap-2">
+                <code className="font-mono px-3 py-2 bg-white dark:bg-slate-900 rounded-lg text-sm">/link {linkCode.code}</code>
+                <button
+                  onClick={() => navigator.clipboard.writeText(`/link ${linkCode.code}`)}
+                  className="btn-outline text-xs"
+                  title="Copiar"
+                ><Copy className="w-3.5 h-3.5" /></button>
+              </div>
+              <p className="text-xs text-indigo-700 dark:text-indigo-300">
+                Expira: {new Date(linkCode.expiresAt).toLocaleString()}
+              </p>
+            </div>
+          )}
+
+          {err && <p className="text-sm text-rose-600 flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5" /> {err}</p>}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
       {/* Pausa global */}
@@ -141,21 +215,7 @@ export default function NotificationsTab() {
           checked={status.channels.email}
           onChange={(v) => update('channels', { ...status.channels, email: v })}
         />
-        <ChannelRow
-          icon={Send}
-          title="Telegram"
-          desc={status.telegramLinked ? 'Vinculado ✓' : status.telegramBotConfigured ? 'No vinculado' : 'Bot no disponible en este servidor'}
-          checked={status.channels.telegram}
-          disabled={!status.telegramBotConfigured || !status.telegramLinked}
-          onChange={(v) => update('channels', { ...status.channels, telegram: v })}
-          extra={
-            status.telegramBotConfigured && !status.telegramLinked ? (
-              <button onClick={startLink} className="btn-outline text-xs">Vincular</button>
-            ) : status.telegramLinked ? (
-              <button onClick={unlink} className="btn-outline text-xs text-rose-600 border-rose-200"><X className="w-3.5 h-3.5" /> Desvincular</button>
-            ) : null
-          }
-        />
+        {telegramRow}
 
         {linkCode && (
           <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-500/10 p-4 space-y-2">

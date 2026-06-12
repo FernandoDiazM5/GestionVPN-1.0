@@ -13,6 +13,8 @@ export interface NodeCardProps {
   tags?: string[];
   onTagClick?: () => void;
   onDiagnose?: () => void;
+  /** Permitir acciones de gestión (kebab, edición de nombre, SSH, etc.). Falso para MEMBER. */
+  canManage?: boolean;
 }
 
 export interface SshCred {

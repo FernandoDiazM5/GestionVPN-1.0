@@ -134,10 +134,16 @@ async function fetchUserTunnels(userId) {
   if (role === 'MEMBER') {
     const ids = await assignmentRepo.assignedTunnelIds(wsId, userId);
     if (!ids.length) return { error: 'No tienes túneles asignados.' };
+    // El `tunnel_id` guardado en `tunnel_assignments` puede contener cualquiera
+    // de los dos identificadores: el modal de asignar usa `nombre_vrf || ppp_user`
+    // (la mayoría termina siendo el VRF). Filtramos por ambos campos, mismo
+    // patrón que `routes/nodes/_shared.js` aplica al HTTP filtro de nodos.
+    const placeholders = ids.map(() => '?').join(',');
     tunnels = await query(
       `SELECT ppp_user, nombre_vrf, nombre_nodo FROM nodes
-        WHERE workspace_id = ? AND ppp_user IN (${ids.map(() => '?').join(',')})`,
-      [wsId, ...ids]
+        WHERE workspace_id = ?
+          AND (nombre_vrf IN (${placeholders}) OR ppp_user IN (${placeholders}))`,
+      [wsId, ...ids, ...ids]
     );
   } else {
     tunnels = await query(

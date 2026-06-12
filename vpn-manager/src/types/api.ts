@@ -84,6 +84,18 @@ export interface WgPeer {
   publicKey: string;
   lastHandshakeSecs: number | null;
   active: boolean;
+  /**
+   * Email del usuario dueño del peer, derivado server-side por JOIN con
+   * `member_wireguard` o `user_mgmt_ips`. `undefined` si el peer no está
+   * mapeado a un user concreto (p. ej. peers legacy del moderador).
+   */
+  email?: string;
+  /**
+   * Alias humano libre del peer (anotación del moderador: "PC casa",
+   * "Celular Personal", etc.). Vive solo en BD del panel; el `comment`
+   * del peer en MikroTik no se altera para preservar trazabilidad.
+   */
+  alias?: string;
 }
 
 /** Respuesta de /api/tunnel/activate */

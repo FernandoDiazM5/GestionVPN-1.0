@@ -19,6 +19,8 @@ interface NodesListSectionProps {
   onDiagnoseNode: (node: NodeInfo) => void;
   onRefreshNodes: () => void;
   isLoading: boolean;
+  /** Permite mostrar Exportar + kebab de acciones de fila. Falso para MEMBER. */
+  canManage?: boolean;
 }
 
 export default function NodesListSection({
@@ -35,6 +37,7 @@ export default function NodesListSection({
   onDiagnoseNode,
   onRefreshNodes,
   isLoading,
+  canManage = true,
 }: NodesListSectionProps) {
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('default');
@@ -128,9 +131,10 @@ export default function NodesListSection({
             onExportCsv={onExportCsv}
             resultCount={filteredAndSortedNodes.length}
             totalCount={nodes.length}
+            canExport={canManage}
           />
 
-          <NodesTable 
+          <NodesTable
             nodes={paginatedNodes}
             nodeTags={nodeTags}
             searchQuery={search}
@@ -144,6 +148,7 @@ export default function NodesListSection({
             onRenameNode={onRenameNode}
             onHistoryNode={onHistoryNode}
             onTagClick={onTagClick}
+            canManage={canManage}
           />
 
           {/* ── Paginación ── */}
