@@ -22,10 +22,16 @@ interface UseDeviceListInput {
   savedIds: Set<string>;
 }
 
+// Sort por defecto = señal desc. Es lo más útil cuando la tabla termina de
+// auth: los dispositivos con mejor señal arriba, los caídos / sin stats abajo
+// (la rama `?? -999` los manda al final). El usuario puede romper este
+// orden haciendo click en cualquier header.
+const DEFAULT_SORT: { key: string; dir: SortDir } = { key: 'signal', dir: 'desc' };
+
 export function useDeviceList({ scanResults, savedIds }: UseDeviceListInput) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterSSID, setFilterSSID] = useState('');
-  const [sortConfig, setSortConfig] = useState<{ key: string; dir: SortDir } | null>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: string; dir: SortDir } | null>(DEFAULT_SORT);
 
   const toggleSort = useCallback((key: string) => {
     setSortConfig(prev =>

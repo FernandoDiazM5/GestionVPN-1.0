@@ -23,7 +23,11 @@ interface DeviceTableRowProps {
   sshStatus: SshAuthStatus | undefined;
   isExpanded: boolean;
   activeConfigCols: ColumnDef[];
-  gridTemplate: string;
+  /**
+   * `gridTemplate` ya no llega como prop — se lee como CSS variable
+   * `--cols-tpl` del contenedor padre. Durante un drag de resize, solo
+   * `DeviceTable` re-renderiza; las filas siguen memoizadas estables.
+   */
   selectedNode: NodeInfo | null;
   savedDevice: SavedDevice | null;
   onToggleExpand: (ip: string) => void;
@@ -38,7 +42,7 @@ interface DeviceTableRowProps {
 
 function DeviceTableRowImpl({
   dev, isSaved, rowIdx, sshStatus, isExpanded,
-  activeConfigCols, gridTemplate, selectedNode, savedDevice,
+  activeConfigCols, selectedNode, savedDevice,
   onToggleExpand, onOpenM5Detail, onSyncToSaved,
   onOpenSavedView, onOpenScanView, onDirectSave, onOpenAddModal, onRefreshStats,
 }: DeviceTableRowProps) {
@@ -55,7 +59,7 @@ function DeviceTableRowImpl({
   return (
     <Fragment>
       <div
-        style={{ display: 'grid', gridTemplateColumns: gridTemplate }}
+        style={{ display: 'grid', gridTemplateColumns: 'var(--cols-tpl)' }}
         className={`items-center border-b transition-colors
           ${isSaved
             ? `${rowIdx % 2 === 0 ? 'bg-indigo-50/20' : 'bg-indigo-50/40'} hover:bg-indigo-50/70 border-indigo-100`
@@ -64,22 +68,35 @@ function DeviceTableRowImpl({
               : `${rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'} hover:bg-slate-50/80 border-slate-100`}
           ${isExpanded ? 'border-b-indigo-200' : ''}`}
       >
-        {/* SSH status */}
+        {/* SSH status — 4 estados visualmente distintos:
+            • pending  → spinner indigo
+            • success  → check emerald sólido
+            • failed   → X rose (NO slate, que se confundía con "no probado")
+            • undef.   → placeholder vacío
+        */}
         <div className="px-2 py-2.5 flex items-center justify-center">
-          {sshStatus === 'pending' && <Loader2 className="w-3.5 h-3.5 text-slate-300 animate-spin" />}
+          {sshStatus === 'pending' && (
+            <div role="status" aria-label="Probando SSH" title="Probando SSH..."
+              className="w-5 h-5 rounded-md bg-indigo-50 flex items-center justify-center border border-indigo-200 dark:bg-indigo-500/10 dark:border-indigo-500/30">
+              <Loader2 className="w-3 h-3 text-indigo-500 animate-spin" />
+            </div>
+          )}
           {sshStatus === 'success' && (
-            <div title={`SSH exitoso: ${dev.sshUser}`}
-              className="w-5 h-5 rounded-md bg-emerald-100 flex items-center justify-center border border-emerald-200">
-              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+            <div role="status" aria-label={`SSH exitoso con ${dev.sshUser}`} title={`SSH exitoso: ${dev.sshUser}`}
+              className="w-5 h-5 rounded-md bg-emerald-100 flex items-center justify-center border border-emerald-200 dark:bg-emerald-500/15 dark:border-emerald-500/30">
+              <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
             </div>
           )}
           {sshStatus === 'failed' && (
-            <div title="Sin acceso SSH"
-              className="w-5 h-5 rounded-md bg-slate-100 flex items-center justify-center border border-slate-200">
-              <X className="w-3 h-3 text-slate-300" />
+            <div role="status" aria-label="Sin acceso SSH" title="Sin acceso SSH (autenticación falló)"
+              className="w-5 h-5 rounded-md bg-rose-50 flex items-center justify-center border border-rose-200 dark:bg-rose-500/10 dark:border-rose-500/30">
+              <X className="w-3 h-3 text-rose-500 dark:text-rose-400" />
             </div>
           )}
-          {!sshStatus && <div className="w-5 h-5" />}
+          {!sshStatus && (
+            <div aria-label="No probado" title="No se intentó conexión SSH"
+              className="w-5 h-5 rounded-md border border-dashed border-slate-200 dark:border-slate-700" />
+          )}
         </div>
 
         {/* Rol + Frecuencia */}
@@ -228,6 +245,5 @@ export const DeviceTableRow = memo(DeviceTableRowImpl, (prev, next) =>
   prev.savedDevice === next.savedDevice &&
   prev.selectedNode === next.selectedNode &&
   prev.activeConfigCols === next.activeConfigCols &&
-  prev.gridTemplate === next.gridTemplate &&
   prev.rowIdx === next.rowIdx
 );

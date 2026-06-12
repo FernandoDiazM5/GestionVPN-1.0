@@ -65,18 +65,30 @@ export function useDeviceLibrary({
   }, [nodesLength]);
 
   const handleAddDevice = useCallback(async (device: SavedDevice) => {
-    const existingIdx = savedDevices.findIndex(d => d.id === device.id);
-    const existingDev = existingIdx >= 0 ? savedDevices[existingIdx] : null;
-    const merged: SavedDevice = existingDev
-      ? { ...existingDev, ...device, addedAt: existingDev.addedAt }
-      : device;
-
-    const current = existingIdx >= 0
-      ? savedDevices.map((d, i) => i === existingIdx ? merged : d)
-      : [...savedDevices, merged];
-
-    setSavedDevices(current);
-    setSavedIds(new Set(current.map(d => d.id)));
+    // Functional setState — el updater ve siempre el estado más reciente, no
+    // el capturado del closure. Cierra la race cuando llegan dos saves cerca
+    // (ej. manual + enriquecimiento SSH en background). Se exporta `merged` y
+    // `wasExisting` del updater vía variables locales: el updater es puro y
+    // se evalúa una sola vez en producción (en StrictMode dev puede correr
+    // dos veces pero el resultado es idempotente).
+    let merged!: SavedDevice;
+    let wasExisting = false;
+    setSavedDevices(prev => {
+      const existing = prev.find(d => d.id === device.id);
+      wasExisting = !!existing;
+      merged = existing
+        ? { ...existing, ...device, addedAt: existing.addedAt }
+        : device;
+      return existing
+        ? prev.map(d => d.id === device.id ? merged : d)
+        : [...prev, merged];
+    });
+    setSavedIds(prev => {
+      if (prev.has(merged.id)) return prev;
+      const next = new Set(prev);
+      next.add(merged.id);
+      return next;
+    });
     await deviceDb.saveSingle(merged);
     setAddingDevice(null);
 
@@ -139,11 +151,11 @@ export function useDeviceLibrary({
         showToast('Guardado. No se pudo conectar por SSH');
       }
     } else {
-      showToast(existingDev
+      showToast(wasExisting
         ? 'Dispositivo actualizado'
         : merged.cachedStats ? 'Dispositivo guardado (con estadísticas)' : 'Dispositivo guardado');
     }
-  }, [savedDevices, setAddingDevice, setScanResults, setSshStatus, showToast]);
+  }, [setAddingDevice, setScanResults, setSshStatus, showToast]);
 
   const handleRemoveDevice = useCallback(async (id: string) => {
     setSavedDevices(prev => prev.filter(d => d.id !== id));

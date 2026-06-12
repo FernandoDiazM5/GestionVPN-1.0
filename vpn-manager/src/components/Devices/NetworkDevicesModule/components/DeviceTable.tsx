@@ -6,7 +6,7 @@
 //  delega cada fila a <DeviceTableRow /> memoizada.
 // ============================================================
 
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { GripVertical } from 'lucide-react';
 import type { ScannedDevice, SavedDevice, AntennaStats } from '../../../../types/devices';
 import type { NodeInfo } from '../../../../types/api';
@@ -19,7 +19,6 @@ interface DeviceTableProps {
   activeConfigCols: ColumnDef[];
   gridTemplate: string;
   minTableWidth: number;
-  colWidths: Record<string, number>;
   sortConfig: { key: string; dir: 'asc' | 'desc' } | null;
   toggleSort: (key: string) => void;
   startResize: (key: string, startX: number) => void;
@@ -39,21 +38,37 @@ interface DeviceTableProps {
 
 function DeviceTableImpl(props: DeviceTableProps) {
   const {
-    sortedRows, activeConfigCols, gridTemplate, minTableWidth, colWidths,
+    sortedRows, activeConfigCols, gridTemplate, minTableWidth,
     sortConfig, toggleSort, startResize, sshStatus, expandedRows, toggleExpand,
     savedDevices, selectedNode,
     onOpenM5Detail, onSyncToSaved, onOpenSavedView, onOpenScanView,
     onDirectSave, onOpenAddModal, onRefreshStats,
   } = props;
 
+  // Setea gridTemplate como CSS variable a nivel del contenedor.
+  // El header y todas las filas leen var(--cols-tpl), así que al cambiar el
+  // ancho de una columna durante un drag solo este contenedor re-renderiza —
+  // las filas no invalidan su memo (su prop gridTemplate ya no varía).
+  const containerStyle: React.CSSProperties & Record<'--cols-tpl', string> = {
+    minWidth: `${minTableWidth}px`,
+    '--cols-tpl': gridTemplate,
+  };
+
+  // Lookup O(1) del SavedDevice por id. Antes era Array.find por fila →
+  // O(n·m) con n filas escaneadas × m saved.
+  const savedById = useMemo(
+    () => new Map(savedDevices.map(d => [d.id, d])),
+    [savedDevices],
+  );
+
   return (
     <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-x-auto">
-      <div style={{ minWidth: `${minTableWidth}px` }}>
+      <div style={containerStyle}>
 
         {/* Header sticky */}
         <div
           className="bg-slate-100 border-b border-slate-200 text-xs font-bold text-slate-600 uppercase tracking-wider rounded-tl-xl rounded-tr-xl dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300"
-          style={{ display: 'grid', gridTemplateColumns: gridTemplate }}
+          style={{ display: 'grid', gridTemplateColumns: 'var(--cols-tpl)' }}
         >
           <div className="px-3 py-3 text-center">SSH</div>
           <div className="px-3 py-3">Rol</div>
@@ -86,8 +101,6 @@ function DeviceTableImpl(props: DeviceTableProps) {
                 onMouseDown={e => {
                   e.preventDefault();
                   startResize(col.key, e.clientX);
-                  // Forzar referencia para silenciar el linter (colWidths se usa internamente en useColumnPrefs)
-                  void colWidths;
                 }}
               >
                 <GripVertical className="w-3 h-3" />
@@ -100,7 +113,7 @@ function DeviceTableImpl(props: DeviceTableProps) {
 
         {/* Body */}
         {sortedRows.map(({ dev, isSaved, devId }, rowIdx) => {
-          const savedDevice = isSaved ? (savedDevices.find(s => s.id === devId) ?? null) : null;
+          const savedDevice = isSaved ? (savedById.get(devId) ?? null) : null;
           return (
           <DeviceTableRow
             key={dev.ip}
@@ -110,7 +123,6 @@ function DeviceTableImpl(props: DeviceTableProps) {
             sshStatus={sshStatus[dev.ip]}
             isExpanded={expandedRows.has(dev.ip)}
             activeConfigCols={activeConfigCols}
-            gridTemplate={gridTemplate}
             selectedNode={selectedNode}
             savedDevice={savedDevice}
             onToggleExpand={toggleExpand}
