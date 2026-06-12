@@ -14,16 +14,21 @@ const EVENT_LABEL: Record<NotificationEvent, string> = {
   TUNNEL_ACTIVATED: 'Túnel activado',
   TUNNEL_DEACTIVATED: 'Túnel desactivado',
   SESSION_EXPIRED: 'Sesión expirada',
+  NODE_DOWN: 'Nodo caído',
+  NODE_RECOVERED: 'Nodo recuperado',
 };
 
 const EVENT_DESC: Record<NotificationEvent, string> = {
   TUNNEL_ACTIVATED: 'Cuando alguien (tú u otro) activa un túnel.',
   TUNNEL_DEACTIVATED: 'Cuando un túnel queda en estado revocado.',
   SESSION_EXPIRED: 'Cuando el TTL de tu sesión vence y se cierra sola.',
+  NODE_DOWN: 'El monitoreo proactivo detectó un nodo sin responder (3 polls consecutivos).',
+  NODE_RECOVERED: 'Un nodo previamente caído volvió a responder.',
 };
 
 const ALL_EVENTS: NotificationEvent[] = [
   'TUNNEL_ACTIVATED', 'TUNNEL_DEACTIVATED', 'SESSION_EXPIRED',
+  'NODE_DOWN', 'NODE_RECOVERED',
 ];
 
 export default function NotificationsTab() {

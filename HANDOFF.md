@@ -84,7 +84,7 @@
 |---|---|
 | 🟡 Limpieza | Quitar `adminIP` hardcodeado (`useNodeManagement.ts`, ya no se usa) · warning MySQL2 `keepAliveInitialDelayMs` (mitigado en F11) · job batch de expiración (hoy perezoso en `/tunnel/status`) · escaneo atado al `mgmt_ip` del solicitante. |
 | 🟡 Mejora | **Fase 5 (opcional):** aislamiento de firewall por-IP + acotar regla "Admin MGMT libre" (defensa en profundidad; hoy el ruteo ya aísla). Dockerfile `USER` no-root (Semgrep S1). |
-| 🟢 Resuelto | O2 repo privado · O5 MySQL estable · UX P6 · **multi-usuario activación (verificado)** · parche `!empty` · fixes C1–C7 · **crash `POST /api/wireguard/peers` (ver §13.6)** · **V1 `register-my-ip` ownership por rol** · **Q1 Notificaciones (§26)** · **M1 Bot Telegram (§27)** · **Q3 Diagnóstico ping/trace (§28)** · **Q4 Export auditoría CSV/JSON (§29)** · **Q2 Dashboard métricas (§30)** · **Job de expiración batch**. |
+| 🟢 Resuelto | O2 repo privado · O5 MySQL estable · UX P6 · **multi-usuario activación (verificado)** · parche `!empty` · fixes C1–C7 · **crash `POST /api/wireguard/peers` (ver §13.6)** · **V1 `register-my-ip` ownership por rol** · **Q1 Notificaciones (§26)** · **M1 Bot Telegram (§27)** · **Q3 Diagnóstico ping/trace (§28)** · **Q4 Export auditoría CSV/JSON (§29)** · **Q2 Dashboard métricas (§30)** · **M5 Monitoreo proactivo (§31)** · **Job de expiración batch**. |
 | 🟢 Nota | Config MikroTik `v2.rsc` SIN mangle global (baseline limpio multi-usuario). Peer `peer27` de prueba con public-key placeholder `abcdEFGH...` (borrable). |
 
 **Scripts:** `cd server && npm run init:rbac | init:multiuser | migrate:sqlite | seed:roles` · `node db/rotateSecrets.js` · `node db/mapUserMgmtIp.js <email> <ip>`.
@@ -1693,6 +1693,108 @@ GET /api/dashboard/metrics
 - **Histórico persistido** — escribir los snapshots a una tabla `metrics_snapshots(ts, json)` para sobrevivir reinicios. ~30 LOC. Hoy basta con que Prometheus haga scrape externo.
 - **Alertas dentro del panel** — si `routerosOkRatio < 0.9` por 5 min, mostrar banner amarillo arriba del dashboard (reutiliza la lógica del notifier).
 - **Métricas de negocio** — `tunnels_active`, `members_total`, `subnets_scanned_total`. Hoy las cards de arriba del AdminDashboard usan `/api/admin/summary` con MySQL puro; podría unificarse.
+
+---
+
+## 31) 🛡️ Monitoreo proactivo (M5)
+
+Cierra el loop entre observación (F9/Q2), notificaciones (Q1) y diagnóstico (Q3). Antes el operador descubría un nodo caído porque un cliente llamaba; ahora el job lo detecta y notifica al OWNER antes que la queja.
+
+### Flujo
+
+```
+setInterval cada MONITORING_INTERVAL_MS (default 5 min)
+   │
+   ▼
+[1] Lee MT_IP/MT_USER/MT_PASS desde app_settings.
+   │
+   ▼
+[2] Conecta UNA vez al router central y trae /ppp/active/print
+   → set de ppp_users vivos.
+   │
+   ▼
+[3] Lee SELECT ppp_user, nombre_nodo, nombre_vrf, workspace_id FROM nodes
+    junto con monitoring_state previo (listAll).
+   │
+   ▼
+[4] Para cada nodo:
+   ├─ está en el set → recordCheck('up', fail_count=0)
+   │     · si venía DOWN → notify NODE_RECOVERED al OWNER
+   │       (payload incluye downSeconds desde last_alert_at)
+   │     · recoverySent=true (actualiza last_recovery_at)
+   │
+   └─ NO está → recordCheck('down', fail_count++)
+         · ¿fail_count >= MONITORING_FAIL_THRESHOLD (default 3)?
+           AND (now - last_alert_at) >= MONITORING_ALERT_COOLDOWN_MS
+           (default 30 min)?
+              → notify NODE_DOWN al OWNER (payload con failCount)
+              → alertSent=true (actualiza last_alert_at)
+              → cooldown frena alertas siguientes mientras esté caído
+```
+
+### Anti-flap explicado
+
+Con defaults: `interval 5min × threshold 3` = **15 min de gracia** antes de la primera alerta. Esto cubre el caso típico de un router que se reinicia 30s — los 2 primeros polls fallan pero el 3º ya lo encuentra vivo, sin spam.
+
+Cooldown 30 min: si el problema persiste 2h, el OWNER recibe ~4 emails, no 24.
+
+### Variables `.env` nuevas
+
+```bash
+# Job de monitoreo proactivo (M5). Sin esto los defaults aplican.
+MONITORING_ENABLED=true                          # false para apagar
+MONITORING_INTERVAL_MS=300000                    # cada 5 min
+MONITORING_FAIL_THRESHOLD=3                      # polls fallidos antes de NODE_DOWN
+MONITORING_ALERT_COOLDOWN_MS=1800000             # 30 min entre alertas DOWN repetidas
+```
+
+### Schema nuevo
+
+```sql
+CREATE TABLE monitoring_state (
+  workspace_id     CHAR(36)    NOT NULL,
+  target_kind      VARCHAR(20) NOT NULL,         -- 'node' hoy
+  target_id        VARCHAR(190) NOT NULL,        -- ppp_user del nodo
+  last_status      VARCHAR(20)  NOT NULL DEFAULT 'unknown',
+  fail_count       INT          NOT NULL DEFAULT 0,
+  last_check_at    BIGINT       NOT NULL DEFAULT 0,
+  last_alert_at    BIGINT       DEFAULT NULL,
+  last_recovery_at BIGINT       DEFAULT NULL,
+  PRIMARY KEY (workspace_id, target_kind, target_id),
+  KEY idx_mon_status (last_status, last_check_at)
+);
+```
+
+Aplicar con `cd server && npm run migrate:monitoring` (idempotente).
+
+### Archivos clave
+
+| Archivo | Para qué |
+|---------|----------|
+| [server/sql/schema_monitoring.sql](server/sql/schema_monitoring.sql) | Tabla `monitoring_state` (1 fila por (ws, kind, id)). |
+| [server/db/migrateMonitoring.js](server/db/migrateMonitoring.js) | Migrador idempotente — `npm run migrate:monitoring`. |
+| [server/db/repos/monitoringRepo.js](server/db/repos/monitoringRepo.js) | `listAll`, `listByWorkspace`, `recordCheck` con upsert. Defensivo ante `ER_NO_SUCH_TABLE` (mismo patrón que Q1). |
+| [server/lib/monitoringJob.js](server/lib/monitoringJob.js) | `start`/`stop`/`runOnce`. Lee creds MT_*, conecta UNA vez, mapea ppp_users vivos vs nodos del MySQL, dispara NODE_DOWN/RECOVERED al OWNER. |
+| [server/lib/notifier.js](server/lib/notifier.js) | Templates HTML/text para `NODE_DOWN` (🔴 con failCount) y `NODE_RECOVERED` (✅ con downSeconds formateado). |
+| [packages/contracts/src/notifications.ts](packages/contracts/src/notifications.ts) | Enum `NotificationEventSchema` ampliado a 5 eventos. |
+| [vpn-manager/.../NotificationsTab.tsx](vpn-manager/src/components/Settings/ModeratorSettings/tabs/NotificationsTab.tsx) | `EVENT_LABEL` + `EVENT_DESC` + `ALL_EVENTS` ampliados — el usuario puede suscribirse/desuscribirse a los nodos caídos como cualquier otro evento. |
+| [server/test/unit/monitoringJob.test.js](server/test/unit/monitoringJob.test.js) | 9 tests: 3 del anti-flap (1/2/3 fallos), 2 del cooldown (dentro/fuera), 2 del recovery (con/sin previo DOWN), 2 de robustez (sin creds, router caído). |
+
+### Decisiones documentadas
+
+- **Job único multi-tenant** — un solo `connectToMikrotik` por tick. Si el router cae, el tick termina sin alertas (no genera ruido falso). Defensa: `monitoringJob.test.js > robustez` lo verifica.
+- **Anti-flap con counter en BD** — el counter persiste a través de reinicios del backend; si reinicias en mitad de un outage, el job no resetea el progreso del anti-flap.
+- **Cooldown medido contra `last_alert_at`** — no contra `last_check_at`. Significa: una vez alertado, no vuelves a alertar hasta `cooldown_ms`, aun si el nodo sigue caído.
+- **Notifica solo al OWNER del workspace** — `workspace_members` con `role='OWNER' AND deleted_at IS NULL`. Si quieres notificar también CO_MOD, cambiar el `LIMIT 1` por un foreach (~5 LOC).
+- **Reusa `notifier.notify`** — toda la maquinaria de canales (email/Telegram), pausa global y suscripción por evento ya existe. M5 solo agrega eventos al enum y templates a `buildMessage`.
+- **El job no escribe en RouterOS** — solo lee `/ppp/active/print`. No toca peers, mangle, ni reglas. Es seguro para correr cada 5 min sin riesgo de degradar el core.
+
+### Pendiente / mejoras futuras
+
+- **Monitoreo de antenas Ubiquiti** — agregar `target_kind='ap'` que cada N min SSH a la antena y verifica `signal_dbm` contra un umbral. Reusa la misma tabla `monitoring_state` y los mismos eventos (extendidos a `SIGNAL_DEGRADED`).
+- **Endpoint `GET /api/monitoring/status`** — devuelve la tabla actual para mostrarla como tarjeta en el dashboard ("3 nodos abajo · 2 alertados").
+- **Configuración por workspace** — hoy los umbrales son globales (`.env`). Para un SaaS multi-tenant real, mover a `app_settings` o tabla nueva por workspace.
+- **Métrica Prometheus** — `vpn_monitoring_node_state{workspace,node,status="up|down"}` gauge para que Grafana también vea el estado.
 
 ---
 

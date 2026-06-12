@@ -11,6 +11,7 @@
     "migrate:sqlite": "node db/migrateSqliteToMysql.js",
     "migrate:perf": "node db/migratePerf.js",
     "migrate:notifications": "node db/migrateNotifications.js",
+    "migrate:monitoring": "node db/migrateMonitoring.js",
     "seed:roles": "node db/seedRoles.js",
     "analyze:queries": "node tools/analyze-queries.js",
     "test": "vitest run",

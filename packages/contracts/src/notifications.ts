@@ -14,6 +14,9 @@ export const NotificationEventSchema = z.enum([
   'TUNNEL_ACTIVATED',
   'TUNNEL_DEACTIVATED',
   'SESSION_EXPIRED',
+  // M5 — monitoreo proactivo
+  'NODE_DOWN',           // un nodo dejó de responder (3 fallos consecutivos)
+  'NODE_RECOVERED',      // un nodo down volvió a responder
 ]);
 export type NotificationEvent = z.infer<typeof NotificationEventSchema>;
 

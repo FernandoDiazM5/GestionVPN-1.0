@@ -27,6 +27,8 @@ const EVENT_LABEL = {
   TUNNEL_ACTIVATED: 'Túnel activado',
   TUNNEL_DEACTIVATED: 'Túnel desactivado',
   SESSION_EXPIRED: 'Sesión expirada',
+  NODE_DOWN: 'Nodo caído',
+  NODE_RECOVERED: 'Nodo recuperado',
 };
 
 /**
@@ -69,6 +71,36 @@ function buildMessage(event, payload = {}) {
         text: `${label}\nEl túnel ${tunnelId || vrf} caducó por TTL.\n` +
               `Reactívalo desde el panel si lo necesitas.\nFecha: ${when}`,
       };
+    case 'NODE_DOWN': {
+      const nodeName = payload.nodeName || tunnelId || vrf || '—';
+      const fails = payload.failCount != null ? `${payload.failCount} polls fallidos` : '';
+      return {
+        subject: `[VPN] 🔴 ${label} · ${nodeName}`,
+        html: `<b>🔴 ${label}</b><br>El nodo <code>${nodeName}</code> dejó de responder.<br>` +
+              `${fails ? `Estado: ${fails}<br>` : ''}` +
+              `Revisa el panel para diagnosticar.<br>Fecha: ${when}`,
+        text: `${label}\nEl nodo ${nodeName} dejó de responder.\n` +
+              `${fails ? `${fails}\n` : ''}` +
+              `Revisa el panel para diagnosticar.\nFecha: ${when}`,
+      };
+    }
+    case 'NODE_RECOVERED': {
+      const nodeName = payload.nodeName || tunnelId || vrf || '—';
+      const downSecs = payload.downSeconds != null ? Math.floor(payload.downSeconds) : null;
+      const downStr = downSecs == null ? '' :
+        downSecs < 60 ? `${downSecs}s` :
+        downSecs < 3600 ? `${Math.floor(downSecs / 60)}m ${downSecs % 60}s` :
+        `${Math.floor(downSecs / 3600)}h ${Math.floor((downSecs % 3600) / 60)}m`;
+      return {
+        subject: `[VPN] ✅ ${label} · ${nodeName}`,
+        html: `<b>✅ ${label}</b><br>El nodo <code>${nodeName}</code> volvió a responder.<br>` +
+              `${downStr ? `Estuvo caído: ${downStr}<br>` : ''}` +
+              `Fecha: ${when}`,
+        text: `${label}\nEl nodo ${nodeName} volvió a responder.\n` +
+              `${downStr ? `Estuvo caído: ${downStr}\n` : ''}` +
+              `Fecha: ${when}`,
+      };
+    }
     default:
       return {
         subject: `[VPN] ${label}`,
