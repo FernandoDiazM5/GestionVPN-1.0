@@ -490,7 +490,7 @@ export default function NetworkDevicesModule() {
                     disabled={bulkSaving}
                     title={`Guardar los ${bulkSaveSelection.length} dispositivos seleccionados en la biblioteca del nodo`}
                     aria-label={`Guardar ${bulkSaveSelection.length} dispositivos seleccionados`}
-                    className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm shadow-emerald-500/20 transition-all active:scale-[0.97] disabled:opacity-50"
+                    className="btn-success btn-sm flex items-center space-x-1.5"
                   >
                     {bulkSaving
                       ? <Loader2 className="w-3.5 h-3.5 motion-safe:animate-spin" />

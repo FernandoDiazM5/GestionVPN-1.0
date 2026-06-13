@@ -83,7 +83,7 @@ export default function NuevoAdmin({ peers, onClose, onSuccess }: NuevoAdminProp
                 </div>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400">Configura el cliente WireGuard con esta IP y conecta para activarlo.</p>
-              <button onClick={onClose} className="w-full py-2.5 rounded-xl text-sm font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors">
+              <button onClick={onClose} className="btn-primary btn-md w-full">
                 Cerrar
               </button>
             </div>
@@ -115,7 +115,7 @@ export default function NuevoAdmin({ peers, onClose, onSuccess }: NuevoAdminProp
                   Cancelar
                 </button>
                 <button onClick={handleCreate} disabled={!pubKey.trim() || saving}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                  className="btn-primary btn-md flex items-center gap-2">
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
                   <span>{saving ? 'Creando...' : 'Crear administrador'}</span>
                 </button>

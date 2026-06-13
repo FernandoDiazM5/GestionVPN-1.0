@@ -48,7 +48,7 @@ export function NodeCardWgPeerForm({
             <button
               onClick={onHandleSetWgPeer}
               disabled={!wgPeerKey.trim() || isSettingPeer}
-              className="flex-1 py-1.5 rounded-lg text-xs font-bold bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="btn-accent btn-sm flex-1"
             >
               {isSettingPeer ? 'Configurando...' : 'Configurar Peer'}
             </button>

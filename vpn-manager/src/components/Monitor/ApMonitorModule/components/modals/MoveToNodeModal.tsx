@@ -65,7 +65,7 @@ function MoveToNodeModal({ device, nodes, knownNames, onConfirm, onClose }: {
           <button
             onClick={() => selected && selected.name !== device.nodeName && onConfirm(selected.id, selected.name)}
             disabled={!selected || selected.name === device.nodeName}
-            className="flex-1 px-4 py-2 rounded-xl text-sm font-bold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+            className="btn-primary btn-md flex-1">
             Mover
           </button>
         </div>

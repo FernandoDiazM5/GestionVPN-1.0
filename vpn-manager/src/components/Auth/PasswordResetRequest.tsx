@@ -63,7 +63,7 @@ export default function PasswordResetRequest({ onBack }: { onBack: () => void })
                   El enlace es válido por <strong>15 minutos</strong>. Revisa tu carpeta de spam si no lo ves.
                 </p>
                 <button onClick={onBack}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-semibold text-sm mt-2">
+                  className="btn-primary btn-md w-full mt-2">
                   Volver a iniciar sesión
                 </button>
               </div>
@@ -81,7 +81,7 @@ export default function PasswordResetRequest({ onBack }: { onBack: () => void })
                     className="input-field pl-10" />
                 </div>
                 <button type="submit" disabled={busy || !email.trim()}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-semibold text-sm disabled:opacity-60 flex items-center justify-center gap-2">
+                  className="btn-primary btn-md w-full flex items-center justify-center">
                   {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />} Enviar enlace
                 </button>
               </form>

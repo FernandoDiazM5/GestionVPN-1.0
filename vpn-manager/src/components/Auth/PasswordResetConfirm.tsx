@@ -112,7 +112,7 @@ export default function PasswordResetConfirm({
                 {mismatch && <p className="text-2xs text-rose-600 dark:text-rose-400">Las contraseñas no coinciden</p>}
 
                 <button type="submit" disabled={busy || !canSubmit}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-semibold text-sm disabled:opacity-60 flex items-center justify-center gap-2">
+                  className="btn-primary btn-md w-full flex items-center justify-center">
                   {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />} Actualizar contraseña
                 </button>
               </form>

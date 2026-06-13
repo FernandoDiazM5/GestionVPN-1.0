@@ -141,12 +141,18 @@ const RULES = [
     severity: 'info',
     title: 'Botón con bg+text inline en vez de usar clase del sistema',
     rationale: 'CLAUDE.md define .btn-primary / .btn-success / .btn-danger / .btn-warning / .btn-outline / .btn-ghost. Los botones inline pierden la consistencia (active:scale, shadow, dark mode, focus ring).',
-    test: (line) => {
-      if (!/<button\b|className="(?:[^"]*\s)?bg-(?:indigo|emerald|rose|amber|sky|brand|success|danger|warning)-(?:500|600|700)/.test(line)) return [];
+    test: (line, ctx) => {
+      // Solo dispara dentro de bloques de JSX que parecen pertenecer a un
+      // <button>. Como el regex es por línea, miramos las 3 líneas previas
+      // del contexto para confirmar que es un <button ...>; si no, lo
+      // dejamos pasar (puede ser <span>, <div> con bg, badge, etc.).
+      const prev = ctx?.prev3 || '';
+      const isButtonish = /<button\b/.test(prev) || /<button\b/.test(line);
+      if (!isButtonish) return [];
       // Si ya usa una clase del sistema, OK.
-      if (/\b(btn-(?:primary|success|danger|warning|outline|ghost)|badge-(?:success|danger|warning|info|neutral|accent))\b/.test(line)) return [];
-      // Solo si tiene tanto bg-...-600 como text-white (botón sólido inline)
-      const hasSolid = /\bbg-(indigo|emerald|rose|amber|sky|brand|success|danger|warning)-(500|600|700)\b.*\btext-white\b/.test(line);
+      if (/\b(btn-(?:primary|success|danger|warning|info|accent|outline|ghost)|badge-(?:success|danger|warning|info|neutral|accent))\b/.test(line)) return [];
+      // Solo si tiene tanto bg-...-{500|600|700} como text-white (botón sólido inline).
+      const hasSolid = /\bbg-(indigo|emerald|rose|amber|sky|violet|brand|success|danger|warning|info|accent)-(500|600|700)\b.*\btext-white\b/.test(line);
       if (hasSolid) return ['botón sólido sin clase .btn-*'];
       return [];
     },
@@ -180,9 +186,13 @@ function audit(opts = {}) {
       const line = lines[i];
       // ignora líneas de comentario puro
       if (/^\s*(?:\/\/|\*|\/\*)/.test(line)) continue;
+      // Contexto: 3 líneas previas para reglas que necesitan saber si el
+      // bloque actual pertenece a un <button> (ver DS06).
+      const prev3 = lines.slice(Math.max(0, i - 3), i).join('\n');
+      const ctx = { prev3 };
       for (const rule of RULES) {
         if (ruleFilter && rule.id !== ruleFilter && !rule.id.startsWith(ruleFilter)) continue;
-        const violations = rule.test(line);
+        const violations = rule.test(line, ctx);
         for (const v of violations) {
           findings.push({
             file: path.relative(path.join(__dirname, '..'), file).replace(/\\/g, '/'),

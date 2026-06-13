@@ -154,7 +154,7 @@ function CpeDetailModal({
                 </div>
               </div>
               <button type="submit" disabled={savingCreds || !credUser}
-                className="w-full py-1.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white text-xs font-semibold rounded-lg transition-colors flex items-center justify-center gap-2">
+                className="btn-warning btn-sm w-full flex items-center justify-center gap-2">
                 {savingCreds ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
                 Conectar y guardar credenciales
               </button>

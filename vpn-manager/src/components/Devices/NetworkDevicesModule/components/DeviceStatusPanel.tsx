@@ -92,7 +92,7 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
         <span className="text-xs text-slate-400 italic">Sin estadísticas SSH disponibles.</span>
         {dev.sshUser && (
           <button onClick={handleRefresh} disabled={refreshing}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-50 transition-colors">
+            className="btn-info btn-sm flex items-center gap-1.5">
             {refreshing ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
             <span>Obtener datos</span>
           </button>
@@ -137,7 +137,7 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
           )}
           {dev.sshUser && (
             <button onClick={handleRefresh} disabled={refreshing}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded text-2xs font-bold bg-sky-500 hover:bg-sky-400 text-white disabled:opacity-50 transition-colors">
+              className="btn-info btn-sm flex items-center gap-1.5">
               {refreshing ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
               <span>Ahora</span>
             </button>

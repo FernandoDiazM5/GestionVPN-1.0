@@ -227,7 +227,7 @@ export default function RouterAccess() {
               <button
                 type="submit"
                 disabled={isConnecting || !username || !password}
-                className="w-full relative flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white py-3 px-4 rounded-xl font-semibold text-sm transition-all focus:ring-4 focus:ring-indigo-100 disabled:opacity-70 disabled:cursor-not-allowed group overflow-hidden mt-6"
+                className="btn-primary btn-md w-full relative flex items-center justify-center space-x-2 group overflow-hidden mt-6"
               >
                 <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
                 <Server className="w-4 h-4 relative z-10" />

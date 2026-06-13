@@ -41,7 +41,7 @@ export default function TagModal({ node, currentTags, onSave, onClose }: {
               placeholder="Nueva etiqueta (Enter para agregar)"
               className="flex-1 px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-300" />
             <button onClick={addTag} disabled={!input.trim()}
-              className="px-3 py-2 rounded-xl bg-amber-500 text-white text-sm font-bold hover:bg-amber-600 disabled:opacity-40 transition-colors">
+              className="btn-warning btn-icon">
               <Plus className="w-4 h-4" />
             </button>
           </div>
@@ -62,7 +62,7 @@ export default function TagModal({ node, currentTags, onSave, onClose }: {
               Cancelar
             </button>
             <button onClick={() => { onSave(tags); onClose(); }}
-              className="flex-1 py-2 rounded-xl text-sm font-bold bg-amber-500 text-white hover:bg-amber-600 transition-colors">
+              className="btn-warning btn-md flex-1">
               Guardar
             </button>
           </div>

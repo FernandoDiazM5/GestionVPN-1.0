@@ -133,7 +133,7 @@ export default function AcceptInvitationForm({
                 )}
                 <button
                   onClick={() => onLoggedIn({ user: result.user.email, token: '', role: result.user.role === 'MEMBER' ? 'viewer' : 'admin' })}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-semibold text-sm mt-2 flex items-center justify-center gap-2">
+                  className="btn-primary btn-md w-full mt-2 flex items-center justify-center">
                   <ShieldCheck className="w-4 h-4" /> Entrar al panel
                 </button>
               </div>
@@ -155,7 +155,7 @@ export default function AcceptInvitationForm({
                 </div>
                 <p className="text-2xs text-slate-400">Al aceptar, generaremos tu configuración WireGuard lista para usar.</p>
                 <button type="submit" disabled={busy || !email.trim() || otp.length !== 6}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-semibold text-sm disabled:opacity-60 flex items-center justify-center gap-2">
+                  className="btn-primary btn-md w-full flex items-center justify-center">
                   {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Aceptar y unirme
                 </button>
               </form>

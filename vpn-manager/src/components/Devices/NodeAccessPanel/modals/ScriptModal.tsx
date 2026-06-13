@@ -196,8 +196,7 @@ export default function ScriptModal({ node, onClose }: { node: NodeInfo; onClose
             Cerrar
           </button>
           <button onClick={handleGenerate} disabled={!canGenerate || loading}
-            className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold bg-emerald-600 text-white
-              hover:bg-emerald-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-md shadow-emerald-500/25">
+            className="btn-success btn-md flex items-center gap-2">
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileCode className="w-4 h-4" />}
             <span>{loading ? 'Generando...' : script ? 'Regenerar' : 'Generar Script'}</span>
           </button>

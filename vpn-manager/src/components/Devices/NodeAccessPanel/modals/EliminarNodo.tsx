@@ -135,7 +135,7 @@ export default function EliminarNodo({ node, onClose, onSuccess }: EliminarNodoP
                 <ProvisionSteps steps={result.steps ?? []} failedAt={result.failedAt} visible={visibleSteps} />
               </div>
               <button onClick={() => result.success ? onSuccess(deletedDeviceIds) : onClose()}
-                className="w-full py-2.5 rounded-xl text-sm font-bold bg-rose-600 text-white hover:bg-rose-700 transition-colors">
+                className="btn-danger btn-md w-full">
                 {result.success ? 'Listo' : 'Cerrar'}
               </button>
             </div>
@@ -177,8 +177,7 @@ export default function EliminarNodo({ node, onClose, onSuccess }: EliminarNodoP
               Cancelar
             </button>
             <button onClick={handleDelete} disabled={!confirmed}
-              className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold bg-rose-600 text-white
-                hover:bg-rose-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-md shadow-rose-500/25">
+              className="btn-danger btn-md flex items-center gap-2">
               <Trash2 className="w-4 h-4" /><span>Eliminar Nodo</span>
             </button>
           </div>

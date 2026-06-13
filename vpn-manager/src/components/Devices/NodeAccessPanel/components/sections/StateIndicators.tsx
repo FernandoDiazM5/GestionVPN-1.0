@@ -54,7 +54,7 @@ export default function StateIndicators({
               {tunnelExpiry && <AnimatedCountdown expiry={tunnelExpiry} />}
               {showRenewalWarn && (
                 <button onClick={onRenew}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-sm shadow-amber-500/30 animate-pulse transition-all">
+                  className="btn-warning btn-sm flex items-center gap-1.5 motion-safe:animate-pulse">
                   <Bell className="w-3.5 h-3.5" />
                   <span>Renovar acceso</span>
                 </button>
@@ -62,8 +62,7 @@ export default function StateIndicators({
               <button
                 onClick={onRevokeAll}
                 disabled={isRevoking}
-                className="bg-rose-500 hover:bg-rose-600 text-white font-bold text-sm px-4 py-2.5 rounded-xl
-                           shadow-md shadow-rose-500/25 active:scale-[0.98] transition-all flex items-center space-x-2"
+                className="btn-danger btn-md flex items-center space-x-2"
               >
                 <ShieldOff className="w-4 h-4" />
                 <span>{isRevoking ? 'Revocando...' : 'Revocar Todo'}</span>
