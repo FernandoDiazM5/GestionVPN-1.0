@@ -3,7 +3,7 @@
 > Documento de migración de contexto entre sesiones.
 > Rama de trabajo: **`dev`** · Remote: `github.com/FernandoDiazM5/GestionVPN-1.0`.
 >
-> **Estado actual (2026-06-12):** REFACTOR_PLAN cerrado (F0-F12) · 5 features quick-wins entregados (Q1-Q5) · 2 mid-size (M1, M5) · iter2 del bot Telegram + reposición "Asignar túneles" + fix crítico `user_mgmt_ips` (§32) · UX MEMBER endurecida (§33) · Workspace unificado + email en peers WG + multi-asignar + QR en aceptar invitación (§34) · Columna Alias editable en peers WG + bloqueo de edición del "Usuario" para preservar trazabilidad MikroTik (§35) · Fix crítico bot Telegram: match dual VRF/PPP en asignaciones del MEMBER (§36) · **Auditoría exhaustiva del módulo Escanear con skills `react-ui-expert` + `vercel-react-best-practices`: 21 mejoras en 5 commits (§37 perf+robustez · §38 UX+features)**. Plan completo abajo.
+> **Estado actual (2026-06-12):** REFACTOR_PLAN cerrado (F0-F12) · 5 features quick-wins entregados (Q1-Q5) · 2 mid-size (M1, M5) · iter2 del bot Telegram + reposición "Asignar túneles" + fix crítico `user_mgmt_ips` (§32) · UX MEMBER endurecida (§33) · Workspace unificado + email en peers WG + multi-asignar + QR en aceptar invitación (§34) · Columna Alias editable en peers WG + bloqueo de edición del "Usuario" para preservar trazabilidad MikroTik (§35) · Fix crítico bot Telegram: match dual VRF/PPP en asignaciones del MEMBER (§36) · Auditoría exhaustiva del módulo Escanear con skills `react-ui-expert` + `vercel-react-best-practices`: 21 mejoras en 5 commits (§37 perf+robustez · §38 UX+features) · **🛑 Política operativa SSH para antenas Ubiquiti establecida: solo lectura + ping + reinicio con confirmación; PROHIBIDO actualizar firmware, borrar archivos, restaurar a fábrica o modificar config persistente (ver sección dedicada al final del doc)**. Plan completo abajo.
 >
 > ### 🧱 Refactor (F0-F12) — Plan completo ejecutado
 > - **F5** Monorepo + `@gestionvpn/contracts` con Zod compartido.
@@ -2893,9 +2893,13 @@ Los siguientes hallazgos están documentados pero **no se implementaron en esta 
 - **U2** Kebab para acciones secundarias.
 - **T3** Indicador de fila expandida en scroll.
 - **T5** Modo lectura: ocultar Nombre con muchas columnas.
-- **F4** Comparar con scan anterior (diff).
+- **F4** Comparar con scan anterior (diff) — **observacional puro**, no induce comandos SSH; respeta la política dedicada al final del documento.
 
 Ver explicación detallada de cada uno al usuario en el chat de la sesión 2026-06-12 mañana.
+
+### 🛑 Política operativa SSH (establecida al cierre de esta sesión)
+
+Ver sección dedicada **"🛑 Política de operaciones SSH sobre dispositivos Ubiquiti airOS"** al final de este documento. Resumen: solo lectura + diagnóstico activo (ping/traceroute) + reinicio con confirmación. **NUNCA** firmware update, rm, factory reset ni modificación de config persistente. Cualquier feature futura del módulo Escanear debe respetarla.
 
 ---
 
@@ -2909,8 +2913,56 @@ Ver explicación detallada de cada uno al usuario en el chat de la sesión 2026-
 6. Si una sesión vieja da 401: F12 → Application → *Clear site data* y re-login.
 7. ⚠️ Si el puerto 3001 aparece "ocupado" por un node zombie: matar el PID (`Get-NetTCPConnection -LocalPort 3001` → `Stop-Process`) y relanzar `npm run dev`. El backend nuevo debe cargar `routeros.service.js` con el parche.
 
+## 🛑 Política de operaciones SSH sobre dispositivos Ubiquiti airOS
+
+> Regla operativa **bloqueante** establecida en sesión 2026-06-12. Cualquier feature futura del módulo Escanear o de cualquier otra superficie del sistema **debe respetar este contrato sin excepciones**.
+
+### ✅ Operaciones PERMITIDAS sobre antenas
+
+| Categoría | Comandos | Por qué se permite |
+|---|---|---|
+| **Lectura de estado** | `mca-status`, `mca-cli-op info`, `wstalist`, `status.cgi`, `iwconfig`, `cat /tmp/system.cfg`, `cat /etc/version`, `cat /proc/meminfo`, `cat /proc/uptime` | Solo extrae datos. No modifica configuración ni persiste cambios. Base del módulo Escanear actual. |
+| **Diagnóstico activo (ping / test de conectividad)** | `ping -c N <target>`, `traceroute <target>`, eventualmente `iperf3` (M4 en backlog) | Inducen tráfico de red transitorio pero **NO modifican** la antena ni su configuración. Sin estado persistido. |
+| **Reinicio de la antena** | `reboot` (cuando se implemente) | El usuario operador a veces necesita reiniciar un equipo colgado. Operación reversible que no cambia configuración (la antena vuelve idéntica). Requiere confirmación explícita del moderador antes de ejecutar. |
+
+### ❌ Operaciones PROHIBIDAS — nunca
+
+| Categoría | Comandos prohibidos | Por qué se prohíbe |
+|---|---|---|
+| **Actualizar firmware** | `fwupdate.real -m URL`, `fwupdate`, copiar binarios `.bin` al equipo | El proyecto NO actualiza firmware. Los upgrades son decisión del operador de campo, ejecutados manualmente por la WebUI del dispositivo. Un bug en el panel que dispare un upgrade puede dejar antenas inalcanzables. |
+| **Eliminar archivos / configuración** | `rm`, `unlink`, `cfgmtd -w` (escribe flash), `mca-cli-set` con flags destructivos | El proyecto NO borra nada del sistema de archivos del equipo. Solo lee. |
+| **Restauración a fábrica** | `cfgmtd -d`, `setdefaults`, `reset_defaults`, equivalentes | Operación destructiva sin retorno. Si un operador necesita resetear, lo hace físicamente. |
+| **Modificar configuración persistente** | `mca-cli-set`, `mca-cli-cfg`, edición de `/tmp/system.cfg` seguida de `cfgmtd -w`, `save-config`, `commit` | El panel NO configura antenas. Para cambios de SSID, canal, IP, modo: el operador usa la WebUI o el airControl del fabricante. |
+| **Apagar el equipo** | `poweroff`, `halt`, `shutdown` | Quedaría inaccesible sin presencia física. |
+| **Crear/borrar usuarios SSH del equipo** | `passwd`, edición de `/etc/passwd`, `useradd`, `userdel` | Las credenciales SSH se documentan en el panel pero se gestionan en el equipo manualmente. |
+
+### Auditoría que respalda esta política (2026-06-12)
+
+Verificado con `grep` sobre todo `server/`:
+
+- `server/ubiquiti.service.js` — único módulo que ejecuta `conn.exec()` sobre dispositivos airOS. Los comandos son `echo` + lecturas (`/usr/www/status.cgi`, `mca-status`, `mca-cli-op info`, `wstalist`, `cat /tmp/system.cfg`, `cat /etc/version`, `cat /proc/meminfo`, `cat /proc/sys/kernel/hostname`, `iwconfig`). **No hay un solo comando que escriba**.
+- `server/routes/diagnostics.routes.js` — Q3 (§28). Ejecuta `/tool/ping` y `/tool/traceroute` **desde el MikroTik**, no desde la antena.
+- `server/routes/device.routes.js` — sin comandos exec. Solo HTTP GET/POST al panel administrativo en `:3001`.
+
+### Si una feature futura necesita salir de este contrato
+
+1. Documentarlo explícitamente en una sub-sección de esta política con justificación.
+2. Requerir confirmación del moderador en UI (ej. modal "Estás a punto de reiniciar la antena. Esto cortará el servicio ~30s. Confirmar.").
+3. Logear la operación en auditoría con `actor_id + target_ip + comando + timestamp`.
+4. NUNCA exponer la capacidad al MEMBER — solo OWNER/CO_MOD/platform_admin.
+
+### Cross-references
+
+- §28 Diagnóstico ping/traceroute desde RouterOS (Q3) — respeta la política (ping es "diagnóstico activo permitido").
+- §37 + §38 Auditoría Escanear — solo añadió features que **leen** (filtrar, exportar, comparar). No agregó ningún comando SSH nuevo.
+- F4 (Comparar con scan anterior — backlog) — read-only por diseño. Solo compara strings ya leídos por el scan, no induce ningún comando.
+- M4 (Speed test desde antena con iperf3 — backlog) — diagnóstico activo, encaja en la política. Requerirá confirmación del moderador antes de ejecutar.
+
+---
+
 ## Reglas del proyecto (ver `vpn-manager/CLAUDE.md` y `DESIGN_SYSTEM.md`)
 - Color = intención · movimiento = estado (no decorativo) · `text-xs` mínimo (`text-2xs`=11px reservado a micro-badges).
 - Usar clases del sistema (`.btn-*`, `.badge-*`, `.card`, `.data-cell`, `.th-cell`, `.skeleton`, `.status-live`, `.reveal-stagger`).
 - Dark mode por clase; toda animación nueva respeta `prefers-reduced-motion`.
 - No versionar secretos (`.jwt_secret`, `.db_secret`, `database.sqlite*`, `.claude/worktrees/`).
+- **Operaciones SSH sobre antenas Ubiquiti airOS:** solo lectura + diagnóstico activo (ping/traceroute) + reinicio con confirmación. **Nunca** actualizar firmware, eliminar archivos, restaurar a fábrica ni modificar configuración persistente. Ver sección dedicada arriba.
