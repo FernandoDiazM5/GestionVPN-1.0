@@ -215,6 +215,13 @@ const parseAirOSStats = (output) => {
         const amQuality  = pn(am, 'quality') ?? pn(data, 'airmax_quality');
         const amCapacity = pn(am, 'capacity') ?? pn(data, 'airmax_capacity');
 
+        // Hostname del AP que estamos consultando — lo necesitamos antes de
+        // procesar `stations` para descartar el caso en que el firmware nos
+        // devuelve el nombre del propio AP en `s.name` o `s.remote.hostname`
+        // (algunos firmwares Ubiquiti hacen esto y todas las estaciones
+        // terminan mostrando el mismo nombre "del AP" en vez del cliente).
+        const apHostnameRaw = decodeHtmlEntities(pick([h, data], 'hostname', 'name', 'devname') || null);
+
         return {
             signal:          signalRaw  != null ? parseInt(signalRaw)  : null,
             noiseFloor:      noiseRaw   != null ? parseInt(noiseRaw)   : null,
@@ -227,23 +234,33 @@ const parseAirOSStats = (output) => {
             airmaxCapacity:  amCapacity != null ? parseInt(amCapacity) : null,
             uptimeStr,
             deviceDate: pick([h, data], 'time', 'date', 'localtime') || null,
-            stations: (data.sta || data.stations || []).map(s => ({
-                mac:        (s.mac || '').toUpperCase(),
-                signal:     s.signal != null ? parseInt(s.signal) : (s.rssi != null ? parseInt(s.rssi) : null),
-                noiseFloor: s.noisefloor != null ? parseInt(s.noisefloor) : null,
-                ccq:        toCCQ(s.ccq ?? s.txccq),
-                txRate:     toMbps(s.txrate ?? s.tx_rate),
-                rxRate:     toMbps(s.rxrate ?? s.rx_rate),
-                distance:   s.ackdistance ?? (s.distance || null),
-                uptime:     s.uptime ?? null,
-                txLatency:  s.tx_latency ?? null,
-                txPower:    s.txpower != null ? parseInt(s.txpower) : null,
-                hostname:   decodeHtmlEntities(s.name || s.remote?.hostname || null),
-                remoteModel: s.remote?.platform || null,
-                lastIp:     s.lastip || null,
-                airmaxQuality:  s.airmax?.quality ?? null,
-                airmaxCapacity: s.airmax?.capacity ?? null,
-            })),
+            stations: (data.sta || data.stations || []).map(s => {
+                // El hostname del cliente puede venir en s.name o s.remote.hostname,
+                // pero algunos firmwares (firmware airOS de Floresta, p.ej.) ponen
+                // ahí el nombre del propio AP — produciendo que TODAS las estaciones
+                // muestren el mismo nombre. Filtramos ese caso: si el valor coincide
+                // con el hostname del AP local, lo tratamos como spurious y dejamos
+                // hostname=null para que la UI no muestre nada engañoso.
+                const rawName = decodeHtmlEntities(s.name || s.remote?.hostname || null);
+                const hostname = rawName && rawName !== apHostnameRaw ? rawName : null;
+                return {
+                    mac:        (s.mac || '').toUpperCase(),
+                    signal:     s.signal != null ? parseInt(s.signal) : (s.rssi != null ? parseInt(s.rssi) : null),
+                    noiseFloor: s.noisefloor != null ? parseInt(s.noisefloor) : null,
+                    ccq:        toCCQ(s.ccq ?? s.txccq),
+                    txRate:     toMbps(s.txrate ?? s.tx_rate),
+                    rxRate:     toMbps(s.rxrate ?? s.rx_rate),
+                    distance:   s.ackdistance ?? (s.distance || null),
+                    uptime:     s.uptime ?? null,
+                    txLatency:  s.tx_latency ?? null,
+                    txPower:    s.txpower != null ? parseInt(s.txpower) : null,
+                    hostname,
+                    remoteModel: s.remote?.platform || null,
+                    lastIp:     s.lastip || null,
+                    airmaxQuality:  s.airmax?.quality ?? null,
+                    airmaxCapacity: s.airmax?.capacity ?? null,
+                };
+            }),
             deviceName:      decodeHtmlEntities(pick([h, data], 'hostname', 'name', 'devname') || null),
             deviceModel:     pick([h, data], 'devmodel', 'product', 'model') || null,
             firmwareVersion: pick([h, data], 'fwversion', 'version', 'fw') || null,
@@ -589,7 +606,12 @@ const parseMcaCli = (text) => {
 //   • name, remote.hostname → nombre de la estación
 //   • remote.platform → modelo de la estación remota
 //   • airmax.quality/capacity → airmax por estación
-const parseWstalist = (text) => {
+// `apHostname` opcional — si llega, descartamos hostnames de estación que
+// coincidan con él (algunos firmwares Ubiquiti ponen el nombre del propio AP
+// en `s.name`/`s.remote.hostname`, lo que hace que TODAS las estaciones
+// muestren el mismo nombre del AP en vez del cliente). Comportamiento
+// históricamente compatible: si no se pasa apHostname, no se filtra.
+const parseWstalist = (text, apHostname = null) => {
     if (!text || typeof text !== 'string') return [];
     try {
         let jsonStr = text.trim();
@@ -601,23 +623,27 @@ const parseWstalist = (text) => {
         }
         const arr = JSON.parse(jsonStr);
         if (!Array.isArray(arr)) return [];
-        return arr.map(s => ({
-            mac:            (s.mac || '').toUpperCase(),
-            signal:         s.signal    != null ? parseInt(s.signal)    : null,
-            noiseFloor:     s.noisefloor != null ? parseInt(s.noisefloor) : null,
-            ccq:            s.ccq       != null ? parseFloat(s.ccq)     : null, // ya 0-100
-            txRate:         s.tx        != null ? parseFloat(s.tx)      : null, // ya Mbps
-            rxRate:         s.rx        != null ? parseFloat(s.rx)      : null,
-            distance:       s.ackdistance ?? (s.distance > 0 ? s.distance : null),
-            uptime:         s.uptime    ?? null,
-            txLatency:      s.tx_latency ?? null,
-            txPower:        s.txpower   != null ? parseInt(s.txpower)   : null,
-            hostname:       s.name || s.remote?.hostname || null,
-            remoteModel:    s.remote?.platform || null,
-            lastIp:         s.lastip    || null,
-            airmaxQuality:  s.airmax?.quality  ?? null,
-            airmaxCapacity: s.airmax?.capacity ?? null,
-        }));
+        return arr.map(s => {
+            const rawName = s.name || s.remote?.hostname || null;
+            const hostname = rawName && rawName !== apHostname ? rawName : null;
+            return {
+                mac:            (s.mac || '').toUpperCase(),
+                signal:         s.signal    != null ? parseInt(s.signal)    : null,
+                noiseFloor:     s.noisefloor != null ? parseInt(s.noisefloor) : null,
+                ccq:            s.ccq       != null ? parseFloat(s.ccq)     : null, // ya 0-100
+                txRate:         s.tx        != null ? parseFloat(s.tx)      : null, // ya Mbps
+                rxRate:         s.rx        != null ? parseFloat(s.rx)      : null,
+                distance:       s.ackdistance ?? (s.distance > 0 ? s.distance : null),
+                uptime:         s.uptime    ?? null,
+                txLatency:      s.tx_latency ?? null,
+                txPower:        s.txpower   != null ? parseInt(s.txpower)   : null,
+                hostname,
+                remoteModel:    s.remote?.platform || null,
+                lastIp:         s.lastip    || null,
+                airmaxQuality:  s.airmax?.quality  ?? null,
+                airmaxCapacity: s.airmax?.capacity ?? null,
+            };
+        });
     } catch { return []; }
 };
 
@@ -680,7 +706,10 @@ const parseFullOutput = (combined) => {
     const mem       = parseMeminfo(meminfoRaw);
     const traffic   = parseNetDev(netdevRaw);
     const mcaCli    = parseMcaCli(mcacliRaw);         // mca-cli-op info → modelo human-readable
-    const wstaSta   = parseWstalist(wstaRaw);          // wstalist → estaciones
+    // Pasamos el hostname del AP (de /proc/sys/kernel/hostname) para que el
+    // parser descarte hostnames de estación que sean spurious — algunos
+    // firmwares ponen el nombre del propio AP en s.name de cada cliente.
+    const wstaSta   = parseWstalist(wstaRaw, hnRaw);   // wstalist → estaciones
     const board     = parseBoardInfo(boardRaw);         // /etc/board.info → modelo hardware
 
     // Primera estación de wstalist — cuando el dispositivo es STA, esta ES su conexión al AP
