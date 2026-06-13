@@ -44,7 +44,7 @@
 > - **142 backend** (14 archivos) + **36 frontend** (5 archivos) = **178 tests verdes**. La auditoría §37-§38 de Escanear NO añade tests nuevos (las mejoras son refactor/UX sin lógica de negocio); el conteo se mantiene desde §36.
 >
 > ### 📚 Secciones de referencia
-> §17–25: REFACTOR_PLAN ejecutado. §26 notificaciones. §27 bot Telegram. §28 ping/trace. §29 export. §30 dashboard. §31 monitoreo. §32 iter2 multi-usuario. §33 UX MEMBER endurecida. §34 Workspace unificado + peers WG mejorados. §35 Alias humano + bloqueo Usuario. §36 Fix bot — match dual VRF/PPP. §37 Escanear — perf + robustez. §38 Escanear — UX + features. §39 Escanear — sticky-right + kebab (cierre auditoría). §40 Escanear — preferencias persistentes (useScanPreferences) + export multi-formato (CSV/JSON/Excel/PDF). §41 Escanear — simplificación de acciones de fila a botones icon-only + limpieza de DeviceCardModal/SshDataModal muertos. §42 Escanear — 4 mejoras UX: ícono Save (disquete) + bulk save selectivo con checkbox tri-state + contraste chevron + IP/Nombre del sistema en panel.
+> §17–25: REFACTOR_PLAN ejecutado. §26 notificaciones. §27 bot Telegram. §28 ping/trace. §29 export. §30 dashboard. §31 monitoreo. §32 iter2 multi-usuario. §33 UX MEMBER endurecida. §34 Workspace unificado + peers WG mejorados. §35 Alias humano + bloqueo Usuario. §36 Fix bot — match dual VRF/PPP. §37 Escanear — perf + robustez. §38 Escanear — UX + features. §39 Escanear — sticky-right + kebab (cierre auditoría). §40 Escanear — preferencias persistentes (useScanPreferences) + export multi-formato (CSV/JSON/Excel/PDF). §41 Escanear — simplificación de acciones de fila a botones icon-only + limpieza de DeviceCardModal/SshDataModal muertos. §42 Escanear — 4 mejoras UX: ícono Save (disquete) + bulk save selectivo con checkbox tri-state + contraste chevron + IP/Nombre del sistema en panel. §43 Política anti-saturación — eliminar polling SSH automático cada 5s en DeviceStatusPanel (saturaba CPU de antenas) + actualizar Política Operativa SSH para prohibir polling SSH.
 >
 > Sesión 2026-06-07 PM: Ajustes del moderador (perfil + workspace + import/export JSON) + Recuperar contraseña + sync MikroTik al deshabilitar + invitaciones por email + .conf WG server-side.
 > Sesión 2026-06-07 AM: multi-usuario con aislamiento por sesión (mangle por-IP), parche `!empty` node-routeros, auditoría (Semgrep+security-review+code-review) y fixes C1–C7.
@@ -3413,6 +3413,86 @@ El usuario fue explícito: "no elimines nada". Cumplido — solo se reordena.
 
 ---
 
+## 43) 🛡️ Política anti-saturación — eliminar polling SSH automático a antenas
+
+Reporte del usuario tras §42: el panel `DeviceStatusPanel` (panel expandido inline al abrir la flecha de una fila en Escanear) hacía **SSH a la antena cada 5 segundos** vía `setInterval(doFetch, 5000)` para mantener stats "en vivo". El usuario lo descubrió al ver consumo anómalo en el CPU de la antena.
+
+> *"Cada 5 segundos se actualiza y vuelve a consultar a la antena sobre sus parámetros, esto genera una saturación en el CPU del equipo. (...) si tomamos en cuenta, si fuera más equipos saturarían el CPU de todos los equipos acortando su tiempo de vida. Formula una correcta implementación. Esto con todas las tablas para evitar la saturación."*
+
+**Por qué es grave:**
+
+Las antenas Ubiquiti airOS son equipos pequeños (CPU MIPS ~400 MHz, ~64 MB RAM). Un comando combinado SSH como el que ejecuta `ANTENNA_CMD` corre 14 comandos en serie (`mca-status`, `wstalist`, `cat /proc/...`, `iwconfig`, etc.) y puede llevar 1-3s de CPU al equipo. Cada panel abierto = **1 SSH cada 5s** = **+5% CPU sostenido en la antena solo por mirarla**. Si un operador abre 10 paneles a la vez = **50% CPU constante en 10 antenas distintas**. A largo plazo, el desgaste por carga térmica reduce la vida útil del equipo.
+
+### Commits
+
+| Commit | Cambios |
+|---|---|
+| _pendiente_ | §43 — quitar `setInterval(doFetch, 5000)` en DeviceStatusPanel + reemplazar indicador "En vivo / Actualizando…" por "Datos del scan · hace X" (ámbar si >5min) + actualizar política operativa SSH |
+
+### Cambios en `DeviceStatusPanel.tsx`
+
+1. **`setInterval(doFetch, 5000)` ELIMINADO.** El panel ahora muestra los datos del scan tal cual quedaron. El usuario refresca manualmente con el botón **"Ahora"** (que ya existía) cuando necesita valores en vivo.
+
+2. **Indicador de frescura, no de "polling activo":**
+   - Antes: `🟢 En vivo` con `animate-pulse` + cambio a `animate-ping` durante refresh. Sugería que el dato se actualizaba solo.
+   - Ahora: `⚫ Datos del scan · hace X` neutral. Si han pasado **más de 5 minutos** desde el último fetch, el indicador se vuelve **ámbar** para que el operador sepa que conviene refrescar antes de tomar decisiones operativas.
+
+3. `handleRefresh = () => doFetch()` mantenido — botón "Ahora" no cambió.
+
+### Auditoría del resto del frontend
+
+Grep exhaustivo de `setInterval` reveló estos call sites tocando equipos:
+
+| Archivo | Intervalo | Qué hace | ¿SSH a antena? | Acción |
+|---|---|---|---|---|
+| **`DeviceStatusPanel.tsx:73`** | 5s | `/api/device/antenna` → SSH a antena | ✅ SÍ | **🔥 Eliminado en §43** |
+| `Common/DeviceCard/useAntennaData.ts` | (sin `setInterval`) | fetch único al montar si `compact` | ✅ SÍ (1 vez) | ✓ Ya correcto |
+| `M5FullInfoModal` | (sin fetches) | Solo lectura de `cachedStats` | ❌ No | ✓ Ya correcto |
+| `ApMonitorModule` | (sin `setInterval` SSH) | Lee `signal_history` de BD; el `monitoringJob` backend muestrea cada 5 min | ❌ No (lee BD) | ✓ Ya correcto |
+| `useNodeFetching.ts:156` | 60s | `/api/nodes` → RouterOS API a MikroTik central | ❌ No (RouterOS API, no SSH a antena) | ⏳ Revisar separadamente |
+| `useNodeFetching.ts:192` | 10s | check de túnel local | ❌ No | OK |
+| `MetricsPanel.tsx:70` | (poll) | métricas dashboard `/api/metrics` | ❌ No | OK |
+
+**Conclusión:** **solo `DeviceStatusPanel`** disparaba SSH a antenas en loop. El resto consulta MikroTik central (que tolera bien la carga vía RouterOS API binaria, no SSH) o lee de BD local.
+
+### Política operativa actualizada — "Política SSH" (final del HANDOFF)
+
+Se añade nueva regla a la sección 🛑 "Política de operaciones SSH sobre dispositivos Ubiquiti airOS":
+
+> **🚫 Polling automático de SSH a antenas: PROHIBIDO.** Ningún componente del frontend ni job del backend debe ejecutar comandos SSH a antenas Ubiquiti en intervalo recurrente.
+>
+> **Patrones permitidos:**
+> - Fetch único al abrir un panel/modal si no hay datos cacheados (`autoFetched.current` o equivalente).
+> - Refresh manual disparado por el usuario (botón "Ahora" / "Actualizar").
+> - Backfill puntual durante el flujo de escaneo (`runAuthPhase`) — 1 SSH por antena, no recurrente.
+>
+> **Por qué:** las antenas tienen CPU MIPS limitado. Cada SSH+`mca-status`+`wstalist` cuesta 1-3s de CPU del equipo. Polleo a 5s sostiene ~5% CPU **por panel abierto**, multiplicable por cuántas antenas se estén observando simultáneamente.
+
+### Reglas operativas reforzadas (post-§43)
+
+- **Toda nueva tabla, panel o modal que muestre datos de antenas Ubiquiti debe leer del cache** (`cachedStats`, BD, scan resultado) y exponer un botón explícito de refresh. **Nunca `setInterval` con fetch SSH.**
+- **Indicadores de "en vivo" / `animate-pulse` / `animate-ping`** se reservan para datos que **realmente** se actualizan en vivo (SSE del scan, métricas del dashboard que vienen del sampler backend). No usar para datos cacheados.
+- **Si necesitas un dato fresco programado**, súbelo a backend (cron / job dedicado) que escribe en BD, y el frontend lee de BD. Patrón ya usado por `monitoringJob` (§31) y `dashboardMetrics` (§30). El backend puede coordinar carga y rate-limit; el frontend no.
+
+### Métricas pre/post §43
+
+| Métrica | Pre-§43 | Post-§43 |
+|---|---|---|
+| SSH/s a una antena con panel abierto | 0.2 (1 cada 5s) | **0** |
+| SSH/s con 10 paneles abiertos a 10 antenas distintas | 2 (1 por antena cada 5s) | **0** |
+| Carga estimada en CPU de antena por panel | ~5% sostenido | **~0%** |
+| `NetworkDevicesModule` chunk | 91.96 KB / 23.34 KB gzip | **91.87 KB / 23.34 KB gzip** (−90 B raw por la lógica retirada) |
+| Bundle inicial | 248.84 KB / 77.76 KB gzip | **248.84 KB / 77.76 KB gzip** (idéntico) |
+| Tests | 44 verdes | 44 verdes |
+
+### Pendiente / mejoras futuras
+
+- **Auditar `useNodeFetching.ts:156` (silentPoll 60s)** — no toca antenas, pero envía un `/api/nodes` cada 60s que tira de RouterOS API al MikroTik central. Si la base de nodos crece, vale revaluar (¿pasar a SSE-driven? ¿bajar a 2-3 min cuando la pestaña no está en foco?).
+- **Botón "Ahora" más prominente en panel expandido** cuando `lastUpdated > 5 min`: pulsar suavemente o cambiar a indigo para invitar al refresh.
+- **Indicador global de "X SSH activos"** en el header del módulo para detectar saturación accidental durante uso normal.
+
+---
+
 ## ⚡ Arranque rápido
 
 1. XAMPP **MySQL** arriba (idealmente como servicio).
@@ -3445,6 +3525,7 @@ El usuario fue explícito: "no elimines nada". Cumplido — solo se reordena.
 | **Modificar configuración persistente** | `mca-cli-set`, `mca-cli-cfg`, edición de `/tmp/system.cfg` seguida de `cfgmtd -w`, `save-config`, `commit` | El panel NO configura antenas. Para cambios de SSID, canal, IP, modo: el operador usa la WebUI o el airControl del fabricante. |
 | **Apagar el equipo** | `poweroff`, `halt`, `shutdown` | Quedaría inaccesible sin presencia física. |
 | **Crear/borrar usuarios SSH del equipo** | `passwd`, edición de `/etc/passwd`, `useradd`, `userdel` | Las credenciales SSH se documentan en el panel pero se gestionan en el equipo manualmente. |
+| **Polling automático de SSH** (§43) | `setInterval(()=>sshExec(...), Xs)` en frontend o backend para mantener datos "en vivo" | Las antenas Ubiquiti tienen CPU MIPS limitado. Cada comando combinado (`mca-status`+`wstalist`+`iwconfig`+`cat /proc/...`) consume 1-3s de CPU. Polleo a 5s sostiene ~5% CPU **por panel abierto**, multiplicable por cuántas antenas se estén observando. **Solo permitido:** (a) fetch puntual al abrir si no hay cache, (b) refresh manual disparado por usuario (botón "Ahora"), (c) backfill durante `runAuthPhase` del scan (1 SSH por antena, no recurrente). Si necesitas dato fresco programado: súbelo a un job backend que escribe en BD (`monitoringJob` §31, `dashboardMetrics` §30) y el frontend lee de BD. |
 
 ### Auditoría que respalda esta política (2026-06-12)
 

@@ -68,13 +68,11 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
     setRefreshing(false);
   };
 
-  useEffect(() => {
-    if (!dev.sshUser || (!('hasSshPass' in dev ? dev.hasSshPass : false) && !dev.sshPass)) return;
-    const id = setInterval(doFetch, 5000);
-    return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dev.sshUser, dev.sshPass]);
-
+  // §43: ELIMINADO el polling automático cada 5s a la antena. Saturaba CPU
+  // de los equipos Ubiquiti (cada panel abierto = 1 SSH cada 5s a una antena
+  // con CPU MIPS limitado). Ahora el panel solo muestra los datos cacheados
+  // del scan; el usuario refresca manualmente con el botón "Ahora" cuando
+  // necesite valores en vivo. Política operativa SSH (final del HANDOFF).
   const handleRefresh = () => doFetch();
 
   const signalPct = (sig: number) => Math.min(100, Math.max(0, Math.round((sig + 90) / 50 * 100)));
@@ -104,7 +102,6 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
   }
 
   const snr = s.signal != null && s.noiseFloor != null ? s.signal - s.noiseFloor : null;
-  const isLive = !!(dev.sshUser && dev.sshPass);
 
   return (
     <div className="border-t border-slate-200 bg-white">
@@ -115,12 +112,21 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
           {dev.sshUser && (
             <span className="text-[10px] font-mono bg-white/10 px-1.5 py-0.5 rounded">{dev.sshUser}</span>
           )}
-          {isLive && (
-            <span className="flex items-center gap-1 text-[10px] text-emerald-400">
-              <span className={`w-1.5 h-1.5 rounded-full ${refreshing ? 'bg-emerald-400 animate-ping' : 'bg-emerald-400 animate-pulse'}`} />
-              {refreshing ? 'Actualizando…' : lastUpdated ? fmtAge(lastUpdated) : 'En vivo'}
-            </span>
-          )}
+          {/* §43: indicador de FRESCURA del dato, no de "polling en vivo".
+              El dato proviene del scan (o último click "Ahora"). Quitamos
+              el pulse/animate-ping que sugería refresco automático. Si el
+              dato es viejo (>5min), color ambar para que el operador sepa
+              que conviene refrescar antes de tomar decisiones. */}
+          {lastUpdated && (() => {
+            const ageSec = Math.floor((Date.now() - lastUpdated) / 1000);
+            const stale = ageSec > 300;  // >5min = pedir refresh
+            return (
+              <span className={`flex items-center gap-1 text-[10px] ${stale ? 'text-amber-300' : 'text-slate-300'}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${refreshing ? 'bg-sky-400 motion-safe:animate-pulse' : stale ? 'bg-amber-400' : 'bg-slate-400'}`} />
+                {refreshing ? 'Actualizando…' : `Datos del scan · ${fmtAge(lastUpdated)}`}
+              </span>
+            );
+          })()}
         </div>
         <div className="flex items-center gap-2">
           {s._rawJson && (
