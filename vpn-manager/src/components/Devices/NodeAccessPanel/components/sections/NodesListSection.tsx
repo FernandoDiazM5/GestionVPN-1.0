@@ -144,7 +144,7 @@ export default function NodesListSection({
             </span>
           </div>
           <button onClick={onRefreshNodes}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-100 border border-amber-300 text-amber-700 font-bold hover:bg-amber-200 transition-colors shrink-0">
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-100 border border-amber-300 text-amber-700 font-bold hover:bg-amber-200 transition-colors shrink-0 dark:bg-amber-500/15 dark:border-amber-500/40 dark:text-amber-400 dark:hover:bg-amber-500/25">
             <RefreshCw className="w-3 h-3" />
             Reintentar
           </button>

@@ -67,10 +67,9 @@ function NodesFilterBarImpl({
             placeholder="Buscar nodo, VRF, red, usuario…"
             value={search}
             onChange={e => onSearchChange(e.target.value)}
-            className="w-full pl-11 pr-9 py-2.5 text-sm rounded-xl border border-slate-200
-                       bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400
-                       placeholder:text-slate-400 text-slate-700 transition-all
-                       dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500"
+            className="w-full pl-11 pr-9 py-2.5 text-sm rounded-xl border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500
+                       focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400
+                       placeholder:text-slate-400 text-slate-700 transition-all"
           />
           {search && (
             <button
@@ -178,8 +177,7 @@ function FilterChip({ label, icon, onClear, ariaLabel }: FilterChipProps) {
       onClick={onClear}
       aria-label={ariaLabel}
       title={ariaLabel}
-      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 hover:border-indigo-300 transition-colors group
-        dark:bg-indigo-500/15 dark:border-indigo-500/30 dark:text-indigo-300 dark:hover:bg-indigo-500/25"
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 hover:border-indigo-300 transition-colors group dark:bg-indigo-500/15 dark:border-indigo-500/30 dark:text-indigo-300 dark:hover:bg-indigo-500/25"
     >
       {icon}
       <span className="font-mono truncate max-w-[140px]">{label}</span>

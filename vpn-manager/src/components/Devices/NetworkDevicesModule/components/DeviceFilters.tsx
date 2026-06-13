@@ -159,8 +159,7 @@ function FilterChip({ label, icon, onClear, ariaLabel }: FilterChipProps) {
       onClick={onClear}
       aria-label={ariaLabel}
       title={ariaLabel}
-      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 hover:border-indigo-300 transition-colors group
-        dark:bg-indigo-500/15 dark:border-indigo-500/30 dark:text-indigo-300 dark:hover:bg-indigo-500/25"
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 hover:border-indigo-300 transition-colors group dark:bg-indigo-500/15 dark:border-indigo-500/30 dark:text-indigo-300 dark:hover:bg-indigo-500/25"
     >
       {icon}
       <span className="font-mono truncate max-w-[120px]">{label}</span>

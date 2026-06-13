@@ -40,7 +40,10 @@ const FORBIDDEN_PALETTES = [
 ];
 
 // Shades claros que típicamente necesitan dark variant para no quedar blancos en dark mode.
-const LIGHT_SHADES_RE = /\bbg-(?:white|(?:indigo|emerald|rose|amber|sky|violet|slate|brand|success|danger|warning|info|accent|neutral)-(?:50|100|200))\b/g;
+// Negative lookahead `(?!\/\d)` excluye sufijos de opacidad (`bg-white/20`, `bg-slate-50/40`):
+// esos overlays viven sobre superficies oscuras permanentes y NO necesitan variant dark —
+// el overlay funciona igual en light y dark mode. Documentado en §48 (Fase 6 del plan).
+const LIGHT_SHADES_RE = /\bbg-(?:white|(?:indigo|emerald|rose|amber|sky|violet|slate|brand|success|danger|warning|info|accent|neutral)-(?:50|100|200))(?!\/\d)\b/g;
 
 // ── Reglas ───────────────────────────────────────────────────────
 const RULES = [

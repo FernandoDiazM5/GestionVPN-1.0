@@ -188,8 +188,8 @@ export default function Sidebar() {
           title={darkMode ? 'Modo claro' : 'Modo oscuro'}
           aria-label={darkMode ? 'Activar modo claro' : 'Activar modo oscuro'}
           className={`w-full flex items-center gap-2.5 rounded-xl text-sm font-semibold text-slate-500
-            hover:text-slate-800 hover:bg-slate-100 transition-colors
-            dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800
+            hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors
+            dark:text-slate-400 dark:hover:text-slate-100
             ${mini ? 'justify-center px-0 py-2.5' : 'px-3 py-2.5'}`}
         >
           {darkMode ? <Sun className="w-[18px] h-[18px] shrink-0" /> : <Moon className="w-[18px] h-[18px] shrink-0" />}
@@ -213,8 +213,8 @@ export default function Sidebar() {
           title={mini ? 'Cerrar sesión' : undefined}
           aria-label="Cerrar sesión"
           className={`w-full flex items-center gap-2.5 rounded-xl text-sm font-semibold text-slate-500
-            hover:text-rose-600 hover:bg-rose-50 transition-colors
-            dark:text-slate-400 dark:hover:text-rose-400 dark:hover:bg-rose-500/10
+            hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors
+            dark:text-slate-400 dark:hover:text-rose-400
             ${mini ? 'justify-center px-0 py-2.5' : 'px-3 py-2.5'}`}
         >
           <LogOut className="w-[18px] h-[18px] shrink-0" />

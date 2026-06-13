@@ -20,12 +20,12 @@ function ApColSelector({ hidden, onChange }: { hidden: Set<string>; onChange: (h
     <div ref={ref} className="relative">
       <button onClick={() => setOpen(v => !v)}
         className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-2xs font-bold
-          bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200 transition-colors">
+          bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200 transition-colors dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:border-slate-700">
         <Columns className="w-3 h-3" />
         COLS AP
       </button>
       {open && (
-        <div className="absolute right-0 top-8 z-50 bg-white border border-slate-200 rounded-xl shadow-xl p-3 w-48 max-h-72 overflow-y-auto">
+        <div className="absolute right-0 top-8 z-50 bg-white border border-slate-200 rounded-xl shadow-xl p-3 w-48 max-h-72 overflow-y-auto dark:bg-slate-900 dark:border-slate-700 dark:shadow-black/40">
           <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">Columnas de APs</p>
           {AP_COL_DEFS.filter(c => !c.always).map(col => (
             <label key={col.key} className="flex items-center gap-2 py-1 cursor-pointer group">

@@ -26,7 +26,7 @@ export default function VpnCardActionsCell({
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all
             ${status === 'disabled'
               ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm shadow-indigo-500/25 active:scale-[0.97]'
-              : 'bg-slate-100 text-slate-300 cursor-not-allowed'}`}
+              : 'bg-slate-100 text-slate-300 cursor-not-allowed dark:bg-slate-800 dark:text-slate-600'}`}
         >
           {status === 'activating'
             ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -40,7 +40,7 @@ export default function VpnCardActionsCell({
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all
             ${status === 'running'
               ? 'bg-rose-500 hover:bg-rose-600 text-white shadow-sm shadow-rose-500/25 active:scale-[0.97]'
-              : 'bg-slate-100 text-slate-300 cursor-not-allowed'}`}
+              : 'bg-slate-100 text-slate-300 cursor-not-allowed dark:bg-slate-800 dark:text-slate-600'}`}
         >
           {status === 'deleting'
             ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -51,7 +51,7 @@ export default function VpnCardActionsCell({
         {!isRunning && !isPending && (
           <button
             onClick={onRemove}
-            className="p-1.5 text-slate-300 hover:text-rose-400 hover:bg-rose-50 rounded-lg transition-colors"
+            className="p-1.5 text-slate-300 hover:text-rose-400 hover:bg-rose-50 rounded-lg transition-colors dark:text-slate-600 dark:hover:bg-rose-500/10"
             title="Quitar"
           >
             <Trash2 className="w-3.5 h-3.5" />

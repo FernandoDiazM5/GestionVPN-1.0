@@ -89,7 +89,8 @@ export default function MemberWireGuardModal({ member, onClose }: Props) {
               {/* QR para móvil */}
               {qr && (
                 <div className="flex flex-col items-center gap-2 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700">
-                  <img src={qr} alt="QR WireGuard" className="rounded-lg bg-white p-1" width={200} height={200} />
+                  {/* QR siempre sobre blanco para que la cámara lo escanee — no se invierte en dark. */}
+                  <img src={qr} alt="QR WireGuard" className="rounded-lg bg-white dark:bg-white p-1" width={200} height={200} />
                   <p className="flex items-center gap-1.5 text-2xs text-slate-400 dark:text-slate-500">
                     <Smartphone className="w-3 h-3" /> Escanea desde la app WireGuard del móvil
                   </p>

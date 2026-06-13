@@ -196,7 +196,7 @@ export default function BatchCsvModal({ onClose, onSuccess, nodes }: BatchCsvMod
                 <div key={i} className={`flex items-center gap-3 px-3 py-2 rounded-lg border text-xs
                   ${r.status === 'ok' ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-100' : r.status === 'error' ? 'bg-rose-50 dark:bg-rose-500/10 border-rose-100' : r.status === 'processing' ? 'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-200' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-800'}`}>
                   <span className={`w-6 h-6 rounded-full flex items-center justify-center text-2xs font-bold shrink-0
-                    ${r.status === 'ok' ? 'bg-emerald-500 text-white' : r.status === 'error' ? 'bg-rose-500 text-white' : r.status === 'processing' ? 'bg-indigo-500 text-white' : 'bg-slate-200 text-slate-400'}`}>
+                    ${r.status === 'ok' ? 'bg-emerald-500 text-white' : r.status === 'error' ? 'bg-rose-500 text-white' : r.status === 'processing' ? 'bg-indigo-500 text-white' : 'bg-slate-200 text-slate-400 dark:bg-slate-700 dark:text-slate-500'}`}>
                     {r.status === 'ok' ? '✓' : r.status === 'error' ? '✗' : r.status === 'processing' ? <Loader2 className="w-3 h-3 animate-spin" /> : i + 1}
                   </span>
                   <span className="font-bold text-slate-700 dark:text-slate-200">{r.nombre}</span>

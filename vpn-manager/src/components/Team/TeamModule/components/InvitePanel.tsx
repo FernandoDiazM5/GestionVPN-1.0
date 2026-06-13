@@ -49,10 +49,9 @@ export default function InvitePanel({ currentRole, invitations, onInvite, onRevo
             value={name} onChange={e => setName(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && submit()}
             placeholder="Nombre del invitado"
-            className="w-full pl-10 pr-3 py-2.5 text-sm rounded-xl border border-slate-200 bg-white
+            className="w-full pl-10 pr-3 py-2.5 text-sm rounded-xl border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500
                        focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400
-                       text-slate-700 placeholder:text-slate-400 transition-all
-                       dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500"
+                       text-slate-700 placeholder:text-slate-400 transition-all"
           />
         </div>
         <div className="relative flex-1">
@@ -61,16 +60,14 @@ export default function InvitePanel({ currentRole, invitations, onInvite, onRevo
             type="email" value={email} onChange={e => setEmail(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && submit()}
             placeholder="correo@ejemplo.com"
-            className="w-full pl-10 pr-3 py-2.5 text-sm rounded-xl border border-slate-200 bg-white
+            className="w-full pl-10 pr-3 py-2.5 text-sm rounded-xl border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500
                        focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400
-                       text-slate-700 placeholder:text-slate-400 transition-all
-                       dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500"
+                       text-slate-700 placeholder:text-slate-400 transition-all"
           />
         </div>
         <select value={role} onChange={e => setRole(e.target.value as Exclude<Role, 'OWNER'>)}
-          className="px-3 py-2.5 text-sm rounded-xl border border-slate-200 bg-white text-slate-700
-                     focus:outline-none focus:ring-2 focus:ring-indigo-300
-                     dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100">
+          className="px-3 py-2.5 text-sm rounded-xl border border-slate-200 bg-white text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100
+                     focus:outline-none focus:ring-2 focus:ring-indigo-300">
           <option value="MEMBER">{ROLE_LABEL.MEMBER}</option>
           {canAssignCoModerator(currentRole) && <option value="CO_MODERATOR">{ROLE_LABEL.CO_MODERATOR}</option>}
         </select>

@@ -142,10 +142,10 @@ export default function AdminPeersManager({
                           onKeyDown={e => { if (e.key === 'Enter') onSavePeerName(peer); if (e.key === 'Escape') setEditingPeerId(null); }}
                           className="flex-1 px-2 py-1 text-xs border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300 font-semibold dark:bg-slate-800 dark:border-indigo-500/50 dark:text-slate-100" />
                         <button onClick={() => onSavePeerName(peer)} disabled={savingPeerName}
-                          className="p-1 rounded text-emerald-600 hover:bg-emerald-50">
+                          className="p-1 rounded text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10">
                           {savingPeerName ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
                         </button>
-                        <button onClick={() => setEditingPeerId(null)} className="p-1 rounded text-slate-400 hover:bg-slate-100">
+                        <button onClick={() => setEditingPeerId(null)} className="p-1 rounded text-slate-400 hover:bg-slate-100 dark:text-slate-500 dark:hover:bg-slate-800">
                           <X className="w-3 h-3" />
                         </button>
                       </div>
