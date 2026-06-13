@@ -116,7 +116,12 @@ function DeviceTableImpl(props: DeviceTableProps) {
             </div>
           ))}
           <div className="px-3 py-3" />
-          <div className="px-3 py-3 text-right">Acción</div>
+          {/* Acción sticky-right (U1.A): siempre visible aunque la tabla scrolle
+              horizontalmente. Shadow sutil hacia la izquierda marca que está
+              flotando sobre las columnas previas cuando hay overflow. */}
+          <div className="px-3 py-3 text-right sticky right-0 z-10 bg-slate-100 dark:bg-slate-800 shadow-[-2px_0_6px_-3px_rgba(0,0,0,0.06)]">
+            Acción
+          </div>
         </div>
 
         {/* Body */}

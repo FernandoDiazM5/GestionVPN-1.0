@@ -80,12 +80,22 @@ function DeviceTableRowImpl({
     : hasStats
       ? 'hover:bg-emerald-50/40 dark:hover:bg-emerald-500/10'
       : 'hover:bg-slate-50 dark:hover:bg-slate-800/60';
+  // Versión group-hover del fondo — la usa la celda Acción sticky para que su
+  // bg cambie sincronizado con el resto del row durante hover. Sin esto, la
+  // celda flotante quedaría con el bg pasivo mientras el resto se ilumina.
+  const groupHoverBg = isSaved
+    ? 'group-hover:bg-indigo-50/40 dark:group-hover:bg-indigo-500/10'
+    : hasStats
+      ? 'group-hover:bg-emerald-50/40 dark:group-hover:bg-emerald-500/10'
+      : 'group-hover:bg-slate-50 dark:group-hover:bg-slate-800/60';
 
   return (
     <Fragment>
+      {/* `group` permite que la celda Acción sticky-right (U1.A) cambie su
+          bg cuando el cursor está sobre el row, sincronizado con el resto. */}
       <div
         style={{ display: 'grid', gridTemplateColumns: 'var(--cols-tpl)' }}
-        className={`items-center border-b border-slate-100 dark:border-slate-800 transition-colors
+        className={`group items-center border-b border-slate-100 dark:border-slate-800 transition-colors
           ${stateBg} ${hoverBg} ${stateBorder}
           ${isExpanded ? 'border-b-indigo-200 dark:border-b-indigo-500/40' : ''}`}
       >
@@ -191,8 +201,10 @@ function DeviceTableRowImpl({
           )}
         </div>
 
-        {/* Action buttons */}
-        <div className="px-3 py-3 flex items-center justify-end gap-1.5">
+        {/* Action buttons — sticky-right (U1.A): siempre visibles aunque la
+            tabla scrolle horizontalmente. El bg pasivo es stateBg del zebra y
+            durante hover usa group-hover para sincronizar con el resto del row. */}
+        <div className={`px-3 py-3 flex items-center justify-end gap-1.5 sticky right-0 z-[1] shadow-[-2px_0_6px_-3px_rgba(0,0,0,0.06)] ${stateBg} ${groupHoverBg}`}>
           {hasStats && (
             <button onClick={() => onOpenM5Detail(dev)}
               title="Ver estado completo del dispositivo (airOS)"
