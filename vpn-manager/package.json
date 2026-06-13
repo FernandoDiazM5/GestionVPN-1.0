@@ -16,6 +16,9 @@
   "dependencies": {
     "@gestionvpn/contracts": "*",
     "clsx": "^2.1.1",
+    "exceljs": "^4.4.0",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "localforage": "^1.10.0",
     "lucide-react": "^0.577.0",
     "qrcode": "^1.5.4",

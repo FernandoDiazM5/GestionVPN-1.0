@@ -1,6 +1,14 @@
 export const SESSION_SCAN_KEY = 'vpn_scan_results_v1';
+
+// Legacy keys — se conservan solo para migrar al esquema unificado v1.
+// Una vez liberada §40 y verificada en producción podrán retirarse.
 export const COLS_STORAGE_KEY = 'vpn_diag_cols_v2';
 export const COL_WIDTHS_STORAGE_KEY = 'vpn_diag_col_widths_v1';
+
+// Almacén unificado de preferencias del módulo Escanear.
+// Reemplaza COLS_STORAGE_KEY + COL_WIDTHS_STORAGE_KEY + añade sort/filtros/subred.
+export const PREFS_STORAGE_KEY = 'vpn_scan_prefs_v1';
+export const PREFS_SCHEMA_VERSION = 1;
 
 // Estima el número de hosts en un CIDR (ej: 192.168.1.0/24 → 254)
 export const estimateIpCount = (cidr: string): number => {

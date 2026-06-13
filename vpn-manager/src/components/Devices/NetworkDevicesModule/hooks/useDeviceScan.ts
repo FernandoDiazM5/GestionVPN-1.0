@@ -379,7 +379,12 @@ export function useDeviceScan(input: UseDeviceScanInput) {
   }, [effectiveLan, scanState.phase, activeNodeVrf, nodes, nodeSshCreds, setNodeSshCreds, runAuthPhase]);
 
   const isScanning = scanState.phase === 'discovering' || scanState.phase === 'authenticating';
-  const canScan = (scanState.phase === 'idle' || scanState.phase === 'done') && !!effectiveLan;
+  // Para escanear se necesita: (a) estar en estado quiescente, (b) tener una
+  // subred efectiva, y (c) un túnel activo — sin el VRF arriba en el router
+  // el scan-stream del backend no puede ver la LAN remota.
+  const canScan = (scanState.phase === 'idle' || scanState.phase === 'done')
+    && !!effectiveLan
+    && !!activeNodeVrf;
 
   return {
     // Estado de scan

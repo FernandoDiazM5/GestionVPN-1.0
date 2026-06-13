@@ -18,7 +18,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
-  CheckCircle2, Cpu, ShieldCheck, ShieldOff, RefreshCw, Radio, Download, Save, Loader2,
+  CheckCircle2, Cpu, ShieldCheck, ShieldOff, RefreshCw, Radio, Save, Loader2,
 } from 'lucide-react';
 
 import { useVpn } from '../../../context';
@@ -30,12 +30,13 @@ import { AddDeviceModal } from './components/AddDeviceModal';
 import { DeviceCardModal } from './components/DeviceCardModal';
 import { SshDataModal } from './components/SshDataModal';
 import { ColumnPicker } from './components/ColumnPicker';
-import { exportScanToCsv } from './utils/exportCsv';
+import { ExportMenu } from './components/ExportMenu';
 import { ScanControls } from './components/ScanControls';
 import { ScanProgressBanner } from './components/ScanProgressBanner';
 import { DeviceFilters } from './components/DeviceFilters';
 import { DeviceTable } from './components/DeviceTable';
 import M5FullInfoModal from '../../Common/M5FullInfoModal';
+import type { ExportMetadata } from './utils/exportShared';
 
 import { SESSION_SCAN_KEY } from './constants';
 import type { ScanCred } from './types';
@@ -44,15 +45,20 @@ import { useDeviceScan } from './hooks/useDeviceScan';
 import { useDeviceList } from './hooks/useDeviceList';
 import { useColumnPrefs } from './hooks/useColumnPrefs';
 import { useDeviceLibrary } from './hooks/useDeviceLibrary';
+import { useScanPreferences } from './hooks/useScanPreferences';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export default function NetworkDevicesModule() {
   const { credentials, activeNodeVrf, nodes, setNodes } = useVpn();
 
+  // ── Preferencias persistentes (§40) ───────────────────────────────
+  // Almacén ÚNICO: columnas + anchos + sort + filtros + búsqueda + subred.
+  // Migra silenciosamente desde las claves viejas v1/v2 la primera vez.
+  const prefs = useScanPreferences();
+
   // ── Estado puramente UI (modales + selección de nodo) ─────────────
   const [selectedNode, setSelectedNode] = useState<NodeInfo | null>(null);
-  const [manualLan, setManualLan] = useState('');
   const [addingDevice, setAddingDevice] = useState<ScannedDevice | null>(null);
   const [editingDevice, setEditingDevice] = useState<SavedDevice | null>(null);
   const [viewingDevice, setViewingDevice] = useState<SavedDevice | null>(null);
@@ -63,10 +69,22 @@ export default function NetworkDevicesModule() {
 
   // ── Derivados básicos del estado externo ──────────────────────────
   const activeNode = activeNodeVrf ? nodes.find(n => n.nombre_vrf === activeNodeVrf) ?? null : null;
-  const effectiveLan = manualLan.trim() || selectedNode?.segmento_lan || '';
+
+  // Fallback: si `selectedNode` aún no se hidrató (el useEffect de sync se
+  // dispara post-mount, y a veces VpnContext rehidrata activeNodeVrf más
+  // tarde), usar `activeNode` como destino efectivo para guardar / mostrar.
+  // Esto evita el caso "celda Acción vacía" que aparecía cuando había
+  // túnel activo pero `selectedNode` seguía siendo null — el botón Guardar
+  // requiere `selectedNode` para asociar el dispositivo al nodo correcto.
+  const effectiveNode = selectedNode ?? activeNode;
+  const effectiveLan = prefs.manualLan.trim() || effectiveNode?.segmento_lan || '';
 
   // ── Hooks especializados ──────────────────────────────────────────
-  const colPrefs = useColumnPrefs();
+  const colPrefs = useColumnPrefs({
+    visibleCols: prefs.visibleCols,
+    colWidths: prefs.colWidths,
+    setColWidths: prefs.setColWidths,
+  });
 
   // Necesitamos savedDevices ANTES del scan (runAuthPhase usa creds saved).
   // Inicializamos library con stubs que se reasignan después del scan; el
@@ -89,7 +107,18 @@ export default function NetworkDevicesModule() {
   // eventos (post-mount), nunca durante el render inicial.
   useEffect(() => { scanRef.current = scan; });
 
-  const list = useDeviceList({ scanResults: scan.scanResults, savedIds: library.savedIds });
+  const list = useDeviceList({
+    scanResults: scan.scanResults,
+    savedIds: library.savedIds,
+    searchQuery: prefs.searchQuery,
+    setSearchQuery: prefs.setSearchQuery,
+    filterSSID: prefs.filterSSID,
+    setFilterSSID: prefs.setFilterSSID,
+    filterRole: prefs.filterRole,
+    setFilterRole: prefs.setFilterRole,
+    sortConfig: prefs.sortConfig,
+    setSortConfig: prefs.setSortConfig,
+  });
 
   // ── Carga inicial de nodos ────────────────────────────────────────
   const loadNodes = useCallback(async () => {
@@ -116,7 +145,13 @@ export default function NetworkDevicesModule() {
   // Auto-seleccionar el nodo activo + autocompletar su subred. Es un efecto de
   // SINCRONIZACIÓN de estado derivado (prop externo del context → state local) y
   // condicional, así que no se puede expresar como useMemo.
+  //
+  // §40: si el usuario ya tenía persistida una subred MANUAL válida para alguna
+  // de las opciones del nodo activo, la respetamos. Si no, autocompletamos con
+  // la primera opción del nodo.
   /* eslint-disable react-hooks/set-state-in-effect */
+  const { setManualLan } = prefs;
+  const persistedLanRef = useRef(prefs.manualLan);
   useEffect(() => {
     if (activeNodeVrf && nodes.length > 0) {
       const active = nodes.find(n => n.nombre_vrf === activeNodeVrf);
@@ -125,10 +160,19 @@ export default function NetworkDevicesModule() {
         const subnets = (active.lan_subnets && active.lan_subnets.length > 0)
           ? active.lan_subnets
           : (active.segmento_lan ? [active.segmento_lan] : []);
-        if (subnets.length > 0) setManualLan(subnets[0]);
+        if (subnets.length > 0) {
+          const persisted = persistedLanRef.current;
+          // Solo respeta la persistida si pertenece a este nodo (evita "contaminar"
+          // un nodo nuevo con la subred de otro). En caso contrario auto-completa.
+          if (persisted && subnets.includes(persisted)) {
+            // ya está bien — no escribimos
+          } else {
+            setManualLan(subnets[0]);
+          }
+        }
       }
     }
-  }, [activeNodeVrf, nodes]);
+  }, [activeNodeVrf, nodes, setManualLan]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // Reset scan results cuando cambia el nodo seleccionado (otro origen).
@@ -172,6 +216,17 @@ export default function NetworkDevicesModule() {
     });
   }, []);
 
+  // Metadatos derivados para el menú Exportar — pasados a CSV/JSON/XLSX/PDF
+  // por igual para que el archivo lleve nodo + subred + contadores coherentes.
+  const exportMeta: ExportMetadata = useMemo(() => ({
+    nodeName: effectiveNode?.nombre_nodo ?? null,
+    subnet: effectiveLan || null,
+    scannedAt: new Date(),
+    totalCount: list.scanRows.length,
+    withStatsCount: list.scanRows.filter(r => r.dev.cachedStats).length,
+    savedCount: list.scanRows.filter(r => r.isSaved).length,
+  }), [effectiveNode, effectiveLan, list.scanRows]);
+
   // Candidatos para "Guardar todos con stats": filas visibles que tienen
   // SSH OK y aún no están guardadas. Se calcula sobre `sortedRows` (lo
   // visible tras filtros) para que el botón refleje lo que el usuario ve.
@@ -183,10 +238,10 @@ export default function NetworkDevicesModule() {
 
   const [bulkSaving, setBulkSaving] = useState(false);
   const handleBulkSave = useCallback(async () => {
-    if (!selectedNode || bulkSaveCandidates.length === 0 || bulkSaving) return;
+    if (!effectiveNode || bulkSaveCandidates.length === 0 || bulkSaving) return;
     if (bulkSaveCandidates.length > 5) {
       const ok = window.confirm(
-        `Vas a guardar ${bulkSaveCandidates.length} dispositivos en la biblioteca local del nodo ${selectedNode.nombre_nodo}. ¿Continuar?`
+        `Vas a guardar ${bulkSaveCandidates.length} dispositivos en la biblioteca local del nodo ${effectiveNode.nombre_nodo}. ¿Continuar?`
       );
       if (!ok) return;
     }
@@ -195,7 +250,7 @@ export default function NetworkDevicesModule() {
     // es idempotente, podríamos relanzar si quisiéramos retry. Por ahora
     // solo contamos ok/fail.
     const results = await Promise.allSettled(
-      bulkSaveCandidates.map(r => handleDirectSave(r.dev, selectedNode))
+      bulkSaveCandidates.map(r => handleDirectSave(r.dev, effectiveNode))
     );
     const failed = results.filter(r => r.status === 'rejected').length;
     setBulkSaving(false);
@@ -204,7 +259,7 @@ export default function NetworkDevicesModule() {
     } else {
       showToast(`Guardados ${results.length} dispositivos`);
     }
-  }, [selectedNode, bulkSaveCandidates, bulkSaving, handleDirectSave, showToast]);
+  }, [effectiveNode, bulkSaveCandidates, bulkSaving, handleDirectSave, showToast]);
 
   const handleSyncToSaved = useCallback((dev: ScannedDevice, savedDev: SavedDevice) => {
     const updated: SavedDevice = {
@@ -239,11 +294,11 @@ export default function NetworkDevicesModule() {
       sshPort: dev.sshPort,
       cachedStats: dev.cachedStats,
       nodeId: '',
-      nodeName: selectedNode?.nombre_nodo || '',
+      nodeName: effectiveNode?.nombre_nodo || '',
       addedAt: Date.now(),
       is_active: true,
     } as SavedDevice);
-  }, [selectedNode]);
+  }, [effectiveNode]);
 
   const handleRefreshStats = useCallback((ip: string, freshStats: AntennaStats) => {
     setScanResults(prev => prev.map(r => r.ip === ip ? { ...r, cachedStats: freshStats } : r));
@@ -319,8 +374,8 @@ export default function NetworkDevicesModule() {
           isTunnelActive={isTunnelActive}
           activeNode={activeNode}
           availableSubnets={availableSubnets}
-          manualLan={manualLan}
-          setManualLan={setManualLan}
+          manualLan={prefs.manualLan}
+          setManualLan={prefs.setManualLan}
           nodeSshCreds={nodeSshCreds}
           effectiveLan={effectiveLan}
           canScan={scan.canScan}
@@ -397,7 +452,7 @@ export default function NetworkDevicesModule() {
               </p>
               <div className="flex items-center gap-1.5">
                 {/* Bulk save — solo aparece si hay candidatos visibles con SSH OK */}
-                {bulkSaveCandidates.length > 0 && selectedNode && (
+                {bulkSaveCandidates.length > 0 && effectiveNode && (
                   <button
                     onClick={handleBulkSave}
                     disabled={bulkSaving}
@@ -411,17 +466,12 @@ export default function NetworkDevicesModule() {
                     <span>Guardar {bulkSaveCandidates.length}</span>
                   </button>
                 )}
-                <button
-                  onClick={() => exportScanToCsv(list.sortedRows, selectedNode?.nombre_nodo)}
+                <ExportMenu
+                  rows={list.sortedRows}
+                  meta={exportMeta}
                   disabled={list.sortedRows.length === 0}
-                  title="Exportar la tabla visible (con filtros aplicados) a CSV"
-                  aria-label="Exportar a CSV"
-                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 border border-slate-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-slate-500"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Exportar</span>
-                </button>
-                <ColumnPicker visibleCols={colPrefs.visibleCols} onChange={colPrefs.saveVisibleCols} />
+                />
+                <ColumnPicker visibleCols={prefs.visibleCols} onChange={prefs.setVisibleCols} />
               </div>
             </div>
 
@@ -450,7 +500,7 @@ export default function NetworkDevicesModule() {
               expandedRows={expandedRows}
               toggleExpand={toggleExpand}
               savedDevices={library.savedDevices}
-              selectedNode={selectedNode}
+              selectedNode={effectiveNode}
               onOpenM5Detail={setM5DetailDevice}
               onSyncToSaved={handleSyncToSaved}
               onOpenSavedView={setViewingDevice}
@@ -468,10 +518,10 @@ export default function NetworkDevicesModule() {
         <SshDataModal dev={viewingRawDevice} onClose={() => setViewingRawDevice(null)} />
       )}
 
-      {addingDevice && selectedNode && (
+      {addingDevice && effectiveNode && (
         <AddDeviceModal
           device={addingDevice}
-          node={selectedNode}
+          node={effectiveNode}
           onSave={handleAddDevice}
           onClose={() => setAddingDevice(null)}
         />

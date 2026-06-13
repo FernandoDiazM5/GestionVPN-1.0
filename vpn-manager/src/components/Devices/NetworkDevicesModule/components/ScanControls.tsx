@@ -9,7 +9,7 @@
 // ============================================================
 
 import { memo } from 'react';
-import { Radio, AlertCircle, KeyRound, RefreshCw, Loader2 } from 'lucide-react';
+import { Radio, AlertCircle, KeyRound, RefreshCw, Loader2, Lock } from 'lucide-react';
 import type { NodeInfo } from '../../../../types/api';
 import type { ScanCred } from '../types';
 import { estimateIpCount } from '../constants';
@@ -101,15 +101,35 @@ function ScanControlsImpl({
       )}
 
       <div className="flex flex-wrap gap-2">
-        <button onClick={onScan} disabled={!canScan}
-          className={`flex items-center space-x-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all
-            ${canScan
-              ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-md shadow-indigo-500/25 hover:shadow-lg active:scale-[0.98]'
-              : 'bg-slate-100 text-slate-300 cursor-not-allowed'}`}
-        >
-          {isScanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-          <span>{isScanning ? `Escaneando ${effectiveLan}...` : 'Escanear dispositivos'}</span>
-        </button>
+        {(() => {
+          // Motivo del disabled — el más restrictivo gana. El orden refleja
+          // la secuencia natural que el usuario debe resolver.
+          const blockedReason = !isTunnelActive
+            ? 'Activa un túnel en la pestaña Nodos para escanear la LAN remota.'
+            : !effectiveLan
+              ? 'Elige o ingresa una subred LAN antes de escanear.'
+              : null;
+          const isBlocked = blockedReason !== null;
+          return (
+            <button
+              onClick={onScan}
+              disabled={!canScan}
+              title={isBlocked ? blockedReason! : undefined}
+              aria-label={isBlocked ? `Escanear dispositivos (bloqueado): ${blockedReason}` : 'Escanear dispositivos'}
+              className={`flex items-center space-x-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all
+                ${canScan
+                  ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-md shadow-indigo-500/25 hover:shadow-lg active:scale-[0.98]'
+                  : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200 dark:bg-slate-800 dark:text-slate-500 dark:border-slate-700'}`}
+            >
+              {isScanning
+                ? <Loader2 className="w-4 h-4 motion-safe:animate-spin" />
+                : isBlocked
+                  ? <Lock className="w-4 h-4" />
+                  : <RefreshCw className="w-4 h-4" />}
+              <span>{isScanning ? `Escaneando ${effectiveLan}...` : 'Escanear dispositivos'}</span>
+            </button>
+          );
+        })()}
       </div>
     </>
   );

@@ -1,17 +1,21 @@
 // ============================================================
 //  useDeviceList — filtra, busca y ordena ScannedDevice[]
 //
-//  Recibe scanResults + savedIds y devuelve los rows derivados
-//  (con flag isSaved + devId calculado), filtrados por search
-//  query y SSID, y ordenados por la columna elegida.
+//  Desde §40 es un "controlled hook": recibe searchQuery, filterSSID,
+//  filterRole y sortConfig + sus setters desde el store consolidado
+//  (useScanPreferences). Esto permite que la persistencia viva en un
+//  solo lugar y que ambas instancias del módulo (raro pero posible)
+//  vean siempre el mismo estado.
+//
+//  Internamente conserva el useDeferredValue para que el filtrado
+//  no compita con el typing del input de búsqueda.
 // ============================================================
 
-import { useState, useMemo, useCallback, useDeferredValue } from 'react';
+import { useMemo, useCallback, useDeferredValue } from 'react';
 import type { ScannedDevice } from '../../../../types/devices';
+import type { RoleFilter, SortConfig } from './useScanPreferences';
 
-type SortDir = 'asc' | 'desc';
-/** Filtros mutuamente excluyentes por rol del device. `''` = todos. */
-export type RoleFilter = '' | 'ap' | 'sta' | 'unknown';
+export type { RoleFilter, SortConfig } from './useScanPreferences';
 
 export interface DeviceRow {
   dev: ScannedDevice;
@@ -19,38 +23,50 @@ export interface DeviceRow {
   devId: string;
 }
 
-/** Normaliza el modo crudo (cachedStats.mode || dev.role) a 3 categorías. */
+/**
+ * Normaliza el modo crudo (`cachedStats.mode || dev.role`) a 3 categorías
+ * para el filtro "Solo APs / Solo CPEs / Solo desconocidos". Acepta variantes
+ * con prefijo separado por `-` o `_` para que los modos PTP también caigan
+ * en su categoría natural:
+ *   • 'ap', 'master', 'ap-ptp', 'ap_ptp', 'ap-something' → 'ap'
+ *   • 'sta', 'sta-ptp', 'sta_ptp', 'sta-something'       → 'sta'
+ *   • todo lo demás                                       → 'unknown'
+ */
 function normalizeRole(dev: ScannedDevice): 'ap' | 'sta' | 'unknown' {
-  const raw = dev.cachedStats?.mode || dev.role;
-  if (raw === 'ap' || raw === 'master') return 'ap';
-  if (raw === 'sta') return 'sta';
+  const raw = (dev.cachedStats?.mode || dev.role || '').toString().toLowerCase();
+  if (raw === 'ap' || raw === 'master' || raw.startsWith('ap-') || raw.startsWith('ap_')) return 'ap';
+  if (raw === 'sta' || raw.startsWith('sta-') || raw.startsWith('sta_')) return 'sta';
   return 'unknown';
 }
 
 interface UseDeviceListInput {
   scanResults: ScannedDevice[];
   savedIds: Set<string>;
+  // Controlled — valores + setters desde useScanPreferences
+  searchQuery: string;
+  setSearchQuery: (s: string) => void;
+  filterSSID: string;
+  setFilterSSID: (s: string) => void;
+  filterRole: RoleFilter;
+  setFilterRole: (r: RoleFilter) => void;
+  sortConfig: SortConfig | null;
+  setSortConfig: (updater: (prev: SortConfig | null) => SortConfig | null) => void;
 }
 
-// Sort por defecto = señal desc. Es lo más útil cuando la tabla termina de
-// auth: los dispositivos con mejor señal arriba, los caídos / sin stats abajo
-// (la rama `?? -999` los manda al final). El usuario puede romper este
-// orden haciendo click en cualquier header.
-const DEFAULT_SORT: { key: string; dir: SortDir } = { key: 'signal', dir: 'desc' };
-
-export function useDeviceList({ scanResults, savedIds }: UseDeviceListInput) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterSSID, setFilterSSID] = useState('');
-  const [filterRole, setFilterRole] = useState<RoleFilter>('');
-  const [sortConfig, setSortConfig] = useState<{ key: string; dir: SortDir } | null>(DEFAULT_SORT);
-
+export function useDeviceList({
+  scanResults, savedIds,
+  searchQuery, setSearchQuery,
+  filterSSID, setFilterSSID,
+  filterRole, setFilterRole,
+  sortConfig, setSortConfig,
+}: UseDeviceListInput) {
   const toggleSort = useCallback((key: string) => {
     setSortConfig(prev =>
       prev?.key === key
         ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
         : { key, dir: 'asc' }
     );
-  }, []);
+  }, [setSortConfig]);
 
   // Rows base con flag de "ya guardado en biblioteca local"
   const scanRows: DeviceRow[] = useMemo(() => scanResults.map(dev => {
@@ -64,11 +80,8 @@ export function useDeviceList({ scanResults, savedIds }: UseDeviceListInput) {
     [scanRows]
   );
 
-  // Filtro por search query (IP/nombre/SSID/MAC) + SSID seleccionado.
-  // useDeferredValue separa el typing del input del recálculo del filter:
-  // React puede mantener el input fluido mientras el filtrado de miles de
-  // filas corre en una transición de baja prioridad. Patrón vercel
-  // rerender-use-deferred-value.
+  // useDeferredValue separa typing → filter recompute. React mantiene
+  // el input fluido mientras el filtrado corre en transición de baja prio.
   const deferredSearch = useDeferredValue(searchQuery);
   const filteredRows = useMemo(() => {
     const q = deferredSearch.toLowerCase().trim();

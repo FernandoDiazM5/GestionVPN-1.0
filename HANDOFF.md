@@ -3,7 +3,7 @@
 > Documento de migración de contexto entre sesiones.
 > Rama de trabajo: **`dev`** · Remote: `github.com/FernandoDiazM5/GestionVPN-1.0`.
 >
-> **Estado actual (2026-06-12):** REFACTOR_PLAN cerrado (F0-F12) · 5 features quick-wins entregados (Q1-Q5) · 2 mid-size (M1, M5) · iter2 del bot Telegram + reposición "Asignar túneles" + fix crítico `user_mgmt_ips` (§32) · UX MEMBER endurecida (§33) · Workspace unificado + email en peers WG + multi-asignar + QR en aceptar invitación (§34) · Columna Alias editable en peers WG + bloqueo de edición del "Usuario" para preservar trazabilidad MikroTik (§35) · Fix crítico bot Telegram: match dual VRF/PPP en asignaciones del MEMBER (§36) · Auditoría exhaustiva del módulo Escanear con skills `react-ui-expert` + `vercel-react-best-practices`: 21 mejoras en 5 commits (§37 perf+robustez · §38 UX+features) · 🛑 Política operativa SSH para antenas Ubiquiti establecida: solo lectura + ping + reinicio con confirmación; PROHIBIDO actualizar firmware, borrar archivos, restaurar a fábrica o modificar config persistente (ver sección dedicada al final del doc) · **Cierre auditoría Escanear (§39): U1.A columna Acción sticky-right + U2 kebab para acciones secundarias (Informe / Sync / Ver datos del scan); 26/27 hallazgos aplicados, solo F4 (diff de scans) queda en backlog**. Plan completo abajo.
+> **Estado actual (2026-06-12):** REFACTOR_PLAN cerrado (F0-F12) · 5 features quick-wins entregados (Q1-Q5) · 2 mid-size (M1, M5) · iter2 del bot Telegram + reposición "Asignar túneles" + fix crítico `user_mgmt_ips` (§32) · UX MEMBER endurecida (§33) · Workspace unificado + email en peers WG + multi-asignar + QR en aceptar invitación (§34) · Columna Alias editable en peers WG + bloqueo de edición del "Usuario" para preservar trazabilidad MikroTik (§35) · Fix crítico bot Telegram: match dual VRF/PPP en asignaciones del MEMBER (§36) · Auditoría exhaustiva del módulo Escanear con skills `react-ui-expert` + `vercel-react-best-practices`: 21 mejoras en 5 commits (§37 perf+robustez · §38 UX+features) · 🛑 Política operativa SSH para antenas Ubiquiti establecida: solo lectura + ping + reinicio con confirmación; PROHIBIDO actualizar firmware, borrar archivos, restaurar a fábrica o modificar config persistente (ver sección dedicada al final del doc) · Cierre auditoría Escanear (§39): U1.A columna Acción sticky-right + U2 kebab para acciones secundarias (Informe / Sync / Ver datos del scan); 26/27 hallazgos aplicados, solo F4 (diff de scans) queda en backlog · **§40 Personalización + export multi-formato: `useScanPreferences` consolida columnas + anchos + sort + filtros + búsqueda + subred en un único store `vpn_scan_prefs_v1` con migración legacy + debounce 300ms + flush al desmontar; nuevo `ExportMenu` con 4 formatos (CSV / JSON / Excel / PDF informe) usando `exceljs` + `jspdf` con dynamic imports, bundle inicial intacto. Incluye 3 fixes (a) regresión §39: `effectiveNode = selectedNode ?? activeNode` para que el botón Guardar aparezca cuando hay túnel activo aunque `selectedNode` aún no se hidrate; (b) roles PTP (`AP-PTP` / `STA-PTP`) ahora se reflejan en el export y entran al filtro "Solo APs" / "Solo CPEs"; (c) botón "Escanear dispositivos" se bloquea con 🔒 + tooltip cuando no hay túnel activo o no hay subred**. Plan completo abajo.
 >
 > ### 🧱 Refactor (F0-F12) — Plan completo ejecutado
 > - **F5** Monorepo + `@gestionvpn/contracts` con Zod compartido.
@@ -44,7 +44,7 @@
 > - **142 backend** (14 archivos) + **36 frontend** (5 archivos) = **178 tests verdes**. La auditoría §37-§38 de Escanear NO añade tests nuevos (las mejoras son refactor/UX sin lógica de negocio); el conteo se mantiene desde §36.
 >
 > ### 📚 Secciones de referencia
-> §17–25: REFACTOR_PLAN ejecutado. §26 notificaciones. §27 bot Telegram. §28 ping/trace. §29 export. §30 dashboard. §31 monitoreo. §32 iter2 multi-usuario. §33 UX MEMBER endurecida. §34 Workspace unificado + peers WG mejorados. §35 Alias humano + bloqueo Usuario. §36 Fix bot — match dual VRF/PPP. §37 Escanear — perf + robustez. §38 Escanear — UX + features. §39 Escanear — sticky-right + kebab (cierre auditoría).
+> §17–25: REFACTOR_PLAN ejecutado. §26 notificaciones. §27 bot Telegram. §28 ping/trace. §29 export. §30 dashboard. §31 monitoreo. §32 iter2 multi-usuario. §33 UX MEMBER endurecida. §34 Workspace unificado + peers WG mejorados. §35 Alias humano + bloqueo Usuario. §36 Fix bot — match dual VRF/PPP. §37 Escanear — perf + robustez. §38 Escanear — UX + features. §39 Escanear — sticky-right + kebab (cierre auditoría). §40 Escanear — preferencias persistentes (useScanPreferences) + export multi-formato (CSV/JSON/Excel/PDF).
 >
 > Sesión 2026-06-07 PM: Ajustes del moderador (perfil + workspace + import/export JSON) + Recuperar contraseña + sync MikroTik al deshabilitar + invitaciones por email + .conf WG server-side.
 > Sesión 2026-06-07 AM: multi-usuario con aislamiento por sesión (mangle por-IP), parche `!empty` node-routeros, auditoría (Semgrep+security-review+code-review) y fixes C1–C7.
@@ -69,7 +69,7 @@
 6. **Pase UX P1–P6** + optimización visual de la vista **Escanear**.
 7. **🆕 Multi-usuario con aislamiento por sesión** (sesión 2026-06-07) — ver §7.
 
-**Estado de salud (2026-06-12 mañana):** `tsc 0` (`--noEmit` + build estricto) · `node --check ✓` · **178 tests verdes** (142 backend + 36 frontend) · 10 commits limpios en `dev` desde el HANDOFF previo. 6 jobs concurrentes en producción (`startMonitor` MySQL, `expirationJob`, `telegramBot`, `dashboardMetrics` sampler, `monitoringJob`). 0 vulnerabilidades npm en prod, 0 findings `semgrep`. Bundles relevantes: **inicial 248 KB / 78 KB gzip** (sin cambios); `TeamModule` 119 KB / 30 KB gzip; `UserManagementPanel` lazy 25 KB / 7 KB gzip; **`NetworkDevicesModule` 97.4 KB / 23.5 KB gzip** (+12 KB acumulado tras §37-§39: `exportCsv.ts` + bulk save + chips + filtros + zebra + sticky-right + kebab). MySQL: tabla `peer_aliases` creada automáticamente en `initDb()` desde `schema_ops.sql`. Sin pendientes del REFACTOR_PLAN; backlog quick-wins (Q1-Q5) y 2 mid-size (M1, M5) entregados. **Últimos commits en `dev`:** `0471d64` (retira "Sin nodo" del primario) · `2bff438` (U2 kebab para acciones secundarias) · `d300a44` (U1.A columna Acción sticky-right) · `0bb0aff` (política SSH bloqueante) · `8d43b19` (HANDOFF §37+§38) · `f1dd8cb` (export CSV + bulk save + zebra T4) · `a3e1caf` (filtro rol + footer + chips + tooltip header) · `1fc502b` (cancel reader on cambio subred + lazy init sessionStorage + schema versionado) · `09b7c5c` (deferred search + reduced motion + touch click-away + cache estimateIpCount) · `4e872f5` (race + listeners + CSS var + Map + SSH UX + sort + widths persist) · `02458f4` (§33-§36 trabajo previo).
+**Estado de salud (2026-06-12 noche):** `tsc 0` (`--noEmit` + build estricto) · `node --check ✓` · **186 tests verdes** (142 backend + 44 frontend — 8 nuevos para `useScanPreferences`). 6 jobs concurrentes en producción. ⚠️ `npm audit --omit=dev`: **2 moderate** (uuid viejo arrastrado por `exceljs` — no expone superficie del panel; pendiente de tracker upstream). 0 findings `semgrep` (sin cambios en backend ni en superficies con reglas activas). Bundles relevantes: **inicial 248.80 KB / 77.74 KB gzip** (idéntico al pre-§40); `TeamModule` 119 KB / 30 KB gzip; `UserManagementPanel` lazy 25 KB / 7 KB gzip; **`NetworkDevicesModule` ~102.5 KB / ~25.1 KB gzip** (+5 KB por `ExportMenu` + `exportShared` estáticos + fixes); **chunks lazy del export**: `exceljs.min` 929 KB / 256 KB gzip (solo Excel), `jspdf.es.min` 399 KB / 130 KB gzip + `html2canvas` 199 KB + `jspdf-autotable` 30 KB (solo PDF), `exportXlsx`/`exportPdf`/`exportJson`/`exportCsv` <3 KB cada uno. MySQL: sin cambios de schema en §40 (todo es frontend). Sin pendientes del REFACTOR_PLAN; backlog quick-wins (Q1-Q5) y 2 mid-size (M1, M5) entregados. **Últimos commits en `dev`:** _§40 pendiente de commit (1 commit consolidado: store de preferencias + ExportMenu + 3 fixes)_ · `236bf66` (HANDOFF §39) · `0471d64` (retira "Sin nodo" del primario) · `2bff438` (U2 kebab para acciones secundarias) · `d300a44` (U1.A columna Acción sticky-right) · `0bb0aff` (política SSH bloqueante) · `8d43b19` (HANDOFF §37+§38) · `f1dd8cb` (export CSV + bulk save + zebra T4) · `a3e1caf` (filtro rol + footer + chips + tooltip header) · `1fc502b` (cancel reader on cambio subred + lazy init sessionStorage + schema versionado).
 
 ---
 
@@ -129,7 +129,7 @@
 | 🟡 Limpieza | Quitar `adminIP` hardcodeado (`useNodeManagement.ts`, ya no se usa) · warning MySQL2 `keepAliveInitialDelayMs` (mitigado en F11) · escaneo atado al `mgmt_ip` del solicitante. |
 | 🟡 Mejora | **Fase 5 (opcional):** aislamiento de firewall por-IP + acotar regla "Admin MGMT libre" (defensa en profundidad; hoy el ruteo ya aísla). Dockerfile `USER` no-root (Semgrep S1). |
 | 🟡 Próximo backlog | **M2** API pública con tokens scoped · **M3** Webhooks salientes · **M4** Speed test desde antena (iperf3 SSH) · **L1** Reportes SLA computados desde `tunnel_session_logs` + `monitoring_state` · **L2** Diagnóstico con LLM · **L3** PWA móvil instalable · **L4** Predicción de degradación con tendencia de `signal_history`. |
-| 🟢 Resuelto | O2 repo privado · O5 MySQL estable · UX P6 · **multi-usuario activación (verificado)** · parche `!empty` · fixes C1–C7 · **crash `POST /api/wireguard/peers` (ver §13.6)** · **V1 `register-my-ip` ownership por rol** · **Q1 Notificaciones (§26)** · **M1 Bot Telegram (§27)** · **Q3 Diagnóstico ping/trace (§28)** · **Q4 Export auditoría CSV/JSON (§29)** · **Q2 Dashboard métricas (§30)** · **M5 Monitoreo proactivo (§31)** · **Job de expiración batch** · **iter2 bot directo + asignar túneles UI + fix `user_mgmt_ips` auto (§32)** · **UX MEMBER endurecida — solo "Acceder" + Ajustes con Telegram (§33)** · **Workspace unificado + Email en peers + multi-asignar túneles + QR en aceptar invitación (§34)** · **Alias humano + bloqueo edición Usuario (§35)** · **Fix bot Telegram: match dual VRF/PPP en asignaciones del MEMBER (§36)** · **Auditoría Escanear: 12 fixes de perf+robustez (§37) + 9 mejoras UX+features (§38) + cierre con sticky-right + kebab (§39)**. |
+| 🟢 Resuelto | O2 repo privado · O5 MySQL estable · UX P6 · **multi-usuario activación (verificado)** · parche `!empty` · fixes C1–C7 · **crash `POST /api/wireguard/peers` (ver §13.6)** · **V1 `register-my-ip` ownership por rol** · **Q1 Notificaciones (§26)** · **M1 Bot Telegram (§27)** · **Q3 Diagnóstico ping/trace (§28)** · **Q4 Export auditoría CSV/JSON (§29)** · **Q2 Dashboard métricas (§30)** · **M5 Monitoreo proactivo (§31)** · **Job de expiración batch** · **iter2 bot directo + asignar túneles UI + fix `user_mgmt_ips` auto (§32)** · **UX MEMBER endurecida — solo "Acceder" + Ajustes con Telegram (§33)** · **Workspace unificado + Email en peers + multi-asignar túneles + QR en aceptar invitación (§34)** · **Alias humano + bloqueo edición Usuario (§35)** · **Fix bot Telegram: match dual VRF/PPP en asignaciones del MEMBER (§36)** · **Auditoría Escanear: 12 fixes de perf+robustez (§37) + 9 mejoras UX+features (§38) + cierre con sticky-right + kebab (§39)** · **Preferencias persistentes Escanear (todo: cols+anchos+sort+filtros+búsqueda+subred) + Export multi-formato CSV/JSON/Excel/PDF informe (§40)**. |
 | 🟢 Nota | Config MikroTik `v2.rsc` SIN mangle global (baseline limpio multi-usuario). Peer `peer27` de prueba con public-key placeholder `abcdEFGH...` (borrable). |
 
 **Scripts:**
@@ -3031,6 +3031,176 @@ Cambio mínimo en `DeviceRowActions`: el bloque `else if (!isSaved && !selectedN
   - Retención automática: últimos 10 snapshots por `(nodeId, lan)`.
 
   **Respeta la política SSH** de la sección final: F4 no induce comandos, solo compara strings ya leídos.
+
+---
+
+## 40) 💾 Preferencias persistentes del módulo Escanear + Export multi-formato
+
+Sesión 2026-06-12 tarde-noche. El usuario reportó que **al volver al módulo Escanear, las columnas que había ajustado se volvían a poner en el set default de 8**, y pidió además poder exportar el scan en **JSON, Excel y PDF** además de CSV. La auditoría reveló que solo `visibleCols` + `colWidths` se persistían en localStorage; **filtros, búsqueda, sort y subred manual NO se guardaban** entre visitas. Esta sección entrega un store unificado de preferencias + 3 nuevos formatos de export con dynamic imports.
+
+### Commits
+
+| Commit | Cambios |
+|---|---|
+| _pendiente_ | §40 (1 commit) — `useScanPreferences` + 4 exporters + `ExportMenu` + tests |
+
+### Persistencia consolidada — `useScanPreferences`
+
+Nuevo hook [`useScanPreferences`](vpn-manager/src/components/Devices/NetworkDevicesModule/hooks/useScanPreferences.ts) — **fuente única de truth** para todo lo que el usuario configura y espera reencontrar al volver:
+
+| Campo | Antes | Ahora |
+|---|---|---|
+| `visibleCols` | localStorage `vpn_diag_cols_v2` | ✅ unificado |
+| `colWidths` | localStorage `vpn_diag_col_widths_v1` | ✅ unificado |
+| `sortConfig` | `useState` en `useDeviceList` (perdido al desmontar) | ✅ persiste |
+| `filterRole` (AP/CPE/Desconocido) | `useState` | ✅ persiste |
+| `filterSSID` | `useState` | ✅ persiste |
+| `searchQuery` | `useState` | ✅ persiste |
+| `manualLan` | `useState` en `NetworkDevicesModule` | ✅ persiste (respeta solo si pertenece al nodo activo) |
+
+**Clave única:** `vpn_scan_prefs_v1` (con `schemaVersion` para evoluciones futuras).
+
+**Migración silenciosa:** la primera vez que el nuevo store arranca y no encuentra `vpn_scan_prefs_v1`, lee las dos claves legacy (`vpn_diag_cols_v2` + `vpn_diag_col_widths_v1`) y las absorbe. Las claves viejas se conservan por una transición para roll-back; podrán retirarse cuando se libere §41.
+
+**Debounce 300ms:** evita escribir localStorage en cada keystroke del input de búsqueda. **Flush sincrónico al desmontar** (vía `useRef` para capturar el último state, no la dep array) — si el usuario sale del módulo antes del debounce, no pierde el último cambio.
+
+**Sanity-check defensivo:** descarta widths fuera del rango 50-1000, `filterRole` desconocidos, sort sin `dir` válido. Si el JSON está corrupto, vuelve a defaults sin lanzar.
+
+**Caso clave del usuario — `visibleCols=[]`:** el código viejo tenía `if (parsed.length > 0) return parsed`. Si el usuario quitaba **TODAS** las columnas técnicas, al recargar se volvía al default de 8. El nuevo store **acepta array vacío** como válido (el usuario aún ve IP/Rol/Acción que son fijas del template). Cubierto por el test `acepta visibleCols=[] sin volver a defaults`.
+
+### Refactor: hooks "controlled"
+
+- [`useColumnPrefs`](vpn-manager/src/components/Devices/NetworkDevicesModule/hooks/useColumnPrefs.ts) — ahora solo cálculo derivado (activeConfigCols, gridTemplate, minTableWidth, compactNameMode, startResize). Recibe `visibleCols + colWidths + setColWidths` por props. Sin estado propio.
+- [`useDeviceList`](vpn-manager/src/components/Devices/NetworkDevicesModule/hooks/useDeviceList.ts) — convertido a "controlled hook". Recibe `searchQuery / setSearchQuery / filterSSID / setFilterSSID / filterRole / setFilterRole / sortConfig / setSortConfig` desde el padre. Mantiene `useDeferredValue` interno para el filtrado.
+- [`NetworkDevicesModule`](vpn-manager/src/components/Devices/NetworkDevicesModule/NetworkDevicesModule.tsx) — orquesta. Llama a `useScanPreferences()` y desestructura para los hooks downstream.
+
+### Export multi-formato
+
+Botón "Exportar" reemplazado por el nuevo componente [`ExportMenu`](vpn-manager/src/components/Devices/NetworkDevicesModule/components/ExportMenu.tsx) — dropdown con 4 opciones (patrón `useKebabMenu` + `createPortal` + close-on-scroll, estandarizado en §39):
+
+| Formato | Lib | Chunk lazy (raw / gzip) | Notas |
+|---|---|---|---|
+| **CSV** | sin libs | exportCsv 0.38 KB / 0.30 KB | BOM UTF-8, RFC 4180 escape. Mantiene comportamiento previo. |
+| **JSON** | sin libs | exportJson 0.50 KB / 0.35 KB | Estructura tipada con `schema: 'gestionvpn.scan/v1'` + metadata (nodo, subred, fecha, contadores) + `devices[]` con keys camelCase. |
+| **Excel** | `exceljs` | exportXlsx 1.75 KB + **exceljs.min 929.91 KB / 256.47 KB** | Hoja "Escaneo" con título indigo, fila de metadatos, header bold + fill indigo-100, freeze pane en fila 5, anchos auto-ajustados (cap 32 chars). |
+| **PDF informe** | `jspdf` + `jspdf-autotable` | exportPdf 2.18 KB + **jspdf.es.min 399.52 KB + plugin 29.92 KB + html2canvas 199.56 KB** | A4 landscape. Header con título + nodo + subred + fecha + línea indigo. 3 KPIs (Total / Con stats / Guardados). Tabla con 11 columnas legibles, header repetido por página, footer "Página N de M · GestionVPN · fecha". |
+
+**Toda la lógica de columnas** vive en [`exportShared.ts`](vpn-manager/src/components/Devices/NetworkDevicesModule/utils/exportShared.ts) — `EXPORT_COLUMNS` (26 cols para CSV/JSON/Excel) + `PDF_COLUMNS` (11 cols subset legible). Cambiar el orden o agregar un campo solo requiere editar `exportShared.ts` y los 4 exporters quedan sincronizados.
+
+### Loading-por-item en el dropdown
+
+Cada item del `ExportMenu` muestra un spinner `Loader2` mientras corre su dynamic import + render. Los otros items quedan `disabled` para evitar paralelizar generaciones que podrían pisarse. Si falla, `window.alert` informa al usuario y la consola guarda el stacktrace.
+
+### Métricas pre/post §40
+
+| Métrica | Pre-§40 | Post-§40 |
+|---------|---------|----------|
+| Bundle inicial | 248.80 KB / 77.73 KB gzip | **248.80 KB / 77.74 KB gzip** (idéntico) |
+| `NetworkDevicesModule` chunk | 97.4 KB / 23.6 KB gzip | **102.13 KB / 25.01 KB gzip** (+5 KB por ExportMenu + exportShared estáticos) |
+| Persistencia | columnas + anchos | **columnas + anchos + sort + 3 filtros + búsqueda + subred manual** |
+| Formatos de export | CSV | **CSV + JSON + Excel + PDF informe** |
+| Tests frontend | 36 | **44** (+8 para useScanPreferences) |
+| Vulnerabilidades npm prod | 0 | ⚠️ **2 moderate** (uuid viejo de exceljs — no compromete superficie del proyecto, solo regex catastrophic backtracking en parseo de UUIDs internos de la lib) |
+
+**Bug cazado por los tests durante el desarrollo:** la primera versión del store tenía `useEffect(() => () => savePrefs(prefs), [prefs])` con la idea de "flush al desmontar". Pero la dep `[prefs]` hacía que el cleanup corriera en cada cambio, escribiendo a localStorage SIN debounce. Reemplazado por `useRef` + `useEffect(() => {}, [])` para que el cleanup solo corra al desmontar y lea la versión más reciente del ref.
+
+### Reglas operativas reforzadas (post-§40)
+
+- **Toda preferencia visible que el usuario ajusta debe persistir.** El módulo Escanear sienta el patrón: store único + clave única + migración legacy + debounce + flush al desmontar + sanity-check.
+- **Hooks "controlled" son el patrón para state que vive en el store.** En vez de duplicar `useState` en cada hook especializado, el padre lo desestructura del store y pasa `value + setter` como props. Los hooks especializados quedan sin estado propio, fáciles de testear con valores hardcoded.
+- **Dynamic imports para libs >100 KB.** `exceljs` (930 KB) y `jspdf` (400 KB + 200 KB html2canvas) no pueden entrar al bundle inicial. Patrón: el componente importa la lib **dentro** del handler async, no en el top-level. Vite genera chunks separados automáticamente.
+- **Definición de columnas centralizada para multi-formato.** CSV y XLSX divergiendo es un bug clásico ("¿por qué la columna X aparece en uno pero no en el otro?"). `exportShared.ts` es la fuente única.
+- **Loader2 por item en menús de export.** Generar un Excel con 200 filas puede tardar 1-2s en máquinas viejas. El feedback inmediato evita que el usuario clickee dos veces.
+
+### Fix regresivo §39 — celda Acción vacía con túnel activo
+
+Reporte del usuario tras §40: con 31 dispositivos escaneados, SSH OK en todos, solo **una** fila (la única `isSaved=true`) mostraba el botón "Ficha". Las otras 30 filas no mostraban "Guardar" — la celda Acción quedaba vacía.
+
+**Causa raíz:** §39 retiró el span "Sin nodo" del primario, pero la lógica de `DeviceRowActions` deja `primary = null` cuando `!isSaved && !selectedNode`. El bug es que `selectedNode` es un `useState` local sincronizado **post-mount** desde `activeNodeVrf` vía `useEffect`. Si VpnContext rehidrata `activeNodeVrf` después de que `NetworkDevicesModule` montó, o si el usuario entra al módulo con túnel ya activo pero el effect de sync aún no corrió, `selectedNode` se queda en `null` aunque haya túnel activo. Con `!selectedNode`, ningún row puede mostrar "Guardar".
+
+**Fix:** introducir `effectiveNode = selectedNode ?? activeNode` en `NetworkDevicesModule.tsx`. `activeNode` es derivado **directo** de `activeNodeVrf + nodes` (sin estado intermedio), así que está disponible en el primer render con datos. Reemplazo de `selectedNode` por `effectiveNode` en:
+
+- `effectiveLan` (fallback de subred)
+- `exportMeta.nodeName`
+- `handleBulkSave` (botón "Guardar N")
+- `handleOpenScanView`
+- prop `selectedNode` del `<DeviceTable>` → llega a `DeviceRowActions` → ahora SÍ hay nodo destino → botón "Guardar" verde aparece en cada fila con SSH OK
+- guarda del modal `<AddDeviceModal>`
+
+`selectedNode` (state interno) se mantiene como elección **explícita** del usuario (cuando se permita elegir manualmente en futuras iteraciones), pero el resto de la UI usa `effectiveNode`.
+
+| Métrica | Pre-fix | Post-fix |
+|---|---|---|
+| Filas con botón Guardar visible (caso 31 dispositivos, SSH OK, túnel activo) | 0/30 | **30/30** |
+| Bundle (NetworkDevicesModule) | 102.13 KB | 102.46 KB (+330 B por el if `?? activeNode`) |
+| Tests | 44 verdes | 44 verdes |
+
+### Fix #2 — Roles PTP caían como "Desconocido" en el export
+
+Reporte del usuario tras §40 (segunda iteración): en el PDF / Excel / JSON / CSV, la columna "Rol" solo distinguía `CPE` vs `Desconocido`. Filas que en la tabla aparecían como **`AP-PTP`** o **`STA-PTP`** salían como `"Desconocido"` en el archivo exportado.
+
+**Causa raíz:** la tabla del módulo Escanear pinta el chip de rol con `String(rawMode).toUpperCase()` cuando `rawMode` no es uno de los 3 canónicos (`ap`/`master`/`sta`), lo que produce etiquetas como `AP-PTP`, `STA-PTP`, `REPEATER` directamente del campo libre `cachedStats.mode` (string que viene del airOS por `mca-status`). Pero mi `roleLabel()` en `exportShared.ts` comparaba con igualdad exacta:
+
+```ts
+if (raw === 'ap' || raw === 'master') return 'AP';
+if (raw === 'sta') return 'CPE';
+return 'Desconocido';   // 'ap-ptp', 'sta-ptp', etc.
+```
+
+→ todo lo que no fuera exactamente `'ap' / 'master' / 'sta'` caía a "Desconocido". Inconsistente con la tabla.
+
+**Fix en [`exportShared.ts`](vpn-manager/src/components/Devices/NetworkDevicesModule/utils/exportShared.ts):** `roleLabel()` ahora devuelve el valor crudo en mayúsculas si no es ninguno de los canónicos:
+
+```ts
+if (lower === 'ap' || lower === 'master') return 'AP';
+if (lower === 'sta') return 'CPE';
+if (lower === 'unknown' || !raw) return 'Desconocido';
+return raw.toUpperCase();   // 'AP-PTP' → 'AP-PTP', 'STA-PTP' → 'STA-PTP'
+```
+
+Tipo de retorno cambia de literal union `'AP' | 'CPE' | 'Desconocido'` a `string`.
+
+**Fix complementario en [`useDeviceList.ts`](vpn-manager/src/components/Devices/NetworkDevicesModule/hooks/useDeviceList.ts):** `normalizeRole()` (que alimenta el filtro "Solo APs / Solo CPEs / Solo desconocidos") ahora acepta prefijos `ap-` / `ap_` / `sta-` / `sta_`, así un `AP-PTP` cae en categoría `ap` (sigue siendo un AP) y un `STA-PTP` en `sta` (sigue siendo una estación cliente). Antes ambos caían en `unknown` y el usuario tenía que filtrar "Solo desconocidos" para verlos — semánticamente raro.
+
+| Antes | Ahora |
+|---|---|
+| Tabla muestra `AP-PTP`, export pone `Desconocido` | Tabla y export coinciden: ambos `AP-PTP` |
+| Filtro "Solo APs" excluye AP-PTP | Filtro "Solo APs" incluye AP / master / AP-PTP / AP-* |
+| Filtro "Solo CPEs" excluye STA-PTP | Filtro "Solo CPEs" incluye STA / STA-PTP / STA-* |
+
+### Fix #3 — Botón "Escanear dispositivos" no se bloqueaba sin túnel activo
+
+Reporte del usuario tras §40 (tercera iteración): el botón "Escanear dispositivos" estaba **habilitado** (gradiente indigo activo) incluso cuando no había túnel activo, lo que es un escaneo destinado a fallar sí o sí (el backend no puede salir a la LAN remota sin VRF arriba).
+
+**Causa raíz:** [`useDeviceScan.ts:382`](vpn-manager/src/components/Devices/NetworkDevicesModule/hooks/useDeviceScan.ts:382) calculaba `canScan` solo con `phase quiescente + effectiveLan`. Faltaba la guarda obvia: necesita `activeNodeVrf`.
+
+**Fix:**
+
+```ts
+const canScan = (scanState.phase === 'idle' || scanState.phase === 'done')
+  && !!effectiveLan
+  && !!activeNodeVrf;   // 🆕
+```
+
+Y en [`ScanControls.tsx`](vpn-manager/src/components/Devices/NetworkDevicesModule/components/ScanControls.tsx), el botón ahora:
+- Muestra ícono **🔒 Lock** cuando está bloqueado (en vez de `RefreshCw`, que parecía "listo para presionar").
+- `title` y `aria-label` con el motivo exacto: "Activa un túnel en la pestaña Nodos…" o "Elige o ingresa una subred…".
+- Color del disabled más contrastado (`border` + `slate-400`) — antes era `slate-300` sobre `slate-100`, casi invisible en modo claro.
+
+### Pendiente / mejoras futuras
+
+- **§41 (cleanup):** retirar las claves legacy `vpn_diag_cols_v2` + `vpn_diag_col_widths_v1` cuando se confirme que toda la base de usuarios migró. Migración silenciosa solo necesita correr una vez por navegador.
+- **Vulnerabilidades:** `exceljs` arrastra `uuid` v8 vulnerable (2 moderate). Tracker: si se libera `exceljs` con uuid v9+ aplicar update; alternativa es migrar a `xlsx` (SheetJS Community) pero su licencia es más restrictiva.
+- **Botón "Resetear preferencias":** el store ya expone `resetPrefs()` (sin UI todavía). Útil para soporte cuando un usuario quiere "empezar de cero" sin borrar cache del navegador. Pendiente de añadir en `ColumnPicker` o como acción en un menú de "Ajustes del módulo".
+- **Persistir `expandedRows`** (filas con panel SSH abierto) — bajo prioridad, comportamiento debatible al re-escanear.
+- **Per-nodo `manualLan`:** hoy es global. Si el usuario alterna entre nodos A y B con subredes manuales distintas, A pisa a B. Solución: `Record<vrfName, string>` en el store. Pendiente cuando alguien lo reporte como dolor real.
+
+### Cross-references
+
+- §35 — Patrón "Alias humano" optimista con rollback. Mismo principio que §40: la UI siempre refleja la intención del usuario aunque el storage subyacente sea async.
+- §37-§39 — Auditoría Escanear (perf+robustez+UX). §40 cierra el ciclo agregando la capa de personalización.
+- F10 — Code-splitting. §40 respeta la regla: bundle inicial sigue en 248 KB, las 2 libs grandes son lazy.
+- Regla operativa nueva: **toda preferencia visible persiste** → debe aplicarse al resto del proyecto (Nodos, Equipo, Monitor AP) si surge el reporte.
 
 ---
 
