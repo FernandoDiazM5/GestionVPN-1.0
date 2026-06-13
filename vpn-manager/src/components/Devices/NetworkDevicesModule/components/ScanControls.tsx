@@ -66,9 +66,9 @@ function ScanControlsImpl({
                 <span className="text-2xs text-slate-400 dark:text-slate-500 ml-1">· {estimateIpCount(availableSubnets[0])} hosts</span>
               </div>
             ) : (
-              <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-100 rounded-xl">
+              <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-100 rounded-xl dark:bg-amber-500/10 dark:border-amber-500/30">
                 <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                <span className="text-xs text-amber-600">No hay subredes configuradas en este nodo</span>
+                <span className="text-xs text-amber-600 dark:text-amber-400">No hay subredes configuradas en este nodo</span>
               </div>
             )}
           </div>
@@ -90,7 +90,7 @@ function ScanControlsImpl({
 
       {isTunnelActive && activeNode && (
         <div className="border-t border-slate-100 pt-3 mt-1 flex items-center gap-2">
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs border ${nodeSshCreds.length > 0 ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs border ${nodeSshCreds.length > 0 ? 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-500/10 dark:border-amber-500/30 dark:text-amber-400' : 'bg-slate-50 border-slate-200 text-slate-400 dark:bg-slate-800/60 dark:border-slate-700 dark:text-slate-500'}`}>
             <KeyRound className="w-3.5 h-3.5 shrink-0" />
             {nodeSshCreds.length > 0
               ? <span>SSH: <strong>{nodeSshCreds.map(c => c.user).join(', ')}</strong> · {nodeSshCreds.length} credencial{nodeSshCreds.length > 1 ? 'es' : ''}</span>

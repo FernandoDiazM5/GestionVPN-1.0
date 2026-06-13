@@ -34,7 +34,7 @@ function ScanProgressBannerImpl({
   return (
     <>
       {scanState.phase !== 'idle' && (
-        <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-2">
+        <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-2 dark:bg-slate-800/60 dark:border-slate-700">
           <div className="flex justify-between items-center text-2xs font-bold text-slate-600 uppercase tracking-widest">
             <span className="flex items-center space-x-2">
               {scanState.phase === 'done' ? (
@@ -49,18 +49,18 @@ function ScanProgressBannerImpl({
               </span>
             </span>
             {scanState.phase === 'discovering' && (
-              <span className="text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-md font-mono">
+              <span className="text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-md font-mono dark:bg-indigo-500/15 dark:text-indigo-400">
                 {discoveryProgress} / {totalIps} IPs
               </span>
             )}
             {scanState.phase === 'authenticating' && (
-              <span className="text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-md font-mono">
+              <span className="text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-md font-mono dark:bg-indigo-500/15 dark:text-indigo-400">
                 {scanState.current} / {scanState.total} dispositivos
               </span>
             )}
           </div>
 
-          <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden relative">
+          <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden relative dark:bg-slate-700">
             {scanState.phase === 'discovering' && (
               <div
                 className="h-full transition-all duration-150 ease-out bg-indigo-500"
@@ -81,7 +81,7 @@ function ScanProgressBannerImpl({
       )}
 
       {debugMsg && !scanError && (
-        <div className="flex items-start space-x-2 text-2xs text-slate-500 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+        <div className="flex items-start space-x-2 text-2xs text-slate-500 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 dark:bg-slate-800/60 dark:border-slate-700 dark:text-slate-400">
           <Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-slate-400" />
           <span>{debugMsg}</span>
         </div>

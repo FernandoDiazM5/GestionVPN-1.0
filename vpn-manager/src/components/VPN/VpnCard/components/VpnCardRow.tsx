@@ -36,12 +36,12 @@ export default function VpnCardRow({
   const showLogs = logs.length > 0 || isPending;
 
   const rowBg = isRunning
-    ? 'bg-emerald-50/60'
+    ? 'bg-emerald-50/60 dark:bg-emerald-500/10'
     : isPending
-      ? 'bg-indigo-50/60'
+      ? 'bg-indigo-50/60 dark:bg-indigo-500/10'
       : rowIndex % 2 === 0
-        ? 'bg-white'
-        : 'bg-slate-50/40';
+        ? 'bg-white dark:bg-slate-900'
+        : 'bg-slate-50/40 dark:bg-slate-900/60';
 
   const borderLeft = isRunning
     ? 'border-l-2 border-l-emerald-400'
@@ -51,7 +51,7 @@ export default function VpnCardRow({
 
   return (
     <>
-      <tr className={`${rowBg} ${borderLeft} transition-colors hover:bg-indigo-50/30`}>
+      <tr className={`${rowBg} ${borderLeft} transition-colors hover:bg-indigo-50/30 dark:hover:bg-indigo-500/10`}>
         <VpnCardStatusIcon status={status} />
         <VpnCardNameCell name={vpn.name} />
         <VpnCardServiceCell service={vpn.service} />

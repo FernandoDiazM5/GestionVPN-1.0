@@ -64,10 +64,10 @@ export default function AcceptInvitationForm({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-sky-50 flex items-center justify-center p-4">
-      <div className="absolute top-0 left-0 w-96 h-96 bg-indigo-100 rounded-full -translate-x-1/2 -translate-y-1/2 opacity-60 blur-3xl pointer-events-none" />
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-sky-50 flex items-center justify-center p-4 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
+      <div className="absolute top-0 left-0 w-96 h-96 bg-indigo-100 rounded-full -translate-x-1/2 -translate-y-1/2 opacity-60 blur-3xl pointer-events-none dark:bg-indigo-500/20 dark:opacity-30" />
       <div className="w-full max-w-md relative z-10">
-        <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/80 border border-slate-200 overflow-hidden">
+        <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/80 border border-slate-200 overflow-hidden dark:bg-slate-900 dark:border-slate-800 dark:shadow-black/40">
           <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 px-8 pt-10 pb-12">
             <div className="flex items-center space-x-3">
               <div className="bg-white/20 p-2.5 rounded-xl"><Mail className="w-6 h-6 text-white" /></div>
@@ -82,7 +82,7 @@ export default function AcceptInvitationForm({
             {result ? (
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center"><Check className="w-4 h-4 text-emerald-600" /></div>
+                  <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center dark:bg-emerald-500/15"><Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /></div>
                   <p className="text-sm font-bold text-slate-700">¡Listo, {result.user.email}!</p>
                 </div>
                 {result.tunnel && (
@@ -101,7 +101,7 @@ export default function AcceptInvitationForm({
                     {/* QR para WireGuard móvil */}
                     {qr ? (
                       <div className="flex flex-col items-center gap-2 py-2">
-                        <div className="bg-white p-2 rounded-xl border border-slate-200 shadow-sm">
+                        <div className="bg-white p-2 rounded-xl border border-slate-200 shadow-sm dark:bg-slate-100 dark:border-slate-700">
                           <img src={qr} alt="QR de configuración WireGuard" width={220} height={220} className="block" />
                         </div>
                         <p className="text-2xs text-slate-500 flex items-center gap-1.5">
@@ -139,7 +139,7 @@ export default function AcceptInvitationForm({
               </div>
             ) : (
               <form onSubmit={submit} className="space-y-4">
-                {error && <p className="text-sm text-rose-600 font-medium bg-rose-50 border border-rose-100 rounded-xl px-3 py-2">{error}</p>}
+                {error && <p className="text-sm text-rose-600 font-medium bg-rose-50 border border-rose-100 rounded-xl px-3 py-2 dark:bg-rose-500/10 dark:border-rose-500/30 dark:text-rose-400">{error}</p>}
                 <div className="relative">
                   <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input type="email" required placeholder="Tu correo invitado" value={email} onChange={e => setEmail(e.target.value)} className="input-field pl-10" />

@@ -21,7 +21,7 @@ export default function NodesStatsCard({
       label: 'Total nodos',
       count: total,
       icon: Server,
-      iconBg: 'bg-slate-100',
+      iconBg: 'bg-slate-100 dark:bg-slate-800',
       iconColor: 'text-slate-500',
       numColor: 'text-slate-800',
       bar: 'bg-slate-400',
@@ -32,7 +32,7 @@ export default function NodesStatsCard({
       label: 'Conectados',
       count: connected,
       icon: Wifi,
-      iconBg: 'bg-emerald-100',
+      iconBg: 'bg-emerald-100 dark:bg-emerald-500/15',
       iconColor: 'text-emerald-600',
       numColor: 'text-emerald-700',
       bar: 'bg-emerald-400',
@@ -43,7 +43,7 @@ export default function NodesStatsCard({
       label: 'Con VRF',
       count: withVrf,
       icon: GitBranch,
-      iconBg: 'bg-sky-100',
+      iconBg: 'bg-sky-100 dark:bg-sky-500/15',
       iconColor: 'text-sky-600',
       numColor: 'text-sky-700',
       bar: 'bg-sky-400',
@@ -54,7 +54,7 @@ export default function NodesStatsCard({
       label: 'Desconectados',
       count: disconnected,
       icon: WifiOff,
-      iconBg: 'bg-rose-100',
+      iconBg: 'bg-rose-100 dark:bg-rose-500/15',
       iconColor: 'text-rose-500',
       numColor: 'text-rose-600',
       bar: 'bg-rose-400',
@@ -71,7 +71,8 @@ export default function NodesStatsCard({
           onClick={onClick}
           className={`flex flex-col gap-3 p-4 rounded-xl bg-white border border-slate-200
                       transition-all duration-200 shadow-sm
-                      ${onClick ? 'cursor-pointer hover:shadow-md hover:border-slate-300' : 'cursor-default'}`}
+                      dark:bg-slate-900 dark:border-slate-800
+                      ${onClick ? 'cursor-pointer hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700' : 'cursor-default'}`}
         >
           {/* Header: ícono + label */}
           <div className="flex items-center gap-2.5">
@@ -89,7 +90,7 @@ export default function NodesStatsCard({
           </div>
 
           {/* Barra de progreso */}
-          <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
+          <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden dark:bg-slate-800">
             <div
               className={`h-full rounded-full transition-all duration-700 ${bar}`}
               style={{ width: `${barPct}%` }}

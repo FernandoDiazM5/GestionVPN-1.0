@@ -79,7 +79,7 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
   const signalColor = (sig: number) => sig >= -65 ? '#22c55e' : sig >= -75 ? '#f59e0b' : '#ef4444';
 
   const Bar = ({ value, colorClass }: { value: number; colorClass: string }) => (
-    <div className="flex-1 h-2.5 bg-slate-100 rounded-full overflow-hidden">
+    <div className="flex-1 h-2.5 bg-slate-100 rounded-full overflow-hidden dark:bg-slate-800">
       <div className={`h-full rounded-full transition-all ${colorClass}`} style={{ width: `${Math.min(100, value)}%` }} />
     </div>
   );
@@ -88,7 +88,7 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
 
   if (!s) {
     return (
-      <div className="px-5 py-5 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-4">
+      <div className="px-5 py-5 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-4 dark:bg-slate-900/60 dark:border-slate-800">
         <span className="text-xs text-slate-400 italic">Sin estadísticas SSH disponibles.</span>
         {dev.sshUser && (
           <button onClick={handleRefresh} disabled={refreshing}
@@ -104,7 +104,7 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
   const snr = s.signal != null && s.noiseFloor != null ? s.signal - s.noiseFloor : null;
 
   return (
-    <div className="border-t border-slate-200 bg-white">
+    <div className="border-t border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
       <div className="flex items-center justify-between px-4 py-2.5 bg-slate-700 text-white">
         <div className="flex items-center gap-2">
           <div className="w-1 h-4 bg-sky-400 rounded-full" />
@@ -250,7 +250,7 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
               </div>
               <div className="relative h-2.5 rounded-full overflow-hidden"
                 style={{ background: 'linear-gradient(to right, #ef4444 0%, #f59e0b 40%, #22c55e 80%)' }}>
-                <div className="absolute right-0 top-0 h-full bg-slate-100 rounded-r-full"
+                <div className="absolute right-0 top-0 h-full bg-slate-100 rounded-r-full dark:bg-slate-900"
                   style={{ width: `${100 - signalPct(s.signal)}%` }} />
               </div>
             </div>
@@ -288,7 +288,7 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
               {s.airmaxEnabled != null && (
                 <div className="flex justify-between items-center">
                   <span className="text-2xs text-slate-500">airMAX:</span>
-                  <span className={`text-2xs font-bold px-2 py-0.5 rounded-full ${s.airmaxEnabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                  <span className={`text-2xs font-bold px-2 py-0.5 rounded-full ${s.airmaxEnabled ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400' : 'bg-slate-100 text-slate-500 dark:bg-slate-700/50 dark:text-slate-300'}`}>
                     {s.airmaxEnabled ? 'Activado' : 'Desactivado'}
                   </span>
                 </div>
@@ -365,7 +365,7 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
                 ? stationNamesByMac?.get(normalizeMac(sta.mac)) ?? sta.hostname
                 : sta.hostname;
               return (
-              <div key={i} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-1.5 bg-slate-50 rounded-lg border border-slate-100 text-2xs">
+              <div key={i} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-1.5 bg-slate-50 rounded-lg border border-slate-100 text-2xs dark:bg-slate-800/60 dark:border-slate-700">
                 <span className="font-mono font-semibold text-slate-700 w-36 shrink-0">{sta.mac}</span>
                 {/* §42 fix: hostname (resuelto vía scan) + IP por estación.
                     Antes solo se mostraba el MAC, críptico para el operador. */}
@@ -403,7 +403,7 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
 
       {showRaw && s._rawJson && (
         <div className="border-t border-slate-200">
-          <div className="flex items-center justify-between px-4 py-1.5 bg-slate-100">
+          <div className="flex items-center justify-between px-4 py-1.5 bg-slate-100 dark:bg-slate-800">
             <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
               mca-status JSON · {s.deviceModel || dev.model}
             </span>
@@ -412,7 +412,7 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
               Copiar
             </button>
           </div>
-          <pre className="p-3 text-[9px] font-mono text-slate-600 bg-slate-50 overflow-x-auto max-h-48 leading-relaxed">
+          <pre className="p-3 text-[9px] font-mono text-slate-600 bg-slate-50 overflow-x-auto max-h-48 leading-relaxed dark:text-slate-300 dark:bg-slate-900">
             {s._rawJson}
           </pre>
         </div>

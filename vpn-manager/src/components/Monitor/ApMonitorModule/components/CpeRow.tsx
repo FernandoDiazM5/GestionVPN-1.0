@@ -20,8 +20,8 @@ function CpeRow({ cpe, idx, onDetail, hiddenCols, gridCols }: {
 
   return (
     <div
-      className={`grid items-center text-xs border-b border-slate-100 last:border-0 transition-colors
-        ${idx % 2 === 0 ? 'bg-white hover:bg-slate-50/80' : 'bg-slate-50/50 hover:bg-slate-50'}`}
+      className={`grid items-center text-xs border-b border-slate-100 last:border-0 transition-colors dark:border-slate-800
+        ${idx % 2 === 0 ? 'bg-white hover:bg-slate-50/80 dark:bg-slate-900 dark:hover:bg-slate-800/60' : 'bg-slate-50/50 hover:bg-slate-50 dark:bg-slate-900/60 dark:hover:bg-slate-800/40'}`}
       style={{ gridTemplateColumns: gridCols }}>
 
       <div className="px-1.5 py-3 flex items-center justify-center">
@@ -33,7 +33,7 @@ function CpeRow({ cpe, idx, onDetail, hiddenCols, gridCols }: {
           <p className="font-mono font-semibold text-slate-700 truncate text-2xs">{cpe.mac}</p>
           {ff && (
             <span className={`shrink-0 text-[7px] font-bold px-1 py-0.5 rounded
-              ${ff === 'AC' ? 'bg-sky-100 text-sky-700' : 'bg-amber-100 text-amber-700'}`}>
+              ${ff === 'AC' ? 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'}`}>
               {ff}
             </span>
           )}
@@ -151,13 +151,13 @@ function CpeRow({ cpe, idx, onDetail, hiddenCols, gridCols }: {
 
       <div className="px-2 py-2 flex items-center justify-end gap-0.5">
         <button onClick={() => onDetail(cpe.mac, cpe.lastip || null)} title="Ver detalle del CPE"
-          className="p-1.5 text-indigo-500 hover:bg-indigo-50 rounded-lg transition-colors">
+          className="p-1.5 text-indigo-500 hover:bg-indigo-50 rounded-lg transition-colors dark:text-indigo-400 dark:hover:bg-indigo-500/10">
           <Eye className="w-3.5 h-3.5" />
         </button>
         {cpe.lastip && (
           <a href={`http://${cpe.lastip}`} target="_blank" rel="noopener noreferrer"
             title={`Abrir ${cpe.lastip}`}
-            className="p-1.5 text-sky-500 hover:bg-sky-50 rounded-lg transition-colors flex items-center">
+            className="p-1.5 text-sky-500 hover:bg-sky-50 rounded-lg transition-colors flex items-center dark:text-sky-400 dark:hover:bg-sky-500/10">
             <ExternalLink className="w-3.5 h-3.5" />
           </a>
         )}

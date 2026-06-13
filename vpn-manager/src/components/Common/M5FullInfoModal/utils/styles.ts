@@ -1,6 +1,6 @@
 export const modalContainerStyles = {
   container: 'fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200',
-  modal: 'bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col animate-in zoom-in-95 duration-200',
+  modal: 'bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col animate-in zoom-in-95 duration-200 dark:bg-slate-900 dark:border dark:border-slate-800',
 };
 
 export const headerStyles = {
@@ -29,7 +29,7 @@ export const rowStyles = {
 };
 
 export const ifaceStyles = {
-  container: 'col-span-2 border border-violet-100 rounded-lg p-3 mb-2 bg-white',
+  container: 'col-span-2 border border-violet-100 rounded-lg p-3 mb-2 bg-white dark:bg-slate-800/60 dark:border-violet-500/30',
   header: 'flex items-center gap-2 mb-2',
   ifname: 'text-2xs font-bold text-violet-600 uppercase font-mono',
   hwaddr: 'text-2xs text-slate-400 font-mono',
@@ -40,5 +40,5 @@ export const ifaceStyles = {
 export const rawDataStyles = {
   container: 'col-span-2 mt-2',
   label: 'text-[9px] font-bold uppercase mb-1',
-  pre: 'text-[9px] font-mono bg-white rounded-lg p-2 overflow-x-auto whitespace-pre-wrap border',
+  pre: 'text-[9px] font-mono bg-white rounded-lg p-2 overflow-x-auto whitespace-pre-wrap border dark:bg-slate-900 dark:border-slate-700 dark:text-slate-300',
 };

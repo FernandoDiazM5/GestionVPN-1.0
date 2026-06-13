@@ -34,7 +34,7 @@ export default function WireGuardSection({
           </div>
           <button
             onClick={onLoadWgPeers}
-            className="text-xs font-semibold text-rose-700 bg-rose-100 hover:bg-rose-200 px-3 py-1.5 rounded-lg transition-colors shrink-0"
+            className="text-xs font-semibold text-rose-700 bg-rose-100 hover:bg-rose-200 px-3 py-1.5 rounded-lg transition-colors shrink-0 dark:bg-rose-500/15 dark:hover:bg-rose-500/25 dark:text-rose-300"
           >
             Reintentar
           </button>
@@ -57,10 +57,10 @@ export default function WireGuardSection({
         <div
           className={`card p-4 border transition-colors ${
             vpsWgActive && mangleActive
-              ? 'border-emerald-300 bg-emerald-50'
+              ? 'border-emerald-300 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/10'
               : vpsWgActive
-                ? 'border-sky-200 bg-sky-50/50'
-                : 'border-slate-200 bg-slate-50'
+                ? 'border-sky-200 bg-sky-50/50 dark:border-sky-500/30 dark:bg-sky-500/10'
+                : 'border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/40'
           }`}
         >
           <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -85,8 +85,8 @@ export default function WireGuardSection({
                   <span
                     className={`text-2xs font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1 ${
                       vpsWgActive
-                        ? 'bg-emerald-100 text-emerald-700'
-                        : 'bg-slate-100 text-slate-400'
+                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400'
+                        : 'bg-slate-100 text-slate-400 dark:bg-slate-700/50 dark:text-slate-500'
                     }`}
                   >
                     <span
@@ -127,8 +127,8 @@ export default function WireGuardSection({
                 vpsWgActive && mangleActive
                   ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/30'
                   : vpsWgActive
-                    ? 'bg-sky-100 text-sky-700 border border-sky-200'
-                    : 'bg-slate-100 text-slate-500 border border-slate-200'
+                    ? 'bg-sky-100 text-sky-700 border border-sky-200 dark:bg-sky-500/15 dark:text-sky-400 dark:border-sky-500/30'
+                    : 'bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
               }`}
             >
               {vpsWgActive && mangleActive

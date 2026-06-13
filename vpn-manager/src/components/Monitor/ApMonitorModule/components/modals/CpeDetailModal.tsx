@@ -99,7 +99,7 @@ function CpeDetailModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200 dark:bg-slate-900 dark:border dark:border-slate-800">
         <div className="flex items-center justify-between bg-slate-800 rounded-t-2xl px-5 py-3 shrink-0">
           <div>
             <p className="text-xs font-bold text-white font-mono">{mac}</p>
@@ -115,13 +115,13 @@ function CpeDetailModal({
             </div>
           )}
           {error && !loading && (
-            <div className="flex items-start gap-2 p-3 bg-rose-50 border border-rose-200 rounded-xl">
+            <div className="flex items-start gap-2 p-3 bg-rose-50 border border-rose-200 rounded-xl dark:bg-rose-500/10 dark:border-rose-500/30">
               <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-              <p className="text-xs text-rose-600">{error}</p>
+              <p className="text-xs text-rose-600 dark:text-rose-300">{error}</p>
             </div>
           )}
           {showCredForm && !loading && (
-            <form onSubmit={handleCredSubmit} className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
+            <form onSubmit={handleCredSubmit} className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3 dark:bg-amber-500/10 dark:border-amber-500/30">
               <p className="text-xs font-semibold text-amber-800">Credenciales SSH del CPE</p>
               <p className="text-2xs text-amber-600">
                 Las credenciales del CPE son independientes de las del AP.
@@ -163,7 +163,7 @@ function CpeDetailModal({
           {detail && !loading && (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
               {rows.map(row => (
-                <div key={row.l} className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+                <div key={row.l} className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 shadow-sm hover:shadow-md transition-shadow dark:bg-slate-800/60 dark:border-slate-700">
                   <p className="text-2xs font-semibold text-slate-500 uppercase tracking-wider mb-1">{row.l}</p>
                   <p className={`text-sm font-bold truncate ${row.color ?? 'text-slate-800'} ${row.mono ? 'font-mono tracking-tight' : ''}`}>{row.v}</p>
                 </div>

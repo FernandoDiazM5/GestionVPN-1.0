@@ -199,10 +199,9 @@ export default function UsersTable({
             placeholder="Buscar usuario, alias, email o IP…"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full pl-11 pr-10 py-3 text-sm rounded-xl border border-slate-200 bg-white
+            className="w-full pl-11 pr-10 py-3 text-sm rounded-xl border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500
                        focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400
-                       placeholder:text-slate-400 text-slate-700 transition-all
-                       dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500"
+                       placeholder:text-slate-400 text-slate-700 transition-all"
           />
           {search && (
             <button onClick={() => setSearch('')} title="Limpiar búsqueda" aria-label="Limpiar búsqueda"

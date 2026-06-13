@@ -13,7 +13,7 @@ export default function SecretsTableRow({
   onToggleManage,
 }: SecretsTableRowProps) {
   return (
-    <tr className="hover:bg-indigo-50/40 transition-colors group">
+    <tr className="hover:bg-indigo-50/40 transition-colors group dark:hover:bg-indigo-500/10">
       <td className="px-5 py-3.5 text-center">
         {secret.disabled ? (
           <ShieldOff className="w-4 h-4 text-rose-400 mx-auto" aria-label="Deshabilitado" />
@@ -22,20 +22,20 @@ export default function SecretsTableRow({
         )}
       </td>
       <td className="px-5 py-3.5">
-        <span className="font-mono text-sm font-semibold text-slate-700">{secret.name}</span>
+        <span className="font-mono text-sm font-semibold text-slate-700 dark:text-slate-200">{secret.name}</span>
       </td>
       <td className="px-5 py-3.5">
         <span
           className={`inline-flex px-2 py-0.5 rounded-lg text-2xs font-bold uppercase tracking-wider
                         ${secret.service === 'sstp'
-            ? 'bg-blue-100 text-blue-700'
-            : 'bg-violet-100 text-violet-700'}`}
+            ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400'
+            : 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-400'}`}
         >
           {secret.service}
         </span>
       </td>
       <td className="px-5 py-3.5 hidden sm:table-cell">
-        <span className="text-xs text-slate-500 font-mono bg-slate-100 px-2 py-1 rounded-lg">
+        <span className="text-xs text-slate-500 font-mono bg-slate-100 px-2 py-1 rounded-lg dark:bg-slate-800 dark:text-slate-300">
           {secret.profile}
         </span>
       </td>
@@ -44,8 +44,8 @@ export default function SecretsTableRow({
           onClick={() => onToggleManage(secret)}
           className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all
                           ${isManaged
-            ? 'bg-emerald-100 text-emerald-700 hover:bg-rose-100 hover:text-rose-600'
-            : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200'}`}
+            ? 'bg-emerald-100 text-emerald-700 hover:bg-rose-100 hover:text-rose-600 dark:bg-emerald-500/15 dark:text-emerald-400 dark:hover:bg-rose-500/15 dark:hover:text-rose-400'
+            : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-400 dark:hover:bg-indigo-500/20 dark:border-indigo-500/30'}`}
           title={isManaged ? 'Quitar de gestión' : 'Añadir a gestión'}
         >
           {isManaged ? (

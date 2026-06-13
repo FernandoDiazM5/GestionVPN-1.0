@@ -194,7 +194,7 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                   <div key={idx} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs border transition-colors
                     ${idx < provStep ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-100' : idx === provStep ? 'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-200' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-800'}`}>
                     <span className={`w-6 h-6 rounded-full flex items-center justify-center text-2xs font-bold shrink-0
-                      ${idx < provStep ? 'bg-emerald-500 text-white' : idx === provStep ? 'bg-indigo-500 text-white' : 'bg-slate-200 text-slate-400'}`}>
+                      ${idx < provStep ? 'bg-emerald-500 text-white' : idx === provStep ? 'bg-indigo-500 text-white' : 'bg-slate-200 text-slate-400 dark:bg-slate-700 dark:text-slate-500'}`}>
                       {idx < provStep ? '✓' : idx === provStep ? <Loader2 className="w-3 h-3 animate-spin" /> : idx + 1}
                     </span>
                     <span className={`font-semibold ${idx === provStep ? 'text-indigo-700' : idx < provStep ? 'text-emerald-700' : 'text-slate-400'}`}>{label}</span>
@@ -324,7 +324,7 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                     <ol className="space-y-2">
                       {cpeSteps.map(step => (
                         <li key={step.n} className="flex items-start gap-3 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-800 rounded-lg px-3 py-2.5">
-                          <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-600 dark:text-slate-300 text-2xs font-bold flex items-center justify-center shrink-0 mt-0.5">{step.n}</span>
+                          <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300 text-2xs font-bold flex items-center justify-center shrink-0 mt-0.5">{step.n}</span>
                           <div className="min-w-0 flex-1">
                             <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-0.5">{step.title}</p>
                             <p className="text-2xs font-mono text-violet-700 break-all bg-violet-50 dark:bg-violet-500/10 rounded px-2 py-1 mt-1">{step.cmd}</p>
@@ -367,7 +367,7 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                     { l: `Interfaz ${protocol === 'wireguard' ? 'WG' : 'SSTP'}`, v: ifaceName || '(ingresar nombre)' },
                     { l: 'VRF', v: vrfName || '(ingresar nombre)' },
                   ].map(row => (
-                    <div key={row.l} className="bg-white rounded-lg px-3 py-2 border border-indigo-100">
+                    <div key={row.l} className="bg-white rounded-lg px-3 py-2 border border-indigo-100 dark:bg-slate-800 dark:border-indigo-500/30">
                       <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">{row.l}</p>
                       <p className="text-2xs font-mono font-bold text-indigo-700 truncate">{row.v}</p>
                     </div>
@@ -541,12 +541,12 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                 <div className="space-y-1.5">
                   {PASOS_LABELS.map((label, idx) => (
                     <div key={idx} className="flex items-center gap-2.5 text-xs">
-                      <span className="w-6 h-6 rounded-full bg-slate-200 text-slate-600 dark:text-slate-300 flex items-center justify-center text-2xs font-bold shrink-0">{idx + 1}</span>
+                      <span className="w-6 h-6 rounded-full bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300 flex items-center justify-center text-2xs font-bold shrink-0">{idx + 1}</span>
                       <span className="font-semibold text-slate-700 dark:text-slate-200">{label}</span>
                     </div>
                   ))}
                   <div className="flex items-center gap-2.5 text-xs mt-1 pt-1 border-t border-slate-200 dark:border-slate-700">
-                    <span className="w-6 h-6 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-2xs font-bold shrink-0">8</span>
+                    <span className="w-6 h-6 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-2xs font-bold shrink-0 dark:bg-sky-500/15 dark:text-sky-400">8</span>
                     <span className="font-semibold text-sky-600">Mangle + vpn-activa</span>
                     <span className="text-slate-400 text-2xs">→ Al activar el nodo</span>
                   </div>

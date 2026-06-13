@@ -57,7 +57,7 @@ function ApDetailModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col animate-in zoom-in-95 duration-200">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col animate-in zoom-in-95 duration-200 dark:bg-slate-900 dark:border dark:border-slate-800">
         <div className="flex items-center justify-between bg-slate-800 rounded-t-2xl px-5 py-3 shrink-0">
           <div>
             <p className="text-sm font-bold text-white">{dev.cachedStats?.deviceName ?? dev.name ?? dev.ip}</p>
@@ -74,9 +74,9 @@ function ApDetailModal({
 
         <div className="overflow-y-auto p-5 space-y-4">
           {error && (
-            <div className="flex items-start gap-2 p-3 bg-rose-50 border border-rose-200 rounded-xl">
+            <div className="flex items-start gap-2 p-3 bg-rose-50 border border-rose-200 rounded-xl dark:bg-rose-500/10 dark:border-rose-500/30">
               <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-              <p className="text-xs text-rose-600">{error}</p>
+              <p className="text-xs text-rose-600 dark:text-rose-300">{error}</p>
             </div>
           )}
           {loading && !s && (
@@ -143,7 +143,7 @@ function ApDetailModal({
                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">Tráfico por Interfaz</p>
                   <div className="space-y-1">
                     {trafficRows.map(([iface, v]) => (
-                      <div key={iface} className="flex items-center gap-4 bg-slate-50 rounded-lg px-3 py-2 border border-slate-100 text-xs">
+                      <div key={iface} className="flex items-center gap-4 bg-slate-50 rounded-lg px-3 py-2 border border-slate-100 text-xs dark:bg-slate-800/60 dark:border-slate-700">
                         <span className="font-mono font-bold text-slate-700 w-16 shrink-0">{iface}</span>
                         <span className="flex items-center gap-1 text-sky-700"><Download className="w-3 h-3" />
                           {(v.rxBytes / 1e6).toFixed(1)} MB RX
@@ -162,11 +162,11 @@ function ApDetailModal({
         </div>
 
         {s && (
-          <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 shrink-0 bg-slate-50 rounded-b-2xl">
+          <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 shrink-0 bg-slate-50 rounded-b-2xl dark:border-slate-800 dark:bg-slate-900/60">
             <p className="text-2xs text-slate-400">Los datos de señal y tráfico son instantáneos y no se persisten</p>
             <button onClick={handleSave} disabled={saved}
               className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all
-                ${saved ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>
+                ${saved ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400' : 'bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400'}`}>
               {saved ? <><CheckCircle2 className="w-3.5 h-3.5" /> Guardado</> : 'Guardar en dispositivo'}
             </button>
           </div>

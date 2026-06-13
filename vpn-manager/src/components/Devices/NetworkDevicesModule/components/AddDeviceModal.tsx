@@ -41,13 +41,13 @@ export function AddDeviceModal({ device, node, existing, onSave, onClose }: AddD
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 animate-in fade-in duration-200"
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-5 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-5 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200 dark:bg-slate-900 dark:border dark:border-slate-800">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="font-bold text-slate-800 dark:text-slate-100">{isEdit ? 'Editar dispositivo' : 'Guardar dispositivo'}</h3>
             <p className="text-xs text-slate-400 mt-0.5">{device.name} · {device.model} · {device.ip}</p>
           </div>
-          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
+          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg dark:text-slate-500 dark:hover:text-slate-200 dark:hover:bg-slate-800">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -98,7 +98,7 @@ export function AddDeviceModal({ device, node, existing, onSave, onClose }: AddD
         </div>
 
         {/* Nodo */}
-        <div className="bg-slate-50 rounded-xl p-3 flex items-center space-x-2">
+        <div className="bg-slate-50 rounded-xl p-3 flex items-center space-x-2 dark:bg-slate-800/60">
           <Radio className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
           <div>
             <p className="text-xs text-slate-500">Nodo asociado</p>
@@ -111,7 +111,7 @@ export function AddDeviceModal({ device, node, existing, onSave, onClose }: AddD
 
         {/* Advertencia de subred incorrecta */}
         {node.segmento_lan && !ipInCidr(device.ip, node.segmento_lan) && (
-          <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
+          <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 dark:bg-amber-500/10 dark:border-amber-500/30">
             <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
             <div>
               <p className="text-xs font-bold text-amber-700">IP fuera del nodo seleccionado</p>
@@ -125,7 +125,7 @@ export function AddDeviceModal({ device, node, existing, onSave, onClose }: AddD
 
         <div className="flex gap-2 pt-1">
           <button onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors">
+            className="flex-1 py-2.5 rounded-xl text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700">
             Cancelar
           </button>
           <button onClick={handleSave}

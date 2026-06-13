@@ -54,9 +54,9 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelAc
 
   return (
     <div className="card overflow-hidden">
-      <div className="flex items-center gap-3 px-5 py-3.5 bg-slate-50 border-b border-slate-100">
+      <div className="flex items-center gap-3 px-5 py-3.5 bg-slate-50 border-b border-slate-100 dark:bg-slate-800/60 dark:border-slate-800">
         <button onClick={() => setExpanded(e => !e)}
-          className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors">
+          className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors dark:text-slate-500 dark:hover:text-indigo-400 dark:hover:bg-indigo-500/10">
           {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
         </button>
         <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -94,7 +94,7 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelAc
                 }, 0);
                 return (
                   <div style={{ minWidth: `${minW}px` }}>
-                    <div className="grid bg-slate-50 border-b border-slate-200 text-[9px] font-bold text-slate-400 uppercase tracking-wider px-4 py-2"
+                    <div className="grid bg-slate-50 border-b border-slate-200 text-[9px] font-bold text-slate-400 uppercase tracking-wider px-4 py-2 dark:bg-slate-800/60 dark:border-slate-800"
                       style={{ gridTemplateColumns: gridCols }}>
                       {visibleCols.map(col => (
                         <span key={col.key} className={`truncate ${col.right ? 'text-right pr-2' : col.key === 'cpes' || col.key === 'estado' ? 'text-center' : col.key === 'actions' ? 'text-right' : ''}`}>
@@ -138,7 +138,7 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelAc
                   {sta.model && <span className="text-2xs text-slate-500 truncate shrink-0 hidden md:block">{sta.model}</span>}
                   {sta.nodeName && <span className="text-2xs text-indigo-400 truncate shrink-0 hidden lg:block">{sta.nodeName}</span>}
                   <button onClick={() => onApDelete(sta)} title="Eliminar CPE guardado"
-                    className="ml-auto p-1.5 text-rose-400 hover:bg-rose-50 rounded-lg transition-colors shrink-0">
+                    className="ml-auto p-1.5 text-rose-400 hover:bg-rose-50 rounded-lg transition-colors shrink-0 dark:hover:bg-rose-500/10">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>

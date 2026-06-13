@@ -338,11 +338,9 @@ const SCHEME_CLASSES: Record<ColorScheme, string> = {
   'indigo-solid':
     'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm shadow-indigo-500/20',
   'violet-outline':
-    'bg-violet-50 text-violet-700 hover:bg-violet-100 border border-violet-200 ' +
-    'dark:bg-violet-500/15 dark:text-violet-300 dark:border-violet-500/30 dark:hover:bg-violet-500/25',
+    'bg-violet-50 text-violet-700 hover:bg-violet-100 border border-violet-200 dark:bg-violet-500/15 dark:text-violet-300 dark:border-violet-500/30 dark:hover:bg-violet-500/25',
   'sky-outline':
-    'bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-200 ' +
-    'dark:bg-sky-500/15 dark:text-sky-300 dark:border-sky-500/30 dark:hover:bg-sky-500/25',
+    'bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-200 dark:bg-sky-500/15 dark:text-sky-300 dark:border-sky-500/30 dark:hover:bg-sky-500/25',
 };
 
 function DeviceRowActions({

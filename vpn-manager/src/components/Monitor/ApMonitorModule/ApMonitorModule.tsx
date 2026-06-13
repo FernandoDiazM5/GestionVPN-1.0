@@ -139,7 +139,7 @@ export default function ApMonitorModule() {
               className={`flex items-center gap-1 px-2 py-1.5 font-bold transition-colors
                 ${logic.nodeFilter === 'active'
                   ? 'bg-emerald-500 text-white'
-                  : 'bg-white text-slate-500 hover:bg-slate-50'}`}>
+                  : 'bg-white text-slate-500 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'}`}>
               <CheckCircle2 className="w-3 h-3" />
               <span className="text-2xs">Activos</span>
             </button>
@@ -149,7 +149,7 @@ export default function ApMonitorModule() {
               className={`flex items-center gap-1 px-2 py-1.5 font-bold border-x border-slate-200 transition-colors
                 ${logic.nodeFilter === 'inactive'
                   ? 'bg-amber-500 text-white'
-                  : 'bg-white text-slate-500 hover:bg-slate-50'}`}>
+                  : 'bg-white text-slate-500 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'}`}>
               <ZapOff className="w-3 h-3" />
               <span className="text-2xs">Inactivos</span>
             </button>
@@ -159,7 +159,7 @@ export default function ApMonitorModule() {
               className={`flex items-center gap-1 px-2 py-1.5 font-bold transition-colors
                 ${logic.nodeFilter === 'all'
                   ? 'bg-indigo-500 text-white'
-                  : 'bg-white text-slate-500 hover:bg-slate-50'}`}>
+                  : 'bg-white text-slate-500 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'}`}>
               <Users className="w-3 h-3" />
               <span className="text-2xs">Todos</span>
             </button>
@@ -169,11 +169,11 @@ export default function ApMonitorModule() {
             <input
               value={logic.apSearch} onChange={e => logic.setApSearch(e.target.value)}
               placeholder="Buscar AP…"
-              className="pl-8 pr-8 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 w-44"
+              className="pl-8 pr-8 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 w-44 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100 dark:placeholder-slate-500"
             />
             {logic.apSearch && <button onClick={() => logic.setApSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"><X className="w-3.5 h-3.5" /></button>}
           </div>
-          <div className="flex items-center gap-1.5 border border-slate-200 rounded-xl px-2 bg-white">
+          <div className="flex items-center gap-1.5 border border-slate-200 rounded-xl px-2 bg-white dark:bg-slate-900 dark:border-slate-700">
             <Clock className="w-3.5 h-3.5 text-slate-400" />
             <select
               value={polling.pollInterval}
@@ -195,7 +195,7 @@ export default function ApMonitorModule() {
             polling.autoPolledRef.current = false;
             logic.loadDevices();
           }} disabled={logic.loading}
-            className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors disabled:opacity-50"
+            className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors disabled:opacity-50 dark:text-slate-500 dark:hover:text-indigo-400 dark:hover:bg-indigo-500/10"
             title="Recargar lista de equipos">
             {logic.loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
           </button>
