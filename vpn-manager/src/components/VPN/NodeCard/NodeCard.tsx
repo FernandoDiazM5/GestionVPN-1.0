@@ -171,8 +171,14 @@ export default function NodeCard({
 
         <NodeCardStatusRow node={node} visibleCols={visibleCols} tags={tags} />
 
-        {/* Acciones */}
-        <td className="px-4 py-3">
+        {/* Acciones — §44 sticky-right. Lleva su propio bg (mismo rowBg
+            que la fila) para tapar las celdas que pasan por debajo cuando
+            la tabla scrollea horizontalmente. group-hover sincroniza el
+            cambio de fondo con el resto del row. Shadow sutil hacia la
+            izquierda marca el "flotamiento" cuando hay overflow. */}
+        <td
+          className={`px-4 py-3 sticky right-0 z-[1] shadow-[-2px_0_6px_-3px_rgba(0,0,0,0.06)] ${rowBg} group-hover:bg-indigo-50/30 dark:group-hover:bg-indigo-500/10`}
+        >
           <div className="flex items-center justify-end gap-2">
             {/* Acceder — tenue en reposo, sólido al hover de la fila */}
             {!isThisNodeActive && (
