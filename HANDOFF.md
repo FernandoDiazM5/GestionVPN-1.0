@@ -44,7 +44,7 @@
 > - **142 backend** (14 archivos) + **36 frontend** (5 archivos) = **178 tests verdes**. La auditoría §37-§38 de Escanear NO añade tests nuevos (las mejoras son refactor/UX sin lógica de negocio); el conteo se mantiene desde §36.
 >
 > ### 📚 Secciones de referencia
-> §17–25: REFACTOR_PLAN ejecutado. §26 notificaciones. §27 bot Telegram. §28 ping/trace. §29 export. §30 dashboard. §31 monitoreo. §32 iter2 multi-usuario. §33 UX MEMBER endurecida. §34 Workspace unificado + peers WG mejorados. §35 Alias humano + bloqueo Usuario. §36 Fix bot — match dual VRF/PPP. §37 Escanear — perf + robustez. §38 Escanear — UX + features. §39 Escanear — sticky-right + kebab (cierre auditoría). §40 Escanear — preferencias persistentes (useScanPreferences) + export multi-formato (CSV/JSON/Excel/PDF). §41 Escanear — simplificación de acciones de fila a botones icon-only + limpieza de DeviceCardModal/SshDataModal muertos. §42 Escanear — 4 mejoras UX: ícono Save (disquete) + bulk save selectivo con checkbox tri-state + contraste chevron + IP/Nombre del sistema en panel. §43 Política anti-saturación — eliminar polling SSH automático cada 5s en DeviceStatusPanel (saturaba CPU de antenas) + actualizar Política Operativa SSH para prohibir polling SSH. §44 Nodos — columnas dinámicas + filtros + chips + export multi-formato + sticky-right. §45 Audit del sistema de diseño (script + skill instalada). §46 Plan ejecutable + sistema extendido (btn-warning/info/accent + focus-visible WCAG + tamaños + modal canónico) + wins rápidos sed (−259 hallazgos). §47 Fase 1 — 23 botones inline migrados a `.btn-{variant} btn-{size}` (DS06 −88.5%).
+> §17–25: REFACTOR_PLAN ejecutado. §26 notificaciones. §27 bot Telegram. §28 ping/trace. §29 export. §30 dashboard. §31 monitoreo. §32 iter2 multi-usuario. §33 UX MEMBER endurecida. §34 Workspace unificado + peers WG mejorados. §35 Alias humano + bloqueo Usuario. §36 Fix bot — match dual VRF/PPP. §37 Escanear — perf + robustez. §38 Escanear — UX + features. §39 Escanear — sticky-right + kebab (cierre auditoría). §40 Escanear — preferencias persistentes (useScanPreferences) + export multi-formato (CSV/JSON/Excel/PDF). §41 Escanear — simplificación de acciones de fila a botones icon-only + limpieza de DeviceCardModal/SshDataModal muertos. §42 Escanear — 4 mejoras UX: ícono Save (disquete) + bulk save selectivo con checkbox tri-state + contraste chevron + IP/Nombre del sistema en panel. §43 Política anti-saturación — eliminar polling SSH automático cada 5s en DeviceStatusPanel (saturaba CPU de antenas) + actualizar Política Operativa SSH para prohibir polling SSH. §44 Nodos — columnas dinámicas + filtros + chips + export multi-formato + sticky-right. §45 Audit del sistema de diseño (script + skill instalada). §46 Plan ejecutable + sistema extendido (btn-warning/info/accent + focus-visible WCAG + tamaños + modal canónico) + wins rápidos sed (−259 hallazgos). §47 Fase 1 — 23 botones inline migrados a `.btn-{variant} btn-{size}` (DS06 −88.5%). §48 Fase 2 — DS02 dark mode en 28 archivos (DS02 265→103, −61%).
 >
 > Sesión 2026-06-07 PM: Ajustes del moderador (perfil + workspace + import/export JSON) + Recuperar contraseña + sync MikroTik al deshabilitar + invitaciones por email + .conf WG server-side.
 > Sesión 2026-06-07 AM: multi-usuario con aislamiento por sesión (mangle por-IP), parche `!empty` node-routeros, auditoría (Semgrep+security-review+code-review) y fixes C1–C7.
@@ -69,7 +69,7 @@
 6. **Pase UX P1–P6** + optimización visual de la vista **Escanear**.
 7. **🆕 Multi-usuario con aislamiento por sesión** (sesión 2026-06-07) — ver §7.
 
-**Estado de salud (2026-06-13):** `tsc 0` (`--noEmit` + build estricto) · `node --check ✓` · **186 tests verdes** (142 backend + 44 frontend). 6 jobs concurrentes en producción. ⚠️ `npm audit --omit=dev`: **2 moderate** (uuid viejo arrastrado por `exceljs` — no expone superficie del panel; pendiente de tracker upstream). 0 findings `semgrep`. Bundles relevantes: **inicial 248.76 KB / 77.74 KB gzip** (esencialmente idéntico desde el pre-§40); `TeamModule` 119 KB; `NetworkDevicesModule` 91.87 KB / 23.34 KB gzip; `NodeAccessPanel` 151.95 KB / 32.91 KB gzip (post §44); chunks lazy `exceljs.min` 929 KB y `jspdf.es.min` 399 KB solo se descargan al usar Excel/PDF. **Sistema de diseño**: audit `npm run audit:design` reporta **814 hallazgos** (baseline 1,096 → −25.7%) con **116 errores** (baseline 375 → −69%) tras §46+§47. DS06 botones inline: 26 → 3 (los 3 restantes son toggles condicionales legítimos). **Últimos commits en `dev`:** `a771cbb` (§47 Fase 1 — 23 botones inline → .btn-*) · `722321f` (§46 sistema extendido + wins rápidos + plan) · `6965ff0` (§45 audit + skill tailwind) · `5165226` (§44 columna Acciones sticky-right) · `9d52d5d` (§44 Nodos cols dinámicas + filtros + chips + export) · `a77d76b` (CI husky `|| true`) · `3f51a35` (§43 sin polling SSH) · `10cc991` (nombre CPE cross-ref) · `f613806` (descartar hostname spurious del AP) · `10404f9` (§42).
+**Estado de salud (2026-06-13):** `tsc 0` (`--noEmit` + build estricto) · `node --check ✓` · **186 tests verdes** (142 backend + 44 frontend). 6 jobs concurrentes en producción. ⚠️ `npm audit --omit=dev`: **2 moderate** (uuid viejo arrastrado por `exceljs` — no expone superficie del panel; pendiente de tracker upstream). 0 findings `semgrep`. Bundles relevantes: **inicial 248.76 KB / 77.74 KB gzip** (esencialmente idéntico desde el pre-§40); `TeamModule` 119 KB; `NetworkDevicesModule` 91.20 KB / 23.04 KB gzip; `NodeAccessPanel` 151.23 KB / 32.86 KB gzip; chunks lazy `exceljs.min` 929 KB y `jspdf.es.min` 399 KB solo se descargan al usar Excel/PDF. **Sistema de diseño**: audit `npm run audit:design` reporta **650 hallazgos** (baseline §45 1,096 → −40.7%) con **112 errores** (baseline 375 → −70%) tras §46+§47+§48. DS02 fondos sin dark: 265 → **103 (−61%)** tras §48. DS06 botones inline: 26 → 3 (los 3 restantes son toggles condicionales legítimos). **Últimos commits en `dev`:** `01b479d` (docs §47 HANDOFF) · `a771cbb` (§47 Fase 1 — 23 botones inline → .btn-*) · `722321f` (§46 sistema extendido + wins rápidos + plan) · `6965ff0` (§45 audit + skill tailwind) · `5165226` (§44 columna Acciones sticky-right) · `9d52d5d` (§44 Nodos cols dinámicas + filtros + chips + export) · `a77d76b` (CI husky `|| true`) · `3f51a35` (§43 sin polling SSH).
 
 ---
 
@@ -3730,9 +3730,136 @@ Los **3 DS06 restantes** son toggles condicionales legítimos (`bg-X` según est
 
 ### Pendiente / próximas fases
 
-- **Fase 2 (DS02 dark mode, 8-12h)** — siguiente prioridad porque es donde más se nota el bug original "fondo blanco en dark mode". Top 5 archivos: NuevoNodo (32), DeviceStatusPanel (22), constants.ts (21), EditarNodo (18), ApGroupCard (14). Con `.card`/`.card-hover` listos para sustituir.
+- ~~**Fase 2 (DS02 dark mode, 8-12h)** — siguiente prioridad porque es donde más se nota el bug original "fondo blanco en dark mode".~~ ✅ **Iniciado en §48 — DS02 265 → 103 (−61%) en 28 archivos**.
 - **Fase 3 (modales unificados, 6-8h)** — los 13 modales del proyecto ya pueden usar `.modal-overlay/.modal-panel/.modal-header/.modal-body/.modal-footer` (creadas en §46).
 - **Fase 4 (DS05 contraste)** y **Fase 5 (DS01 palette)** — backlog.
+
+---
+
+## 48) 🌑 Fase 2 del Plan — DS02 dark mode en archivos top (−61% en 3 rondas)
+
+Pedido del usuario tras §47: "sigue con la fase 2 usando las skills correspondientes". Skill usada: `tailwind-design-system` (Tailwind v4 conceptual; el proyecto usa v3 con `darkMode: 'class'` — los patrones de tokens semánticos y `dark:` variants son los mismos).
+
+### Patrón canónico aplicado (consistente con `index.css`)
+
+| Token claro | Variant dark |
+|---|---|
+| `bg-{color}-50` | `dark:bg-{color}-500/10` |
+| `bg-{color}-100` | `dark:bg-{color}-500/15` |
+| `bg-{color}-200` | `dark:bg-{color}-500/25` |
+| `bg-white` | `dark:bg-slate-900` (o `dark:bg-slate-800` para superficie elevada) |
+| `bg-slate-50/100/200` | `dark:bg-slate-800` o `dark:bg-slate-700/50` |
+| `border-{color}-100/200` | `dark:border-{color}-500/30` |
+| `text-{color}-700` (badges) | `dark:text-{color}-400` |
+| `text-slate-700/800` | `dark:text-slate-200/100` |
+| `hover:bg-{color}-50/100` | `dark:hover:bg-{color}-500/10/20` |
+
+Replica el patrón ya establecido en `.status-online`, `.badge-success/danger/warning/info/neutral/accent`, `.card`, `.card-hover`, `.input-field` y `.btn-*` del sistema.
+
+### Archivos modificados — 28 totales en 3 rondas
+
+**Ronda 1 (top 4 por hallazgos):**
+
+| Archivo | DS02 cerrados |
+|---|---|
+| `Monitor/ApMonitorModule/components/ApRow.tsx` | 14 |
+| `VPN/NodeCard/components/NodeCardKebabMenu.tsx` | 12 |
+| `Devices/NetworkDevicesModule/components/DeviceStatusPanel.tsx` | 9 (de 11; 2 falsos positivos por `bg-white/N` sobre `bg-slate-700` permanente) |
+
+**Ronda 2 (siguientes 8):**
+
+| Archivo | DS02 cerrados |
+|---|---|
+| `Devices/NodeAccessPanel/components/sections/WireGuardSection.tsx` | 9 |
+| `Monitor/ApMonitorModule/ApMonitorModule.tsx` | 9 |
+| `Auth/RouterAccess.tsx` | 5 (de 8; 3 son `bg-white/N` sobre `bg-indigo-700` permanente) |
+| `Monitor/ApMonitorModule/components/CpeRow.tsx` | 8 |
+| `Devices/NodeAccessPanel/constants.ts` | 4 (PEER_COLOR_PALETTE + TAG_PALETTE — solo paletas válidas reciben `dark:`; las prohibidas quedan para Fase 5 sin duplicar DS01) |
+| `Devices/NodeAccessPanel/modals/NuevoNodo.tsx` | 5 (de 7; 2 falsos positivos por `bg-white/N` sobre `bg-indigo-700`) |
+| `Devices/ScannerModule/components/SecretsTableRow.tsx` | 7 |
+| `Monitor/ApMonitorModule/components/modals/MoveToNodeModal.tsx` | 7 |
+
+**Ronda 3 (top 11 después de rondas 1-2):**
+
+| Archivo | DS02 cerrados |
+|---|---|
+| `Auth/AcceptInvitationForm.tsx` | 6 |
+| `Devices/NetworkDevicesModule/components/AddDeviceModal.tsx` | 6 |
+| `Devices/NodeAccessPanel/components/shared/NodesStatsCard.tsx` | 6 |
+| `Common/M5FullInfoModal/utils/styles.ts` | 2 (de 5; 3 son `bg-white/N` sobre `bg-slate-800` permanente) |
+| `Devices/NetworkDevicesModule/components/ColumnPicker.tsx` | 5 |
+| `Devices/NetworkDevicesModule/components/ScanProgressBanner.tsx` | 5 |
+| `Monitor/ApMonitorModule/components/modals/ApDetailModal.tsx` | 5 |
+| `VPN/VpnCard/components/VpnCardRow.tsx` | 5 |
+| `Common/DeviceCard/components/InfoStrip.tsx` | 4 |
+| `Devices/NetworkDevicesModule/components/DeviceTableRow.tsx` | 4 (junté líneas multilínea para que el auditor las vea) |
+| `Devices/NetworkDevicesModule/components/RawBlock.tsx` | 4 |
+| `Monitor/ApMonitorModule/components/ApGroupCard.tsx` | 4 |
+| `Monitor/ApMonitorModule/components/modals/CpeDetailModal.tsx` | 4 |
+| `Monitor/ApMonitorModule/components/StationTable.tsx` | 4 |
+| `VPN/NodeProvisionForm/components/ProtocolSelector.tsx` | 4 |
+| `Devices/NetworkDevicesModule/components/ScanControls.tsx` | 3 |
+| `Users/UserManagementPanel/components/UsersTable.tsx` | 1 (multilínea junto en una sola para el auditor) |
+
+### Falsos positivos NO tocados (documentar para auditor futuro)
+
+`bg-white/N` (con sufijo de opacidad) sobre superficies oscuras permanentes (`bg-slate-700`, `bg-slate-800`, `bg-indigo-700`, gradiente `from-indigo-600 to-indigo-800`) NO necesita variant dark — el overlay funciona igual en light y dark mode porque el contenedor padre ya es oscuro.
+
+Archivos con falsos positivos legítimos: `RouterAccess.tsx` (header), `DeviceStatusPanel.tsx` (header `bg-slate-700`), `NuevoNodo.tsx` (header `bg-indigo-700`), `DeviceHeader.tsx` (todo sobre header oscuro), `M5FullInfoModal/styles.ts` (header `bg-slate-800`).
+
+**Mejora futura del auditor (Fase 6):** refinar DS02 para distinguir `bg-{color}` literal de `bg-{color}/N` (con opacidad) cuando el padre directo es una superficie oscura — reduciría ~10 falsos positivos.
+
+### Decisión de diseño — paletas prohibidas en `constants.ts`
+
+`PEER_COLOR_PALETTE` y `TAG_PALETTE` contienen colores fuera del sistema (`blue`, `green`, `yellow`, `red`, `purple`, `pink`, `orange`, `teal`, `cyan` — los 9 tonos no aprobados por CLAUDE.md). Esos entries son DS01 desde el día 1 (Fase 5 los migrará). En esta fase **solo se agregó `dark:` a las entries con paletas válidas** (indigo/violet/rose/amber/emerald/sky); las prohibidas quedan sin `dark:` para no duplicar hallazgos DS01.
+
+Comentario in-file explica la decisión:
+
+```ts
+// NOTA: pink/orange/teal/cyan/blue/green/yellow/red/purple son paletas FUERA
+// del sistema (CLAUDE.md). Quedan así como DS01 explícita para Fase 5 del
+// refactor del sistema de diseño (migración a paletas válidas). NO agregar
+// `dark:` a esas entries — duplica los hallazgos DS01.
+```
+
+### Bonus — DS01 corregido en RouterAccess
+
+Mientras tocaba `RouterAccess.tsx` migré `bg-blue-100` (palette prohibida) → `bg-sky-100` (palette válida) y `bg-red-50 border-red-100 text-red-500/700` (palette prohibida) → `bg-rose-50 border-rose-100 text-rose-500/700` (palette válida). Mismo cambio aplicado al gradiente `to-blue-50` → `to-sky-50` ya hecho por §46 sed-replace. Suma 4 hallazgos DS01 menos sin propósito explícito de Fase 5.
+
+### Snapshot acumulado desde el baseline §45
+
+| Métrica | Baseline §45 | Post-§47 | Post-§48 | Δ acumulada |
+|---|---|---|---|---|
+| **DS02 bg sin dark** | 265 | 265 | **103** | **−61%** |
+| DS06 botones inline | 26 | 3 | 3 | −88% |
+| DS03 text < 12px | 313 | 61 | 61 | −80.5% |
+| DS01 palette prohibida | 62 | 55 | **51** | −18% (bonus §48) |
+| DS04 gradiente multi | 19 | 19 | 21 | +2 (gradientes nuevos en RouterAccess + AcceptInvitationForm, ambos light→dark documentados) |
+| DS05 texto contraste | 411 | 411 | 411 | 0% (Fase 4 pendiente) |
+| **Errores (severidad error)** | 375 | 116 | **112** | **−70%** |
+| **TOTAL hallazgos** | **1,096** | 814 | **650** | **−40.7%** |
+
+### Verificación
+
+- `tsc 0` errores · `npm run build` OK · pre-commit hook OK
+- **44/44 tests frontend verdes**
+- Bundle inicial: **248.76 KB / 77.74 KB gzip** (idéntico — solo cambian clases CSS)
+- 28 archivos modificados en este commit
+
+### Reglas operativas reforzadas
+
+- **Cualquier `bg-{color}-50/100/200` o `bg-white` SIN dark variant requiere justificación** (overlay sobre superficie oscura permanente). Si no hay justificación → bug visual en dark mode.
+- **El patrón canónico para `dark:bg-{color}` es `/10` (sobre bg-50), `/15` (sobre bg-100), `/25` (sobre bg-200)**. Replica `.badge-*` del sistema. NO usar `dark:bg-{color}-900` ni mezclas — pierde consistencia visual.
+- **Multi-líneas con `className` separado en JSX rompen el auditor**: si `bg-white` está en una línea y `dark:bg-slate-900` en la siguiente, DS02 lo marca como falso positivo. Junta en una sola línea.
+- **Bordes acompañan el bg**: si `border-amber-200` está con `bg-amber-50`, agrega `dark:border-amber-500/30` con `dark:bg-amber-500/10`. No mezcles paletas.
+
+### Pendiente / próximas fases
+
+- **Fase 2 cont. (otra ronda DS02)** — quedan 103 hallazgos en 58 archivos (top actual: 4 archivos con 4 cada uno, distribución plana). Otra ronda de 1-2 horas bajaría a ~50 (los falsos positivos sobre superficies oscuras permanentes quedarán como excepciones documentadas).
+- **Fase 3 (modales unificados, 6-8h)** — varios modales tocados en §48 (`MoveToNodeModal`, `AddDeviceModal`, `CpeDetailModal`, `ApDetailModal`) ya tienen `dark:` pero NO usan `.modal-overlay/.modal-panel`. Fase 3 los migrará a las clases del sistema (creadas en §46).
+- **Fase 4 (DS05 contraste, 411)** — backlog.
+- **Fase 5 (DS01 palette, 51)** — backlog. Empieza por `constants.ts` (PEER_COLOR_PALETTE + TAG_PALETTE = 40 hallazgos).
+- **Fase 6 (refinamiento auditor)** — soportar `bg-white/N` con opacidad como excepción cuando padre es oscuro permanente.
 
 ---
 
