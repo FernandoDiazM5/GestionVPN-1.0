@@ -219,6 +219,27 @@ export default function NetworkDevicesModule() {
     });
   }, []);
 
+  // §42 fix: el AP sólo conoce a sus clientes por MAC+IP en wstalist. Para
+  // mostrar el nombre del CPE en "Estaciones conectadas" cruzamos con los
+  // datos del scan — todos los dispositivos de la LAN ya fueron escaneados y
+  // tienen su `deviceName`. También priorizamos savedDevices porque ahí el
+  // operador puede haber editado el nombre humano.
+  const stationNamesByMac = useMemo(() => {
+    const m = new Map<string, string>();
+    const norm = (mac: string) => mac.toUpperCase().replace(/[:-]/g, '');
+    // Saved primero (con menor prioridad) — luego scanResults los sobreescribe
+    // si trae datos más frescos del último scan.
+    for (const sd of library.savedDevices) {
+      if (sd.mac && sd.name) m.set(norm(sd.mac), sd.name);
+    }
+    for (const r of scan.scanResults) {
+      const name = r.cachedStats?.deviceName || (r.name && r.name !== r.ip ? r.name : null);
+      const mac = r.cachedStats?.wlanMac || r.mac;
+      if (mac && name) m.set(norm(mac), name);
+    }
+    return m;
+  }, [scan.scanResults, library.savedDevices]);
+
   // Metadatos derivados para el menú Exportar — pasados a CSV/JSON/XLSX/PDF
   // por igual para que el archivo lleve nodo + subred + contadores coherentes.
   const exportMeta: ExportMetadata = useMemo(() => ({
@@ -517,6 +538,7 @@ export default function NetworkDevicesModule() {
               onSelectAllVisibleCandidates={handleSelectAllVisibleCandidates}
               onClearSelection={handleClearSelection}
               visibleCandidateCount={visibleCandidates.length}
+              stationNamesByMac={stationNamesByMac}
               onOpenM5Detail={setM5DetailDevice}
               onSyncToSaved={handleSyncToSaved}
               onDirectSave={handleDirectSave}

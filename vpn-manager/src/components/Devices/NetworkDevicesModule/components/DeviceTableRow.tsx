@@ -37,6 +37,8 @@ interface DeviceTableRowProps {
   isSelected: boolean;
   /** Toggle de selección — se invoca al click en el checkbox de la fila. */
   onToggleSelected: (devId: string) => void;
+  /** §42 fix: mapa MAC→nombre para resolver hostname de estaciones. */
+  stationNamesByMac: Map<string, string>;
   onToggleExpand: (ip: string) => void;
   onOpenM5Detail: (dev: ScannedDevice) => void;
   onSyncToSaved: (dev: ScannedDevice, savedDev: SavedDevice) => void;
@@ -48,7 +50,7 @@ interface DeviceTableRowProps {
 function DeviceTableRowImpl({
   dev, isSaved, rowIdx, sshStatus, isExpanded,
   activeConfigCols, compactNameMode, selectedNode, savedDevice,
-  isSelected, onToggleSelected,
+  isSelected, onToggleSelected, stationNamesByMac,
   onToggleExpand, onOpenM5Detail, onSyncToSaved,
   onDirectSave, onOpenAddModal, onRefreshStats,
 }: DeviceTableRowProps) {
@@ -263,6 +265,7 @@ function DeviceTableRowImpl({
       {isExpanded && (
         <DeviceStatusPanel
           dev={dev}
+          stationNamesByMac={stationNamesByMac}
           onRefresh={(freshStats) => onRefreshStats(dev.ip, freshStats)}
         />
       )}
@@ -280,7 +283,9 @@ export const DeviceTableRow = memo(DeviceTableRowImpl, (prev, next) =>
   prev.activeConfigCols === next.activeConfigCols &&
   prev.compactNameMode === next.compactNameMode &&
   prev.rowIdx === next.rowIdx &&
-  prev.isSelected === next.isSelected
+  prev.isSelected === next.isSelected &&
+  // stationNamesByMac solo afecta el panel expandido; comparamos referencia.
+  (!prev.isExpanded || prev.stationNamesByMac === next.stationNamesByMac)
 );
 
 // ────────────────────────────────────────────────────────────────────

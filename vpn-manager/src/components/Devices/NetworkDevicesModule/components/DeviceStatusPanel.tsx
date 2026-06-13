@@ -4,7 +4,19 @@ import type { ScannedDevice, AntennaStats } from '../../../../types/devices';
 import { fetchWithTimeout } from '../../../../utils/fetchWithTimeout';
 import { API_BASE_URL } from '../../../../config';
 
-export function DeviceStatusPanel({ dev, onRefresh }: { dev: ScannedDevice; onRefresh?: (stats: AntennaStats) => void }) {
+interface DeviceStatusPanelProps {
+  dev: ScannedDevice;
+  /** §42 fix: mapa MAC normalizado → nombre del dispositivo, derivado del
+   *  scan. Usado para resolver el hostname de cada estación cuando el AP
+   *  no lo provee en wstalist. Opcional para no romper consumidores
+   *  externos del componente. */
+  stationNamesByMac?: Map<string, string>;
+  onRefresh?: (stats: AntennaStats) => void;
+}
+
+const normalizeMac = (mac: string) => mac.toUpperCase().replace(/[:-]/g, '');
+
+export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceStatusPanelProps) {
   const [stats, setStats] = useState<AntennaStats | undefined>(dev.cachedStats);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<number | null>(dev.cachedStats ? Date.now() : null);
@@ -337,18 +349,26 @@ export function DeviceStatusPanel({ dev, onRefresh }: { dev: ScannedDevice; onRe
             Estaciones conectadas ({s.stations.length})
           </p>
           <div className="space-y-1">
-            {s.stations.map((sta, i) => (
+            {s.stations.map((sta, i) => {
+              // §42 fix: el AP no provee el hostname real del CPE en wstalist
+              // (a veces devuelve su propio nombre, ya filtrado en backend).
+              // Cruzamos por MAC con los datos del scan, donde el CPE ya fue
+              // identificado por su `deviceName` al autenticar SSH. Fallback
+              // al sta.hostname si por alguna razón el firmware sí lo entrega.
+              const resolvedName = sta.mac
+                ? stationNamesByMac?.get(normalizeMac(sta.mac)) ?? sta.hostname
+                : sta.hostname;
+              return (
               <div key={i} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-1.5 bg-slate-50 rounded-lg border border-slate-100 text-[11px]">
                 <span className="font-mono font-semibold text-slate-700 w-36 shrink-0">{sta.mac}</span>
-                {/* §42 fix: hostname + IP por estación (wstalist remote.hostname / lastip).
-                    Antes solo se mostraba el MAC, que es críptico — el operador
-                    quiere ver de un vistazo qué cliente es. */}
-                {sta.hostname && (
+                {/* §42 fix: hostname (resuelto vía scan) + IP por estación.
+                    Antes solo se mostraba el MAC, críptico para el operador. */}
+                {resolvedName && (
                   <span
-                    className="font-semibold text-slate-600 truncate max-w-[160px]"
-                    title={`Nombre del equipo remoto: ${sta.hostname}`}
+                    className="font-semibold text-slate-600 truncate max-w-[180px]"
+                    title={`Nombre del equipo remoto: ${resolvedName}`}
                   >
-                    {sta.hostname}
+                    {resolvedName}
                   </span>
                 )}
                 {sta.lastIp && (
@@ -369,7 +389,8 @@ export function DeviceStatusPanel({ dev, onRefresh }: { dev: ScannedDevice; onRe
                 {sta.rxRate != null && <span className="font-mono text-slate-500">↓ {sta.rxRate} Mbps</span>}
                 {sta.distance != null && <span className="text-slate-400 ml-auto">{sta.distance} m</span>}
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

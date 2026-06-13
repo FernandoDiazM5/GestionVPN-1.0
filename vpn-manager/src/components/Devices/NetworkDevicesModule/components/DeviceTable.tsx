@@ -39,6 +39,10 @@ interface DeviceTableProps {
   onClearSelection: () => void;
   /** Cuántas filas candidatas visibles hay (informativo para el checkbox del header). */
   visibleCandidateCount: number;
+  /** §42 fix: mapa MAC (sin separadores, upper) → nombre del dispositivo. Lo
+   *  usa DeviceStatusPanel para resolver el hostname de cada estación cuando el
+   *  AP no lo provee (cross-reference con los datos del scan). */
+  stationNamesByMac: Map<string, string>;
   onOpenM5Detail: (dev: ScannedDevice) => void;
   onSyncToSaved: (dev: ScannedDevice, savedDev: SavedDevice) => void;
   onDirectSave: (dev: ScannedDevice, node: NodeInfo) => void;
@@ -52,7 +56,7 @@ function DeviceTableImpl(props: DeviceTableProps) {
     sortConfig, toggleSort, startResize, sshStatus, expandedRows, toggleExpand,
     savedDevices, selectedNode,
     selectedIds, onToggleSelected, onSelectAllVisibleCandidates, onClearSelection,
-    visibleCandidateCount,
+    visibleCandidateCount, stationNamesByMac,
     onOpenM5Detail, onSyncToSaved,
     onDirectSave, onOpenAddModal, onRefreshStats,
   } = props;
@@ -210,6 +214,7 @@ function DeviceTableImpl(props: DeviceTableProps) {
             isSelected={selectedIds.has(devId)}
             onToggleSelected={onToggleSelected}
             onToggleExpand={toggleExpand}
+            stationNamesByMac={stationNamesByMac}
             onOpenM5Detail={onOpenM5Detail}
             onSyncToSaved={onSyncToSaved}
             onDirectSave={onDirectSave}
