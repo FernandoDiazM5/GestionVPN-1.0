@@ -32,6 +32,7 @@ export default function NodeCard({
   onTagClick,
   onDiagnose,
   canManage = true,
+  visibleCols,
 }: NodeCardProps) {
   const {
     isActivating,
@@ -168,7 +169,7 @@ export default function NodeCard({
           canEditName={canManage}
         />
 
-        <NodeCardStatusRow node={node} />
+        <NodeCardStatusRow node={node} visibleCols={visibleCols} tags={tags} />
 
         {/* Acciones */}
         <td className="px-4 py-3">

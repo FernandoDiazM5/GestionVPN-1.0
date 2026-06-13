@@ -1,15 +1,27 @@
-import { useState, useMemo } from 'react';
+// ============================================================
+//  NodesListSection — orquestador de filtros + tabla + paginación + export
+//
+//  §44: pasa de `useState` locales (search/sort) a `useNodesPreferences`
+//  consolidado, agrega filtros (protocolo + estado), chips + contador
+//  permanente, ColumnPicker para columnas opcionales, y reemplaza el
+//  botón Exportar simple por NodesExportMenu con 4 formatos.
+//
+//  useDeferredValue separa typing de la búsqueda del recálculo del filter
+//  (typing fluido aunque haya cientos de nodos).
+// ============================================================
+
+import { useMemo, useDeferredValue, useEffect, useState } from 'react';
 import { AlertCircle, Radio, Search, RefreshCw } from 'lucide-react';
 import NodesFilterBar from './NodesFilterBar';
 import NodesTable from './NodesTable';
-import type { SortKey, SortDir } from './NodesTable';
+import { NodesExportMenu } from './NodesExportMenu';
+import { useNodesPreferences } from '../../hooks/useNodesPreferences';
 import type { NodeInfo } from '../../../../../types/api';
 
 interface NodesListSectionProps {
   nodes: NodeInfo[];
   hasLoaded: boolean;
   nodeTags: Record<string, string[]>;
-  onExportCsv: () => void;
   onEditNode: (node: NodeInfo) => void;
   onDeleteNode: (node: NodeInfo) => void;
   onScriptNode: (node: NodeInfo) => void;
@@ -23,11 +35,12 @@ interface NodesListSectionProps {
   canManage?: boolean;
 }
 
+const ITEMS_PER_PAGE = 50;
+
 export default function NodesListSection({
   nodes,
   hasLoaded,
   nodeTags,
-  onExportCsv,
   onEditNode,
   onDeleteNode,
   onScriptNode,
@@ -39,69 +52,88 @@ export default function NodesListSection({
   isLoading,
   canManage = true,
 }: NodesListSectionProps) {
-  const [search, setSearch] = useState('');
-  const [sortKey, setSortKey] = useState<SortKey>('default');
-  const [sortDir, setSortDir] = useState<SortDir>('asc');
-
-  // Paginación básica
+  const prefs = useNodesPreferences();
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 50;
 
-  const handleSort = (key: SortKey) => {
-    if (sortKey === key) {
-      if (sortDir === 'asc') setSortDir('desc');
-      else { setSortKey('default'); setSortDir('asc'); }
-    } else {
-      setSortKey(key);
-      setSortDir('asc');
-    }
-  };
+  // useDeferredValue → typing fluido en la búsqueda. El filtrado puede
+  // correr en una transición de baja prioridad.
+  const deferredSearch = useDeferredValue(prefs.searchQuery);
 
-  const filteredAndSortedNodes = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    let result = nodes;
-    
-    // 1. Filter
-    if (q) {
-      result = result.filter(n =>
-        n.nombre_nodo?.toLowerCase().includes(q) ||
-        n.nombre_vrf?.toLowerCase().includes(q) ||
-        n.segmento_lan?.toLowerCase().includes(q) ||
-        n.ppp_user?.toLowerCase().includes(q)
-      );
-    }
-    
-    // 2. Sort
-    if (sortKey !== 'default') {
-      result = [...result].sort((a, b) => {
-        let valA: any = a[sortKey as keyof NodeInfo];
-        let valB: any = b[sortKey as keyof NodeInfo];
-        
-        if (typeof valA === 'string') valA = valA.toLowerCase();
-        if (typeof valB === 'string') valB = valB.toLowerCase();
-        
-        if (sortKey === 'running') {
-          valA = a.running ? 1 : 0;
-          valB = b.running ? 1 : 0;
-        }
+  const filteredNodes = useMemo(() => {
+    const q = deferredSearch.trim().toLowerCase();
+    return nodes.filter(n => {
+      // Texto libre
+      if (q) {
+        const matchesText =
+          n.nombre_nodo?.toLowerCase().includes(q) ||
+          n.nombre_vrf?.toLowerCase().includes(q) ||
+          n.segmento_lan?.toLowerCase().includes(q) ||
+          n.ppp_user?.toLowerCase().includes(q);
+        if (!matchesText) return false;
+      }
+      // Protocolo
+      if (prefs.filterProtocol && n.service !== prefs.filterProtocol) return false;
+      // Estado
+      if (prefs.filterStatus === 'connected' && !n.running) return false;
+      if (prefs.filterStatus === 'disconnected' && n.running) return false;
+      return true;
+    });
+  }, [nodes, deferredSearch, prefs.filterProtocol, prefs.filterStatus]);
 
-        if (valA < valB) return sortDir === 'asc' ? -1 : 1;
-        if (valA > valB) return sortDir === 'asc' ? 1 : -1;
-        return 0;
-      });
-    }
-    return result;
-  }, [nodes, search, sortKey, sortDir]);
+  const sortedNodes = useMemo(() => {
+    if (prefs.sortKey === 'default') return filteredNodes;
+    return [...filteredNodes].sort((a, b) => {
+      // running es bool — se compara como número
+      if (prefs.sortKey === 'running') {
+        const va = a.running ? 1 : 0;
+        const vb = b.running ? 1 : 0;
+        return prefs.sortDir === 'asc' ? va - vb : vb - va;
+      }
+      const rawA = a[prefs.sortKey as keyof NodeInfo];
+      const rawB = b[prefs.sortKey as keyof NodeInfo];
+      const va = typeof rawA === 'string' ? rawA.toLowerCase() : rawA;
+      const vb = typeof rawB === 'string' ? rawB.toLowerCase() : rawB;
+      // null/undefined al final
+      if (va == null && vb == null) return 0;
+      if (va == null) return 1;
+      if (vb == null) return -1;
+      if (va < vb) return prefs.sortDir === 'asc' ? -1 : 1;
+      if (va > vb) return prefs.sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [filteredNodes, prefs.sortKey, prefs.sortDir]);
 
-  // Reset pagination on search change
-  useMemo(() => { setCurrentPage(1); }, [search, sortKey, sortDir]);
+  // Reset pagination cuando cambia el contenido filtrado.
+  useEffect(() => { setCurrentPage(1); }, [deferredSearch, prefs.filterProtocol, prefs.filterStatus, prefs.sortKey, prefs.sortDir]);
 
-  const totalPages = Math.ceil(filteredAndSortedNodes.length / itemsPerPage);
-  const paginatedNodes = filteredAndSortedNodes.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const totalPages = Math.ceil(sortedNodes.length / ITEMS_PER_PAGE);
+  const paginatedNodes = sortedNodes.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+  // Metadata para el export — refleja LO FILTRADO (no todos los nodos).
+  const connectedCount = useMemo(() => sortedNodes.filter(n => n.running).length, [sortedNodes]);
+  const activeFilters = useMemo(() => {
+    const f: string[] = [];
+    if (prefs.searchQuery) f.push(`búsqueda: "${prefs.searchQuery}"`);
+    if (prefs.filterProtocol) f.push(`protocolo=${prefs.filterProtocol}`);
+    if (prefs.filterStatus) f.push(`estado=${prefs.filterStatus}`);
+    return f;
+  }, [prefs.searchQuery, prefs.filterProtocol, prefs.filterStatus]);
+
+  const exportRows = useMemo(() => sortedNodes.map(n => ({
+    node: n,
+    tags: nodeTags[n.ppp_user] || [],
+  })), [sortedNodes, nodeTags]);
+
+  const exportMeta = useMemo(() => ({
+    totalCount: sortedNodes.length,
+    connectedCount,
+    activeFilters,
+    scannedAt: new Date(),
+  }), [sortedNodes.length, connectedCount, activeFilters]);
 
   return (
     <>
-      {/* ── Banner caché local (MikroTik offline) ── */}
+      {/* Banner caché local (MikroTik offline) */}
       {hasLoaded && nodes.length > 0 && nodes.some(n => n.cached) && (
         <div className="flex items-center gap-3 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs dark:bg-amber-500/10 dark:border-amber-500/30">
           <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" />
@@ -119,28 +151,36 @@ export default function NodesListSection({
         </div>
       )}
 
-
-
-      {/* ── Sección de Tabla y Filtros ── */}
       {hasLoaded && nodes.length > 0 && (
         <div className="card overflow-hidden border border-slate-200">
-          
+
           <NodesFilterBar
-            search={search}
-            onSearchChange={setSearch}
-            onExportCsv={onExportCsv}
-            resultCount={filteredAndSortedNodes.length}
+            search={prefs.searchQuery}
+            onSearchChange={prefs.setSearchQuery}
+            filterProtocol={prefs.filterProtocol}
+            setFilterProtocol={prefs.setFilterProtocol}
+            filterStatus={prefs.filterStatus}
+            setFilterStatus={prefs.setFilterStatus}
+            visibleCols={prefs.visibleCols}
+            setVisibleCols={prefs.setVisibleCols}
+            exportSlot={canManage ? (
+              <NodesExportMenu
+                rows={exportRows}
+                meta={exportMeta}
+                disabled={sortedNodes.length === 0}
+              />
+            ) : null}
+            resultCount={sortedNodes.length}
             totalCount={nodes.length}
-            canExport={canManage}
           />
 
           <NodesTable
             nodes={paginatedNodes}
             nodeTags={nodeTags}
-            searchQuery={search}
-            sortKey={sortKey}
-            sortDir={sortDir}
-            onSort={handleSort}
+            searchQuery={prefs.searchQuery}
+            sortKey={prefs.sortKey}
+            sortDir={prefs.sortDir}
+            onSort={prefs.toggleSort}
             onEditNode={onEditNode}
             onDeleteNode={onDeleteNode}
             onScriptNode={onScriptNode}
@@ -149,12 +189,12 @@ export default function NodesListSection({
             onHistoryNode={onHistoryNode}
             onTagClick={onTagClick}
             canManage={canManage}
+            visibleCols={prefs.visibleCols}
           />
 
-          {/* ── Paginación ── */}
           {totalPages > 1 && (
             <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-400">
-              <span>Mostrando {((currentPage - 1) * itemsPerPage) + 1} a {Math.min(currentPage * itemsPerPage, filteredAndSortedNodes.length)} de {filteredAndSortedNodes.length} nodos</span>
+              <span>Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1} a {Math.min(currentPage * ITEMS_PER_PAGE, sortedNodes.length)} de {sortedNodes.length} nodos</span>
               <div className="flex items-center gap-1">
                 <button
                   disabled={currentPage === 1}
@@ -177,7 +217,7 @@ export default function NodesListSection({
         </div>
       )}
 
-      {/* ── Empty state: Sin nodos ── */}
+      {/* Empty state: Sin nodos */}
       {hasLoaded && nodes.length === 0 && (
         <div className="card border-dashed border-2 border-slate-200 dark:border-slate-700 py-16 flex flex-col items-center text-center space-y-3">
           <div className="w-14 h-14 bg-indigo-50 dark:bg-indigo-500/15 rounded-2xl flex items-center justify-center">
@@ -188,7 +228,7 @@ export default function NodesListSection({
         </div>
       )}
 
-      {/* ── Estado inicial ── */}
+      {/* Estado inicial */}
       {!hasLoaded && !isLoading && (
         <div className="card border-dashed border-2 border-slate-200 dark:border-slate-700 py-16 flex flex-col items-center text-center space-y-3">
           <div className="w-14 h-14 bg-indigo-50 dark:bg-indigo-500/15 rounded-2xl flex items-center justify-center">

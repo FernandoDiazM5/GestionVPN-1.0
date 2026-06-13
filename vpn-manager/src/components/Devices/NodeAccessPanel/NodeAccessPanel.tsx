@@ -113,20 +113,8 @@ export default function NodeAccessPanel() {
     savingPeerName,
   });
 
-  const exportCsv = () => {
-    const header = 'Nombre,VRF,Red LAN,IP Túnel,Usuario PPP,Estado';
-    const csvRows = nodes.map(n => [
-      `"${n.nombre_nodo}"`, n.nombre_vrf || '',
-      `"${(n.lan_subnets?.join(';') || n.segmento_lan || '')}"`,
-      n.ip_tunnel || '', n.ppp_user,
-      n.running ? 'Conectado' : 'Desconectado',
-    ].join(','));
-    const blob = new Blob([[header, ...csvRows].join('\n')], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `nodos-${new Date().toISOString().slice(0, 10)}.csv`; a.click();
-    URL.revokeObjectURL(url);
-  };
+  // §44: exportCsv inline retirado — sustituido por NodesExportMenu (4 formatos)
+  // dentro de NodesListSection.
 
   const handleRevokeAll = async () => {
     setIsRevoking(true);
@@ -231,7 +219,6 @@ export default function NodeAccessPanel() {
         nodes={nodes}
         hasLoaded={hasLoaded}
         nodeTags={nodeTags}
-        onExportCsv={exportCsv}
         onEditNode={setEditNode}
         onDeleteNode={setDeleteNode}
         onScriptNode={setScriptNode}
