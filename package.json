@@ -24,7 +24,9 @@
     "test:frontend": "npm test --prefix vpn-manager",
     "test:all": "npm run test:backend && npm run test:frontend",
     "e2e": "playwright test",
-    "e2e:install": "playwright install --with-deps chromium"
+    "e2e:install": "playwright install --with-deps chromium",
+    "audit:design": "node scripts/audit-design.js",
+    "audit:design:json": "node scripts/audit-design.js --json"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",

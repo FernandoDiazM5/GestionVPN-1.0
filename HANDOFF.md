@@ -3493,6 +3493,93 @@ Se añade nueva regla a la sección 🛑 "Política de operaciones SSH sobre dis
 
 ---
 
+## 45) 🎨 Audit del Sistema de Diseño — script + skill instalada
+
+Reporte del usuario tras §44: en modo oscuro varios componentes quedan con fondos blancos, algunos botones tienen colores fuera de la paleta semántica, tamaños de texto inconsistentes. Pide una forma de **estandarizar** y **detectar** estas inconsistencias.
+
+### Acciones tomadas
+
+1. **Skill `tailwind-design-system` instalada** (`wshobson/agents`, 48.1K installs). Provee patrones de tokens semánticos, dark mode con `@custom-variant`, componentes CVA, accessibility-first. Sirve como referencia conceptual al refactorizar componentes; está disponible vía el sistema de skills.
+
+2. **Auditor automático `scripts/audit-design.js`** — recorre `vpn-manager/src/**/*.{ts,tsx}` y reporta violaciones a `CLAUDE.md` + `DESIGN_SYSTEM.md` + `tailwind.config.js`. Sin dependencias externas, solo Node.js + regex.
+
+### Reglas auditadas
+
+| ID | Severidad | Detecta |
+|---|---|---|
+| **DS01-disallowed-palette** | error | Colores fuera de las 7 paletas permitidas (indigo/emerald/rose/amber/sky/violet/slate). Bloquea `red`/`blue`/`green`/`gray`/etc. |
+| **DS02-bg-without-dark** | warning | `bg-{color}-50/100/200` o `bg-white` sin variante `dark:` correspondiente. Esos componentes quedan con fondo blanco/casi-blanco en modo oscuro y el contenido se vuelve invisible. Excepciones: líneas que ya usan clases del sistema (`.card`/`.btn-*`/`.input-field`/etc) — esas manejan dark internamente. |
+| **DS03-text-too-small** | error | `text-[10px]`, `text-[11px]` literales. `CLAUDE.md` fija `text-xs` (12px) como mínimo. La única excepción permitida es la clase `text-2xs` (alias de 11px reservado para micro-badges). |
+| **DS04-multicolor-gradient** | warning | `from-COLOR-N to-OTHERCOLOR-N` (paletas distintas). `CLAUDE.md` exige un estado = un color. |
+| **DS05-low-contrast-text** | info | `text-slate-300/400` fuera de variant `dark:`. Sobre fondo blanco no pasa AA. Los labels deben ser mínimo `slate-600`. |
+| **DS06-raw-button-color** | info | `<button>` con `bg-...-600 text-white` inline en vez de usar `.btn-primary` / `.btn-success` / etc. Pierden focus ring, active:scale, shadow consistente. |
+
+### Comandos
+
+```bash
+npm run audit:design        # reporte formateado con colores ANSI
+npm run audit:design:json   # JSON estructurado (para CI futuro)
+node scripts/audit-design.js --rule DS02   # solo una regla
+```
+
+Exit code: **1 si hay errores** (severity=error), **0** si solo warnings/infos. Útil para CI eventual sin bloquear el flujo actual.
+
+### Snapshot inicial (al cierre de §44)
+
+333 archivos analizados:
+
+| Regla | Severidad | Violaciones | Archivos afectados |
+|---|---|---|---|
+| DS05 (texto slate-300/400) | info | 411 | 97 |
+| DS03 (text-[10/11px] literal) | **error** | 313 | 57 |
+| DS02 (bg sin dark variant) | warning | 265 | 80 |
+| DS01 (palette prohibida) | **error** | 62 | 16 |
+| DS06 (botón inline) | info | 26 | 17 |
+| DS04 (gradiente multicolor) | warning | 19 | 10 |
+
+**Total: 1,096 hallazgos** (375 errores · 284 warnings · 437 infos).
+
+**Top archivos a refactorizar primero** (más violaciones):
+
+1. `Devices/NodeAccessPanel/modals/NuevoNodo.tsx` — 74
+2. `Devices/NetworkDevicesModule/components/DeviceStatusPanel.tsx` — 63
+3. `Devices/NetworkDevicesModule/utils/columns.tsx` — 55
+4. `Monitor/ApMonitorModule/components/ApRow.tsx` — 37
+5. `Devices/NodeAccessPanel/modals/EditarNodo.tsx` — 32
+6. `Users/UserManagementPanel/components/UsersTable.tsx` — 28
+7. `Devices/NodeAccessPanel/constants.ts` — 27
+8. `Monitor/ApMonitorModule/components/ApGroupCard.tsx` — 26
+9. `Admin/ModeratorsModule/ModeratorsModule.tsx` — 25
+10. `Devices/NodeAccessPanel/modals/BatchCsvModal.tsx` — 23
+
+### Cómo usar el auditor en flujo de trabajo
+
+1. **Antes de mergear**: correr `npm run audit:design` y revisar errores DS01/DS03 — esos son objetivos (palette / tamaño) y se solucionan en un par de minutos.
+2. **Refactor incremental**: tomar 1 archivo del top 10 por sesión. Aplicar fixes guiados por la skill `tailwind-design-system` (palette OKLCH + dark variants) o por el agente `react-ui-expert` ya configurado.
+3. **CI eventual** (no implementado todavía): agregar paso `npm run audit:design` al workflow `ci.yml` y bloquear PRs solo cuando los errores aumenten respecto a `main`. Esto evita el "blast radius" inicial de 375 errores acumulados.
+
+### Falsos positivos conocidos
+
+- **DS02** puede marcar `hover:bg-indigo-50 dark:hover:bg-indigo-500/10` como sin dark variant si el patrón de variante dark intermedio no matchea (ya corregido en este commit con regex `\bdark:[^\s"'\`]*bg-/`).
+- **DS05** marca todo `text-slate-400` aunque esté sobre fondo oscuro — solo es señal, no error. El operador decide caso por caso.
+- **DS06** es heurístico — un botón inline puede ser intencional (modal de confirmación con palette distinta). Por eso es severity=info.
+
+### Reglas operativas reforzadas (post-§45)
+
+- **`text-2xs` SIEMPRE en lugar de `text-[11px]`** — la primera ya está en `tailwind.config.js` y el auditor la respeta como excepción válida.
+- **Toda nueva clase de botón sólido debe usar `.btn-*`** del sistema — perdemos focus ring + active:scale + shadow si vamos inline.
+- **Toda fila `<tr>` o `<div>` con bg de color debe tener variant `dark:`** o usar `.card`/`.card-hover`. El auditor lo bloquea.
+
+### Pendiente / mejoras futuras
+
+- **Refactor sistemático**: aplicar fixes al top 10 archivos para reducir los 375 errores. Estimación: 4-6h por archivo × 10 = 1-2 días de trabajo enfocado.
+- **Reducir `text-[11px]` a `text-2xs`**: 313 ocurrencias — sed/replace masivo + revisión visual. La paleta OKLCH del skill instalado puede aportar pistas.
+- **DS07 — z-index inconsistente**: pendiente regla nueva para detectar `z-[number]` literales fuera de la escala `z-0/10/20/30/40/50`.
+- **DS08 — hardcoded hex**: detectar `text-[#hex]` o `bg-[#hex]` (saltean la paleta).
+- **Integración a CI**: cuando los errores bajen a 0, agregar `npm run audit:design` al workflow para no regresar.
+
+---
+
 ## ⚡ Arranque rápido
 
 1. XAMPP **MySQL** arriba (idealmente como servicio).
