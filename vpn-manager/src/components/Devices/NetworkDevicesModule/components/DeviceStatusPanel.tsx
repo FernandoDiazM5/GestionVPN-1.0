@@ -338,8 +338,27 @@ export function DeviceStatusPanel({ dev, onRefresh }: { dev: ScannedDevice; onRe
           </p>
           <div className="space-y-1">
             {s.stations.map((sta, i) => (
-              <div key={i} className="flex items-center gap-4 px-3 py-1.5 bg-slate-50 rounded-lg border border-slate-100 text-[11px]">
+              <div key={i} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-1.5 bg-slate-50 rounded-lg border border-slate-100 text-[11px]">
                 <span className="font-mono font-semibold text-slate-700 w-36 shrink-0">{sta.mac}</span>
+                {/* §42 fix: hostname + IP por estación (wstalist remote.hostname / lastip).
+                    Antes solo se mostraba el MAC, que es críptico — el operador
+                    quiere ver de un vistazo qué cliente es. */}
+                {sta.hostname && (
+                  <span
+                    className="font-semibold text-slate-600 truncate max-w-[160px]"
+                    title={`Nombre del equipo remoto: ${sta.hostname}`}
+                  >
+                    {sta.hostname}
+                  </span>
+                )}
+                {sta.lastIp && (
+                  <span
+                    className="font-mono text-sky-600 shrink-0"
+                    title={`Última IP conocida del cliente: ${sta.lastIp}`}
+                  >
+                    {sta.lastIp}
+                  </span>
+                )}
                 {sta.signal != null && (
                   <span className={`font-bold font-mono w-16 ${sta.signal >= -65 ? 'text-emerald-600' : sta.signal >= -75 ? 'text-sky-600' : 'text-amber-500'}`}>
                     {sta.signal} dBm
