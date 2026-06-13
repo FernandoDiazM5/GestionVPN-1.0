@@ -442,6 +442,7 @@ export default function NetworkDevicesModule() {
               activeConfigCols={colPrefs.activeConfigCols}
               gridTemplate={colPrefs.gridTemplate}
               minTableWidth={colPrefs.minTableWidth}
+              compactNameMode={colPrefs.compactNameMode}
               sortConfig={list.sortConfig}
               toggleSort={list.toggleSort}
               startResize={colPrefs.startResize}

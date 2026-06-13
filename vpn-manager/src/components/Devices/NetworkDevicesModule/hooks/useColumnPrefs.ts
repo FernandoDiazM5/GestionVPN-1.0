@@ -107,27 +107,40 @@ export function useColumnPrefs() {
     [visibleCols]
   );
 
-  // gridTemplateColumns para CSS grid: fixed + dynamic + fixed
+  // Modo lectura (T5): cuando el usuario activa muchas columnas técnicas,
+  // la columna fija "Nombre / Modelo" (4ta) se aplasta a ~80px y el nombre
+  // truncado deja de ser legible. A partir de COMPACT_NAME_THRESHOLD
+  // columnas configurables, esa columna se oculta automáticamente — el
+  // nombre sigue accesible vía title del IP y, sobre todo, en el panel
+  // expandido (botón chevron del row).
+  const COMPACT_NAME_THRESHOLD = 6;
+  const compactNameMode = activeConfigCols.length >= COMPACT_NAME_THRESHOLD;
+
+  // gridTemplateColumns para CSS grid: fixed + dynamic + fixed.
+  // En modo compacto, la 4ta columna ('minmax(100px,1fr)' = Nombre/Modelo)
+  // se omite del template para que el header y las filas se alineen sin
+  // dejar un hueco en su lugar.
   const gridTemplate = useMemo(() => [
     '40px',
     '54px',
     '140px',
-    'minmax(100px,1fr)',
+    ...(compactNameMode ? [] : ['minmax(100px,1fr)']),
     ...activeConfigCols.map(c => colWidths[c.key] != null ? `${colWidths[c.key]}px` : c.width),
     '32px',
     '180px',
-  ].join(' '), [activeConfigCols, colWidths]);
+  ].join(' '), [activeConfigCols, colWidths, compactNameMode]);
 
-  const minTableWidth = useMemo(() =>
-    [40, 54, 148, 120, ...activeConfigCols.map(c => parseInt(c.width.match(/\d+/)?.[0] || '80') || 80), 32, 180]
-      .reduce((a, b) => a + b, 0),
-    [activeConfigCols]
-  );
+  const minTableWidth = useMemo(() => {
+    const base = compactNameMode ? [40, 54, 148] : [40, 54, 148, 120];
+    return [...base, ...activeConfigCols.map(c => parseInt(c.width.match(/\d+/)?.[0] || '80') || 80), 32, 180]
+      .reduce((a, b) => a + b, 0);
+  }, [activeConfigCols, compactNameMode]);
 
   return {
     visibleCols, saveVisibleCols,
     colWidths,
     activeConfigCols,
+    compactNameMode,
     gridTemplate,
     minTableWidth,
     startResize,

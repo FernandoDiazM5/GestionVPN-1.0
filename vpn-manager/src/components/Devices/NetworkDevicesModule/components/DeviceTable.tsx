@@ -19,6 +19,8 @@ interface DeviceTableProps {
   activeConfigCols: ColumnDef[];
   gridTemplate: string;
   minTableWidth: number;
+  /** T5: oculta la columna fija Nombre/Modelo cuando hay 6+ columnas configurables visibles. */
+  compactNameMode: boolean;
   sortConfig: { key: string; dir: 'asc' | 'desc' } | null;
   toggleSort: (key: string) => void;
   startResize: (key: string, startX: number) => void;
@@ -38,7 +40,7 @@ interface DeviceTableProps {
 
 function DeviceTableImpl(props: DeviceTableProps) {
   const {
-    sortedRows, activeConfigCols, gridTemplate, minTableWidth,
+    sortedRows, activeConfigCols, gridTemplate, minTableWidth, compactNameMode,
     sortConfig, toggleSort, startResize, sshStatus, expandedRows, toggleExpand,
     savedDevices, selectedNode,
     onOpenM5Detail, onSyncToSaved, onOpenSavedView, onOpenScanView,
@@ -79,13 +81,15 @@ function DeviceTableImpl(props: DeviceTableProps) {
             IP / MAC
             {sortConfig?.key === 'ip' && <span className="text-indigo-600">{sortConfig.dir === 'asc' ? '↑' : '↓'}</span>}
           </div>
-          <div
-            className="px-3 py-3 cursor-pointer select-none flex items-center gap-1 hover:text-slate-700"
-            onClick={() => toggleSort('name')}
-          >
-            Nombre / Modelo
-            {sortConfig?.key === 'name' && <span className="text-indigo-600">{sortConfig.dir === 'asc' ? '↑' : '↓'}</span>}
-          </div>
+          {!compactNameMode && (
+            <div
+              className="px-3 py-3 cursor-pointer select-none flex items-center gap-1 hover:text-slate-700"
+              onClick={() => toggleSort('name')}
+            >
+              Nombre / Modelo
+              {sortConfig?.key === 'name' && <span className="text-indigo-600">{sortConfig.dir === 'asc' ? '↑' : '↓'}</span>}
+            </div>
+          )}
           {activeConfigCols.map(col => (
             <div
               key={col.key}
@@ -127,6 +131,7 @@ function DeviceTableImpl(props: DeviceTableProps) {
             sshStatus={sshStatus[dev.ip]}
             isExpanded={expandedRows.has(dev.ip)}
             activeConfigCols={activeConfigCols}
+            compactNameMode={compactNameMode}
             selectedNode={selectedNode}
             savedDevice={savedDevice}
             onToggleExpand={toggleExpand}

@@ -23,6 +23,8 @@ interface DeviceTableRowProps {
   sshStatus: SshAuthStatus | undefined;
   isExpanded: boolean;
   activeConfigCols: ColumnDef[];
+  /** T5: oculta la celda Nombre/Modelo cuando hay 6+ columnas configurables. */
+  compactNameMode: boolean;
   /**
    * `gridTemplate` ya no llega como prop — se lee como CSS variable
    * `--cols-tpl` del contenedor padre. Durante un drag de resize, solo
@@ -42,7 +44,7 @@ interface DeviceTableRowProps {
 
 function DeviceTableRowImpl({
   dev, isSaved, rowIdx, sshStatus, isExpanded,
-  activeConfigCols, selectedNode, savedDevice,
+  activeConfigCols, compactNameMode, selectedNode, savedDevice,
   onToggleExpand, onOpenM5Detail, onSyncToSaved,
   onOpenSavedView, onOpenScanView, onDirectSave, onOpenAddModal, onRefreshStats,
 }: DeviceTableRowProps) {
@@ -60,11 +62,18 @@ function DeviceTableRowImpl({
   // comunica con un border-l-2 lateral (indigo=guardado, emerald=hasStats,
   // transparente=neutro). Esto recupera el efecto zebra que rastrea filas en
   // listas largas (que antes se rompía cuando mezclaban 3 paletas).
-  const stateBorder = isSaved
-    ? 'border-l-2 border-l-indigo-400'
-    : hasStats
-      ? 'border-l-2 border-l-emerald-400'
-      : 'border-l-2 border-l-transparent';
+  //
+  // Cuando la fila está EXPANDIDA (panel de stats abierto debajo), el border
+  // pasa a 4px sólido indigo-500 — se ve distinto al border-2 normal incluso
+  // en la visión periférica del scroll. Permite al usuario rastrear qué
+  // fila tiene panel abierto sin tener que volver a ella.
+  const stateBorder = isExpanded
+    ? 'border-l-4 border-l-indigo-500 dark:border-l-indigo-400'
+    : isSaved
+      ? 'border-l-2 border-l-indigo-400'
+      : hasStats
+        ? 'border-l-2 border-l-emerald-400'
+        : 'border-l-2 border-l-transparent';
   const stateBg = rowIdx % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/60 dark:bg-slate-800/40';
   const hoverBg = isSaved
     ? 'hover:bg-indigo-50/40 dark:hover:bg-indigo-500/10'
@@ -132,11 +141,14 @@ function DeviceTableRowImpl({
           )}
         </div>
 
-        {/* IP / MAC */}
+        {/* IP / MAC — en modo compacto enriquecemos el title con nombre+modelo
+            porque la columna Nombre/Modelo se oculta a partir de 6 configurables */}
         <div className="px-3 py-3 min-w-0 pr-3">
           <a href={`http://${dev.ip}`} target="_blank" rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            title={`Abrir http://${dev.ip}`}
+            title={compactNameMode && (displayName || displayModel)
+              ? `${displayName || dev.ip}${displayModel ? ` · ${displayModel}` : ''}\nAbrir http://${dev.ip}`
+              : `Abrir http://${dev.ip}`}
             className="font-mono text-sm font-semibold text-slate-700 hover:text-sky-600 hover:underline truncate block dark:text-slate-200 dark:hover:text-sky-400"
           >{dev.ip}</a>
           {displayMac
@@ -145,14 +157,16 @@ function DeviceTableRowImpl({
           }
         </div>
 
-        {/* Nombre / Modelo */}
-        <div className="px-3 py-3 min-w-0 pr-3">
-          {displayName && displayName !== dev.ip
-            ? <p className="text-sm font-bold text-slate-700 truncate dark:text-slate-200" title={displayName}>{displayName}</p>
-            : <p className="text-sm font-semibold text-slate-500 truncate font-mono dark:text-slate-400" title={dev.ip}>{dev.ip}</p>
-          }
-          <p className="text-2xs text-slate-500 truncate dark:text-slate-400" title={displayModel}>{displayModel || '—'}</p>
-        </div>
+        {/* Nombre / Modelo — oculto en modo compacto (T5) */}
+        {!compactNameMode && (
+          <div className="px-3 py-3 min-w-0 pr-3">
+            {displayName && displayName !== dev.ip
+              ? <p className="text-sm font-bold text-slate-700 truncate dark:text-slate-200" title={displayName}>{displayName}</p>
+              : <p className="text-sm font-semibold text-slate-500 truncate font-mono dark:text-slate-400" title={dev.ip}>{dev.ip}</p>
+            }
+            <p className="text-2xs text-slate-500 truncate dark:text-slate-400" title={displayModel}>{displayModel || '—'}</p>
+          </div>
+        )}
 
         {/* Columnas configurables */}
         {activeConfigCols.map(col => (
@@ -257,5 +271,6 @@ export const DeviceTableRow = memo(DeviceTableRowImpl, (prev, next) =>
   prev.savedDevice === next.savedDevice &&
   prev.selectedNode === next.selectedNode &&
   prev.activeConfigCols === next.activeConfigCols &&
+  prev.compactNameMode === next.compactNameMode &&
   prev.rowIdx === next.rowIdx
 );
