@@ -3,7 +3,7 @@
 > Documento de migración de contexto entre sesiones.
 > Rama de trabajo: **`dev`** · Remote: `github.com/FernandoDiazM5/GestionVPN-1.0`.
 >
-> **Estado actual (2026-06-12):** REFACTOR_PLAN cerrado (F0-F12) · 5 features quick-wins entregados (Q1-Q5) · 2 mid-size (M1, M5) · iter2 del bot Telegram + reposición "Asignar túneles" + fix crítico `user_mgmt_ips` (§32) · UX MEMBER endurecida (§33) · Workspace unificado + email en peers WG + multi-asignar + QR en aceptar invitación (§34) · Columna Alias editable en peers WG + bloqueo de edición del "Usuario" para preservar trazabilidad MikroTik (§35) · Fix crítico bot Telegram: match dual VRF/PPP en asignaciones del MEMBER (§36) · Auditoría exhaustiva del módulo Escanear con skills `react-ui-expert` + `vercel-react-best-practices`: 21 mejoras en 5 commits (§37 perf+robustez · §38 UX+features) · **🛑 Política operativa SSH para antenas Ubiquiti establecida: solo lectura + ping + reinicio con confirmación; PROHIBIDO actualizar firmware, borrar archivos, restaurar a fábrica o modificar config persistente (ver sección dedicada al final del doc)**. Plan completo abajo.
+> **Estado actual (2026-06-12):** REFACTOR_PLAN cerrado (F0-F12) · 5 features quick-wins entregados (Q1-Q5) · 2 mid-size (M1, M5) · iter2 del bot Telegram + reposición "Asignar túneles" + fix crítico `user_mgmt_ips` (§32) · UX MEMBER endurecida (§33) · Workspace unificado + email en peers WG + multi-asignar + QR en aceptar invitación (§34) · Columna Alias editable en peers WG + bloqueo de edición del "Usuario" para preservar trazabilidad MikroTik (§35) · Fix crítico bot Telegram: match dual VRF/PPP en asignaciones del MEMBER (§36) · Auditoría exhaustiva del módulo Escanear con skills `react-ui-expert` + `vercel-react-best-practices`: 21 mejoras en 5 commits (§37 perf+robustez · §38 UX+features) · 🛑 Política operativa SSH para antenas Ubiquiti establecida: solo lectura + ping + reinicio con confirmación; PROHIBIDO actualizar firmware, borrar archivos, restaurar a fábrica o modificar config persistente (ver sección dedicada al final del doc) · **Cierre auditoría Escanear (§39): U1.A columna Acción sticky-right + U2 kebab para acciones secundarias (Informe / Sync / Ver datos del scan); 26/27 hallazgos aplicados, solo F4 (diff de scans) queda en backlog**. Plan completo abajo.
 >
 > ### 🧱 Refactor (F0-F12) — Plan completo ejecutado
 > - **F5** Monorepo + `@gestionvpn/contracts` con Zod compartido.
@@ -44,7 +44,7 @@
 > - **142 backend** (14 archivos) + **36 frontend** (5 archivos) = **178 tests verdes**. La auditoría §37-§38 de Escanear NO añade tests nuevos (las mejoras son refactor/UX sin lógica de negocio); el conteo se mantiene desde §36.
 >
 > ### 📚 Secciones de referencia
-> §17–25: REFACTOR_PLAN ejecutado. §26 notificaciones. §27 bot Telegram. §28 ping/trace. §29 export. §30 dashboard. §31 monitoreo. §32 iter2 multi-usuario. §33 UX MEMBER endurecida. §34 Workspace unificado + peers WG mejorados. §35 Alias humano + bloqueo Usuario. §36 Fix bot — match dual VRF/PPP. §37 Escanear — perf + robustez. §38 Escanear — UX + features.
+> §17–25: REFACTOR_PLAN ejecutado. §26 notificaciones. §27 bot Telegram. §28 ping/trace. §29 export. §30 dashboard. §31 monitoreo. §32 iter2 multi-usuario. §33 UX MEMBER endurecida. §34 Workspace unificado + peers WG mejorados. §35 Alias humano + bloqueo Usuario. §36 Fix bot — match dual VRF/PPP. §37 Escanear — perf + robustez. §38 Escanear — UX + features. §39 Escanear — sticky-right + kebab (cierre auditoría).
 >
 > Sesión 2026-06-07 PM: Ajustes del moderador (perfil + workspace + import/export JSON) + Recuperar contraseña + sync MikroTik al deshabilitar + invitaciones por email + .conf WG server-side.
 > Sesión 2026-06-07 AM: multi-usuario con aislamiento por sesión (mangle por-IP), parche `!empty` node-routeros, auditoría (Semgrep+security-review+code-review) y fixes C1–C7.
@@ -69,7 +69,7 @@
 6. **Pase UX P1–P6** + optimización visual de la vista **Escanear**.
 7. **🆕 Multi-usuario con aislamiento por sesión** (sesión 2026-06-07) — ver §7.
 
-**Estado de salud (2026-06-12 mañana):** `tsc 0` (`--noEmit` + build estricto) · `node --check ✓` · **178 tests verdes** (142 backend + 36 frontend) · 6 commits limpios en `dev` desde el último HANDOFF. 6 jobs concurrentes en producción (`startMonitor` MySQL, `expirationJob`, `telegramBot`, `dashboardMetrics` sampler, `monitoringJob`). 0 vulnerabilidades npm en prod, 0 findings `semgrep`. Bundles relevantes: **inicial 248 KB / 78 KB gzip** (sin cambios); `TeamModule` 119 KB / 30 KB gzip; `UserManagementPanel` lazy 25 KB / 7 KB gzip; **`NetworkDevicesModule` 95 KB / 23 KB gzip** (+9 KB acumulado tras §37-§38: `exportCsv.ts` + bulk save + chips + filtros + zebra). MySQL: tabla `peer_aliases` creada automáticamente en `initDb()` desde `schema_ops.sql`. Sin pendientes del REFACTOR_PLAN; backlog quick-wins (Q1-Q5) y 2 mid-size (M1, M5) entregados. **Últimos commits en `dev`:** `f1dd8cb` (export CSV + bulk save + zebra T4) · `a3e1caf` (filtro rol + footer + chips + tooltip header) · `1fc502b` (cancel reader on cambio subred + lazy init sessionStorage + schema versionado) · `09b7c5c` (deferred search + reduced motion + touch click-away + cache estimateIpCount) · `4e872f5` (race + listeners + CSS var + Map + SSH UX + sort + widths persist) · `02458f4` (§33-§36 trabajo previo).
+**Estado de salud (2026-06-12 mañana):** `tsc 0` (`--noEmit` + build estricto) · `node --check ✓` · **178 tests verdes** (142 backend + 36 frontend) · 10 commits limpios en `dev` desde el HANDOFF previo. 6 jobs concurrentes en producción (`startMonitor` MySQL, `expirationJob`, `telegramBot`, `dashboardMetrics` sampler, `monitoringJob`). 0 vulnerabilidades npm en prod, 0 findings `semgrep`. Bundles relevantes: **inicial 248 KB / 78 KB gzip** (sin cambios); `TeamModule` 119 KB / 30 KB gzip; `UserManagementPanel` lazy 25 KB / 7 KB gzip; **`NetworkDevicesModule` 97.4 KB / 23.5 KB gzip** (+12 KB acumulado tras §37-§39: `exportCsv.ts` + bulk save + chips + filtros + zebra + sticky-right + kebab). MySQL: tabla `peer_aliases` creada automáticamente en `initDb()` desde `schema_ops.sql`. Sin pendientes del REFACTOR_PLAN; backlog quick-wins (Q1-Q5) y 2 mid-size (M1, M5) entregados. **Últimos commits en `dev`:** `0471d64` (retira "Sin nodo" del primario) · `2bff438` (U2 kebab para acciones secundarias) · `d300a44` (U1.A columna Acción sticky-right) · `0bb0aff` (política SSH bloqueante) · `8d43b19` (HANDOFF §37+§38) · `f1dd8cb` (export CSV + bulk save + zebra T4) · `a3e1caf` (filtro rol + footer + chips + tooltip header) · `1fc502b` (cancel reader on cambio subred + lazy init sessionStorage + schema versionado) · `09b7c5c` (deferred search + reduced motion + touch click-away + cache estimateIpCount) · `4e872f5` (race + listeners + CSS var + Map + SSH UX + sort + widths persist) · `02458f4` (§33-§36 trabajo previo).
 
 ---
 
@@ -129,7 +129,7 @@
 | 🟡 Limpieza | Quitar `adminIP` hardcodeado (`useNodeManagement.ts`, ya no se usa) · warning MySQL2 `keepAliveInitialDelayMs` (mitigado en F11) · escaneo atado al `mgmt_ip` del solicitante. |
 | 🟡 Mejora | **Fase 5 (opcional):** aislamiento de firewall por-IP + acotar regla "Admin MGMT libre" (defensa en profundidad; hoy el ruteo ya aísla). Dockerfile `USER` no-root (Semgrep S1). |
 | 🟡 Próximo backlog | **M2** API pública con tokens scoped · **M3** Webhooks salientes · **M4** Speed test desde antena (iperf3 SSH) · **L1** Reportes SLA computados desde `tunnel_session_logs` + `monitoring_state` · **L2** Diagnóstico con LLM · **L3** PWA móvil instalable · **L4** Predicción de degradación con tendencia de `signal_history`. |
-| 🟢 Resuelto | O2 repo privado · O5 MySQL estable · UX P6 · **multi-usuario activación (verificado)** · parche `!empty` · fixes C1–C7 · **crash `POST /api/wireguard/peers` (ver §13.6)** · **V1 `register-my-ip` ownership por rol** · **Q1 Notificaciones (§26)** · **M1 Bot Telegram (§27)** · **Q3 Diagnóstico ping/trace (§28)** · **Q4 Export auditoría CSV/JSON (§29)** · **Q2 Dashboard métricas (§30)** · **M5 Monitoreo proactivo (§31)** · **Job de expiración batch** · **iter2 bot directo + asignar túneles UI + fix `user_mgmt_ips` auto (§32)** · **UX MEMBER endurecida — solo "Acceder" + Ajustes con Telegram (§33)** · **Workspace unificado + Email en peers + multi-asignar túneles + QR en aceptar invitación (§34)** · **Alias humano + bloqueo edición Usuario (§35)** · **Fix bot Telegram: match dual VRF/PPP en asignaciones del MEMBER (§36)** · **Auditoría Escanear: 12 fixes de perf+robustez (§37) + 9 mejoras UX+features (§38)**. |
+| 🟢 Resuelto | O2 repo privado · O5 MySQL estable · UX P6 · **multi-usuario activación (verificado)** · parche `!empty` · fixes C1–C7 · **crash `POST /api/wireguard/peers` (ver §13.6)** · **V1 `register-my-ip` ownership por rol** · **Q1 Notificaciones (§26)** · **M1 Bot Telegram (§27)** · **Q3 Diagnóstico ping/trace (§28)** · **Q4 Export auditoría CSV/JSON (§29)** · **Q2 Dashboard métricas (§30)** · **M5 Monitoreo proactivo (§31)** · **Job de expiración batch** · **iter2 bot directo + asignar túneles UI + fix `user_mgmt_ips` auto (§32)** · **UX MEMBER endurecida — solo "Acceder" + Ajustes con Telegram (§33)** · **Workspace unificado + Email en peers + multi-asignar túneles + QR en aceptar invitación (§34)** · **Alias humano + bloqueo edición Usuario (§35)** · **Fix bot Telegram: match dual VRF/PPP en asignaciones del MEMBER (§36)** · **Auditoría Escanear: 12 fixes de perf+robustez (§37) + 9 mejoras UX+features (§38) + cierre con sticky-right + kebab (§39)**. |
 | 🟢 Nota | Config MikroTik `v2.rsc` SIN mangle global (baseline limpio multi-usuario). Peer `peer27` de prueba con public-key placeholder `abcdEFGH...` (borrable). |
 
 **Scripts:**
@@ -2885,21 +2885,152 @@ Resultado: zebra estable que rastrea filas + indicador semántico claro a la izq
 - **Bulk operations = `Promise.allSettled` + feedback parcial.** Si Promise.all aborta a la primera, el usuario pierde contexto sobre qué se guardó.
 - **`role="status"` y `aria-label` en cada chip de estado SSH** son requeridos por CLAUDE.md y el lente react-ui-expert.
 
-### Pendiente / mejoras futuras (auditoría original — no aplicadas)
+### Pendiente / mejoras futuras (auditoría original — pendientes tras §38)
 
-Los siguientes hallazgos están documentados pero **no se implementaron en esta sesión** porque son cambios visuales más grandes que ameritan revisión con captura previa, o features mayores:
+Cuando se cerró §38 quedaban estos hallazgos en backlog. Su estado actual tras §39:
 
-- **U1** Acción sticky-right + densidad toggle.
-- **U2** Kebab para acciones secundarias.
-- **T3** Indicador de fila expandida en scroll.
-- **T5** Modo lectura: ocultar Nombre con muchas columnas.
-- **F4** Comparar con scan anterior (diff) — **observacional puro**, no induce comandos SSH; respeta la política dedicada al final del documento.
-
-Ver explicación detallada de cada uno al usuario en el chat de la sesión 2026-06-12 mañana.
+- **U1.A** Acción sticky-right — ✅ APLICADO EN §39.
+- **U1.B** Densidad toggle — ❌ DESCARTADO por preferencia del usuario.
+- **U2** Kebab para acciones secundarias — ✅ APLICADO EN §39.
+- **T3** Indicador de fila expandida en scroll — ✅ APLICADO antes de §38 (border-l-4 en isExpanded).
+- **T5** Modo lectura: ocultar Nombre con muchas columnas — ✅ APLICADO antes de §38 (`compactNameMode`).
+- **F4** Comparar con scan anterior (diff) — 📋 En backlog. **Observacional puro**, no induce comandos SSH; respeta la política dedicada al final del documento.
 
 ### 🛑 Política operativa SSH (establecida al cierre de esta sesión)
 
 Ver sección dedicada **"🛑 Política de operaciones SSH sobre dispositivos Ubiquiti airOS"** al final de este documento. Resumen: solo lectura + diagnóstico activo (ping/traceroute) + reinicio con confirmación. **NUNCA** firmware update, rm, factory reset ni modificación de config persistente. Cualquier feature futura del módulo Escanear debe respetarla.
+
+---
+
+## 39) 🎯 Cierre auditoría Escanear — sticky-right (U1.A) + kebab (U2)
+
+Sesión 2026-06-12 tarde. Cierre formal de la auditoría iniciada en §37-§38. De los 2 hallazgos visuales pendientes (U1, U2) y 1 feature mayor (F4):
+
+- **U1.A** aplicado, **U1.B** descartado por preferencia del usuario.
+- **U2** aplicado.
+- **F4** queda en backlog (~4h, requiere schema nuevo en IndexedDB + lógica de diff).
+
+Total tras §39: **26/27 hallazgos aplicados**.
+
+### Commits
+
+| Commit | Cambios |
+|---|---|
+| `d300a44` | U1.A — columna Acción sticky-right con shadow sutil + `groupHoverBg` para sincronizar bg durante hover |
+| `2bff438` | U2 — DeviceRowActions con primario contextual + kebab portal (reusa `useKebabMenu` de NodeCard) |
+| `0471d64` | Retira el span "Sin nodo" del primario — la celda queda vacía si no hay nodo, ya no ensucia escaneos completos |
+
+### U1.A — Columna Acción sticky-right
+
+**Antes:** la columna Acción era la última del grid sin sticky. Con el column picker abierto y 8+ stats visibles, la tabla forzaba scroll horizontal y los botones de Acción quedaban fuera del viewport. El usuario tenía que scrollear cada vez que quería guardar / ver informe / sincronizar.
+
+**Cambios:**
+
+[DeviceTable.tsx](vpn-manager/src/components/Devices/NetworkDevicesModule/components/DeviceTable.tsx) — header:
+
+```tsx
+<div className="px-3 py-3 text-right sticky right-0 z-10 bg-slate-100 dark:bg-slate-800 shadow-[-2px_0_6px_-3px_rgba(0,0,0,0.06)]">
+  Acción
+</div>
+```
+
+[DeviceTableRow.tsx](vpn-manager/src/components/Devices/NetworkDevicesModule/components/DeviceTableRow.tsx) — row + celda Acción:
+
+1. El `<div>` del row recibe `group` para que la celda Acción sticky pueda reaccionar al hover del row vía `group-hover:bg-*`.
+2. Nueva const `groupHoverBg` paralela a `hoverBg`:
+
+```tsx
+const groupHoverBg = isSaved
+  ? 'group-hover:bg-indigo-50/40 dark:group-hover:bg-indigo-500/10'
+  : hasStats
+    ? 'group-hover:bg-emerald-50/40 dark:group-hover:bg-emerald-500/10'
+    : 'group-hover:bg-slate-50 dark:group-hover:bg-slate-800/60';
+```
+
+3. Celda Acción del row:
+
+```tsx
+<div className={`... sticky right-0 z-[1] shadow-[-2px_0_6px_-3px_rgba(0,0,0,0.06)] ${stateBg} ${groupHoverBg}`}>
+```
+
+`z-index`: row sticky-right `z-[1]` < header sticky-top `z-10` — el header siempre queda por encima cuando se cruzan.
+
+**Resultado:** la celda Acción siempre visible incluso con scroll horizontal. Shadow muy sutil (-2px blur 6px opacity 0.06) — invisible cuando la tabla cabe, marcado cuando flota sobre las columnas previas.
+
+### U1.B — Densidad toggle (DESCARTADO)
+
+Propuesto en §38 como toggle "Compacta / Cómoda" para ahorrar espacio vertical con 30+ dispositivos. El usuario revisó la propuesta y la descartó por preferencia visual ("no me gusta como quedaría"). Sin cambios al código.
+
+### U2 — Kebab para acciones secundarias
+
+**Antes:** la celda Acción tenía 4 botones simultáneos (Informe / Sync / Ficha / Guardar) que ocupaban ~280px. En la captura del usuario tras U1.A, los 4 botones se solapaban con la columna Toggle vecina (números 3, 8, 3 visibles detrás de los botones) — el sticky-right tapaba la celda Toggle parcialmente y los botones largos no terminaban de "limpiar" el área.
+
+**Cambios:**
+
+Nuevo subcomponente local `DeviceRowActions` en [DeviceTableRow.tsx](vpn-manager/src/components/Devices/NetworkDevicesModule/components/DeviceTableRow.tsx) con:
+
+**Lógica del botón primario:**
+
+| Contexto | Primario | Color |
+|---|---|---|
+| `!isSaved && sshStatus=success && selectedNode` | "Guardar" | emerald sólido |
+| `!isSaved && selectedNode` (sin SSH ok) | "Guardar" (abre modal manual) | indigo sólido |
+| `!isSaved && !selectedNode` | (vacío) | — |
+| `isSaved && savedDevice` | "Ficha" | indigo outline |
+
+**Lógica del kebab (solo si `secondaries.length > 0`):**
+
+```tsx
+if (hasStats) secondaries.push({ label: 'Ver informe airOS', icon: Activity, color: 'violet' });
+if (hasStats && isSaved) secondaries.push({ label: 'Sincronizar stats', icon: RefreshCw, color: 'sky' });
+if (hasStats && !isSaved) secondaries.push({ label: 'Ver datos del scan', icon: Eye, color: 'indigo' });
+```
+
+Cada item del dropdown tiene su propio color hover según el rol semántico de la acción (violeta para info técnica, sky para refresh, indigo para visualización general).
+
+**Patrón técnico (reuso del módulo Nodos):**
+
+- Hook compartido [`useKebabMenu`](vpn-manager/src/components/VPN/NodeCard/hooks/useKebabMenu.ts) — encapsula `showKebab`/`kebabCoords` + click-away (`document.mousedown`) + scroll-close (`window.scroll` con `capture: true`).
+- `createPortal` a `document.body` (regla `react-ui-expert`): evita el clipping del `overflow-x-auto` de la tabla. Sin portal el menú quedaría recortado al ancho del card.
+- `getBoundingClientRect` para calcular `position: fixed` con `top` (o `bottom` si no hay 280px abajo) + `right`.
+- A11y: `aria-label`, `aria-haspopup="menu"`, `aria-expanded`, `role="menu"`, `role="menuitem"`.
+
+**Resultado:** la celda Acción pasa de ~280px a ~110px. Solapamiento visual del bug original resuelto sin tocar U1.A. El kebab no se renderiza si no hay secundarias.
+
+### Retira "Sin nodo"
+
+Tras revisar las capturas del usuario, el span gris "Sin nodo" aparecía en cada fila no guardada cuando no había `selectedNode`. En escaneos típicos donde la mayoría de dispositivos están "sin asignar" eso era ruido visual constante.
+
+Cambio mínimo en `DeviceRowActions`: el bloque `else if (!isSaved && !selectedNode)` se elimina. Si no hay primario aplicable, la celda queda vacía — el kebab con secundarias sigue disponible cuando hay `hasStats`. La fila se ve limpia.
+
+### Métricas pre/post §39
+
+| Métrica | Pre-§39 | Post-§39 |
+|---------|---------|----------|
+| Botones simultáneos en celda Acción | 4 (Informe/Sync/Ficha/Guardar) | **1 primario + ⋮** |
+| Ancho de celda Acción | ~280px | **~110px** (−60%) |
+| Acción siempre visible con scroll horizontal | ❌ | ✅ (sticky-right) |
+| Solapamiento de Acción con columna Toggle | ✅ (bug visual) | ❌ (resuelto) |
+| Ruido visual "Sin nodo" en filas sin guardar | ✅ | ❌ |
+| `NetworkDevicesModule` chunk | 95 KB / 23 KB gzip | **97.4 KB / 23.6 KB gzip** (+2.4 KB) |
+
+### Reglas operativas reforzadas (post-§39)
+
+- **Dropdowns dentro de tablas con `overflow-x-auto` SIEMPRE deben usar `createPortal` a `document.body`** con `position: fixed` y `getBoundingClientRect` para coords. Patrón ya estandarizado en NodeCard y ahora en DeviceTableRow. Cualquier menú nuevo (filtros, kebabs, tooltips) debe seguirlo. Regla del lente `react-ui-expert`.
+- **Tooltips/dropdowns con coords absolutas SIEMPRE deben cerrar al scroll** (`window.addEventListener('scroll', handler, true)`). Sin esto el menú flota sobre componentes ajenos cuando el usuario scrollea con el menú abierto.
+- **`group` + `group-hover:` es el patrón canónico para celdas sticky** que deben reaccionar al hover del row padre. Calcular `groupHoverBg` separado de `hoverBg` aunque sean la misma paleta — son selectors distintos.
+
+### Pendiente / mejoras futuras (cierre del backlog Escanear)
+
+- **F4** Comparar con scan anterior (diff) — único hallazgo de la auditoría original sin aplicar. ~4h estimadas. Requiere:
+  - Nueva tabla en IndexedDB: `scan_snapshots(id, nodeId, nodeLan, timestamp, devices)`.
+  - Hook `useScanDiff` que compara último snapshot vs scan actual por MAC.
+  - Badges en filas (señal Δ ≥ 5dBm, CCQ Δ ≥ 15, firmware ≠, IP cambió) — observacional puro, sin escritura SSH.
+  - Sección "Desaparecidos" colapsable arriba.
+  - Toggle "Comparar con: último / 1 día / 1 semana / fecha custom".
+  - Retención automática: últimos 10 snapshots por `(nodeId, lan)`.
+
+  **Respeta la política SSH** de la sección final: F4 no induce comandos, solo compara strings ya leídos.
 
 ---
 
