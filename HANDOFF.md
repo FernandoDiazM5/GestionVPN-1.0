@@ -44,7 +44,7 @@
 > - **142 backend** (14 archivos) + **36 frontend** (5 archivos) = **178 tests verdes**. La auditoría §37-§38 de Escanear NO añade tests nuevos (las mejoras son refactor/UX sin lógica de negocio); el conteo se mantiene desde §36.
 >
 > ### 📚 Secciones de referencia
-> §17–25: REFACTOR_PLAN ejecutado. §26 notificaciones. §27 bot Telegram. §28 ping/trace. §29 export. §30 dashboard. §31 monitoreo. §32 iter2 multi-usuario. §33 UX MEMBER endurecida. §34 Workspace unificado + peers WG mejorados. §35 Alias humano + bloqueo Usuario. §36 Fix bot — match dual VRF/PPP. §37 Escanear — perf + robustez. §38 Escanear — UX + features. §39 Escanear — sticky-right + kebab (cierre auditoría). §40 Escanear — preferencias persistentes (useScanPreferences) + export multi-formato (CSV/JSON/Excel/PDF). §41 Escanear — simplificación de acciones de fila a botones icon-only + limpieza de DeviceCardModal/SshDataModal muertos. §42 Escanear — 4 mejoras UX: ícono Save (disquete) + bulk save selectivo con checkbox tri-state + contraste chevron + IP/Nombre del sistema en panel. §43 Política anti-saturación — eliminar polling SSH automático cada 5s en DeviceStatusPanel (saturaba CPU de antenas) + actualizar Política Operativa SSH para prohibir polling SSH.
+> §17–25: REFACTOR_PLAN ejecutado. §26 notificaciones. §27 bot Telegram. §28 ping/trace. §29 export. §30 dashboard. §31 monitoreo. §32 iter2 multi-usuario. §33 UX MEMBER endurecida. §34 Workspace unificado + peers WG mejorados. §35 Alias humano + bloqueo Usuario. §36 Fix bot — match dual VRF/PPP. §37 Escanear — perf + robustez. §38 Escanear — UX + features. §39 Escanear — sticky-right + kebab (cierre auditoría). §40 Escanear — preferencias persistentes (useScanPreferences) + export multi-formato (CSV/JSON/Excel/PDF). §41 Escanear — simplificación de acciones de fila a botones icon-only + limpieza de DeviceCardModal/SshDataModal muertos. §42 Escanear — 4 mejoras UX: ícono Save (disquete) + bulk save selectivo con checkbox tri-state + contraste chevron + IP/Nombre del sistema en panel. §43 Política anti-saturación — eliminar polling SSH automático cada 5s en DeviceStatusPanel (saturaba CPU de antenas) + actualizar Política Operativa SSH para prohibir polling SSH. §44 Nodos — columnas dinámicas + filtros + chips + export multi-formato + sticky-right. §45 Audit del sistema de diseño (script + skill instalada). §46 Plan ejecutable + sistema extendido (btn-warning/info/accent + focus-visible WCAG + tamaños + modal canónico) + wins rápidos sed (−259 hallazgos). §47 Fase 1 — 23 botones inline migrados a `.btn-{variant} btn-{size}` (DS06 −88.5%).
 >
 > Sesión 2026-06-07 PM: Ajustes del moderador (perfil + workspace + import/export JSON) + Recuperar contraseña + sync MikroTik al deshabilitar + invitaciones por email + .conf WG server-side.
 > Sesión 2026-06-07 AM: multi-usuario con aislamiento por sesión (mangle por-IP), parche `!empty` node-routeros, auditoría (Semgrep+security-review+code-review) y fixes C1–C7.
@@ -69,7 +69,7 @@
 6. **Pase UX P1–P6** + optimización visual de la vista **Escanear**.
 7. **🆕 Multi-usuario con aislamiento por sesión** (sesión 2026-06-07) — ver §7.
 
-**Estado de salud (2026-06-12 noche):** `tsc 0` (`--noEmit` + build estricto) · `node --check ✓` · **186 tests verdes** (142 backend + 44 frontend). 6 jobs concurrentes en producción. ⚠️ `npm audit --omit=dev`: **2 moderate** (uuid viejo arrastrado por `exceljs` — no expone superficie del panel; pendiente de tracker upstream). 0 findings `semgrep`. Bundles relevantes: **inicial 248.84 KB / 77.76 KB gzip** (esencialmente idéntico al pre-§40); `TeamModule` 119 KB / 30 KB gzip; `UserManagementPanel` lazy 25 KB / 7 KB gzip; **`NetworkDevicesModule` 91.03 KB / 23.03 KB gzip** (§41 −14 KB por retiro de DeviceCardModal/SshDataModal; §42 +3 KB por checkbox + handlers del bulk save selectivo); **chunks lazy del export**: `exceljs.min` 929 KB / 256 KB gzip (solo Excel), `jspdf.es.min` 399 KB / 130 KB gzip + `html2canvas` 199 KB + `jspdf-autotable` 30 KB (solo PDF). MySQL: sin cambios de schema en §40-§42 (todo es frontend). Sin pendientes del REFACTOR_PLAN; backlog quick-wins (Q1-Q5) y 2 mid-size (M1, M5) entregados. **Últimos commits en `dev`:** `10404f9` (§42 4 mejoras UX: Save ícono + bulk save selectivo + contraste chevron + IP/hostname panel) · `4992b61` (HANDOFF §41) · `02475fb` (§41 acciones icon-only + retiro de DeviceCardModal/SshDataModal muertos) · `a749386` (HANDOFF §40) · `aca56fe` (§40 consolidado: prefs persistentes + ExportMenu + 3 fixes) · `236bf66` (HANDOFF §39) · `0471d64` (retira "Sin nodo" del primario) · `2bff438` (U2 kebab acciones secundarias) · `d300a44` (U1.A columna Acción sticky-right).
+**Estado de salud (2026-06-13):** `tsc 0` (`--noEmit` + build estricto) · `node --check ✓` · **186 tests verdes** (142 backend + 44 frontend). 6 jobs concurrentes en producción. ⚠️ `npm audit --omit=dev`: **2 moderate** (uuid viejo arrastrado por `exceljs` — no expone superficie del panel; pendiente de tracker upstream). 0 findings `semgrep`. Bundles relevantes: **inicial 248.76 KB / 77.74 KB gzip** (esencialmente idéntico desde el pre-§40); `TeamModule` 119 KB; `NetworkDevicesModule` 91.87 KB / 23.34 KB gzip; `NodeAccessPanel` 151.95 KB / 32.91 KB gzip (post §44); chunks lazy `exceljs.min` 929 KB y `jspdf.es.min` 399 KB solo se descargan al usar Excel/PDF. **Sistema de diseño**: audit `npm run audit:design` reporta **814 hallazgos** (baseline 1,096 → −25.7%) con **116 errores** (baseline 375 → −69%) tras §46+§47. DS06 botones inline: 26 → 3 (los 3 restantes son toggles condicionales legítimos). **Últimos commits en `dev`:** `a771cbb` (§47 Fase 1 — 23 botones inline → .btn-*) · `722321f` (§46 sistema extendido + wins rápidos + plan) · `6965ff0` (§45 audit + skill tailwind) · `5165226` (§44 columna Acciones sticky-right) · `9d52d5d` (§44 Nodos cols dinámicas + filtros + chips + export) · `a77d76b` (CI husky `|| true`) · `3f51a35` (§43 sin polling SSH) · `10cc991` (nombre CPE cross-ref) · `f613806` (descartar hostname spurious del AP) · `10404f9` (§42).
 
 ---
 
@@ -129,7 +129,7 @@
 | 🟡 Limpieza | Quitar `adminIP` hardcodeado (`useNodeManagement.ts`, ya no se usa) · warning MySQL2 `keepAliveInitialDelayMs` (mitigado en F11) · escaneo atado al `mgmt_ip` del solicitante. |
 | 🟡 Mejora | **Fase 5 (opcional):** aislamiento de firewall por-IP + acotar regla "Admin MGMT libre" (defensa en profundidad; hoy el ruteo ya aísla). Dockerfile `USER` no-root (Semgrep S1). |
 | 🟡 Próximo backlog | **M2** API pública con tokens scoped · **M3** Webhooks salientes · **M4** Speed test desde antena (iperf3 SSH) · **L1** Reportes SLA computados desde `tunnel_session_logs` + `monitoring_state` · **L2** Diagnóstico con LLM · **L3** PWA móvil instalable · **L4** Predicción de degradación con tendencia de `signal_history`. |
-| 🟢 Resuelto | O2 repo privado · O5 MySQL estable · UX P6 · **multi-usuario activación (verificado)** · parche `!empty` · fixes C1–C7 · **crash `POST /api/wireguard/peers` (ver §13.6)** · **V1 `register-my-ip` ownership por rol** · **Q1 Notificaciones (§26)** · **M1 Bot Telegram (§27)** · **Q3 Diagnóstico ping/trace (§28)** · **Q4 Export auditoría CSV/JSON (§29)** · **Q2 Dashboard métricas (§30)** · **M5 Monitoreo proactivo (§31)** · **Job de expiración batch** · **iter2 bot directo + asignar túneles UI + fix `user_mgmt_ips` auto (§32)** · **UX MEMBER endurecida — solo "Acceder" + Ajustes con Telegram (§33)** · **Workspace unificado + Email en peers + multi-asignar túneles + QR en aceptar invitación (§34)** · **Alias humano + bloqueo edición Usuario (§35)** · **Fix bot Telegram: match dual VRF/PPP en asignaciones del MEMBER (§36)** · **Auditoría Escanear: 12 fixes de perf+robustez (§37) + 9 mejoras UX+features (§38) + cierre con sticky-right + kebab (§39)** · **Preferencias persistentes Escanear (todo: cols+anchos+sort+filtros+búsqueda+subred) + Export multi-formato CSV/JSON/Excel/PDF informe (§40)** · **Simplificación acciones de fila Escanear — botones icon-only inline + retiro de DeviceCardModal/SshDataModal muertos (§41)** · **4 mejoras UX Escanear (§42): ícono Save (disquete) en Guardar, bulk save SELECTIVO con checkbox por fila + tri-state header, contraste del chevron expand, IP + Nombre del sistema arriba en panel expandido**. |
+| 🟢 Resuelto | O2 repo privado · O5 MySQL estable · UX P6 · **multi-usuario activación (verificado)** · parche `!empty` · fixes C1–C7 · **crash `POST /api/wireguard/peers` (ver §13.6)** · **V1 `register-my-ip` ownership por rol** · **Q1 Notificaciones (§26)** · **M1 Bot Telegram (§27)** · **Q3 Diagnóstico ping/trace (§28)** · **Q4 Export auditoría CSV/JSON (§29)** · **Q2 Dashboard métricas (§30)** · **M5 Monitoreo proactivo (§31)** · **Job de expiración batch** · **iter2 bot directo + asignar túneles UI + fix `user_mgmt_ips` auto (§32)** · **UX MEMBER endurecida — solo "Acceder" + Ajustes con Telegram (§33)** · **Workspace unificado + Email en peers + multi-asignar túneles + QR en aceptar invitación (§34)** · **Alias humano + bloqueo edición Usuario (§35)** · **Fix bot Telegram: match dual VRF/PPP en asignaciones del MEMBER (§36)** · **Auditoría Escanear: 12 fixes de perf+robustez (§37) + 9 mejoras UX+features (§38) + cierre con sticky-right + kebab (§39)** · **Preferencias persistentes Escanear (todo: cols+anchos+sort+filtros+búsqueda+subred) + Export multi-formato CSV/JSON/Excel/PDF informe (§40)** · **Simplificación acciones de fila Escanear — botones icon-only inline + retiro de DeviceCardModal/SshDataModal muertos (§41)** · **4 mejoras UX Escanear (§42): ícono Save (disquete) en Guardar, bulk save SELECTIVO con checkbox por fila + tri-state header, contraste del chevron expand, IP + Nombre del sistema arriba en panel expandido** · **Polling SSH automático eliminado (§43)** · **Tabla Nodos: cols dinámicas + NodeColumnPicker + filtros chips + export 4 formatos + sticky-right (§44)** · **Audit del sistema de diseño + script (§45) + sistema extendido con .btn-warning/info/accent + focus-visible WCAG + tamaños + modal canónico + wins rápidos sed -25.7% hallazgos (§46) + Fase 1: 23 botones inline → .btn-* sistema (§47, DS06 -88.5%)**. |
 | 🟢 Nota | Config MikroTik `v2.rsc` SIN mangle global (baseline limpio multi-usuario). Peer `peer27` de prueba con public-key placeholder `abcdEFGH...` (borrable). |
 
 **Scripts:**
@@ -3639,12 +3639,100 @@ Tests: **44/44 verdes**. tsc 0 errores. Build OK.
 
 ### Pendiente / Roadmap próximas iteraciones
 
-- **Fase 1 (8-12h)**: migrar 26 botones inline DS06 a `.btn-*` (5 archivos top).
+- ~~**Fase 1 (8-12h)**: migrar 26 botones inline DS06 a `.btn-*`.~~ ✅ **HECHO en §47**
 - **Fase 2 (15-20h)**: bajar las 265 DS02 con dark variants archivo por archivo (10 archivos top).
 - **Fase 3 (6-8h)**: unificar los ~13 modales del proyecto con `.modal-*`.
 - **Fase 4 (8-16h)**: revisión manual de las 411 DS05 (texto contraste).
 - **Fase 5 (2-4h)**: limpiar las 55 DS01 (`red→rose`, `green→emerald`, `gray→slate`, etc.).
 - **CI eventual**: cuando errores=0, agregar `npm run audit:design` al workflow para no regresar.
+
+---
+
+## 47) 🎯 Fase 1 del Plan — botones inline migrados a `.btn-*` (DS06 −88.5%)
+
+Pedido del usuario tras §46: "implementa el plan… los botones deben tener las mismas características y efectos. Quiero que se sienta que es un proyecto en conjunto." Skill usada: patrones CVA + variant/size de `tailwind-design-system`.
+
+### Commit
+
+| Hash | Cambios |
+|---|---|
+| `a771cbb` | §47 Fase 1 — 23 botones inline migrados a `.btn-{variant} btn-{size}` en 18 archivos + refinamiento del auditor DS06. |
+
+### Migración por archivo
+
+| Archivo | Botones | Clase aplicada |
+|---|---|---|
+| `Auth/AcceptInvitationForm.tsx` | 2 | `btn-primary btn-md` |
+| `Auth/PasswordResetConfirm.tsx` | 1 | `btn-primary btn-md` |
+| `Auth/PasswordResetRequest.tsx` | 2 | `btn-primary btn-md` |
+| `Auth/RouterAccess.tsx` | 1 | `btn-primary btn-md` |
+| `NodeAccessPanel/modals/NuevoNodo.tsx` | 2 | `btn-primary btn-md` |
+| `NodeAccessPanel/modals/EditarNodo.tsx` | 2 | `btn-primary btn-md` |
+| `NodeAccessPanel/modals/EliminarNodo.tsx` | 2 | `btn-danger btn-md` |
+| `NodeAccessPanel/modals/NuevoAdmin.tsx` | 2 | `btn-primary btn-md` |
+| `NodeAccessPanel/modals/TagModal.tsx` | 2 | `btn-warning btn-icon` + `btn-warning btn-md` |
+| `NodeAccessPanel/modals/ScriptModal.tsx` | 1 | `btn-success btn-md` |
+| `NodeAccessPanel/modals/BatchCsvModal.tsx` | 3 | `btn-accent btn-md` |
+| `NodeAccessPanel/sections/StateIndicators.tsx` | 2 | `btn-warning btn-sm` + `btn-danger btn-md` |
+| `NetworkDevicesModule.tsx` (bulk save) | 1 | `btn-success btn-sm` |
+| `NetworkDevicesModule/DeviceStatusPanel.tsx` | 2 | `btn-info btn-sm` |
+| `ApMonitorModule/modals/CpeDetailModal.tsx` | 1 | `btn-warning btn-sm` |
+| `ApMonitorModule/modals/MoveToNodeModal.tsx` | 1 | `btn-primary btn-md` |
+| `VPN/NodeCard/components/NodeCardSshForm.tsx` | 1 | `btn-warning btn-sm` |
+| `VPN/NodeCard/components/NodeCardWgPeerForm.tsx` | 1 | `btn-accent btn-sm` |
+
+**Total: 23 botones migrados en 18 archivos.**
+
+Cada botón ahora hereda del sistema (definido en §46-1):
+- `focus-visible:ring-2 ring-offset-2 ring-{color}-500/60` (WCAG)
+- `active:scale-[0.98]` (feedback táctil)
+- `disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-... disabled:shadow-none`
+- Shadow semántico (`shadow-{color}-500/25`)
+- Variante `dark:` con `ring-offset-slate-900`
+
+### Refinamiento del auditor
+
+`scripts/audit-design.js` ahora pasa **contexto de 3 líneas previas** (`ctx.prev3`) a las reglas. La regla **DS06** verifica que el patrón `bg+text-white` esté dentro de un `<button>` real, no de `<span>` o `<div>` con bg-color. Reduce los falsos positivos clásicos:
+
+- ✅ Antes marcaba el `<span>` de paginación (`bg-indigo-600 text-white` indicador de página actual).
+- ✅ Ahora solo marca elementos cuya línea actual o las 3 previas contienen `<button`.
+
+### Snapshot acumulado desde el baseline §45
+
+| Métrica | Baseline | Post-§46 | Post-§47 | Δ acumulada |
+|---|---|---|---|---|
+| DS06 botones inline | 26 | 26 | **3** | **−88.5%** |
+| DS03 text < 12px | 313 | 61 | 61 | −80.5% |
+| DS01 palette prohibida | 62 | 55 | 55 | −11.3% |
+| DS02 bg sin dark | 265 | 265 | 265 | 0% (Fase 2 pendiente) |
+| DS04 gradiente multi | 19 | 19 | 19 | 0% (excepción documentada) |
+| DS05 texto contraste | 411 | 411 | 411 | 0% (Fase 4 pendiente) |
+| **Errores (severidad error)** | 375 | 116 | **116** | **−69%** |
+| **TOTAL hallazgos** | **1,096** | 837 | **814** | **−25.7%** |
+
+Los **3 DS06 restantes** son toggles condicionales legítimos (`bg-X` según estado de `saved`/`selected`/`group-hover`), no botones primarios sólidos:
+- `ApDetailModal:169` — toggle save/saved
+- `UsersTable:439` — botón ghost con bg al hover del row padre
+- `MoveToNodeModal:49` — botón de lista de opciones con estado "seleccionado"
+
+### Verificación
+
+- `tsc 0` errores · `npm run build` OK · pre-commit hook OK
+- 44/44 tests verdes
+- Bundle inicial: **248.76 KB / 77.74 KB gzip** (idéntico)
+- 19 archivos modificados, +45/-40 LOC neto
+
+### Reglas operativas reforzadas
+
+- **Botones sólidos SIEMPRE con `.btn-{variant} btn-{size}`.** Patrón inline = revisar PR.
+- **Toggles condicionales** (cambian bg según estado) están EXENTOS de DS06 — son patrón legítimo.
+- **`btn-icon`** es la única clase que combina padding + display + rounded para botones icon-only. Usar SIEMPRE para `<button><Icon /></button>` sin texto.
+
+### Pendiente / próximas fases
+
+- **Fase 2 (DS02 dark mode, 8-12h)** — siguiente prioridad porque es donde más se nota el bug original "fondo blanco en dark mode". Top 5 archivos: NuevoNodo (32), DeviceStatusPanel (22), constants.ts (21), EditarNodo (18), ApGroupCard (14). Con `.card`/`.card-hover` listos para sustituir.
+- **Fase 3 (modales unificados, 6-8h)** — los 13 modales del proyecto ya pueden usar `.modal-overlay/.modal-panel/.modal-header/.modal-body/.modal-footer` (creadas en §46).
+- **Fase 4 (DS05 contraste)** y **Fase 5 (DS01 palette)** — backlog.
 
 ---
 
