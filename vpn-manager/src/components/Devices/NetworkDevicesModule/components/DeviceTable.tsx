@@ -7,7 +7,7 @@
 // ============================================================
 
 import { memo, useMemo } from 'react';
-import { GripVertical } from 'lucide-react';
+import { GripVertical, Check, Minus } from 'lucide-react';
 import type { ScannedDevice, SavedDevice, AntennaStats } from '../../../../types/devices';
 import type { NodeInfo } from '../../../../types/api';
 import type { ColumnDef, SshAuthStatus } from '../types';
@@ -29,6 +29,16 @@ interface DeviceTableProps {
   toggleExpand: (ip: string) => void;
   savedDevices: SavedDevice[];
   selectedNode: NodeInfo | null;
+  /** §42-2: ids de filas marcadas para bulk save selectivo. */
+  selectedIds: Set<string>;
+  /** Toggle de selección para una fila. */
+  onToggleSelected: (devId: string) => void;
+  /** Selecciona todas las filas candidatas visibles (SSH OK + no guardadas). */
+  onSelectAllVisibleCandidates: () => void;
+  /** Limpia toda la selección. */
+  onClearSelection: () => void;
+  /** Cuántas filas candidatas visibles hay (informativo para el checkbox del header). */
+  visibleCandidateCount: number;
   onOpenM5Detail: (dev: ScannedDevice) => void;
   onSyncToSaved: (dev: ScannedDevice, savedDev: SavedDevice) => void;
   onDirectSave: (dev: ScannedDevice, node: NodeInfo) => void;
@@ -41,9 +51,36 @@ function DeviceTableImpl(props: DeviceTableProps) {
     sortedRows, activeConfigCols, gridTemplate, minTableWidth, compactNameMode,
     sortConfig, toggleSort, startResize, sshStatus, expandedRows, toggleExpand,
     savedDevices, selectedNode,
+    selectedIds, onToggleSelected, onSelectAllVisibleCandidates, onClearSelection,
+    visibleCandidateCount,
     onOpenM5Detail, onSyncToSaved,
     onDirectSave, onOpenAddModal, onRefreshStats,
   } = props;
+
+  // Tri-state del checkbox del header. Si hay candidatos visibles y todos están
+  // seleccionados → marcado completo; si algunos sí y otros no → indeterminate;
+  // si ninguno → vacío. Cuando no hay candidatos visibles el checkbox se
+  // deshabilita (nada que seleccionar masivamente).
+  const selectedCandidateCount = useMemo(() => {
+    if (selectedIds.size === 0) return 0;
+    let n = 0;
+    for (const row of sortedRows) {
+      if (selectedIds.has(row.devId) && !row.isSaved && sshStatus[row.dev.ip] === 'success') n++;
+    }
+    return n;
+  }, [sortedRows, selectedIds, sshStatus]);
+
+  const headerCheckState: 'empty' | 'partial' | 'full' =
+    visibleCandidateCount === 0 ? 'empty'
+      : selectedCandidateCount === 0 ? 'empty'
+      : selectedCandidateCount >= visibleCandidateCount ? 'full'
+      : 'partial';
+
+  const handleHeaderCheckboxClick = () => {
+    if (visibleCandidateCount === 0) return;
+    if (headerCheckState === 'full') onClearSelection();
+    else onSelectAllVisibleCandidates();
+  };
 
   // Setea gridTemplate como CSS variable a nivel del contenedor.
   // El header y todas las filas leen var(--cols-tpl), así que al cambiar el
@@ -70,6 +107,39 @@ function DeviceTableImpl(props: DeviceTableProps) {
           className="bg-slate-100 border-b border-slate-200 text-xs font-bold text-slate-600 uppercase tracking-wider rounded-tl-xl rounded-tr-xl dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300"
           style={{ display: 'grid', gridTemplateColumns: 'var(--cols-tpl)' }}
         >
+          {/* §42-2: checkbox de selección masiva — afecta solo a candidatos
+              (SSH OK + no guardados). Tri-state. */}
+          <div className="px-1 py-3 flex items-center justify-center">
+            <button
+              onClick={handleHeaderCheckboxClick}
+              disabled={visibleCandidateCount === 0}
+              title={
+                visibleCandidateCount === 0
+                  ? 'No hay candidatos para guardar (necesitan SSH OK + no estar guardados)'
+                  : headerCheckState === 'full'
+                    ? 'Deseleccionar todos'
+                    : `Seleccionar ${visibleCandidateCount} candidato${visibleCandidateCount !== 1 ? 's' : ''} visible${visibleCandidateCount !== 1 ? 's' : ''}`
+              }
+              aria-label="Seleccionar candidatos para guardar"
+              aria-checked={
+                headerCheckState === 'full' ? 'true'
+                  : headerCheckState === 'partial' ? 'mixed'
+                  : 'false'
+              }
+              role="checkbox"
+              className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors
+                ${visibleCandidateCount === 0
+                  ? 'border-slate-300 bg-slate-50 cursor-not-allowed dark:border-slate-700 dark:bg-slate-800'
+                  : headerCheckState === 'full'
+                    ? 'border-emerald-500 bg-emerald-500 hover:bg-emerald-600 hover:border-emerald-600'
+                    : headerCheckState === 'partial'
+                      ? 'border-emerald-500 bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-500/30'
+                      : 'border-slate-400 hover:border-emerald-500 dark:border-slate-500'}`}
+            >
+              {headerCheckState === 'full' && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+              {headerCheckState === 'partial' && <Minus className="w-3 h-3 text-emerald-700" strokeWidth={3} />}
+            </button>
+          </div>
           <div className="px-3 py-3 text-center">SSH</div>
           <div className="px-3 py-3">Rol</div>
           <div
@@ -137,6 +207,8 @@ function DeviceTableImpl(props: DeviceTableProps) {
             compactNameMode={compactNameMode}
             selectedNode={selectedNode}
             savedDevice={savedDevice}
+            isSelected={selectedIds.has(devId)}
+            onToggleSelected={onToggleSelected}
             onToggleExpand={toggleExpand}
             onOpenM5Detail={onOpenM5Detail}
             onSyncToSaved={onSyncToSaved}

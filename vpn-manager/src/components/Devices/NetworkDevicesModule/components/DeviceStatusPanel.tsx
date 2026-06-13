@@ -131,8 +131,13 @@ export function DeviceStatusPanel({ dev, onRefresh }: { dev: ScannedDevice; onRe
         <div className="px-4 py-3">
           <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest pb-1.5 border-b border-slate-100 mb-2">Configuración</p>
           {([
+            // §42-4: IP + Nombre del sistema arriba de todo — son los dos
+            // identificadores que el operador busca primero al abrir el panel.
+            // Antes la IP solo aparecía en el header oscuro pequeño y el
+            // "Nombre de dispositivo" quedaba enterrado en la lista.
+            ['IP', dev.ip],
+            ['Nombre del sistema', s.deviceName || dev.name],
             ['Modelo de Dispositivo', s.deviceModel || dev.model],
-            ['Nombre de dispositivo', s.deviceName || dev.name],
             ['Modo de máscara de red', (() => {
               const m = s.networkMode || '';
               if (m === 'router') return 'Enrutador';

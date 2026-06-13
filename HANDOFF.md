@@ -44,7 +44,7 @@
 > - **142 backend** (14 archivos) + **36 frontend** (5 archivos) = **178 tests verdes**. La auditoría §37-§38 de Escanear NO añade tests nuevos (las mejoras son refactor/UX sin lógica de negocio); el conteo se mantiene desde §36.
 >
 > ### 📚 Secciones de referencia
-> §17–25: REFACTOR_PLAN ejecutado. §26 notificaciones. §27 bot Telegram. §28 ping/trace. §29 export. §30 dashboard. §31 monitoreo. §32 iter2 multi-usuario. §33 UX MEMBER endurecida. §34 Workspace unificado + peers WG mejorados. §35 Alias humano + bloqueo Usuario. §36 Fix bot — match dual VRF/PPP. §37 Escanear — perf + robustez. §38 Escanear — UX + features. §39 Escanear — sticky-right + kebab (cierre auditoría). §40 Escanear — preferencias persistentes (useScanPreferences) + export multi-formato (CSV/JSON/Excel/PDF). §41 Escanear — simplificación de acciones de fila a botones icon-only + limpieza de DeviceCardModal/SshDataModal muertos.
+> §17–25: REFACTOR_PLAN ejecutado. §26 notificaciones. §27 bot Telegram. §28 ping/trace. §29 export. §30 dashboard. §31 monitoreo. §32 iter2 multi-usuario. §33 UX MEMBER endurecida. §34 Workspace unificado + peers WG mejorados. §35 Alias humano + bloqueo Usuario. §36 Fix bot — match dual VRF/PPP. §37 Escanear — perf + robustez. §38 Escanear — UX + features. §39 Escanear — sticky-right + kebab (cierre auditoría). §40 Escanear — preferencias persistentes (useScanPreferences) + export multi-formato (CSV/JSON/Excel/PDF). §41 Escanear — simplificación de acciones de fila a botones icon-only + limpieza de DeviceCardModal/SshDataModal muertos. §42 Escanear — 4 mejoras UX: ícono Save (disquete) + bulk save selectivo con checkbox tri-state + contraste chevron + IP/Nombre del sistema en panel.
 >
 > Sesión 2026-06-07 PM: Ajustes del moderador (perfil + workspace + import/export JSON) + Recuperar contraseña + sync MikroTik al deshabilitar + invitaciones por email + .conf WG server-side.
 > Sesión 2026-06-07 AM: multi-usuario con aislamiento por sesión (mangle por-IP), parche `!empty` node-routeros, auditoría (Semgrep+security-review+code-review) y fixes C1–C7.
@@ -69,7 +69,7 @@
 6. **Pase UX P1–P6** + optimización visual de la vista **Escanear**.
 7. **🆕 Multi-usuario con aislamiento por sesión** (sesión 2026-06-07) — ver §7.
 
-**Estado de salud (2026-06-12 noche):** `tsc 0` (`--noEmit` + build estricto) · `node --check ✓` · **186 tests verdes** (142 backend + 44 frontend — 8 nuevos para `useScanPreferences`). 6 jobs concurrentes en producción. ⚠️ `npm audit --omit=dev`: **2 moderate** (uuid viejo arrastrado por `exceljs` — no expone superficie del panel; pendiente de tracker upstream). 0 findings `semgrep` (sin cambios en backend ni en superficies con reglas activas). Bundles relevantes: **inicial 248.84 KB / 77.76 KB gzip** (esencialmente idéntico al pre-§40); `TeamModule` 119 KB / 30 KB gzip; `UserManagementPanel` lazy 25 KB / 7 KB gzip; **`NetworkDevicesModule` 87.81 KB / 22.21 KB gzip** (§41 retiró el modal `DeviceCardModal`, `SshDataModal`, kebab e imports muertos → **−14.65 KB raw / −2.83 KB gzip** vs §40); **chunks lazy del export**: `exceljs.min` 929 KB / 256 KB gzip (solo Excel), `jspdf.es.min` 399 KB / 130 KB gzip + `html2canvas` 199 KB + `jspdf-autotable` 30 KB (solo PDF). MySQL: sin cambios de schema en §40-§41 (todo es frontend). Sin pendientes del REFACTOR_PLAN; backlog quick-wins (Q1-Q5) y 2 mid-size (M1, M5) entregados. **Últimos commits en `dev`:** `02475fb` (§41 acciones icon-only + retiro de DeviceCardModal/SshDataModal muertos) · `a749386` (HANDOFF §40 — registra aca56fe) · `aca56fe` (§40 consolidado: prefs persistentes + ExportMenu + 3 fixes regresión/PTP/botón-bloqueado) · `236bf66` (HANDOFF §39) · `0471d64` (retira "Sin nodo" del primario) · `2bff438` (U2 kebab para acciones secundarias) · `d300a44` (U1.A columna Acción sticky-right) · `0bb0aff` (política SSH bloqueante) · `8d43b19` (HANDOFF §37+§38).
+**Estado de salud (2026-06-12 noche):** `tsc 0` (`--noEmit` + build estricto) · `node --check ✓` · **186 tests verdes** (142 backend + 44 frontend). 6 jobs concurrentes en producción. ⚠️ `npm audit --omit=dev`: **2 moderate** (uuid viejo arrastrado por `exceljs` — no expone superficie del panel; pendiente de tracker upstream). 0 findings `semgrep`. Bundles relevantes: **inicial 248.84 KB / 77.76 KB gzip** (esencialmente idéntico al pre-§40); `TeamModule` 119 KB / 30 KB gzip; `UserManagementPanel` lazy 25 KB / 7 KB gzip; **`NetworkDevicesModule` 91.03 KB / 23.03 KB gzip** (§41 −14 KB por retiro de DeviceCardModal/SshDataModal; §42 +3 KB por checkbox + handlers del bulk save selectivo); **chunks lazy del export**: `exceljs.min` 929 KB / 256 KB gzip (solo Excel), `jspdf.es.min` 399 KB / 130 KB gzip + `html2canvas` 199 KB + `jspdf-autotable` 30 KB (solo PDF). MySQL: sin cambios de schema en §40-§42 (todo es frontend). Sin pendientes del REFACTOR_PLAN; backlog quick-wins (Q1-Q5) y 2 mid-size (M1, M5) entregados. **Últimos commits en `dev`:** _§42 pendiente de commit (4 mejoras UX: Save ícono + bulk save selectivo + contraste chevron + IP/hostname panel)_ · `4992b61` (HANDOFF §41) · `02475fb` (§41 acciones icon-only + retiro de DeviceCardModal/SshDataModal muertos) · `a749386` (HANDOFF §40) · `aca56fe` (§40 consolidado: prefs persistentes + ExportMenu + 3 fixes) · `236bf66` (HANDOFF §39) · `0471d64` (retira "Sin nodo" del primario) · `2bff438` (U2 kebab acciones secundarias) · `d300a44` (U1.A columna Acción sticky-right).
 
 ---
 
@@ -129,7 +129,7 @@
 | 🟡 Limpieza | Quitar `adminIP` hardcodeado (`useNodeManagement.ts`, ya no se usa) · warning MySQL2 `keepAliveInitialDelayMs` (mitigado en F11) · escaneo atado al `mgmt_ip` del solicitante. |
 | 🟡 Mejora | **Fase 5 (opcional):** aislamiento de firewall por-IP + acotar regla "Admin MGMT libre" (defensa en profundidad; hoy el ruteo ya aísla). Dockerfile `USER` no-root (Semgrep S1). |
 | 🟡 Próximo backlog | **M2** API pública con tokens scoped · **M3** Webhooks salientes · **M4** Speed test desde antena (iperf3 SSH) · **L1** Reportes SLA computados desde `tunnel_session_logs` + `monitoring_state` · **L2** Diagnóstico con LLM · **L3** PWA móvil instalable · **L4** Predicción de degradación con tendencia de `signal_history`. |
-| 🟢 Resuelto | O2 repo privado · O5 MySQL estable · UX P6 · **multi-usuario activación (verificado)** · parche `!empty` · fixes C1–C7 · **crash `POST /api/wireguard/peers` (ver §13.6)** · **V1 `register-my-ip` ownership por rol** · **Q1 Notificaciones (§26)** · **M1 Bot Telegram (§27)** · **Q3 Diagnóstico ping/trace (§28)** · **Q4 Export auditoría CSV/JSON (§29)** · **Q2 Dashboard métricas (§30)** · **M5 Monitoreo proactivo (§31)** · **Job de expiración batch** · **iter2 bot directo + asignar túneles UI + fix `user_mgmt_ips` auto (§32)** · **UX MEMBER endurecida — solo "Acceder" + Ajustes con Telegram (§33)** · **Workspace unificado + Email en peers + multi-asignar túneles + QR en aceptar invitación (§34)** · **Alias humano + bloqueo edición Usuario (§35)** · **Fix bot Telegram: match dual VRF/PPP en asignaciones del MEMBER (§36)** · **Auditoría Escanear: 12 fixes de perf+robustez (§37) + 9 mejoras UX+features (§38) + cierre con sticky-right + kebab (§39)** · **Preferencias persistentes Escanear (todo: cols+anchos+sort+filtros+búsqueda+subred) + Export multi-formato CSV/JSON/Excel/PDF informe (§40)** · **Simplificación acciones de fila Escanear — botones icon-only inline + retiro de DeviceCardModal/SshDataModal muertos (§41)**. |
+| 🟢 Resuelto | O2 repo privado · O5 MySQL estable · UX P6 · **multi-usuario activación (verificado)** · parche `!empty` · fixes C1–C7 · **crash `POST /api/wireguard/peers` (ver §13.6)** · **V1 `register-my-ip` ownership por rol** · **Q1 Notificaciones (§26)** · **M1 Bot Telegram (§27)** · **Q3 Diagnóstico ping/trace (§28)** · **Q4 Export auditoría CSV/JSON (§29)** · **Q2 Dashboard métricas (§30)** · **M5 Monitoreo proactivo (§31)** · **Job de expiración batch** · **iter2 bot directo + asignar túneles UI + fix `user_mgmt_ips` auto (§32)** · **UX MEMBER endurecida — solo "Acceder" + Ajustes con Telegram (§33)** · **Workspace unificado + Email en peers + multi-asignar túneles + QR en aceptar invitación (§34)** · **Alias humano + bloqueo edición Usuario (§35)** · **Fix bot Telegram: match dual VRF/PPP en asignaciones del MEMBER (§36)** · **Auditoría Escanear: 12 fixes de perf+robustez (§37) + 9 mejoras UX+features (§38) + cierre con sticky-right + kebab (§39)** · **Preferencias persistentes Escanear (todo: cols+anchos+sort+filtros+búsqueda+subred) + Export multi-formato CSV/JSON/Excel/PDF informe (§40)** · **Simplificación acciones de fila Escanear — botones icon-only inline + retiro de DeviceCardModal/SshDataModal muertos (§41)** · **4 mejoras UX Escanear (§42): ícono Save (disquete) en Guardar, bulk save SELECTIVO con checkbox por fila + tri-state header, contraste del chevron expand, IP + Nombre del sistema arriba en panel expandido**. |
 | 🟢 Nota | Config MikroTik `v2.rsc` SIN mangle global (baseline limpio multi-usuario). Peer `peer27` de prueba con public-key placeholder `abcdEFGH...` (borrable). |
 
 **Scripts:**
@@ -3289,7 +3289,116 @@ Tras retirar la lógica de "Ficha" y "Ver datos del scan" del kebab, quedaron hu
 
 ### Pendiente / mejoras futuras
 
-- **§42 (cleanup):** retirar las claves legacy `vpn_diag_cols_v2` + `vpn_diag_col_widths_v1` cuando se confirme que toda la base de usuarios migró. Migración silenciosa solo necesita correr una vez por navegador.
+- **§43 (cleanup):** retirar las claves legacy `vpn_diag_cols_v2` + `vpn_diag_col_widths_v1` cuando se confirme que toda la base de usuarios migró. Migración silenciosa solo necesita correr una vez por navegador.
+
+---
+
+## 42) 🎯 Feedback del usuario — 4 mejoras de UX en la tabla Escanear
+
+Sesión 2026-06-12 noche. Tras §41 el usuario revisó la vista Escanear y mandó un documento Word con 4 observaciones concretas:
+
+1. El ícono **✓** del botón Guardar verde se confundía con "ya está OK / verificado". Cambiar por algo que diga explícitamente "guardar" (disquete).
+2. El antiguo botón "Guardar N" tomaba **todos** los candidatos visibles automáticamente. El usuario quiere **elegir** cuáles guardar.
+3. La **flecha de expandir** (`ChevronRight` con `text-slate-300`) se perdía sobre el zebra blanco/slate-50 en modo claro.
+4. Al expandir una fila, el `DeviceStatusPanel` muestra mucho detalle ("está más que perfecto, no elimines nada"), pero **faltan IP y nombre del sistema** arriba como identificadores rápidos.
+
+### Commits
+
+| Commit | Cambios |
+|---|---|
+| _pendiente_ | §42 — checkbox de selección por fila + tri-state header + ícono Save + chevron con border + IP/hostname en panel |
+
+### §42-1 · Ícono Save en lugar de Check
+
+[`DeviceTableRow.tsx`](vpn-manager/src/components/Devices/NetworkDevicesModule/components/DeviceTableRow.tsx) — el primario "Guardar emerald" cuando `directSave === true` ahora usa el ícono `Save` (disquete) de lucide en vez de `Check`. El `Check` se mantiene para los **checkboxes de selección** (donde sí significa "está marcado"). Cambio de 1 línea, peso del bundle idéntico.
+
+### §42-2 · Bulk save selectivo con checkbox por fila
+
+Reescritura del flujo de bulk save. Antes (§38) el botón "Guardar N" tomaba **todos** los candidatos visibles (`!isSaved && sshSuccess && hasStats`) y los persistía en la biblioteca. Ahora:
+
+**Modelo de estado** (en [`NetworkDevicesModule.tsx`](vpn-manager/src/components/Devices/NetworkDevicesModule/NetworkDevicesModule.tsx)):
+
+```ts
+const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+const visibleCandidates = useMemo(() => /* SSH OK + !isSaved + hasStats */, [...]);
+const bulkSaveSelection = useMemo(() => visibleCandidates.filter(r => selectedIds.has(r.devId)), [...]);
+```
+
+**Handlers expuestos:** `handleToggleSelected(devId)` · `handleSelectAllVisibleCandidates()` · `handleClearSelection()`. La selección se limpia automáticamente al cambiar de nodo (mismo `useEffect` que resetea los scan results). Tras un bulk save exitoso, los ids guardados se quitan del set; los que fallaron quedan seleccionados para reintentar.
+
+**Nueva columna 36px al inicio del grid** (en [`useColumnPrefs.ts`](vpn-manager/src/components/Devices/NetworkDevicesModule/hooks/useColumnPrefs.ts) y `useScanPreferences`): el `gridTemplate` ahora empieza por `'36px'` (checkbox) antes de la columna SSH. `minTableWidth` actualizado a los nuevos valores base.
+
+**Header con checkbox tri-state** ([`DeviceTable.tsx`](vpn-manager/src/components/Devices/NetworkDevicesModule/components/DeviceTable.tsx)):
+
+| Estado | Visual | Acción al click |
+|---|---|---|
+| `empty` (nada seleccionado) | □ borde slate | seleccionar todos los visibles candidatos |
+| `partial` (algunos seleccionados) | ☑ fondo emerald-100 + ícono `Minus` | seleccionar todos los visibles candidatos |
+| `full` (todos seleccionados) | ☑ fondo emerald-500 + `Check` blanco | limpiar la selección |
+| sin candidatos | □ slate-300 disabled | nada (deshabilitado con `title`) |
+
+`role="checkbox"` + `aria-checked="mixed"` para el estado parcial — patrón ARIA estándar.
+
+**Checkbox por fila** ([`DeviceTableRow.tsx`](vpn-manager/src/components/Devices/NetworkDevicesModule/components/DeviceTableRow.tsx)): solo se renderiza si la fila es **candidato** (`!isSaved && sshStatus === 'success' && !!selectedNode`). En las demás filas la celda queda vacía — no confundir al usuario con checkbox inhábiles. `stopPropagation` en el click para no disparar el toggle del expand.
+
+**Botón "Guardar N"** ahora depende de `bulkSaveSelection.length`, NO de `visibleCandidates.length`:
+- Solo aparece cuando el usuario ha marcado **al menos uno**.
+- Muestra el conteo de la selección efectiva.
+- Confirmación de window si N>5 (igual que antes).
+
+### §42-3 · Chevron de expandir con border y mejor contraste
+
+[`DeviceTableRow.tsx`](vpn-manager/src/components/Devices/NetworkDevicesModule/components/DeviceTableRow.tsx) — el botón toggle pasó de:
+
+```
+text-slate-300 hover:text-slate-500 hover:bg-slate-100   (invisible sobre blanco)
+```
+
+a:
+
+```
+text-slate-500 bg-slate-100 border border-slate-200       (visible sin hover)
+hover:text-slate-700 hover:bg-slate-200 hover:border-slate-300
+```
+
+Cuando está expandido (`isExpanded`) mantiene la paleta indigo previa, ahora también con `border-indigo-200`. Añadidos `aria-label` y `aria-expanded` para a11y.
+
+### §42-4 · IP + Nombre del sistema arriba en el panel
+
+[`DeviceStatusPanel.tsx`](vpn-manager/src/components/Devices/NetworkDevicesModule/components/DeviceStatusPanel.tsx) — la lista de "Configuración" ahora abre con dos filas que antes estaban dispersas (IP solo en el header oscuro pequeño; "Nombre de dispositivo" enterrado entre 30 filas):
+
+```ts
+['IP', dev.ip],                                       // 🆕 §42
+['Nombre del sistema', s.deviceName || dev.name],     // 🆕 movido + renombrado
+['Modelo de Dispositivo', s.deviceModel || dev.model],
+// ...resto sin tocar
+```
+
+El usuario fue explícito: "no elimines nada". Cumplido — solo se reordena.
+
+### Métricas pre/post §42
+
+| Métrica | Pre-§42 | Post-§42 |
+|---|---|---|
+| `NetworkDevicesModule` chunk | 87.81 KB / 22.21 KB gzip | **91.03 KB / 23.03 KB gzip** (+3.22 KB raw / +0.82 KB gzip por columna nueva + handlers + checkbox UI) |
+| Bundle inicial | 248.84 KB / 77.76 KB gzip | **248.84 KB / 77.76 KB gzip** (idéntico) |
+| Columnas fijas del grid | SSH/Rol/IP/Nombre/...activeConfig/Toggle/Acción | **Checkbox**/SSH/Rol/IP/Nombre/...activeConfig/Toggle/Acción |
+| Modelo bulk save | "guarda todos los candidatos visibles" | **"guarda los marcados por el usuario"** |
+| Tests | 44 verdes | 44 verdes |
+
+### Reglas operativas reforzadas
+
+- **Tri-state checkbox es el patrón ARIA correcto** para "seleccionar todos visibles". `aria-checked="mixed"` no es opcional — los screen readers lo necesitan para distinguir parcial de vacío.
+- **`stopPropagation` en checkbox dentro de row clickeable** — sin esto el click en el checkbox también dispara el toggle expand del row.
+- **Ícono = metáfora, no decoración** (CLAUDE.md). El usuario no debe estar adivinando si `Check` significa "OK" o "guardar". `Save` (disquete) es la metáfora universal pese a que las generaciones jóvenes ya no usen disquetes — sigue funcionando como íconograma.
+- **Color contrastante en controles pasivos** — `text-slate-300` en un botón que el usuario debe descubrir es invisible sobre `bg-white`. Subir mínimo a slate-400/500 + leve bg/border para que la affordance exista incluso sin hover.
+
+### Pendiente / mejoras futuras
+
+- **Shift+click para selección por rango** — gold standard de los pickers tabulares. Solo necesita guardar el último `devId` clickeado y, al detectar `shift`, seleccionar el rango entre ese y el actual sobre `sortedRows`.
+- **Persistir `selectedIds`** — debate: si el usuario se va a otra pestaña y vuelve, ¿debe seguir su selección? Hoy NO se persiste (se va con el unmount). Probablemente bien así — la selección es transaccional.
+- **"Resetear preferencias"** sigue pendiente desde §40.
 - **Vulnerabilidades:** `exceljs` arrastra `uuid` v8 vulnerable (2 moderate). Tracker: si se libera `exceljs` con uuid v9+ aplicar update; alternativa es migrar a `xlsx` (SheetJS Community) pero su licencia es más restrictiva.
 - **Botón "Resetear preferencias":** el store ya expone `resetPrefs()` (sin UI todavía). Útil para soporte cuando un usuario quiere "empezar de cero" sin borrar cache del navegador. Pendiente de añadir en `ColumnPicker` o como acción en un menú de "Ajustes del módulo".
 - **Persistir `expandedRows`** (filas con panel SSH abierto) — bajo prioridad, comportamiento debatible al re-escanear.

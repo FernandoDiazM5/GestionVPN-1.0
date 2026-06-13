@@ -77,20 +77,22 @@ export function useColumnPrefs({ visibleCols, colWidths, setColWidths }: UseColu
   const COMPACT_NAME_THRESHOLD = 6;
   const compactNameMode = activeConfigCols.length >= COMPACT_NAME_THRESHOLD;
 
-  // gridTemplateColumns para CSS grid. En compactNameMode se omite la
-  // 4ta columna ('minmax(100px,1fr)' = Nombre/Modelo) para alinear filas.
+  // gridTemplateColumns para CSS grid. La 1ra columna (36px) es el checkbox
+  // de selección (§42-2). En compactNameMode se omite la columna
+  // 'minmax(100px,1fr)' = Nombre/Modelo para alinear filas.
   const gridTemplate = useMemo(() => [
-    '40px',
-    '54px',
-    '140px',
+    '36px',       // checkbox selección (bulk save)
+    '40px',       // SSH status
+    '54px',       // Rol + Freq
+    '140px',      // IP / MAC
     ...(compactNameMode ? [] : ['minmax(100px,1fr)']),
     ...activeConfigCols.map(c => colWidths[c.key] != null ? `${colWidths[c.key]}px` : c.width),
-    '32px',
-    '180px',
+    '32px',       // Toggle expand
+    '180px',      // Acción
   ].join(' '), [activeConfigCols, colWidths, compactNameMode]);
 
   const minTableWidth = useMemo(() => {
-    const base = compactNameMode ? [40, 54, 148] : [40, 54, 148, 120];
+    const base = compactNameMode ? [36, 40, 54, 148] : [36, 40, 54, 148, 120];
     return [...base, ...activeConfigCols.map(c => parseInt(c.width.match(/\d+/)?.[0] || '80') || 80), 32, 180]
       .reduce((a, b) => a + b, 0);
   }, [activeConfigCols, compactNameMode]);

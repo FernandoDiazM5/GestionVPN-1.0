@@ -170,6 +170,11 @@ export default function NetworkDevicesModule() {
   }, [activeNodeVrf, nodes, setManualLan]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
+  // §42-2: selección manual del usuario para bulk save. Declarado ANTES del
+  // useEffect que limpia al cambiar de nodo. Se mantiene en memoria (no en
+  // localStorage — debería resetearse entre sesiones).
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+
   // Reset scan results cuando cambia el nodo seleccionado (otro origen).
   // NO incluimos `scan` en deps: es un objeto que se recrea cada render, lo que
   // dispararía el effect constantemente. Los setters de React son estables, así
@@ -182,6 +187,9 @@ export default function NetworkDevicesModule() {
       resetScanResults([]);
       resetSshStatus({});
       setNodeSshCreds([]);
+      // §42-2: la selección de bulk save también se limpia al cambiar de nodo
+      // — los devIds del nodo anterior no aplican aquí y dejarlos confunde.
+      setSelectedIds(new Set());
       try { sessionStorage.removeItem(SESSION_SCAN_KEY); } catch { /* ignore */ }
     }
     prevSelectedNodeIdRef.current = newId;
@@ -222,21 +230,52 @@ export default function NetworkDevicesModule() {
     savedCount: list.scanRows.filter(r => r.isSaved).length,
   }), [effectiveNode, effectiveLan, list.scanRows]);
 
-  // Candidatos para "Guardar todos con stats": filas visibles que tienen
-  // SSH OK y aún no están guardadas. Se calcula sobre `sortedRows` (lo
-  // visible tras filtros) para que el botón refleje lo que el usuario ve.
-  const bulkSaveCandidates = useMemo(() => {
+  // Candidatos visibles para bulk save: filas que tienen SSH OK y aún no
+  // están guardadas. Antes (§38) el botón guardaba a TODOS automáticamente;
+  // desde §42 el usuario elige cuáles vía el checkbox por fila.
+  const visibleCandidates = useMemo(() => {
     return list.sortedRows.filter(r =>
       !r.isSaved && scan.sshStatus[r.dev.ip] === 'success' && !!r.dev.cachedStats
     );
   }, [list.sortedRows, scan.sshStatus]);
 
+  // El set "vivo" para el bulk save: la intersección entre lo que el usuario
+  // marcó y lo que sigue siendo candidato visible (puede haberse guardado por
+  // otra vía después de marcarse).
+  const bulkSaveSelection = useMemo(() => {
+    if (selectedIds.size === 0) return [] as typeof visibleCandidates;
+    return visibleCandidates.filter(r => selectedIds.has(r.devId));
+  }, [visibleCandidates, selectedIds]);
+
+  // Setters de React son estables, pero los listamos en deps para satisfacer
+  // al React Compiler (regla react-hooks/preserve-manual-memoization).
+  const handleToggleSelected = useCallback((devId: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(devId)) next.delete(devId);
+      else next.add(devId);
+      return next;
+    });
+  }, [setSelectedIds]);
+
+  const handleSelectAllVisibleCandidates = useCallback(() => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      for (const c of visibleCandidates) next.add(c.devId);
+      return next;
+    });
+  }, [visibleCandidates, setSelectedIds]);
+
+  const handleClearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+  }, [setSelectedIds]);
+
   const [bulkSaving, setBulkSaving] = useState(false);
   const handleBulkSave = useCallback(async () => {
-    if (!effectiveNode || bulkSaveCandidates.length === 0 || bulkSaving) return;
-    if (bulkSaveCandidates.length > 5) {
+    if (!effectiveNode || bulkSaveSelection.length === 0 || bulkSaving) return;
+    if (bulkSaveSelection.length > 5) {
       const ok = window.confirm(
-        `Vas a guardar ${bulkSaveCandidates.length} dispositivos en la biblioteca local del nodo ${effectiveNode.nombre_nodo}. ¿Continuar?`
+        `Vas a guardar ${bulkSaveSelection.length} dispositivos seleccionados en la biblioteca local del nodo ${effectiveNode.nombre_nodo}. ¿Continuar?`
       );
       if (!ok) return;
     }
@@ -245,16 +284,25 @@ export default function NetworkDevicesModule() {
     // es idempotente, podríamos relanzar si quisiéramos retry. Por ahora
     // solo contamos ok/fail.
     const results = await Promise.allSettled(
-      bulkSaveCandidates.map(r => handleDirectSave(r.dev, effectiveNode))
+      bulkSaveSelection.map(r => handleDirectSave(r.dev, effectiveNode))
     );
     const failed = results.filter(r => r.status === 'rejected').length;
     setBulkSaving(false);
+    // Limpia los ids guardados con éxito (los fallidos se mantienen seleccionados
+    // por si el usuario quiere reintentar).
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      bulkSaveSelection.forEach((r, idx) => {
+        if (results[idx].status === 'fulfilled') next.delete(r.devId);
+      });
+      return next;
+    });
     if (failed > 0) {
       showToast(`Guardados ${results.length - failed}. ${failed} fallaron.`);
     } else {
       showToast(`Guardados ${results.length} dispositivos`);
     }
-  }, [effectiveNode, bulkSaveCandidates, bulkSaving, handleDirectSave, showToast]);
+  }, [effectiveNode, bulkSaveSelection, bulkSaving, handleDirectSave, showToast, setSelectedIds]);
 
   const handleSyncToSaved = useCallback((dev: ScannedDevice, savedDev: SavedDevice) => {
     const updated: SavedDevice = {
@@ -413,19 +461,20 @@ export default function NetworkDevicesModule() {
                 )}
               </p>
               <div className="flex items-center gap-1.5">
-                {/* Bulk save — solo aparece si hay candidatos visibles con SSH OK */}
-                {bulkSaveCandidates.length > 0 && effectiveNode && (
+                {/* §42-2: Bulk save — opera SOLO sobre lo que el usuario marcó
+                    con los checkbox de fila. Antes guardaba todo lo visible. */}
+                {bulkSaveSelection.length > 0 && effectiveNode && (
                   <button
                     onClick={handleBulkSave}
                     disabled={bulkSaving}
-                    title={`Guardar los ${bulkSaveCandidates.length} dispositivos visibles con SSH OK en la biblioteca del nodo`}
-                    aria-label={`Guardar ${bulkSaveCandidates.length} dispositivos con stats`}
+                    title={`Guardar los ${bulkSaveSelection.length} dispositivos seleccionados en la biblioteca del nodo`}
+                    aria-label={`Guardar ${bulkSaveSelection.length} dispositivos seleccionados`}
                     className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm shadow-emerald-500/20 transition-all active:scale-[0.97] disabled:opacity-50"
                   >
                     {bulkSaving
                       ? <Loader2 className="w-3.5 h-3.5 motion-safe:animate-spin" />
                       : <Save className="w-3.5 h-3.5" />}
-                    <span>Guardar {bulkSaveCandidates.length}</span>
+                    <span>Guardar {bulkSaveSelection.length}</span>
                   </button>
                 )}
                 <ExportMenu
@@ -463,6 +512,11 @@ export default function NetworkDevicesModule() {
               toggleExpand={toggleExpand}
               savedDevices={library.savedDevices}
               selectedNode={effectiveNode}
+              selectedIds={selectedIds}
+              onToggleSelected={handleToggleSelected}
+              onSelectAllVisibleCandidates={handleSelectAllVisibleCandidates}
+              onClearSelection={handleClearSelection}
+              visibleCandidateCount={visibleCandidates.length}
               onOpenM5Detail={setM5DetailDevice}
               onSyncToSaved={handleSyncToSaved}
               onDirectSave={handleDirectSave}
