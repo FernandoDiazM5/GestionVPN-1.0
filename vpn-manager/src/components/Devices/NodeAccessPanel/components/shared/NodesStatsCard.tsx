@@ -97,7 +97,7 @@ export default function NodesStatsCard({
           </div>
 
           {/* Porcentaje */}
-          <span className="text-[10px] text-slate-400 font-medium">
+          <span className="text-2xs text-slate-400 font-medium">
             {Math.round(barPct)}% del total
           </span>
         </div>

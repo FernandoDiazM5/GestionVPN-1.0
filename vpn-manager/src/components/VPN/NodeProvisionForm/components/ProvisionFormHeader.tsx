@@ -17,7 +17,7 @@ export function ProvisionFormHeader({ isOpen, onToggle }: ProvisionFormHeaderPro
         </div>
         <div className="text-left">
           <h3 className="font-bold text-slate-800 dark:text-slate-100 text-sm">Provisionar Nuevo Nodo</h3>
-          <p className="text-[10px] text-slate-500 mt-0.5">Crear VPN + VRF + Rutas automáticamente</p>
+          <p className="text-2xs text-slate-500 mt-0.5">Crear VPN + VRF + Rutas automáticamente</p>
         </div>
       </div>
       {isOpen ? (

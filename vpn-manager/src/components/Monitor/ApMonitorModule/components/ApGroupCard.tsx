@@ -133,10 +133,10 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelAc
                 <div key={sta.id} className="flex items-center gap-3 px-4 py-2.5 border-b border-cyan-100/60 last:border-0 hover:bg-cyan-50 transition-colors text-xs">
                   <span className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-cyan-100 text-cyan-700 border border-cyan-200">CPE</span>
                   <span className="font-semibold text-slate-700 truncate min-w-0 max-w-[160px]" title={sta.name || sta.ip}>{sta.name || sta.ip}</span>
-                  <span className="font-mono text-[10px] text-slate-400 shrink-0">{sta.ip}</span>
-                  {sta.mac && <span className="font-mono text-[10px] text-slate-400 shrink-0 hidden sm:block">{sta.mac}</span>}
-                  {sta.model && <span className="text-[10px] text-slate-500 truncate shrink-0 hidden md:block">{sta.model}</span>}
-                  {sta.nodeName && <span className="text-[10px] text-indigo-400 truncate shrink-0 hidden lg:block">{sta.nodeName}</span>}
+                  <span className="font-mono text-2xs text-slate-400 shrink-0">{sta.ip}</span>
+                  {sta.mac && <span className="font-mono text-2xs text-slate-400 shrink-0 hidden sm:block">{sta.mac}</span>}
+                  {sta.model && <span className="text-2xs text-slate-500 truncate shrink-0 hidden md:block">{sta.model}</span>}
+                  {sta.nodeName && <span className="text-2xs text-indigo-400 truncate shrink-0 hidden lg:block">{sta.nodeName}</span>}
                   <button onClick={() => onApDelete(sta)} title="Eliminar CPE guardado"
                     className="ml-auto p-1.5 text-rose-400 hover:bg-rose-50 rounded-lg transition-colors shrink-0">
                     <Trash2 className="w-3.5 h-3.5" />

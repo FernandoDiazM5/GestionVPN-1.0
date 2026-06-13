@@ -24,16 +24,16 @@ export const sectionStyles = {
 };
 
 export const rowStyles = {
-  label: 'text-[11px] text-slate-500 truncate',
-  value: 'text-[11px] font-mono font-semibold text-slate-800 truncate',
+  label: 'text-2xs text-slate-500 truncate',
+  value: 'text-2xs font-mono font-semibold text-slate-800 truncate',
 };
 
 export const ifaceStyles = {
   container: 'col-span-2 border border-violet-100 rounded-lg p-3 mb-2 bg-white',
   header: 'flex items-center gap-2 mb-2',
-  ifname: 'text-[10px] font-bold text-violet-600 uppercase font-mono',
-  hwaddr: 'text-[10px] text-slate-400 font-mono',
-  ipaddr: 'text-[10px] font-mono font-bold text-sky-600 ml-auto',
+  ifname: 'text-2xs font-bold text-violet-600 uppercase font-mono',
+  hwaddr: 'text-2xs text-slate-400 font-mono',
+  ipaddr: 'text-2xs font-mono font-bold text-sky-600 ml-auto',
   grid: 'grid grid-cols-2 gap-x-6 gap-y-0.5',
 };
 

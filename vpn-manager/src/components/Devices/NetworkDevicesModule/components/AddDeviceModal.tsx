@@ -59,16 +59,16 @@ export function AddDeviceModal({ device, node, existing, onSave, onClose }: AddD
           </p>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Usuario</label>
+              <label className="text-2xs sm:text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Usuario</label>
               <input value={sshUser} onChange={e => setSshUser(e.target.value)} className="input-field w-full text-xs" placeholder="ubnt" />
             </div>
             <div>
-              <label className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Puerto SSH</label>
+              <label className="text-2xs sm:text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Puerto SSH</label>
               <input type="number" value={sshPort} onChange={e => setSshPort(+e.target.value)} className="input-field w-full text-xs" />
             </div>
           </div>
           <div>
-            <label className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">
+            <label className="text-2xs sm:text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">
               Clave SSH
               {prefilledFromScan && (
                 <span className="ml-2 normal-case font-normal text-emerald-600">✓ obtenida del escaneo</span>
@@ -90,7 +90,7 @@ export function AddDeviceModal({ device, node, existing, onSave, onClose }: AddD
             <Wifi className="w-3 h-3" /><span>Router del cliente</span>
           </p>
           <div>
-            <label className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">
+            <label className="text-2xs sm:text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">
               Puerto WebUI <span className="normal-case font-normal text-slate-300">(acceso en {device.ip}:puerto)</span>
             </label>
             <input type="number" value={routerPort} onChange={e => setRouterPort(+e.target.value)} className="input-field w-full text-xs" />
@@ -115,7 +115,7 @@ export function AddDeviceModal({ device, node, existing, onSave, onClose }: AddD
             <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
             <div>
               <p className="text-xs font-bold text-amber-700">IP fuera del nodo seleccionado</p>
-              <p className="text-[11px] text-amber-600 mt-0.5">
+              <p className="text-2xs text-amber-600 mt-0.5">
                 <span className="font-mono">{device.ip}</span> no pertenece a <span className="font-mono">{node.segmento_lan}</span>.<br />
                 Verifica que el nodo sea correcto antes de guardar.
               </p>

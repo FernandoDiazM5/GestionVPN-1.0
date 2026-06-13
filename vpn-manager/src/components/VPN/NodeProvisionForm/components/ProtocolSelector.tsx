@@ -6,7 +6,7 @@ interface ProtocolSelectorProps {
 export function ProtocolSelector({ protocol, onProtocolChange }: ProtocolSelectorProps) {
   return (
     <div>
-      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 block">Protocolo</label>
+      <label className="text-2xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">Protocolo</label>
       <div className="flex gap-2">
         <button
           type="button"

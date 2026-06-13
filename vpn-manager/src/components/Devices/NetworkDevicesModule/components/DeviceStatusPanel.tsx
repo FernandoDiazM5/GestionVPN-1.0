@@ -110,7 +110,7 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
           <div className="w-1 h-4 bg-sky-400 rounded-full" />
           <span className="text-xs font-bold tracking-wide uppercase">Estado · {dev.ip}</span>
           {dev.sshUser && (
-            <span className="text-[10px] font-mono bg-white/10 px-1.5 py-0.5 rounded">{dev.sshUser}</span>
+            <span className="text-2xs font-mono bg-white/10 px-1.5 py-0.5 rounded">{dev.sshUser}</span>
           )}
           {/* §43: indicador de FRESCURA del dato, no de "polling en vivo".
               El dato proviene del scan (o último click "Ahora"). Quitamos
@@ -121,7 +121,7 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
             const ageSec = Math.floor((Date.now() - lastUpdated) / 1000);
             const stale = ageSec > 300;  // >5min = pedir refresh
             return (
-              <span className={`flex items-center gap-1 text-[10px] ${stale ? 'text-amber-300' : 'text-slate-300'}`}>
+              <span className={`flex items-center gap-1 text-2xs ${stale ? 'text-amber-300' : 'text-slate-300'}`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${refreshing ? 'bg-sky-400 motion-safe:animate-pulse' : stale ? 'bg-amber-400' : 'bg-slate-400'}`} />
                 {refreshing ? 'Actualizando…' : `Datos del scan · ${fmtAge(lastUpdated)}`}
               </span>
@@ -131,13 +131,13 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
         <div className="flex items-center gap-2">
           {s._rawJson && (
             <button onClick={() => setShowRaw(r => !r)}
-              className="flex items-center gap-1 text-[10px] text-slate-300 hover:text-white px-2 py-1 rounded hover:bg-white/10 transition-colors">
+              className="flex items-center gap-1 text-2xs text-slate-300 hover:text-white px-2 py-1 rounded hover:bg-white/10 transition-colors">
               <Info className="w-3 h-3" /><span>JSON</span>
             </button>
           )}
           {dev.sshUser && (
             <button onClick={handleRefresh} disabled={refreshing}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-bold bg-sky-500 hover:bg-sky-400 text-white disabled:opacity-50 transition-colors">
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded text-2xs font-bold bg-sky-500 hover:bg-sky-400 text-white disabled:opacity-50 transition-colors">
               {refreshing ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
               <span>Ahora</span>
             </button>
@@ -206,8 +206,8 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
             ['Estaciones', s.stations != null ? String(s.stations.length) : null],
           ] as [string, string | null | undefined][]).filter(([, v]) => v).map(([label, value]) => (
             <div key={label} className="flex items-baseline justify-between py-1 border-b border-slate-50 gap-2">
-              <span className="text-[11px] text-slate-500 shrink-0">{label}:</span>
-              <span className="text-[11px] font-semibold text-slate-800 font-mono text-right truncate max-w-[58%]">{value}</span>
+              <span className="text-2xs text-slate-500 shrink-0">{label}:</span>
+              <span className="text-2xs font-semibold text-slate-800 font-mono text-right truncate max-w-[58%]">{value}</span>
             </div>
           ))}
         </div>
@@ -218,8 +218,8 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
           {s.cpuLoad != null && (
             <div>
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[11px] text-slate-500">CPU:</span>
-                <span className={`text-[11px] font-bold font-mono ${s.cpuLoad < 50 ? 'text-sky-600' : s.cpuLoad < 80 ? 'text-amber-500' : 'text-rose-500'}`}>{s.cpuLoad} %</span>
+                <span className="text-2xs text-slate-500">CPU:</span>
+                <span className={`text-2xs font-bold font-mono ${s.cpuLoad < 50 ? 'text-sky-600' : s.cpuLoad < 80 ? 'text-amber-500' : 'text-rose-500'}`}>{s.cpuLoad} %</span>
               </div>
               <Bar value={s.cpuLoad} colorClass={s.cpuLoad < 50 ? 'bg-sky-400' : s.cpuLoad < 80 ? 'bg-amber-400' : 'bg-rose-500'} />
             </div>
@@ -228,8 +228,8 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
           {s.memoryPercent != null && (
             <div>
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[11px] text-slate-500">Memory:</span>
-                <span className={`text-[11px] font-bold font-mono ${s.memoryPercent < 60 ? 'text-emerald-600' : s.memoryPercent < 80 ? 'text-amber-500' : 'text-rose-500'}`}>{s.memoryPercent} %</span>
+                <span className="text-2xs text-slate-500">Memory:</span>
+                <span className={`text-2xs font-bold font-mono ${s.memoryPercent < 60 ? 'text-emerald-600' : s.memoryPercent < 80 ? 'text-amber-500' : 'text-rose-500'}`}>{s.memoryPercent} %</span>
               </div>
               <Bar value={s.memoryPercent} colorClass={s.memoryPercent < 60 ? 'bg-emerald-400' : s.memoryPercent < 80 ? 'bg-amber-400' : 'bg-rose-500'} />
             </div>
@@ -237,16 +237,16 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
 
           {s.apMac && (
             <div className="flex items-center justify-between py-1 border-t border-slate-50">
-              <span className="text-[11px] text-slate-500">AP MAC:</span>
-              <span className="text-[11px] font-bold font-mono text-slate-700">{s.apMac}</span>
+              <span className="text-2xs text-slate-500">AP MAC:</span>
+              <span className="text-2xs font-bold font-mono text-slate-700">{s.apMac}</span>
             </div>
           )}
 
           {s.signal != null && (
             <div className="border-t border-slate-100 pt-2">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[11px] text-slate-500">Intensidad de la señal:</span>
-                <span className="text-[11px] font-bold font-mono" style={{ color: signalColor(s.signal) }}>{s.signal} dBm</span>
+                <span className="text-2xs text-slate-500">Intensidad de la señal:</span>
+                <span className="text-2xs font-bold font-mono" style={{ color: signalColor(s.signal) }}>{s.signal} dBm</span>
               </div>
               <div className="relative h-2.5 rounded-full overflow-hidden"
                 style={{ background: 'linear-gradient(to right, #ef4444 0%, #f59e0b 40%, #22c55e 80%)' }}>
@@ -259,26 +259,26 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
           <div className="space-y-1 border-t border-slate-100 pt-2">
             {s.noiseFloor != null && (
               <div className="flex justify-between">
-                <span className="text-[11px] text-slate-500">Umbral mínimo de ruido:</span>
-                <span className="text-[11px] font-mono font-semibold text-slate-700">{s.noiseFloor} dBm</span>
+                <span className="text-2xs text-slate-500">Umbral mínimo de ruido:</span>
+                <span className="text-2xs font-mono font-semibold text-slate-700">{s.noiseFloor} dBm</span>
               </div>
             )}
             {snr != null && (
               <div className="flex justify-between">
-                <span className="text-[11px] text-slate-500">SNR:</span>
-                <span className={`text-[11px] font-mono font-bold ${snr >= 30 ? 'text-emerald-600' : snr >= 15 ? 'text-sky-600' : 'text-amber-500'}`}>{snr} dB</span>
+                <span className="text-2xs text-slate-500">SNR:</span>
+                <span className={`text-2xs font-mono font-bold ${snr >= 30 ? 'text-emerald-600' : snr >= 15 ? 'text-sky-600' : 'text-amber-500'}`}>{snr} dB</span>
               </div>
             )}
             {s.ccq != null && (
               <div className="flex justify-between">
-                <span className="text-[11px] text-slate-500">Transmitir CCQ:</span>
-                <span className={`text-[11px] font-mono font-bold ${s.ccq >= 80 ? 'text-emerald-600' : s.ccq >= 60 ? 'text-sky-600' : 'text-amber-500'}`}>{s.ccq} %</span>
+                <span className="text-2xs text-slate-500">Transmitir CCQ:</span>
+                <span className={`text-2xs font-mono font-bold ${s.ccq >= 80 ? 'text-emerald-600' : s.ccq >= 60 ? 'text-sky-600' : 'text-amber-500'}`}>{s.ccq} %</span>
               </div>
             )}
             {(s.txRate != null || s.rxRate != null) && (
               <div className="flex justify-between">
-                <span className="text-[11px] text-slate-500">Velocidad de TX/RX:</span>
-                <span className="text-[11px] font-mono font-semibold text-slate-700">{s.txRate ?? '—'} Mbps / {s.rxRate ?? '—'} Mbps</span>
+                <span className="text-2xs text-slate-500">Velocidad de TX/RX:</span>
+                <span className="text-2xs font-mono font-semibold text-slate-700">{s.txRate ?? '—'} Mbps / {s.rxRate ?? '—'} Mbps</span>
               </div>
             )}
           </div>
@@ -287,23 +287,23 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
             <div className="border-t border-slate-100 pt-2 space-y-2">
               {s.airmaxEnabled != null && (
                 <div className="flex justify-between items-center">
-                  <span className="text-[11px] text-slate-500">airMAX:</span>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${s.airmaxEnabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                  <span className="text-2xs text-slate-500">airMAX:</span>
+                  <span className={`text-2xs font-bold px-2 py-0.5 rounded-full ${s.airmaxEnabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
                     {s.airmaxEnabled ? 'Activado' : 'Desactivado'}
                   </span>
                 </div>
               )}
               {s.airmaxPriority && (
                 <div className="flex justify-between">
-                  <span className="text-[11px] text-slate-500">Prioridad airMAX:</span>
-                  <span className="text-[11px] font-semibold text-slate-700 capitalize">{s.airmaxPriority}</span>
+                  <span className="text-2xs text-slate-500">Prioridad airMAX:</span>
+                  <span className="text-2xs font-semibold text-slate-700 capitalize">{s.airmaxPriority}</span>
                 </div>
               )}
               {s.airmaxQuality != null && (
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[11px] text-slate-500">Calidad airMAX:</span>
-                    <span className={`text-[11px] font-bold font-mono ${s.airmaxQuality >= 80 ? 'text-emerald-600' : s.airmaxQuality >= 60 ? 'text-sky-600' : 'text-amber-500'}`}>{s.airmaxQuality} %</span>
+                    <span className="text-2xs text-slate-500">Calidad airMAX:</span>
+                    <span className={`text-2xs font-bold font-mono ${s.airmaxQuality >= 80 ? 'text-emerald-600' : s.airmaxQuality >= 60 ? 'text-sky-600' : 'text-amber-500'}`}>{s.airmaxQuality} %</span>
                   </div>
                   <Bar value={s.airmaxQuality} colorClass={s.airmaxQuality >= 80 ? 'bg-emerald-400' : s.airmaxQuality >= 60 ? 'bg-sky-400' : 'bg-amber-400'} />
                 </div>
@@ -311,8 +311,8 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
               {s.airmaxCapacity != null && (
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[11px] text-slate-500">Capacidad airMAX:</span>
-                    <span className={`text-[11px] font-bold font-mono ${s.airmaxCapacity >= 80 ? 'text-emerald-600' : s.airmaxCapacity >= 60 ? 'text-sky-600' : 'text-amber-500'}`}>{s.airmaxCapacity} %</span>
+                    <span className="text-2xs text-slate-500">Capacidad airMAX:</span>
+                    <span className={`text-2xs font-bold font-mono ${s.airmaxCapacity >= 80 ? 'text-emerald-600' : s.airmaxCapacity >= 60 ? 'text-sky-600' : 'text-amber-500'}`}>{s.airmaxCapacity} %</span>
                   </div>
                   <Bar value={s.airmaxCapacity} colorClass={s.airmaxCapacity >= 80 ? 'bg-emerald-400' : s.airmaxCapacity >= 60 ? 'bg-sky-400' : 'bg-amber-400'} />
                 </div>
@@ -323,8 +323,8 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
           {s.temperature != null && (
             <div className="border-t border-slate-100 pt-2">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[11px] text-slate-500">Temperatura:</span>
-                <span className={`text-[11px] font-bold font-mono ${s.temperature < 60 ? 'text-emerald-600' : s.temperature < 80 ? 'text-amber-500' : 'text-rose-500'}`}>{s.temperature} °C</span>
+                <span className="text-2xs text-slate-500">Temperatura:</span>
+                <span className={`text-2xs font-bold font-mono ${s.temperature < 60 ? 'text-emerald-600' : s.temperature < 80 ? 'text-amber-500' : 'text-rose-500'}`}>{s.temperature} °C</span>
               </div>
               <Bar value={Math.round((s.temperature / 100) * 100)} colorClass={s.temperature < 60 ? 'bg-emerald-400' : s.temperature < 80 ? 'bg-amber-400' : 'bg-rose-500'} />
             </div>
@@ -332,16 +332,16 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
 
           {s.cinr != null && (
             <div className="flex justify-between border-t border-slate-100 pt-2">
-              <span className="text-[11px] text-slate-500">CINR:</span>
-              <span className={`text-[11px] font-mono font-bold ${s.cinr >= 20 ? 'text-emerald-600' : s.cinr >= 10 ? 'text-sky-600' : 'text-amber-500'}`}>{s.cinr} dB</span>
+              <span className="text-2xs text-slate-500">CINR:</span>
+              <span className={`text-2xs font-mono font-bold ${s.cinr >= 20 ? 'text-emerald-600' : s.cinr >= 10 ? 'text-sky-600' : 'text-amber-500'}`}>{s.cinr} dB</span>
             </div>
           )}
 
           {s.airtime != null && (
             <div className="border-t border-slate-100 pt-2">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[11px] text-slate-500">Airtime:</span>
-                <span className={`text-[11px] font-bold font-mono ${s.airtime < 50 ? 'text-emerald-600' : s.airtime < 80 ? 'text-amber-500' : 'text-rose-500'}`}>{s.airtime}%</span>
+                <span className="text-2xs text-slate-500">Airtime:</span>
+                <span className={`text-2xs font-bold font-mono ${s.airtime < 50 ? 'text-emerald-600' : s.airtime < 80 ? 'text-amber-500' : 'text-rose-500'}`}>{s.airtime}%</span>
               </div>
               <Bar value={s.airtime} colorClass={s.airtime < 50 ? 'bg-emerald-400' : s.airtime < 80 ? 'bg-amber-400' : 'bg-rose-500'} />
             </div>
@@ -365,7 +365,7 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
                 ? stationNamesByMac?.get(normalizeMac(sta.mac)) ?? sta.hostname
                 : sta.hostname;
               return (
-              <div key={i} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-1.5 bg-slate-50 rounded-lg border border-slate-100 text-[11px]">
+              <div key={i} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-1.5 bg-slate-50 rounded-lg border border-slate-100 text-2xs">
                 <span className="font-mono font-semibold text-slate-700 w-36 shrink-0">{sta.mac}</span>
                 {/* §42 fix: hostname (resuelto vía scan) + IP por estación.
                     Antes solo se mostraba el MAC, críptico para el operador. */}

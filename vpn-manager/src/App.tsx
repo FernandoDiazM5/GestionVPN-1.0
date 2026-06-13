@@ -71,7 +71,7 @@ function AppContent() {
 
   if (!isReady) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-blue-50">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-sky-50">
         <div className="flex flex-col items-center space-y-4">
           <div className="p-4 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-500/30 animate-pulse">
             <Server className="w-8 h-8 text-white" />
@@ -90,7 +90,7 @@ function AppContent() {
     return (
       <Suspense
         fallback={
-          <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-blue-50">
+          <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-sky-50">
             <div className="flex flex-col items-center space-y-4">
               <div className="p-4 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-500/30 animate-pulse">
                 <Server className="w-8 h-8 text-white" />

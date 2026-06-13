@@ -16,7 +16,7 @@ export default function InterfacesSection({ antennaStats }: InterfacesSectionPro
       </p>
       {antennaStats.ifaceDetails.map((ifc, i) => (
         <div key={i} className="mb-2 last:mb-0">
-          <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">{ifc.ifname} {ifc.hwaddr && <span className="font-mono font-normal">{ifc.hwaddr}</span>}</p>
+          <p className="text-2xs font-bold text-slate-400 uppercase mb-1">{ifc.ifname} {ifc.hwaddr && <span className="font-mono font-normal">{ifc.hwaddr}</span>}</p>
           <div className="pl-2 flex flex-col">
             {ifc.ipaddr && <ParamRow label="IP" value={ifc.ipaddr} />}
             {ifc.speed != null && <ParamRow label="Velocidad" value={`${ifc.speed} Mbps${ifc.duplex != null ? (ifc.duplex ? ' Full-Duplex' : ' Half-Duplex') : ''}`} />}

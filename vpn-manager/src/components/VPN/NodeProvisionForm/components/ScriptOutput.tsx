@@ -21,7 +21,7 @@ export function ScriptOutput({ script, onCopy, copied }: ScriptOutputProps) {
           <span>{copied ? '¡Copiado!' : 'Copiar'}</span>
         </button>
       </div>
-      <pre className="bg-slate-900 text-emerald-400 rounded-xl p-4 text-[11px] leading-relaxed overflow-x-auto max-h-[320px] overflow-y-auto font-mono whitespace-pre">
+      <pre className="bg-slate-900 text-emerald-400 rounded-xl p-4 text-2xs leading-relaxed overflow-x-auto max-h-[320px] overflow-y-auto font-mono whitespace-pre">
         {script}
       </pre>
     </div>

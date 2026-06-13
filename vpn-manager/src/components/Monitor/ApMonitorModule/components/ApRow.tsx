@@ -48,7 +48,7 @@ const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCol
         style={{ gridTemplateColumns: gridCols }}>
 
         <div>
-          <span className="inline-flex text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-indigo-100 text-indigo-700">AP</span>
+          <span className="inline-flex text-2xs font-bold px-1.5 py-0.5 rounded-md bg-indigo-100 text-indigo-700">AP</span>
           {freqGhz && <p className="text-[9px] font-bold text-sky-600 mt-0.5">{freqGhz}</p>}
           {netMode && <p className="text-[8px] text-slate-400 truncate">{netMode}</p>}
         </div>
@@ -69,7 +69,7 @@ const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCol
           <div className="min-w-0 pr-2">
             {ssid
               ? <p className="font-mono text-xs text-slate-700 truncate" title={ssid}>{ssid}</p>
-              : <span className="text-[10px] text-slate-300">—</span>}
+              : <span className="text-2xs text-slate-300">—</span>}
             {channel && <p className="text-[9px] text-slate-400">{channel} MHz</p>}
           </div>
         )}
@@ -96,7 +96,7 @@ const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCol
 
         {showAp('uptime') && (
           <div className="min-w-0 pr-2 overflow-hidden">
-            <span className="font-mono text-[10px] text-slate-400 truncate block">{fmtUptime(stats?.uptimeStr)}</span>
+            <span className="font-mono text-2xs text-slate-400 truncate block">{fmtUptime(stats?.uptimeStr)}</span>
           </div>
         )}
 
@@ -108,7 +108,7 @@ const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCol
 
         <div className="flex items-center justify-center">
           {displayCount != null ? (
-            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-bold
               ${expanded ? 'bg-indigo-600 text-white'
                 : isHistorical ? 'bg-slate-100 text-slate-400'
                   : 'bg-violet-100 text-violet-700'}`}
@@ -136,13 +136,13 @@ const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCol
 
         <div className="flex items-center gap-0.5 pl-1">
           {noSsh ? (
-            <span className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200">
+            <span className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-2xs font-bold text-amber-600 bg-amber-50 border border-amber-200">
               <WifiOff className="w-3 h-3" /><span>Sin SSH</span>
             </span>
           ) : (
             <button onClick={onToggle}
               title={expanded ? 'Ocultar CPEs' : 'Ver CPEs en tiempo real'}
-              className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-bold transition-all
+              className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-2xs font-bold transition-all
                 ${expanded
                   ? 'bg-indigo-600 text-white hover:bg-indigo-700'
                   : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200'}`}>
@@ -161,7 +161,7 @@ const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCol
             {isPolling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
           </button>
           <button onClick={onM5Detail} title="Ver estado completo del dispositivo (airOS)"
-            className="flex items-center space-x-1 px-2 py-1.5 rounded-lg text-[11px] font-bold bg-violet-50 text-violet-600 hover:bg-violet-100 border border-violet-200 transition-colors">
+            className="flex items-center space-x-1 px-2 py-1.5 rounded-lg text-2xs font-bold bg-violet-50 text-violet-600 hover:bg-violet-100 border border-violet-200 transition-colors">
             <Activity className="w-2.5 h-2.5" />
             <span>Informe</span>
           </button>

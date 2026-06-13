@@ -64,7 +64,7 @@ function ColSelector({ hidden, onChange }: {
   return (
     <div ref={ref} className="relative">
       <button onClick={() => setOpen(v => !v)}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-2xs font-bold
           bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200 transition-colors">
         <Columns className="w-3.5 h-3.5" />
         COLUMNAS
@@ -80,7 +80,7 @@ function ColSelector({ hidden, onChange }: {
             </label>
           ))}
           <button onClick={() => onChange(new Set())}
-            className="mt-2 w-full text-[10px] text-indigo-600 hover:underline text-center">
+            className="mt-2 w-full text-2xs text-indigo-600 hover:underline text-center">
             Mostrar todas
           </button>
         </div>

@@ -30,7 +30,7 @@ function CpeRow({ cpe, idx, onDetail, hiddenCols, gridCols }: {
 
       <div className="px-2 py-2 min-w-0">
         <div className="flex items-center gap-1 min-w-0">
-          <p className="font-mono font-semibold text-slate-700 truncate text-[10px]">{cpe.mac}</p>
+          <p className="font-mono font-semibold text-slate-700 truncate text-2xs">{cpe.mac}</p>
           {ff && (
             <span className={`shrink-0 text-[7px] font-bold px-1 py-0.5 rounded
               ${ff === 'AC' ? 'bg-sky-100 text-sky-700' : 'bg-amber-100 text-amber-700'}`}>
@@ -43,14 +43,14 @@ function CpeRow({ cpe, idx, onDetail, hiddenCols, gridCols }: {
 
       {show('modelo') && (
         <div className="px-2 py-2 min-w-0">
-          <p className="text-[10px] text-slate-600 truncate">{displayModel || <span className="text-slate-300">—</span>}</p>
+          <p className="text-2xs text-slate-600 truncate">{displayModel || <span className="text-slate-300">—</span>}</p>
         </div>
       )}
 
       {show('nombre') && (
         <div className="px-2 py-2 min-w-0">
           {displayName
-            ? <p className="truncate font-semibold text-slate-800 text-[10px]">{displayName}</p>
+            ? <p className="truncate font-semibold text-slate-800 text-2xs">{displayName}</p>
             : <p className="text-slate-300 italic text-[9px]">Sin nombre</p>}
         </div>
       )}
@@ -136,7 +136,7 @@ function CpeRow({ cpe, idx, onDetail, hiddenCols, gridCols }: {
       )}
 
       {show('uptime') && (
-        <div className="px-2 py-2 font-mono text-slate-400 text-[10px] truncate">{fmtUptime(cpe.uptimeStr)}</div>
+        <div className="px-2 py-2 font-mono text-slate-400 text-2xs truncate">{fmtUptime(cpe.uptimeStr)}</div>
       )}
 
       {show('distance') && (
@@ -146,7 +146,7 @@ function CpeRow({ cpe, idx, onDetail, hiddenCols, gridCols }: {
       )}
 
       {show('lastip') && (
-        <div className="px-2 py-2 font-mono text-[10px] text-slate-500 truncate">{cpe.lastip || '—'}</div>
+        <div className="px-2 py-2 font-mono text-2xs text-slate-500 truncate">{cpe.lastip || '—'}</div>
       )}
 
       <div className="px-2 py-2 flex items-center justify-end gap-0.5">

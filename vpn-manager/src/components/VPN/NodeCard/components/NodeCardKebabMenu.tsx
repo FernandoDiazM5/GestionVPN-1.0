@@ -163,7 +163,7 @@ export function NodeCardKebabMenu({
               <div className="my-1 border-t border-slate-100" />
               <div className="flex items-center gap-2.5 px-3 py-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" />
-                <span className="text-[10px] text-indigo-500 font-semibold">Logs activos ({logs.length})</span>
+                <span className="text-2xs text-indigo-500 font-semibold">Logs activos ({logs.length})</span>
               </div>
             </>
           )}

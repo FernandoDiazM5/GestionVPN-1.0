@@ -14,21 +14,21 @@ export function WireGuardDetails({ serverPublicKey, wgPort }: WireGuardDetailsPr
         <Shield className="w-3.5 h-3.5" />
         Clave Pública del Servidor (para configurar el CPE):
       </p>
-      <code className="text-[10px] font-mono text-violet-900 break-all block mb-2">{serverPublicKey}</code>
+      <code className="text-2xs font-mono text-violet-900 break-all block mb-2">{serverPublicKey}</code>
       <button
         onClick={() => navigator.clipboard.writeText(serverPublicKey)}
-        className="text-[10px] text-violet-600 hover:text-violet-800 font-semibold"
+        className="text-2xs text-violet-600 hover:text-violet-800 font-semibold"
       >
         Copiar
       </button>
       {wgPort && (
         <div className="mt-2 pt-2 border-t border-violet-200">
-          <p className="text-[10px] font-bold text-violet-500 uppercase tracking-wider mb-1">Listen Port</p>
+          <p className="text-2xs font-bold text-violet-500 uppercase tracking-wider mb-1">Listen Port</p>
           <div className="flex items-center gap-2">
             <code className="text-xs font-mono text-violet-900">{wgPort}</code>
             <button
               onClick={() => navigator.clipboard.writeText(String(wgPort))}
-              className="text-[10px] text-violet-600 hover:text-violet-800 font-semibold"
+              className="text-2xs text-violet-600 hover:text-violet-800 font-semibold"
             >
               Copiar
             </button>

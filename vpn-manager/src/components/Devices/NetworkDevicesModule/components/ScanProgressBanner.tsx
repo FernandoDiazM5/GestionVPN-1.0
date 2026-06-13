@@ -35,7 +35,7 @@ function ScanProgressBannerImpl({
     <>
       {scanState.phase !== 'idle' && (
         <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-2">
-          <div className="flex justify-between items-center text-[11px] font-bold text-slate-600 uppercase tracking-widest">
+          <div className="flex justify-between items-center text-2xs font-bold text-slate-600 uppercase tracking-widest">
             <span className="flex items-center space-x-2">
               {scanState.phase === 'done' ? (
                 <CheckCircle2 className="w-4 h-4 text-emerald-500" />
@@ -81,7 +81,7 @@ function ScanProgressBannerImpl({
       )}
 
       {debugMsg && !scanError && (
-        <div className="flex items-start space-x-2 text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+        <div className="flex items-start space-x-2 text-2xs text-slate-500 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
           <Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-slate-400" />
           <span>{debugMsg}</span>
         </div>

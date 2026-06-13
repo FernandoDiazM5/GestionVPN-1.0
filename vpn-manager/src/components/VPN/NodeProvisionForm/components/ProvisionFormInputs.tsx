@@ -42,7 +42,7 @@ export function ProvisionFormInputs({
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
       <div>
-        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 block">Nº Nodo</label>
+        <label className="text-2xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">Nº Nodo</label>
         <input
           type="number"
           min="1"
@@ -53,7 +53,7 @@ export function ProvisionFormInputs({
         />
       </div>
       <div>
-        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 block">Nombre Nodo</label>
+        <label className="text-2xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">Nombre Nodo</label>
         <input
           value={nodeName}
           onChange={e => onNodeNameChange(e.target.value)}
@@ -73,7 +73,7 @@ export function ProvisionFormInputs({
         <WireGuardInputs cpePublicKey={cpePublicKey} onCpePublicKeyChange={onCpePublicKeyChange} />
       )}
       <div>
-        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 block">Subred LAN Remota</label>
+        <label className="text-2xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">Subred LAN Remota</label>
         <input
           value={lanSubnet}
           onChange={e => onLanSubnetChange(e.target.value)}
@@ -82,7 +82,7 @@ export function ProvisionFormInputs({
         />
       </div>
       <div>
-        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 block">IP Remota Túnel</label>
+        <label className="text-2xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">IP Remota Túnel</label>
         <input
           value={remoteAddress}
           onChange={e => onRemoteAddressChange(e.target.value)}

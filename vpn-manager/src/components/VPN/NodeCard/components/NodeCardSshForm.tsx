@@ -56,7 +56,7 @@ export function NodeCardSshForm({
       <td colSpan={7} className="px-4 pb-3 pt-0">
         <div className="ml-10 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 space-y-2.5">
           <div className="flex items-center justify-between">
-            <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider flex items-center gap-1.5">
+            <p className="text-2xs font-bold text-amber-600 uppercase tracking-wider flex items-center gap-1.5">
               <KeyRound className="w-3 h-3" />
               Credenciales SSH — {node.nombre_nodo}
             </p>
@@ -74,7 +74,7 @@ export function NodeCardSshForm({
           <div className="space-y-2">
             {sshCredsArr.map((cred, i) => (
               <div key={i} className="flex items-center gap-2">
-                <span className="text-[10px] font-black text-amber-400 w-4 text-center shrink-0">{i + 1}º</span>
+                <span className="text-2xs font-black text-amber-400 w-4 text-center shrink-0">{i + 1}º</span>
                 <input
                   type="text"
                   placeholder="Usuario (ej: ubnt)"
@@ -103,7 +103,7 @@ export function NodeCardSshForm({
             <button
               onClick={onAddCred}
               disabled={sshCredsArr.length >= 5}
-              className="flex items-center gap-1 text-[11px] font-bold text-amber-600 hover:text-amber-800 disabled:opacity-40 transition-colors"
+              className="flex items-center gap-1 text-2xs font-bold text-amber-600 hover:text-amber-800 disabled:opacity-40 transition-colors"
             >
               <PlusCircle className="w-3.5 h-3.5" />
               <span>Añadir ({sshCredsArr.length}/5)</span>
@@ -118,7 +118,7 @@ export function NodeCardSshForm({
             </button>
           </div>
 
-          <p className="text-[10px] text-amber-500">
+          <p className="text-2xs text-amber-500">
             Se probarán en orden al escanear equipos en este nodo.
           </p>
         </div>

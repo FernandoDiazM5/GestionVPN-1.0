@@ -35,8 +35,8 @@ export function NodeCardWgPeerForm({
     <tr className={rowBg}>
       <td colSpan={7} className="px-4 pb-3 pt-0">
         <div className="ml-10 bg-violet-50 border border-violet-200 rounded-xl p-3 space-y-2 animate-in slide-in-from-top-2 duration-200">
-          <p className="text-[10px] font-bold text-violet-700 uppercase tracking-wider">Clave Pública del CPE</p>
-          <p className="text-[10px] text-violet-500">Obtener con: <span className="font-mono">/interface wireguard print</span></p>
+          <p className="text-2xs font-bold text-violet-700 uppercase tracking-wider">Clave Pública del CPE</p>
+          <p className="text-2xs text-violet-500">Obtener con: <span className="font-mono">/interface wireguard print</span></p>
           <textarea
             value={wgPeerKey}
             onChange={e => onSetWgPeerKey(e.target.value)}

@@ -43,7 +43,7 @@ export default function ControlBar({
         {showServerIP && (
         <div className="flex items-center gap-1.5 mt-2">
           <Globe className="w-3 h-3 text-slate-400" />
-          <span className="text-[11px] text-slate-400 font-medium">Servidor SSTP:</span>
+          <span className="text-2xs text-slate-400 font-medium">Servidor SSTP:</span>
           {editingGlobalIP ? (
             <input
               value={globalServerIP}
@@ -64,12 +64,12 @@ export default function ControlBar({
                 if (e.key === 'Escape') { setGlobalServerIP(localStorage.getItem('server_public_ip') || ''); setEditingGlobalIP(false); }
               }}
               placeholder="Ej: 213.173.36.232"
-              className="px-2 py-0.5 text-[11px] font-mono border border-indigo-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 w-36 dark:bg-slate-800 dark:border-indigo-500/50 dark:text-slate-100"
+              className="px-2 py-0.5 text-2xs font-mono border border-indigo-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 w-36 dark:bg-slate-800 dark:border-indigo-500/50 dark:text-slate-100"
               autoFocus
             />
           ) : (
             <button onClick={() => setEditingGlobalIP(true)} className="flex items-center gap-1 group">
-              <span className={`text-[11px] font-mono font-semibold ${globalServerIP ? 'text-slate-700 dark:text-slate-200' : 'text-slate-400 italic'}`}>
+              <span className={`text-2xs font-mono font-semibold ${globalServerIP ? 'text-slate-700 dark:text-slate-200' : 'text-slate-400 italic'}`}>
                 {globalServerIP || 'Sin configurar'}
               </span>
               <Pencil className="w-2.5 h-2.5 text-slate-300 group-hover:text-indigo-500 transition-colors" />

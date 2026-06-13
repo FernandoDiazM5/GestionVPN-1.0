@@ -9,7 +9,7 @@ export function SSTPInputs({ pppUser, pppPassword, onUserChange, onPasswordChang
   return (
     <>
       <div>
-        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 block">Usuario PPP</label>
+        <label className="text-2xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">Usuario PPP</label>
         <input
           type="text"
           value={pppUser}
@@ -19,7 +19,7 @@ export function SSTPInputs({ pppUser, pppPassword, onUserChange, onPasswordChang
         />
       </div>
       <div>
-        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 block">Contraseña PPP</label>
+        <label className="text-2xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">Contraseña PPP</label>
         <input
           type="password"
           value={pppPassword}

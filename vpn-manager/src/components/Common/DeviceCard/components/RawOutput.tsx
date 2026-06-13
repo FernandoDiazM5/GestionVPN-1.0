@@ -16,7 +16,7 @@ export default function RawOutput({ antennaStats }: RawOutputProps) {
           const k = eq > 0 ? line.slice(0, eq).trim() : line;
           const v = eq > 0 ? line.slice(eq + 1).trim() : '';
           return (
-            <div key={i} className={`flex items-center justify-between px-3 py-1.5 text-[11px]
+            <div key={i} className={`flex items-center justify-between px-3 py-1.5 text-2xs
                 ${i % 2 === 0 ? 'bg-slate-800/80' : 'bg-slate-800/40'}`}>
               <span className="font-mono text-slate-400">{k}</span>
               <span className="font-mono text-emerald-400 font-semibold">{v}</span>

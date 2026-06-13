@@ -141,7 +141,7 @@ export default function ApMonitorModule() {
                   ? 'bg-emerald-500 text-white'
                   : 'bg-white text-slate-500 hover:bg-slate-50'}`}>
               <CheckCircle2 className="w-3 h-3" />
-              <span className="text-[10px]">Activos</span>
+              <span className="text-2xs">Activos</span>
             </button>
             <button
               onClick={() => logic.setNodeFilter('inactive')}
@@ -151,7 +151,7 @@ export default function ApMonitorModule() {
                   ? 'bg-amber-500 text-white'
                   : 'bg-white text-slate-500 hover:bg-slate-50'}`}>
               <ZapOff className="w-3 h-3" />
-              <span className="text-[10px]">Inactivos</span>
+              <span className="text-2xs">Inactivos</span>
             </button>
             <button
               onClick={() => logic.setNodeFilter('all')}
@@ -161,7 +161,7 @@ export default function ApMonitorModule() {
                   ? 'bg-indigo-500 text-white'
                   : 'bg-white text-slate-500 hover:bg-slate-50'}`}>
               <Users className="w-3 h-3" />
-              <span className="text-[10px]">Todos</span>
+              <span className="text-2xs">Todos</span>
             </button>
           </div>
           <div className="relative">
@@ -202,7 +202,7 @@ export default function ApMonitorModule() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-3 px-1 text-[10px] text-slate-400">
+      <div className="flex flex-wrap gap-3 px-1 text-2xs text-slate-400">
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Online</span>
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400" /> Parcial / Errores</span>
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-sky-400" /> Conectando…</span>

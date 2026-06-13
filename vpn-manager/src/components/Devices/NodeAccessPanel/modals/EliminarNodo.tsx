@@ -88,7 +88,7 @@ export default function EliminarNodo({ node, onClose, onSuccess }: EliminarNodoP
             </div>
             <div>
               <p className="text-sm font-bold text-white">Eliminar Nodo VPN</p>
-              <p className="text-[10px] text-rose-200 mt-0.5">Reverso completo del provisionamiento — 8 pasos</p>
+              <p className="text-2xs text-rose-200 mt-0.5">Reverso completo del provisionamiento — 8 pasos</p>
             </div>
           </div>
           {!deleting && !result && (
@@ -101,12 +101,12 @@ export default function EliminarNodo({ node, onClose, onSuccess }: EliminarNodoP
         <div className="overflow-y-auto flex-1 p-5 space-y-4">
           {deleting && !result && (
             <div className="space-y-3">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Eliminando configuración de MikroTik…</p>
+              <p className="text-2xs font-bold text-slate-400 uppercase tracking-wider">Eliminando configuración de MikroTik…</p>
               <div className="space-y-1.5">
                 {DEL_STEPS.map((label, idx) => (
                   <div key={idx} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs border transition-colors
                     ${idx < delStep ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-100' : idx === delStep ? 'bg-rose-50 dark:bg-rose-500/10 border-rose-200' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-800'}`}>
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0
+                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-2xs font-bold shrink-0
                       ${idx < delStep ? 'bg-emerald-500 text-white' : idx === delStep ? 'bg-rose-500 text-white' : 'bg-slate-200 text-slate-400'}`}>
                       {idx < delStep ? '✓' : idx === delStep ? <Loader2 className="w-3 h-3 animate-spin" /> : idx + 1}
                     </span>

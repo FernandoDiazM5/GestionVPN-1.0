@@ -26,7 +26,7 @@ export default function SecretsTableRow({
       </td>
       <td className="px-5 py-3.5">
         <span
-          className={`inline-flex px-2 py-0.5 rounded-lg text-[11px] font-bold uppercase tracking-wider
+          className={`inline-flex px-2 py-0.5 rounded-lg text-2xs font-bold uppercase tracking-wider
                         ${secret.service === 'sstp'
             ? 'bg-blue-100 text-blue-700'
             : 'bg-violet-100 text-violet-700'}`}

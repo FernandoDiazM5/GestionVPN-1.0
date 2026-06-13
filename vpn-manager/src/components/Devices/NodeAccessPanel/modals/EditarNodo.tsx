@@ -181,7 +181,7 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
             </div>
             <div>
               <p className="text-sm font-bold text-white">Editar Nodo — {node.nombre_nodo}</p>
-              <p className="text-[10px] text-indigo-200 mt-0.5">{node.nombre_vrf}</p>
+              <p className="text-2xs text-indigo-200 mt-0.5">{node.nombre_vrf}</p>
             </div>
           </div>
           {!saving && !result && (
@@ -235,7 +235,7 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
               </div>
 
               <div className="border-t border-slate-100 dark:border-slate-800 pt-4 space-y-3">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Campos editables</p>
+                <p className="text-2xs font-bold text-slate-400 uppercase tracking-wider">Campos editables</p>
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Nombre / Etiqueta del nodo</label>
@@ -243,7 +243,7 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
                     placeholder={node.nombre_nodo || ''}
                     className={`w-full px-3 py-2 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300
                       ${labelChanged ? 'border-amber-300 bg-amber-50 dark:bg-amber-500/10' : 'border-slate-200 dark:border-slate-700'}`} />
-                  {labelChanged && <p className="text-[10px] text-amber-600 mt-0.5">Cambiará de <span className="font-mono font-bold">{node.nombre_nodo}</span> a <span className="font-mono font-bold">{newLabel}</span></p>}
+                  {labelChanged && <p className="text-2xs text-amber-600 mt-0.5">Cambiará de <span className="font-mono font-bold">{node.nombre_nodo}</span> a <span className="font-mono font-bold">{newLabel}</span></p>}
                 </div>
 
                 {!isWg && (
@@ -254,7 +254,7 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
                       autoComplete="off"
                       className={`w-full px-3 py-2 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300
                       ${pppUserChanged ? 'border-amber-300 bg-amber-50 dark:bg-amber-500/10' : 'border-slate-200 dark:border-slate-700'}`} />
-                    {pppUserChanged && <p className="text-[10px] text-amber-600 mt-0.5">Cambiará de <span className="font-mono font-bold">{node.ppp_user}</span> a <span className="font-mono font-bold">{newPppUser}</span></p>}
+                    {pppUserChanged && <p className="text-2xs text-amber-600 mt-0.5">Cambiará de <span className="font-mono font-bold">{node.ppp_user}</span> a <span className="font-mono font-bold">{newPppUser}</span></p>}
                   </div>
                 )}
 
@@ -263,7 +263,7 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
                     <div className="flex items-center justify-between mb-1">
                       <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">Contraseña PPP</label>
                       {passChanged && (
-                        <span className="text-[10px] text-amber-600 font-medium">Se actualizará en MikroTik al guardar</span>
+                        <span className="text-2xs text-amber-600 font-medium">Se actualizará en MikroTik al guardar</span>
                       )}
                     </div>
                     <input type="text" style={{ display: 'none' }} aria-hidden="true" readOnly tabIndex={-1} />
@@ -296,20 +296,20 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
                     {!loadingDetails && (
                       <div className="flex items-center justify-between mt-1.5 gap-2">
                         {!loadedPass ? (
-                          <p className="text-[10px] text-slate-400">
+                          <p className="text-2xs text-slate-400">
                             Sin contraseña en DB local — ingrésala y pulsa <span className="font-bold">Guardar en DB</span>
                           </p>
                         ) : newPass === loadedPass ? (
-                          <p className="text-[10px] text-emerald-600 flex items-center gap-1">
+                          <p className="text-2xs text-emerald-600 flex items-center gap-1">
                             <ShieldCheck className="w-3 h-3" /> Sincronizada con DB local
                           </p>
                         ) : (
-                          <p className="text-[10px] text-amber-600">Modificada — guarda para actualizar</p>
+                          <p className="text-2xs text-amber-600">Modificada — guarda para actualizar</p>
                         )}
 
                         {newPass.trim() && newPass !== loadedPass && (
                           <button onClick={handleSavePassToDb} disabled={savingPassDb}
-                            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-colors shrink-0
+                            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-2xs font-bold border transition-colors shrink-0
                             bg-sky-50 dark:bg-sky-500/10 border-sky-200 text-sky-700 hover:bg-sky-100 disabled:opacity-50">
                             {savingPassDb
                               ? <Loader2 className="w-3 h-3 animate-spin" />
@@ -331,7 +331,7 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
                       placeholder={currentRemoteIP || '10.10.250.xxx'}
                       className={`w-full px-3 py-2 text-sm border rounded-xl focus:outline-none focus:ring-2 font-mono
                       ${newRemote && !IPV4_RE.test(newRemote.trim()) ? 'border-rose-300 focus:ring-rose-300' : remoteChanged ? 'border-amber-300 bg-amber-50 dark:bg-amber-500/10' : 'border-slate-200 dark:border-slate-700 focus:ring-indigo-300'}`} />
-                    {remoteChanged && <p className="text-[10px] text-amber-600 mt-0.5">Cambiará de <span className="font-mono font-bold">{currentRemoteIP}</span> a <span className="font-mono font-bold">{newRemote}</span></p>}
+                    {remoteChanged && <p className="text-2xs text-amber-600 mt-0.5">Cambiará de <span className="font-mono font-bold">{currentRemoteIP}</span> a <span className="font-mono font-bold">{newRemote}</span></p>}
                   </div>
                 )}
               </div>
@@ -339,7 +339,7 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
               {node.nombre_vrf && (
                 <>
                   <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                    <p className="text-2xs font-bold text-slate-400 uppercase tracking-wider mb-2">
                       Redes LAN actuales {loadingDetails && <Loader2 className="inline w-3 h-3 animate-spin ml-1" />}
                     </p>
                     {currentSubnets.length === 0 && !loadingDetails && (
@@ -351,7 +351,7 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
                           ${removeSet.has(s) ? 'bg-rose-50 dark:bg-rose-500/10 border-rose-200' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 hover:border-rose-200'}`}
                           onClick={() => toggleRemove(s)}>
                           <span className={`font-mono font-bold ${removeSet.has(s) ? 'text-rose-600 line-through' : 'text-slate-700 dark:text-slate-200'}`}>{s}</span>
-                          <span className={`text-[10px] font-bold ${removeSet.has(s) ? 'text-rose-500' : 'text-slate-400'}`}>
+                          <span className={`text-2xs font-bold ${removeSet.has(s) ? 'text-rose-500' : 'text-slate-400'}`}>
                             {removeSet.has(s) ? 'Eliminar' : 'Clic para eliminar'}
                           </span>
                         </div>
@@ -361,9 +361,9 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
 
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Agregar redes LAN</p>
+                      <p className="text-2xs font-bold text-slate-400 uppercase tracking-wider">Agregar redes LAN</p>
                       <button onClick={() => setAddSubnets(p => [...p, ''])}
-                        className="flex items-center gap-1 text-[10px] font-bold text-indigo-600 hover:text-indigo-800">
+                        className="flex items-center gap-1 text-2xs font-bold text-indigo-600 hover:text-indigo-800">
                         <Plus className="w-3 h-3" /> Agregar
                       </button>
                     </div>

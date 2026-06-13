@@ -43,19 +43,19 @@ export default function SecretsTable({
         <table className="w-full text-left">
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50/30">
-              <th className="px-5 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider w-12 text-center">
+              <th className="px-5 py-3 text-2xs font-semibold text-slate-400 uppercase tracking-wider w-12 text-center">
                 Estado
               </th>
-              <th className="px-5 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+              <th className="px-5 py-3 text-2xs font-semibold text-slate-400 uppercase tracking-wider">
                 Nombre
               </th>
-              <th className="px-5 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+              <th className="px-5 py-3 text-2xs font-semibold text-slate-400 uppercase tracking-wider">
                 Servicio
               </th>
-              <th className="px-5 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider hidden sm:table-cell">
+              <th className="px-5 py-3 text-2xs font-semibold text-slate-400 uppercase tracking-wider hidden sm:table-cell">
                 Perfil
               </th>
-              <th className="px-5 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider text-center">
+              <th className="px-5 py-3 text-2xs font-semibold text-slate-400 uppercase tracking-wider text-center">
                 Acción
               </th>
             </tr>

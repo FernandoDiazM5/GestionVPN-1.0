@@ -61,7 +61,7 @@ function ApDetailModal({
         <div className="flex items-center justify-between bg-slate-800 rounded-t-2xl px-5 py-3 shrink-0">
           <div>
             <p className="text-sm font-bold text-white">{dev.cachedStats?.deviceName ?? dev.name ?? dev.ip}</p>
-            <p className="text-[10px] text-slate-400 mt-0.5">{dev.ip} · Detalle completo del AP</p>
+            <p className="text-2xs text-slate-400 mt-0.5">{dev.ip} · Detalle completo del AP</p>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={refresh} disabled={loading}
@@ -151,7 +151,7 @@ function ApDetailModal({
                         <span className="flex items-center gap-1 text-rose-600"><Upload className="w-3 h-3" />
                           {(v.txBytes / 1e6).toFixed(1)} MB TX
                         </span>
-                        <span className="text-slate-400 text-[10px]">{v.rxPackets + v.txPackets} pkts</span>
+                        <span className="text-slate-400 text-2xs">{v.rxPackets + v.txPackets} pkts</span>
                       </div>
                     ))}
                   </div>
@@ -163,7 +163,7 @@ function ApDetailModal({
 
         {s && (
           <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 shrink-0 bg-slate-50 rounded-b-2xl">
-            <p className="text-[10px] text-slate-400">Los datos de señal y tráfico son instantáneos y no se persisten</p>
+            <p className="text-2xs text-slate-400">Los datos de señal y tráfico son instantáneos y no se persisten</p>
             <button onClick={handleSave} disabled={saved}
               className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all
                 ${saved ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>

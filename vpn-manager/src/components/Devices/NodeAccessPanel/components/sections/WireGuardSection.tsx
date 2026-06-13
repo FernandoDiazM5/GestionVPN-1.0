@@ -103,7 +103,7 @@ export default function WireGuardSection({
                 </div>
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
                   <span
-                    className={`text-[11px] font-semibold flex items-center gap-1 ${
+                    className={`text-2xs font-semibold flex items-center gap-1 ${
                       mangleActive ? 'text-emerald-600' : 'text-slate-400'
                     }`}
                   >
@@ -115,7 +115,7 @@ export default function WireGuardSection({
                       : 'Sin mangle activo'}
                   </span>
                   {mangleActive && (
-                    <span className="text-[11px] text-slate-500">
+                    <span className="text-2xs text-slate-500">
                       →<span className="font-semibold text-slate-700 ml-1">Nodo activo</span>
                     </span>
                   )}

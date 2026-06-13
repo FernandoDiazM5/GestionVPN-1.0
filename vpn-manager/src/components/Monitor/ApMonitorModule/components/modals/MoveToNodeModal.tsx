@@ -52,7 +52,7 @@ function MoveToNodeModal({ device, nodes, knownNames, onConfirm, onClose }: {
                     : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-indigo-50 hover:border-indigo-300'}`}
               disabled={opt.name === device.nodeName}>
               {opt.name}
-              {opt.name === device.nodeName && <span className="ml-2 text-[10px] opacity-60">(nodo actual)</span>}
+              {opt.name === device.nodeName && <span className="ml-2 text-2xs opacity-60">(nodo actual)</span>}
             </button>
           ))}
         </div>

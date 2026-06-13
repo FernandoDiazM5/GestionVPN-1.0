@@ -460,7 +460,7 @@ export default function NetworkDevicesModule() {
         {list.scanRows.length > 0 && (
           <div>
             <div className="flex items-center justify-between mb-2">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+              <p className="text-2xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
                 <span>
                   {list.scanRows.length} dispositivo{list.scanRows.length !== 1 ? 's' : ''}
                 </span>

@@ -78,7 +78,7 @@ export default function NodesTable({
 
             {/* Fija: Nodo (sortable) */}
             <th
-              className="px-4 py-3 text-left font-bold text-slate-500 uppercase tracking-wider text-[11px] cursor-pointer hover:bg-slate-100 group transition-colors dark:text-slate-400 dark:hover:bg-slate-800"
+              className="px-4 py-3 text-left font-bold text-slate-500 uppercase tracking-wider text-2xs cursor-pointer hover:bg-slate-100 group transition-colors dark:text-slate-400 dark:hover:bg-slate-800"
               onClick={() => onSort('nombre_nodo')}
             >
               <div className="flex items-center">
@@ -93,7 +93,7 @@ export default function NodesTable({
               return (
                 <th
                   key={key}
-                  className={`px-4 py-3 text-left font-bold text-slate-500 uppercase tracking-wider text-[11px] dark:text-slate-400 ${sortable ? 'cursor-pointer hover:bg-slate-100 group transition-colors dark:hover:bg-slate-800' : ''}`}
+                  className={`px-4 py-3 text-left font-bold text-slate-500 uppercase tracking-wider text-2xs dark:text-slate-400 ${sortable ? 'cursor-pointer hover:bg-slate-100 group transition-colors dark:hover:bg-slate-800' : ''}`}
                   onClick={sortable ? () => onSort(meta.sortKey!) : undefined}
                 >
                   <div className="flex items-center">
@@ -107,7 +107,7 @@ export default function NodesTable({
             {/* Fija: Acciones — §44 sticky-right (patrón §39 de Escanear).
                 Shadow sutil hacia la izquierda marca que está flotando
                 cuando hay overflow horizontal. */}
-            <th className="px-4 py-3 text-right font-bold text-slate-500 uppercase tracking-wider text-[11px] sticky right-0 z-10 bg-slate-50 shadow-[-2px_0_6px_-3px_rgba(0,0,0,0.06)] dark:text-slate-400 dark:bg-slate-800/50">
+            <th className="px-4 py-3 text-right font-bold text-slate-500 uppercase tracking-wider text-2xs sticky right-0 z-10 bg-slate-50 shadow-[-2px_0_6px_-3px_rgba(0,0,0,0.06)] dark:text-slate-400 dark:bg-slate-800/50">
               Acciones
             </th>
           </tr>

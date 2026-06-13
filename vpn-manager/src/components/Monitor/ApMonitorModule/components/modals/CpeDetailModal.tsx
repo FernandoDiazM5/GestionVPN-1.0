@@ -103,7 +103,7 @@ function CpeDetailModal({
         <div className="flex items-center justify-between bg-slate-800 rounded-t-2xl px-5 py-3 shrink-0">
           <div>
             <p className="text-xs font-bold text-white font-mono">{mac}</p>
-            <p className="text-[10px] text-slate-400 mt-0.5">{cpeIp || 'IP desconocida'} · Detalle CPE</p>
+            <p className="text-2xs text-slate-400 mt-0.5">{cpeIp || 'IP desconocida'} · Detalle CPE</p>
           </div>
           <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg"><X className="w-4 h-4" /></button>
         </div>
@@ -123,13 +123,13 @@ function CpeDetailModal({
           {showCredForm && !loading && (
             <form onSubmit={handleCredSubmit} className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
               <p className="text-xs font-semibold text-amber-800">Credenciales SSH del CPE</p>
-              <p className="text-[10px] text-amber-600">
+              <p className="text-2xs text-amber-600">
                 Las credenciales del CPE son independientes de las del AP.
                 Los equipos Ubiquiti usan por defecto <span className="font-mono">ubnt / ubnt</span>.
               </p>
               <div className="grid grid-cols-3 gap-2">
                 <div className="col-span-1">
-                  <label className="block text-[10px] font-semibold text-slate-500 mb-1">Usuario</label>
+                  <label className="block text-2xs font-semibold text-slate-500 mb-1">Usuario</label>
                   <input
                     className="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-amber-400"
                     value={credUser} onChange={e => setCredUser(e.target.value)}
@@ -137,7 +137,7 @@ function CpeDetailModal({
                   />
                 </div>
                 <div className="col-span-1">
-                  <label className="block text-[10px] font-semibold text-slate-500 mb-1">Contrasena</label>
+                  <label className="block text-2xs font-semibold text-slate-500 mb-1">Contrasena</label>
                   <input type="password"
                     className="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-amber-400"
                     value={credPass} onChange={e => setCredPass(e.target.value)}
@@ -145,7 +145,7 @@ function CpeDetailModal({
                   />
                 </div>
                 <div className="col-span-1">
-                  <label className="block text-[10px] font-semibold text-slate-500 mb-1">Puerto SSH</label>
+                  <label className="block text-2xs font-semibold text-slate-500 mb-1">Puerto SSH</label>
                   <input type="number"
                     className="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-amber-400"
                     value={credPort} onChange={e => setCredPort(e.target.value)}
@@ -164,7 +164,7 @@ function CpeDetailModal({
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
               {rows.map(row => (
                 <div key={row.l} className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{row.l}</p>
+                  <p className="text-2xs font-semibold text-slate-500 uppercase tracking-wider mb-1">{row.l}</p>
                   <p className={`text-sm font-bold truncate ${row.color ?? 'text-slate-800'} ${row.mono ? 'font-mono tracking-tight' : ''}`}>{row.v}</p>
                 </div>
               ))}

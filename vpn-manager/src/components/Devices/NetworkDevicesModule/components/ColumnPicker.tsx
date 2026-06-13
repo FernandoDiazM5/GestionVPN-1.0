@@ -104,12 +104,12 @@ export function ColumnPicker({ visibleCols, onChange }: ColumnPickerProps) {
 
           <div className="mt-2 pt-2 border-t border-slate-100 flex gap-1.5">
             <button onClick={() => onChange(COLUMN_DEFS.map(c => c.key))}
-              className="flex-1 text-[10px] font-bold text-indigo-600 hover:text-indigo-700 transition-colors">
+              className="flex-1 text-2xs font-bold text-indigo-600 hover:text-indigo-700 transition-colors">
               Todas
             </button>
             <span className="text-slate-200">|</span>
             <button onClick={() => onChange(COLUMN_DEFS.filter(c => c.defaultVisible).map(c => c.key))}
-              className="flex-1 text-[10px] font-bold text-slate-400 hover:text-slate-600 transition-colors">
+              className="flex-1 text-2xs font-bold text-slate-400 hover:text-slate-600 transition-colors">
               Resetear
             </button>
           </div>

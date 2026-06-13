@@ -102,16 +102,38 @@
   .console-text {
     @apply font-mono text-xs tracking-tight leading-relaxed;
   }
+  /* ════════════════════════════════════════════════════════════════════
+     SISTEMA DE BOTONES — §46
+     ───────────────────────────────────────────────────────────────────
+     Cada .btn-* trae el set completo: bg+hover, shadow semántico,
+     transición, active:scale, focus-visible ring (WCAG) y variante
+     dark. Para tamaños componer con .btn-sm / .btn-lg / .btn-icon.
+
+     Reglas de uso (CLAUDE.md):
+       • .btn-primary  → ACCIÓN principal por contexto (1 por zona)
+       • .btn-success  → confirmación de algo positivo
+       • .btn-danger   → eliminar / revocar / acción destructiva
+       • .btn-warning  → atención sin ser destructiva
+       • .btn-info     → acción informativa neutra
+       • .btn-outline  → secundarios (los que acompañan al primario)
+       • .btn-ghost    → terciarios / icon-only sin fondo
+       • .btn-accent   → WireGuard u otra etiqueta semántica violet
+     ════════════════════════════════════════════════════════════════════ */
+
   .btn-primary {
     @apply bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl
            shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40
            transition-all duration-200 active:scale-[0.98]
-           dark:bg-indigo-500 dark:hover:bg-indigo-400;
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white
+           disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-indigo-600 disabled:shadow-none
+           dark:bg-indigo-500 dark:hover:bg-indigo-400 dark:focus-visible:ring-offset-slate-900;
   }
   .btn-ghost {
     @apply text-slate-500 hover:text-slate-800 hover:bg-slate-100
            rounded-xl transition-all duration-200 active:scale-[0.98]
-           dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800;
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white
+           disabled:opacity-50 disabled:cursor-not-allowed
+           dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800 dark:focus-visible:ring-offset-slate-900;
   }
   .input-field {
     @apply w-full pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm
@@ -146,18 +168,53 @@
   .btn-success {
     @apply bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl
            shadow-sm shadow-emerald-500/25 transition-all duration-200 active:scale-[0.98]
-           dark:bg-emerald-500 dark:hover:bg-emerald-400;
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white
+           disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-emerald-600 disabled:shadow-none
+           dark:bg-emerald-500 dark:hover:bg-emerald-400 dark:focus-visible:ring-offset-slate-900;
   }
   .btn-danger {
     @apply bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-xl
            shadow-sm shadow-rose-500/25 transition-all duration-200 active:scale-[0.98]
-           dark:bg-rose-500 dark:hover:bg-rose-400;
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white
+           disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-rose-600 disabled:shadow-none
+           dark:bg-rose-500 dark:hover:bg-rose-400 dark:focus-visible:ring-offset-slate-900;
+  }
+  .btn-warning {
+    @apply bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-xl
+           shadow-sm shadow-amber-500/25 transition-all duration-200 active:scale-[0.98]
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white
+           disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-amber-600 disabled:shadow-none
+           dark:bg-amber-500 dark:hover:bg-amber-400 dark:focus-visible:ring-offset-slate-900;
+  }
+  .btn-info {
+    @apply bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-xl
+           shadow-sm shadow-sky-500/25 transition-all duration-200 active:scale-[0.98]
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white
+           disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-sky-600 disabled:shadow-none
+           dark:bg-sky-500 dark:hover:bg-sky-400 dark:focus-visible:ring-offset-slate-900;
+  }
+  .btn-accent {
+    @apply bg-violet-600 hover:bg-violet-700 text-white font-semibold rounded-xl
+           shadow-sm shadow-violet-500/25 transition-all duration-200 active:scale-[0.98]
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white
+           disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-violet-600 disabled:shadow-none
+           dark:bg-violet-500 dark:hover:bg-violet-400 dark:focus-visible:ring-offset-slate-900;
   }
   .btn-outline {
     @apply bg-white border border-slate-200 text-slate-600 font-semibold rounded-xl
            hover:border-slate-300 hover:text-slate-800 transition-all duration-200 active:scale-[0.98]
-           dark:bg-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:text-slate-100;
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white
+           disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-slate-200 disabled:hover:text-slate-600
+           dark:bg-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:text-slate-100 dark:focus-visible:ring-offset-slate-900;
   }
+
+  /* ── Tamaños de botón (modificadores composables) ──
+     Por defecto los .btn-* no traen padding propio (usar inline o estos).
+     El default sensato: px-4 py-2.5 text-sm. */
+  .btn-sm   { @apply px-3 py-1.5 text-xs gap-1.5; }
+  .btn-md   { @apply px-4 py-2.5 text-sm gap-2; }
+  .btn-lg   { @apply px-5 py-3 text-base gap-2; }
+  .btn-icon { @apply p-2 inline-flex items-center justify-center rounded-lg; } /* botón icon-only */
 
   /* ── Badges de ESTADO (única fuente para conectado/desconectado/etc) ── */
   .badge {
@@ -180,6 +237,42 @@
     @apply px-4 py-3 text-left font-bold text-slate-500 uppercase tracking-wider dark:text-slate-400;
     font-size: 0.6875rem; /* 11px — token 2xs */
     line-height: 1rem;
+  }
+
+  /* ── Modal canónico (§46) ──
+     .modal-overlay: backdrop con blur + bg slate transparente. fixed, z-50.
+     .modal-panel:   contenedor centrado, max-width, rounded, shadow XL, dark variant.
+     .modal-header:  título + botón X consistente.
+     .modal-body:    padding y scroll vertical si excede.
+
+     Patrón de uso:
+       <div className="modal-overlay" onClick={onClose}>
+         <div className="modal-panel" onClick={e => e.stopPropagation()}>
+           <div className="modal-header">…</div>
+           <div className="modal-body">…</div>
+         </div>
+       </div>
+  */
+  .modal-overlay {
+    @apply fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm
+           flex items-center justify-center p-4
+           dark:bg-slate-950/70;
+  }
+  .modal-panel {
+    @apply bg-white border border-slate-200 rounded-2xl shadow-2xl
+           w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col
+           dark:bg-slate-900 dark:border-slate-800;
+  }
+  .modal-header {
+    @apply flex items-center justify-between px-6 py-4 border-b border-slate-100
+           dark:border-slate-800;
+  }
+  .modal-body {
+    @apply p-6 overflow-y-auto;
+  }
+  .modal-footer {
+    @apply flex items-center justify-end gap-2 px-6 py-4 border-t border-slate-100
+           dark:border-slate-800;
   }
 }
 

@@ -48,10 +48,10 @@ export function NodeCardNameSection({
             />
             <button onClick={onSaveName} disabled={savingName || !nameInput.trim() || nameInput.trim() === node.nombre_nodo}
               className="p-1 rounded text-emerald-600 hover:bg-emerald-50 disabled:opacity-40">
-              {savingName ? <Loader2 className="w-3 h-3 animate-spin" /> : <span className="text-[11px] font-bold">✓</span>}
+              {savingName ? <Loader2 className="w-3 h-3 animate-spin" /> : <span className="text-2xs font-bold">✓</span>}
             </button>
             <button onClick={onCancelEdit} className="p-1 rounded text-slate-400 hover:bg-slate-100">
-              <span className="text-[11px] font-bold">✕</span>
+              <span className="text-2xs font-bold">✕</span>
             </button>
           </div>
         ) : (

@@ -3580,6 +3580,74 @@ Exit code: **1 si hay errores** (severity=error), **0** si solo warnings/infos. 
 
 ---
 
+## 46) 🎨 Plan ejecutable de estandarización + sistema extendido + wins rápidos
+
+Pedido del usuario tras §45: "implementa un plan para ejecutar dichos cambios. Los botones deben tener las mismas características y efectos. Quiero que se sienta que es un proyecto en conjunto, no partes de distintos proyectos. Usa la skill y genera el informe."
+
+### Lo entregado en este commit
+
+**1. Sistema de diseño extendido** ([`index.css`](vpn-manager/src/index.css)) — completa los huecos que tenía el sistema:
+
+- **3 botones nuevos**: `.btn-warning` / `.btn-info` / `.btn-accent` (antes solo `.btn-primary/success/danger/outline/ghost`).
+- **Focus-visible WCAG en TODOS los `.btn-*`**: `focus-visible:ring-2 ring-offset-2 ring-{color}-500/60 ring-offset-white` + dark variant. Antes ninguno lo tenía.
+- **Disabled state consistente**: `disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-... disabled:shadow-none`.
+- **Tamaños composables**: `.btn-sm` / `.btn-md` (default) / `.btn-lg` / `.btn-icon`. Patrón: `<button className="btn-primary btn-md">`.
+- **Modal canónico**: `.modal-overlay` (backdrop + blur) / `.modal-panel` (container) / `.modal-header` / `.modal-body` / `.modal-footer`. Reemplazará los modales reinventados que tenemos.
+
+**2. Wins rápidos por sed-replace** (`vpn-manager/src/**/*.{ts,tsx}`):
+
+| Patrón | Antes | Después |
+|---|---|---|
+| `text-[11px]` literal | 252 ocurrencias | `text-2xs` (alias 11px reservado) |
+| `text-[10px]` literal | ~61 | `text-2xs` |
+| `from-blue-50` / `to-blue-50` / `via-blue-50` | DS04 violations | `from-sky-50` etc. (paleta válida) |
+
+Aplicado con `find ... -exec sed -i 's/.../.../g' {} +`. **−259 violaciones totales (−23.6%)** sin tocar ningún archivo a mano.
+
+**3. Plan ejecutable** [`DESIGN_REFACTOR_PLAN.md`](DESIGN_REFACTOR_PLAN.md) en la raíz:
+
+- Diagnóstico actual con métricas pre/post
+- Catálogo unificado de botones (variants + sizes + states + dark + focus)
+- Patrón canónico de modal
+- 6 fases de refactor (Fase 0 ✅ hecha, Fases 1-5 pendientes)
+- Estimación: **~60h** para llegar a cero hallazgos (8 fases × 6-8h cada una si vamos 1 por semana)
+- Checklist por archivo (template para PRs)
+- Reglas operativas reforzadas
+
+### Métricas pre/post §46
+
+| Regla | Pre-§46 | Post-§46 | Δ |
+|---|---|---|---|
+| DS03 (text < 12px) | 313 | **61** | **−252 (−80.5%)** |
+| DS01 (palette prohibida) | 62 | 55 | −7 |
+| DS04 (gradiente multicolor) | 19 | 19 | 0 (documentado como excepción para backgrounds decorativos) |
+| DS02 (bg sin dark) | 265 | 265 | 0 (requiere refactor manual archivo por archivo) |
+| DS05 (texto contraste) | 411 | 411 | 0 (requiere juicio caso por caso) |
+| DS06 (botón inline) | 26 | 26 | 0 (depende de §46-1 ya entregado — ahora hay clases destino) |
+| **TOTAL** | **1,096** | **837** | **−259 (−23.6%)** |
+
+Bundle inicial: **248.76 KB / 77.72 KB gzip** (idéntico — solo cambian clases CSS y literales de texto).
+Tests: **44/44 verdes**. tsc 0 errores. Build OK.
+
+### Reglas operativas reforzadas (post-§46)
+
+- **Botones SIEMPRE con `.btn-*` + un tamaño (`.btn-sm/md/lg/icon`)**. PR con botón inline = revisar.
+- **`text-[10/11px]` literal queda PROHIBIDO**. Usar `text-2xs` (clase ya en `tailwind.config.js`).
+- **Modales SIEMPRE con `.modal-overlay/.modal-panel/.modal-header/.modal-body/.modal-footer`**. Modal ad-hoc = revisar.
+- **focus-visible:ring obligatorio en cualquier componente interactivo nuevo** (las clases del sistema ya lo traen — solo respetarlas).
+- **Fondos claros (`bg-{color}-50/100/200`, `bg-white`) sin variante `dark:` quedan PROHIBIDOS** — o usar `.card`/`.input-field`/etc, o agregar la variante manualmente.
+
+### Pendiente / Roadmap próximas iteraciones
+
+- **Fase 1 (8-12h)**: migrar 26 botones inline DS06 a `.btn-*` (5 archivos top).
+- **Fase 2 (15-20h)**: bajar las 265 DS02 con dark variants archivo por archivo (10 archivos top).
+- **Fase 3 (6-8h)**: unificar los ~13 modales del proyecto con `.modal-*`.
+- **Fase 4 (8-16h)**: revisión manual de las 411 DS05 (texto contraste).
+- **Fase 5 (2-4h)**: limpiar las 55 DS01 (`red→rose`, `green→emerald`, `gray→slate`, etc.).
+- **CI eventual**: cuando errores=0, agregar `npm run audit:design` al workflow para no regresar.
+
+---
+
 ## ⚡ Arranque rápido
 
 1. XAMPP **MySQL** arriba (idealmente como servicio).

@@ -29,7 +29,7 @@ export default function HistoryModal({ node, onClose }: { node: NodeInfo; onClos
             </div>
             <div>
               <p className="text-sm font-bold text-white">Historial — {node.nombre_nodo}</p>
-              <p className="text-[10px] text-sky-200">{node.ppp_user}</p>
+              <p className="text-2xs text-sky-200">{node.ppp_user}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1.5 text-sky-300 hover:text-white hover:bg-white/10 rounded-lg">
