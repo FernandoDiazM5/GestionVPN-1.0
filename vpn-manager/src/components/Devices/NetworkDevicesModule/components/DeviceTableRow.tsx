@@ -356,9 +356,10 @@ function DeviceRowActions({
         <span>Ficha</span>
       </button>
     );
-  } else if (!isSaved && !selectedNode) {
-    primary = <span className="text-[10px] text-slate-400 whitespace-nowrap pr-1">Sin nodo</span>;
   }
+  // Sin caso "Sin nodo" — si no hay selectedNode el primario simplemente
+  // no se renderiza; el kebab con las secundarias (Informe / Ver datos)
+  // sigue disponible cuando hay hasStats.
 
   const hoverColorMap: Record<SecondaryAction['color'], string> = {
     violet: 'hover:bg-violet-50 hover:text-violet-700 dark:hover:bg-violet-500/15 dark:hover:text-violet-300',
