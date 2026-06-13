@@ -7,16 +7,15 @@
 // ============================================================
 
 import { memo, Fragment } from 'react';
-import { createPortal } from 'react-dom';
 import {
   CheckCircle2, X, Loader2, ChevronDown, ChevronRight,
-  Activity, RefreshCw, Eye, PlusCircle, Check, MoreVertical,
+  Activity, RefreshCw, PlusCircle, Check,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import type { ScannedDevice, SavedDevice, AntennaStats } from '../../../../types/devices';
 import type { NodeInfo } from '../../../../types/api';
 import type { ColumnDef, SshAuthStatus } from '../types';
 import { DeviceStatusPanel } from './DeviceStatusPanel';
-import { useKebabMenu } from '../../../VPN/NodeCard/hooks/useKebabMenu';
 
 interface DeviceTableRowProps {
   dev: ScannedDevice;
@@ -37,8 +36,6 @@ interface DeviceTableRowProps {
   onToggleExpand: (ip: string) => void;
   onOpenM5Detail: (dev: ScannedDevice) => void;
   onSyncToSaved: (dev: ScannedDevice, savedDev: SavedDevice) => void;
-  onOpenSavedView: (saved: SavedDevice) => void;
-  onOpenScanView: (dev: ScannedDevice) => void;
   onDirectSave: (dev: ScannedDevice, node: NodeInfo) => void;
   onOpenAddModal: (dev: ScannedDevice) => void;
   onRefreshStats: (ip: string, stats: AntennaStats) => void;
@@ -48,7 +45,7 @@ function DeviceTableRowImpl({
   dev, isSaved, rowIdx, sshStatus, isExpanded,
   activeConfigCols, compactNameMode, selectedNode, savedDevice,
   onToggleExpand, onOpenM5Detail, onSyncToSaved,
-  onOpenSavedView, onOpenScanView, onDirectSave, onOpenAddModal, onRefreshStats,
+  onDirectSave, onOpenAddModal, onRefreshStats,
 }: DeviceTableRowProps) {
   const hasStats = !!dev.cachedStats;
   const rawMode = dev.cachedStats?.mode || dev.role;
@@ -219,8 +216,6 @@ function DeviceTableRowImpl({
             hasStats={hasStats}
             onOpenM5Detail={onOpenM5Detail}
             onSyncToSaved={onSyncToSaved}
-            onOpenSavedView={onOpenSavedView}
-            onOpenScanView={onOpenScanView}
             onDirectSave={onDirectSave}
             onOpenAddModal={onOpenAddModal}
           />
@@ -250,18 +245,23 @@ export const DeviceTableRow = memo(DeviceTableRowImpl, (prev, next) =>
 );
 
 // ────────────────────────────────────────────────────────────────────
-//  DeviceRowActions (U2) — primario contextual + kebab con secundarias
+//  DeviceRowActions (§41) — botones icon-only inline, sin kebab
 //
-//  Reglas de visibilidad:
-//   • !isSaved + sshStatus=success + selectedNode  → primario "Guardar" verde
-//   • !isSaved + selectedNode (sin SSH ok)         → primario "Guardar" indigo (modal manual)
-//   • !isSaved + !selectedNode                     → "Sin nodo" disabled
-//   • isSaved                                      → primario "Ficha" indigo
+//  Tras §39 (kebab) la celda llevaba 1 primario + ⋮ con 2-3 secundarias.
+//  §41 simplifica: las acciones aplicables se renderizan directamente
+//  como botones icono — no hay dropdown ni modal "Ficha". Reglas:
 //
-//  Kebab con: Informe (siempre si hasStats), Sync (si hasStats+isSaved),
-//  Ver datos del scan (si hasStats y NO es la primaria).
-//  El menú usa createPortal a document.body + getBoundingClientRect
-//  para no quedar atrapado en el overflow-x-auto de la tabla.
+//   • !isSaved + selectedNode + sshStatus=success → ✓ Guardar (emerald sólido)
+//   • !isSaved + selectedNode (sin SSH ok)        → ➕ Guardar (indigo sólido, abre modal manual)
+//   • hasStats                                    → 📈 Informe airOS (violet outline)
+//   • isSaved + savedDevice + hasStats            → 🔄 Sincronizar stats (sky outline)
+//
+//  Resultados típicos:
+//   • CPE no guardado con stats:  [✓ Guardar] [📈 Informe airOS]
+//   • CPE guardado con stats:     [📈 Informe airOS] [🔄 Sincronizar]
+//   • CPE sin stats / sin SSH:    [➕ Guardar]  (o nada si tampoco hay nodo)
+//
+//  A11y: cada botón icon-only lleva aria-label + title (regla CLAUDE.md).
 // ────────────────────────────────────────────────────────────────────
 
 interface DeviceRowActionsProps {
@@ -273,144 +273,94 @@ interface DeviceRowActionsProps {
   hasStats: boolean;
   onOpenM5Detail: (dev: ScannedDevice) => void;
   onSyncToSaved: (dev: ScannedDevice, savedDev: SavedDevice) => void;
-  onOpenSavedView: (saved: SavedDevice) => void;
-  onOpenScanView: (dev: ScannedDevice) => void;
   onDirectSave: (dev: ScannedDevice, node: NodeInfo) => void;
   onOpenAddModal: (dev: ScannedDevice) => void;
 }
 
+type ColorScheme = 'emerald-solid' | 'indigo-solid' | 'violet-outline' | 'sky-outline';
+
+interface RowAction {
+  key: string;
+  Icon: LucideIcon;
+  onClick: () => void;
+  title: string;
+  ariaLabel: string;
+  scheme: ColorScheme;
+}
+
+const SCHEME_CLASSES: Record<ColorScheme, string> = {
+  'emerald-solid':
+    'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm shadow-emerald-500/20',
+  'indigo-solid':
+    'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm shadow-indigo-500/20',
+  'violet-outline':
+    'bg-violet-50 text-violet-700 hover:bg-violet-100 border border-violet-200 ' +
+    'dark:bg-violet-500/15 dark:text-violet-300 dark:border-violet-500/30 dark:hover:bg-violet-500/25',
+  'sky-outline':
+    'bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-200 ' +
+    'dark:bg-sky-500/15 dark:text-sky-300 dark:border-sky-500/30 dark:hover:bg-sky-500/25',
+};
+
 function DeviceRowActions({
   dev, isSaved, savedDevice, selectedNode, sshStatus, hasStats,
-  onOpenM5Detail, onSyncToSaved, onOpenSavedView, onOpenScanView,
-  onDirectSave, onOpenAddModal,
+  onOpenM5Detail, onSyncToSaved, onDirectSave, onOpenAddModal,
 }: DeviceRowActionsProps) {
-  const { showKebab, setShowKebab, kebabCoords, kebabRef, dropdownRef, handleKebabClick } = useKebabMenu();
+  const actions: RowAction[] = [];
 
-  // ── Acciones secundarias del kebab según contexto ───────────────
-  interface SecondaryAction {
-    icon: React.ReactNode;
-    label: string;
-    title: string;
-    onClick: () => void;
-    color: 'violet' | 'sky' | 'indigo';
-  }
-  const secondaries: SecondaryAction[] = [];
-  if (hasStats) {
-    secondaries.push({
-      icon: <Activity className="w-3.5 h-3.5 text-violet-500 shrink-0" />,
-      label: 'Ver informe airOS',
-      title: 'Estado completo del dispositivo (mca-status)',
-      onClick: () => onOpenM5Detail(dev),
-      color: 'violet',
-    });
-  }
-  if (hasStats && isSaved && savedDevice) {
-    secondaries.push({
-      icon: <RefreshCw className="w-3.5 h-3.5 text-sky-500 shrink-0" />,
-      label: 'Sincronizar stats',
-      title: 'Refresca señal/CCQ/etc en el dispositivo guardado',
-      onClick: () => onSyncToSaved(dev, savedDevice),
-      color: 'sky',
-    });
-  }
-  if (hasStats && !isSaved) {
-    secondaries.push({
-      icon: <Eye className="w-3.5 h-3.5 text-indigo-500 shrink-0" />,
-      label: 'Ver datos del scan',
-      title: 'Ficha con los datos detectados durante el escaneo',
-      onClick: () => onOpenScanView(dev),
-      color: 'indigo',
-    });
-  }
-
-  // ── Botón primario contextual ───────────────────────────────────
-  let primary: React.ReactNode = null;
+  // 1) Guardar — solo si NO está saved y hay nodo destino.
   if (!isSaved && selectedNode) {
-    primary = sshStatus === 'success' && dev.sshUser ? (
-      <button
-        onClick={() => onDirectSave(dev, selectedNode)}
-        title="Guardar con las credenciales SSH ya validadas"
-        className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm shadow-emerald-500/20 transition-all active:scale-[0.97] whitespace-nowrap"
-      >
-        <Check className="w-3 h-3" />
-        <span>Guardar</span>
-      </button>
-    ) : (
-      <button
-        onClick={() => onOpenAddModal(dev)}
-        title="Guardar dispositivo — ingresar credenciales SSH manualmente"
-        className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm shadow-indigo-500/20 transition-all active:scale-[0.97] whitespace-nowrap"
-      >
-        <PlusCircle className="w-3 h-3" />
-        <span>Guardar</span>
-      </button>
-    );
-  } else if (isSaved && savedDevice) {
-    primary = (
-      <button
-        onClick={() => onOpenSavedView(savedDevice)}
-        title="Ver ficha guardada del dispositivo"
-        className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition-all whitespace-nowrap dark:bg-indigo-500/15 dark:text-indigo-300 dark:border-indigo-500/30 dark:hover:bg-indigo-500/25"
-      >
-        <Eye className="w-3 h-3" />
-        <span>Ficha</span>
-      </button>
-    );
+    const directSave = sshStatus === 'success' && !!dev.sshUser;
+    actions.push({
+      key: 'save',
+      Icon: directSave ? Check : PlusCircle,
+      onClick: () => directSave
+        ? onDirectSave(dev, selectedNode)
+        : onOpenAddModal(dev),
+      title: directSave
+        ? 'Guardar con las credenciales SSH ya validadas'
+        : 'Guardar — ingresar credenciales SSH manualmente',
+      ariaLabel: 'Guardar dispositivo',
+      scheme: directSave ? 'emerald-solid' : 'indigo-solid',
+    });
   }
-  // Sin caso "Sin nodo" — si no hay selectedNode el primario simplemente
-  // no se renderiza; el kebab con las secundarias (Informe / Ver datos)
-  // sigue disponible cuando hay hasStats.
 
-  const hoverColorMap: Record<SecondaryAction['color'], string> = {
-    violet: 'hover:bg-violet-50 hover:text-violet-700 dark:hover:bg-violet-500/15 dark:hover:text-violet-300',
-    sky:    'hover:bg-sky-50 hover:text-sky-700 dark:hover:bg-sky-500/15 dark:hover:text-sky-300',
-    indigo: 'hover:bg-indigo-50 hover:text-indigo-700 dark:hover:bg-indigo-500/15 dark:hover:text-indigo-300',
-  };
+  // 2) Ver informe airOS — siempre que haya stats disponibles.
+  if (hasStats) {
+    actions.push({
+      key: 'info',
+      Icon: Activity,
+      onClick: () => onOpenM5Detail(dev),
+      title: 'Ver informe airOS — estado completo del dispositivo (mca-status)',
+      ariaLabel: 'Ver informe airOS',
+      scheme: 'violet-outline',
+    });
+  }
+
+  // 3) Sincronizar stats — solo si ya está guardado y hay stats nuevas.
+  if (isSaved && savedDevice && hasStats) {
+    actions.push({
+      key: 'sync',
+      Icon: RefreshCw,
+      onClick: () => onSyncToSaved(dev, savedDevice),
+      title: 'Sincronizar señal/CCQ/etc en el dispositivo guardado',
+      ariaLabel: 'Sincronizar stats',
+      scheme: 'sky-outline',
+    });
+  }
 
   return (
     <>
-      {primary}
-
-      {secondaries.length > 0 && (
-        <div ref={kebabRef} className="relative">
-          <button
-            onClick={handleKebabClick}
-            title="Más acciones"
-            aria-label="Más acciones"
-            aria-haspopup="menu"
-            aria-expanded={showKebab}
-            className={`p-1.5 rounded-lg transition-colors
-              ${showKebab
-                ? 'text-slate-700 bg-slate-100 dark:text-slate-100 dark:bg-slate-700'
-                : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-500 dark:hover:text-slate-200 dark:hover:bg-slate-800'}`}
-          >
-            <MoreVertical className="w-4 h-4" />
-          </button>
-
-          {showKebab && createPortal(
-            <div
-              ref={dropdownRef}
-              role="menu"
-              style={kebabCoords}
-              className="fixed w-52 bg-white border border-slate-200 rounded-xl shadow-lg shadow-slate-200/60 z-[9999] py-1 overflow-hidden dark:bg-slate-800 dark:border-slate-700 dark:shadow-black/40"
-            >
-              {secondaries.map(a => (
-                <button
-                  key={a.label}
-                  role="menuitem"
-                  onClick={() => { a.onClick(); setShowKebab(false); }}
-                  title={a.title}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-600 transition-colors text-left dark:text-slate-300 ${hoverColorMap[a.color]}`}
-                >
-                  {a.icon}
-                  <span>{a.label}</span>
-                </button>
-              ))}
-            </div>,
-            document.body
-          )}
-        </div>
-      )}
+      {actions.map(({ key, Icon, onClick, title, ariaLabel, scheme }) => (
+        <button
+          key={key}
+          onClick={onClick}
+          title={title}
+          aria-label={ariaLabel}
+          className={`p-1.5 rounded-lg transition-all active:scale-[0.95] ${SCHEME_CLASSES[scheme]}`}
+        >
+          <Icon className="w-3.5 h-3.5" />
+        </button>
+      ))}
     </>
   );
 }

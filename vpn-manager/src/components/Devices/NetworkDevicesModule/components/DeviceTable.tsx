@@ -31,8 +31,6 @@ interface DeviceTableProps {
   selectedNode: NodeInfo | null;
   onOpenM5Detail: (dev: ScannedDevice) => void;
   onSyncToSaved: (dev: ScannedDevice, savedDev: SavedDevice) => void;
-  onOpenSavedView: (saved: SavedDevice) => void;
-  onOpenScanView: (dev: ScannedDevice) => void;
   onDirectSave: (dev: ScannedDevice, node: NodeInfo) => void;
   onOpenAddModal: (dev: ScannedDevice) => void;
   onRefreshStats: (ip: string, stats: AntennaStats) => void;
@@ -43,7 +41,7 @@ function DeviceTableImpl(props: DeviceTableProps) {
     sortedRows, activeConfigCols, gridTemplate, minTableWidth, compactNameMode,
     sortConfig, toggleSort, startResize, sshStatus, expandedRows, toggleExpand,
     savedDevices, selectedNode,
-    onOpenM5Detail, onSyncToSaved, onOpenSavedView, onOpenScanView,
+    onOpenM5Detail, onSyncToSaved,
     onDirectSave, onOpenAddModal, onRefreshStats,
   } = props;
 
@@ -142,8 +140,6 @@ function DeviceTableImpl(props: DeviceTableProps) {
             onToggleExpand={toggleExpand}
             onOpenM5Detail={onOpenM5Detail}
             onSyncToSaved={onSyncToSaved}
-            onOpenSavedView={onOpenSavedView}
-            onOpenScanView={onOpenScanView}
             onDirectSave={onDirectSave}
             onOpenAddModal={onOpenAddModal}
             onRefreshStats={onRefreshStats}

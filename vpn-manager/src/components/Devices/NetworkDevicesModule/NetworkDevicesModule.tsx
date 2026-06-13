@@ -27,8 +27,6 @@ import type { ScannedDevice, SavedDevice, AntennaStats } from '../../../types/de
 import type { NodeInfo } from '../../../types/api';
 
 import { AddDeviceModal } from './components/AddDeviceModal';
-import { DeviceCardModal } from './components/DeviceCardModal';
-import { SshDataModal } from './components/SshDataModal';
 import { ColumnPicker } from './components/ColumnPicker';
 import { ExportMenu } from './components/ExportMenu';
 import { ScanControls } from './components/ScanControls';
@@ -60,9 +58,6 @@ export default function NetworkDevicesModule() {
   // ── Estado puramente UI (modales + selección de nodo) ─────────────
   const [selectedNode, setSelectedNode] = useState<NodeInfo | null>(null);
   const [addingDevice, setAddingDevice] = useState<ScannedDevice | null>(null);
-  const [editingDevice, setEditingDevice] = useState<SavedDevice | null>(null);
-  const [viewingDevice, setViewingDevice] = useState<SavedDevice | null>(null);
-  const [viewingRawDevice, setViewingRawDevice] = useState<ScannedDevice | null>(null);
   const [m5DetailDevice, setM5DetailDevice] = useState<ScannedDevice | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [nodeSshCreds, setNodeSshCreds] = useState<ScanCred[]>([]);
@@ -206,7 +201,7 @@ export default function NetworkDevicesModule() {
   // `scan` y `library` se recrean en cada render, así que usar `[scan]` o
   // `[library]` como dep dispararía effects/handlers en cada repintado.
   const { setScanResults } = scan;
-  const { handleRemoveDevice, handleUpdateDevice, showToast, handleDirectSave, handleAddDevice } = library;
+  const { handleUpdateDevice, showToast, handleDirectSave, handleAddDevice } = library;
 
   const toggleExpand = useCallback((ip: string) => {
     setExpandedRows(prev => {
@@ -277,42 +272,9 @@ export default function NetworkDevicesModule() {
     showToast('Stats actualizadas en el dispositivo guardado');
   }, [handleUpdateDevice, showToast]);
 
-  const handleOpenScanView = useCallback((dev: ScannedDevice) => {
-    const devId = dev.mac ? dev.mac.replace(/:/g, '') : dev.ip.replace(/\./g, '');
-    setViewingDevice({
-      id: devId,
-      mac: dev.mac,
-      ip: dev.ip,
-      name: dev.name,
-      model: dev.model,
-      firmware: dev.firmware,
-      role: dev.role === 'unknown' ? 'ap' : dev.role,
-      essid: dev.essid,
-      frequency: dev.frequency,
-      sshUser: dev.sshUser,
-      sshPass: dev.sshPass,
-      sshPort: dev.sshPort,
-      cachedStats: dev.cachedStats,
-      nodeId: '',
-      nodeName: effectiveNode?.nombre_nodo || '',
-      addedAt: Date.now(),
-      is_active: true,
-    } as SavedDevice);
-  }, [effectiveNode]);
-
   const handleRefreshStats = useCallback((ip: string, freshStats: AntennaStats) => {
     setScanResults(prev => prev.map(r => r.ip === ip ? { ...r, cachedStats: freshStats } : r));
   }, [setScanResults]);
-
-  const handleRemoveDeviceUnified = useCallback(async (id: string) => {
-    await handleRemoveDevice(id);
-    if (viewingDevice?.id === id) setViewingDevice(null);
-  }, [handleRemoveDevice, viewingDevice]);
-
-  const handleUpdateDeviceUnified = useCallback(async (updated: SavedDevice) => {
-    await handleUpdateDevice(updated);
-    if (viewingDevice?.id === updated.id) setViewingDevice(updated);
-  }, [handleUpdateDevice, viewingDevice]);
 
   // ── Derivados de UI ────────────────────────────────────────────────
   const isTunnelActive = !!activeNodeVrf;
@@ -503,8 +465,6 @@ export default function NetworkDevicesModule() {
               selectedNode={effectiveNode}
               onOpenM5Detail={setM5DetailDevice}
               onSyncToSaved={handleSyncToSaved}
-              onOpenSavedView={setViewingDevice}
-              onOpenScanView={handleOpenScanView}
               onDirectSave={handleDirectSave}
               onOpenAddModal={setAddingDevice}
               onRefreshStats={handleRefreshStats}
@@ -514,46 +474,12 @@ export default function NetworkDevicesModule() {
       </div>
 
       {/* ── Modales ─────────────────────────────────────────────── */}
-      {viewingRawDevice && (
-        <SshDataModal dev={viewingRawDevice} onClose={() => setViewingRawDevice(null)} />
-      )}
-
       {addingDevice && effectiveNode && (
         <AddDeviceModal
           device={addingDevice}
           node={effectiveNode}
           onSave={handleAddDevice}
           onClose={() => setAddingDevice(null)}
-        />
-      )}
-
-      {editingDevice && (
-        <AddDeviceModal
-          device={editingDevice}
-          node={nodes.find(n => n.id === editingDevice.nodeId) ?? {
-            id: editingDevice.nodeId,
-            nombre_nodo: editingDevice.nodeName,
-            ppp_user: '', segmento_lan: '', nombre_vrf: '',
-            service: 'sstp' as const, disabled: false, running: false,
-            ip_tunnel: '', uptime: '',
-          }}
-          existing={{
-            sshUser: editingDevice.sshUser,
-            sshPass: editingDevice.sshPass,
-            sshPort: editingDevice.sshPort,
-            routerPort: editingDevice.routerPort,
-          }}
-          onSave={(d) => { handleAddDevice(d); setEditingDevice(null); }}
-          onClose={() => setEditingDevice(null)}
-        />
-      )}
-
-      {viewingDevice && (
-        <DeviceCardModal
-          device={viewingDevice}
-          onClose={() => setViewingDevice(null)}
-          onRemove={() => handleRemoveDeviceUnified(viewingDevice.id)}
-          onUpdate={handleUpdateDeviceUnified}
         />
       )}
 

@@ -44,7 +44,7 @@
 > - **142 backend** (14 archivos) + **36 frontend** (5 archivos) = **178 tests verdes**. La auditoría §37-§38 de Escanear NO añade tests nuevos (las mejoras son refactor/UX sin lógica de negocio); el conteo se mantiene desde §36.
 >
 > ### 📚 Secciones de referencia
-> §17–25: REFACTOR_PLAN ejecutado. §26 notificaciones. §27 bot Telegram. §28 ping/trace. §29 export. §30 dashboard. §31 monitoreo. §32 iter2 multi-usuario. §33 UX MEMBER endurecida. §34 Workspace unificado + peers WG mejorados. §35 Alias humano + bloqueo Usuario. §36 Fix bot — match dual VRF/PPP. §37 Escanear — perf + robustez. §38 Escanear — UX + features. §39 Escanear — sticky-right + kebab (cierre auditoría). §40 Escanear — preferencias persistentes (useScanPreferences) + export multi-formato (CSV/JSON/Excel/PDF).
+> §17–25: REFACTOR_PLAN ejecutado. §26 notificaciones. §27 bot Telegram. §28 ping/trace. §29 export. §30 dashboard. §31 monitoreo. §32 iter2 multi-usuario. §33 UX MEMBER endurecida. §34 Workspace unificado + peers WG mejorados. §35 Alias humano + bloqueo Usuario. §36 Fix bot — match dual VRF/PPP. §37 Escanear — perf + robustez. §38 Escanear — UX + features. §39 Escanear — sticky-right + kebab (cierre auditoría). §40 Escanear — preferencias persistentes (useScanPreferences) + export multi-formato (CSV/JSON/Excel/PDF). §41 Escanear — simplificación de acciones de fila a botones icon-only + limpieza de DeviceCardModal/SshDataModal muertos.
 >
 > Sesión 2026-06-07 PM: Ajustes del moderador (perfil + workspace + import/export JSON) + Recuperar contraseña + sync MikroTik al deshabilitar + invitaciones por email + .conf WG server-side.
 > Sesión 2026-06-07 AM: multi-usuario con aislamiento por sesión (mangle por-IP), parche `!empty` node-routeros, auditoría (Semgrep+security-review+code-review) y fixes C1–C7.
@@ -69,7 +69,7 @@
 6. **Pase UX P1–P6** + optimización visual de la vista **Escanear**.
 7. **🆕 Multi-usuario con aislamiento por sesión** (sesión 2026-06-07) — ver §7.
 
-**Estado de salud (2026-06-12 noche):** `tsc 0` (`--noEmit` + build estricto) · `node --check ✓` · **186 tests verdes** (142 backend + 44 frontend — 8 nuevos para `useScanPreferences`). 6 jobs concurrentes en producción. ⚠️ `npm audit --omit=dev`: **2 moderate** (uuid viejo arrastrado por `exceljs` — no expone superficie del panel; pendiente de tracker upstream). 0 findings `semgrep` (sin cambios en backend ni en superficies con reglas activas). Bundles relevantes: **inicial 248.80 KB / 77.74 KB gzip** (idéntico al pre-§40); `TeamModule` 119 KB / 30 KB gzip; `UserManagementPanel` lazy 25 KB / 7 KB gzip; **`NetworkDevicesModule` ~102.5 KB / ~25.1 KB gzip** (+5 KB por `ExportMenu` + `exportShared` estáticos + fixes); **chunks lazy del export**: `exceljs.min` 929 KB / 256 KB gzip (solo Excel), `jspdf.es.min` 399 KB / 130 KB gzip + `html2canvas` 199 KB + `jspdf-autotable` 30 KB (solo PDF), `exportXlsx`/`exportPdf`/`exportJson`/`exportCsv` <3 KB cada uno. MySQL: sin cambios de schema en §40 (todo es frontend). Sin pendientes del REFACTOR_PLAN; backlog quick-wins (Q1-Q5) y 2 mid-size (M1, M5) entregados. **Últimos commits en `dev`:** `aca56fe` (§40 consolidado: prefs persistentes + ExportMenu + 3 fixes regresión/PTP/botón-bloqueado) · `236bf66` (HANDOFF §39) · `0471d64` (retira "Sin nodo" del primario) · `2bff438` (U2 kebab para acciones secundarias) · `d300a44` (U1.A columna Acción sticky-right) · `0bb0aff` (política SSH bloqueante) · `8d43b19` (HANDOFF §37+§38) · `f1dd8cb` (export CSV + bulk save + zebra T4) · `a3e1caf` (filtro rol + footer + chips + tooltip header) · `1fc502b` (cancel reader on cambio subred + lazy init sessionStorage + schema versionado).
+**Estado de salud (2026-06-12 noche):** `tsc 0` (`--noEmit` + build estricto) · `node --check ✓` · **186 tests verdes** (142 backend + 44 frontend — 8 nuevos para `useScanPreferences`). 6 jobs concurrentes en producción. ⚠️ `npm audit --omit=dev`: **2 moderate** (uuid viejo arrastrado por `exceljs` — no expone superficie del panel; pendiente de tracker upstream). 0 findings `semgrep` (sin cambios en backend ni en superficies con reglas activas). Bundles relevantes: **inicial 248.84 KB / 77.76 KB gzip** (esencialmente idéntico al pre-§40); `TeamModule` 119 KB / 30 KB gzip; `UserManagementPanel` lazy 25 KB / 7 KB gzip; **`NetworkDevicesModule` 87.81 KB / 22.21 KB gzip** (§41 retiró el modal `DeviceCardModal`, `SshDataModal`, kebab e imports muertos → **−14.65 KB raw / −2.83 KB gzip** vs §40); **chunks lazy del export**: `exceljs.min` 929 KB / 256 KB gzip (solo Excel), `jspdf.es.min` 399 KB / 130 KB gzip + `html2canvas` 199 KB + `jspdf-autotable` 30 KB (solo PDF). MySQL: sin cambios de schema en §40-§41 (todo es frontend). Sin pendientes del REFACTOR_PLAN; backlog quick-wins (Q1-Q5) y 2 mid-size (M1, M5) entregados. **Últimos commits en `dev`:** _§41 pendiente de commit (simplificación de acciones de fila + limpieza de modales muertos)_ · `a749386` (HANDOFF §40 — registra aca56fe) · `aca56fe` (§40 consolidado: prefs persistentes + ExportMenu + 3 fixes regresión/PTP/botón-bloqueado) · `236bf66` (HANDOFF §39) · `0471d64` (retira "Sin nodo" del primario) · `2bff438` (U2 kebab para acciones secundarias) · `d300a44` (U1.A columna Acción sticky-right) · `0bb0aff` (política SSH bloqueante) · `8d43b19` (HANDOFF §37+§38).
 
 ---
 
@@ -129,7 +129,7 @@
 | 🟡 Limpieza | Quitar `adminIP` hardcodeado (`useNodeManagement.ts`, ya no se usa) · warning MySQL2 `keepAliveInitialDelayMs` (mitigado en F11) · escaneo atado al `mgmt_ip` del solicitante. |
 | 🟡 Mejora | **Fase 5 (opcional):** aislamiento de firewall por-IP + acotar regla "Admin MGMT libre" (defensa en profundidad; hoy el ruteo ya aísla). Dockerfile `USER` no-root (Semgrep S1). |
 | 🟡 Próximo backlog | **M2** API pública con tokens scoped · **M3** Webhooks salientes · **M4** Speed test desde antena (iperf3 SSH) · **L1** Reportes SLA computados desde `tunnel_session_logs` + `monitoring_state` · **L2** Diagnóstico con LLM · **L3** PWA móvil instalable · **L4** Predicción de degradación con tendencia de `signal_history`. |
-| 🟢 Resuelto | O2 repo privado · O5 MySQL estable · UX P6 · **multi-usuario activación (verificado)** · parche `!empty` · fixes C1–C7 · **crash `POST /api/wireguard/peers` (ver §13.6)** · **V1 `register-my-ip` ownership por rol** · **Q1 Notificaciones (§26)** · **M1 Bot Telegram (§27)** · **Q3 Diagnóstico ping/trace (§28)** · **Q4 Export auditoría CSV/JSON (§29)** · **Q2 Dashboard métricas (§30)** · **M5 Monitoreo proactivo (§31)** · **Job de expiración batch** · **iter2 bot directo + asignar túneles UI + fix `user_mgmt_ips` auto (§32)** · **UX MEMBER endurecida — solo "Acceder" + Ajustes con Telegram (§33)** · **Workspace unificado + Email en peers + multi-asignar túneles + QR en aceptar invitación (§34)** · **Alias humano + bloqueo edición Usuario (§35)** · **Fix bot Telegram: match dual VRF/PPP en asignaciones del MEMBER (§36)** · **Auditoría Escanear: 12 fixes de perf+robustez (§37) + 9 mejoras UX+features (§38) + cierre con sticky-right + kebab (§39)** · **Preferencias persistentes Escanear (todo: cols+anchos+sort+filtros+búsqueda+subred) + Export multi-formato CSV/JSON/Excel/PDF informe (§40)**. |
+| 🟢 Resuelto | O2 repo privado · O5 MySQL estable · UX P6 · **multi-usuario activación (verificado)** · parche `!empty` · fixes C1–C7 · **crash `POST /api/wireguard/peers` (ver §13.6)** · **V1 `register-my-ip` ownership por rol** · **Q1 Notificaciones (§26)** · **M1 Bot Telegram (§27)** · **Q3 Diagnóstico ping/trace (§28)** · **Q4 Export auditoría CSV/JSON (§29)** · **Q2 Dashboard métricas (§30)** · **M5 Monitoreo proactivo (§31)** · **Job de expiración batch** · **iter2 bot directo + asignar túneles UI + fix `user_mgmt_ips` auto (§32)** · **UX MEMBER endurecida — solo "Acceder" + Ajustes con Telegram (§33)** · **Workspace unificado + Email en peers + multi-asignar túneles + QR en aceptar invitación (§34)** · **Alias humano + bloqueo edición Usuario (§35)** · **Fix bot Telegram: match dual VRF/PPP en asignaciones del MEMBER (§36)** · **Auditoría Escanear: 12 fixes de perf+robustez (§37) + 9 mejoras UX+features (§38) + cierre con sticky-right + kebab (§39)** · **Preferencias persistentes Escanear (todo: cols+anchos+sort+filtros+búsqueda+subred) + Export multi-formato CSV/JSON/Excel/PDF informe (§40)** · **Simplificación acciones de fila Escanear — botones icon-only inline + retiro de DeviceCardModal/SshDataModal muertos (§41)**. |
 | 🟢 Nota | Config MikroTik `v2.rsc` SIN mangle global (baseline limpio multi-usuario). Peer `peer27` de prueba con public-key placeholder `abcdEFGH...` (borrable). |
 
 **Scripts:**
@@ -3187,9 +3187,109 @@ Y en [`ScanControls.tsx`](vpn-manager/src/components/Devices/NetworkDevicesModul
 - `title` y `aria-label` con el motivo exacto: "Activa un túnel en la pestaña Nodos…" o "Elige o ingresa una subred…".
 - Color del disabled más contrastado (`border` + `slate-400`) — antes era `slate-300` sobre `slate-100`, casi invisible en modo claro.
 
+---
+
+## 41) 🎯 Simplificación de acciones de fila — icon-only inline, sin kebab ni modal "Ficha"
+
+Sesión 2026-06-12 noche. Tras §40 el usuario reportó que la columna Acción tenía demasiada cosa:
+
+- Botón **"Ficha"** + su modal `DeviceCardModal` (re-ver el dispositivo ya guardado) — duplicado con info que la fila + el panel expandido ya muestran.
+- **Kebab ⋮** con 3 opciones cuyo contenido se solapaba: "Ver informe airOS" (modal real), "Sincronizar stats" (útil), "Ver datos del scan" (duplicado de "Ficha").
+
+Pedido del usuario: dejar solo **Guardar** (icon-only), **Ver informe airOS** (icon-only) y **Sincronizar stats** (icon-only cuando aplica). Sin kebab. Sin modal "Ficha".
+
+### Commits
+
+| Commit | Cambios |
+|---|---|
+| _pendiente_ | §41 (1 commit) — `DeviceRowActions` reescrito a botones icon-only inline, retirados `DeviceCardModal` + `SshDataModal` + handlers asociados + types muertos |
+
+### Diseño post-§41 — DeviceRowActions
+
+[`DeviceTableRow.tsx`](vpn-manager/src/components/Devices/NetworkDevicesModule/components/DeviceTableRow.tsx) — `DeviceRowActions` reescrito sin estado interno ni hooks:
+
+```ts
+const actions: RowAction[] = [];
+
+// 1) Guardar — solo si NO está saved y hay nodo destino
+if (!isSaved && selectedNode) {
+  const directSave = sshStatus === 'success' && !!dev.sshUser;
+  actions.push({
+    Icon: directSave ? Check : PlusCircle,
+    onClick: () => directSave ? onDirectSave(dev, selectedNode) : onOpenAddModal(dev),
+    scheme: directSave ? 'emerald-solid' : 'indigo-solid',
+    ariaLabel: 'Guardar dispositivo',
+  });
+}
+
+// 2) Ver informe airOS — siempre si hay stats
+if (hasStats) {
+  actions.push({
+    Icon: Activity,
+    onClick: () => onOpenM5Detail(dev),
+    scheme: 'violet-outline',
+    ariaLabel: 'Ver informe airOS',
+  });
+}
+
+// 3) Sincronizar stats — solo si saved + hasStats
+if (isSaved && savedDevice && hasStats) {
+  actions.push({
+    Icon: RefreshCw,
+    onClick: () => onSyncToSaved(dev, savedDevice),
+    scheme: 'sky-outline',
+    ariaLabel: 'Sincronizar stats',
+  });
+}
+```
+
+Tabla de comportamiento:
+
+| Contexto | Botones renderizados |
+|---|---|
+| CPE no guardado con SSH OK + stats | [✓ verde Guardar] [📈 violet Informe airOS] |
+| CPE no guardado SIN SSH OK | [➕ indigo Guardar — modal manual] (+ Informe si hay stats) |
+| CPE ya guardado con stats | [📈 violet Informe airOS] [🔄 sky Sincronizar] |
+| CPE sin SSH OK ni stats ni nodo | (vacío) |
+
+Estilo: `p-1.5 rounded-lg` con `w-3.5 h-3.5` por icono. `aria-label` + `title` obligatorios (regla CLAUDE.md para icon-only). Sólido = acción que cambia estado (Guardar). Outline = acción observacional (Informe / Sincronizar).
+
+### Limpieza de código muerto
+
+Tras retirar la lógica de "Ficha" y "Ver datos del scan" del kebab, quedaron huérfanos:
+
+- `DeviceCardModal.tsx` (~210 LOC) — modal "Detalle del dispositivo" + edición. Sin consumidores externos (verificado con grep en todo `src/`).
+- `SshDataModal.tsx` — `setViewingRawDevice` nunca se llamaba (ya era código muerto desde antes; solo se descubrió al simplificar).
+- `viewingDevice` / `viewingRawDevice` / `editingDevice` states.
+- `handleOpenScanView` / `handleRemoveDeviceUnified` / `handleUpdateDeviceUnified` callbacks.
+- `handleRemoveDevice` desestructuración de `library` (ya no se usa).
+- Types `DeviceCardModalProps` + `SshDataModalProps`.
+- Re-exports en `index.ts`.
+
+**Total retirado:** 2 archivos `.tsx` (`git rm`) + ~80 LOC de handlers/states + 2 types + 4 re-exports.
+
+### Métricas pre/post §41
+
+| Métrica | Pre-§41 | Post-§41 |
+|---|---|---|
+| `NetworkDevicesModule` chunk | 102.46 KB / 25.04 KB gzip | **87.81 KB / 22.21 KB gzip** (−14.65 KB raw / −2.83 KB gzip) |
+| Bundle inicial | 248.80 KB / 77.74 KB gzip | **248.84 KB / 77.76 KB gzip** (idéntico ±0.04 KB) |
+| Botones primarios en celda Acción | "Ficha" (saved) o "Guardar" (no saved) + ⋮ | 1-2 botones icon-only directos |
+| Dependencias del kebab (`useKebabMenu`, `createPortal`, `MoreVertical`) | sí | **eliminadas del módulo** |
+| Modales activos en el módulo | 3 (`AddDeviceModal`, `DeviceCardModal`, `M5FullInfoModal`) | **2** (`AddDeviceModal`, `M5FullInfoModal`) |
+| Archivos `.tsx` del módulo | 14 | **12** |
+| Tests | 44 verdes | 44 verdes |
+
+### Reglas operativas reforzadas
+
+- **El kebab no es la respuesta a "tengo varias acciones".** Si caben ≤3 botones icon-only en la celda, mostrarlos directos. El kebab agrega un click extra, requiere portal + listeners, y muchas veces oculta acciones que el usuario quiere ver de un vistazo.
+- **Modales que solo "muestran lo mismo en grande" son sospechosos.** El panel expandido del row (`DeviceStatusPanel`) ya despliega los datos completos del dispositivo. Un modal "Ficha" que repite la información es ruido.
+- **Limpieza de código muerto es parte del feature.** Al retirar el botón "Ficha", `DeviceCardModal` quedó huérfano. No mantener componentes "por si acaso": grep, verificar, borrar. El bundle se beneficia (−14 KB).
+- **Color = intención (CLAUDE.md):** verde sólido para acción confirmada (SSH OK + Guardar), indigo sólido para acción que abrirá un flujo adicional (Guardar manual), violet outline para observacional (Informe), sky outline para refresh de estado (Sincronizar). Cero gradientes multi-color.
+
 ### Pendiente / mejoras futuras
 
-- **§41 (cleanup):** retirar las claves legacy `vpn_diag_cols_v2` + `vpn_diag_col_widths_v1` cuando se confirme que toda la base de usuarios migró. Migración silenciosa solo necesita correr una vez por navegador.
+- **§42 (cleanup):** retirar las claves legacy `vpn_diag_cols_v2` + `vpn_diag_col_widths_v1` cuando se confirme que toda la base de usuarios migró. Migración silenciosa solo necesita correr una vez por navegador.
 - **Vulnerabilidades:** `exceljs` arrastra `uuid` v8 vulnerable (2 moderate). Tracker: si se libera `exceljs` con uuid v9+ aplicar update; alternativa es migrar a `xlsx` (SheetJS Community) pero su licencia es más restrictiva.
 - **Botón "Resetear preferencias":** el store ya expone `resetPrefs()` (sin UI todavía). Útil para soporte cuando un usuario quiere "empezar de cero" sin borrar cache del navegador. Pendiente de añadir en `ColumnPicker` o como acción en un menú de "Ajustes del módulo".
 - **Persistir `expandedRows`** (filas con panel SSH abierto) — bajo prioridad, comportamiento debatible al re-escanear.

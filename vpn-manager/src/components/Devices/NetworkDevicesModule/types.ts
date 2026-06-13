@@ -21,14 +21,6 @@ export interface AddDeviceModalProps {
   onClose: () => void;
 }
 
-export interface DeviceCardModalProps {
-  device: SavedDevice;
-  onClose: () => void;
-  onRemove?: () => void;
-  onUpdate?: (updated: SavedDevice) => void;
-  isPreview?: boolean;
-}
-
 export interface ScanCred {
   user: string;
   pass: string;
@@ -37,11 +29,6 @@ export interface ScanCred {
 export interface DeviceStatusPanelProps {
   dev: ScannedDevice;
   onRefresh?: (stats: AntennaStats) => void;
-}
-
-export interface SshDataModalProps {
-  dev: ScannedDevice;
-  onClose: () => void;
 }
 
 export interface ColumnPickerProps {
