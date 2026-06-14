@@ -18,7 +18,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
-  CheckCircle2, Cpu, ShieldCheck, ShieldOff, RefreshCw, Radio, Save, Loader2,
+  CheckCircle2, Cpu, ShieldCheck, ShieldOff, RefreshCw, Radio, Save, Loader2, RotateCcw,
 } from 'lucide-react';
 
 import { useVpn } from '../../../context';
@@ -34,6 +34,7 @@ import { ScanProgressBanner } from './components/ScanProgressBanner';
 import { DeviceFilters } from './components/DeviceFilters';
 import { DeviceTable } from './components/DeviceTable';
 import M5FullInfoModal from '../../Common/M5FullInfoModal';
+import ConfirmModal from '../../Common/ConfirmModal';
 import type { ExportMetadata } from './utils/exportShared';
 
 import { SESSION_SCAN_KEY } from './constants';
@@ -60,6 +61,7 @@ export default function NetworkDevicesModule() {
   const [addingDevice, setAddingDevice] = useState<ScannedDevice | null>(null);
   const [m5DetailDevice, setM5DetailDevice] = useState<ScannedDevice | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [nodeSshCreds, setNodeSshCreds] = useState<ScanCred[]>([]);
 
   // ── Derivados básicos del estado externo ──────────────────────────
@@ -504,6 +506,13 @@ export default function NetworkDevicesModule() {
                   disabled={list.sortedRows.length === 0}
                 />
                 <ColumnPicker visibleCols={prefs.visibleCols} onChange={prefs.setVisibleCols} />
+                <button
+                  onClick={() => setShowResetConfirm(true)}
+                  title="Resetear preferencias de la tabla (columnas, orden, filtros)"
+                  aria-label="Resetear preferencias de la tabla"
+                  className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors dark:text-slate-500 dark:hover:text-indigo-400 dark:hover:bg-indigo-500/10">
+                  <RotateCcw className="w-4 h-4" />
+                </button>
               </div>
             </div>
 
@@ -562,6 +571,15 @@ export default function NetworkDevicesModule() {
       {m5DetailDevice && (
         <M5FullInfoModal dev={m5DetailDevice} onClose={() => setM5DetailDevice(null)} />
       )}
+
+      <ConfirmModal
+        isOpen={showResetConfirm}
+        title="Resetear preferencias"
+        message="Se restablecerán columnas, anchos, orden y filtros de la tabla a los valores por defecto. Los dispositivos guardados no se tocan."
+        confirmLabel="Resetear"
+        onConfirm={() => { prefs.resetPrefs(); setShowResetConfirm(false); }}
+        onCancel={() => setShowResetConfirm(false)}
+      />
     </div>
   );
 }
