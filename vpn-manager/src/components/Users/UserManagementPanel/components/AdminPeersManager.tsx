@@ -59,7 +59,7 @@ export default function AdminPeersManager({
               {adminPeers.filter(p => p.active).length}/{adminPeers.length} activos
             </span>
           )}
-          {loadingWg && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />}
+          {loadingWg && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-500 dark:text-slate-400" />}
         </div>
         <div className="flex items-center gap-1.5">
           {/* Crear/Actualizar viven en la cabecera de la página (sin duplicar aquí) */}
@@ -77,7 +77,7 @@ export default function AdminPeersManager({
       {!peersExpanded && (
         <div className="flex items-center gap-2 mt-3 overflow-x-auto pb-2 scrollbar-thin">
           {adminPeers.length === 0 && !loadingWg && (
-            <span className="text-xs text-slate-400 italic">No hay administradores configurados</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 italic">No hay administradores configurados</span>
           )}
           {adminPeers.map(peer => {
             const color = peerColors[peer.allowedAddress];
@@ -106,7 +106,7 @@ export default function AdminPeersManager({
         <div className="mt-4 space-y-3">
           {/* Endpoint config */}
           <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
-            <span className="text-2xs font-bold text-slate-400 uppercase tracking-wider shrink-0">Endpoint servidor:</span>
+            <span className="text-2xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider shrink-0">Endpoint servidor:</span>
             <input value={serverEndpointIP}
               onChange={e => { setServerEndpointIP(e.target.value); localStorage.setItem('wg_endpoint_ip', e.target.value); }}
               placeholder="IP pública del servidor"
@@ -118,7 +118,7 @@ export default function AdminPeersManager({
           </div>
 
           {adminPeers.length === 0 && (
-            <p className="text-xs text-slate-400 italic text-center py-4">Sin administradores configurados</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 italic text-center py-4">Sin administradores configurados</p>
           )}
 
           {adminPeers.map(peer => {
@@ -151,10 +151,10 @@ export default function AdminPeersManager({
                       </div>
                     ) : (
                       <div className="flex items-center gap-1.5 group">
-                        <p className={`text-xs font-bold truncate ${peer.active ? 'text-slate-700 dark:text-slate-200' : 'text-slate-400'}`}>{peer.name}</p>
+                        <p className={`text-xs font-bold truncate ${peer.active ? 'text-slate-700 dark:text-slate-200' : 'text-slate-500 dark:text-slate-400'}`}>{peer.name}</p>
                         <button onClick={() => { setEditingPeerId(peer.id); setEditingPeerName(peer.name); setColorPickerAddr(null); }}
                           aria-label="Editar nombre"
-                          className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-slate-400 hover:text-indigo-600 transition-opacity">
+                          className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-slate-500 dark:text-slate-400 hover:text-indigo-600 transition-opacity">
                           <Pencil className="w-2.5 h-2.5" />
                         </button>
                       </div>
@@ -189,7 +189,7 @@ export default function AdminPeersManager({
                       ))}
                       {color && (
                         <button onClick={() => onSavePeerColor(peer.allowedAddress, '')}
-                          className="text-2xs text-slate-400 hover:text-slate-600 ml-1">✕ quitar</button>
+                          className="text-2xs text-slate-500 dark:text-slate-400 hover:text-slate-600 ml-1">✕ quitar</button>
                       )}
                     </div>
                   </div>

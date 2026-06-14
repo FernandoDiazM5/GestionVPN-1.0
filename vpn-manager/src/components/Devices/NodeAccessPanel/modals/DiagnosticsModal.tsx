@@ -118,7 +118,7 @@ export default function DiagnosticsModal({ initialTarget, nodeName, onClose }: D
           )}
 
           {!err && !pingResult && !traceResult && !busy && (
-            <div className="text-center py-10 text-slate-400">
+            <div className="text-center py-10 text-slate-500 dark:text-slate-400">
               <Play className="w-10 h-10 mx-auto mb-3 opacity-40" />
               <p className="text-sm">Pulsa <b>Ejecutar</b> para iniciar.</p>
               <p className="text-xs mt-1">El comando se ejecuta en el router central, no desde tu navegador.</p>
@@ -205,7 +205,7 @@ function TraceResults({ data }: { data: DiagnosticsTraceResponse }) {
             {data.hops.map(h => (
               <tr key={h.hop} className="border-t border-slate-100 dark:border-slate-800">
                 <td className="data-cell">{h.hop}</td>
-                <td className="data-cell">{h.address || <span className="text-slate-400">* * *</span>}</td>
+                <td className="data-cell">{h.address || <span className="text-slate-500 dark:text-slate-400">* * *</span>}</td>
                 <td className="data-cell">{h.rttMs != null ? `${h.rttMs} ms` : <span className="text-rose-500">timeout</span>}</td>
                 <td className="data-cell">{h.lossPct != null ? `${h.lossPct}%` : '—'}</td>
               </tr>

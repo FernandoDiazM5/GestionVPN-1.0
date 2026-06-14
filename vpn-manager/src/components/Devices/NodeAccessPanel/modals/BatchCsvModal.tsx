@@ -134,7 +134,7 @@ export default function BatchCsvModal({ onClose, onSuccess, nodes }: BatchCsvMod
                     <span className="text-sky-600 font-mono">{(n.lan_subnets?.[0] || n.segmento_lan) || '—'}</span>
                   </div>
                 ))}
-                {nodes.length === 0 && <p className="text-xs text-slate-400 italic text-center py-4">Sin nodos cargados</p>}
+                {nodes.length === 0 && <p className="text-xs text-slate-500 dark:text-slate-400 italic text-center py-4">Sin nodos cargados</p>}
               </div>
               <button onClick={handleExport} disabled={nodes.length === 0}
                 className="btn-accent btn-md w-full flex items-center justify-center gap-2">
@@ -171,7 +171,7 @@ export default function BatchCsvModal({ onClose, onSuccess, nodes }: BatchCsvMod
                 className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-300 font-mono resize-none" />
               {rows.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-2xs font-bold text-slate-400 uppercase tracking-wider">{rows.filter(r => r.valid).length}/{rows.length} filas válidas</p>
+                  <p className="text-2xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{rows.filter(r => r.valid).length}/{rows.length} filas válidas</p>
                   <div className="space-y-1.5 max-h-48 overflow-y-auto">
                     {rows.map((r, i) => (
                       <div key={i} className={`flex items-center gap-3 px-3 py-2 rounded-lg border text-xs ${r.valid ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-100' : 'bg-rose-50 dark:bg-rose-500/10 border-rose-100'}`}>
@@ -179,7 +179,7 @@ export default function BatchCsvModal({ onClose, onSuccess, nodes }: BatchCsvMod
                           {r.valid ? '✓' : '✗'}
                         </span>
                         <span className="font-bold text-slate-700 dark:text-slate-200">{r.nombre || '(sin nombre)'}</span>
-                        <span className="text-slate-400">{r.usuario}</span>
+                        <span className="text-slate-500 dark:text-slate-400">{r.usuario}</span>
                         <span className="text-sky-600 font-mono">{r.subnets.join(', ') || '(sin subred)'}</span>
                       </div>
                     ))}
@@ -191,7 +191,7 @@ export default function BatchCsvModal({ onClose, onSuccess, nodes }: BatchCsvMod
 
           {tab === 'import' && (processing || done) && results.length > 0 && (
             <div className="space-y-2">
-              <p className="text-2xs font-bold text-slate-400 uppercase tracking-wider">Progreso de provisionamiento</p>
+              <p className="text-2xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Progreso de provisionamiento</p>
               {results.map((r, i) => (
                 <div key={i} className={`flex items-center gap-3 px-3 py-2 rounded-lg border text-xs
                   ${r.status === 'ok' ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-100' : r.status === 'error' ? 'bg-rose-50 dark:bg-rose-500/10 border-rose-100' : r.status === 'processing' ? 'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-200' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-800'}`}>
@@ -200,7 +200,7 @@ export default function BatchCsvModal({ onClose, onSuccess, nodes }: BatchCsvMod
                     {r.status === 'ok' ? '✓' : r.status === 'error' ? '✗' : r.status === 'processing' ? <Loader2 className="w-3 h-3 animate-spin" /> : i + 1}
                   </span>
                   <span className="font-bold text-slate-700 dark:text-slate-200">{r.nombre}</span>
-                  {r.message && <span className="text-slate-400 text-2xs truncate">{r.message}</span>}
+                  {r.message && <span className="text-slate-500 dark:text-slate-400 text-2xs truncate">{r.message}</span>}
                 </div>
               ))}
             </div>

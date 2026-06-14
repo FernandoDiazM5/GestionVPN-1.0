@@ -42,8 +42,8 @@ export default function ControlBar({
         {/* IP global del servidor SSTP — solo visible para Administrador de plataforma */}
         {showServerIP && (
         <div className="flex items-center gap-1.5 mt-2">
-          <Globe className="w-3 h-3 text-slate-400" />
-          <span className="text-2xs text-slate-400 font-medium">Servidor SSTP:</span>
+          <Globe className="w-3 h-3 text-slate-500 dark:text-slate-400" />
+          <span className="text-2xs text-slate-500 dark:text-slate-400 font-medium">Servidor SSTP:</span>
           {editingGlobalIP ? (
             <input
               value={globalServerIP}
@@ -69,10 +69,10 @@ export default function ControlBar({
             />
           ) : (
             <button onClick={() => setEditingGlobalIP(true)} className="flex items-center gap-1 group">
-              <span className={`text-2xs font-mono font-semibold ${globalServerIP ? 'text-slate-700 dark:text-slate-200' : 'text-slate-400 italic'}`}>
+              <span className={`text-2xs font-mono font-semibold ${globalServerIP ? 'text-slate-700 dark:text-slate-200' : 'text-slate-500 dark:text-slate-400 italic'}`}>
                 {globalServerIP || 'Sin configurar'}
               </span>
-              <Pencil className="w-2.5 h-2.5 text-slate-300 group-hover:text-indigo-500 transition-colors" />
+              <Pencil className="w-2.5 h-2.5 text-slate-400 dark:text-slate-500 group-hover:text-indigo-500 transition-colors" />
             </button>
           )}
         </div>

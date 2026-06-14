@@ -4,7 +4,7 @@ export function formatSignalStrength(signal: number | null | undefined): string 
 }
 
 export function getSignalColor(signal: number | null | undefined): string {
-  if (signal == null) return 'text-slate-400';
+  if (signal == null) return 'text-slate-500 dark:text-slate-400';
   if (signal >= -65) return 'text-emerald-600';
   if (signal >= -75) return 'text-sky-600';
   return 'text-amber-500';
@@ -16,7 +16,7 @@ export function formatPercentage(value: number | null | undefined): string {
 }
 
 export function getHealthColor(value: number | null | undefined, thresholds: { good: number; ok: number }): string {
-  if (value == null) return 'text-slate-400';
+  if (value == null) return 'text-slate-500 dark:text-slate-400';
   if (value >= thresholds.good) return 'text-emerald-600';
   if (value >= thresholds.ok) return 'text-amber-500';
   return 'text-rose-500';

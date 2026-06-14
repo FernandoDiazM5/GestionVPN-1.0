@@ -191,7 +191,7 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
         <div className="overflow-y-auto flex-1">
           {provisioning && !result && (
             <div className="p-5 space-y-3">
-              <p className="text-2xs font-bold text-slate-400 uppercase tracking-wider">Ejecutando en MikroTik…</p>
+              <p className="text-2xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Ejecutando en MikroTik…</p>
               <div className="space-y-1.5">
                 {PASOS_LABELS.map((label, idx) => (
                   <div key={idx} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs border transition-colors
@@ -250,7 +250,7 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                           <p className="text-sm font-mono font-bold text-slate-800 dark:text-slate-100">{pppUser}</p>
                         </div>
                         <button onClick={() => copyField(pppUser, 'res-user')}
-                          className="p-1.5 text-slate-400 hover:text-emerald-600 rounded-lg transition-colors shrink-0">
+                          className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-emerald-600 rounded-lg transition-colors shrink-0">
                           {copiedField === 'res-user' ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
                         </button>
                       </div>
@@ -263,11 +263,11 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
                           <button onClick={() => setShowResPass(v => !v)}
-                            className="p-1.5 text-slate-400 hover:text-slate-700 dark:text-slate-200 rounded-lg transition-colors">
+                            className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg transition-colors">
                             {showResPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                           </button>
                           <button onClick={() => copyField(pppPass, 'res-pass')}
-                            className="p-1.5 text-slate-400 hover:text-emerald-600 rounded-lg transition-colors">
+                            className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-emerald-600 rounded-lg transition-colors">
                             {copiedField === 'res-pass' ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
                           </button>
                         </div>
@@ -281,7 +281,7 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
               )}
 
               <div>
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">Pasos ejecutados</p>
+                <p className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Pasos ejecutados</p>
                 <ProvisionSteps steps={result.steps ?? []} failedAt={result.failedAt} visible={visibleSteps} />
               </div>
 
@@ -340,7 +340,7 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                         </li>
                       ))}
                     </ol>
-                    <p className="text-2xs text-slate-400 mt-3">
+                    <p className="text-2xs text-slate-500 dark:text-slate-400 mt-3">
                       Luego obtén la public key del CPE con: <span className="font-mono">/interface wireguard print</span>
                     </p>
                   </div>
@@ -379,17 +379,17 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
               </div>
 
               <div className="space-y-3">
-                <p className="text-2xs font-bold text-slate-400 uppercase tracking-wider">Datos del nodo</p>
+                <p className="text-2xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Datos del nodo</p>
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                     Nombre del nodo <span className="text-rose-500">*</span>
-                    <span className="text-2xs font-normal text-slate-400 ml-1">(cualquier nombre)</span>
+                    <span className="text-2xs font-normal text-slate-500 dark:text-slate-400 ml-1">(cualquier nombre)</span>
                   </label>
                   <input value={nombre} onChange={e => setNombre(e.target.value)}
                     placeholder="Ej: ROSMERY, FIWIS, MILAGROS"
                     className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-                  {nameClean && <p className="text-2xs text-slate-400 mt-0.5">Se usará: <span className="font-mono font-bold text-indigo-600">{nameClean}</span></p>}
+                  {nameClean && <p className="text-2xs text-slate-500 dark:text-slate-400 mt-0.5">Se usará: <span className="font-mono font-bold text-indigo-600">{nameClean}</span></p>}
                 </div>
 
                 <div>
@@ -412,7 +412,7 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                   <div>
                     <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                       Usuario PPP <span className="text-rose-500">*</span>
-                      <span className="text-2xs font-normal text-slate-400 ml-1">— ingresar manualmente</span>
+                      <span className="text-2xs font-normal text-slate-500 dark:text-slate-400 ml-1">— ingresar manualmente</span>
                     </label>
                     <div className="relative">
                       <input value={pppUser} onChange={e => setPppUser(e.target.value)}
@@ -421,7 +421,7 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                       {pppUser && (
                         <button onClick={() => copyField(pppUser, 'form-user')}
                           title="Copiar usuario"
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600 transition-colors">
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 hover:text-indigo-600 transition-colors">
                           {copiedField === 'form-user' ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
                         </button>
                       )}
@@ -444,20 +444,20 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                         className="w-full px-3 py-2 pr-24 text-sm border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300 font-mono" />
                       <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
                         <button onClick={() => setShowPass(v => !v)} title={showPass ? 'Ocultar' : 'Ver'}
-                          className="p-1.5 text-slate-400 hover:text-slate-700 dark:text-slate-200 rounded-lg transition-colors">
+                          className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg transition-colors">
                           {showPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                         </button>
                         <button onClick={() => setPppPass(generateSecurePassword())} title="Regenerar contraseña"
-                          className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg transition-colors">
+                          className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-indigo-600 rounded-lg transition-colors">
                           <RefreshCw className="w-3.5 h-3.5" />
                         </button>
                         <button onClick={() => copyField(pppPass, 'form-pass')} title="Copiar contraseña"
-                          className="p-1.5 text-slate-400 hover:text-emerald-600 rounded-lg transition-colors">
+                          className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-emerald-600 rounded-lg transition-colors">
                           {copiedField === 'form-pass' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
                         </button>
                       </div>
                     </div>
-                    <p className="text-2xs text-slate-400 mt-0.5">Puedes editar o regenerar — se guardará en la base de datos local</p>
+                    <p className="text-2xs text-slate-500 dark:text-slate-400 mt-0.5">Puedes editar o regenerar — se guardará en la base de datos local</p>
                   </div>
                 </>)}
 
@@ -470,14 +470,14 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                       placeholder="213.173.36.232"
                       className="input-field w-full font-mono text-sm"
                     />
-                    <p className="text-2xs text-slate-400 mt-1">IP pública del MikroTik. Se guarda automáticamente para próximos nodos.</p>
+                    <p className="text-2xs text-slate-500 dark:text-slate-400 mt-1">IP pública del MikroTik. Se guarda automáticamente para próximos nodos.</p>
                   </div>
                 )}
 
                 {protocol === 'wireguard' && (
                   <div>
                     <label className="text-2xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1 block">
-                      Clave Pública del CPE <span className="text-slate-400 font-normal normal-case">(opcional)</span>
+                      Clave Pública del CPE <span className="text-slate-500 dark:text-slate-400 font-normal normal-case">(opcional)</span>
                     </label>
                     <textarea
                       value={cpePublicKey}
@@ -486,7 +486,7 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                       className="input-field w-full font-mono text-xs resize-none"
                       rows={3}
                     />
-                    <p className="text-2xs text-slate-400 mt-1">
+                    <p className="text-2xs text-slate-500 dark:text-slate-400 mt-1">
                       Si no la tienes aún: crea el nodo primero, obtén la clave del servidor y configura el CPE. Luego agrega la clave del CPE desde el script del nodo.
                     </p>
                   </div>
@@ -521,7 +521,7 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                       );
                     })}
                   </div>
-                  {validSubnets.length > 0 && <p className="text-2xs text-slate-400 mt-1">{validSubnets.length} subred(es) válida(s)</p>}
+                  {validSubnets.length > 0 && <p className="text-2xs text-slate-500 dark:text-slate-400 mt-1">{validSubnets.length} subred(es) válida(s)</p>}
                   {subnetConflicts.length > 0 && (
                     <div className="mt-2 space-y-1">
                       {subnetConflicts.map((msg, i) => (

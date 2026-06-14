@@ -89,7 +89,7 @@ export default function MembersTable({
                       <div className="min-w-0">
                         <p className="font-semibold text-slate-800 dark:text-slate-100 truncate">
                           {m.name || m.email.split('@')[0]}
-                          {isSelf && <span className="ml-1.5 text-2xs font-medium text-slate-400">(tú)</span>}
+                          {isSelf && <span className="ml-1.5 text-2xs font-medium text-slate-500 dark:text-slate-400">(tú)</span>}
                         </p>
                         <p className="font-mono text-2xs text-slate-400 dark:text-slate-500 truncate">{m.email}</p>
                       </div>
@@ -109,7 +109,7 @@ export default function MembersTable({
                   {/* Acciones */}
                   <td className="px-4 py-3 align-middle text-right">
                     <div className="inline-flex items-center justify-end gap-1.5 whitespace-nowrap">
-                      {busy && <Loader2 className="w-4 h-4 animate-spin text-slate-400" />}
+                      {busy && <Loader2 className="w-4 h-4 animate-spin text-slate-500 dark:text-slate-400" />}
 
                       {/* Acceso WireGuard (moderador, sobre miembros no-OWNER) */}
                       {canManage && !ownerRow && !busy && (

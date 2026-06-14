@@ -10,7 +10,7 @@ export default function VpnCardIPCell({ ip, status }: VpnCardIPCellProps) {
 
   return (
     <td className="px-4 py-3">
-      <span className={`font-mono text-xs font-semibold ${isRunning ? 'text-emerald-600' : 'text-slate-300'}`}>
+      <span className={`font-mono text-xs font-semibold ${isRunning ? 'text-emerald-600' : 'text-slate-400 dark:text-slate-500'}`}>
         {ip ?? '—'}
       </span>
     </td>

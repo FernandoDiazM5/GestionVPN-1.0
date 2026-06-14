@@ -109,7 +109,7 @@ function CpeDetailModal({
         </div>
         <div className="overflow-y-auto p-5 space-y-4">
           {loading && (
-            <div className="flex items-center justify-center gap-3 py-12 text-slate-400">
+            <div className="flex items-center justify-center gap-3 py-12 text-slate-500 dark:text-slate-400">
               <Loader2 className="w-5 h-5 animate-spin" />
               <span className="text-sm">Conectando SSH al CPE…</span>
             </div>

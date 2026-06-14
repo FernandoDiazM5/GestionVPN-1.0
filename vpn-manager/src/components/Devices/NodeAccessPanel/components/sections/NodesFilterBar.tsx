@@ -59,7 +59,7 @@ function NodesFilterBarImpl({
           <input type="text" name="dummy-user" style={{ display: 'none' }} />
           <input type="password" name="dummy-pass" style={{ display: 'none' }} />
 
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
           <input
             type="text"
             name="node-search-filter-off"
@@ -76,7 +76,7 @@ function NodesFilterBarImpl({
               onClick={() => onSearchChange('')}
               aria-label="Limpiar búsqueda"
               title="Limpiar búsqueda"
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 hover:text-slate-600 transition-colors p-1"
             >
               <X className="w-4 h-4" />
             </button>
@@ -150,12 +150,12 @@ function NodesFilterBarImpl({
               <span className="font-bold text-indigo-600 dark:text-indigo-400">{resultCount}</span>
               <span className="text-slate-300 dark:text-slate-600 mx-1">/</span>
               <span>{totalCount}</span>
-              <span className="ml-1 text-slate-400">nodos</span>
+              <span className="ml-1 text-slate-500 dark:text-slate-400">nodos</span>
             </>
           ) : (
             <>
               <span className="font-bold text-slate-600 dark:text-slate-300">{totalCount}</span>
-              <span className="ml-1 text-slate-400">nodos</span>
+              <span className="ml-1 text-slate-500 dark:text-slate-400">nodos</span>
             </>
           )}
         </span>

@@ -25,11 +25,11 @@ export default function StationsList({ antennaStats }: StationsListProps) {
             </div>
             <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 text-slate-600 dark:text-slate-300 font-mono text-2xs">
               {sta.signal != null && <span className={sta.signal >= -65 ? 'text-emerald-600 dark:text-emerald-400' : sta.signal >= -75 ? 'text-sky-600' : 'text-amber-500'}>{sta.signal} dBm</span>}
-              {sta.noiseFloor != null && <span className="text-slate-400">/ {sta.noiseFloor} dBm</span>}
+              {sta.noiseFloor != null && <span className="text-slate-500 dark:text-slate-400">/ {sta.noiseFloor} dBm</span>}
               {sta.ccq != null && <span className={sta.ccq >= 80 ? 'text-emerald-600 dark:text-emerald-400' : sta.ccq >= 60 ? 'text-sky-600' : 'text-amber-500'}>{sta.ccq}%</span>}
               {sta.txRate != null && <span className="text-emerald-600 dark:text-emerald-400">{sta.txRate}↑</span>}
               {sta.rxRate != null && <span className="text-sky-600 dark:text-sky-400">{sta.rxRate}↓ Mbps</span>}
-              {sta.distance != null && <span className="text-slate-400">{sta.distance}m</span>}
+              {sta.distance != null && <span className="text-slate-500 dark:text-slate-400">{sta.distance}m</span>}
               {sta.txLatency != null && <span className="text-violet-500">{sta.txLatency}ms</span>}
               {sta.airmaxQuality != null && <span className="text-indigo-500">AM:{sta.airmaxQuality}%</span>}
             </div>

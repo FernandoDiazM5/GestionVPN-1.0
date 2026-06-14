@@ -73,7 +73,7 @@ export default function MyInvitationsInbox({ onAccepted }: { onAccepted: () => v
                 Opcional: puedes aceptar sin clave y configurarla luego.
               </p>
               <div className="relative">
-                <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
                 <input
                   value={publicKey} onChange={e => setPublicKey(e.target.value)}
                   placeholder="Clave pública WG (ej. abcd...=)"

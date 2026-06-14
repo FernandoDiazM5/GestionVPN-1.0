@@ -243,13 +243,13 @@ function CreateModeratorModal({ onClose, onCreated }: { onClose: () => void; onC
         y generará su configuración WireGuard al aceptar.
       </p>
       <div className="relative">
-        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
         <input className={inputCls + ' pl-10'} type="email" placeholder="Correo del moderador" value={email} onChange={e => setEmail(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && email.trim() && submit()} />
       </div>
       <input className={inputCls} placeholder="Nombre (opcional)" value={name} onChange={e => setName(e.target.value)} />
       <div className="relative">
-        <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
         <input className={inputCls + ' pl-10'} placeholder="Nombre del workspace (opcional)" value={workspaceName} onChange={e => setWorkspaceName(e.target.value)} />
       </div>
       {error && <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">{error}</p>}
@@ -286,7 +286,7 @@ function EditModeratorModal({ mod, onClose, onSaved }: { mod: Moderator; onClose
       <input className={inputCls} placeholder="Nombre del moderador" value={name} onChange={e => setName(e.target.value)} />
       <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">Workspace</label>
       <div className="relative">
-        <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
         <input className={inputCls + ' pl-10'} placeholder="Nombre del workspace" value={workspaceName} onChange={e => setWorkspaceName(e.target.value)} />
       </div>
       {error && <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">{error}</p>}
@@ -322,7 +322,7 @@ function ResetPasswordModal({ mod, onClose, onSaved }: { mod: Moderator; onClose
         Nueva contraseña para <span className="font-semibold text-slate-700 dark:text-slate-200">{mod.name || mod.email}</span>.
       </p>
       <div className="relative">
-        <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
         <input className={inputCls + ' pl-10'} type="password" placeholder="Contraseña (mín. 8)" value={password} onChange={e => setPassword(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && password.length >= 8 && submit()} autoFocus />
       </div>

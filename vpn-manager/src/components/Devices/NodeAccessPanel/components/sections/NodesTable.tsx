@@ -57,7 +57,7 @@ export default function NodesTable({
 }: NodesTableProps) {
 
   const SortIcon = ({ columnKey }: { columnKey: SortKey }) => {
-    if (sortKey !== columnKey) return <ArrowUpDown className="w-3 h-3 text-slate-300 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />;
+    if (sortKey !== columnKey) return <ArrowUpDown className="w-3 h-3 text-slate-400 dark:text-slate-500 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />;
     return sortDir === 'asc'
       ? <ArrowUp className="w-3 h-3 text-indigo-500 ml-1" />
       : <ArrowDown className="w-3 h-3 text-indigo-500 ml-1" />;
@@ -134,9 +134,9 @@ export default function NodesTable({
             <tr>
               <td colSpan={totalCols} className="px-4 py-12 text-center">
                 <div className="flex flex-col items-center gap-2">
-                  <Search className="w-8 h-8 text-slate-300" />
-                  <p className="text-slate-400 font-semibold">Sin resultados</p>
-                  <p className="text-slate-400 text-xs">
+                  <Search className="w-8 h-8 text-slate-400 dark:text-slate-500" />
+                  <p className="text-slate-500 dark:text-slate-400 font-semibold">Sin resultados</p>
+                  <p className="text-slate-500 dark:text-slate-400 text-xs">
                     {searchQuery ? `No se encontraron nodos coincidentes con "${searchQuery}"` : 'No hay nodos para mostrar'}
                   </p>
                 </div>

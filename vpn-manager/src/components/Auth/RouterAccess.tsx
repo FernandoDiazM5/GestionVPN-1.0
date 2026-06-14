@@ -195,7 +195,7 @@ export default function RouterAccess() {
                   {needsSetup ? 'Usuario Administrador' : 'Usuario o correo'}
                 </label>
                 <div className="relative">
-                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
                   <input
                     type="text"
                     required
@@ -212,7 +212,7 @@ export default function RouterAccess() {
                   Contraseña
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
                   <input
                     type="password"
                     required
@@ -252,7 +252,7 @@ export default function RouterAccess() {
           </div>
         </div>
 
-        <p className="text-center text-xs text-slate-400 font-medium mt-6">
+        <p className="text-center text-xs text-slate-500 dark:text-slate-400 font-medium mt-6">
           Microservicios encriptados AES-256-GCM.
         </p>
       </div>

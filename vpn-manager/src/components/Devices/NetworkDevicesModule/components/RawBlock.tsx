@@ -12,8 +12,8 @@ export function RawBlock({ title, content, icon }: { title: string; content: str
           {icon}{title}
         </span>
         <div className="flex items-center gap-2">
-          {!open && <span className="text-[9px] text-slate-400">ver</span>}
-          <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+          {!open && <span className="text-[9px] text-slate-500 dark:text-slate-400">ver</span>}
+          <ChevronDown className={`w-3 h-3 text-slate-500 dark:text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
         </div>
       </button>
       {open && (

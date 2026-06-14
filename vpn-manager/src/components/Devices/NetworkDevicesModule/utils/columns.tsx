@@ -10,7 +10,7 @@ export const COLUMN_DEFS: ColumnDef[] = [
     render: (dev) => {
       const ssid = dev.cachedStats?.essid ?? dev.essid;
       const parentAp = dev.parentAp;
-      if (!ssid && !parentAp) return <span className="text-2xs text-slate-300">—</span>;
+      if (!ssid && !parentAp) return <span className="data-empty">—</span>;
       return (
         <div className="min-w-0">
           {ssid && (
@@ -31,7 +31,7 @@ export const COLUMN_DEFS: ColumnDef[] = [
     requiresStats: true,
     render: (dev) => {
       const v = dev.cachedStats?.signal;
-      if (v == null) return <span className="text-2xs text-slate-300">—</span>;
+      if (v == null) return <span className="data-empty">—</span>;
       const c = v >= -65 ? 'text-emerald-600' : v >= -75 ? 'text-sky-600' : 'text-amber-500';
       return <span className={`font-mono font-bold text-xs ${c}`}>{v} dBm</span>;
     },
@@ -44,7 +44,7 @@ export const COLUMN_DEFS: ColumnDef[] = [
     requiresStats: true,
     render: (dev) => {
       const v = dev.cachedStats?.ccq;
-      if (v == null) return <span className="text-2xs text-slate-300">—</span>;
+      if (v == null) return <span className="data-empty">—</span>;
       const c = v >= 80 ? 'text-emerald-600' : v >= 60 ? 'text-sky-600' : 'text-amber-500';
       return <span className={`font-mono font-bold text-xs ${c}`}>{v}%</span>;
     },
@@ -57,7 +57,7 @@ export const COLUMN_DEFS: ColumnDef[] = [
     requiresStats: true,
     render: (dev) => {
       const v = dev.cachedStats?.txRate;
-      if (v == null) return <span className="text-2xs text-slate-300">—</span>;
+      if (v == null) return <span className="data-empty">—</span>;
       return <span className="font-mono text-xs text-slate-600">{v} Mbps</span>;
     },
   },
@@ -69,7 +69,7 @@ export const COLUMN_DEFS: ColumnDef[] = [
     requiresStats: true,
     render: (dev) => {
       const v = dev.cachedStats?.rxRate;
-      if (v == null) return <span className="text-2xs text-slate-300">—</span>;
+      if (v == null) return <span className="data-empty">—</span>;
       return <span className="font-mono text-xs text-slate-600">{v} Mbps</span>;
     },
   },
@@ -81,7 +81,7 @@ export const COLUMN_DEFS: ColumnDef[] = [
     requiresStats: true,
     render: (dev) => {
       const v = dev.cachedStats?.noiseFloor;
-      if (v == null) return <span className="text-2xs text-slate-300">—</span>;
+      if (v == null) return <span className="data-empty">—</span>;
       return <span className="font-mono text-xs text-slate-500">{v} dBm</span>;
     },
   },
@@ -93,7 +93,7 @@ export const COLUMN_DEFS: ColumnDef[] = [
     requiresStats: true,
     render: (dev) => {
       const v = dev.cachedStats?.cpuLoad;
-      if (v == null) return <span className="text-2xs text-slate-300">—</span>;
+      if (v == null) return <span className="data-empty">—</span>;
       const c = v < 50 ? 'text-emerald-600' : v < 80 ? 'text-amber-500' : 'text-rose-500';
       return <span className={`font-mono font-bold text-xs ${c}`}>{v}%</span>;
     },
@@ -106,7 +106,7 @@ export const COLUMN_DEFS: ColumnDef[] = [
     requiresStats: true,
     render: (dev) => {
       const v = dev.cachedStats?.memoryPercent;
-      if (v == null) return <span className="text-2xs text-slate-300">—</span>;
+      if (v == null) return <span className="data-empty">—</span>;
       const c = v < 60 ? 'text-emerald-600' : v < 80 ? 'text-amber-500' : 'text-rose-500';
       return <span className={`font-mono font-bold text-xs ${c}`}>{v}%</span>;
     },
@@ -119,7 +119,7 @@ export const COLUMN_DEFS: ColumnDef[] = [
     requiresStats: true,
     render: (dev) => {
       const v = dev.cachedStats?.airmaxQuality;
-      if (v == null) return <span className="text-2xs text-slate-300">—</span>;
+      if (v == null) return <span className="data-empty">—</span>;
       const c = v >= 80 ? 'text-emerald-600' : v >= 60 ? 'text-sky-600' : 'text-amber-500';
       return <span className={`font-mono font-bold text-xs ${c}`}>{v}%</span>;
     },
@@ -132,7 +132,7 @@ export const COLUMN_DEFS: ColumnDef[] = [
     requiresStats: true,
     render: (dev) => {
       const v = dev.cachedStats?.airmaxCapacity;
-      if (v == null) return <span className="text-2xs text-slate-300">—</span>;
+      if (v == null) return <span className="data-empty">—</span>;
       const c = v >= 80 ? 'text-emerald-600' : v >= 60 ? 'text-sky-600' : 'text-amber-500';
       return <span className={`font-mono font-bold text-xs ${c}`}>{v}%</span>;
     },
@@ -145,7 +145,7 @@ export const COLUMN_DEFS: ColumnDef[] = [
     requiresStats: true,
     render: (dev) => {
       const v = dev.cachedStats?.uptimeStr;
-      if (!v) return <span className="text-2xs text-slate-300">—</span>;
+      if (!v) return <span className="data-empty">—</span>;
       return <span className="font-mono text-2xs text-slate-500">{v}</span>;
     },
   },
@@ -157,7 +157,7 @@ export const COLUMN_DEFS: ColumnDef[] = [
     requiresStats: true,
     render: (dev) => {
       const v = dev.cachedStats?.txPower;
-      if (v == null) return <span className="text-2xs text-slate-300">—</span>;
+      if (v == null) return <span className="data-empty">—</span>;
       return <span className="font-mono text-xs text-slate-500">{v} dBm</span>;
     },
   },
@@ -169,7 +169,7 @@ export const COLUMN_DEFS: ColumnDef[] = [
     requiresStats: true,
     render: (dev) => {
       const v = dev.cachedStats?.channelWidth;
-      if (v == null) return <span className="text-2xs text-slate-300">—</span>;
+      if (v == null) return <span className="data-empty">—</span>;
       return <span className="font-mono text-xs text-slate-500">{v} MHz</span>;
     },
   },
@@ -181,7 +181,7 @@ export const COLUMN_DEFS: ColumnDef[] = [
     requiresStats: true,
     render: (dev) => {
       const v = dev.cachedStats?.rssi ?? dev.cachedStats?.signal;
-      if (v == null) return <span className="text-2xs text-slate-300">—</span>;
+      if (v == null) return <span className="data-empty">—</span>;
       const c = v >= -65 ? 'text-emerald-600' : v >= -75 ? 'text-sky-600' : 'text-amber-500';
       return <span className={`font-mono font-bold text-xs ${c}`}>{v} dBm</span>;
     },
@@ -194,7 +194,7 @@ export const COLUMN_DEFS: ColumnDef[] = [
     requiresStats: true,
     render: (dev) => {
       const v = dev.cachedStats?.distance;
-      if (v == null) return <span className="text-2xs text-slate-300">—</span>;
+      if (v == null) return <span className="data-empty">—</span>;
       const m = parseInt(String(v));
       return <span className="font-mono text-xs text-slate-500">{m >= 1000 ? `${(m / 1000).toFixed(2)} km` : `${m} m`}</span>;
     },
@@ -207,7 +207,7 @@ export const COLUMN_DEFS: ColumnDef[] = [
     requiresStats: false,
     render: (dev) => {
       const v = dev.cachedStats?.frequency ?? dev.frequency;
-      if (!v) return <span className="text-2xs text-slate-300">—</span>;
+      if (!v) return <span className="data-empty">—</span>;
       return <span className="font-mono text-xs text-slate-500">{v} MHz</span>;
     },
   },
@@ -219,7 +219,7 @@ export const COLUMN_DEFS: ColumnDef[] = [
     requiresStats: true,
     render: (dev) => {
       const v = dev.cachedStats?.deviceName ?? dev.name;
-      if (!v) return <span className="text-2xs text-slate-300">—</span>;
+      if (!v) return <span className="data-empty">—</span>;
       return <span className="font-mono text-2xs text-slate-600 truncate block" title={v}>{v}</span>;
     },
   },
@@ -231,7 +231,7 @@ export const COLUMN_DEFS: ColumnDef[] = [
     requiresStats: true,
     render: (dev) => {
       const v = dev.cachedStats?.firmwareVersion ?? dev.firmware;
-      if (!v) return <span className="text-2xs text-slate-300">—</span>;
+      if (!v) return <span className="data-empty">—</span>;
       return <span className="font-mono text-2xs text-slate-500 truncate block" title={v}>{v}</span>;
     },
   },
@@ -243,7 +243,7 @@ export const COLUMN_DEFS: ColumnDef[] = [
     requiresStats: true,
     render: (dev) => {
       const v = dev.cachedStats?.chains;
-      if (!v) return <span className="text-2xs text-slate-300">—</span>;
+      if (!v) return <span className="data-empty">—</span>;
       return <span className="font-mono text-xs text-slate-500">{v}</span>;
     },
   },
@@ -255,7 +255,7 @@ export const COLUMN_DEFS: ColumnDef[] = [
     requiresStats: true,
     render: (dev) => {
       const v = dev.cachedStats?.security;
-      if (!v) return <span className="text-2xs text-slate-300">—</span>;
+      if (!v) return <span className="data-empty">—</span>;
       return <span className="font-mono text-2xs text-slate-500 uppercase">{v}</span>;
     },
   },
@@ -267,7 +267,7 @@ export const COLUMN_DEFS: ColumnDef[] = [
     requiresStats: true,
     render: (dev) => {
       const v = dev.cachedStats?.txRetries;
-      if (v == null) return <span className="text-2xs text-slate-300">—</span>;
+      if (v == null) return <span className="data-empty">—</span>;
       const c = v < 100 ? 'text-emerald-600' : v < 500 ? 'text-amber-500' : 'text-rose-500';
       return <span className={`font-mono text-xs ${c}`}>{v}</span>;
     },
@@ -280,7 +280,7 @@ export const COLUMN_DEFS: ColumnDef[] = [
     requiresStats: true,
     render: (dev) => {
       const v = dev.cachedStats?.opmode;
-      if (!v) return <span className="text-2xs text-slate-300">—</span>;
+      if (!v) return <span className="data-empty">—</span>;
       return <span className="font-mono text-2xs text-slate-500">{v}</span>;
     },
   },
@@ -292,7 +292,7 @@ export const COLUMN_DEFS: ColumnDef[] = [
     requiresStats: true,
     render: (dev) => {
       const v = dev.cachedStats?.countryCode;
-      if (!v) return <span className="text-2xs text-slate-300">—</span>;
+      if (!v) return <span className="data-empty">—</span>;
       return <span className="font-mono text-2xs text-slate-500">{v}</span>;
     },
   },

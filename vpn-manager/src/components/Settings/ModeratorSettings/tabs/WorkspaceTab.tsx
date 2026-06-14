@@ -52,7 +52,7 @@ export default function WorkspaceTab() {
             Nuevo nombre
           </label>
           <div className="relative">
-            <Briefcase className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Briefcase className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
             <input value={name} onChange={e => setName(e.target.value)}
               maxLength={160}
               placeholder="Ej: FIWIS Networks"

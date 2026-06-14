@@ -44,7 +44,7 @@ export default function InvitePanel({ currentRole, invitations, onInvite, onRevo
 
       <div className="flex flex-col sm:flex-row gap-2">
         <div className="relative sm:w-56">
-          <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
           <input
             value={name} onChange={e => setName(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && submit()}
@@ -55,7 +55,7 @@ export default function InvitePanel({ currentRole, invitations, onInvite, onRevo
           />
         </div>
         <div className="relative flex-1">
-          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
           <input
             type="email" value={email} onChange={e => setEmail(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && submit()}

@@ -109,7 +109,7 @@ export default function AuditTimeline({ logs, live }: AuditTimelineProps) {
                 JSON
               </button>
             </div>
-            <p className="text-2xs text-slate-400 leading-snug">
+            <p className="text-2xs text-slate-500 dark:text-slate-400 leading-snug">
               El CSV abre directo en Excel (BOM UTF-8). Máx 10 000 filas por export.
             </p>
           </div>

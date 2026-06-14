@@ -230,7 +230,12 @@
 
   /* ── Celdas de DATOS en tablas (mono + jerarquía neutra) ── */
   .data-cell   { @apply font-mono text-xs font-semibold text-slate-700 dark:text-slate-200; }
-  .data-muted  { @apply font-mono text-xs text-slate-400 dark:text-slate-600; } /* valor vacío "—" */
+  .data-muted  { @apply font-mono text-xs text-slate-400 dark:text-slate-600; } /* valor secundario muted */
+  /* Placeholder "—" para celdas vacías: tamaño 2xs (más sutil que data-muted)
+     + slate-400 que pasa AA marginal sobre fondo claro. Usado masivamente en
+     columns.tsx (Escanear) y similares. Antes era `text-2xs text-slate-300`
+     repetido inline (DS05 — slate-300 no pasa AA). */
+  .data-empty  { @apply font-mono text-2xs text-slate-400 dark:text-slate-600; }
 
   /* ── Encabezado de tabla estándar ── */
   .th-cell {

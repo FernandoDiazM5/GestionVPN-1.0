@@ -67,7 +67,7 @@ function ExportCard({ disabled }: { disabled?: boolean }) {
       )}
 
       <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-        <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
+        <ShieldCheck className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
         <p className="text-2xs text-slate-500 dark:text-slate-400 flex-1">
           Guarda este archivo en un lugar seguro — contiene datos sensibles cifrados.
         </p>
@@ -193,7 +193,7 @@ function ImportCard({ disabled }: { disabled?: boolean }) {
           </div>
 
           <div>
-            <label className="block text-2xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+            <label className="block text-2xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
               Política de conflictos
             </label>
             <div className="flex gap-2">
@@ -233,15 +233,15 @@ function ImportCard({ disabled }: { disabled?: boolean }) {
           </div>
           <div className="grid grid-cols-2 gap-3 text-xs">
             <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-3">
-              <p className="text-2xs font-bold uppercase tracking-wider text-slate-400">Insertados</p>
+              <p className="text-2xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Insertados</p>
               {Object.entries(applyResult.inserts).map(([k, v]) => (
-                <p key={k} className="font-mono text-slate-700 dark:text-slate-200 mt-1">+{v} <span className="text-slate-400 font-sans">{k}</span></p>
+                <p key={k} className="font-mono text-slate-700 dark:text-slate-200 mt-1">+{v} <span className="text-slate-500 dark:text-slate-400 font-sans">{k}</span></p>
               ))}
             </div>
             <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-3">
-              <p className="text-2xs font-bold uppercase tracking-wider text-slate-400">Actualizados</p>
+              <p className="text-2xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Actualizados</p>
               {Object.entries(applyResult.updates).map(([k, v]) => (
-                <p key={k} className="font-mono text-slate-700 dark:text-slate-200 mt-1">↻{v} <span className="text-slate-400 font-sans">{k}</span></p>
+                <p key={k} className="font-mono text-slate-700 dark:text-slate-200 mt-1">↻{v} <span className="text-slate-500 dark:text-slate-400 font-sans">{k}</span></p>
               ))}
             </div>
           </div>
@@ -303,7 +303,7 @@ function Row({ color, label, items }: { color: 'emerald' | 'sky' | 'slate'; labe
     <div className="flex items-start gap-2">
       <div className={`w-2 h-2 rounded-full ${dot} mt-1.5 shrink-0`} />
       <div className="min-w-0 flex-1">
-        <p className="text-2xs font-bold uppercase tracking-wider text-slate-400">{label}</p>
+        <p className="text-2xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{label}</p>
         <p className="font-mono text-2xs text-slate-600 dark:text-slate-300 break-all">{items.join(', ')}</p>
       </div>
     </div>

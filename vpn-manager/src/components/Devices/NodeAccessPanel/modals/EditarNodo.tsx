@@ -214,7 +214,7 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
           {!saving && !result && (
             <>
               {loadingDetails && (
-                <div className="flex items-center gap-2 text-xs text-slate-400">
+                <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   <span>Cargando datos actuales del router…</span>
                 </div>
@@ -235,7 +235,7 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
               </div>
 
               <div className="border-t border-slate-100 dark:border-slate-800 pt-4 space-y-3">
-                <p className="text-2xs font-bold text-slate-400 uppercase tracking-wider">Campos editables</p>
+                <p className="text-2xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Campos editables</p>
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Nombre / Etiqueta del nodo</label>
@@ -282,12 +282,12 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
                           {showPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                         </button>
                         <button onClick={() => setNewPass(generateSecurePassword())} title="Generar nueva contraseña segura"
-                          className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg transition-colors">
+                          className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-indigo-600 rounded-lg transition-colors">
                           <RefreshCw className="w-3.5 h-3.5" />
                         </button>
                         {newPass && (
                           <button onClick={() => copyEditField(newPass, 'edit-pass')} title="Copiar contraseña"
-                            className="p-1.5 text-slate-400 hover:text-emerald-600 rounded-lg transition-colors">
+                            className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-emerald-600 rounded-lg transition-colors">
                             {copiedEditField === 'edit-pass' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
                           </button>
                         )}
@@ -296,7 +296,7 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
                     {!loadingDetails && (
                       <div className="flex items-center justify-between mt-1.5 gap-2">
                         {!loadedPass ? (
-                          <p className="text-2xs text-slate-400">
+                          <p className="text-2xs text-slate-500 dark:text-slate-400">
                             Sin contraseña en DB local — ingrésala y pulsa <span className="font-bold">Guardar en DB</span>
                           </p>
                         ) : newPass === loadedPass ? (
@@ -339,11 +339,11 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
               {node.nombre_vrf && (
                 <>
                   <div>
-                    <p className="text-2xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                    <p className="text-2xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
                       Redes LAN actuales {loadingDetails && <Loader2 className="inline w-3 h-3 animate-spin ml-1" />}
                     </p>
                     {currentSubnets.length === 0 && !loadingDetails && (
-                      <p className="text-xs text-slate-400 italic">Sin subnets detectadas</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 italic">Sin subnets detectadas</p>
                     )}
                     <div className="space-y-1.5">
                       {currentSubnets.map(s => (
@@ -361,7 +361,7 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
 
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <p className="text-2xs font-bold text-slate-400 uppercase tracking-wider">Agregar redes LAN</p>
+                      <p className="text-2xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Agregar redes LAN</p>
                       <button onClick={() => setAddSubnets(p => [...p, ''])}
                         className="flex items-center gap-1 text-2xs font-bold text-indigo-600 hover:text-indigo-800">
                         <Plus className="w-3 h-3" /> Agregar

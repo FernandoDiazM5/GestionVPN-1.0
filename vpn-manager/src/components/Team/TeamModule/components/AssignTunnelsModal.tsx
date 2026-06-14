@@ -165,7 +165,7 @@ export default function AssignTunnelsModal({ member, onClose }: Props) {
                   </button>
                   {selectedCount > 0 && !visibleAllSelected && (
                     <>
-                      <span className="text-slate-300">·</span>
+                      <span className="text-slate-400 dark:text-slate-500">·</span>
                       <button
                         onClick={clearSelection}
                         disabled={busy}
@@ -181,7 +181,7 @@ export default function AssignTunnelsModal({ member, onClose }: Props) {
 
             {/* Búsqueda */}
             <div className="relative mb-2">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
               <input
                 type="text"
                 value={search}
@@ -194,7 +194,7 @@ export default function AssignTunnelsModal({ member, onClose }: Props) {
                 <button
                   onClick={() => setSearch('')}
                   aria-label="Limpiar búsqueda"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-500 dark:text-slate-400 hover:text-slate-600"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>

@@ -101,7 +101,7 @@ export default function EliminarNodo({ node, onClose, onSuccess }: EliminarNodoP
         <div className="overflow-y-auto flex-1 p-5 space-y-4">
           {deleting && !result && (
             <div className="space-y-3">
-              <p className="text-2xs font-bold text-slate-400 uppercase tracking-wider">Eliminando configuración de MikroTik…</p>
+              <p className="text-2xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Eliminando configuración de MikroTik…</p>
               <div className="space-y-1.5">
                 {DEL_STEPS.map((label, idx) => (
                   <div key={idx} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs border transition-colors
@@ -131,7 +131,7 @@ export default function EliminarNodo({ node, onClose, onSuccess }: EliminarNodoP
                 </div>
               </div>
               <div>
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">Pasos ejecutados</p>
+                <p className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Pasos ejecutados</p>
                 <ProvisionSteps steps={result.steps ?? []} failedAt={result.failedAt} visible={visibleSteps} />
               </div>
               <button onClick={() => result.success ? onSuccess(deletedDeviceIds) : onClose()}

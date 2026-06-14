@@ -27,7 +27,7 @@ export function SettingsForm({
             {SETTINGS_LABELS.MT_IP}
           </label>
           <div className="relative">
-            <Server className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Server className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
             <input
               type="text"
               required
@@ -44,7 +44,7 @@ export function SettingsForm({
             {SETTINGS_LABELS.MT_USER}
           </label>
           <div className="relative">
-            <Shield className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Shield className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
             <input
               type="text"
               required
@@ -61,7 +61,7 @@ export function SettingsForm({
             {SETTINGS_LABELS.MT_PASS}
           </label>
           <div className="relative">
-            <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
             <input
               type="password"
               required
@@ -71,7 +71,7 @@ export function SettingsForm({
               placeholder={SETTINGS_PLACEHOLDERS.MT_PASS}
             />
           </div>
-          <p className="text-xs text-slate-400 mt-2 font-medium">{SETTINGS_HINTS.MT_PASS}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 font-medium">{SETTINGS_HINTS.MT_PASS}</p>
         </div>
       </div>
 

@@ -102,7 +102,7 @@ export default function NuevoAdmin({ peers, onClose, onSuccess }: NuevoAdminProp
                 <textarea value={pubKey} onChange={e => setPubKey(e.target.value)} rows={3}
                   placeholder="Pega aquí la Public Key del cliente WireGuard"
                   className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300 font-mono resize-none" />
-                <p className="text-2xs text-slate-400 mt-0.5">Se obtiene en el cliente WireGuard → Interface → Public Key</p>
+                <p className="text-2xs text-slate-500 dark:text-slate-400 mt-0.5">Se obtiene en el cliente WireGuard → Interface → Public Key</p>
               </div>
               {error && (
                 <div className="flex items-center gap-2 text-xs text-rose-600 bg-rose-50 dark:bg-rose-500/10 border border-rose-200 rounded-lg px-3 py-2">

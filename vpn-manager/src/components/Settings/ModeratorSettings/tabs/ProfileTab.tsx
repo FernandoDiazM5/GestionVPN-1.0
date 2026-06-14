@@ -87,19 +87,19 @@ function ChangePassword() {
       )}
 
       <div className="relative">
-        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
         <input type={show ? 'text' : 'password'} required value={current}
           onChange={e => setCurrent(e.target.value)}
           placeholder="Contraseña actual"
           className="input-field pl-10 pr-10" />
         <button type="button" onClick={() => setShow(s => !s)} aria-label="ver"
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 hover:text-slate-600">
           {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
         </button>
       </div>
 
       <div className="relative">
-        <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
         <input type={show ? 'text' : 'password'} required value={next}
           onChange={e => setNext(e.target.value)}
           placeholder="Nueva contraseña (mín. 8)"
@@ -108,7 +108,7 @@ function ChangePassword() {
       {tooShort && <p className="text-2xs text-amber-600 dark:text-amber-400 -mt-2">Mínimo 8 caracteres</p>}
 
       <div className="relative">
-        <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
         <input type={show ? 'text' : 'password'} required value={confirm}
           onChange={e => setConfirm(e.target.value)}
           placeholder="Confirma la nueva contraseña"
@@ -187,7 +187,7 @@ function ChangeEmail() {
       {step === 'request' ? (
         <form onSubmit={requestChange} className="space-y-4">
           <div className="relative">
-            <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
             <input type="email" required value={newEmail}
               onChange={e => setNewEmail(e.target.value)}
               placeholder="nuevo@correo.com"
@@ -208,14 +208,14 @@ function ChangeEmail() {
             Te enviamos un código a <span className="font-mono">{newEmail}</span>. Revisa tu correo.
           </div>
           <div className="relative">
-            <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
             <input required inputMode="numeric" maxLength={6} value={otp}
               onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
               placeholder="Código de 6 dígitos"
               className="input-field pl-10 font-mono tracking-widest" />
           </div>
           <div className="relative">
-            <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
             <input type="password" required value={password}
               onChange={e => setPassword(e.target.value)}
               placeholder="Tu contraseña actual"

@@ -226,7 +226,7 @@ function DeviceTableRowImpl({
               title={isExpanded ? 'Ocultar detalle' : 'Ver estadísticas completas'}
               aria-label={isExpanded ? 'Ocultar detalle del dispositivo' : 'Ver estadísticas completas'}
               aria-expanded={isExpanded}
-              // §42-3: el chevron pasivo (text-slate-300) era invisible en
+              // §42-3: el chevron pasivo (text-slate-400 dark:text-slate-500) era invisible en
               // modo claro sobre el zebra blanco/slate-50. Subimos a
               // slate-500 + leve bg slate-100 con border slate-200 para
               // que el control destaque sin competir con la celda Acción.

@@ -99,7 +99,7 @@ export default function AnimatedCountdown({ expiry }: AnimatedCountdownProps) {
         <span className="text-2xs font-bold uppercase tracking-wide text-slate-500">
           Acceso abierto
         </span>
-        <span className="text-2xs text-slate-400 mt-0.5">
+        <span className="text-2xs text-slate-500 dark:text-slate-400 mt-0.5">
           {critical ? 'Expira pronto' : 'Tiempo restante'}
         </span>
       </div>

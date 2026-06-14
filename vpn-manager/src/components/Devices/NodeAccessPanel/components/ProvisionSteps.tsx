@@ -20,7 +20,7 @@ export default function ProvisionSteps({ steps, failedAt, visible }: ProvisionSt
           </span>
           <div className="min-w-0">
             <span className="font-bold text-slate-700">Paso {s.step} — {s.obj}</span>
-            <p className="text-2xs text-slate-400 font-mono truncate">{s.name}</p>
+            <p className="text-2xs text-slate-500 dark:text-slate-400 font-mono truncate">{s.name}</p>
           </div>
         </div>
       ))}

@@ -44,7 +44,7 @@ function DeviceFiltersImpl({
       {/* Toolbar de inputs */}
       <div className="flex flex-wrap gap-2 items-center">
         <div className="relative flex-1 min-w-[180px]">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
           <input
             type="text"
             placeholder="Buscar IP, nombre, MAC..."
@@ -57,7 +57,7 @@ function DeviceFiltersImpl({
               onClick={() => setSearchQuery('')}
               aria-label="Limpiar búsqueda"
               title="Limpiar búsqueda"
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-300 hover:text-slate-500 rounded transition-colors"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 dark:text-slate-500 hover:text-slate-500 rounded transition-colors"
             >
               <X className="w-3 h-3" />
             </button>
@@ -132,12 +132,12 @@ function DeviceFiltersImpl({
               <span className="font-bold text-indigo-600 dark:text-indigo-400">{filteredCount}</span>
               <span className="text-slate-300 dark:text-slate-600 mx-1">/</span>
               <span>{totalCount}</span>
-              <span className="ml-1 text-slate-400">dispositivos</span>
+              <span className="ml-1 text-slate-500 dark:text-slate-400">dispositivos</span>
             </>
           ) : (
             <>
               <span className="font-bold text-slate-600 dark:text-slate-300">{totalCount}</span>
-              <span className="ml-1 text-slate-400">dispositivos</span>
+              <span className="ml-1 text-slate-500 dark:text-slate-400">dispositivos</span>
             </>
           )}
         </span>

@@ -13,7 +13,7 @@ export function NamePreview({ ifaceName, vrfName }: NamePreviewProps) {
         <p className="font-mono text-xs font-bold text-indigo-600 mt-0.5">{ifaceName}</p>
       </div>
       <div>
-        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">VRF</span>
+        <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">VRF</span>
         <p className="font-mono text-xs font-bold text-violet-600 mt-0.5">{vrfName}</p>
       </div>
     </div>

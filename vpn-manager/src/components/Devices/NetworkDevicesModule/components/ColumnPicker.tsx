@@ -55,7 +55,7 @@ export function ColumnPicker({ visibleCols, onChange }: ColumnPickerProps) {
 
           {visibleCols.length > 0 && (
             <>
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Visibles · orden</p>
+              <p className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Visibles · orden</p>
               <div className="space-y-0.5 mb-2">
                 {visibleCols.map((key, idx) => {
                   const col = COLUMN_DEFS.find(c => c.key === key);
@@ -68,12 +68,12 @@ export function ColumnPicker({ visibleCols, onChange }: ColumnPickerProps) {
                           <ChevronUp className="w-3 h-3" />
                         </button>
                         <button onClick={() => moveDown(idx)} disabled={idx === visibleCols.length - 1}
-                          className="p-0.5 text-slate-300 hover:text-indigo-600 disabled:opacity-20 transition-colors">
+                          className="p-0.5 text-slate-400 dark:text-slate-500 hover:text-indigo-600 disabled:opacity-20 transition-colors">
                           <ChevronDown className="w-3 h-3" />
                         </button>
                       </div>
                       <span className="text-xs text-slate-700 flex-1 leading-tight">{col.label}</span>
-                      {col.requiresStats && <span className="text-[8px] font-bold text-slate-300 uppercase">SSH</span>}
+                      {col.requiresStats && <span className="text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase">SSH</span>}
                       <button onClick={() => remove(key)}
                         className="p-0.5 text-slate-200 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100 shrink-0">
                         <X className="w-3 h-3" />
@@ -88,7 +88,7 @@ export function ColumnPicker({ visibleCols, onChange }: ColumnPickerProps) {
           {hiddenCols.length > 0 && (
             <>
               <div className="border-t border-slate-100 my-1" />
-              <p className="text-[9px] font-bold text-slate-300 uppercase tracking-wider mb-1.5 mt-2">Ocultas</p>
+              <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 mt-2">Ocultas</p>
               <div className="space-y-0.5">
                 {hiddenCols.map(col => (
                   <button key={col.key} onClick={() => addCol(col.key)}
@@ -109,7 +109,7 @@ export function ColumnPicker({ visibleCols, onChange }: ColumnPickerProps) {
             </button>
             <span className="text-slate-200">|</span>
             <button onClick={() => onChange(COLUMN_DEFS.filter(c => c.defaultVisible).map(c => c.key))}
-              className="flex-1 text-2xs font-bold text-slate-400 hover:text-slate-600 transition-colors">
+              className="flex-1 text-2xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-600 transition-colors">
               Resetear
             </button>
           </div>

@@ -88,7 +88,7 @@ export default function PasswordResetConfirm({
                 )}
 
                 <div className="relative">
-                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
                   <input type={showPwd ? 'text' : 'password'} required
                     placeholder="Nueva contraseña (mín. 8)"
                     value={password} onChange={e => setPassword(e.target.value)}
@@ -96,14 +96,14 @@ export default function PasswordResetConfirm({
                     className="input-field pl-10 pr-10" />
                   <button type="button" onClick={() => setShowPwd(s => !s)}
                     aria-label={showPwd ? 'Ocultar' : 'Ver'}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
                     {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
                 {tooShort && <p className="text-2xs text-amber-600 dark:text-amber-400">Mínimo 8 caracteres</p>}
 
                 <div className="relative">
-                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
                   <input type={showPwd ? 'text' : 'password'} required
                     placeholder="Confirma la contraseña"
                     value={confirm} onChange={e => setConfirm(e.target.value)}

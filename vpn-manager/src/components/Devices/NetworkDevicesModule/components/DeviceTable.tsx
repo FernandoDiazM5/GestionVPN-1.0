@@ -177,7 +177,7 @@ function DeviceTableImpl(props: DeviceTableProps) {
               </span>
               <span
                 title="Arrastra para redimensionar"
-                className="cursor-col-resize opacity-0 group-hover:opacity-60 hover:!opacity-100 text-slate-400 shrink-0 select-none"
+                className="cursor-col-resize opacity-0 group-hover:opacity-60 hover:!opacity-100 text-slate-500 dark:text-slate-400 shrink-0 select-none"
                 onMouseDown={e => {
                   e.preventDefault();
                   startResize(col.key, e.clientX);

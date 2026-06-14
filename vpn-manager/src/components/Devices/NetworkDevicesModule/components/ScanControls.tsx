@@ -47,7 +47,7 @@ function ScanControlsImpl({
             <label className="text-2xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-1.5">
               Subred LAN a escanear
               {availableSubnets.length > 1 && (
-                <span className="ml-1.5 normal-case font-normal text-slate-300">({availableSubnets.length} disponibles)</span>
+                <span className="ml-1.5 normal-case font-normal text-slate-400 dark:text-slate-500">({availableSubnets.length} disponibles)</span>
               )}
             </label>
             {availableSubnets.length > 1 ? (

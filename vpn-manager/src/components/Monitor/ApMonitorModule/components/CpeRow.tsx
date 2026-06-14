@@ -43,7 +43,7 @@ function CpeRow({ cpe, idx, onDetail, hiddenCols, gridCols }: {
 
       {show('modelo') && (
         <div className="px-2 py-2 min-w-0">
-          <p className="text-2xs text-slate-600 truncate">{displayModel || <span className="text-slate-300">—</span>}</p>
+          <p className="text-2xs text-slate-600 truncate">{displayModel || <span className="data-empty">—</span>}</p>
         </div>
       )}
 
@@ -51,7 +51,7 @@ function CpeRow({ cpe, idx, onDetail, hiddenCols, gridCols }: {
         <div className="px-2 py-2 min-w-0">
           {displayName
             ? <p className="truncate font-semibold text-slate-800 text-2xs">{displayName}</p>
-            : <p className="text-slate-300 italic text-[9px]">Sin nombre</p>}
+            : <p className="text-slate-400 dark:text-slate-500 italic text-[9px]">Sin nombre</p>}
         </div>
       )}
 
@@ -136,7 +136,7 @@ function CpeRow({ cpe, idx, onDetail, hiddenCols, gridCols }: {
       )}
 
       {show('uptime') && (
-        <div className="px-2 py-2 font-mono text-slate-400 text-2xs truncate">{fmtUptime(cpe.uptimeStr)}</div>
+        <div className="px-2 py-2 font-mono text-slate-500 dark:text-slate-400 text-2xs truncate">{fmtUptime(cpe.uptimeStr)}</div>
       )}
 
       {show('distance') && (

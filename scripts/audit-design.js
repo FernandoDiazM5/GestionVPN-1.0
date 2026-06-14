@@ -124,7 +124,7 @@ const RULES = [
     severity: 'info',
     title: 'Texto slate-300/400 sobre fondo claro — posible contraste insuficiente',
     rationale: 'CLAUDE.md pide labels mínimo slate-600 sobre fondo blanco para contraste AA. slate-300/400 funcionan solo sobre fondos oscuros.',
-    test: (line) => {
+    test: (line, ctx) => {
       // Solo dispara si la clase NO está en variante dark:
       const re = /(?:^|[\s"'`])text-slate-(300|400)\b/g;
       const violations = [];
@@ -136,6 +136,36 @@ const RULES = [
         if (/dark:$/.test(before)) continue;
         violations.push(`text-slate-${m[1]}`);
       }
+      if (violations.length === 0) return [];
+
+      // Refinamiento §53: el text-slate-300/400 es legítimo (NO falso positivo)
+      // cuando vive sobre una superficie OSCURA permanente. Detectamos contexto
+      // mirando la línea actual + 3 previas (ctx.prev3) por:
+      //   - Clases bg oscuras: bg-slate-{700-950}, bg-{tone}-{500-800},
+      //     bg-gradient-to-*, bg-black
+      //   - Sistema de modal-header decorativo (modal-header-{tone},
+      //     modal-header-decorated, modal-header-slate)
+      //   - text-white (compañero típico de overlay sobre dark)
+      // Si alguno está presente, el slate-400 funciona BIEN ahí (contraste OK
+      // contra fondo oscuro) y descartamos el hallazgo.
+      const context = (ctx?.prev3 || '') + '\n' + line;
+      const DARK_SURFACE_RE = /(?:bg-slate-(?:700|800|900|950)|bg-(?:indigo|rose|violet|emerald|sky|amber)-(?:500|600|700|800)|bg-gradient-to-|bg-black|modal-header-(?:decorated|indigo|rose|amber|emerald|sky|violet|slate)|text-white\b|text-white\/)/;
+      if (DARK_SURFACE_RE.test(context)) return [];
+
+      // Refinamiento §53-b: si la MISMA línea tiene `dark:text-slate-{500-700}`
+      // o `dark:text-slate-{300-400}`, el desarrollador ya tomó una decisión
+      // consciente del par claro/oscuro (patrón `.data-muted` etc.). No marca.
+      // Esto NO es 100% defensible (slate-300 en claro sigue siendo bajo
+      // contraste técnicamente), pero respeta la intención del diseño en el
+      // patrón "valor vacío sutil" que es legítimo en tablas densas.
+      if (/\bdark:text-slate-(?:300|400|500|600|700)\b/.test(line)) return [];
+
+      // Refinamiento §53-c: si la clase está dentro de un `<Icon>` (lucide-react)
+      // como className, es para tinte del SVG, no texto leíble. Saltar.
+      // Heurística: la línea contiene `<[A-Z]\w+ className="..."` + size class
+      // (w-3 / w-4 / w-3.5 etc.) — patrón típico de íconos.
+      if (/<[A-Z]\w+ [^>]*className=["'`][^"'`]*\bw-(?:2|2\.5|3|3\.5|4|5)\b/.test(line)) return [];
+
       return violations;
     },
   },

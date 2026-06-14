@@ -118,7 +118,7 @@ export default function MetricsPanel() {
         >
           <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
         </button>
-        <span className="text-slate-400">Uptime: <span className="font-mono">{formatUptime(current.uptimeMs)}</span></span>
+        <span className="text-slate-500 dark:text-slate-400">Uptime: <span className="font-mono">{formatUptime(current.uptimeMs)}</span></span>
       </div>
 
       {/* 4 cards de KPI principales con sparkline embebida */}
@@ -145,7 +145,7 @@ export default function MetricsPanel() {
           value={authFailsPerHour >= 1 ? Math.round(authFailsPerHour).toString() : '0'}
           sub={`${current.authFails} totales`}
           sparkline={history.map(s => s.authFails)}
-          color={current.authFails > 0 ? 'text-rose-500' : 'text-slate-400'}
+          color={current.authFails > 0 ? 'text-rose-500' : 'text-slate-500 dark:text-slate-400'}
         />
         <KpiCard
           icon={Wifi}
@@ -236,7 +236,7 @@ function KpiCard({ icon: Icon, label, value, sub, sparkline, color }: KpiCardPro
       <div>
         <div className="text-2xl font-bold text-slate-800 dark:text-slate-100 leading-none font-mono">{value}</div>
         <div className="text-2xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 mt-1.5">{label}</div>
-        <div className="text-2xs text-slate-400 mt-0.5">{sub}</div>
+        <div className="text-2xs text-slate-500 dark:text-slate-400 mt-0.5">{sub}</div>
       </div>
     </div>
   );

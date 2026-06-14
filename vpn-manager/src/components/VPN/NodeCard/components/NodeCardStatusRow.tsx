@@ -89,7 +89,7 @@ export function NodeCardStatusRow({ node, visibleCols, tags }: NodeCardStatusRow
                       </span>
                     ))}
                     {tags.length > 3 && (
-                      <span className="text-2xs text-slate-400">+{tags.length - 3}</span>
+                      <span className="text-2xs text-slate-500 dark:text-slate-400">+{tags.length - 3}</span>
                     )}
                   </div>
                 ) : <span className="data-muted">—</span>}

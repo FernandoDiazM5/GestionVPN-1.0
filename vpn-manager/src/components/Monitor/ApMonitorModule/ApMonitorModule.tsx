@@ -122,7 +122,7 @@ export default function ApMonitorModule() {
             <Activity className="w-5 h-5 text-indigo-500" />
             <span>Monitor de APs</span>
           </h2>
-          <p className="text-slate-400 text-sm mt-1">
+          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
             Monitoreo en tiempo real — APs de la pestaña Equipos, agrupados por nodo
           </p>
         </div>
@@ -165,7 +165,7 @@ export default function ApMonitorModule() {
             </button>
           </div>
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
             <input
               value={logic.apSearch} onChange={e => logic.setApSearch(e.target.value)}
               placeholder="Buscar AP…"
@@ -202,7 +202,7 @@ export default function ApMonitorModule() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-3 px-1 text-2xs text-slate-400">
+      <div className="flex flex-wrap gap-3 px-1 text-2xs text-slate-500 dark:text-slate-400">
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Online</span>
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400" /> Parcial / Errores</span>
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-sky-400" /> Conectando…</span>
@@ -211,7 +211,7 @@ export default function ApMonitorModule() {
       </div>
 
       {logic.loading && (
-        <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-slate-400" /></div>
+        <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-slate-500 dark:text-slate-400" /></div>
       )}
 
       {!logic.loading && logic.nodeGroups.length === 0 && (
@@ -229,7 +229,7 @@ export default function ApMonitorModule() {
       )}
 
       {!logic.loading && logic.nodeFilter === 'active' && !tunnelActive && logic.filteredGroups.length === 0 && (
-        <div className="card p-8 text-center text-slate-400">
+        <div className="card p-8 text-center text-slate-500 dark:text-slate-400">
           <WifiOff className="w-8 h-8 mx-auto mb-3 text-amber-400" />
           <p className="font-semibold text-slate-600">Sin túnel VPN activo</p>
           <p className="text-sm mt-1">Conéctate a un nodo para ver sus APs en tiempo real</p>

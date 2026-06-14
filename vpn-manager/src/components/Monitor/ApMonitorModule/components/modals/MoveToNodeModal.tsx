@@ -29,7 +29,7 @@ function MoveToNodeModal({ device, nodes, knownNames, onConfirm, onClose }: {
               <ArrowRightLeft className="w-4 h-4 text-indigo-500" />
               Mover a nodo
             </h3>
-            <p className="text-xs text-slate-400 mt-0.5 truncate max-w-[220px]">{device.name || device.ip} · actual: <span className="font-medium">{device.nodeName}</span></p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate max-w-[220px]">{device.name || device.ip} · actual: <span className="font-medium">{device.nodeName}</span></p>
           </div>
           <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg dark:text-slate-500 dark:hover:text-slate-200 dark:hover:bg-slate-800">
             <X className="w-4 h-4" />
@@ -38,7 +38,7 @@ function MoveToNodeModal({ device, nodes, knownNames, onConfirm, onClose }: {
 
         <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
           {options.length === 0 && (
-            <p className="text-xs text-slate-400 text-center py-6">
+            <p className="text-xs text-slate-500 dark:text-slate-400 text-center py-6">
               Sin nodos disponibles.<br />Conéctate al MikroTik para cargar los nodos.
             </p>
           )}

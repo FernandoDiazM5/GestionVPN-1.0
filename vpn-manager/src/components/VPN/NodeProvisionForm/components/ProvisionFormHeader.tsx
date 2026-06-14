@@ -21,9 +21,9 @@ export function ProvisionFormHeader({ isOpen, onToggle }: ProvisionFormHeaderPro
         </div>
       </div>
       {isOpen ? (
-        <ChevronUp className="w-4 h-4 text-slate-400" />
+        <ChevronUp className="w-4 h-4 text-slate-500 dark:text-slate-400" />
       ) : (
-        <ChevronDown className="w-4 h-4 text-slate-400" />
+        <ChevronDown className="w-4 h-4 text-slate-500 dark:text-slate-400" />
       )}
     </button>
   );

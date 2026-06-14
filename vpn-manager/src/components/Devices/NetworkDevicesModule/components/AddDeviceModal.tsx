@@ -45,7 +45,7 @@ export function AddDeviceModal({ device, node, existing, onSave, onClose }: AddD
         <div className="flex items-center justify-between">
           <div>
             <h3 className="font-bold text-slate-800 dark:text-slate-100">{isEdit ? 'Editar dispositivo' : 'Guardar dispositivo'}</h3>
-            <p className="text-xs text-slate-400 mt-0.5">{device.name} · {device.model} · {device.ip}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{device.name} · {device.model} · {device.ip}</p>
           </div>
           <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg dark:text-slate-500 dark:hover:text-slate-200 dark:hover:bg-slate-800">
             <X className="w-4 h-4" />
@@ -91,7 +91,7 @@ export function AddDeviceModal({ device, node, existing, onSave, onClose }: AddD
           </p>
           <div>
             <label className="text-2xs sm:text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">
-              Puerto WebUI <span className="normal-case font-normal text-slate-300">(acceso en {device.ip}:puerto)</span>
+              Puerto WebUI <span className="normal-case font-normal text-slate-400 dark:text-slate-500">(acceso en {device.ip}:puerto)</span>
             </label>
             <input type="number" value={routerPort} onChange={e => setRouterPort(+e.target.value)} className="input-field w-full text-xs" />
           </div>
@@ -104,7 +104,7 @@ export function AddDeviceModal({ device, node, existing, onSave, onClose }: AddD
             <p className="text-xs text-slate-500">Nodo asociado</p>
             <p className="text-xs font-bold text-slate-700">
               {node.nombre_nodo}
-              {node.segmento_lan && <span className="font-mono font-normal text-slate-400 ml-1">({node.segmento_lan})</span>}
+              {node.segmento_lan && <span className="font-mono font-normal text-slate-500 dark:text-slate-400 ml-1">({node.segmento_lan})</span>}
             </p>
           </div>
         </div>

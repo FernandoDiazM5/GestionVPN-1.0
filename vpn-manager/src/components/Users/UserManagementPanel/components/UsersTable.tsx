@@ -173,7 +173,7 @@ export default function UsersTable({
 
   // ── Helpers ───────────────────────────────────────────────────
   const SortIcon = ({ k }: { k: SortKey }) => {
-    if (sortKey !== k) return <ArrowUpDown className="w-3 h-3 text-slate-300 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />;
+    if (sortKey !== k) return <ArrowUpDown className="w-3 h-3 text-slate-400 dark:text-slate-500 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />;
     return sortDir === 'asc' ? <ArrowUp className="w-3 h-3 text-indigo-500 ml-1" /> : <ArrowDown className="w-3 h-3 text-indigo-500 ml-1" />;
   };
 
@@ -205,7 +205,7 @@ export default function UsersTable({
           />
           {search && (
             <button onClick={() => setSearch('')} title="Limpiar búsqueda" aria-label="Limpiar búsqueda"
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1">
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 hover:text-slate-600 transition-colors p-1">
               <X className="w-4 h-4" />
             </button>
           )}
@@ -354,7 +354,7 @@ export default function UsersTable({
                     <td className="px-4 py-3 min-w-[160px]">
                       <span
                         title="Identificador MikroTik (no editable). Usa el alias para anotar el equipo."
-                        className={`font-semibold text-xs ${peer.active ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400'}`}
+                        className={`font-semibold text-xs ${peer.active ? 'text-slate-800 dark:text-slate-100' : 'text-slate-500 dark:text-slate-400'}`}
                       >
                         {peer.name}
                       </span>
@@ -382,7 +382,7 @@ export default function UsersTable({
                     <td className="px-4 py-3 min-w-[160px]">
                       {peer.email ? (
                         <CopyableCell
-                          icon={<Mail className="w-3 h-3 text-slate-300" />}
+                          icon={<Mail className="w-3 h-3 text-slate-400 dark:text-slate-500" />}
                           text={peer.email}
                           title={`Copiar ${peer.email}`}
                           mono={false}
@@ -410,7 +410,7 @@ export default function UsersTable({
                     <td className="px-4 py-3 max-w-[180px]">
                       {peer.publicKey ? (
                         <CopyableCell
-                          icon={<Key className="w-3 h-3 text-slate-300" />}
+                          icon={<Key className="w-3 h-3 text-slate-400 dark:text-slate-500" />}
                           text={peer.publicKey}
                           displayText={truncatePubKey(peer.publicKey)}
                           title={`Copiar ${peer.publicKey}`}
@@ -424,7 +424,7 @@ export default function UsersTable({
                   {/* Último acceso */}
                   {isVisible('lastSeen') && (
                     <td className="px-4 py-3">
-                      <span className={`text-xs font-medium ${peer.lastHandshakeSecs == null ? 'text-slate-300' : peer.active ? 'text-slate-600' : 'text-slate-400'}`}>
+                      <span className={`text-xs font-medium ${peer.lastHandshakeSecs == null ? 'text-slate-400 dark:text-slate-500' : peer.active ? 'text-slate-600' : 'text-slate-500 dark:text-slate-400'}`}>
                         {formatLastHandshake(peer.lastHandshakeSecs)}
                       </span>
                     </td>
@@ -448,9 +448,9 @@ export default function UsersTable({
               <tr>
                 <td colSpan={totalCols} className="px-4 py-12 text-center">
                   <div className="flex flex-col items-center gap-2">
-                    <Users className="w-8 h-8 text-slate-300" />
-                    <p className="text-slate-400 font-semibold">Sin usuarios</p>
-                    <p className="text-slate-400 text-xs">
+                    <Users className="w-8 h-8 text-slate-400 dark:text-slate-500" />
+                    <p className="text-slate-500 dark:text-slate-400 font-semibold">Sin usuarios</p>
+                    <p className="text-slate-500 dark:text-slate-400 text-xs">
                       {search || status !== 'all' ? 'Ningún usuario coincide con los filtros' : 'No hay administradores configurados'}
                     </p>
                   </div>
@@ -467,7 +467,7 @@ export default function UsersTable({
           <div>
             <span className="font-bold text-slate-700 dark:text-slate-200">{peers.length}</span> usuario{peers.length !== 1 ? 's' : ''}
             {' · '}<span className="text-emerald-600 font-semibold">{activeCount} activo{activeCount !== 1 ? 's' : ''}</span>
-            {' · '}<span className="text-slate-400 font-semibold">{peers.length - activeCount} inactivo{peers.length - activeCount !== 1 ? 's' : ''}</span>
+            {' · '}<span className="text-slate-500 dark:text-slate-400 font-semibold">{peers.length - activeCount} inactivo{peers.length - activeCount !== 1 ? 's' : ''}</span>
           </div>
           <div className="text-2xs text-slate-400 dark:text-slate-500">
             {visibleCount} de {COLUMNS.length} columnas visibles
@@ -515,7 +515,7 @@ function CopyableCell({ text, displayText, title, icon, mono = true }: CopyableC
       <span className="truncate max-w-[220px]">{displayText || text}</span>
       {copied
         ? <Check className="w-3 h-3 text-emerald-500 shrink-0" />
-        : <Copy className="w-3 h-3 text-slate-300 opacity-0 group-hover/cell:opacity-100 transition-opacity shrink-0" />
+        : <Copy className="w-3 h-3 text-slate-400 dark:text-slate-500 opacity-0 group-hover/cell:opacity-100 transition-opacity shrink-0" />
       }
     </button>
   );
@@ -587,7 +587,7 @@ function AliasCell({ peer, editing, draft, saving, onStart, onCancel, onChange, 
         <button
           onClick={onStart}
           aria-label="Editar alias"
-          className="opacity-0 group-hover/alias:opacity-100 p-0.5 rounded text-slate-400 hover:text-indigo-600 transition-opacity"
+          className="opacity-0 group-hover/alias:opacity-100 p-0.5 rounded text-slate-500 dark:text-slate-400 hover:text-indigo-600 transition-opacity"
         >
           <Pencil className="w-2.5 h-2.5" />
         </button>

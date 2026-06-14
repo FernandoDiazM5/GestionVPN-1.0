@@ -13,7 +13,7 @@ export default function ScannerHeader({ isScanning, onScan }: ScannerHeaderProps
           <Search className="w-5 h-5 text-indigo-500" />
           <span>Escáner PPP Secrets</span>
         </h2>
-        <p className="text-slate-400 text-sm mt-1">
+        <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
           Extrae los secretos configurados desde el router
         </p>
       </div>

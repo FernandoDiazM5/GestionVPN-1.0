@@ -65,7 +65,7 @@ export function NodeCardNameSection({
             </p>
             {canEditName && (
               <button onClick={onStartEdit} title="Editar nombre"
-                className="opacity-0 group-hover/name:opacity-100 p-0.5 rounded text-slate-400 hover:text-indigo-600 transition-opacity shrink-0">
+                className="opacity-0 group-hover/name:opacity-100 p-0.5 rounded text-slate-500 dark:text-slate-400 hover:text-indigo-600 transition-opacity shrink-0">
                 <Pencil className="w-2.5 h-2.5" />
               </button>
             )}
@@ -74,7 +74,7 @@ export function NodeCardNameSection({
         <div className="flex items-center gap-1.5 flex-wrap">
           {node.running && !node.disabled ? (
             /* Estado normal → discreto (la señal verde ya está en el ícono) */
-            <span className="inline-flex items-center gap-1 text-2xs font-semibold text-slate-400 uppercase tracking-wide">
+            <span className="inline-flex items-center gap-1 text-2xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
               Conectado
             </span>

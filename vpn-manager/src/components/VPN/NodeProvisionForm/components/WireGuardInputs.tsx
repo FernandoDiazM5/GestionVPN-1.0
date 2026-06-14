@@ -14,7 +14,7 @@ export function WireGuardInputs({ cpePublicKey, onCpePublicKeyChange }: WireGuar
         rows={2}
         className="w-full mt-1 px-3 py-2 text-xs font-mono border border-slate-200 rounded-lg resize-none focus:border-violet-400 outline-none"
       />
-      <p className="text-2xs text-slate-400 mt-1">Obtener en el router torre: /interface/wireguard/print</p>
+      <p className="text-2xs text-slate-500 dark:text-slate-400 mt-1">Obtener en el router torre: /interface/wireguard/print</p>
     </div>
   );
 }

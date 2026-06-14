@@ -7,7 +7,7 @@ export default function EmptyState() {
         <Search className="w-7 h-7 text-indigo-400" />
       </div>
       <p className="text-slate-500 font-medium">Sin datos aún</p>
-      <p className="text-slate-400 text-sm">
+      <p className="text-slate-500 dark:text-slate-400 text-sm">
         Haz clic en "Escanear Router" para obtener los secretos PPP
       </p>
     </div>

@@ -121,7 +121,7 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
             const ageSec = Math.floor((Date.now() - lastUpdated) / 1000);
             const stale = ageSec > 300;  // >5min = pedir refresh
             return (
-              <span className={`flex items-center gap-1 text-2xs ${stale ? 'text-amber-300' : 'text-slate-300'}`}>
+              <span className={`flex items-center gap-1 text-2xs ${stale ? 'text-amber-300' : 'text-slate-400 dark:text-slate-500'}`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${refreshing ? 'bg-sky-400 motion-safe:animate-pulse' : stale ? 'bg-amber-400' : 'bg-slate-400'}`} />
                 {refreshing ? 'Actualizando…' : `Datos del scan · ${fmtAge(lastUpdated)}`}
               </span>
@@ -147,7 +147,7 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
 
       <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
         <div className="px-4 py-3">
-          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest pb-1.5 border-b border-slate-100 mb-2">Configuración</p>
+          <p className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest pb-1.5 border-b border-slate-100 mb-2">Configuración</p>
           {([
             // §42-4: IP + Nombre del sistema arriba de todo — son los dos
             // identificadores que el operador busca primero al abrir el panel.
@@ -213,7 +213,7 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
         </div>
 
         <div className="px-4 py-3 space-y-3">
-          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest pb-1.5 border-b border-slate-100">Métricas en tiempo real</p>
+          <p className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest pb-1.5 border-b border-slate-100">Métricas en tiempo real</p>
 
           {s.cpuLoad != null && (
             <div>
@@ -351,7 +351,7 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
 
       {s.stations && s.stations.length > 0 && (
         <div className="px-4 py-3 border-t border-slate-100">
-          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">
+          <p className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">
             Estaciones conectadas ({s.stations.length})
           </p>
           <div className="space-y-1">
@@ -393,7 +393,7 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
                 {sta.ccq != null && <span className="text-slate-500 w-16">CCQ {sta.ccq}%</span>}
                 {sta.txRate != null && <span className="font-mono text-slate-500">↑ {sta.txRate} Mbps</span>}
                 {sta.rxRate != null && <span className="font-mono text-slate-500">↓ {sta.rxRate} Mbps</span>}
-                {sta.distance != null && <span className="text-slate-400 ml-auto">{sta.distance} m</span>}
+                {sta.distance != null && <span className="text-slate-500 dark:text-slate-400 ml-auto">{sta.distance} m</span>}
               </div>
               );
             })}

@@ -104,7 +104,7 @@ export default function WireGuardSection({
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
                   <span
                     className={`text-2xs font-semibold flex items-center gap-1 ${
-                      mangleActive ? 'text-emerald-600' : 'text-slate-400'
+                      mangleActive ? 'text-emerald-600' : 'text-slate-500 dark:text-slate-400'
                     }`}
                   >
                     <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

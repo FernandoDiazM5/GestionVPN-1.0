@@ -78,7 +78,7 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelAc
       {expanded && (
         <>
           {group.aps.length === 0 && group.stas.length === 0 && (
-            <div className="flex flex-col items-center py-10 gap-3 text-slate-400">
+            <div className="flex flex-col items-center py-10 gap-3 text-slate-500 dark:text-slate-400">
               <Wifi className="w-8 h-8" />
               <p className="text-sm">No hay APs guardados en este nodo</p>
             </div>
@@ -133,8 +133,8 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelAc
                 <div key={sta.id} className="flex items-center gap-3 px-4 py-2.5 border-b border-cyan-100/60 last:border-0 hover:bg-cyan-50 transition-colors text-xs">
                   <span className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-cyan-100 text-cyan-700 border border-cyan-200">CPE</span>
                   <span className="font-semibold text-slate-700 truncate min-w-0 max-w-[160px]" title={sta.name || sta.ip}>{sta.name || sta.ip}</span>
-                  <span className="font-mono text-2xs text-slate-400 shrink-0">{sta.ip}</span>
-                  {sta.mac && <span className="font-mono text-2xs text-slate-400 shrink-0 hidden sm:block">{sta.mac}</span>}
+                  <span className="font-mono text-2xs text-slate-500 dark:text-slate-400 shrink-0">{sta.ip}</span>
+                  {sta.mac && <span className="font-mono text-2xs text-slate-500 dark:text-slate-400 shrink-0 hidden sm:block">{sta.mac}</span>}
                   {sta.model && <span className="text-2xs text-slate-500 truncate shrink-0 hidden md:block">{sta.model}</span>}
                   {sta.nodeName && <span className="text-2xs text-indigo-400 truncate shrink-0 hidden lg:block">{sta.nodeName}</span>}
                   <button onClick={() => onApDelete(sta)} title="Eliminar CPE guardado"

@@ -46,7 +46,7 @@ export default function TagModal({ node, currentTags, onSave, onClose }: {
             </button>
           </div>
           <div className="flex flex-wrap gap-2 min-h-[40px]">
-            {tags.length === 0 && <p className="text-xs text-slate-400 italic">Sin etiquetas</p>}
+            {tags.length === 0 && <p className="text-xs text-slate-500 dark:text-slate-400 italic">Sin etiquetas</p>}
             {tags.map(t => (
               <span key={t} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold text-white"
                 style={{ backgroundColor: getColor(t) }}>

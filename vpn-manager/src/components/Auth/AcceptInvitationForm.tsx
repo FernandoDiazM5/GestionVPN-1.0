@@ -110,7 +110,7 @@ export default function AcceptInvitationForm({
                       </div>
                     ) : (
                       <div className="flex items-center justify-center py-6">
-                        <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+                        <Loader2 className="w-4 h-4 animate-spin text-slate-500 dark:text-slate-400" />
                       </div>
                     )}
 
@@ -145,15 +145,15 @@ export default function AcceptInvitationForm({
                   <input type="email" required placeholder="Tu correo invitado" value={email} onChange={e => setEmail(e.target.value)} className="input-field pl-10" />
                 </div>
                 <div className="relative">
-                  <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
                   <input required inputMode="numeric" maxLength={6} placeholder="Código de 6 dígitos" value={otp}
                     onChange={e => setOtp(e.target.value.replace(/\D/g, ''))} className="input-field pl-10 font-mono tracking-widest" />
                 </div>
                 <div className="relative">
-                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
                   <input type="password" placeholder="Crea tu contraseña (mín. 8)" value={password} onChange={e => setPassword(e.target.value)} className="input-field pl-10" />
                 </div>
-                <p className="text-2xs text-slate-400">Al aceptar, generaremos tu configuración WireGuard lista para usar.</p>
+                <p className="text-2xs text-slate-500 dark:text-slate-400">Al aceptar, generaremos tu configuración WireGuard lista para usar.</p>
                 <button type="submit" disabled={busy || !email.trim() || otp.length !== 6}
                   className="btn-primary btn-md w-full flex items-center justify-center">
                   {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Aceptar y unirme

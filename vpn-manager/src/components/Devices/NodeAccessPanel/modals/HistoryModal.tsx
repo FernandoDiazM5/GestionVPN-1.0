@@ -39,7 +39,7 @@ export default function HistoryModal({ node, onClose }: { node: NodeInfo; onClos
         <div className="overflow-y-auto flex-1 p-4">
           {loading && <div className="flex items-center justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-sky-500" /></div>}
           {!loading && history.length === 0 && (
-            <p className="text-center text-slate-400 text-sm py-10">Sin eventos registrados aún.</p>
+            <p className="text-center text-slate-500 dark:text-slate-400 text-sm py-10">Sin eventos registrados aún.</p>
           )}
           {!loading && history.length > 0 && (
             <div className="space-y-2">
@@ -55,7 +55,7 @@ export default function HistoryModal({ node, onClose }: { node: NodeInfo; onClos
                   <div key={i} className={`flex items-center gap-3 px-3 py-2 rounded-lg border text-xs ${c.row}`}>
                     <span className={`w-2 h-2 rounded-full shrink-0 ${c.dot}`} />
                     <span className={`font-bold ${c.text}`}>{c.label}</span>
-                    <span className="text-slate-400 ml-auto font-mono">{fmt(h.timestamp)}</span>
+                    <span className="text-slate-500 dark:text-slate-400 ml-auto font-mono">{fmt(h.timestamp)}</span>
                   </div>
                 );
               })}

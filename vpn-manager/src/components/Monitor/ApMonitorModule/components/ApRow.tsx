@@ -55,13 +55,13 @@ const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCol
 
         <div className="min-w-0 pr-2">
           <p className="text-sm font-semibold text-slate-800 truncate" title={name || dev.ip}>{name || dev.ip}</p>
-          <p className="font-mono text-[9px] text-slate-400 truncate">{dev.ip}</p>
+          <p className="font-mono text-[9px] text-slate-500 dark:text-slate-400 truncate">{dev.ip}</p>
         </div>
 
         {showAp('modelo') && (
           <div className="min-w-0 pr-2">
             {model && <p className="text-xs text-slate-600 truncate" title={model}>{model}</p>}
-            {firmware && <p className="text-[9px] text-slate-400 truncate">{fmtFw(firmware)}</p>}
+            {firmware && <p className="text-[9px] text-slate-500 dark:text-slate-400 truncate">{fmtFw(firmware)}</p>}
           </div>
         )}
 
@@ -69,8 +69,8 @@ const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCol
           <div className="min-w-0 pr-2">
             {ssid
               ? <p className="font-mono text-xs text-slate-700 truncate" title={ssid}>{ssid}</p>
-              : <span className="text-2xs text-slate-300">—</span>}
-            {channel && <p className="text-[9px] text-slate-400">{channel} MHz</p>}
+              : <span className="data-empty">—</span>}
+            {channel && <p className="text-[9px] text-slate-500 dark:text-slate-400">{channel} MHz</p>}
           </div>
         )}
 
@@ -90,13 +90,13 @@ const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCol
           <div className="text-right pr-2">
             {txPower != null
               ? <span className="text-xs font-mono font-bold text-indigo-600">{txPower} dBm</span>
-              : <span className="text-slate-300 text-xs">—</span>}
+              : <span className="text-slate-400 dark:text-slate-500 text-xs">—</span>}
           </div>
         )}
 
         {showAp('uptime') && (
           <div className="min-w-0 pr-2 overflow-hidden">
-            <span className="font-mono text-2xs text-slate-400 truncate block">{fmtUptime(stats?.uptimeStr)}</span>
+            <span className="font-mono text-2xs text-slate-500 dark:text-slate-400 truncate block">{fmtUptime(stats?.uptimeStr)}</span>
           </div>
         )}
 
@@ -120,7 +120,7 @@ const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCol
               {isHistorical && <span className="text-[8px] opacity-60">*</span>}
             </span>
           ) : (
-            <span className="text-slate-300 text-xs">—</span>
+            <span className="text-slate-400 dark:text-slate-500 text-xs">—</span>
           )}
         </div>
 
