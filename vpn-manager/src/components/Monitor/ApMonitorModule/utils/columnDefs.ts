@@ -53,7 +53,7 @@ const AP_COL_DEFS: ApColDef[] = [
   { key: 'cpu', label: 'CPU', width: '56px', right: true },
   { key: 'cpes', label: 'CPEs', always: true, width: '64px' },
   { key: 'estado', label: '', always: true, width: '32px' },
-  { key: 'actions', label: 'Acciones', always: true, width: '230px' },
+  { key: 'actions', label: 'Acciones', always: true, width: '150px' },
 ];
 const AP_DEFAULT_HIDDEN = new Set<string>(['signal', 'ccq', 'uptime', 'cpu']);
 const AP_LS_KEY = 'ap_monitor_ap_cols_v1';

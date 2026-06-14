@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, Eye, RefreshCw, Loader2, WifiOff, ExternalLi
 import type { SavedDevice } from '../../../../types/devices';
 import type { PollResult } from '../../../../types/apMonitor';
 import StationTable from './StationTable';
+import { ApRowKebab } from './ApRowKebab';
 import { fmtDbm, fmtPct, fmtFw, fmtUptime, fmtCpu } from '../utils/formatters';
 import { sigColor, ccqColor } from '../utils/colors';
 import { AP_COL_DEFS } from '../utils/columnDefs';
@@ -152,32 +153,17 @@ const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCol
               <span>CPEs</span>
             </button>
           )}
-          <button onClick={onView} title="Estado / Ficha del equipo"
-            className="p-1.5 text-indigo-500 hover:bg-indigo-50 rounded-lg transition-colors dark:text-indigo-400 dark:hover:bg-indigo-500/10">
-            <Eye className="w-3.5 h-3.5" />
-          </button>
           <button onClick={onSync} title="Sincronizar ahora" disabled={isPolling}
             className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-40 dark:text-emerald-400 dark:hover:bg-emerald-500/10">
             {isPolling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
           </button>
-          <button onClick={onM5Detail} title="Ver estado completo del dispositivo (airOS)"
-            className="flex items-center space-x-1 px-2 py-1.5 rounded-lg text-2xs font-bold bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200 transition-colors dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:border-slate-700">
-            <Activity className="w-2.5 h-2.5" />
-            <span>Informe</span>
-          </button>
-          <a href={`http://${dev.ip}`} target="_blank" rel="noopener noreferrer"
-            title={`Abrir ${dev.ip}`}
-            className="p-1.5 text-slate-400 hover:bg-slate-100 rounded-lg transition-colors flex items-center dark:text-slate-500 dark:hover:bg-slate-800">
-            <ExternalLink className="w-3.5 h-3.5" />
-          </a>
-          <button onClick={onMove} title="Mover a otro nodo"
-            className="p-1.5 text-indigo-400 hover:bg-indigo-50 rounded-lg transition-colors dark:text-indigo-500 dark:hover:bg-indigo-500/10">
-            <ArrowRightLeft className="w-3.5 h-3.5" />
-          </button>
-          <button onClick={onDelete} title="Eliminar equipo"
-            className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors dark:text-rose-400 dark:hover:bg-rose-500/10">
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
+          <ApRowKebab items={[
+            { icon: <Eye className="w-3.5 h-3.5" />, label: 'Ver ficha', onClick: onView },
+            { icon: <Activity className="w-3.5 h-3.5" />, label: 'Informe airOS', onClick: onM5Detail },
+            { icon: <ExternalLink className="w-3.5 h-3.5" />, label: 'Abrir web', onClick: () => window.open(`http://${dev.ip}`, '_blank', 'noopener,noreferrer') },
+            { icon: <ArrowRightLeft className="w-3.5 h-3.5" />, label: 'Mover a nodo', onClick: onMove },
+            { icon: <Trash2 className="w-3.5 h-3.5" />, label: 'Eliminar', onClick: onDelete, danger: true },
+          ]} />
         </div>
       </div>
 
