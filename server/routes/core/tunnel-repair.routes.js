@@ -15,11 +15,13 @@ const router = express.Router();
 const log = require('../../lib/logger').child({ scope: 'core:tunnel-repair' });
 const { connectToMikrotik, safeWrite, getErrorMessage, writeIdempotent } = require('../../routeros.service');
 const { getDb } = require('../../db.service');
+const provisioner = require('../../lib/tunnelProvisioner');
+const sessionRepo = require('../../db/repos/sessionRepo');
 
 router.post('/tunnel/repair', async (req, res) => {
   if (!req.mikrotik) return res.status(503).json({ success: false, needsConfig: true, message: 'Configura las credenciales MikroTik en Ajustes antes de continuar.' });
   const { ip, user, pass } = req.mikrotik;
-  const { pppUser, vrfName, lanSubnets, tunnelIP, adminWgNet } = req.body;
+  const { pppUser, vrfName, lanSubnets, adminWgNet } = req.body;
 
   if (!pppUser) return res.status(400).json({ success: false, message: 'pppUser requerido' });
   if (!vrfName) return res.status(400).json({ success: false, message: 'vrfName requerido' });
@@ -311,35 +313,48 @@ router.post('/tunnel/repair', async (req, res) => {
       steps.push({ step: 6, obj: 'vpn-activa', name: ADMIN_POOL_REPAIR, status: 'error', action: e.message });
     }
 
-    // ── Paso 7: Mangle ACCESO-ADMIN (una sola regla: pool 192.168.21.0/24) ─
-    if (tunnelIP && vrfName) {
-      try {
-        const hasAdmin = allMangle.some(m =>
-          m.comment === 'ACCESO-ADMIN' &&
-          m['src-address'] === '192.168.21.0/24' &&
+    // ── Paso 7: Mangle de acceso POR-USUARIO (modelo multi-tenant) ─────────
+    // Reemplaza la antigua regla GLOBAL `ACCESO-ADMIN` (src=192.168.21.0/24 → un
+    // solo VRF), que el provisioner trata como LEGACY porque rompe el aislamiento
+    // (marcaría TODA la /24 hacia un VRF, colisionando entre moderadores).
+    //   7a. Elimina cualquier mangle legacy global (ACCESO-ADMIN/ACCESO-DINAMICO).
+    //   7b. Recrea la mangle del solicitante (su mgmt_ip → su VRF), idempotente.
+    // El gate es server-authoritative: usa la sesión activa (no un IP del body).
+    try {
+      const acc = req.account;
+      const session = (acc?.sub && acc?.workspace_id)
+        ? await sessionRepo.getActiveByUser(acc.workspace_id, acc.sub)
+        : null;
+
+      // 7a. Limpieza de reglas legacy globales presentes (snapshot inicial).
+      const legacyIds = allMangle
+        .filter(m => provisioner.LEGACY_GLOBAL_COMMENTS.includes(m.comment) && m['.id'])
+        .map(m => m['.id']);
+      if (legacyIds.length > 0) {
+        await provisioner.removeMangleIds(api, legacyIds);
+        steps.push({ step: 7, obj: 'Mangle legacy global', name: `${legacyIds.length} regla(s)`, status: 'created', action: 'removed (rompía aislamiento)' });
+        repaired++;
+      }
+
+      // 7b. Mangle por-usuario del solicitante (solo si tiene sesión activa a este VRF).
+      if (session && session.vrf_name === vrfName && session.mgmt_ip) {
+        const present = allMangle.some(m =>
+          m.comment === provisioner.mangleComment(acc.sub) &&
+          m['src-address'] === session.mgmt_ip &&
           m['new-routing-mark'] === vrfName
         );
-        if (hasAdmin) {
-          steps.push({ step: 7, obj: 'Mangle ACCESO-ADMIN', name: `192.168.21.0/24→${vrfName}`, status: 'ok', action: 'exists' });
+        if (present) {
+          steps.push({ step: 7, obj: 'Mangle ACCESO-USER', name: `${session.mgmt_ip}→${vrfName}`, status: 'ok', action: 'exists' });
         } else {
-          await writeIdempotent(api, [
-            '/ip/firewall/mangle/add',
-            '=chain=prerouting',
-            '=action=mark-routing',
-            '=comment=ACCESO-ADMIN',
-            '=dst-address-list=LIST-NET-REMOTE-TOWERS',
-            `=new-routing-mark=${vrfName}`,
-            '=src-address=192.168.21.0/24',
-            '=passthrough=yes',
-          ]);
-          steps.push({ step: 7, obj: 'Mangle ACCESO-ADMIN', name: `192.168.21.0/24→${vrfName}`, status: 'created', action: 'created' });
+          await provisioner.addUserMangle(api, { userId: acc.sub, mgmtIp: session.mgmt_ip, vrfName });
+          steps.push({ step: 7, obj: 'Mangle ACCESO-USER', name: `${session.mgmt_ip}→${vrfName}`, status: 'created', action: 'created' });
           repaired++;
         }
-      } catch (e) {
-        steps.push({ step: 7, obj: 'Mangle ACCESO-ADMIN', name: `→${vrfName}`, status: 'error', action: e.message });
+      } else {
+        steps.push({ step: 7, obj: 'Mangle ACCESO-USER', name: null, status: 'skipped', action: 'sin sesión activa del solicitante para este VRF' });
       }
-    } else {
-      steps.push({ step: 7, obj: 'Mangle ACCESO-ADMIN', name: null, status: 'skipped', action: 'no tunnelIP or vrfName' });
+    } catch (e) {
+      steps.push({ step: 7, obj: 'Mangle por-usuario', name: null, status: 'error', action: e.message });
     }
 
     await api.close();

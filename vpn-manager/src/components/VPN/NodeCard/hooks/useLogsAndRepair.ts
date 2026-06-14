@@ -3,7 +3,7 @@ import { fetchWithTimeout } from '../../../../utils/fetchWithTimeout';
 import { API_BASE_URL } from '../../../../config';
 import type { NodeInfo } from '../../../../types/api';
 
-export function useLogsAndRepair(node: NodeInfo, isThisNodeActive: boolean) {
+export function useLogsAndRepair(node: NodeInfo) {
   const [isRepairing, setIsRepairing] = useState(false);
   const logsEndRef = useRef<HTMLDivElement>(null);
 
@@ -11,11 +11,13 @@ export function useLogsAndRepair(node: NodeInfo, isThisNodeActive: boolean) {
     logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
-  const handleRepair = async (addLog: (msg: string) => void, setLogs: React.Dispatch<React.SetStateAction<string[]>>, adminIP: string | null) => {
+  const handleRepair = async (addLog: (msg: string) => void, setLogs: React.Dispatch<React.SetStateAction<string[]>>) => {
     setIsRepairing(true);
     setLogs([]);
     addLog('Verificando configuración MikroTik...');
     try {
+      // El backend recrea la mangle POR-USUARIO desde la sesión activa del
+      // solicitante (mgmt_ip → VRF); ya no se envía ningún IP desde el cliente.
       const res = await fetchWithTimeout(`${API_BASE_URL}/api/tunnel/repair`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -23,7 +25,6 @@ export function useLogsAndRepair(node: NodeInfo, isThisNodeActive: boolean) {
           pppUser: node.ppp_user,
           vrfName: node.nombre_vrf,
           lanSubnets: node.lan_subnets || [],
-          tunnelIP: isThisNodeActive ? adminIP : null,
           adminWgNet: '192.168.21.0/24',
         }),
       }, 30_000);

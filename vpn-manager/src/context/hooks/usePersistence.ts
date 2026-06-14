@@ -10,7 +10,6 @@ interface ContextState {
   scannedSecrets: VpnSecret[];
   activeNodeVrf: string | null;
   tunnelExpiry: number | null;
-  adminIP: string;
   nodes: NodeInfo[];
 }
 

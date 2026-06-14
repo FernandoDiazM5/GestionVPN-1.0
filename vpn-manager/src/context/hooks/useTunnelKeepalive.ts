@@ -6,8 +6,7 @@ import { TUNNEL_KEEPALIVE_MS } from '../constants';
 export function useTunnelKeepalive(
   tunnelExpiry: number | null,
   credentials: any,
-  activeNodeVrf: string | null,
-  adminIP: string
+  activeNodeVrf: string | null
 ) {
   const keepaliveRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -19,16 +18,14 @@ export function useTunnelKeepalive(
     if (!tunnelExpiry || !credentials) return;
 
     const sendKeepalive = async () => {
-      if (!activeNodeVrf || !adminIP) return;
+      if (!activeNodeVrf) return;
       if (Date.now() >= tunnelExpiry) return;
       try {
+        // El backend resuelve mgmt_ip + VRF desde la sesión activa (server-authoritative).
         const res = await fetchWithTimeout(`${API_BASE_URL}/api/tunnel/keepalive`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            tunnelIP: adminIP,
-            targetVRF: activeNodeVrf,
-          }),
+          body: JSON.stringify({ targetVRF: activeNodeVrf }),
         }, 12_000);
         const data = await res.json();
         if (data.restored) {
@@ -47,7 +44,7 @@ export function useTunnelKeepalive(
         keepaliveRef.current = null;
       }
     };
-  }, [tunnelExpiry, credentials, activeNodeVrf, adminIP]);
+  }, [tunnelExpiry, credentials, activeNodeVrf]);
 
   return { keepaliveRef };
 }

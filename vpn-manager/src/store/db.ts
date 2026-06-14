@@ -30,7 +30,6 @@ export interface VpnStoreData {
   scannedSecrets?: VpnSecret[];
   activeNodeVrf?: string | null;
   tunnelExpiry?: number | null;
-  adminIP?: string;
   nodes?: NodeInfo[];
 }
 
@@ -47,7 +46,6 @@ interface StoredData {
   scannedSecrets?: VpnSecret[];
   activeNodeVrf?: string | null;
   tunnelExpiry?: number | null;
-  adminIP?: string;
   nodes?: NodeInfo[];
 }
 
@@ -78,7 +76,6 @@ export const dbService = {
         scannedSecrets: raw.scannedSecrets ?? [],
         activeNodeVrf:  raw.activeNodeVrf  ?? null,
         tunnelExpiry:   raw.tunnelExpiry   ?? null,
-        adminIP:        raw.adminIP,
         nodes:          raw.nodes          ?? [],
       };
     } catch {
@@ -106,7 +103,6 @@ export const dbService = {
       scannedSecrets: data.scannedSecrets,
       activeNodeVrf:  data.activeNodeVrf,
       tunnelExpiry:   data.tunnelExpiry,
-      adminIP:        data.adminIP,
       nodes:          data.nodes,
     };
     await localforage.setItem(STORAGE_KEY, stored);

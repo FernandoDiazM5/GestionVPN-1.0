@@ -95,7 +95,7 @@ export default function NodeCard({
     isRepairing,
     logsEndRef,
     handleRepair: repairFunc,
-  } = useLogsAndRepair(node, isThisNodeActive);
+  } = useLogsAndRepair(node);
 
   const addLog = (msg: string) => setLogs(prev => [...prev.slice(-8), msg]);
 
@@ -124,7 +124,7 @@ export default function NodeCard({
       : 'border-l-2 border-l-transparent';
 
   const handleRepair = async () => {
-    await repairFunc(addLog, setLogs, null);
+    await repairFunc(addLog, setLogs);
   };
 
   const handleWgPeerClick = () => {

@@ -26,8 +26,6 @@ export interface VpnContextType {
   setActiveNodeVrf: React.Dispatch<React.SetStateAction<string | null>>;
   tunnelExpiry: number | null;
   setTunnelExpiry: React.Dispatch<React.SetStateAction<number | null>>;
-  adminIP: string;
-  setAdminIP: React.Dispatch<React.SetStateAction<string>>;
   deactivateAllNodes: () => Promise<void>;
   removeNodeFromState: (pppUser: string) => void;
 

@@ -35,9 +35,6 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
           scanner.setScannedSecrets(store.scannedSecrets);
           scanner.setHasScanned(true);
         }
-        if (store.adminIP) {
-          nodes.setAdminIP(store.adminIP);
-        }
         if (store.nodes?.length) {
           nodes.setNodes(store.nodes);
         }
@@ -67,7 +64,7 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
   );
 
   useTunnelTimeout(nodes.tunnelExpiry, () => nodes.deactivateAllNodes(auth.credentials));
-  useTunnelKeepalive(nodes.tunnelExpiry, auth.credentials, nodes.activeNodeVrf, nodes.adminIP);
+  useTunnelKeepalive(nodes.tunnelExpiry, auth.credentials, nodes.activeNodeVrf);
   useAuthExpiry(auth.handleLogout);
 
   usePersistence(auth.isReady, auth.isLoggingOutRef.current, {
@@ -77,7 +74,6 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
     scannedSecrets: scanner.scannedSecrets,
     activeNodeVrf: nodes.activeNodeVrf,
     tunnelExpiry: nodes.tunnelExpiry,
-    adminIP: nodes.adminIP,
     nodes: nodes.nodes,
   });
 
@@ -131,8 +127,6 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
     setActiveNodeVrf: nodes.setActiveNodeVrf,
     tunnelExpiry: nodes.tunnelExpiry,
     setTunnelExpiry: nodes.setTunnelExpiry,
-    adminIP: nodes.adminIP,
-    setAdminIP: nodes.setAdminIP,
     deactivateAllNodes: () => nodes.deactivateAllNodes(auth.credentials),
     removeNodeFromState: nodes.removeNodeFromState,
 

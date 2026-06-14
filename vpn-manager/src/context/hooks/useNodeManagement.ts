@@ -7,12 +7,10 @@ export function useNodeManagement() {
   const [nodes, setNodes] = useState<NodeInfo[]>([]);
   const [activeNodeVrf, setActiveNodeVrf] = useState<string | null>(null);
   const [tunnelExpiry, setTunnelExpiry] = useState<number | null>(null);
-  const [adminIP, setAdminIP] = useState('192.168.21.20');
 
   const timeoutRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const keepaliveRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const activeNodeVrfRef = useRef<string | null>(null);
-  const adminIPRef = useRef<string>('192.168.21.20');
 
   const deactivateAllNodes = useCallback(async (credentials: any) => {
     if (!credentials) return;
@@ -58,13 +56,10 @@ export function useNodeManagement() {
     setActiveNodeVrf,
     tunnelExpiry,
     setTunnelExpiry,
-    adminIP,
-    setAdminIP,
     deactivateAllNodes,
     removeNodeFromState,
     timeoutRef,
     keepaliveRef,
     activeNodeVrfRef,
-    adminIPRef,
   };
 }

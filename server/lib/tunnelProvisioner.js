@@ -122,6 +122,7 @@ async function addUserMangle(api, { userId, mgmtIp, vrfName }) {
 
 module.exports = {
   DST_LIST,
+  LEGACY_GLOBAL_COMMENTS,
   userTag, mangleComment,
   vrfExists, findUserMangleIds, findLegacyGlobalMangleIds, hasUserMangle,
   removeMangleIds, addUserMangle,
