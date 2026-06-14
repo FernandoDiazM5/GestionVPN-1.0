@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { PollResult } from '../../../../types/apMonitor';
+import type { PollResult, LiveCpe } from '../../../../types/apMonitor';
 import type { SavedDevice } from '../../../../types/devices';
 import { fetchWithTimeout } from '../../../../utils/fetchWithTimeout';
 import { API_BASE_URL } from '../../../../config';
@@ -81,6 +81,46 @@ export function usePolling(devices: SavedDevice[], _activeNodeName: string | nul
     }
   }, []);
 
+  // ── E1/Etapa 2: heartbeat + seed desde BD + ingest de SSE ──────────────
+  // pingWatch: avisa al backend "estoy mirando" (el apPollJob solo pollea
+  // workspaces con heartbeat reciente → SSH solo mientras la vista está abierta).
+  const pingWatch = useCallback(() => {
+    fetchWithTimeout(`${BASE}/watch`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    }, 5_000).catch(() => { /* no-fatal */ });
+  }, []);
+
+  // seedFromDb: pinta inmediato las estaciones ya conocidas (cpes.last_stats)
+  // sin esperar a un poll. No pisa un resultado más fresco que ya tengamos.
+  const seedFromDb = useCallback(async () => {
+    try {
+      const res = await fetchWithTimeout(`${BASE}/stations`, {}, 10_000);
+      const data = await res.json();
+      if (!data.success || !data.aps) return;
+      setPollResults(prev => {
+        const next = { ...prev };
+        for (const [apId, info] of Object.entries(data.aps as Record<string, { stations: LiveCpe[]; polledAt: number }>)) {
+          const cur = prev[apId];
+          if (!cur || (info.polledAt ?? 0) >= (cur.polledAt ?? 0)) {
+            next[apId] = { stations: info.stations || [], polledAt: info.polledAt || 0, loading: false };
+          }
+        }
+        return next;
+      });
+    } catch { /* no-fatal */ }
+  }, []);
+
+  // ingestApPoll: aplica un evento SSE 'ap-poll' del backend.
+  const ingestApPoll = useCallback((ev: { apId: string; stations?: LiveCpe[]; polledAt?: number; error?: string }) => {
+    if (!ev?.apId) return;
+    setPollResults(prev => ({
+      ...prev,
+      [ev.apId]: ev.error
+        ? { ...(prev[ev.apId] ?? { stations: [] }), loading: false, error: ev.error }
+        : { stations: ev.stations || [], polledAt: ev.polledAt || Date.now(), loading: false },
+    }));
+  }, []);
+
   return {
     pollResults,
     setPollResults,
@@ -91,5 +131,8 @@ export function usePolling(devices: SavedDevice[], _activeNodeName: string | nul
     pollApDirect,
     pollResultsRef,
     autoPolledRef,
+    pingWatch,
+    seedFromDb,
+    ingestApPoll,
   };
 }

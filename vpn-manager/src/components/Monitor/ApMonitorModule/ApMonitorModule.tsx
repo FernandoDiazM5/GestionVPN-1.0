@@ -19,6 +19,7 @@ import ApDetailModal from './components/modals/ApDetailModal';
 
 import { useApMonitorLogic } from './hooks/useApMonitorLogic';
 import { usePolling } from './hooks/usePolling';
+import { useApPollEvents } from './hooks/useApPollEvents';
 
 export default function ApMonitorModule() {
   const { nodes, activeNodeVrf, tunnelExpiry, setActiveModule } = useVpn();
@@ -79,22 +80,20 @@ export default function ApMonitorModule() {
     Object.values(polling.pollTimers.current).forEach(clearTimeout);
   }, []);
 
+  // E1/Etapa 2: en vez del "burst" de SSH del navegador al montar, ahora
+  //   (a) avisamos al backend que estamos mirando (heartbeat → apPollJob),
+  //   (b) sembramos el estado desde la BD (cpes.last_stats), y
+  //   (c) recibimos actualizaciones en vivo por SSE ('ap-poll').
+  // El SSH a antenas vive en el backend (§43). El sync manual sigue disponible.
   useEffect(() => {
-    if (logic.devices.length === 0 || polling.autoPolledRef.current) return;
-    polling.autoPolledRef.current = true;
+    polling.pingWatch();
+    const t = setInterval(polling.pingWatch, 30_000);
+    return () => clearInterval(t);
+  }, [polling.pingWatch]);
 
-    const apDevices = logic.devices.filter(d => d.role !== 'sta');
-    const apsToInit = apDevices.filter(ap => {
-      const hasCreds = ap.sshUser && (ap.sshPass || ap.hasSshPass);
-      const pr = polling.pollResultsRef.current[ap.id];
-      const isFresh = pr?.polledAt && (Date.now() - pr.polledAt < 300_000);
-      return hasCreds && !isFresh;
-    });
-    const initTimers = apsToInit.map((dev, i) =>
-      setTimeout(() => polling.pollApDirect(dev.id, false), i * 600)
-    );
-    return () => initTimers.forEach(clearTimeout);
-  }, [logic.devices.length, polling.pollApDirect, activeNodeName]);
+  useEffect(() => { polling.seedFromDb(); }, [polling.seedFromDb]);
+
+  useApPollEvents(polling.ingestApPoll, true);
 
   const toggleAp = (apId: string) => {
     setExpandedAps(prev => {
