@@ -37,6 +37,16 @@ export function useDeviceLibrary({
   const [toast, setToast] = useState('');
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
+  // Ref sincronizado con `savedDevices` para lookup síncrono dentro de
+  // handlers async. Sin este ref, el patrón `setSavedDevices(prev => ...)`
+  // del fix §37-B1 dejaba `merged` como undefined en la siguiente línea
+  // (React no garantiza ejecución sincrónica del functional updater — se
+  // procesa en el próximo flush, después del próximo `await`). El bug se
+  // manifestaba como crash al guardar: `Cannot read properties of undefined
+  // (reading 'cachedStats')` en deviceDb.saveSingle.
+  const savedDevicesRef = useRef<SavedDevice[]>([]);
+  useEffect(() => { savedDevicesRef.current = savedDevices; }, [savedDevices]);
+
   const showToast = useCallback((msg: string) => {
     setToast(msg);
     clearTimeout(toastTimer.current);
@@ -65,28 +75,30 @@ export function useDeviceLibrary({
   }, [nodesLength]);
 
   const handleAddDevice = useCallback(async (device: SavedDevice) => {
-    // Functional setState — el updater ve siempre el estado más reciente, no
-    // el capturado del closure. Cierra la race cuando llegan dos saves cerca
-    // (ej. manual + enriquecimiento SSH en background). Se exporta `merged` y
-    // `wasExisting` del updater vía variables locales: el updater es puro y
-    // se evalúa una sola vez en producción (en StrictMode dev puede correr
-    // dos veces pero el resultado es idempotente).
-    let merged!: SavedDevice;
-    let wasExisting = false;
+    // Computamos `merged` SINCRÓNICAMENTE desde el ref para tenerlo disponible
+    // antes del `await` siguiente. El functional setState (más abajo) recalcula
+    // el merge con el `prev` que React le pasa: si hubo un save concurrente
+    // entre la lectura del ref y el commit, el segundo merge re-aplica los
+    // nuevos campos sobre la versión actual — idempotente porque
+    // saveSingle es un upsert por id en el backend.
+    const prevList = savedDevicesRef.current;
+    const existing = prevList.find(d => d.id === device.id);
+    const wasExisting = !!existing;
+    const merged: SavedDevice = existing
+      ? { ...existing, ...device, addedAt: existing.addedAt }
+      : device;
+
     setSavedDevices(prev => {
-      const existing = prev.find(d => d.id === device.id);
-      wasExisting = !!existing;
-      merged = existing
-        ? { ...existing, ...device, addedAt: existing.addedAt }
-        : device;
-      return existing
-        ? prev.map(d => d.id === device.id ? merged : d)
-        : [...prev, merged];
+      const e = prev.find(d => d.id === device.id);
+      const m = e ? { ...e, ...device, addedAt: e.addedAt } : device;
+      return e
+        ? prev.map(d => d.id === device.id ? m : d)
+        : [...prev, m];
     });
     setSavedIds(prev => {
-      if (prev.has(merged.id)) return prev;
+      if (prev.has(device.id)) return prev;
       const next = new Set(prev);
-      next.add(merged.id);
+      next.add(device.id);
       return next;
     });
     await deviceDb.saveSingle(merged);

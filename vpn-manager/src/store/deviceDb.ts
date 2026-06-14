@@ -139,6 +139,14 @@ export const deviceDb = {
 
   async saveSingle(device: SavedDevice): Promise<void> {
     try {
+      // Guardrail: el bug §51 mostró que un caller podía pasar `undefined` si
+      // intentaba leer una variable que dependía de un setState con functional
+      // updater (que React no procesa sincrónicamente). El fix raíz vive en el
+      // caller; este check evita el crash si una regresión similar reaparece.
+      if (!device || !device.id) {
+        console.warn('deviceDb.saveSingle: device sin id — ignorado', device);
+        return;
+      }
       // 1. Guardar stats COMPLETAS en IndexedDB (sin filtro)
       if (device.cachedStats) {
         await statsCache.save(device.id, device.cachedStats);
