@@ -45,7 +45,12 @@ export function useSession(): UseSessionResult {
     }
   }, []);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  // Carga al montar. Se difiere un tick para no disparar setState de forma
+  // síncrona dentro del effect (react-hooks/set-state-in-effect).
+  useEffect(() => {
+    const id = setTimeout(refresh, 0);
+    return () => clearTimeout(id);
+  }, [refresh]);
 
   return { session, loading, refresh };
 }

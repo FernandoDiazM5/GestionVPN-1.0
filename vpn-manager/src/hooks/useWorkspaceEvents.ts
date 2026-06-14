@@ -15,7 +15,9 @@ interface TunnelEvent {
 
 export function useWorkspaceEvents(onEvent: (e: TunnelEvent) => void, enabled: boolean) {
   const cbRef = useRef(onEvent);
-  cbRef.current = onEvent;
+  // El ref se sincroniza en un effect (no durante el render) para no leer/escribir
+  // refs en fase de render (react-hooks/refs).
+  useEffect(() => { cbRef.current = onEvent; });
 
   useEffect(() => {
     if (!enabled) return;
