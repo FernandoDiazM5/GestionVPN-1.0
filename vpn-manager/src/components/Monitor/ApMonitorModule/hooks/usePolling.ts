@@ -44,17 +44,11 @@ export function usePolling(devices: SavedDevice[], _activeNodeName: string | nul
     }));
 
     try {
+      // C4: solo enviamos apId. IP, puerto, firmware y credenciales SSH se
+      // resuelven server-side desde la DB (cifradas) — nunca viajan por el navegador.
       const res = await fetchWithTimeout(`${BASE}/poll-direct`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          apId,
-          ip: dev.ip,
-          port: dev.sshPort ?? 22,
-          user: dev.sshUser ?? '',
-          pass: dev.sshPass ?? '',
-          firmware: dev.firmware ?? '',
-          saveHistory: false,
-        }),
+        body: JSON.stringify({ apId, saveHistory: false }),
       }, 20_000);
       const data = await res.json();
       if (data.success) {

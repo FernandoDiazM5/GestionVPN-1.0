@@ -46,12 +46,11 @@ function StationTable({ poll, onCpeDetail, dev }: {
     try {
       const r = await fetchWithTimeout(`${BASE}/cpes/enrich-batch`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
+        // C4: credenciales SSH resueltas server-side desde la DB; no se envían desde el navegador.
         body: JSON.stringify({
           cpes: needEnrich.map(s => ({ mac: s.mac, ip: s.lastip })),
           apId: dev.id,
           port: dev.sshPort ?? 22,
-          user: dev.sshUser,
-          pass: dev.sshPass ?? '',
         }),
       }, 120_000);
       const d = await r.json();

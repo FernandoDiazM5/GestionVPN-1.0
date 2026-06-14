@@ -369,35 +369,31 @@ router.get('/historial/:mac', async (req, res) => {
 // ── Poll AP directly — usa credenciales del nodo (node_ssh_creds) ────────
 router.post('/poll-direct', async (req, res) => {
     try {
-        const { apId, ip, port, user, pass, saveHistory, firmware } = req.body;
-        if (!apId || !ip) return res.status(400).json({ success: false, message: 'apId e ip requeridos' });
+        const { apId, saveHistory } = req.body;
+        if (!apId) return res.status(400).json({ success: false, message: 'apId requerido' });
 
+        const db = await getDb();
         // Aislamiento: el AP debe pertenecer al workspace del solicitante
-        {
-            const dbg = await getDb();
-            if (!(await ownsApUuid(dbg, req, apId))) return res.status(404).json({ success: false, message: 'AP no encontrado' });
-        }
+        if (!(await ownsApUuid(db, req, apId))) return res.status(404).json({ success: false, message: 'AP no encontrado' });
+
+        // C2: IP, puerto y firmware se leen SIEMPRE de la DB — nunca del body.
+        // Evita forzar una conexión SSH (con las credenciales del AP) a un host arbitrario.
+        const apRow = await db.get(
+            'SELECT ip, usuario_ssh, clave_ssh_enc, puerto_ssh, ap_group_id, firmware FROM aps WHERE uuid = ?', [apId]
+        );
+        if (!apRow || !apRow.ip) return res.status(404).json({ success: false, message: 'AP no encontrado' });
+
         // Resolve AP integer id from uuid
         const apIntId = await getApIntId(apId);
 
-        // Buscar credenciales SSH del AP desde tabla aps (normalizada) o node_ssh_creds (fallback)
-        let sshUser = user || '';
-        let sshPass = pass || '';
+        // C4: credenciales SSH resueltas server-side desde tabla aps (cifradas) o node_ssh_creds (fallback)
+        let sshUser = apRow.usuario_ssh || '';
+        let sshPass = apRow.clave_ssh_enc ? decryptPass(apRow.clave_ssh_enc) : '';
         try {
-            const db = await getDb();
-            // Primero intentar leer credenciales propias del AP desde tabla aps
-            const apRow = await db.get('SELECT usuario_ssh, clave_ssh_enc, puerto_ssh, ap_group_id FROM aps WHERE uuid = ?', [apId]);
-            if (apRow && apRow.usuario_ssh) {
-                sshUser = sshUser || apRow.usuario_ssh;
-                sshPass = sshPass || (apRow.clave_ssh_enc ? decryptPass(apRow.clave_ssh_enc) : '');
-            }
             // Si no hay credenciales propias, buscar por nodo padre via ap_group
-            if (!sshUser && apRow && apRow.ap_group_id) {
-                // ap_group doesn't directly link to nodes — we need to find node_ssh_creds
-                // via the ap_group's associated node. For now, try reading from ap_group → node mapping
-                // The node_ssh_creds table uses node_id (INTEGER FK to nodes.id)
-                // We need to find which node this AP group belongs to.
-                // Strategy: look up nodes whose segmento_lan covers the AP's IP, or use a direct link if available
+            // NOTA (C3): ap_group aún no está enlazado a nodes; se usa el primer node_ssh_creds.
+            // Pendiente de la Fase 2 (FK ap_groups.node_id) para resolver el nodo correcto.
+            if (!sshUser && apRow.ap_group_id) {
                 const nodeRows = await db.all('SELECT id FROM nodes');
                 for (const nr of nodeRows) {
                     const credRows = await db.all(
@@ -415,8 +411,7 @@ router.post('/poll-direct', async (req, res) => {
             log.warn({ err: e.message }, 'poll-direct: error buscando credenciales del nodo');
         }
 
-        const stations = await pollAp(apId, ip, parseInt(port) || 22, sshUser, sshPass, firmware || '');
-        const db = await getDb();
+        const stations = await pollAp(apId, apRow.ip, apRow.puerto_ssh || 22, sshUser, sshPass, apRow.firmware || '');
 
         // B8+B17+B20: UPSERT atomico + validacion MAC + transaccion batch
         await db.run('BEGIN');
@@ -473,7 +468,7 @@ router.post('/poll-direct', async (req, res) => {
         }));
 
         res.json({ success: true, stations: enriched, polledAt: Date.now() });
-    } catch (e) { res.json({ success: false, message: e.message }); }
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
 // ── Full AP detail direct — all 12 SSH sections (ANTENNA_CMD) ────────────
@@ -503,31 +498,26 @@ router.post('/ap-detail-direct', async (req, res) => {
 router.post('/cpes/enrich-batch', async (req, res) => {
     try {
         const { cpes, apId, port } = req.body;
-        let { user, pass } = req.body;
         // cpes: [{ mac, ip }]
         if (!Array.isArray(cpes)) return res.status(400).json({ success: false, message: 'cpes[] requerido' });
+        if (!apId) return res.status(400).json({ success: false, message: 'apId requerido' });
         const db = await getDb();
 
-        // Fallback: resolver credenciales desde tabla aps por apId (uuid)
-        if (apId && (!user || !pass)) {
-            try {
-                const apRow = await db.get('SELECT usuario_ssh, clave_ssh_enc, puerto_ssh FROM aps WHERE uuid = ?', [apId]);
-                if (apRow && apRow.usuario_ssh) {
-                    user = user || apRow.usuario_ssh;
-                    pass = pass || (apRow.clave_ssh_enc ? decryptPass(apRow.clave_ssh_enc) : '');
-                }
-            } catch (e) {
-                log.warn({ err: e.message }, 'enrich-batch: error leyendo credenciales del AP');
-            }
-        }
+        // C1: aislamiento — el AP debe pertenecer al workspace del solicitante.
+        if (!(await ownsApUuid(db, req, apId))) return res.status(404).json({ success: false, message: 'AP no encontrado' });
 
-        if (!user || !pass) return res.status(400).json({ success: false, message: 'Sin credenciales SSH (ni body ni DB)' });
+        // C4: credenciales SSH resueltas SIEMPRE server-side desde tabla aps (cifradas), nunca del body.
+        const apRow = await db.get('SELECT usuario_ssh, clave_ssh_enc, puerto_ssh FROM aps WHERE uuid = ?', [apId]);
+        if (!apRow || !apRow.usuario_ssh) return res.status(400).json({ success: false, message: 'AP sin credenciales SSH' });
+        const user = apRow.usuario_ssh;
+        const pass = apRow.clave_ssh_enc ? decryptPass(apRow.clave_ssh_enc) : '';
+        const sshPort = parseInt(port) || apRow.puerto_ssh || 22;
 
         const results = [];
         for (const { mac, ip } of cpes) {
             if (!mac || !ip) continue;
             try {
-                const s = await getDetail(ip, parseInt(port) || 22, user, pass);
+                const s = await getDetail(ip, sshPort, user, pass);
                 const MAC = mac.toUpperCase();
                 await db.run(
                     `INSERT INTO cpes (mac,hostname,modelo,firmware,ip_lan,mac_lan,mac_wlan,last_seen)
