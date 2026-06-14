@@ -131,9 +131,9 @@ export default function AssignTunnelsModal({ member, onClose }: Props) {
       onClick={e => e.target === e.currentTarget && !busy && onClose()}>
       <div className="modal-panel modal-panel-lg">
         {/* Header */}
-        <div className="flex items-center justify-between bg-indigo-600 rounded-t-2xl px-5 py-4 shrink-0">
+        <div className="modal-header-decorated modal-header-indigo">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center shrink-0">
+            <div className="modal-header-icon">
               <Waypoints className="w-4 h-4 text-white" />
             </div>
             <div className="min-w-0">
@@ -141,8 +141,7 @@ export default function AssignTunnelsModal({ member, onClose }: Props) {
               <p className="text-2xs text-indigo-200 truncate">{member.name || member.email}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 text-indigo-200 hover:text-white hover:bg-white/10 rounded-lg"
-            aria-label="Cerrar">
+          <button onClick={onClose} className="modal-header-close" aria-label="Cerrar">
             <X className="w-4 h-4" />
           </button>
         </div>

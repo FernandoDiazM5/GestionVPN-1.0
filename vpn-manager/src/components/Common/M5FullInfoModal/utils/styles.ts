@@ -4,12 +4,12 @@ export const modalContainerStyles = {
 };
 
 export const headerStyles = {
-  container: 'flex items-center justify-between bg-slate-800 rounded-t-2xl px-5 py-4 shrink-0',
-  iconWrapper: 'w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center',
+  container: 'modal-header-decorated modal-header-slate',
+  iconWrapper: 'modal-header-icon',
   titleSection: 'flex items-center gap-3',
   titleContainer: 'flex items-center gap-2',
   subtitle: 'flex items-center gap-2 mt-0.5',
-  closeButton: 'p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg',
+  closeButton: 'modal-header-close',
 };
 
 export const contentStyles = {

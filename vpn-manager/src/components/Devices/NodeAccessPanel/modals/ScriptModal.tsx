@@ -78,9 +78,9 @@ export default function ScriptModal({ node, onClose }: { node: NodeInfo; onClose
     <div className="modal-overlay"
       onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal-panel modal-panel-xl">
-        <div className="flex items-center justify-between bg-emerald-600 rounded-t-2xl px-5 py-4 shrink-0">
+        <div className="modal-header-decorated modal-header-emerald">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center">
+            <div className="modal-header-icon">
               <FileCode className="w-4 h-4 text-white" />
             </div>
             <div>
@@ -88,7 +88,7 @@ export default function ScriptModal({ node, onClose }: { node: NodeInfo; onClose
               <p className="text-2xs text-emerald-200 mt-0.5">{node.nombre_nodo} — {node.ppp_user}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 text-emerald-300 hover:text-white hover:bg-white/10 rounded-lg">
+          <button onClick={onClose} className="modal-header-close">
             <X className="w-4 h-4" />
           </button>
         </div>

@@ -23,14 +23,14 @@ export default function TagModal({ node, currentTags, onSave, onClose }: {
     <div className="modal-overlay"
       onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal-panel modal-panel-sm">
-        <div className="flex items-center justify-between bg-amber-500 rounded-t-2xl px-5 py-4 shrink-0">
+        <div className="modal-header-decorated modal-header-amber">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center">
+            <div className="modal-header-icon">
               <Tag className="w-4 h-4 text-white" />
             </div>
             <p className="text-sm font-bold text-white">Etiquetas — {node.nombre_nodo}</p>
           </div>
-          <button onClick={onClose} className="p-1.5 text-amber-200 hover:text-white hover:bg-white/10 rounded-lg">
+          <button onClick={onClose} className="modal-header-close">
             <X className="w-4 h-4" />
           </button>
         </div>

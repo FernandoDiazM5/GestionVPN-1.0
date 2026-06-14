@@ -10,9 +10,9 @@ function DeviceCardModal({ device, onClose, onRemove, onUpdate }: {
     <div className="modal-overlay"
       onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal-panel modal-panel-md overflow-y-auto">
-        <div className="flex items-center justify-between bg-slate-800 rounded-t-2xl px-4 py-2.5">
+        <div className="modal-header-decorated modal-header-slate px-4 py-2.5">
           <span className="text-xs font-bold text-slate-300">Detalle del dispositivo</span>
-          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors">
+          <button onClick={onClose} className="modal-header-close">
             <X className="w-4 h-4" />
           </button>
         </div>

@@ -100,12 +100,12 @@ function CpeDetailModal({
     <div className="modal-overlay"
       onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal-panel modal-panel-lg">
-        <div className="flex items-center justify-between bg-slate-800 rounded-t-2xl px-5 py-3 shrink-0">
+        <div className="modal-header-decorated modal-header-slate py-3">
           <div>
             <p className="text-xs font-bold text-white font-mono">{mac}</p>
             <p className="text-2xs text-slate-400 mt-0.5">{cpeIp || 'IP desconocida'} · Detalle CPE</p>
           </div>
-          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg"><X className="w-4 h-4" /></button>
+          <button onClick={onClose} className="modal-header-close"><X className="w-4 h-4" /></button>
         </div>
         <div className="overflow-y-auto p-5 space-y-4">
           {loading && (

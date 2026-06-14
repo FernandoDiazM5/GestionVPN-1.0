@@ -95,9 +95,9 @@ export default function BatchCsvModal({ onClose, onSuccess, nodes }: BatchCsvMod
     <div className="modal-overlay"
       onClick={e => e.target === e.currentTarget && !processing && onClose()}>
       <div className="modal-panel modal-panel-2xl">
-        <div className="flex items-center justify-between bg-violet-600 rounded-t-2xl px-5 py-4 shrink-0">
+        <div className="modal-header-decorated modal-header-violet">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center">
+            <div className="modal-header-icon">
               <Download className="w-4 h-4 text-white" />
             </div>
             <div>
@@ -105,7 +105,7 @@ export default function BatchCsvModal({ onClose, onSuccess, nodes }: BatchCsvMod
               <p className="text-2xs text-violet-200">Importar para provisionar · Exportar inventario actual</p>
             </div>
           </div>
-          {!processing && <button onClick={onClose} className="p-1.5 text-violet-300 hover:text-white hover:bg-white/10 rounded-lg"><X className="w-4 h-4" /></button>}
+          {!processing && <button onClick={onClose} className="modal-header-close"><X className="w-4 h-4" /></button>}
         </div>
 
         <div className="flex border-b border-slate-100 dark:border-slate-800 shrink-0">

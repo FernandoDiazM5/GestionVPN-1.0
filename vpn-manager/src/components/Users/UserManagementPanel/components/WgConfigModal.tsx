@@ -54,8 +54,10 @@ export default function WgConfigModal({ peer, onClose }: { peer: WgPeer; onClose
     <div className="modal-overlay"
       onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-panel modal-panel-xl">
-        {/* Header */}
-        <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 px-6 py-4 flex items-center justify-between">
+        {/* Header — usa gradient indigo-600→800 intencional para destacar
+            del modal-header-indigo (color sólido) que tienen otros modales.
+            Mantiene .modal-header-decorated para layout y .modal-header-close. */}
+        <div className="modal-header-decorated bg-gradient-to-br from-indigo-600 to-indigo-800 px-6">
           <div className="flex items-center gap-3 min-w-0">
             <div className="bg-white/20 p-2 rounded-xl shrink-0"><ShieldCheck className="w-5 h-5 text-white" /></div>
             <div className="min-w-0">
@@ -63,8 +65,7 @@ export default function WgConfigModal({ peer, onClose }: { peer: WgPeer; onClose
               <p className="text-2xs text-indigo-200 font-mono truncate">{peer.name}</p>
             </div>
           </div>
-          <button onClick={onClose} aria-label="Cerrar"
-            className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors shrink-0">
+          <button onClick={onClose} aria-label="Cerrar" className="modal-header-close">
             <X className="w-4 h-4" />
           </button>
         </div>

@@ -58,17 +58,16 @@ function ApDetailModal({
     <div className="modal-overlay"
       onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal-panel modal-panel-2xl max-h-[92vh]">
-        <div className="flex items-center justify-between bg-slate-800 rounded-t-2xl px-5 py-3 shrink-0">
+        <div className="modal-header-decorated modal-header-slate py-3">
           <div>
             <p className="text-sm font-bold text-white">{dev.cachedStats?.deviceName ?? dev.name ?? dev.ip}</p>
             <p className="text-2xs text-slate-400 mt-0.5">{dev.ip} · Detalle completo del AP</p>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={refresh} disabled={loading}
-              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg disabled:opacity-40">
+            <button onClick={refresh} disabled={loading} className="modal-header-close disabled:opacity-40">
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             </button>
-            <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg"><X className="w-4 h-4" /></button>
+            <button onClick={onClose} className="modal-header-close"><X className="w-4 h-4" /></button>
           </div>
         </div>
 

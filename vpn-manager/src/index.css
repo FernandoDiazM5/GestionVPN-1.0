@@ -284,6 +284,45 @@
     @apply flex items-center justify-end gap-2 px-6 py-4 border-t border-slate-100
            dark:border-slate-800;
   }
+
+  /* ── Modal header DECORADO (§52) ────────────────────────────────────
+     Para modales que abren con un header coloreado sólido (rose=destruir,
+     emerald=script generado, sky=historial, etc.). El layout es el mismo
+     que `.modal-header` pero con fondo de color y texto blanco.
+     Composición: `<div className="modal-header-decorated modal-header-{tone}">`.
+
+     7 tonos canónicos (uno por intención semántica de CLAUDE.md):
+       indigo   → acción primaria, "Nuevo"
+       rose     → destructivo, "Eliminar"
+       amber    → atención, "Etiquetas / advertencia"
+       emerald  → éxito / script generado
+       sky      → informativo, "Historial"
+       violet   → WireGuard / WG config
+       slate    → estado neutro oscuro (M5 full info, Detail modals)
+
+     Los sub-elementos `.modal-header-icon` y `.modal-header-close` son
+     comunes a todos los tonos y reutilizables. */
+  .modal-header-decorated {
+    @apply flex items-center justify-between gap-3 rounded-t-2xl px-5 py-4 shrink-0;
+  }
+  .modal-header-indigo  { @apply bg-indigo-600; }
+  .modal-header-rose    { @apply bg-rose-600; }
+  .modal-header-amber   { @apply bg-amber-500; }
+  .modal-header-emerald { @apply bg-emerald-600; }
+  .modal-header-sky     { @apply bg-sky-600; }
+  .modal-header-violet  { @apply bg-violet-600; }
+  .modal-header-slate   { @apply bg-slate-800; }
+
+  /* Caja del ícono en el header decorado — w-8 sólo, con overlay translúcido. */
+  .modal-header-icon {
+    @apply w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center shrink-0;
+  }
+
+  /* Botón X de cierre en el header decorado. Hover sutil sobre fondo coloreado. */
+  .modal-header-close {
+    @apply p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors shrink-0
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40;
+  }
 }
 
 /* ── Reveal escalonado al montar una vista (P1) ──────────────────────────

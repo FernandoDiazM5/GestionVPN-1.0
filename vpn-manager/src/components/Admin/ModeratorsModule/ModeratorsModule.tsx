@@ -180,12 +180,12 @@ function ModalShell({ icon, title, danger, busy, onClose, children }: {
     <div className="modal-overlay"
       onClick={e => e.target === e.currentTarget && !busy && onClose()}>
       <div className="modal-panel modal-panel-md">
-        <div className={`flex items-center justify-between rounded-t-2xl px-5 py-4 ${danger ? 'bg-rose-600' : 'bg-indigo-600'}`}>
+        <div className={`modal-header-decorated ${danger ? 'modal-header-rose' : 'modal-header-indigo'}`}>
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center">{icon}</div>
+            <div className="modal-header-icon">{icon}</div>
             <p className="text-sm font-bold text-white">{title}</p>
           </div>
-          {!busy && <button onClick={onClose} className="p-1.5 text-white/70 hover:text-white hover:bg-white/10 rounded-lg"><X className="w-4 h-4" /></button>}
+          {!busy && <button onClick={onClose} className="modal-header-close"><X className="w-4 h-4" /></button>}
         </div>
         <div className="p-5 space-y-3">{children}</div>
       </div>

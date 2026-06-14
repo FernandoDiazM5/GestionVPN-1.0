@@ -22,9 +22,9 @@ export default function HistoryModal({ node, onClose }: { node: NodeInfo; onClos
     <div className="modal-overlay"
       onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal-panel modal-panel-md max-h-[80vh]">
-        <div className="flex items-center justify-between bg-sky-600 rounded-t-2xl px-5 py-4 shrink-0">
+        <div className="modal-header-decorated modal-header-sky">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center">
+            <div className="modal-header-icon">
               <History className="w-4 h-4 text-white" />
             </div>
             <div>
@@ -32,7 +32,7 @@ export default function HistoryModal({ node, onClose }: { node: NodeInfo; onClos
               <p className="text-2xs text-sky-200">{node.ppp_user}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 text-sky-300 hover:text-white hover:bg-white/10 rounded-lg">
+          <button onClick={onClose} className="modal-header-close">
             <X className="w-4 h-4" />
           </button>
         </div>

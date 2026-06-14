@@ -168,9 +168,12 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
       onClick={e => e.target === e.currentTarget && !provisioning && !result && onClose()}>
       <div className="modal-panel modal-panel-2xl">
 
-        <div className="flex items-center justify-between bg-indigo-700 rounded-t-2xl px-5 py-4 shrink-0">
+        {/* NuevoNodo usa indigo-700 intencional (más sólido que el indigo-600
+            estándar de modal-header-indigo) para diferenciarlo visualmente
+            del EditarNodo y NuevoAdmin que comparten el tono indigo. */}
+        <div className="modal-header-decorated modal-header-indigo !bg-indigo-700">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center">
+            <div className="modal-header-icon">
               <Plus className="w-4 h-4 text-white" />
             </div>
             <div>
@@ -179,7 +182,7 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
             </div>
           </div>
           {!provisioning && !result && (
-            <button onClick={onClose} className="p-1.5 text-indigo-300 hover:text-white hover:bg-white/10 rounded-lg">
+            <button onClick={onClose} className="modal-header-close">
               <X className="w-4 h-4" />
             </button>
           )}
