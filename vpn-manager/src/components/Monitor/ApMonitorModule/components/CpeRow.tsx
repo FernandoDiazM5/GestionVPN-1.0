@@ -2,6 +2,7 @@ import { Eye, ExternalLink } from 'lucide-react';
 import type { LiveCpe } from '../../../../types/apMonitor';
 import { fmtDbm, fmtPct, fmtMbps, fmtKbps, fmtUptime } from '../utils/formatters';
 import { sigColor, ccqColor } from '../utils/colors';
+import { cpeHealth } from '../utils/health';
 
 function CpeRow({ cpe, idx, onDetail, hiddenCols, gridCols }: {
   cpe: LiveCpe; idx: number;
@@ -18,6 +19,13 @@ function CpeRow({ cpe, idx, onDetail, hiddenCols, gridCols }: {
   const displayModel = cpe.cpe_product || cpe.modelo || null;
   const ff = cpe.firmware_family;
 
+  // E3: el dot de "Estado" refleja la salud (señal/CCQ), no solo "conectado".
+  const health = cpeHealth(cpe);
+  const healthDot = health === 'critical' ? 'bg-rose-500' : health === 'warning' ? 'bg-amber-400' : 'bg-emerald-500';
+  const healthTitle = health === 'critical' ? 'Crítico — señal/CCQ muy bajos'
+    : health === 'warning' ? 'Advertencia — señal/CCQ degradados'
+      : 'Conectado — señal/CCQ OK';
+
   return (
     <div
       className={`grid items-center text-xs border-b border-slate-100 last:border-0 transition-colors dark:border-slate-800
@@ -25,7 +33,7 @@ function CpeRow({ cpe, idx, onDetail, hiddenCols, gridCols }: {
       style={{ gridTemplateColumns: gridCols }}>
 
       <div className="px-1.5 py-3 flex items-center justify-center">
-        <span className="w-2 h-2 rounded-full bg-emerald-500" title="Conectado" />
+        <span className={`w-2 h-2 rounded-full ${healthDot} ${health === 'critical' ? 'animate-pulse' : ''}`} title={healthTitle} />
       </div>
 
       <div className="px-2 py-2 min-w-0">

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Loader2, X, Search, ScanSearch, ZapOff } from 'lucide-react';
+import { Loader2, X, Search, ScanSearch, ZapOff, AlertTriangle } from 'lucide-react';
 import type { SavedDevice } from '../../../../types/devices';
 import type { PollResult } from '../../../../types/apMonitor';
 import { fetchWithTimeout } from '../../../../utils/fetchWithTimeout';
@@ -7,6 +7,7 @@ import { API_BASE_URL } from '../../../../config';
 import CpeRow from './CpeRow';
 import ColSelector from './selectors/ColSelector';
 import { CPE_COL_DEFS, loadColPrefs, saveColPrefs } from '../utils/columnDefs';
+import { cpeHealth, degradedSummary } from '../utils/health';
 
 const BASE = `${API_BASE_URL}/api/ap-monitor`;
 
@@ -17,24 +18,32 @@ function StationTable({ poll, onCpeDetail, dev }: {
 }) {
   const [hiddenCols, setHiddenCols] = useState<Set<string>>(loadColPrefs);
   const [cpeSearch, setCpeSearch] = useState('');
+  const [onlyDegraded, setOnlyDegraded] = useState(false);
   const [enriching, setEnriching] = useState(false);
   const [enrichMsg, setEnrichMsg] = useState('');
 
   const handleColChange = (h: Set<string>) => { setHiddenCols(h); saveColPrefs(h); };
 
+  // E3: resumen de CPEs degradados (señal/CCQ bajo umbral).
+  const degraded = useMemo(() => degradedSummary(poll.stations), [poll.stations]);
+
   const filtered = useMemo(() => {
-    if (!cpeSearch.trim()) return poll.stations;
-    const q = cpeSearch.toLowerCase();
-    return poll.stations.filter(s =>
-      s.mac.toLowerCase().includes(q) ||
-      (s.hostname ?? '').toLowerCase().includes(q) ||
-      (s.remote_hostname ?? '').toLowerCase().includes(q) ||
-      (s.cpe_name ?? '').toLowerCase().includes(q) ||
-      (s.cpe_product ?? '').toLowerCase().includes(q) ||
-      (s.modelo ?? '').toLowerCase().includes(q) ||
-      (s.lastip ?? '').includes(q)
-    );
-  }, [poll.stations, cpeSearch]);
+    let list = poll.stations;
+    if (onlyDegraded) list = list.filter(s => cpeHealth(s) !== 'ok');
+    if (cpeSearch.trim()) {
+      const q = cpeSearch.toLowerCase();
+      list = list.filter(s =>
+        s.mac.toLowerCase().includes(q) ||
+        (s.hostname ?? '').toLowerCase().includes(q) ||
+        (s.remote_hostname ?? '').toLowerCase().includes(q) ||
+        (s.cpe_name ?? '').toLowerCase().includes(q) ||
+        (s.cpe_product ?? '').toLowerCase().includes(q) ||
+        (s.modelo ?? '').toLowerCase().includes(q) ||
+        (s.lastip ?? '').includes(q)
+      );
+    }
+    return list;
+  }, [poll.stations, cpeSearch, onlyDegraded]);
 
   const needEnrich = poll.stations.filter(s =>
     s.lastip && !s.isKnown && !s.remote_hostname && !s.cpe_name
@@ -82,10 +91,32 @@ function StationTable({ poll, onCpeDetail, dev }: {
           <span className="text-3xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
             Station List · {poll.stations.length} CPE{poll.stations.length !== 1 ? 's' : ''}
           </span>
+          {degraded.count > 0 && (
+            <span title={`${degraded.count} CPE(s) con señal o CCQ bajo umbral`}
+              className={`inline-flex items-center gap-1 text-2xs font-bold px-1.5 py-0.5 rounded-md
+                ${degraded.hasCritical
+                  ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-400'
+                  : 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'}`}>
+              <AlertTriangle className="w-2.5 h-2.5" />
+              {degraded.count} degradado{degraded.count !== 1 ? 's' : ''}
+            </span>
+          )}
           {poll.error && <span className="text-3xs text-rose-500 font-medium">{poll.error}</span>}
           {enrichMsg && <span className="text-3xs text-emerald-600 font-medium">{enrichMsg}</span>}
         </div>
         <div className="flex items-center gap-2">
+          {degraded.count > 0 && (
+            <button onClick={() => setOnlyDegraded(v => !v)}
+              title="Mostrar solo CPEs degradados (señal/CCQ bajo umbral)"
+              aria-pressed={onlyDegraded}
+              className={`flex items-center gap-1 px-2 py-1 rounded-lg text-2xs font-bold border transition-colors
+                ${onlyDegraded
+                  ? 'bg-amber-500 text-white border-amber-500'
+                  : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-700 dark:hover:bg-slate-800'}`}>
+              <AlertTriangle className="w-3 h-3" />
+              Solo degradados
+            </button>
+          )}
           <div className="relative">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500 dark:text-slate-400" />
             <input
@@ -132,8 +163,10 @@ function StationTable({ poll, onCpeDetail, dev }: {
             {filtered.map((cpe, idx) => (
               <CpeRow key={cpe.mac} cpe={cpe} idx={idx} onDetail={onCpeDetail} hiddenCols={hiddenCols} gridCols={gridCols} />
             ))}
-            {filtered.length === 0 && cpeSearch && (
-              <div className="text-center py-4 text-xs text-slate-500 dark:text-slate-400">Sin resultados para "{cpeSearch}"</div>
+            {filtered.length === 0 && (cpeSearch || onlyDegraded) && (
+              <div className="text-center py-4 text-xs text-slate-500 dark:text-slate-400">
+                {cpeSearch ? `Sin resultados para "${cpeSearch}"` : 'Sin CPEs degradados'}
+              </div>
             )}
           </div>
         </div>
