@@ -4,8 +4,9 @@ import {
   CheckCircle2, Activity, Clock,
   Users, ZapOff, WifiOff,
   Search,
-  AlertTriangle,
+  AlertTriangle, RotateCw,
 } from 'lucide-react';
+import { fmtAgo } from './utils/formatters';
 import M5FullInfoModal from '../../Common/M5FullInfoModal';
 import ConfirmModal from '../../Common/ConfirmModal';
 import { useVpn } from '../../../context';
@@ -113,6 +114,32 @@ export default function ApMonitorModule() {
   const totalCpes = Object.entries(polling.pollResults).reduce(
     (s, [id, r]) => (visibleApIds.has(id) ? s + r.stations.length : s), 0);
 
+  // E7: frescura global = poll más reciente entre los APs visibles.
+  const lastPolledAt = useMemo(() => {
+    let m = 0;
+    for (const [id, r] of Object.entries(polling.pollResults)) {
+      if (visibleApIds.has(id) && r.polledAt > m) m = r.polledAt;
+    }
+    return m;
+  }, [polling.pollResults, visibleApIds]);
+
+  // Tick de UI (solo refresca la etiqueta "hace Xs"; no hace SSH).
+  const [, setNowTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setNowTick(x => x + 1), 30_000);
+    return () => clearInterval(t);
+  }, []);
+
+  // E7: sincroniza CPEs de TODOS los APs visibles con credenciales.
+  // Disparo MANUAL (botón) → permitido por §43. Persiste historial (saveCount).
+  const syncableAps = useMemo(
+    () => logic.filteredGroups.flatMap(g => g.aps).filter(ap => ap.sshUser && (ap.sshPass || ap.hasSshPass)),
+    [logic.filteredGroups],
+  );
+  const syncAllVisible = () => {
+    syncableAps.forEach((ap, i) => setTimeout(() => polling.pollApDirect(ap.id, false, true), i * 600));
+  };
+
   return (
     <div className="space-y-5">
       {logic.toast && (
@@ -198,6 +225,12 @@ export default function ApMonitorModule() {
               <option value={300000}>5m</option>
             </select>
           </div>
+          <button onClick={syncAllVisible} disabled={syncableAps.length === 0}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            title="Sincronizar ahora los CPEs de todos los APs visibles (manual)">
+            <RotateCw className="w-3.5 h-3.5" />
+            <span>Sincronizar todo</span>
+          </button>
           <button onClick={() => {
             Object.values(polling.pollTimers.current).forEach(clearTimeout);
             polling.pollTimers.current = {};
@@ -217,6 +250,7 @@ export default function ApMonitorModule() {
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-sky-400" /> Conectando…</span>
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-300" /> Sin datos</span>
         <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {polling.pollInterval > 0 ? `Poll cada ${polling.pollInterval/1000}s (expandido)` : 'Auto-poll desactivado'}</span>
+        {lastPolledAt > 0 && <span className="flex items-center gap-1"><RotateCw className="w-3 h-3" /> Última actualización {fmtAgo(lastPolledAt)}</span>}
       </div>
 
       {logic.loading && (

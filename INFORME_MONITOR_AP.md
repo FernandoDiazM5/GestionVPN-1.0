@@ -141,15 +141,17 @@ Cuando el filtro está en **Activos** y no hay túnel, el cuerpo muestra "Sin t�
 
 ## E. Funcionalidades adicionales propuestas
 
-| # | Feature | Por qué | Esfuerzo |
-|---|---|---|---|
-| E1 | **Monitoreo vía job backend → DB** (SSE/WebSocket al front) | Cumple §43, datos "live" sin SSH desde el navegador, sin coste por panel abierto. Reusa `monitoringJob`/`signal_history`. | Alto |
-| E2 | **Sparkline de señal por AP/CPE en la fila** | `signal_history` ya se guarda; un mini-gráfico de tendencia da contexto sin abrir modal. | Medio |
-| E3 | **Umbrales de alerta** (señal < X, CCQ < Y) con badge de color | Detección proactiva de enlaces degradados. | Medio |
-| E4 | **Exportar CPEs a CSV** por AP/nodo | Ya existe util `csv` en backend; reporte operativo. | Bajo |
-| E5 | **Acción "Reiniciar AP"** (con modal de confirmación + auditoría) | Contemplado por la política §43 como reversible y con confirmación. | Medio |
-| E6 | **Densidad de tabla / presets de columnas** | Mejora ergonomía en pantallas densas. | Bajo |
-| E7 | **Indicador "última actualización" global** + auto-refresh visible | Hoy el `polledAt` está por tabla; un reloj global aclara frescura. | Bajo |
+| # | Feature | Por qué | Esfuerzo | Estado |
+|---|---|---|---|---|
+| E1 | **Monitoreo vía job backend → DB** (SSE/WebSocket al front) | Cumple §43, datos "live" sin SSH desde el navegador, sin coste por panel abierto. Reusa `monitoringJob`/`signal_history`. | Alto | ⏳ pendiente |
+| E2 | **Sparkline de señal en el detalle del CPE** | tendencia de `signal_history` sin abrir nada externo. | Medio | ✅ hecho |
+| E3 | **Umbrales de salud** (señal/CCQ) con dot + badge + filtro "solo degradados" | Detección proactiva de enlaces degradados. | Medio | ✅ hecho |
+| E4 | **Exportar CPEs a CSV** del Station List | reporte operativo; CSV sin deps (evita exceljs). | Bajo | ✅ hecho |
+| E5 | **Acción "Reiniciar AP"** (con modal de confirmación + auditoría) | Contemplado por la política §43 como reversible y con confirmación. | Medio | ⏳ pendiente |
+| E6 | **Densidad de tabla / presets de columnas** | Mejora ergonomía en pantallas densas. | Bajo | ⏳ pendiente |
+| E7 | **Indicador "última actualización" global** + "Sincronizar todo" manual | un reloj global aclara frescura; sync masivo manual (§43-OK). | Bajo | ✅ hecho |
+
+> **Nota E2:** `signal_history` no lo poblaba nadie; ahora el "Sync ahora"/"Sincronizar todo" **manual** persiste un punto (los polls automáticos no). El histórico se vuelve denso al implementar **E1**.
 
 ---
 

@@ -26,4 +26,16 @@ const fmtMem = (totalKb?: number | null, freeKb?: number | null, pct?: number | 
   return '—';
 };
 
-export { fmtDbm, fmtPct, fmtKbps, fmtMbps, fmtFw, fmtUptime, fmtCpu, fmtMem };
+// E7: tiempo relativo compacto ("hace 5s/3m/2h"). now inyectable para tests.
+const fmtAgo = (ts?: number | null, now: number = Date.now()) => {
+  if (!ts || ts <= 0) return 'nunca';
+  const s = Math.max(0, Math.floor((now - ts) / 1000));
+  if (s < 60) return `hace ${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `hace ${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `hace ${h}h`;
+  return `hace ${Math.floor(h / 24)}d`;
+};
+
+export { fmtDbm, fmtPct, fmtKbps, fmtMbps, fmtFw, fmtUptime, fmtCpu, fmtMem, fmtAgo };
