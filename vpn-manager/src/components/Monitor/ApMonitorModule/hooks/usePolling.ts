@@ -22,9 +22,11 @@ export function usePolling(devices: SavedDevice[], _activeNodeName: string | nul
   const pollResultsRef = useRef(pollResults);
   useEffect(() => { pollResultsRef.current = pollResults; }, [pollResults]);
 
+  // B3: default Off (0). El polling SSH automático queda como opt-in explícito
+  // del usuario (política §43: no polling SSH automático por defecto).
   const [pollInterval, setPollInterval] = useState<number>(() => {
     const saved = localStorage.getItem('vpn_ap_poll_ms');
-    return saved ? parseInt(saved, 10) : 30_000;
+    return saved ? parseInt(saved, 10) : 0;
   });
   const pollIntervalRef = useRef(pollInterval);
 

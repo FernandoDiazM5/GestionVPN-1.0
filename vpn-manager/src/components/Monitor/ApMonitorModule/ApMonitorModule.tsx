@@ -7,6 +7,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import M5FullInfoModal from '../../Common/M5FullInfoModal';
+import ConfirmModal from '../../Common/ConfirmModal';
 import { useVpn } from '../../../context';
 
 import ApGroupCard from './components/ApGroupCard';
@@ -19,7 +20,7 @@ import { useApMonitorLogic } from './hooks/useApMonitorLogic';
 import { usePolling } from './hooks/usePolling';
 
 export default function ApMonitorModule() {
-  const { nodes, activeNodeVrf, tunnelExpiry } = useVpn();
+  const { nodes, activeNodeVrf, tunnelExpiry, setActiveModule } = useVpn();
   const tunnelActive = activeNodeVrf !== null && tunnelExpiry !== null && tunnelExpiry > Date.now();
   const activeNode = useMemo(() => nodes.find(n => n.nombre_vrf === activeNodeVrf) ?? null, [nodes, activeNodeVrf]);
   const activeNodeName = activeNode?.nombre_nodo ?? null;
@@ -102,8 +103,15 @@ export default function ApMonitorModule() {
     });
   };
 
-  const totalAps = logic.nodeGroups.reduce((s, g) => s + g.aps.length, 0);
-  const totalCpes = Object.values(polling.pollResults).reduce((s, r) => s + r.stations.length, 0);
+  // B1: los contadores reflejan la vista filtrada (no el inventario total),
+  // para que el header coincida con lo que realmente se muestra abajo.
+  const visibleApIds = useMemo(
+    () => new Set(logic.filteredGroups.flatMap(g => g.aps.map(a => a.id))),
+    [logic.filteredGroups],
+  );
+  const totalAps = logic.filteredGroups.reduce((s, g) => s + g.aps.length, 0);
+  const totalCpes = Object.entries(polling.pollResults).reduce(
+    (s, [id, r]) => (visibleApIds.has(id) ? s + r.stations.length : s), 0);
 
   return (
     <div className="space-y-5">
@@ -128,7 +136,7 @@ export default function ApMonitorModule() {
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <div className="text-right text-sm text-slate-500 dark:text-slate-400">
-            <span className="font-bold text-indigo-600 dark:text-indigo-400">{logic.nodeGroups.length}</span> nodos ·{' '}
+            <span className="font-bold text-indigo-600 dark:text-indigo-400">{logic.filteredGroups.length}</span> nodos ·{' '}
             <span className="font-bold text-indigo-600 dark:text-indigo-400">{totalAps}</span> APs ·{' '}
             <span className="font-bold text-cyan-600 dark:text-cyan-400">{totalCpes}</span> CPEs live
           </div>
@@ -168,17 +176,18 @@ export default function ApMonitorModule() {
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
             <input
               value={logic.apSearch} onChange={e => logic.setApSearch(e.target.value)}
-              placeholder="Buscar AP…"
+              placeholder="Buscar AP…" aria-label="Buscar AP por nombre, IP, modelo o SSID"
               className="pl-8 pr-8 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 w-44 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100 dark:placeholder-slate-500"
             />
-            {logic.apSearch && <button onClick={() => logic.setApSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"><X className="w-3.5 h-3.5" /></button>}
+            {logic.apSearch && <button onClick={() => logic.setApSearch('')} aria-label="Limpiar búsqueda" title="Limpiar búsqueda" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"><X className="w-3.5 h-3.5" /></button>}
           </div>
           <div className="flex items-center gap-1.5 border border-slate-200 rounded-xl px-2 bg-white dark:bg-slate-900 dark:border-slate-700">
             <Clock className="w-3.5 h-3.5 text-slate-400" />
             <select
               value={polling.pollInterval}
               onChange={e => polling.setPollInterval(Number(e.target.value))}
-              className="text-xs bg-transparent focus:outline-none text-slate-600 font-medium py-2 appearance-none pr-4"
+              aria-label="Intervalo de auto-poll de CPEs"
+              className="text-xs bg-transparent focus:outline-none text-slate-600 dark:text-slate-300 font-medium py-2 appearance-none pr-4"
               style={{ backgroundImage: `url('data:image/svg+xml;utf8,<svg fill="none" viewBox="0 0 24 24" stroke="%2394a3b8" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>')`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right center', backgroundSize: '0.8rem' }}
             >
               <option value={0}>Auto-poll Off</option>
@@ -231,8 +240,16 @@ export default function ApMonitorModule() {
       {!logic.loading && logic.nodeFilter === 'active' && !tunnelActive && logic.filteredGroups.length === 0 && (
         <div className="card p-8 text-center text-slate-500 dark:text-slate-400">
           <WifiOff className="w-8 h-8 mx-auto mb-3 text-amber-400" />
-          <p className="font-semibold text-slate-600">Sin túnel VPN activo</p>
+          <p className="font-semibold text-slate-600 dark:text-slate-300">Sin túnel VPN activo</p>
           <p className="text-sm mt-1">Conéctate a un nodo para ver sus APs en tiempo real</p>
+          <div className="flex items-center justify-center gap-2 mt-4">
+            <button onClick={() => setActiveModule('nodes')} className="btn-primary btn-sm">
+              Conectar a un nodo
+            </button>
+            <button onClick={() => logic.setNodeFilter('all')} className="btn-outline btn-sm">
+              Ver todos los nodos
+            </button>
+          </div>
         </div>
       )}
 
@@ -316,6 +333,15 @@ export default function ApMonitorModule() {
           onClose={() => logic.setMovingDevice(null)}
         />
       )}
+
+      <ConfirmModal
+        isOpen={!!logic.deleteTarget}
+        title="Eliminar equipo"
+        message={`¿Eliminar ${logic.deleteTarget?.cachedStats?.deviceName ?? logic.deleteTarget?.name ?? logic.deleteTarget?.ip ?? ''}? Se quitará del monitor.`}
+        confirmLabel="Eliminar"
+        onConfirm={logic.confirmDeleteDev}
+        onCancel={() => logic.setDeleteTarget(null)}
+      />
     </div>
   );
 }

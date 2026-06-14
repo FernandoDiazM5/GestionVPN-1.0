@@ -21,6 +21,7 @@ export function useApMonitorLogic(nodes: NodeInfo[], activeNodeName: string | nu
   const [m5DetailDevice, setM5DetailDevice] = useState<SavedDevice | null>(null);
   const [viewingApDevice, setViewingApDevice] = useState<SavedDevice | null>(null);
   const [movingDevice, setMovingDevice] = useState<SavedDevice | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<SavedDevice | null>(null);
 
   const devicesRef = useRef(devices);
   const nodesRef = useRef(nodes);
@@ -107,8 +108,13 @@ export function useApMonitorLogic(nodes: NodeInfo[], activeNodeName: string | nu
     }
   }, [nodes.length, loadDevices]);
 
-  const handleDeleteDev = async (dev: SavedDevice) => {
-    if (!window.confirm(`¿Eliminar ${dev.cachedStats?.deviceName ?? dev.name ?? dev.ip}?`)) return;
+  // B5: el borrado abre un ConfirmModal del sistema (antes window.confirm).
+  const handleDeleteDev = (dev: SavedDevice) => setDeleteTarget(dev);
+
+  const confirmDeleteDev = async () => {
+    const dev = deleteTarget;
+    if (!dev) return;
+    setDeleteTarget(null);
     setDevices(prev => prev.filter(d => d.id !== dev.id));
     if (viewingApDevice?.id === dev.id) setViewingApDevice(null);
     if (apDetailDev?.id === dev.id) setApDetailDev(null);
@@ -175,6 +181,9 @@ export function useApMonitorLogic(nodes: NodeInfo[], activeNodeName: string | nu
     setViewingApDevice,
     movingDevice,
     setMovingDevice,
+    deleteTarget,
+    setDeleteTarget,
+    confirmDeleteDev,
     nodeGroups,
     filteredGroups,
     loadDevices,
