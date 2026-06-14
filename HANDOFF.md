@@ -44,7 +44,7 @@
 > - **142 backend** (14 archivos) + **36 frontend** (5 archivos) = **178 tests verdes**. La auditoría §37-§38 de Escanear NO añade tests nuevos (las mejoras son refactor/UX sin lógica de negocio); el conteo se mantiene desde §36.
 >
 > ### 📚 Secciones de referencia
-> §17–25: REFACTOR_PLAN ejecutado. §26 notificaciones. §27 bot Telegram. §28 ping/trace. §29 export. §30 dashboard. §31 monitoreo. §32 iter2 multi-usuario. §33 UX MEMBER endurecida. §34 Workspace unificado + peers WG mejorados. §35 Alias humano + bloqueo Usuario. §36 Fix bot — match dual VRF/PPP. §37 Escanear — perf + robustez. §38 Escanear — UX + features. §39 Escanear — sticky-right + kebab (cierre auditoría). §40 Escanear — preferencias persistentes (useScanPreferences) + export multi-formato (CSV/JSON/Excel/PDF). §41 Escanear — simplificación de acciones de fila a botones icon-only + limpieza de DeviceCardModal/SshDataModal muertos. §42 Escanear — 4 mejoras UX: ícono Save (disquete) + bulk save selectivo con checkbox tri-state + contraste chevron + IP/Nombre del sistema en panel. §43 Política anti-saturación — eliminar polling SSH automático cada 5s en DeviceStatusPanel (saturaba CPU de antenas) + actualizar Política Operativa SSH para prohibir polling SSH. §44 Nodos — columnas dinámicas + filtros + chips + export multi-formato + sticky-right. §45 Audit del sistema de diseño (script + skill instalada). §46 Plan ejecutable + sistema extendido (btn-warning/info/accent + focus-visible WCAG + tamaños + modal canónico) + wins rápidos sed (−259 hallazgos). §47 Fase 1 — 23 botones inline migrados a `.btn-{variant} btn-{size}` (DS06 −88.5%). §48 Fase 2 — DS02 dark mode en 28 archivos (DS02 265→103, −61%). §49 Fase 2 cierre — DS02 a 0 (−100% desde baseline) + auditor refinado con lookahead `/N` para excluir opacidad sobre superficies oscuras + cleanup de archivos temporales accidentalmente commiteados. §50 Fase 3 — 19 modales migrados a `.modal-overlay/.modal-panel/.modal-panel-{size}` con animaciones por @keyframes nativos (no tailwindcss-animate, incompatible con @apply).
+> §17–25: REFACTOR_PLAN ejecutado. §26 notificaciones. §27 bot Telegram. §28 ping/trace. §29 export. §30 dashboard. §31 monitoreo. §32 iter2 multi-usuario. §33 UX MEMBER endurecida. §34 Workspace unificado + peers WG mejorados. §35 Alias humano + bloqueo Usuario. §36 Fix bot — match dual VRF/PPP. §37 Escanear — perf + robustez. §38 Escanear — UX + features. §39 Escanear — sticky-right + kebab (cierre auditoría). §40 Escanear — preferencias persistentes (useScanPreferences) + export multi-formato (CSV/JSON/Excel/PDF). §41 Escanear — simplificación de acciones de fila a botones icon-only + limpieza de DeviceCardModal/SshDataModal muertos. §42 Escanear — 4 mejoras UX: ícono Save (disquete) + bulk save selectivo con checkbox tri-state + contraste chevron + IP/Nombre del sistema en panel. §43 Política anti-saturación — eliminar polling SSH automático cada 5s en DeviceStatusPanel (saturaba CPU de antenas) + actualizar Política Operativa SSH para prohibir polling SSH. §44 Nodos — columnas dinámicas + filtros + chips + export multi-formato + sticky-right. §45 Audit del sistema de diseño (script + skill instalada). §46 Plan ejecutable + sistema extendido (btn-warning/info/accent + focus-visible WCAG + tamaños + modal canónico) + wins rápidos sed (−259 hallazgos). §47 Fase 1 — 23 botones inline migrados a `.btn-{variant} btn-{size}` (DS06 −88.5%). §48 Fase 2 — DS02 dark mode en 28 archivos (DS02 265→103, −61%). §49 Fase 2 cierre — DS02 a 0 (−100% desde baseline) + auditor refinado con lookahead `/N` para excluir opacidad sobre superficies oscuras + cleanup de archivos temporales accidentalmente commiteados. §50 Fase 3 — 19 modales migrados a `.modal-overlay/.modal-panel/.modal-panel-{size}` con animaciones por @keyframes nativos (no tailwindcss-animate, incompatible con @apply). §51 Fix bug `merged=undefined` en `handleAddDevice` — el guardar de dispositivos crasheaba silenciosamente y el POST al backend nunca se ejecutaba (Monitor AP no veía los devices guardados). Causa: functional setState updater no ejecuta sincrónicamente en React 18+. Fix: `savedDevicesRef` para lookup síncrono. §52 Fase 3.1 — extiende el sistema con `.modal-header-{indigo,rose,amber,emerald,sky,violet,slate}` + `.modal-header-icon` + `.modal-header-close`. 15 headers decorativos unificados.
 >
 > Sesión 2026-06-07 PM: Ajustes del moderador (perfil + workspace + import/export JSON) + Recuperar contraseña + sync MikroTik al deshabilitar + invitaciones por email + .conf WG server-side.
 > Sesión 2026-06-07 AM: multi-usuario con aislamiento por sesión (mangle por-IP), parche `!empty` node-routeros, auditoría (Semgrep+security-review+code-review) y fixes C1–C7.
@@ -69,7 +69,7 @@
 6. **Pase UX P1–P6** + optimización visual de la vista **Escanear**.
 7. **🆕 Multi-usuario con aislamiento por sesión** (sesión 2026-06-07) — ver §7.
 
-**Estado de salud (2026-06-13):** `tsc 0` (`--noEmit` + build estricto) · `node --check ✓` · **186 tests verdes** (142 backend + 44 frontend). 6 jobs concurrentes en producción. ⚠️ `npm audit --omit=dev`: **2 moderate** (uuid viejo arrastrado por `exceljs` — no expone superficie del panel; pendiente de tracker upstream). 0 findings `semgrep`. Bundles relevantes: **inicial 248.76 KB / 77.74 KB gzip** (esencialmente idéntico desde el pre-§40); `TeamModule` 119 KB; `NetworkDevicesModule` 91.20 KB / 23.04 KB gzip; `NodeAccessPanel` 151.23 KB / 32.86 KB gzip; chunks lazy `exceljs.min` 929 KB y `jspdf.es.min` 399 KB solo se descargan al usar Excel/PDF. **Sistema de diseño**: audit `npm run audit:design` reporta **542 hallazgos** (baseline §45 1,096 → −50.5%) con **107 errores** (baseline 375 → −71%) tras §46–§50. **DS02 fondos sin dark: 0 (✅ Fase 2 cerrada)**. **19 modales unificados al sistema canónico (✅ Fase 3 cerrada)**. DS06 botones inline: 3 (toggles legítimos). **Últimos commits en `dev`:** `de536d8` (§50 Fase 3 modales unificados) · `68b5eb5` (docs §49 HANDOFF) · `49b3cea` (§49 Fase 2 cierre DS02→0) · `4018fad` (ronda 4 + auditor refinado) · `3a1012b` (docs §48 HANDOFF) · `21ec46a` (§48 Fase 2 28 archivos −61%) · `01b479d` (docs §47 HANDOFF) · `a771cbb` (§47 Fase 1).
+**Estado de salud (2026-06-13):** `tsc 0` (`--noEmit` + build estricto) · `node --check ✓` · **186 tests verdes** (142 backend + 44 frontend). 6 jobs concurrentes en producción. ⚠️ `npm audit --omit=dev`: **2 moderate** (uuid viejo arrastrado por `exceljs` — no expone superficie del panel; pendiente de tracker upstream). 0 findings `semgrep`. Bundles relevantes: **inicial 248.90 KB / 77.77 KB gzip** (esencialmente idéntico desde el pre-§40); `TeamModule` 119 KB; `NetworkDevicesModule` 91.20 KB / 23.04 KB gzip; `NodeAccessPanel` 151.23 KB / 32.86 KB gzip; chunks lazy `exceljs.min` 929 KB y `jspdf.es.min` 399 KB solo se descargan al usar Excel/PDF. **Sistema de diseño**: audit `npm run audit:design` reporta **537 hallazgos** (baseline §45 1,096 → −51%) con **107 errores** (baseline 375 → −71%) tras §46–§52. **DS02 fondos sin dark: 0 (✅ Fase 2 cerrada)**. **19 modales unificados con .modal-overlay/.modal-panel/.modal-panel-{size} (✅ Fase 3 cerrada)**. **15 headers decorativos unificados con .modal-header-{tone} (✅ Fase 3.1 cerrada)**. DS06 botones inline: 3 (toggles legítimos). **Últimos commits en `dev`:** `b7639eb` (§52 Fase 3.1 modal-header-{tone}) · `1fcdb3c` (§51 fix bug merged undefined) · `7e10d33` (docs §50 HANDOFF) · `de536d8` (§50 Fase 3 modales unificados) · `68b5eb5` (docs §49 HANDOFF) · `49b3cea` (§49 Fase 2 cierre DS02→0) · `4018fad` (ronda 4 + auditor refinado) · `3a1012b` (docs §48 HANDOFF).
 
 ---
 
@@ -4113,10 +4113,191 @@ El **header decorativo (`bg-indigo-600`, `bg-rose-600`, `bg-violet-600`, etc.) s
 
 ### Pendiente / próximas fases
 
-- **Fase 3.1 (opcional, 4-6h)** — extender `.modal-header-{indigo,rose,amber,emerald,sky,violet,slate}` para los headers decorativos. Reduce ~80 LOC adicionales pero requiere decisión de diseño sobre dark variants (ej. `bg-rose-600` dark queda igual o `dark:bg-rose-700`?).
-- **Fase 4 (DS05 contraste, 411 hallazgos)** — backlog. Manual por caso.
+- ~~**Fase 3.1 (opcional, 4-6h)** — extender `.modal-header-{indigo,rose,amber,emerald,sky,violet,slate}` para los headers decorativos.~~ ✅ **CERRADA en §52** — 15 headers decorativos unificados.
+- **Fase 4 (DS05 contraste, 406 hallazgos)** — backlog. Manual por caso.
 - **Fase 5 (DS01 palette, 46)** — backlog. Migrar `constants.ts` (PEER_COLOR_PALETTE + TAG_PALETTE).
 - **CI gate (cuando todas las fases cierren):** agregar `npm run audit:design` al workflow para no regresar.
+
+---
+
+## 51) 🐛 Fix bug — guardar dispositivo no persistía (`merged=undefined` silencioso)
+
+Bug reportado por el usuario tras §50: al pulsar "Guardar" en la tabla de Escanear (tanto el individual como el bulk "Guardar N"), el toast confirmaba el guardado pero el dispositivo **no aparecía en Monitor AP**. Console log:
+
+```
+deviceDb.ts:161 Error guardando device:
+  TypeError: Cannot read properties of undefined (reading 'cachedStats')
+    at Object.saveSingle (deviceDb.ts:143:18)
+    at useDeviceLibrary.ts:92:20
+    at useDeviceLibrary.ts:210:11
+    at onClick (DeviceTableRow.tsx:362:11)
+```
+
+### Causa raíz
+
+El fix de §37 (commit `4e872f5`) introdujo el patrón "functional setState para cerrar race":
+
+```ts
+let merged!: SavedDevice;
+setSavedDevices(prev => {
+  merged = existing ? {...} : device;   // ← el updater NO corre sincrónicamente
+  return ...;
+});
+await deviceDb.saveSingle(merged);       // ← merged === undefined aquí
+```
+
+**React 18+ NO ejecuta el functional updater en el mismo tick que el dispatch** — lo procesa en el próximo commit, después del `await` siguiente. Por eso `merged` queda `undefined`. El catch interno en `saveSingle` lo agarra silenciosamente, el toast aparece como "guardado", pero el `POST /api/db/devices` **nunca se ejecuta** → Monitor AP no ve el dispositivo.
+
+### Fix
+
+[useDeviceLibrary.ts](vpn-manager/src/components/Devices/NetworkDevicesModule/hooks/useDeviceLibrary.ts) — nuevo `savedDevicesRef` sincronizado vía `useEffect`. `handleAddDevice` computa `merged` SÍNCRONAMENTE desde el ref antes del `await`:
+
+```ts
+const prevList = savedDevicesRef.current;
+const existing = prevList.find(d => d.id === device.id);
+const merged: SavedDevice = existing
+  ? { ...existing, ...device, addedAt: existing.addedAt }
+  : device;
+
+setSavedDevices(prev => { /* re-computa merge con prev fresco — race-safe */ });
+await deviceDb.saveSingle(merged);   // ya está definido
+```
+
+[deviceDb.ts](vpn-manager/src/store/deviceDb.ts) — guardrail defensivo:
+
+```ts
+async saveSingle(device: SavedDevice): Promise<void> {
+  try {
+    if (!device || !device.id) {
+      console.warn('deviceDb.saveSingle: device sin id — ignorado', device);
+      return;
+    }
+    ...
+```
+
+### Reglas operativas reforzadas
+
+- **`setState` con functional updater NO se ejecuta sincrónicamente.** En React 18+ el updater corre en el próximo commit, no inmediatamente. Si necesitas leer el valor calculado dentro del updater, usa `useRef` espejo del state.
+- **Patrón `useRef` espejo:** declarar `const xRef = useRef<T>(initial)` + `useEffect(() => { xRef.current = x }, [x])`. Lookup síncrono en handlers async sin race conditions.
+- **`try/catch` interno NO debe silenciar errores de capa de persistencia.** Cuando el catch logra evitar el crash de UI pero los datos no llegan a BD, el usuario queda con falsa sensación de éxito. Mejor: dejar lanzar y manejar en el caller, o reportar al usuario con toast de error.
+
+### Pendiente / mejoras futuras
+
+- **Auditar otros `setState` con functional updater que lean el valor después del setter.** El patrón es: `let x; setState(prev => { x = ...; return ... }); /* usar x */`. Buscar con grep `setSaved\|setX\|setScan` + `let merged\|let next\|let last`.
+- **Test de regresión:** mockear `deviceDb.saveSingle` y verificar que se llame con un objeto válido (no undefined) al hacer click en Guardar. Asegura que un futuro refactor no rompa el flujo.
+
+---
+
+## 52) 🪟 Fase 3.1 cierre — headers de modal con 7 tonos canónicos
+
+Continuación de §50. Pedido del usuario: "Sigue con Fase 3.1 (extender `.modal-header-{tone}`)". Skill consultada: `tailwind-design-system` (patrón Base → Variants → Sizes → States).
+
+### Lo que faltaba después de §50
+
+Los 19 modales ya usaban `.modal-overlay` + `.modal-panel` (§50). Pero **15 de ellos** tenían además un header decorativo con `bg-{tone}-{shade} rounded-t-2xl px-5 py-4` inline. Cada uno definía:
+
+- Su propio `bg-{tone}` (8 tonos distintos)
+- Una caja `w-8 h-8 bg-white/20 rounded-xl ...` para el ícono
+- Un botón `p-1.5 text-{tone}-{shade} hover:text-white hover:bg-white/10 rounded-lg` para el X
+
+Resultado: ~150 LOC redundantes esparcidos en 15 archivos.
+
+### Extensión del sistema (index.css)
+
+```css
+.modal-header-decorated {
+  @apply flex items-center justify-between gap-3 rounded-t-2xl px-5 py-4 shrink-0;
+}
+.modal-header-indigo  { @apply bg-indigo-600; }
+.modal-header-rose    { @apply bg-rose-600; }
+.modal-header-amber   { @apply bg-amber-500; }
+.modal-header-emerald { @apply bg-emerald-600; }
+.modal-header-sky     { @apply bg-sky-600; }
+.modal-header-violet  { @apply bg-violet-600; }
+.modal-header-slate   { @apply bg-slate-800; }
+
+.modal-header-icon {
+  @apply w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center shrink-0;
+}
+.modal-header-close {
+  @apply p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors shrink-0
+         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40;
+}
+```
+
+7 tonos canónicos. Cada uno mapeado a una intención semántica del proyecto (CLAUDE.md):
+
+| Tono | Intención | Modales |
+|---|---|---|
+| `indigo` | acción primaria | NuevoAdmin, EditarNodo, AssignTunnelsModal, ModeratorsModule (estándar) |
+| `rose` | destructivo | EliminarNodo, ModeratorsModule danger variant |
+| `amber` | atención | TagModal |
+| `emerald` | éxito | ScriptModal |
+| `sky` | informativo | HistoryModal |
+| `violet` | WireGuard | MemberWireGuardModal, BatchCsvModal |
+| `slate` | estado oscuro | M5FullInfoModal, ApDetailModal, CpeDetailModal, DeviceCardModal |
+
+### Patrón aplicado
+
+```diff
+- <div className="flex items-center justify-between bg-rose-600 rounded-t-2xl px-5 py-4 shrink-0">
+-   <div className="flex items-center gap-3">
+-     <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center">
+-       <Trash2 className="w-4 h-4 text-white" />
+-     </div>
+-     ...
+-   </div>
+-   <button onClick={onClose} className="p-1.5 text-rose-300 hover:text-white hover:bg-white/10 rounded-lg">
+-     <X className="w-4 h-4" />
+-   </button>
++ <div className="modal-header-decorated modal-header-rose">
++   <div className="flex items-center gap-3">
++     <div className="modal-header-icon">
++       <Trash2 className="w-4 h-4 text-white" />
++     </div>
++     ...
++   </div>
++   <button onClick={onClose} className="modal-header-close">
++     <X className="w-4 h-4" />
++   </button>
+```
+
+### Excepciones documentadas en el código
+
+- **NuevoNodo:** usa `!bg-indigo-700` (override) para diferenciar visualmente del estándar `indigo-600`. Es un "indigo más sólido" que indica acción más fuerte/oscura.
+- **WgConfigModal:** mantiene gradient `from-indigo-600 to-indigo-800` inline (caso especial, único modal con gradient header). Usa `.modal-header-decorated` + `.modal-header-close` pero NO `.modal-header-{tone}`.
+- **ApDetailModal / CpeDetailModal:** override `py-3` para header compacto.
+- **DeviceCardModal:** override `px-4 py-2.5` para header aún más compacto.
+
+### Métricas pre/post §52
+
+| Métrica | Pre-§52 | **Post-§52** |
+|---|---|---|
+| Modales con header coloreado inline | 15 | 0 |
+| Modales usando `.modal-header-decorated` | 0 | **15** |
+| Modales usando `.modal-header-icon` | 0 | **14** (todos menos los compactos sin ícono) |
+| Modales usando `.modal-header-close` | 0 | **15** |
+| Tonos canónicos en sistema | 0 | **7** |
+| LOC redundantes JSX inline | ~150 | 0 |
+| Hallazgos auditor | 542 | 537 (−5) |
+| DS05 hallazgos | 411 | 406 (−5 bonus por quitar `text-{tone}-200/300` inline) |
+| DS02 / DS01 / DS04 / DS06 | 0/46/21/3 | 0/46/21/3 (sin regresión) |
+| Bundle inicial | 248.76 KB | 248.90 KB (+0.14 KB del CSS extendido) |
+| Tests | 44 verdes | 44 verdes |
+
+### Reglas operativas reforzadas
+
+- **Header decorativo de modal SIEMPRE con `.modal-header-decorated` + un tono.** Patrón `bg-{tone}-{shade} rounded-t-2xl px-5 py-4` inline = revisar PR.
+- **`.modal-header-icon` para la caja de ícono blanca con overlay** + `.modal-header-close` para el botón X. No reinventar.
+- **Si necesitas otro tono (ej. magenta para un brand específico)**, agrégalo a `index.css` como `.modal-header-{nuevo}` — NO uses `bg-{otro}-600` inline.
+- **El override de tamaño/padding es legítimo** (ej. `py-3` para compactos). El override de bg solo está justificado si el modal tiene identidad visual única documentada (NuevoNodo `!bg-indigo-700`, WgConfigModal gradient).
+
+### Pendiente / próximas fases
+
+- ~~**Fase 3 + 3.1**~~ ✅ CERRADAS.
+- **Fase 4 (DS05 contraste, 406 hallazgos)** — siguiente prioridad. Manual por caso (slate-300/400 sobre fondo claro vs. oscuro). Requiere juicio caso por caso, no es mecánico.
+- **Fase 5 (DS01 palette, 46)** — backlog. 40 de los 46 viven en `constants.ts`.
+- **CI gate:** cuando Fases 4 + 5 cierren, agregar `npm run audit:design` al workflow para no regresar.
 
 ---
 
