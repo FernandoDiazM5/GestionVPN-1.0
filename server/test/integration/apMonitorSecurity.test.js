@@ -182,4 +182,14 @@ describe('POST /poll-direct — C3: resuelve el nodo DUEÑO, no "el primero"', (
     const [, , , userArg] = apServiceMocks.pollAp.mock.calls[0];
     expect(userArg).toBe('admin-b');   // ← 10.0.50.7 ∈ 10.0.50.0/24 (NODO-B)
   });
+
+  it('B: usa node_id persistido directo (ignora nombre_nodo/IP que apuntarían a otro)', async () => {
+    // node_id = 2 aunque nombre_nodo/IP coincidirían con NODO-A: gana el FK.
+    db.get.mockResolvedValue({ ip: '10.0.10.7', usuario_ssh: '', clave_ssh_enc: '', puerto_ssh: 22, nombre_nodo: 'NODO-A', node_id: 2, firmware: '' });
+    db.all.mockImplementation(twoNodesWithCreds);
+    const r = await request(app).post('/api/ap-monitor/poll-direct').send({ apId: 'ap1' });
+    expect(r.status).toBe(200);
+    const [, , , userArg] = apServiceMocks.pollAp.mock.calls[0];
+    expect(userArg).toBe('admin-b');   // ← node_id=2 (NODO-B), no NODO-A
+  });
 });

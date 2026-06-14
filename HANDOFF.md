@@ -4629,6 +4629,7 @@ Si en una sesión futura aparece una regresión (alguien añade `text-red-500` o
 
 1. XAMPP **MySQL** arriba (idealmente como servicio).
 2. (1ª vez tras pull) `cd server && npm run init:multiuser` — crea tablas multi-usuario + backfill.
+2b. (Fase 2-B, opcional) `cd server && npm run migrate:apnode` — backfill completo de `aps.node_id` **por subred**. La columna y el backfill por `nombre_nodo` ya los aplica `initDb()` en cada boot (auto-heal); este script añade la resolución por CIDR para los APs que no matchean por nombre.
 3. `cd server && npm run dev` (reintenta si MySQL aún no levanta). Debe imprimir `[ROUTEROS] Parche !empty aplicado...`.
 4. `cd vpn-manager && npm run dev` → `http://localhost:5173/GestionVPN-1.0/`.
 5. Login `admin/admin` o `fernando@local.app / 48523451`.

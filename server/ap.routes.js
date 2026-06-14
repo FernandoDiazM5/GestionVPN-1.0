@@ -5,22 +5,17 @@ const { getDb, encryptPass, decryptPass, getApIntId, getCpeIntId, getApGroupIntI
 const { pollAp, getDetail, getFullDetail, clearApCache }  = require('./ap.service');
 
 const { reqWorkspace, ownedGroupIntIds, ownedApIntIds, ownsGroupUuid, ownsApUuid, cpeForeign } = require('./lib/tenantScope');
+const { ipInCidr, resolveOwnerNodeId } = require('./lib/apNode');
 const log = require('./lib/logger').child({ scope: 'ap-routes' });
 
 const genUuid = () => crypto.randomBytes(8).toString('hex');
 const isValidMac = (mac) => /^([0-9a-f]{2}:?){5}([0-9a-f]{2})$/i.test(mac);
 
-// ── C3 (Fase 2 · Enfoque A): resuelve las credenciales SSH del nodo que
-//    POSEE este AP, sin depender de una FK. Estrategia, en orden:
-//      1. match exacto por nombre_nodo (aps.nombre_nodo === nodes.nombre_nodo)
-//      2. la IP del AP cae en la subred del nodo (ipInCidr vs segmento_lan)
-//      3. último recurso: primer node_ssh_creds disponible (comportamiento previo)
-//    Devuelve { user, pass, port } o null. `ipInCidr` está declarado más abajo
-//    (function declaration → hoisted).
+// ── C3 (Fase 2): resuelve las credenciales SSH del nodo que POSEE este AP.
+//    El nodo dueño se resuelve vía resolveOwnerNodeId (node_id persistido >
+//    nombre_nodo > subred). Si no hay creds para el dueño, último recurso:
+//    primer node_ssh_creds disponible. Devuelve { user, pass, port } o null.
 async function resolveNodeCreds(db, apRow) {
-    const nodes = await db.all('SELECT id, nombre_nodo, segmento_lan FROM nodes');
-    if (!nodes.length) return null;
-
     const credsForNode = async (nodeId) => {
         const rows = await db.all(
             'SELECT ssh_user, ssh_pass_enc, ssh_port FROM node_ssh_creds WHERE node_id = ? ORDER BY priority',
@@ -34,15 +29,13 @@ async function resolveNodeCreds(db, apRow) {
         };
     };
 
-    const owner =
-        (apRow.nombre_nodo && nodes.find(n => n.nombre_nodo && n.nombre_nodo === apRow.nombre_nodo)) ||
-        (apRow.ip && nodes.find(n => n.segmento_lan && ipInCidr(apRow.ip, n.segmento_lan))) ||
-        null;
-    if (owner) {
-        const c = await credsForNode(owner.id);
+    const ownerId = await resolveOwnerNodeId(db, apRow);
+    if (ownerId) {
+        const c = await credsForNode(ownerId);
         if (c) return c;
     }
     // Último recurso: primer nodo con credenciales.
+    const nodes = await db.all('SELECT id FROM nodes');
     for (const n of nodes) {
         const c = await credsForNode(n.id);
         if (c) return c;
@@ -167,13 +160,16 @@ router.post('/aps', async (req, res) => {
             }
         }
 
+        // B: persistir el nodo dueño (por subred; nombre_nodo no se conoce al registrar).
+        const nodeId = await resolveOwnerNodeId(db, { ip });
+
         await db.run(
             `INSERT INTO aps (uuid,ap_group_id,hostname,modelo,firmware,mac_lan,mac_wlan,ip,
-             frecuencia_mhz,ssid,canal_mhz,tx_power,modo_red,usuario_ssh,clave_ssh_enc,puerto_ssh,is_active,created_at)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?)`,
+             frecuencia_mhz,ssid,canal_mhz,tx_power,modo_red,usuario_ssh,clave_ssh_enc,puerto_ssh,node_id,is_active,created_at)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?)`,
             [uuid, apGroupId, hostname, modelo, firmware, mac_lan, mac_wlan, ip,
              frecuencia_mhz, ssid, canal_mhz, tx_power, modo_red,
-             usuario_ssh || '', enc, port, Date.now()]
+             usuario_ssh || '', enc, port, nodeId, Date.now()]
         );
         res.json({ success: true, id: uuid, hostname, modelo, firmware, ssid, mac_wlan, frecuencia_mhz });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
@@ -419,7 +415,7 @@ router.post('/poll-direct', async (req, res) => {
         // C2: IP, puerto y firmware se leen SIEMPRE de la DB — nunca del body.
         // Evita forzar una conexión SSH (con las credenciales del AP) a un host arbitrario.
         const apRow = await db.get(
-            'SELECT ip, usuario_ssh, clave_ssh_enc, puerto_ssh, nombre_nodo, firmware FROM aps WHERE uuid = ?', [apId]
+            'SELECT ip, usuario_ssh, clave_ssh_enc, puerto_ssh, nombre_nodo, node_id, firmware FROM aps WHERE uuid = ?', [apId]
         );
         if (!apRow || !apRow.ip) return res.status(404).json({ success: false, message: 'AP no encontrado' });
 
@@ -595,7 +591,7 @@ router.post('/cpes/:mac/detail-direct', async (req, res) => {
         // 2. Credenciales del AP padre y su nodo (como fallback)
         if (apId) {
             try {
-                const apRow = await db.get('SELECT id, usuario_ssh, clave_ssh_enc, nombre_nodo, ip, puerto_ssh FROM aps WHERE uuid = ?', [apId]);
+                const apRow = await db.get('SELECT id, usuario_ssh, clave_ssh_enc, nombre_nodo, node_id, ip, puerto_ssh FROM aps WHERE uuid = ?', [apId]);
                 if (apRow) {
                     if (apRow.usuario_ssh) {
                         credList.push({ user: apRow.usuario_ssh, pass: apRow.clave_ssh_enc ? decryptPass(apRow.clave_ssh_enc) : '', port: apRow.puerto_ssh || 22 });
@@ -764,19 +760,6 @@ router.post('/poll-all-monitor', async (req, res) => {
         res.json({ success: true, ok, fail, total: aps.length });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
-
-// ── Helper: verifica si una IP cae dentro de un CIDR ──────────────────────
-function ipInCidr(ip, cidr) {
-    if (!ip || !cidr) return false;
-    try {
-        const [net, bits] = cidr.split('/');
-        if (!net || !bits) return false;
-        const b = 32 - parseInt(bits);
-        const mask = b >= 32 ? 0 : ~((1 << b) - 1) >>> 0;
-        const toInt = s => s.split('.').reduce((a, o) => ((a << 8) >>> 0) + parseInt(o), 0) >>> 0;
-        return (toInt(ip) & mask) === (toInt(net) & mask);
-    } catch { return false; }
-}
 
 // ── CPEs para Topologia — CPEs conocidos con AP info y ultimo senal ───────
 // ap_id in cpes is now an INTEGER FK to aps.id

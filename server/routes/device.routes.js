@@ -5,6 +5,7 @@ const { IPV4_REGEX, CIDR_REGEX, getSubnetHosts, probeUbiquiti, sshExec, parseAir
 const { getDb, encryptPass, decryptPass, getApByUuid, getApIntId, getApGroupIntId } = require('../db.service');
 const log = require('../lib/logger').child({ scope: 'device' });
 const { reqWorkspace, ownedGroupIntIds, ownsApUuid, ownsGroupUuid } = require('../lib/tenantScope');
+const { resolveOwnerNodeId } = require('../lib/apNode');
 
 router.post('/device/auto-login', async (req, res) => {
     const { ip, sshCredentials } = req.body;
@@ -179,14 +180,18 @@ router.post('/db/devices', async (req, res) => {
             // Si aún no hay grupo, continuar con null (no bloquear el guardado)
         }
 
+        // B: nodo VPN dueño del AP (por nombre_nodo / subred). Si no resuelve,
+        // queda NULL y el resolver en caliente lo cubre en cada poll.
+        const apNodeId = await resolveOwnerNodeId(db, { nombre_nodo: d.nodeName, ip: d.ip });
+
         // UPSERT en la tabla "aps" (schema v2: uuid UNIQUE, id INTEGER AUTO)
         await db.run(
             `INSERT INTO aps (
                 uuid, ap_group_id, hostname, modelo, firmware, mac_lan, mac_wlan, ip, frecuencia_mhz,
                 ssid, canal_mhz, modo_red, usuario_ssh, clave_ssh_enc, puerto_ssh, wifi_password_enc,
-                cpes_conectados_count, last_saved, is_active, nombre_nodo, router_port, last_seen,
+                cpes_conectados_count, last_saved, is_active, nombre_nodo, node_id, router_port, last_seen,
                 created_at
-             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
              ON CONFLICT(uuid) DO UPDATE SET
                 ap_group_id = excluded.ap_group_id,
                 hostname = excluded.hostname,
@@ -205,6 +210,7 @@ router.post('/db/devices', async (req, res) => {
                 last_saved = excluded.last_saved,
                 is_active = excluded.is_active,
                 nombre_nodo = excluded.nombre_nodo,
+                node_id = COALESCE(excluded.node_id, aps.node_id),
                 router_port = excluded.router_port,
                 last_seen = excluded.last_seen,
                 updated_at = ${now}`,
@@ -214,7 +220,7 @@ router.post('/db/devices', async (req, res) => {
                 d.channelWidth || null, d.role === 'sta' ? 'station' : 'ap',
                 d.sshUser || '', sshEncrypted, d.sshPort || 22, wifiEncrypted,
                 cpesCount, now, (d.is_active !== false && d.is_active !== 0) ? 1 : 0,
-                d.nodeName || '', d.routerPort || 8075, d.lastSeen || 0,
+                d.nodeName || '', apNodeId, d.routerPort || 8075, d.lastSeen || 0,
                 d.addedAt || now
             ]
         );
@@ -260,6 +266,13 @@ router.put('/db/devices/:id', async (req, res) => {
         const params = [];
 
         if (apGroupId !== null) { sets.push('ap_group_id = ?'); params.push(apGroupId); }
+        // B: al mover, sincronizar nombre_nodo y recomputar el nodo VPN dueño.
+        // Si no resuelve, node_id queda NULL → el resolver en caliente lo recalcula.
+        if (d.nodeName !== undefined) { sets.push('nombre_nodo = ?'); params.push(d.nodeName || ''); }
+        if (d.nodeName !== undefined || d.ip !== undefined) {
+            const movedNodeId = await resolveOwnerNodeId(db, { nombre_nodo: d.nodeName, ip: d.ip });
+            sets.push('node_id = ?'); params.push(movedNodeId);
+        }
         if (d.name || d.deviceName) { sets.push('hostname = ?'); params.push(d.name || d.deviceName); }
         if (d.model !== undefined) { sets.push('modelo = ?'); params.push(d.model || ''); }
         if (d.firmware !== undefined) { sets.push('firmware = ?'); params.push(d.firmware || ''); }

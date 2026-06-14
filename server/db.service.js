@@ -162,6 +162,35 @@ async function initDb() {
         }
     }
 
+    // Fase 2-B: asegurar la columna aps.node_id en instalaciones existentes.
+    // CREATE TABLE IF NOT EXISTS no añade columnas a tablas ya creadas, así que
+    // la añadimos aquí de forma idempotente (auto-heal en cada boot). El backfill
+    // completo (incluye resolución por subred) lo hace `npm run migrate:apnode`.
+    try {
+        const dbName = process.env.MYSQL_DATABASE || 'vpn_manager';
+        const [col] = await getPool().query(
+            `SELECT 1 FROM information_schema.COLUMNS
+              WHERE table_schema = ? AND table_name = 'aps' AND column_name = 'node_id' LIMIT 1`,
+            [dbName]
+        );
+        if (col.length === 0) {
+            await getPool().query('ALTER TABLE aps ADD COLUMN node_id INT DEFAULT NULL');
+            await getPool().query('ALTER TABLE aps ADD KEY idx_aps_node (node_id)').catch(() => {});
+            await getPool().query(
+                'ALTER TABLE aps ADD CONSTRAINT fk_ap_node FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE SET NULL'
+            ).catch(() => {});
+            // Backfill rápido por nombre_nodo (la resolución por subred la hace migrate:apnode)
+            await getPool().query(
+                `UPDATE aps a JOIN nodes n ON a.nombre_nodo = n.nombre_nodo
+                    SET a.node_id = n.id
+                  WHERE a.node_id IS NULL AND a.nombre_nodo <> ''`
+            ).catch(() => {});
+            log.info('Columna aps.node_id añadida (Fase 2-B) + backfill por nombre_nodo');
+        }
+    } catch (e) {
+        log.warn({ err: e.message.substring(0, 120) }, 'ensure aps.node_id aviso');
+    }
+
     // Purgar historial de señal > 30 días
     const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
     await getPool().query('DELETE FROM signal_history WHERE timestamp < ?', [thirtyDaysAgo]).catch(() => {});

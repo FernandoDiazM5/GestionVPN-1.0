@@ -128,6 +128,7 @@ CREATE TABLE IF NOT EXISTS aps (
     id                    INT AUTO_INCREMENT PRIMARY KEY,
     uuid                  VARCHAR(64)  NOT NULL UNIQUE,
     ap_group_id           INT NOT NULL,
+    node_id               INT          DEFAULT NULL,        -- nodo VPN dueño (Fase 2-B; resuelto por nombre_nodo/subred)
     hostname              VARCHAR(255) NOT NULL DEFAULT '',
     modelo                VARCHAR(255) NOT NULL DEFAULT '',
     firmware              VARCHAR(255) NOT NULL DEFAULT '',
@@ -154,7 +155,9 @@ CREATE TABLE IF NOT EXISTS aps (
     KEY idx_aps_group (ap_group_id),
     KEY idx_aps_active (is_active),
     KEY idx_aps_ip (ip),
-    CONSTRAINT fk_ap_group FOREIGN KEY (ap_group_id) REFERENCES ap_groups(id) ON DELETE CASCADE
+    KEY idx_aps_node (node_id),
+    CONSTRAINT fk_ap_group FOREIGN KEY (ap_group_id) REFERENCES ap_groups(id) ON DELETE CASCADE,
+    CONSTRAINT fk_ap_node  FOREIGN KEY (node_id)      REFERENCES nodes(id)     ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ── 9. CPEs conocidos ──────────────────────────────────────
