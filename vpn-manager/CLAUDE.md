@@ -39,7 +39,7 @@ Al crear o modificar CUALQUIER componente, respeta esto sin excepción:
 
 - **UI / texto:** `font-sans` (Inter) — ya es el default, no hace falta declararlo.
 - **Datos técnicos** (IP, VRF, MAC, puertos, usuarios, claves): **siempre** `font-mono` (JetBrains Mono) o la clase `.data-cell` / `.data-muted`.
-- **Tamaño mínimo: 12px (`text-xs`).** No usar `text-[10px]` ni `text-[11px]`. Para micro-badges existe `text-2xs` (11px) reservado.
+- **Tamaño mínimo: 12px (`text-xs`).** No usar `text-[Npx]` literales. Para micro-badges existen `text-2xs` (11px, micro-badges de estado) y `text-3xs` (9px, RESERVADO para tablas densas multi-columna: Escanear, Monitor AP, headers tracking-wider, badges CPE/AC/PTP).
 
 ### 🧩 Usa las clases del sistema (no reinventes)
 

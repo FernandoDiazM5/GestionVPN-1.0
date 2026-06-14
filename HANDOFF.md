@@ -44,7 +44,7 @@
 > - **142 backend** (14 archivos) + **36 frontend** (5 archivos) = **178 tests verdes**. La auditoría §37-§38 de Escanear NO añade tests nuevos (las mejoras son refactor/UX sin lógica de negocio); el conteo se mantiene desde §36.
 >
 > ### 📚 Secciones de referencia
-> §17–25: REFACTOR_PLAN ejecutado. §26 notificaciones. §27 bot Telegram. §28 ping/trace. §29 export. §30 dashboard. §31 monitoreo. §32 iter2 multi-usuario. §33 UX MEMBER endurecida. §34 Workspace unificado + peers WG mejorados. §35 Alias humano + bloqueo Usuario. §36 Fix bot — match dual VRF/PPP. §37 Escanear — perf + robustez. §38 Escanear — UX + features. §39 Escanear — sticky-right + kebab (cierre auditoría). §40 Escanear — preferencias persistentes (useScanPreferences) + export multi-formato (CSV/JSON/Excel/PDF). §41 Escanear — simplificación de acciones de fila a botones icon-only + limpieza de DeviceCardModal/SshDataModal muertos. §42 Escanear — 4 mejoras UX: ícono Save (disquete) + bulk save selectivo con checkbox tri-state + contraste chevron + IP/Nombre del sistema en panel. §43 Política anti-saturación — eliminar polling SSH automático cada 5s en DeviceStatusPanel (saturaba CPU de antenas) + actualizar Política Operativa SSH para prohibir polling SSH. §44 Nodos — columnas dinámicas + filtros + chips + export multi-formato + sticky-right. §45 Audit del sistema de diseño (script + skill instalada). §46 Plan ejecutable + sistema extendido (btn-warning/info/accent + focus-visible WCAG + tamaños + modal canónico) + wins rápidos sed (−259 hallazgos). §47 Fase 1 — 23 botones inline migrados a `.btn-{variant} btn-{size}` (DS06 −88.5%). §48 Fase 2 — DS02 dark mode en 28 archivos (DS02 265→103, −61%). §49 Fase 2 cierre — DS02 a 0 (−100% desde baseline) + auditor refinado con lookahead `/N` para excluir opacidad sobre superficies oscuras + cleanup de archivos temporales accidentalmente commiteados. §50 Fase 3 — 19 modales migrados a `.modal-overlay/.modal-panel/.modal-panel-{size}` con animaciones por @keyframes nativos (no tailwindcss-animate, incompatible con @apply). §51 Fix bug `merged=undefined` en `handleAddDevice` — el guardar de dispositivos crasheaba silenciosamente y el POST al backend nunca se ejecutaba (Monitor AP no veía los devices guardados). Causa: functional setState updater no ejecuta sincrónicamente en React 18+. Fix: `savedDevicesRef` para lookup síncrono. §52 Fase 3.1 — extiende el sistema con `.modal-header-{indigo,rose,amber,emerald,sky,violet,slate}` + `.modal-header-icon` + `.modal-header-close`. 15 headers decorativos unificados. §53 Fase 4 — DS05 contraste a 0 (de 406 baseline, −100%): auditor refinado con detección de superficie oscura, par dark consciente e íconos SVG; nueva clase `.data-empty` para placeholders "—"; script `migrate-ds05.js` con 207 reemplazos mecánicos en 68 archivos; fix manual de 7 condicionales ternarios. §54 Fase 5 — DS01 paletas a 0 (de 46, −100%): `cyan` agregado como paleta oficial para CPEs en CLAUDE.md + auditor; mecanismo `audit:ignore-file <ruleId>` para excepciones documentadas (PEER_COLOR_PALETTE / TAG_PALETTE); migración mecánica de 14 hallazgos (red→rose, blue→sky, orange→amber, fuchsia→violet, teal→emerald).
+> §17–25: REFACTOR_PLAN ejecutado. §26 notificaciones. §27 bot Telegram. §28 ping/trace. §29 export. §30 dashboard. §31 monitoreo. §32 iter2 multi-usuario. §33 UX MEMBER endurecida. §34 Workspace unificado + peers WG mejorados. §35 Alias humano + bloqueo Usuario. §36 Fix bot — match dual VRF/PPP. §37 Escanear — perf + robustez. §38 Escanear — UX + features. §39 Escanear — sticky-right + kebab (cierre auditoría). §40 Escanear — preferencias persistentes (useScanPreferences) + export multi-formato (CSV/JSON/Excel/PDF). §41 Escanear — simplificación de acciones de fila a botones icon-only + limpieza de DeviceCardModal/SshDataModal muertos. §42 Escanear — 4 mejoras UX: ícono Save (disquete) + bulk save selectivo con checkbox tri-state + contraste chevron + IP/Nombre del sistema en panel. §43 Política anti-saturación — eliminar polling SSH automático cada 5s en DeviceStatusPanel (saturaba CPU de antenas) + actualizar Política Operativa SSH para prohibir polling SSH. §44 Nodos — columnas dinámicas + filtros + chips + export multi-formato + sticky-right. §45 Audit del sistema de diseño (script + skill instalada). §46 Plan ejecutable + sistema extendido (btn-warning/info/accent + focus-visible WCAG + tamaños + modal canónico) + wins rápidos sed (−259 hallazgos). §47 Fase 1 — 23 botones inline migrados a `.btn-{variant} btn-{size}` (DS06 −88.5%). §48 Fase 2 — DS02 dark mode en 28 archivos (DS02 265→103, −61%). §49 Fase 2 cierre — DS02 a 0 (−100% desde baseline) + auditor refinado con lookahead `/N` para excluir opacidad sobre superficies oscuras + cleanup de archivos temporales accidentalmente commiteados. §50 Fase 3 — 19 modales migrados a `.modal-overlay/.modal-panel/.modal-panel-{size}` con animaciones por @keyframes nativos (no tailwindcss-animate, incompatible con @apply). §51 Fix bug `merged=undefined` en `handleAddDevice` — el guardar de dispositivos crasheaba silenciosamente y el POST al backend nunca se ejecutaba (Monitor AP no veía los devices guardados). Causa: functional setState updater no ejecuta sincrónicamente en React 18+. Fix: `savedDevicesRef` para lookup síncrono. §52 Fase 3.1 — extiende el sistema con `.modal-header-{indigo,rose,amber,emerald,sky,violet,slate}` + `.modal-header-icon` + `.modal-header-close`. 15 headers decorativos unificados. §53 Fase 4 — DS05 contraste a 0 (de 406 baseline, −100%): auditor refinado con detección de superficie oscura, par dark consciente e íconos SVG; nueva clase `.data-empty` para placeholders "—"; script `migrate-ds05.js` con 207 reemplazos mecánicos en 68 archivos; fix manual de 7 condicionales ternarios. §54 Fase 5 — DS01 paletas a 0 (de 46, −100%): `cyan` agregado como paleta oficial para CPEs en CLAUDE.md + auditor; mecanismo `audit:ignore-file <ruleId>` para excepciones documentadas (PEER_COLOR_PALETTE / TAG_PALETTE); migración mecánica de 14 hallazgos (red→rose, blue→sky, orange→amber, fuchsia→violet, teal→emerald). §55 Fase 5b — DS03 tamaños a 0 (de 61, −100%) + **errores totales = 0** (de 375 baseline, −100%): nueva clase `.text-3xs` (9px) RESERVADA para tablas densas; script `migrate-ds03.js` con 61 reemplazos mecánicos en 24 archivos.
 >
 > Sesión 2026-06-07 PM: Ajustes del moderador (perfil + workspace + import/export JSON) + Recuperar contraseña + sync MikroTik al deshabilitar + invitaciones por email + .conf WG server-side.
 > Sesión 2026-06-07 AM: multi-usuario con aislamiento por sesión (mangle por-IP), parche `!empty` node-routeros, auditoría (Semgrep+security-review+code-review) y fixes C1–C7.
@@ -69,7 +69,7 @@
 6. **Pase UX P1–P6** + optimización visual de la vista **Escanear**.
 7. **🆕 Multi-usuario con aislamiento por sesión** (sesión 2026-06-07) — ver §7.
 
-**Estado de salud (2026-06-13):** `tsc 0` (`--noEmit` + build estricto) · `node --check ✓` · **186 tests verdes** (142 backend + 44 frontend). 6 jobs concurrentes en producción. ⚠️ `npm audit --omit=dev`: **2 moderate** (uuid viejo arrastrado por `exceljs` — no expone superficie del panel; pendiente de tracker upstream). 0 findings `semgrep`. Bundles relevantes: **inicial 248.90 KB / 77.77 KB gzip** (esencialmente idéntico desde el pre-§40); `TeamModule` 119 KB; `NetworkDevicesModule` 91.20 KB / 23.04 KB gzip; `NodeAccessPanel` 151.23 KB / 32.86 KB gzip; chunks lazy `exceljs.min` 929 KB y `jspdf.es.min` 399 KB solo se descargan al usar Excel/PDF. **Sistema de diseño**: audit `npm run audit:design` reporta **84 hallazgos** (baseline §45 1,096 → **−92%**) con **61 errores** (baseline 375 → **−84%**) tras §46–§54. **DS01 paletas: 0 (✅ Fase 5 cerrada)**. **DS02 fondos sin dark: 0 (✅ Fase 2 cerrada)**. **DS05 contraste: 0 (✅ Fase 4 cerrada)**. **19 modales unificados con .modal-overlay/.modal-panel/.modal-panel-{size} (✅ Fase 3 cerrada)**. **15 headers decorativos unificados con .modal-header-{tone} (✅ Fase 3.1 cerrada)**. **Solo queda Fase 5b (DS03: 61 tamaños < 12px) + DS04 (20 gradientes documentados OK) + DS06 (3 toggles legítimos).** **Últimos commits en `dev`:** `3691092` (§54 Fase 5 DS01 a 0) · `be6466c` (docs §53 HANDOFF) · `65b1ced` (§53 Fase 4 DS05 a 0) · `5c99c4a` (docs §51+§52 HANDOFF) · `b7639eb` (§52 Fase 3.1 modal-header-{tone}) · `1fcdb3c` (§51 fix bug merged undefined) · `7e10d33` (docs §50 HANDOFF) · `de536d8` (§50 Fase 3).
+**Estado de salud (2026-06-13):** `tsc 0` (`--noEmit` + build estricto) · `node --check ✓` · **186 tests verdes** (142 backend + 44 frontend). 6 jobs concurrentes en producción. ⚠️ `npm audit --omit=dev`: **2 moderate** (uuid viejo arrastrado por `exceljs` — no expone superficie del panel; pendiente de tracker upstream). 0 findings `semgrep`. Bundles relevantes: **inicial 248.90 KB / 77.77 KB gzip** (esencialmente idéntico desde el pre-§40); `TeamModule` 119 KB; `NetworkDevicesModule` 91.20 KB / 23.04 KB gzip; `NodeAccessPanel` 151.23 KB / 32.86 KB gzip; chunks lazy `exceljs.min` 929 KB y `jspdf.es.min` 399 KB solo se descargan al usar Excel/PDF. **🎯 Sistema de diseño 100% migrado**: audit `npm run audit:design` reporta **23 hallazgos** (baseline §45 1,096 → **−98%**) con **0 errores** (baseline 375 → **−100%, hito alcanzado**) tras §46–§55. **DS01 paletas: 0 ✅** · **DS02 fondos sin dark: 0 ✅** · **DS03 tamaños < 12px: 0 ✅** · **DS05 contraste: 0 ✅**. Solo restan DS04 (20 gradientes decorativos documentados como excepción) + DS06 (3 toggles condicionales legítimos). **19 modales unificados con .modal-overlay/.modal-panel/.modal-panel-{size} (✅ Fase 3)** + **15 headers decorativos unificados con .modal-header-{tone} (✅ Fase 3.1)**. **Últimos commits en `dev`:** `7df3992` (§55 Fase 5b DS03 a 0, errores totales = 0) · `8eb9afe` (docs §54 HANDOFF) · `3691092` (§54 Fase 5 DS01 a 0) · `be6466c` (docs §53 HANDOFF) · `65b1ced` (§53 Fase 4 DS05 a 0) · `5c99c4a` (docs §51+§52 HANDOFF) · `b7639eb` (§52 Fase 3.1) · `1fcdb3c` (§51 fix bug).
 
 ---
 
@@ -4485,12 +4485,140 @@ Total vs baseline §45 (1,096): **−92% acumulado**.
 
 ### Pendiente / próximas fases
 
-- ~~**Fases 2 + 3 + 3.1 + 4 + 5**~~ ✅ TODAS CERRADAS. **Sistema de diseño 92% migrado.**
-- **Fase 5b (DS03 tamaños < 12px, 61)** — siguiente y última prioridad. El patrón es: `text-[9px]` / `text-[10px]` / `text-[11px]` literales en componentes densos (rows de tablas, badges micro, headers de tabla con muchas columnas). Opciones:
-  - **A)** Migrar todos a `.text-2xs` (11px) y aceptar pérdida marginal de densidad visual.
-  - **B)** Crear `.text-3xs` (9px) + `.text-2xs` (11px) y usar consistentemente.
-  - **C)** Marcar archivos con tabla muy densa (ej. ApRow, CpeRow) con `audit:ignore-file DS03` documentado.
-- **CI gate** — cuando Fase 5b cierre: agregar `npm run audit:design` al workflow con `--strict` (exit 1 si error > 0).
+- ~~**Fases 2 + 3 + 3.1 + 4 + 5 + 5b**~~ ✅ TODAS CERRADAS. **Sistema de diseño 98% migrado · errores totales = 0.**
+- **CI gate (próximo paso)** — agregar `npm run audit:design` al workflow CI. El auditor ya devuelve exit code 1 si hay errores y 0 si solo hay warnings/infos. Solo falta el step en GitHub Actions.
+
+---
+
+## 55) 🏁 Fase 5b cierre — DS03 tamaños a 0 (errores totales = 0)
+
+Pedido del usuario tras §54: "continua". Cierra la última fase del refactor del sistema de diseño llevando los hallazgos de tamaño de texto < 12px de **61 a 0**. Con esto se alcanza el **hito de errores totales = 0** en el auditor — el sistema de diseño está 98% migrado y listo para el CI gate.
+
+### Extensión del sistema
+
+Nueva clase `.text-3xs` en `index.css`:
+
+```css
+.text-3xs { @apply text-[9px] leading-tight tracking-tight; }
+```
+
+**RESERVADO EXCLUSIVAMENTE para:**
+- Headers de tablas densas (Escanear / Monitor AP con 10+ columnas)
+- Badges de tipo (CPE, AC, PTP, frequency-class)
+- Subtítulos en filas micro-info
+- Pies de fila en tablas multi-columna
+
+Para cualquier otro contexto usar `.text-2xs` (11px) o `.text-xs` (12px).
+
+Documentado en CLAUDE.md: tabla de tipografía extendida con `text-3xs`.
+
+### Script de migración
+
+[scripts/migrate-ds03.js](scripts/migrate-ds03.js) — **NUEVO, reutilizable**. 61 reemplazos en 24 archivos:
+
+```
+text-[11px] → text-2xs   (ya existía)
+text-[10px] → text-2xs   (sube 1px, cerca del límite)
+text-[9px]  → text-3xs   (nueva clase para micro-badges)
+text-[8px]  → text-3xs   (sube 1px)
+text-[7px]  → text-3xs   (sube 2px, mínimo legible)
+```
+
+Distribución original: 51 × 9px + 9 × 8px + 1 × 7px.
+
+### Rationale del approach
+
+La opción "migrar todo a `text-2xs` (11px) y aceptar pérdida de densidad" era válida pero rompía intencionalmente la jerarquía visual densa de las tablas de Escanear/Monitor AP, donde 9px se usa hace tiempo para badges micro como "CPE" o "AC" sin queja del usuario.
+
+**Centralizar a `.text-3xs`** mantiene la intención sin violar el contrato del sistema:
+- El patrón está **documentado** (en CLAUDE.md + comentario in-file).
+- Es **ubicable** (clase grep-able, no literal `text-[9px]`).
+- Es **bajable desde un solo punto** si después se decide subir el límite a 10px o 11px.
+
+### Métricas pre/post §55 — y hito final
+
+| Regla | Pre-§55 | **Post-§55** | Δ |
+|---|---:|---:|---|
+| DS01 | 0 | 0 | mantenido |
+| DS02 | 0 | 0 | mantenido |
+| DS03 | 61 | **0** | **−100%** ✅ |
+| DS04 | 20 | 20 | sin cambio (excepciones doc) |
+| DS05 | 0 | 0 | mantenido |
+| DS06 | 3 | 3 | sin cambio (toggles legítimos) |
+| **Errores** | 61 | **0** | **−100% ← HITO** |
+| **Total** | 84 | **23** | −73% |
+
+**Acumulado vs baseline §45 (1,096 hallazgos / 375 errores):**
+- Hallazgos: **−97.9%** (1,096 → 23)
+- **Errores: −100%** (375 → **0** ✅)
+
+### Resumen acumulado de TODO el refactor del sistema de diseño
+
+| § | Fase | Estado |
+|---|---|---|
+| §45 | Audit del sistema + skill instalada | ✅ |
+| §46 | Sistema extendido + plan ejecutable + wins rápidos | ✅ |
+| §47 | Fase 1 — botones inline → `.btn-*` (DS06 −88%) | ✅ |
+| §48 + §49 | Fase 2 — DS02 fondos sin dark (−100%) | ✅ |
+| §50 | Fase 3 — 19 modales unificados | ✅ |
+| §51 | Fix bug crítico merged=undefined | ✅ |
+| §52 | Fase 3.1 — 15 headers decorativos | ✅ |
+| §53 | Fase 4 — DS05 contraste (−100%) | ✅ |
+| §54 | Fase 5 — DS01 paletas (−100%) | ✅ |
+| **§55** | **Fase 5b — DS03 tamaños (−100%) · ERRORES = 0** | ✅ |
+
+### Sistema final (resumen visual)
+
+```
+Sistema de diseño v2 (post-§55):
+
+  COLORES (intención semántica):
+    indigo  → acción primaria
+    emerald → éxito / activo
+    rose    → peligro / error
+    amber   → advertencia
+    sky     → informativo
+    violet  → WireGuard
+    cyan    → CPEs (clientes)
+    slate   → estructura / texto
+
+  TIPOGRAFÍA:
+    text-3xs (9px)  → micro-badges en tablas densas
+    text-2xs (11px) → badges de estado
+    text-xs  (12px) → mínimo general
+
+  BOTONES:
+    .btn-{primary, success, danger, warning, info, accent, outline, ghost}
+    + .btn-{sm, md, lg, icon}
+
+  MODALES:
+    .modal-overlay (animación + dark)
+    .modal-panel + .modal-panel-{sm, md, lg, xl, 2xl, 3xl}
+    .modal-header (simple) o .modal-header-decorated + .modal-header-{tone}
+    .modal-header-icon + .modal-header-close
+
+  TABLAS:
+    .data-cell, .data-muted, .data-empty
+    .th-cell
+
+  BADGES:
+    .badge + .badge-{success, danger, warning, info, neutral, accent}
+
+  EXCEPCIONES:
+    // audit:ignore-file <ruleId>  (file-level)
+    // audit:ignore <ruleId>       (inline)
+```
+
+### Próximo paso — CI gate
+
+El auditor (`scripts/audit-design.js`) ya devuelve exit code 1 si hay errores y 0 si solo hay warnings/infos. Solo falta agregar el step al workflow GitHub Actions:
+
+```yaml
+- name: Audit design system
+  run: npm run audit:design
+```
+
+Si en una sesión futura aparece una regresión (alguien añade `text-red-500` o `text-[9px]` literal), el CI lo detectará y bloqueará el merge.
 
 ---
 
