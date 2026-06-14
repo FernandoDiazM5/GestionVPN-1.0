@@ -44,7 +44,7 @@
 > - **142 backend** (14 archivos) + **36 frontend** (5 archivos) = **178 tests verdes**. La auditoría §37-§38 de Escanear NO añade tests nuevos (las mejoras son refactor/UX sin lógica de negocio); el conteo se mantiene desde §36.
 >
 > ### 📚 Secciones de referencia
-> §17–25: REFACTOR_PLAN ejecutado. §26 notificaciones. §27 bot Telegram. §28 ping/trace. §29 export. §30 dashboard. §31 monitoreo. §32 iter2 multi-usuario. §33 UX MEMBER endurecida. §34 Workspace unificado + peers WG mejorados. §35 Alias humano + bloqueo Usuario. §36 Fix bot — match dual VRF/PPP. §37 Escanear — perf + robustez. §38 Escanear — UX + features. §39 Escanear — sticky-right + kebab (cierre auditoría). §40 Escanear — preferencias persistentes (useScanPreferences) + export multi-formato (CSV/JSON/Excel/PDF). §41 Escanear — simplificación de acciones de fila a botones icon-only + limpieza de DeviceCardModal/SshDataModal muertos. §42 Escanear — 4 mejoras UX: ícono Save (disquete) + bulk save selectivo con checkbox tri-state + contraste chevron + IP/Nombre del sistema en panel. §43 Política anti-saturación — eliminar polling SSH automático cada 5s en DeviceStatusPanel (saturaba CPU de antenas) + actualizar Política Operativa SSH para prohibir polling SSH. §44 Nodos — columnas dinámicas + filtros + chips + export multi-formato + sticky-right. §45 Audit del sistema de diseño (script + skill instalada). §46 Plan ejecutable + sistema extendido (btn-warning/info/accent + focus-visible WCAG + tamaños + modal canónico) + wins rápidos sed (−259 hallazgos). §47 Fase 1 — 23 botones inline migrados a `.btn-{variant} btn-{size}` (DS06 −88.5%). §48 Fase 2 — DS02 dark mode en 28 archivos (DS02 265→103, −61%). §49 Fase 2 cierre — DS02 a 0 (−100% desde baseline) + auditor refinado con lookahead `/N` para excluir opacidad sobre superficies oscuras + cleanup de archivos temporales accidentalmente commiteados.
+> §17–25: REFACTOR_PLAN ejecutado. §26 notificaciones. §27 bot Telegram. §28 ping/trace. §29 export. §30 dashboard. §31 monitoreo. §32 iter2 multi-usuario. §33 UX MEMBER endurecida. §34 Workspace unificado + peers WG mejorados. §35 Alias humano + bloqueo Usuario. §36 Fix bot — match dual VRF/PPP. §37 Escanear — perf + robustez. §38 Escanear — UX + features. §39 Escanear — sticky-right + kebab (cierre auditoría). §40 Escanear — preferencias persistentes (useScanPreferences) + export multi-formato (CSV/JSON/Excel/PDF). §41 Escanear — simplificación de acciones de fila a botones icon-only + limpieza de DeviceCardModal/SshDataModal muertos. §42 Escanear — 4 mejoras UX: ícono Save (disquete) + bulk save selectivo con checkbox tri-state + contraste chevron + IP/Nombre del sistema en panel. §43 Política anti-saturación — eliminar polling SSH automático cada 5s en DeviceStatusPanel (saturaba CPU de antenas) + actualizar Política Operativa SSH para prohibir polling SSH. §44 Nodos — columnas dinámicas + filtros + chips + export multi-formato + sticky-right. §45 Audit del sistema de diseño (script + skill instalada). §46 Plan ejecutable + sistema extendido (btn-warning/info/accent + focus-visible WCAG + tamaños + modal canónico) + wins rápidos sed (−259 hallazgos). §47 Fase 1 — 23 botones inline migrados a `.btn-{variant} btn-{size}` (DS06 −88.5%). §48 Fase 2 — DS02 dark mode en 28 archivos (DS02 265→103, −61%). §49 Fase 2 cierre — DS02 a 0 (−100% desde baseline) + auditor refinado con lookahead `/N` para excluir opacidad sobre superficies oscuras + cleanup de archivos temporales accidentalmente commiteados. §50 Fase 3 — 19 modales migrados a `.modal-overlay/.modal-panel/.modal-panel-{size}` con animaciones por @keyframes nativos (no tailwindcss-animate, incompatible con @apply).
 >
 > Sesión 2026-06-07 PM: Ajustes del moderador (perfil + workspace + import/export JSON) + Recuperar contraseña + sync MikroTik al deshabilitar + invitaciones por email + .conf WG server-side.
 > Sesión 2026-06-07 AM: multi-usuario con aislamiento por sesión (mangle por-IP), parche `!empty` node-routeros, auditoría (Semgrep+security-review+code-review) y fixes C1–C7.
@@ -69,7 +69,7 @@
 6. **Pase UX P1–P6** + optimización visual de la vista **Escanear**.
 7. **🆕 Multi-usuario con aislamiento por sesión** (sesión 2026-06-07) — ver §7.
 
-**Estado de salud (2026-06-13):** `tsc 0` (`--noEmit` + build estricto) · `node --check ✓` · **186 tests verdes** (142 backend + 44 frontend). 6 jobs concurrentes en producción. ⚠️ `npm audit --omit=dev`: **2 moderate** (uuid viejo arrastrado por `exceljs` — no expone superficie del panel; pendiente de tracker upstream). 0 findings `semgrep`. Bundles relevantes: **inicial 248.76 KB / 77.74 KB gzip** (esencialmente idéntico desde el pre-§40); `TeamModule` 119 KB; `NetworkDevicesModule` 91.20 KB / 23.04 KB gzip; `NodeAccessPanel` 151.23 KB / 32.86 KB gzip; chunks lazy `exceljs.min` 929 KB y `jspdf.es.min` 399 KB solo se descargan al usar Excel/PDF. **Sistema de diseño**: audit `npm run audit:design` reporta **542 hallazgos** (baseline §45 1,096 → −50.5%) con **107 errores** (baseline 375 → −71%) tras §46+§47+§48+§49. **DS02 fondos sin dark: 265 → 0 (−100% ✅ Fase 2 cerrada)**. DS06 botones inline: 26 → 3 (los 3 restantes son toggles condicionales legítimos). **Últimos commits en `dev`:** `49b3cea` (§49 Fase 2 cierre DS02→0) · `4018fad` (ronda 4 + auditor refinado) · `3a1012b` (docs §48 HANDOFF) · `21ec46a` (§48 Fase 2 28 archivos −61%) · `01b479d` (docs §47 HANDOFF) · `a771cbb` (§47 Fase 1) · `722321f` (§46) · `6965ff0` (§45).
+**Estado de salud (2026-06-13):** `tsc 0` (`--noEmit` + build estricto) · `node --check ✓` · **186 tests verdes** (142 backend + 44 frontend). 6 jobs concurrentes en producción. ⚠️ `npm audit --omit=dev`: **2 moderate** (uuid viejo arrastrado por `exceljs` — no expone superficie del panel; pendiente de tracker upstream). 0 findings `semgrep`. Bundles relevantes: **inicial 248.76 KB / 77.74 KB gzip** (esencialmente idéntico desde el pre-§40); `TeamModule` 119 KB; `NetworkDevicesModule` 91.20 KB / 23.04 KB gzip; `NodeAccessPanel` 151.23 KB / 32.86 KB gzip; chunks lazy `exceljs.min` 929 KB y `jspdf.es.min` 399 KB solo se descargan al usar Excel/PDF. **Sistema de diseño**: audit `npm run audit:design` reporta **542 hallazgos** (baseline §45 1,096 → −50.5%) con **107 errores** (baseline 375 → −71%) tras §46–§50. **DS02 fondos sin dark: 0 (✅ Fase 2 cerrada)**. **19 modales unificados al sistema canónico (✅ Fase 3 cerrada)**. DS06 botones inline: 3 (toggles legítimos). **Últimos commits en `dev`:** `de536d8` (§50 Fase 3 modales unificados) · `68b5eb5` (docs §49 HANDOFF) · `49b3cea` (§49 Fase 2 cierre DS02→0) · `4018fad` (ronda 4 + auditor refinado) · `3a1012b` (docs §48 HANDOFF) · `21ec46a` (§48 Fase 2 28 archivos −61%) · `01b479d` (docs §47 HANDOFF) · `a771cbb` (§47 Fase 1).
 
 ---
 
@@ -3993,10 +3993,130 @@ Ambos generados durante el debugging y borrados en `49b3cea`. **Regla operativa:
 ### Pendiente / próximas fases
 
 - ~~**Fase 2 (DS02)**~~ ✅ **CERRADA en §49** — 0 hallazgos.
-- **Fase 3 (modales unificados, 6-8h)** — siguiente prioridad. Los 13+ modales del proyecto ya tienen `dark:` pero NO usan `.modal-overlay/.modal-panel/.modal-header/.modal-body/.modal-footer` (creadas en §46). Migración mecánica, bajo riesgo.
+- ~~**Fase 3 (modales unificados, 6-8h)**~~ ✅ **CERRADA en §50** — 19 modales migrados al sistema canónico.
+- **Fase 3.1 (opcional)** — extender `.modal-header-{indigo,rose,amber,emerald,sky,violet,slate}` para los headers decorativos coloreados que aún viven inline en cada modal. Reduce ~80 LOC adicionales pero requiere decisión de diseño sobre dark variants de cada tono.
 - **Fase 4 (DS05 contraste, 411 hallazgos)** — backlog. Manual, requiere juicio por caso (slate-300/400 sobre fondo claro vs. oscuro).
 - **Fase 5 (DS01 palette, 46)** — backlog. 40 de los 46 viven en `constants.ts` (PEER_COLOR_PALETTE + TAG_PALETTE). Decisión de diseño previa: pasarlos a paletas válidas (sky/emerald/rose/amber/violet/indigo) o mantener las paletas extra cyan/teal/pink/orange/blue/green/yellow/red/purple como excepción de constants?
 - **Refinamiento DS06 (opcional):** los 3 toggles condicionales restantes son legítimos. Documentar como excepción permanente con `// audit:ignore DS06` u opción `--ignore-line` en el auditor.
+
+---
+
+## 50) 🪟 Fase 3 cierre — modales unificados al sistema canónico
+
+Pedido del usuario tras §49: "continua" (con confirmación de "Push + Fase 3 modales"). Esta sección cierra la Fase 3 del plan del sistema de diseño: migrar los 19 modales del proyecto al patrón canónico `.modal-overlay` + `.modal-panel`.
+
+### Lo que había antes
+
+Cada modal definía su overlay y panel inline con clases largas (8-10 utilities por componente):
+
+```tsx
+<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200">
+  <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
+    ...
+```
+
+Resultado: 19 implementaciones similares pero NO idénticas. Sutiles inconsistencias en `bg-slate-900/N` (a veces /50, /60), padding lateral (px-4 vs p-4), animaciones (algunas con `motion-safe:`, otras sin), `max-h` (90vh/92vh/95vh). Auditor DS02 los marcaba uno a uno.
+
+### Extensión del sistema (index.css)
+
+```css
+.modal-overlay {
+  @apply fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm
+         flex items-center justify-center p-4
+         dark:bg-slate-950/70;
+  animation: modal-fade-in 200ms ease-out;
+}
+.modal-panel {
+  @apply bg-white border border-slate-200 rounded-2xl shadow-2xl
+         w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col
+         dark:bg-slate-900 dark:border-slate-800;
+  animation: modal-zoom-in 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.modal-panel-sm  { @apply max-w-sm; }
+.modal-panel-md  { @apply max-w-md; }
+.modal-panel-lg  { @apply max-w-lg; }
+.modal-panel-xl  { @apply max-w-xl; }
+.modal-panel-2xl { @apply max-w-2xl; }
+.modal-panel-3xl { @apply max-w-3xl; }
+
+@keyframes modal-fade-in {
+  from { opacity: 0; } to { opacity: 1; }
+}
+@keyframes modal-zoom-in {
+  from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .modal-overlay, .modal-panel { animation: none; }
+}
+```
+
+**Hallazgo no obvio:** las utilities `animate-in fade-in duration-200` del plugin **tailwindcss-animate NO funcionan dentro de `@apply`** en Tailwind v3 — al hacer `npm run build` lanza `The `animate-in` class does not exist`. Solución: keyframes CSS nativos con mismas curvas y duraciones. El comportamiento visual es idéntico al patrón previo.
+
+### Modales migrados (19)
+
+| Categoría | Archivo | Tamaño |
+|---|---|---|
+| Auth | (ya usaban `.input-field` + `.btn-*`) | — |
+| Admin | `Admin/ModeratorsModule/ModeratorsModule.tsx` (Modal interno) | `modal-panel-md` |
+| Common | `Common/M5FullInfoModal/utils/styles.ts` (genérico) | `modal-panel-3xl` |
+| Devices | `Devices/NetworkDevicesModule/AddDeviceModal.tsx` | `modal-panel-sm` |
+| Devices | `Devices/NodeAccessPanel/modals/NuevoNodo.tsx` | `modal-panel-2xl` |
+| Devices | `Devices/NodeAccessPanel/modals/EditarNodo.tsx` | `modal-panel-xl` |
+| Devices | `Devices/NodeAccessPanel/modals/EliminarNodo.tsx` | `modal-panel-xl` |
+| Devices | `Devices/NodeAccessPanel/modals/NuevoAdmin.tsx` | `modal-panel-md` |
+| Devices | `Devices/NodeAccessPanel/modals/BatchCsvModal.tsx` | `modal-panel-2xl` |
+| Devices | `Devices/NodeAccessPanel/modals/TagModal.tsx` | `modal-panel-sm` |
+| Devices | `Devices/NodeAccessPanel/modals/ScriptModal.tsx` | `modal-panel-xl` |
+| Devices | `Devices/NodeAccessPanel/modals/HistoryModal.tsx` | `modal-panel-md` |
+| Devices | `Devices/NodeAccessPanel/modals/DiagnosticsModal.tsx` | `modal-panel-2xl` |
+| Monitor | `Monitor/ApMonitorModule/modals/ApDetailModal.tsx` | `modal-panel-2xl` |
+| Monitor | `Monitor/ApMonitorModule/modals/CpeDetailModal.tsx` | `modal-panel-lg` |
+| Monitor | `Monitor/ApMonitorModule/modals/MoveToNodeModal.tsx` | `modal-panel-sm` |
+| Monitor | `Monitor/ApMonitorModule/modals/DeviceCardModal.tsx` | `modal-panel-md` |
+| Team | `Team/TeamModule/components/AssignTunnelsModal.tsx` | `modal-panel-lg` |
+| Team | `Team/TeamModule/components/MemberWireGuardModal.tsx` | `modal-panel-md` |
+| Users | `Users/UserManagementPanel/components/WgConfigModal.tsx` | `modal-panel-xl` |
+
+Patrón aplicado a cada uno:
+
+```diff
+- <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200">
+-   <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
++ <div className="modal-overlay">
++   <div className="modal-panel modal-panel-xl">
+```
+
+El **header decorativo (`bg-indigo-600`, `bg-rose-600`, `bg-violet-600`, etc.) se mantiene inline** porque cada modal usa un tono distinto y el sistema actual no contempla `.modal-header-{tone}`. Fase 3.1 los unificará.
+
+### Métricas pre/post §50
+
+| Métrica | Pre-§50 | **Post-§50** |
+|---|---|---|
+| Modales con overlay/panel definidos inline | 19 | 0 |
+| Modales usando `.modal-overlay` | 0 | **19** |
+| Modales usando `.modal-panel` + `.modal-panel-{size}` | 0 | **19** |
+| Tamaños de modal estandarizados | mixed (`max-w-sm/md/lg/xl/2xl/3xl` inline) | **6 variants composables en CSS** |
+| Animaciones de entrada | mixed (`animate-in fade-in`, algunas `motion-safe:`) | **`@keyframes modal-fade-in` + `modal-zoom-in` con `prefers-reduced-motion`** |
+| LOC redundantes en CSS inline | ~150 | 0 |
+| DS02 hallazgos | 0 | 0 (mantenido) |
+| DS01 / DS04 / DS05 / DS06 | 46 / 21 / 411 / 3 | 46 / 21 / 411 / 3 (sin regresión) |
+| Total hallazgos | 542 | 542 (sin regresión) |
+| Bundle inicial | 248.76 KB / 77.74 KB gzip | 248.76 KB / 77.74 KB gzip (idéntico) |
+| Tests | 44 verdes | 44 verdes |
+
+### Reglas operativas reforzadas
+
+- **TODO modal nuevo debe usar `.modal-overlay` + `.modal-panel` + `.modal-panel-{size}`.** Patrón inline = revisar PR.
+- **NO usar `animate-in fade-in duration-200` dentro de `@apply`** — el plugin tailwindcss-animate las define a nivel de utility, no de componente. Define `@keyframes` propios en `index.css` si necesitas animar dentro de una clase de componente.
+- **`prefers-reduced-motion` es obligatorio** en cualquier `@keyframes` nuevo. Ya lo tienen `modal-fade-in`/`modal-zoom-in`/`reveal-stagger`/`skeleton`/`status-ping`.
+- **Tamaño del modal = una sola clase**. `.modal-panel-2xl` (no `max-w-2xl` inline) para que mañana podamos cambiar el tope desde un solo lugar si el diseño lo pide.
+
+### Pendiente / próximas fases
+
+- **Fase 3.1 (opcional, 4-6h)** — extender `.modal-header-{indigo,rose,amber,emerald,sky,violet,slate}` para los headers decorativos. Reduce ~80 LOC adicionales pero requiere decisión de diseño sobre dark variants (ej. `bg-rose-600` dark queda igual o `dark:bg-rose-700`?).
+- **Fase 4 (DS05 contraste, 411 hallazgos)** — backlog. Manual por caso.
+- **Fase 5 (DS01 palette, 46)** — backlog. Migrar `constants.ts` (PEER_COLOR_PALETTE + TAG_PALETTE).
+- **CI gate (cuando todas las fases cierren):** agregar `npm run audit:design` al workflow para no regresar.
 
 ---
 
