@@ -27,7 +27,7 @@ export default function DeviceCard({ device, onRemove, isPreview, compact }: Dev
   const { antennaStats, isLoadingAntenna, antennaError, handleLoadAntenna } = useAntennaData(device, isPreview, compact);
 
   return (
-    <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm flex flex-col bg-white">
+    <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm flex flex-col bg-white dark:bg-slate-900 dark:border-slate-800">
       <DeviceHeader device={device} antennaStats={antennaStats} onRemove={onRemove} isPreview={isPreview} />
       <InfoStrip device={device} antennaStats={antennaStats} />
 

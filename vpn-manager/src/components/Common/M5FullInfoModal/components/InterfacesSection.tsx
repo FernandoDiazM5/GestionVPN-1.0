@@ -15,7 +15,7 @@ export default function InterfacesSection({ s }: InterfacesSectionProps) {
     <M5Section
       title={SECTION_TITLES.INTERFACES}
       icon={<Network className="w-3.5 h-3.5" />}
-      colorClass="bg-violet-50 border-violet-200 text-violet-700"
+      colorClass="bg-violet-50 border-violet-200 text-violet-700 dark:bg-violet-500/10 dark:border-violet-500/30 dark:text-violet-400"
     >
       {s.ifaceDetails && s.ifaceDetails.length > 0 ? (
         s.ifaceDetails.map(ifc => <IfaceBlock key={ifc.ifname} ifc={ifc} />)

@@ -70,7 +70,7 @@ export default function StateIndicators({
             </div>
           </div>
           {showRenewalWarn && (
-            <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 font-semibold">
+            <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 font-semibold dark:bg-amber-500/10 dark:border-amber-500/30 dark:text-amber-300">
               <Bell className="w-3.5 h-3.5 animate-pulse shrink-0" />
               <span>El acceso expirará en menos de 2 minutos. Haz clic en "Renovar acceso" para extenderlo 30 minutos más sin interrumpir la conexión.</span>
             </div>

@@ -115,7 +115,7 @@ function AppContent() {
 
         {/* Banner: MikroTik no configurado (solo en módulos operativos) — no es lazy. */}
         {configAlert && !['settings', 'dashboard', 'moderators'].includes(activeModule) && (
-          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3 dark:bg-amber-500/10 dark:border-amber-500/30">
             <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
             <div className="flex-1">
               <p className="text-sm font-bold text-amber-800">Conexión al router no disponible</p>

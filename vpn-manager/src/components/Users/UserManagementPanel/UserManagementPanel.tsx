@@ -117,7 +117,7 @@ export default function UserManagementPanel({ embedded = false }: UserManagement
             <p className="text-2xs text-rose-600">{wgError}</p>
           </div>
           <button onClick={loadWgPeers}
-            className="text-xs font-semibold text-rose-700 bg-rose-100 hover:bg-rose-200 px-3 py-1.5 rounded-lg transition-colors shrink-0">
+            className="text-xs font-semibold text-rose-700 bg-rose-100 hover:bg-rose-200 px-3 py-1.5 rounded-lg transition-colors shrink-0 dark:bg-rose-500/15 dark:hover:bg-rose-500/25 dark:text-rose-300">
             Reintentar
           </button>
         </div>

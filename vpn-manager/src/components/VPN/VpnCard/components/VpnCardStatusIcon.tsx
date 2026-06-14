@@ -17,7 +17,7 @@ export default function VpnCardStatusIcon({ status }: VpnCardStatusIconProps) {
             ? 'bg-emerald-500 shadow-sm shadow-emerald-500/40'
             : isPending
               ? 'bg-indigo-500 shadow-sm shadow-indigo-500/40'
-              : 'bg-slate-200'}`}
+              : 'bg-slate-200 dark:bg-slate-700'}`}
       >
         {isRunning ? (
           <Wifi className="w-3.5 h-3.5 text-white" />

@@ -34,7 +34,7 @@ export function NodeCardWgPeerForm({
   return (
     <tr className={rowBg}>
       <td colSpan={7} className="px-4 pb-3 pt-0">
-        <div className="ml-10 bg-violet-50 border border-violet-200 rounded-xl p-3 space-y-2 animate-in slide-in-from-top-2 duration-200">
+        <div className="ml-10 bg-violet-50 border border-violet-200 rounded-xl p-3 space-y-2 animate-in slide-in-from-top-2 duration-200 dark:bg-violet-500/10 dark:border-violet-500/30">
           <p className="text-2xs font-bold text-violet-700 uppercase tracking-wider">Clave Pública del CPE</p>
           <p className="text-2xs text-violet-500">Obtener con: <span className="font-mono">/interface wireguard print</span></p>
           <textarea
@@ -54,7 +54,7 @@ export function NodeCardWgPeerForm({
             </button>
             <button
               onClick={onClosePeerForm}
-              className="px-3 py-1.5 rounded-lg text-xs text-slate-500 hover:bg-slate-100 transition-colors"
+              className="px-3 py-1.5 rounded-lg text-xs text-slate-500 hover:bg-slate-100 transition-colors dark:text-slate-400 dark:hover:bg-slate-800"
             >
               Cancelar
             </button>

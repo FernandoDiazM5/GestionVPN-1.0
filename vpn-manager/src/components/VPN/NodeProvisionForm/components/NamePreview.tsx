@@ -7,7 +7,7 @@ export function NamePreview({ ifaceName, vrfName }: NamePreviewProps) {
   if (!ifaceName || !vrfName) return null;
 
   return (
-    <div className="bg-slate-50 rounded-xl p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+    <div className="bg-slate-50 rounded-xl p-3 grid grid-cols-1 sm:grid-cols-2 gap-2 dark:bg-slate-800/60">
       <div>
         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Interfaz SSTP</span>
         <p className="font-mono text-xs font-bold text-indigo-600 mt-0.5">{ifaceName}</p>

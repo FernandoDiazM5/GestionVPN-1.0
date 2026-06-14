@@ -18,7 +18,7 @@ export function NodeCardStatusIcon({ node, isThisNodeActive, isPending }: NodeCa
               ? 'bg-indigo-500 shadow-sm shadow-indigo-500/40'
               : node.running
                 ? 'bg-emerald-500 shadow-sm shadow-emerald-500/30'
-                : 'bg-slate-200'}`}
+                : 'bg-slate-200 dark:bg-slate-700'}`}
       >
         {isThisNodeActive ? (
           <Radio className="w-3.5 h-3.5 text-white animate-pulse" />

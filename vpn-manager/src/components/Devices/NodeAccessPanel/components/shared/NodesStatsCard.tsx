@@ -69,9 +69,8 @@ export default function NodesStatsCard({
         <div
           key={label}
           onClick={onClick}
-          className={`flex flex-col gap-3 p-4 rounded-xl bg-white border border-slate-200
+          className={`flex flex-col gap-3 p-4 rounded-xl bg-white border border-slate-200 dark:bg-slate-900 dark:border-slate-800
                       transition-all duration-200 shadow-sm
-                      dark:bg-slate-900 dark:border-slate-800
                       ${onClick ? 'cursor-pointer hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700' : 'cursor-default'}`}
         >
           {/* Header: ícono + label */}

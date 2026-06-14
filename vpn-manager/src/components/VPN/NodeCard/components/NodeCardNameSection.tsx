@@ -47,10 +47,10 @@ export function NodeCardNameSection({
               className="flex-1 px-2 py-1 text-xs border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300 font-semibold min-w-0 max-w-[150px] dark:bg-slate-800 dark:border-indigo-500/50 dark:text-slate-100"
             />
             <button onClick={onSaveName} disabled={savingName || !nameInput.trim() || nameInput.trim() === node.nombre_nodo}
-              className="p-1 rounded text-emerald-600 hover:bg-emerald-50 disabled:opacity-40">
+              className="p-1 rounded text-emerald-600 hover:bg-emerald-50 disabled:opacity-40 dark:text-emerald-400 dark:hover:bg-emerald-500/10">
               {savingName ? <Loader2 className="w-3 h-3 animate-spin" /> : <span className="text-2xs font-bold">✓</span>}
             </button>
-            <button onClick={onCancelEdit} className="p-1 rounded text-slate-400 hover:bg-slate-100">
+            <button onClick={onCancelEdit} className="p-1 rounded text-slate-400 hover:bg-slate-100 dark:text-slate-500 dark:hover:bg-slate-800">
               <span className="text-2xs font-bold">✕</span>
             </button>
           </div>

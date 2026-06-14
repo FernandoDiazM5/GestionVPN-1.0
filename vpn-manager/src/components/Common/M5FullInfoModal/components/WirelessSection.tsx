@@ -15,7 +15,7 @@ export default function WirelessSection({ s, family }: WirelessSectionProps) {
     <M5Section
       title={SECTION_TITLES.WIRELESS}
       icon={<Wifi className="w-3.5 h-3.5" />}
-      colorClass="bg-sky-50 border-sky-200 text-sky-700"
+      colorClass="bg-sky-50 border-sky-200 text-sky-700 dark:bg-sky-500/10 dark:border-sky-500/30 dark:text-sky-400"
     >
       <M5Row label="mode" value={s.mode} />
       <M5Row label="essid" value={s.essid} />

@@ -27,7 +27,8 @@ export default function AntennaSectionMain({ antennaStats }: AntennaSectionMainP
               {sig.label}
             </span>
           </div>
-          <Bar pct={sig.pct} color="bg-white" />
+          {/* Barra blanca sobre fondo oscuro de la card — no se invierte en dark. */}
+          <Bar pct={sig.pct} color="bg-white dark:bg-white" />
           {antennaStats.noiseFloor != null && (
             <p className="text-2xs text-white/50 mt-2 font-mono flex justify-between">
               <span>Ruido: <strong className="text-white/80">{antennaStats.noiseFloor}</strong></span>

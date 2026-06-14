@@ -54,7 +54,7 @@ export function NodeCardSshForm({
   return (
     <tr className={rowBg}>
       <td colSpan={7} className="px-4 pb-3 pt-0">
-        <div className="ml-10 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 space-y-2.5">
+        <div className="ml-10 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 space-y-2.5 dark:bg-amber-500/10 dark:border-amber-500/30">
           <div className="flex items-center justify-between">
             <p className="text-2xs font-bold text-amber-600 uppercase tracking-wider flex items-center gap-1.5">
               <KeyRound className="w-3 h-3" />

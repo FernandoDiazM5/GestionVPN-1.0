@@ -29,7 +29,7 @@ export function ProvisionActionButtons({
         className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl font-bold text-sm transition-all
           ${canProvision
             ? 'bg-gradient-to-r from-violet-500 to-indigo-600 text-white shadow-md shadow-violet-500/25 hover:shadow-lg active:scale-[0.98]'
-            : 'bg-slate-100 text-slate-300 cursor-not-allowed'}`}
+            : 'bg-slate-100 text-slate-300 cursor-not-allowed dark:bg-slate-800 dark:text-slate-600'}`}
       >
         {isProvisioning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Cpu className="w-4 h-4" />}
         <span>{isProvisioning ? 'Creando...' : 'Crear Nodo en Servidor'}</span>
@@ -49,7 +49,7 @@ export function ProvisionActionButtons({
           className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap
             ${canGenerateScript
               ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/25 hover:shadow-lg active:scale-[0.98]'
-              : 'bg-slate-100 text-slate-300 cursor-not-allowed'}`}
+              : 'bg-slate-100 text-slate-300 cursor-not-allowed dark:bg-slate-800 dark:text-slate-600'}`}
         >
           {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Terminal className="w-4 h-4" />}
           <span>Generar Script Nodo</span>

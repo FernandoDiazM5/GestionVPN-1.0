@@ -9,7 +9,7 @@ export function WireGuardDetails({ serverPublicKey, wgPort }: WireGuardDetailsPr
   if (!serverPublicKey) return null;
 
   return (
-    <div className="bg-violet-50 border border-violet-200 rounded-lg p-3 mt-2">
+    <div className="bg-violet-50 border border-violet-200 rounded-lg p-3 mt-2 dark:bg-violet-500/10 dark:border-violet-500/30">
       <p className="text-xs font-semibold text-violet-700 mb-1 flex items-center gap-1.5">
         <Shield className="w-3.5 h-3.5" />
         Clave Pública del Servidor (para configurar el CPE):

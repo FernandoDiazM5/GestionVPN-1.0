@@ -122,7 +122,8 @@ export default function MemberProfile({ session }: Props) {
                 <div className="flex flex-col items-center gap-4">
                   {qr && (
                     <div className="flex flex-col items-center gap-2">
-                      <img src={qr} alt="QR WireGuard" className="rounded-lg bg-white p-1" width={200} height={200} />
+                      {/* QR siempre blanco — la cámara debe leerlo igual en dark. */}
+                      <img src={qr} alt="QR WireGuard" className="rounded-lg bg-white dark:bg-white p-1" width={200} height={200} />
                       <p className="flex items-center gap-1.5 text-2xs text-slate-400 dark:text-slate-500">
                         <Smartphone className="w-3 h-3" /> Escanea desde la app WireGuard del móvil
                       </p>
