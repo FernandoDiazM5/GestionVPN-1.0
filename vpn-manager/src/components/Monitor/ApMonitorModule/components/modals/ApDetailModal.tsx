@@ -88,7 +88,7 @@ function ApDetailModal({
           {s && (
             <>
               <div>
-                <p className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Sistema</p>
+                <p className="text-3xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Sistema</p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                   {s.deviceName && <StatCard label="Hostname" value={s.deviceName} />}
                   {s.deviceModel && <StatCard label="Modelo" value={s.deviceModel} />}
@@ -106,7 +106,7 @@ function ApDetailModal({
               </div>
 
               <div>
-                <p className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Radio / Wireless</p>
+                <p className="text-3xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Radio / Wireless</p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                   {s.essid && <StatCard label="SSID" value={s.essid} />}
                   {s.frequency && <StatCard label="Frecuencia" value={`${s.frequency} MHz`} sub={`${(s.frequency / 1000).toFixed(2)} GHz`} />}
@@ -126,7 +126,7 @@ function ApDetailModal({
 
               {(s.signal != null || s.ccq != null) && (
                 <div>
-                  <p className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Señal RF</p>
+                  <p className="text-3xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Señal RF</p>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                     {s.signal != null && <StatCard label="Señal" value={fmtDbm(s.signal)} color={sigColor(s.signal)} />}
                     {s.noiseFloor != null && <StatCard label="Noise" value={fmtDbm(s.noiseFloor)} />}
@@ -139,7 +139,7 @@ function ApDetailModal({
 
               {trafficRows.length > 0 && (
                 <div>
-                  <p className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Tráfico por Interfaz</p>
+                  <p className="text-3xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Tráfico por Interfaz</p>
                   <div className="space-y-1">
                     {trafficRows.map(([iface, v]) => (
                       <div key={iface} className="flex items-center gap-4 bg-slate-50 rounded-lg px-3 py-2 border border-slate-100 text-xs dark:bg-slate-800/60 dark:border-slate-700">

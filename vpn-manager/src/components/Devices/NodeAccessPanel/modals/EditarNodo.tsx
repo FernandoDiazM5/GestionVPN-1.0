@@ -228,7 +228,7 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
                   { l: 'IP Túnel actual', v: currentRemoteIP || node.ip_tunnel || '—' },
                 ].map(row => (
                   <div key={row.l} className="bg-slate-50 dark:bg-slate-800/50 rounded-lg px-3 py-2 border border-slate-100 dark:border-slate-800">
-                    <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">{row.l}</p>
+                    <p className="text-3xs font-bold text-slate-400 uppercase tracking-wider">{row.l}</p>
                     <p className="text-xs font-mono font-bold text-slate-600 dark:text-slate-300 truncate">{row.v}</p>
                   </div>
                 ))}

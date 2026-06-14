@@ -232,7 +232,7 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                       { l: 'LAN(s)', v: validSubnets.join(', ') },
                     ].filter(r => r.v).map(row => (
                       <div key={row.l} className="bg-slate-50 dark:bg-slate-800/50 rounded-lg px-3 py-2 border border-slate-100 dark:border-slate-800">
-                        <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">{row.l}</p>
+                        <p className="text-3xs font-bold text-slate-400 uppercase tracking-wider">{row.l}</p>
                         <p className="text-xs font-mono font-bold text-slate-700 dark:text-slate-200 truncate">{row.v}</p>
                       </div>
                     ))}
@@ -246,7 +246,7 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                       </div>
                       <div className="flex items-center justify-between bg-white dark:bg-slate-800 border border-amber-100 rounded-lg px-3 py-2.5 gap-3">
                         <div className="min-w-0">
-                          <p className="text-[9px] font-bold text-amber-500 uppercase tracking-wider">Usuario PPP</p>
+                          <p className="text-3xs font-bold text-amber-500 uppercase tracking-wider">Usuario PPP</p>
                           <p className="text-sm font-mono font-bold text-slate-800 dark:text-slate-100">{pppUser}</p>
                         </div>
                         <button onClick={() => copyField(pppUser, 'res-user')}
@@ -256,7 +256,7 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                       </div>
                       <div className="flex items-center justify-between bg-white dark:bg-slate-800 border border-amber-100 rounded-lg px-3 py-2.5 gap-3">
                         <div className="min-w-0 flex-1">
-                          <p className="text-[9px] font-bold text-amber-500 uppercase tracking-wider">Contraseña PPP</p>
+                          <p className="text-3xs font-bold text-amber-500 uppercase tracking-wider">Contraseña PPP</p>
                           <p className={`text-sm font-mono font-bold text-slate-800 dark:text-slate-100 truncate transition-all ${showResPass ? '' : 'blur-sm select-none'}`}>
                             {pppPass}
                           </p>
@@ -281,7 +281,7 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
               )}
 
               <div>
-                <p className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Pasos ejecutados</p>
+                <p className="text-3xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Pasos ejecutados</p>
                 <ProvisionSteps steps={result.steps ?? []} failedAt={result.failedAt} visible={visibleSteps} />
               </div>
 
@@ -371,7 +371,7 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                     { l: 'VRF', v: vrfName || '(ingresar nombre)' },
                   ].map(row => (
                     <div key={row.l} className="bg-white rounded-lg px-3 py-2 border border-indigo-100 dark:bg-slate-800 dark:border-indigo-500/30">
-                      <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">{row.l}</p>
+                      <p className="text-3xs font-bold text-slate-400 uppercase tracking-wider mb-0.5">{row.l}</p>
                       <p className="text-2xs font-mono font-bold text-indigo-700 truncate">{row.v}</p>
                     </div>
                   ))}

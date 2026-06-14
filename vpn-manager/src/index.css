@@ -82,9 +82,17 @@
 }
 
 @layer utilities {
-  /* Escala de texto — respeta limites de DESIGN_SYSTEM.md */
+  /* Escala de texto — respeta limites de DESIGN_SYSTEM.md.
+     `text-2xs` (11px) reservado para micro-badges de estado.
+     `text-3xs` (9px) — RESERVADO EXCLUSIVAMENTE para etiquetas
+     micro en tablas densas multi-columna (rows de Escanear / Monitor AP
+     con 10+ columnas, badges de tipo CPE/AC/PTP, headers tracking-wider).
+     En CUALQUIER otro contexto usar `text-2xs` o `text-xs` (12px). §55. */
   .text-2xs {
     @apply text-[11px] leading-tight;
+  }
+  .text-3xs {
+    @apply text-[9px] leading-tight tracking-tight;
   }
 
   .card {

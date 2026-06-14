@@ -80,11 +80,11 @@ function StationTable({ poll, onCpeDetail, dev }: {
       <div className="flex items-center justify-between flex-wrap gap-2 px-4 py-2 border-b border-indigo-100">
         <div className="flex items-center gap-2">
           {poll.loading && <Loader2 className="w-3 h-3 animate-spin text-indigo-400" />}
-          <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+          <span className="text-3xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
             Station List · {poll.stations.length} CPE{poll.stations.length !== 1 ? 's' : ''}
           </span>
-          {poll.error && <span className="text-[9px] text-rose-500 font-medium">{poll.error}</span>}
-          {enrichMsg && <span className="text-[9px] text-emerald-600 font-medium">{enrichMsg}</span>}
+          {poll.error && <span className="text-3xs text-rose-500 font-medium">{poll.error}</span>}
+          {enrichMsg && <span className="text-3xs text-emerald-600 font-medium">{enrichMsg}</span>}
         </div>
         <div className="flex items-center gap-2">
           <div className="relative">
@@ -107,7 +107,7 @@ function StationTable({ poll, onCpeDetail, dev }: {
           )}
           <ColSelector hidden={hiddenCols} onChange={handleColChange} />
           {poll.polledAt > 0 && (
-            <span className="text-[9px] text-slate-400 dark:text-slate-500 font-mono">
+            <span className="text-3xs text-slate-400 dark:text-slate-500 font-mono">
               {new Date(poll.polledAt).toLocaleTimeString()}
             </span>
           )}

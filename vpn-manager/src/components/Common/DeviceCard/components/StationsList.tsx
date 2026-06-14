@@ -21,7 +21,7 @@ export default function StationsList({ antennaStats }: StationsListProps) {
             <div className="flex items-center justify-between mb-1">
               <span className="font-mono text-emerald-600 dark:text-emerald-400 text-2xs">{sta.mac}</span>
               {sta.hostname && <span className="text-2xs text-slate-500 truncate max-w-[50%]">{sta.hostname}</span>}
-              {sta.remoteModel && <span className="text-[9px] bg-slate-100 dark:bg-slate-700 text-slate-500 px-1.5 py-0.5 rounded">{sta.remoteModel}</span>}
+              {sta.remoteModel && <span className="text-3xs bg-slate-100 dark:bg-slate-700 text-slate-500 px-1.5 py-0.5 rounded">{sta.remoteModel}</span>}
             </div>
             <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 text-slate-600 dark:text-slate-300 font-mono text-2xs">
               {sta.signal != null && <span className={sta.signal >= -65 ? 'text-emerald-600 dark:text-emerald-400' : sta.signal >= -75 ? 'text-sky-600' : 'text-amber-500'}>{sta.signal} dBm</span>}

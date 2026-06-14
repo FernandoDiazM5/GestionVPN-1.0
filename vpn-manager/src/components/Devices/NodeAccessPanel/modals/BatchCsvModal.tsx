@@ -175,7 +175,7 @@ export default function BatchCsvModal({ onClose, onSuccess, nodes }: BatchCsvMod
                   <div className="space-y-1.5 max-h-48 overflow-y-auto">
                     {rows.map((r, i) => (
                       <div key={i} className={`flex items-center gap-3 px-3 py-2 rounded-lg border text-xs ${r.valid ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-100' : 'bg-rose-50 dark:bg-rose-500/10 border-rose-100'}`}>
-                        <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 ${r.valid ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}>
+                        <span className={`w-4 h-4 rounded-full flex items-center justify-center text-3xs font-bold shrink-0 ${r.valid ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}>
                           {r.valid ? '✓' : '✗'}
                         </span>
                         <span className="font-bold text-slate-700 dark:text-slate-200">{r.nombre || '(sin nombre)'}</span>

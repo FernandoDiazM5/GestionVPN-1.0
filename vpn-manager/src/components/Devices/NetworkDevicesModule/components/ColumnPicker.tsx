@@ -44,7 +44,7 @@ export function ColumnPicker({ visibleCols, onChange }: ColumnPickerProps) {
       >
         <SlidersHorizontal className="w-3.5 h-3.5" />
         <span>Columnas</span>
-        <span className="bg-indigo-100 text-indigo-600 text-[9px] font-black px-1.5 py-0.5 rounded-md min-w-[18px] text-center dark:bg-indigo-500/15 dark:text-indigo-400">
+        <span className="bg-indigo-100 text-indigo-600 text-3xs font-black px-1.5 py-0.5 rounded-md min-w-[18px] text-center dark:bg-indigo-500/15 dark:text-indigo-400">
           {visibleCols.length}
         </span>
         <ChevronDown className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} />
@@ -55,7 +55,7 @@ export function ColumnPicker({ visibleCols, onChange }: ColumnPickerProps) {
 
           {visibleCols.length > 0 && (
             <>
-              <p className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Visibles · orden</p>
+              <p className="text-3xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Visibles · orden</p>
               <div className="space-y-0.5 mb-2">
                 {visibleCols.map((key, idx) => {
                   const col = COLUMN_DEFS.find(c => c.key === key);
@@ -73,7 +73,7 @@ export function ColumnPicker({ visibleCols, onChange }: ColumnPickerProps) {
                         </button>
                       </div>
                       <span className="text-xs text-slate-700 flex-1 leading-tight">{col.label}</span>
-                      {col.requiresStats && <span className="text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase">SSH</span>}
+                      {col.requiresStats && <span className="text-3xs font-bold text-slate-400 dark:text-slate-500 uppercase">SSH</span>}
                       <button onClick={() => remove(key)}
                         className="p-0.5 text-slate-200 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100 shrink-0">
                         <X className="w-3 h-3" />
@@ -88,13 +88,13 @@ export function ColumnPicker({ visibleCols, onChange }: ColumnPickerProps) {
           {hiddenCols.length > 0 && (
             <>
               <div className="border-t border-slate-100 my-1" />
-              <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 mt-2">Ocultas</p>
+              <p className="text-3xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 mt-2">Ocultas</p>
               <div className="space-y-0.5">
                 {hiddenCols.map(col => (
                   <button key={col.key} onClick={() => addCol(col.key)}
                     className="w-full flex items-center gap-2 py-1 px-1.5 rounded-lg hover:bg-indigo-50 text-left group dark:hover:bg-indigo-500/10">
                     <span className="text-xs text-slate-400 flex-1 group-hover:text-indigo-600 transition-colors">{col.label}</span>
-                    {col.requiresStats && <span className="text-[8px] font-bold text-slate-300 uppercase">SSH</span>}
+                    {col.requiresStats && <span className="text-3xs font-bold text-slate-300 uppercase">SSH</span>}
                     <PlusCircle className="w-3 h-3 text-slate-200 group-hover:text-indigo-500 transition-colors shrink-0" />
                   </button>
                 ))}

@@ -89,7 +89,7 @@ const RULES = [
     id: 'DS03-text-too-small',
     severity: 'error',
     title: 'Tamaño de texto < 12px',
-    rationale: 'CLAUDE.md fija text-xs (12px) como mínimo. Solo text-2xs (11px) está reservado para micro-badges.',
+    rationale: 'CLAUDE.md fija text-xs (12px) como mínimo. text-2xs (11px) y text-3xs (9px) están reservados para micro-badges en tablas densas; usa esas clases en lugar de text-[Npx] literal.',
     test: (line) => {
       const violations = [];
       const re = /\btext-\[(\d+)px\]/g;

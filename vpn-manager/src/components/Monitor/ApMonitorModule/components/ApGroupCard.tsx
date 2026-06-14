@@ -94,7 +94,7 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelAc
                 }, 0);
                 return (
                   <div style={{ minWidth: `${minW}px` }}>
-                    <div className="grid bg-slate-50 border-b border-slate-200 text-[9px] font-bold text-slate-400 uppercase tracking-wider px-4 py-2 dark:bg-slate-800/60 dark:border-slate-800"
+                    <div className="grid bg-slate-50 border-b border-slate-200 text-3xs font-bold text-slate-400 uppercase tracking-wider px-4 py-2 dark:bg-slate-800/60 dark:border-slate-800"
                       style={{ gridTemplateColumns: gridCols }}>
                       {visibleCols.map(col => (
                         <span key={col.key} className={`truncate ${col.right ? 'text-right pr-2' : col.key === 'cpes' || col.key === 'estado' ? 'text-center' : col.key === 'actions' ? 'text-right' : ''}`}>
@@ -127,11 +127,11 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelAc
           {group.stas.length > 0 && (
             <div className="border-t border-cyan-100 bg-cyan-50/30">
               <div className="px-4 py-2 flex items-center gap-2 border-b border-cyan-100">
-                <span className="text-[9px] font-bold text-cyan-600 uppercase tracking-wider">CPEs guardados · {group.stas.length}</span>
+                <span className="text-3xs font-bold text-cyan-600 uppercase tracking-wider">CPEs guardados · {group.stas.length}</span>
               </div>
               {group.stas.map(sta => (
                 <div key={sta.id} className="flex items-center gap-3 px-4 py-2.5 border-b border-cyan-100/60 last:border-0 hover:bg-cyan-50 transition-colors text-xs">
-                  <span className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-cyan-100 text-cyan-700 border border-cyan-200">CPE</span>
+                  <span className="shrink-0 text-3xs font-bold px-1.5 py-0.5 rounded-md bg-cyan-100 text-cyan-700 border border-cyan-200">CPE</span>
                   <span className="font-semibold text-slate-700 truncate min-w-0 max-w-[160px]" title={sta.name || sta.ip}>{sta.name || sta.ip}</span>
                   <span className="font-mono text-2xs text-slate-500 dark:text-slate-400 shrink-0">{sta.ip}</span>
                   {sta.mac && <span className="font-mono text-2xs text-slate-500 dark:text-slate-400 shrink-0 hidden sm:block">{sta.mac}</span>}

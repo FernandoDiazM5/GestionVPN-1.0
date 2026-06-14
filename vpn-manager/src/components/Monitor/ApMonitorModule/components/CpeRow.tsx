@@ -32,13 +32,13 @@ function CpeRow({ cpe, idx, onDetail, hiddenCols, gridCols }: {
         <div className="flex items-center gap-1 min-w-0">
           <p className="font-mono font-semibold text-slate-700 truncate text-2xs">{cpe.mac}</p>
           {ff && (
-            <span className={`shrink-0 text-[7px] font-bold px-1 py-0.5 rounded
+            <span className={`shrink-0 text-3xs font-bold px-1 py-0.5 rounded
               ${ff === 'AC' ? 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'}`}>
               {ff}
             </span>
           )}
         </div>
-        {displayName && <p className="text-[9px] text-indigo-600 truncate font-medium">{displayName}</p>}
+        {displayName && <p className="text-3xs text-indigo-600 truncate font-medium">{displayName}</p>}
       </div>
 
       {show('modelo') && (
@@ -51,7 +51,7 @@ function CpeRow({ cpe, idx, onDetail, hiddenCols, gridCols }: {
         <div className="px-2 py-2 min-w-0">
           {displayName
             ? <p className="truncate font-semibold text-slate-800 text-2xs">{displayName}</p>
-            : <p className="text-slate-400 dark:text-slate-500 italic text-[9px]">Sin nombre</p>}
+            : <p className="text-slate-400 dark:text-slate-500 italic text-3xs">Sin nombre</p>}
         </div>
       )}
 

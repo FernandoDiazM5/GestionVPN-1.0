@@ -49,19 +49,19 @@ const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCol
 
         <div>
           <span className="inline-flex text-2xs font-bold px-1.5 py-0.5 rounded-md bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-400">AP</span>
-          {freqGhz && <p className="text-[9px] font-bold text-sky-600 mt-0.5">{freqGhz}</p>}
-          {netMode && <p className="text-[8px] text-slate-400 truncate">{netMode}</p>}
+          {freqGhz && <p className="text-3xs font-bold text-sky-600 mt-0.5">{freqGhz}</p>}
+          {netMode && <p className="text-3xs text-slate-400 truncate">{netMode}</p>}
         </div>
 
         <div className="min-w-0 pr-2">
           <p className="text-sm font-semibold text-slate-800 truncate" title={name || dev.ip}>{name || dev.ip}</p>
-          <p className="font-mono text-[9px] text-slate-500 dark:text-slate-400 truncate">{dev.ip}</p>
+          <p className="font-mono text-3xs text-slate-500 dark:text-slate-400 truncate">{dev.ip}</p>
         </div>
 
         {showAp('modelo') && (
           <div className="min-w-0 pr-2">
             {model && <p className="text-xs text-slate-600 truncate" title={model}>{model}</p>}
-            {firmware && <p className="text-[9px] text-slate-500 dark:text-slate-400 truncate">{fmtFw(firmware)}</p>}
+            {firmware && <p className="text-3xs text-slate-500 dark:text-slate-400 truncate">{fmtFw(firmware)}</p>}
           </div>
         )}
 
@@ -70,7 +70,7 @@ const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCol
             {ssid
               ? <p className="font-mono text-xs text-slate-700 truncate" title={ssid}>{ssid}</p>
               : <span className="data-empty">—</span>}
-            {channel && <p className="text-[9px] text-slate-500 dark:text-slate-400">{channel} MHz</p>}
+            {channel && <p className="text-3xs text-slate-500 dark:text-slate-400">{channel} MHz</p>}
           </div>
         )}
 
@@ -117,7 +117,7 @@ const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCol
                 : undefined}>
               <Users className="w-2.5 h-2.5" />
               {displayCount}
-              {isHistorical && <span className="text-[8px] opacity-60">*</span>}
+              {isHistorical && <span className="text-3xs opacity-60">*</span>}
             </span>
           ) : (
             <span className="text-slate-400 dark:text-slate-500 text-xs">—</span>

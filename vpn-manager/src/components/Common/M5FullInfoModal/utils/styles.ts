@@ -39,6 +39,6 @@ export const ifaceStyles = {
 
 export const rawDataStyles = {
   container: 'col-span-2 mt-2',
-  label: 'text-[9px] font-bold uppercase mb-1',
-  pre: 'text-[9px] font-mono bg-white rounded-lg p-2 overflow-x-auto whitespace-pre-wrap border dark:bg-slate-900 dark:border-slate-700 dark:text-slate-300',
+  label: 'text-3xs font-bold uppercase mb-1',
+  pre: 'text-3xs font-mono bg-white rounded-lg p-2 overflow-x-auto whitespace-pre-wrap border dark:bg-slate-900 dark:border-slate-700 dark:text-slate-300',
 };

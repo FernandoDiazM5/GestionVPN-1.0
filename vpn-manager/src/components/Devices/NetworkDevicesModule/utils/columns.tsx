@@ -17,7 +17,7 @@ export const COLUMN_DEFS: ColumnDef[] = [
             <span className="font-mono text-2xs text-slate-600 truncate block" title={ssid}>{ssid}</span>
           )}
           {parentAp && parentAp !== ssid && (
-            <span className="text-[9px] text-violet-500 truncate block" title={`AP: ${parentAp}`}>{parentAp}</span>
+            <span className="text-3xs text-violet-500 truncate block" title={`AP: ${parentAp}`}>{parentAp}</span>
           )}
         </div>
       );

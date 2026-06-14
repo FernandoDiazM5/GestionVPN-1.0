@@ -131,7 +131,7 @@ export default function EliminarNodo({ node, onClose, onSuccess }: EliminarNodoP
                 </div>
               </div>
               <div>
-                <p className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Pasos ejecutados</p>
+                <p className="text-3xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Pasos ejecutados</p>
                 <ProvisionSteps steps={result.steps ?? []} failedAt={result.failedAt} visible={visibleSteps} />
               </div>
               <button onClick={() => result.success ? onSuccess(deletedDeviceIds) : onClose()}
@@ -157,7 +157,7 @@ export default function EliminarNodo({ node, onClose, onSuccess }: EliminarNodoP
                   { l: 'IP Túnel', v: node.ip_tunnel || '—' },
                 ].map(row => (
                   <div key={row.l} className="bg-slate-50 dark:bg-slate-800/50 rounded-lg px-3 py-2 border border-slate-100 dark:border-slate-800">
-                    <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">{row.l}</p>
+                    <p className="text-3xs font-bold text-slate-400 uppercase tracking-wider">{row.l}</p>
                     <p className="text-xs font-mono font-bold text-slate-700 dark:text-slate-200 truncate">{row.v}</p>
                   </div>
                 ))}

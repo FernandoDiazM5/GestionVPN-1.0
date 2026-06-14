@@ -9,7 +9,7 @@ export default function RawOutput({ antennaStats }: RawOutputProps) {
 
   return (
     <div className="mx-4 mb-4">
-      <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Output SSH</p>
+      <p className="text-3xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Output SSH</p>
       <div className="bg-slate-800 rounded-xl overflow-hidden border border-slate-700">
         {antennaStats.raw.split('\n').filter(Boolean).map((line, i) => {
           const eq = line.indexOf('=');

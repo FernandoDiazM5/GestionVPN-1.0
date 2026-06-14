@@ -23,7 +23,7 @@ export default function DeviceHeader({ device, antennaStats, onRemove, isPreview
         <div className="min-w-0">
           <div className="flex items-center space-x-2">
             <h3 className="font-bold text-white text-sm truncate">{displayName}</h3>
-            <span className="text-[9px] font-bold bg-white/20 text-white px-1.5 py-0.5 rounded-md shrink-0">{roleLabel}</span>
+            <span className="text-3xs font-bold bg-white/20 text-white px-1.5 py-0.5 rounded-md shrink-0">{roleLabel}</span>
           </div>
           <p className="text-2xs text-white/70 font-mono truncate">{antennaStats?.deviceModel || device.model} · {antennaStats?.firmwareVersion || device.firmware}</p>
         </div>

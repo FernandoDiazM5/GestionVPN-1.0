@@ -16,9 +16,9 @@ export default function ModalHeader({ dev, copiedIp, copyIp, onClose }: ModalHea
 
   const familyBadge =
     family === 'ac' ? (
-      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-sky-500/30 text-sky-200 uppercase tracking-wide">AC</span>
+      <span className="px-1.5 py-0.5 rounded text-3xs font-bold bg-sky-500/30 text-sky-200 uppercase tracking-wide">AC</span>
     ) : family === 'm5' ? (
-      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/30 text-amber-200 uppercase tracking-wide">M5</span>
+      <span className="px-1.5 py-0.5 rounded text-3xs font-bold bg-amber-500/30 text-amber-200 uppercase tracking-wide">M5</span>
     ) : null;
 
   return (

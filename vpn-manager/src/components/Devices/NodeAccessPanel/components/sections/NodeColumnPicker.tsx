@@ -62,7 +62,7 @@ export function NodeColumnPicker({ visibleCols, onChange }: NodeColumnPickerProp
       >
         <SlidersHorizontal className="w-3.5 h-3.5" />
         <span>Columnas</span>
-        <span className="bg-indigo-100 text-indigo-600 text-[9px] font-black px-1.5 py-0.5 rounded-md min-w-[18px] text-center dark:bg-indigo-500/20 dark:text-indigo-300">
+        <span className="bg-indigo-100 text-indigo-600 text-3xs font-black px-1.5 py-0.5 rounded-md min-w-[18px] text-center dark:bg-indigo-500/20 dark:text-indigo-300">
           {visibleCols.length}
         </span>
         <ChevronDown className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} />
@@ -73,7 +73,7 @@ export function NodeColumnPicker({ visibleCols, onChange }: NodeColumnPickerProp
 
           {visibleCols.length > 0 && (
             <>
-              <p className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Visibles · orden</p>
+              <p className="text-3xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Visibles · orden</p>
               <div className="space-y-0.5 mb-2">
                 {visibleCols.map((key, idx) => {
                   const col = NODE_COLUMN_DEFS.find(c => c.key === key);
@@ -108,7 +108,7 @@ export function NodeColumnPicker({ visibleCols, onChange }: NodeColumnPickerProp
           {hiddenCols.length > 0 && (
             <>
               <div className="border-t border-slate-100 dark:border-slate-700 my-1" />
-              <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 mt-2">Ocultas</p>
+              <p className="text-3xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 mt-2">Ocultas</p>
               <div className="space-y-0.5">
                 {hiddenCols.map(col => (
                   <button key={col.key} onClick={() => addCol(col.key)}
