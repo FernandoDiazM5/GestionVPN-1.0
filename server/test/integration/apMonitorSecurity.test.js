@@ -54,6 +54,7 @@ const ROUTES_PATH = require.resolve(path.join(__dirname, '..', '..', 'ap.routes'
 // ── Build Express app con SOLO ap.routes ────────────────────────
 const express = require('express');
 const request = require('supertest');
+const apWatch = require('../../lib/apWatch');
 const apRoutes = require('../../ap.routes');
 
 const app = express();
@@ -191,5 +192,34 @@ describe('POST /poll-direct — C3: resuelve el nodo DUEÑO, no "el primero"', (
     expect(r.status).toBe(200);
     const [, , , userArg] = apServiceMocks.pollAp.mock.calls[0];
     expect(userArg).toBe('admin-b');   // ← node_id=2 (NODO-B), no NODO-A
+  });
+});
+
+describe('E1 — heartbeat /watch y seed /stations', () => {
+  beforeEach(() => apWatch._reset());
+
+  it('POST /watch registra el heartbeat del workspace y devuelve intervalMs', async () => {
+    const r = await request(app).post('/api/ap-monitor/watch').send({});
+    expect(r.status).toBe(200);
+    expect(r.body.success).toBe(true);
+    expect(typeof r.body.intervalMs).toBe('number');
+    expect(apWatch.isWatched('ws-1')).toBe(true);   // reqWorkspace mock = 'ws-1'
+  });
+
+  it('GET /stations agrupa cpes.last_stats por uuid de AP', async () => {
+    db.all.mockImplementation(async (sql) => {
+      if (/FROM cpes WHERE ap_id IS NOT NULL/.test(sql)) {
+        return [
+          { ap_id: 7, last_stats: JSON.stringify({ mac: 'AA:BB:CC:DD:EE:01', signal: -60 }), last_seen: 1000 },
+          { ap_id: 7, last_stats: JSON.stringify({ mac: 'AA:BB:CC:DD:EE:02', signal: -70 }), last_seen: 2000 },
+        ];
+      }
+      if (/FROM aps WHERE id IN/.test(sql)) return [{ id: 7, uuid: 'ap1' }];
+      return [];
+    });
+    const r = await request(app).get('/api/ap-monitor/stations');
+    expect(r.status).toBe(200);
+    expect(r.body.aps.ap1.stations).toHaveLength(2);
+    expect(r.body.aps.ap1.polledAt).toBe(2000);     // max last_seen
   });
 });

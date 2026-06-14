@@ -59,6 +59,7 @@ const { verifyToken } = require('./auth.middleware');
 const { startMonitor } = require('./db/mysql');
 const expirationJob = require('./lib/expirationJob');
 const monitoringJob = require('./lib/monitoringJob');
+const apPollJob = require('./lib/apPollJob');
 const telegramBot = require('./lib/telegramBot');
 
 // ── Helmet — headers de seguridad HTTP (FASE 2 del REFACTOR_PLAN) ──
@@ -233,6 +234,7 @@ function startServer(attempt = 1) {
         telegramBot.start();
         dashboardMetrics.start();
         monitoringJob.start();
+        apPollJob.start();
     });
 
     server.on('error', (err) => {

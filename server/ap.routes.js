@@ -5,43 +5,15 @@ const { getDb, encryptPass, decryptPass, getApIntId, getCpeIntId, getApGroupIntI
 const { pollAp, getDetail, getFullDetail, clearApCache }  = require('./ap.service');
 
 const { reqWorkspace, ownedGroupIntIds, ownedApIntIds, ownsGroupUuid, ownsApUuid, cpeForeign } = require('./lib/tenantScope');
-const { ipInCidr, resolveOwnerNodeId } = require('./lib/apNode');
+const { ipInCidr, resolveOwnerNodeId, resolveNodeCreds: resolveNodeCredsShared } = require('./lib/apNode');
+const apWatch = require('./lib/apWatch');
 const log = require('./lib/logger').child({ scope: 'ap-routes' });
 
 const genUuid = () => crypto.randomBytes(8).toString('hex');
 const isValidMac = (mac) => /^([0-9a-f]{2}:?){5}([0-9a-f]{2})$/i.test(mac);
 
-// ── C3 (Fase 2): resuelve las credenciales SSH del nodo que POSEE este AP.
-//    El nodo dueño se resuelve vía resolveOwnerNodeId (node_id persistido >
-//    nombre_nodo > subred). Si no hay creds para el dueño, último recurso:
-//    primer node_ssh_creds disponible. Devuelve { user, pass, port } o null.
-async function resolveNodeCreds(db, apRow) {
-    const credsForNode = async (nodeId) => {
-        const rows = await db.all(
-            'SELECT ssh_user, ssh_pass_enc, ssh_port FROM node_ssh_creds WHERE node_id = ? ORDER BY priority',
-            [nodeId]
-        );
-        if (!rows.length) return null;
-        return {
-            user: rows[0].ssh_user || '',
-            pass: rows[0].ssh_pass_enc ? decryptPass(rows[0].ssh_pass_enc) : '',
-            port: rows[0].ssh_port || 22,
-        };
-    };
-
-    const ownerId = await resolveOwnerNodeId(db, apRow);
-    if (ownerId) {
-        const c = await credsForNode(ownerId);
-        if (c) return c;
-    }
-    // Último recurso: primer nodo con credenciales.
-    const nodes = await db.all('SELECT id FROM nodes');
-    for (const n of nodes) {
-        const c = await credsForNode(n.id);
-        if (c) return c;
-    }
-    return null;
-}
+// C3 (Fase 2): delega en el helper compartido (lib/apNode), inyectando decryptPass.
+const resolveNodeCreds = (db, apRow) => resolveNodeCredsShared(db, apRow, decryptPass);
 
 // ── Nodos (ap_groups) ────────────────────────────────────────────────────
 router.get('/nodos', async (req, res) => {
@@ -853,6 +825,55 @@ router.get('/topology-cpes', async (req, res) => {
         });
 
         res.json({ success: true, cpes: result });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// ── E1: heartbeat "estoy mirando Monitor AP" ─────────────────────────────
+// Mientras el frontend tenga la vista abierta manda este latido (~30s). El
+// apPollJob solo pollea workspaces con latido reciente (§43: SSH solo si
+// alguien está mirando).
+router.post('/watch', (req, res) => {
+    const ws = reqWorkspace(req);                    // null = platform_admin
+    if (ws && ws !== '__none__') apWatch.touch(ws);
+    res.json({ success: true, intervalMs: Number(process.env.AP_POLL_INTERVAL_MS || 60_000) });
+});
+
+// ── E1: estaciones actuales desde la BD (cpes.last_stats) ────────────────
+// Seed inmediato del frontend al montar, sin esperar a un poll. Aislado por
+// workspace vía ownedApIntIds.
+router.get('/stations', async (req, res) => {
+    try {
+        const db = await getDb();
+        const apIds = await ownedApIntIds(db, req);  // null = admin (todos)
+        let cpes;
+        if (apIds === null) {
+            cpes = await db.all('SELECT ap_id, last_stats, last_seen FROM cpes WHERE ap_id IS NOT NULL');
+        } else if (apIds.length === 0) {
+            cpes = [];
+        } else {
+            const ph = apIds.map(() => '?').join(',');
+            cpes = await db.all(`SELECT ap_id, last_stats, last_seen FROM cpes WHERE ap_id IN (${ph})`, apIds);
+        }
+
+        const apIntIds = [...new Set(cpes.map(c => c.ap_id))];
+        const uuidById = {};
+        if (apIntIds.length > 0) {
+            const ph = apIntIds.map(() => '?').join(',');
+            const aps = await db.all(`SELECT id, uuid FROM aps WHERE id IN (${ph})`, apIntIds);
+            aps.forEach(a => { uuidById[a.id] = a.uuid; });
+        }
+
+        const byAp = {};
+        for (const c of cpes) {
+            const uuid = uuidById[c.ap_id];
+            if (!uuid) continue;
+            if (!byAp[uuid]) byAp[uuid] = { stations: [], polledAt: 0 };
+            let sta = null;
+            try { sta = c.last_stats ? JSON.parse(c.last_stats) : null; } catch { /* ignora JSON corrupto */ }
+            if (sta) byAp[uuid].stations.push(sta);
+            if (c.last_seen > byAp[uuid].polledAt) byAp[uuid].polledAt = c.last_seen;
+        }
+        res.json({ success: true, aps: byAp });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 

@@ -42,4 +42,38 @@ async function resolveOwnerNodeId(db, apRow) {
     return owner ? owner.id : null;
 }
 
-module.exports = { ipInCidr, resolveOwnerNodeId };
+/**
+ * Resuelve las credenciales SSH del NODO que posee este AP:
+ *   1. nodo dueño (node_id > nombre_nodo > subred) → su node_ssh_creds
+ *   2. último recurso: primer node_ssh_creds disponible
+ * (Las credenciales PROPIAS del AP las maneja el caller.)
+ * `decryptPass` se inyecta (de db.service) para no acoplar este módulo
+ * al cifrado y mantenerlo testeable. Devuelve { user, pass, port } o null.
+ */
+async function resolveNodeCreds(db, apRow, decryptPass) {
+  const credsForNode = async (nodeId) => {
+    const rows = await db.all(
+      'SELECT ssh_user, ssh_pass_enc, ssh_port FROM node_ssh_creds WHERE node_id = ? ORDER BY priority',
+      [nodeId]
+    );
+    if (!rows.length) return null;
+    return {
+      user: rows[0].ssh_user || '',
+      pass: rows[0].ssh_pass_enc ? decryptPass(rows[0].ssh_pass_enc) : '',
+      port: rows[0].ssh_port || 22,
+    };
+  };
+  const ownerId = await resolveOwnerNodeId(db, apRow);
+  if (ownerId) {
+    const c = await credsForNode(ownerId);
+    if (c) return c;
+  }
+  const nodes = await db.all('SELECT id FROM nodes');
+  for (const n of nodes) {
+    const c = await credsForNode(n.id);
+    if (c) return c;
+  }
+  return null;
+}
+
+module.exports = { ipInCidr, resolveOwnerNodeId, resolveNodeCreds };

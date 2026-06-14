@@ -143,7 +143,7 @@ Cuando el filtro está en **Activos** y no hay túnel, el cuerpo muestra "Sin t�
 
 | # | Feature | Por qué | Esfuerzo | Estado |
 |---|---|---|---|---|
-| E1 | **Monitoreo vía job backend → DB** (SSE/WebSocket al front) | Cumple §43, datos "live" sin SSH desde el navegador, sin coste por panel abierto. Reusa `monitoringJob`/`signal_history`. | Alto | ⏳ pendiente |
+| E1 | **Monitoreo vía job backend → DB** (SSE al front) | Cumple §43, datos "live" sin SSH desde el navegador, sin coste por panel abierto. Reusa `sse`/`signal_history`. | Alto | 🔧 Etapa 1 hecha (backend aditivo: apPollJob + /watch + /stations). Falta switch del frontend a SSE (Etapas 2-3). |
 | E2 | **Sparkline de señal en el detalle del CPE** | tendencia de `signal_history` sin abrir nada externo. | Medio | ✅ hecho |
 | E3 | **Umbrales de salud** (señal/CCQ) con dot + badge + filtro "solo degradados" | Detección proactiva de enlaces degradados. | Medio | ✅ hecho |
 | E4 | **Exportar CPEs a CSV** del Station List | reporte operativo; CSV sin deps (evita exceljs). | Bajo | ✅ hecho |
