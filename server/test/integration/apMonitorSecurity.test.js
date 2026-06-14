@@ -142,3 +142,44 @@ describe('POST /cpes/enrich-batch — aislamiento (C1/C4)', () => {
     expect(passArg).toBe('secret');   // ← ignora user/pass del body
   });
 });
+
+describe('POST /poll-direct — C3: resuelve el nodo DUEÑO, no "el primero"', () => {
+  // Dos nodos, ambos con credenciales. El AP no tiene credenciales propias.
+  // El bug previo usaba el primer node_ssh_creds (NODO-A); ahora debe resolver
+  // el nodo que posee el AP (NODO-B) por nombre_nodo o por subred.
+  const twoNodesWithCreds = (sql, params) => {
+    if (/FROM nodes/.test(sql)) {
+      return Promise.resolve([
+        { id: 1, nombre_nodo: 'NODO-A', segmento_lan: '10.0.10.0/24' },
+        { id: 2, nombre_nodo: 'NODO-B', segmento_lan: '10.0.50.0/24' },
+      ]);
+    }
+    if (/node_ssh_creds/.test(sql)) {
+      const nodeId = params && params[0];
+      if (nodeId === 1) return Promise.resolve([{ ssh_user: 'admin-a', ssh_pass_enc: 'pass-a', ssh_port: 22 }]);
+      if (nodeId === 2) return Promise.resolve([{ ssh_user: 'admin-b', ssh_pass_enc: 'pass-b', ssh_port: 22 }]);
+      return Promise.resolve([]);
+    }
+    return Promise.resolve([]);
+  };
+
+  it('resuelve por nombre_nodo (NODO-B), no las credenciales del primer nodo', async () => {
+    db.get.mockResolvedValue({ ip: '10.0.50.7', usuario_ssh: '', clave_ssh_enc: '', puerto_ssh: 22, nombre_nodo: 'NODO-B', firmware: '' });
+    db.all.mockImplementation(twoNodesWithCreds);
+    const r = await request(app).post('/api/ap-monitor/poll-direct').send({ apId: 'ap1' });
+    expect(r.status).toBe(200);
+    const [, , , userArg, passArg] = apServiceMocks.pollAp.mock.calls[0];
+    expect(userArg).toBe('admin-b');   // ← nodo dueño
+    expect(passArg).toBe('pass-b');
+    expect(userArg).not.toBe('admin-a');
+  });
+
+  it('resuelve por subred (CIDR) cuando nombre_nodo no coincide', async () => {
+    db.get.mockResolvedValue({ ip: '10.0.50.7', usuario_ssh: '', clave_ssh_enc: '', puerto_ssh: 22, nombre_nodo: '', firmware: '' });
+    db.all.mockImplementation(twoNodesWithCreds);
+    const r = await request(app).post('/api/ap-monitor/poll-direct').send({ apId: 'ap1' });
+    expect(r.status).toBe(200);
+    const [, , , userArg] = apServiceMocks.pollAp.mock.calls[0];
+    expect(userArg).toBe('admin-b');   // ← 10.0.50.7 ∈ 10.0.50.0/24 (NODO-B)
+  });
+});

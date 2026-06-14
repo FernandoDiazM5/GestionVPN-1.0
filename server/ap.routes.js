@@ -10,6 +10,46 @@ const log = require('./lib/logger').child({ scope: 'ap-routes' });
 const genUuid = () => crypto.randomBytes(8).toString('hex');
 const isValidMac = (mac) => /^([0-9a-f]{2}:?){5}([0-9a-f]{2})$/i.test(mac);
 
+// ── C3 (Fase 2 · Enfoque A): resuelve las credenciales SSH del nodo que
+//    POSEE este AP, sin depender de una FK. Estrategia, en orden:
+//      1. match exacto por nombre_nodo (aps.nombre_nodo === nodes.nombre_nodo)
+//      2. la IP del AP cae en la subred del nodo (ipInCidr vs segmento_lan)
+//      3. último recurso: primer node_ssh_creds disponible (comportamiento previo)
+//    Devuelve { user, pass, port } o null. `ipInCidr` está declarado más abajo
+//    (function declaration → hoisted).
+async function resolveNodeCreds(db, apRow) {
+    const nodes = await db.all('SELECT id, nombre_nodo, segmento_lan FROM nodes');
+    if (!nodes.length) return null;
+
+    const credsForNode = async (nodeId) => {
+        const rows = await db.all(
+            'SELECT ssh_user, ssh_pass_enc, ssh_port FROM node_ssh_creds WHERE node_id = ? ORDER BY priority',
+            [nodeId]
+        );
+        if (!rows.length) return null;
+        return {
+            user: rows[0].ssh_user || '',
+            pass: rows[0].ssh_pass_enc ? decryptPass(rows[0].ssh_pass_enc) : '',
+            port: rows[0].ssh_port || 22,
+        };
+    };
+
+    const owner =
+        (apRow.nombre_nodo && nodes.find(n => n.nombre_nodo && n.nombre_nodo === apRow.nombre_nodo)) ||
+        (apRow.ip && nodes.find(n => n.segmento_lan && ipInCidr(apRow.ip, n.segmento_lan))) ||
+        null;
+    if (owner) {
+        const c = await credsForNode(owner.id);
+        if (c) return c;
+    }
+    // Último recurso: primer nodo con credenciales.
+    for (const n of nodes) {
+        const c = await credsForNode(n.id);
+        if (c) return c;
+    }
+    return null;
+}
+
 // ── Nodos (ap_groups) ────────────────────────────────────────────────────
 router.get('/nodos', async (req, res) => {
     try {
@@ -379,36 +419,25 @@ router.post('/poll-direct', async (req, res) => {
         // C2: IP, puerto y firmware se leen SIEMPRE de la DB — nunca del body.
         // Evita forzar una conexión SSH (con las credenciales del AP) a un host arbitrario.
         const apRow = await db.get(
-            'SELECT ip, usuario_ssh, clave_ssh_enc, puerto_ssh, ap_group_id, firmware FROM aps WHERE uuid = ?', [apId]
+            'SELECT ip, usuario_ssh, clave_ssh_enc, puerto_ssh, nombre_nodo, firmware FROM aps WHERE uuid = ?', [apId]
         );
         if (!apRow || !apRow.ip) return res.status(404).json({ success: false, message: 'AP no encontrado' });
 
         // Resolve AP integer id from uuid
         const apIntId = await getApIntId(apId);
 
-        // C4: credenciales SSH resueltas server-side desde tabla aps (cifradas) o node_ssh_creds (fallback)
+        // C4: credenciales SSH resueltas server-side desde tabla aps (cifradas) o node_ssh_creds.
         let sshUser = apRow.usuario_ssh || '';
         let sshPass = apRow.clave_ssh_enc ? decryptPass(apRow.clave_ssh_enc) : '';
-        try {
-            // Si no hay credenciales propias, buscar por nodo padre via ap_group
-            // NOTA (C3): ap_group aún no está enlazado a nodes; se usa el primer node_ssh_creds.
-            // Pendiente de la Fase 2 (FK ap_groups.node_id) para resolver el nodo correcto.
-            if (!sshUser && apRow.ap_group_id) {
-                const nodeRows = await db.all('SELECT id FROM nodes');
-                for (const nr of nodeRows) {
-                    const credRows = await db.all(
-                        'SELECT ssh_user, ssh_pass_enc, ssh_port FROM node_ssh_creds WHERE node_id = ? ORDER BY priority',
-                        [nr.id]
-                    );
-                    if (credRows.length > 0) {
-                        sshUser = credRows[0].ssh_user;
-                        sshPass = credRows[0].ssh_pass_enc ? decryptPass(credRows[0].ssh_pass_enc) : '';
-                        break;
-                    }
-                }
+        // C3: si el AP no tiene credenciales propias, resolver las del nodo que lo POSEE
+        // (por nombre_nodo / subred), no "el primer nodo que aparezca".
+        if (!sshUser) {
+            try {
+                const c = await resolveNodeCreds(db, apRow);
+                if (c) { sshUser = c.user; sshPass = c.pass; }
+            } catch (e) {
+                log.warn({ err: e.message }, 'poll-direct: error resolviendo credenciales del nodo');
             }
-        } catch (e) {
-            log.warn({ err: e.message }, 'poll-direct: error buscando credenciales del nodo');
         }
 
         const stations = await pollAp(apId, apRow.ip, apRow.puerto_ssh || 22, sshUser, sshPass, apRow.firmware || '');
@@ -566,14 +595,17 @@ router.post('/cpes/:mac/detail-direct', async (req, res) => {
         // 2. Credenciales del AP padre y su nodo (como fallback)
         if (apId) {
             try {
-                const apRow = await db.get('SELECT id, usuario_ssh, clave_ssh_enc, ap_group_id, puerto_ssh FROM aps WHERE uuid = ?', [apId]);
+                const apRow = await db.get('SELECT id, usuario_ssh, clave_ssh_enc, nombre_nodo, ip, puerto_ssh FROM aps WHERE uuid = ?', [apId]);
                 if (apRow) {
                     if (apRow.usuario_ssh) {
                         credList.push({ user: apRow.usuario_ssh, pass: apRow.clave_ssh_enc ? decryptPass(apRow.clave_ssh_enc) : '', port: apRow.puerto_ssh || 22 });
                     }
-                    // Credenciales del nodo padre — node_ssh_creds uses node_id (INTEGER FK)
-                    // We need to find the node associated with this AP group's context
-                    // Try all node_ssh_creds ordered by priority
+                    // C3: priorizar las credenciales del nodo que POSEE este AP (por
+                    // nombre_nodo / subred) antes que la lista genérica de todos los nodos.
+                    const owner = await resolveNodeCreds(db, apRow);
+                    if (owner && owner.user) credList.push(owner);
+                    // Resto de node_ssh_creds como último recurso (puede que el CPE
+                    // use credenciales de otro nodo en topologías mixtas).
                     const nodeCredRows = await db.all(
                         'SELECT ssh_user, ssh_pass_enc, ssh_port FROM node_ssh_creds ORDER BY priority'
                     );
