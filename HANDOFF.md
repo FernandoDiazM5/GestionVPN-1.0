@@ -4609,16 +4609,19 @@ Sistema de diseño v2 (post-§55):
     // audit:ignore <ruleId>       (inline)
 ```
 
-### Próximo paso — CI gate
+### Próximo paso — CI gate (opcional, NO implementado)
 
-El auditor (`scripts/audit-design.js`) ya devuelve exit code 1 si hay errores y 0 si solo hay warnings/infos. Solo falta agregar el step al workflow GitHub Actions:
+**¿Qué es un "CI gate"?** CI = *Continuous Integration* (integración continua), el sistema que GitHub corre automáticamente en cada `git push` o PR (en este proyecto sería **GitHub Actions**). Un "gate" (barrera) es un chequeo que **bloquea el merge si algo falla**. La idea: hoy el sistema de diseño está en **0 errores**; agregar el auditor al CI haría que **si en el futuro alguien mete un `text-red-500` o un `text-[9px]` literal, el push falle automáticamente** y no se pueda mergear hasta arreglarlo. Es un candado que protege el trabajo ya hecho para que no se degrade con el tiempo. Es una mejora de mantenimiento opcional — el panel funciona perfecto sin esto.
+
+**Estado:** el auditor (`scripts/audit-design.js`) ya devuelve exit code 1 si hay errores y 0 si solo hay warnings/infos, así que técnicamente ya está listo para usarse como gate. Solo falta agregar el step al workflow de GitHub Actions:
 
 ```yaml
+# en .github/workflows/<archivo>.yml
 - name: Audit design system
-  run: npm run audit:design
+  run: npm run audit:design   # falla el build si hay errores DS0X
 ```
 
-Si en una sesión futura aparece una regresión (alguien añade `text-red-500` o `text-[9px]` literal), el CI lo detectará y bloqueará el merge.
+Si en una sesión futura aparece una regresión (alguien añade `text-red-500` o `text-[9px]` literal), el CI lo detectaría y bloquearía el merge. **No se ha implementado** — queda anotado como próximo paso por si se quiere blindar el sistema.
 
 ---
 
