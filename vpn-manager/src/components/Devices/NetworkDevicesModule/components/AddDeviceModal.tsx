@@ -39,9 +39,9 @@ export function AddDeviceModal({ device, node, existing, onSave, onClose }: AddD
   const isEdit = !!existing;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 animate-in fade-in duration-200"
+    <div className="modal-overlay"
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-5 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200 dark:bg-slate-900 dark:border dark:border-slate-800">
+      <div className="modal-panel modal-panel-sm p-6 space-y-5 overflow-y-auto">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="font-bold text-slate-800 dark:text-slate-100">{isEdit ? 'Editar dispositivo' : 'Guardar dispositivo'}</h3>

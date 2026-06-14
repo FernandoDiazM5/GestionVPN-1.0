@@ -59,9 +59,9 @@ export default function DiagnosticsModal({ initialTarget, nodeName, onClose }: D
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="modal-overlay" onClick={onClose}>
       <div
-        className="card p-0 w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
+        className="modal-panel modal-panel-2xl"
         onClick={e => e.stopPropagation()}
         role="dialog"
         aria-modal="true"

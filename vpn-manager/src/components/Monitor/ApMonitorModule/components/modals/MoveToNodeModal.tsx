@@ -20,9 +20,9 @@ function MoveToNodeModal({ device, nodes, knownNames, onConfirm, onClose }: {
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 animate-in fade-in duration-200"
+    <div className="modal-overlay"
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5 space-y-4 animate-in zoom-in-95 duration-200 dark:bg-slate-900 dark:border dark:border-slate-800">
+      <div className="modal-panel modal-panel-sm p-5 space-y-4">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">

@@ -1,6 +1,6 @@
 export const modalContainerStyles = {
-  container: 'fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200',
-  modal: 'bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col animate-in zoom-in-95 duration-200 dark:bg-slate-900 dark:border dark:border-slate-800',
+  container: 'modal-overlay',
+  modal: 'modal-panel modal-panel-3xl max-h-[92vh]',
 };
 
 export const headerStyles = {

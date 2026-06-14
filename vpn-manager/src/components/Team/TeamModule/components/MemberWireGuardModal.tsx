@@ -62,9 +62,9 @@ export default function MemberWireGuardModal({ member, onClose }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"
+    <div className="modal-overlay"
       onClick={e => e.target === e.currentTarget && !busy && onClose()}>
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md flex flex-col animate-in zoom-in-95 duration-200">
+      <div className="modal-panel modal-panel-md">
         <div className="flex items-center justify-between bg-violet-600 rounded-t-2xl px-5 py-4">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center shrink-0"><Shield className="w-4 h-4 text-white" /></div>

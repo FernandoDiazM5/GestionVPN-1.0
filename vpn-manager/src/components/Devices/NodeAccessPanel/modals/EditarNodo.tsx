@@ -170,9 +170,9 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 py-6 animate-in fade-in duration-200"
+    <div className="modal-overlay"
       onClick={e => e.target === e.currentTarget && !saving && !result && onClose()}>
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
+      <div className="modal-panel modal-panel-xl">
 
         <div className="flex items-center justify-between bg-indigo-600 rounded-t-2xl px-5 py-4 shrink-0">
           <div className="flex items-center gap-3">

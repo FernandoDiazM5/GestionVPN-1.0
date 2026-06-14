@@ -51,9 +51,9 @@ export default function WgConfigModal({ peer, onClose }: { peer: WgPeer; onClose
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+    <div className="modal-overlay"
       onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="w-full max-w-xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden animate-in zoom-in-95 duration-200">
+      <div className="modal-panel modal-panel-xl">
         {/* Header */}
         <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
