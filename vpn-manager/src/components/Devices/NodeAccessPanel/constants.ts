@@ -1,3 +1,18 @@
+// audit:ignore-file DS01
+//
+// Excepción al sistema de diseño documentada en §54: las paletas
+// PEER_COLOR_PALETTE y TAG_PALETTE requieren 10 y 7 colores únicos para
+// distinguir visualmente N peers WireGuard / N etiquetas creadas por el
+// moderador. El sistema canónico solo provee 7 paletas válidas + cyan
+// (indigo/emerald/rose/amber/sky/violet/slate + cyan para CPEs), lo que
+// alcanza para TAG_PALETTE pero no para PEER_COLOR_PALETTE. Documentamos
+// la excepción aquí en lugar de violar el contrato semántico del sistema
+// (cada paleta tiene un dueño semántico en CLAUDE.md).
+//
+// El comentario audit:ignore-file DS01 silencia la regla DS01 (paletas
+// fuera del sistema) para todo este archivo. Las demás reglas (DS02-DS06)
+// siguen activas.
+
 import type { ProtectedNet } from './types';
 
 export const VPS_IP = '192.168.21.60';

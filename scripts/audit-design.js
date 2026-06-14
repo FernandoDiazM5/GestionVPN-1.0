@@ -27,6 +27,10 @@ const SRC_ROOT = path.join(__dirname, '..', 'vpn-manager', 'src');
 // ── Paletas permitidas (CLAUDE.md) ───────────────────────────────
 const ALLOWED_PALETTES = new Set([
   'indigo', 'emerald', 'rose', 'amber', 'sky', 'violet', 'slate',
+  // §54: cyan agregado como paleta semántica para CPEs/clientes
+  // (nodos terminales en jerarquía de red, distintos de APs que usan
+  // violet=infra/WireGuard). Documentado en CLAUDE.md.
+  'cyan',
   // tokens semánticos del tailwind.config.js
   'brand', 'success', 'danger', 'warning', 'info', 'accent', 'neutral',
   // utility colors permitidos (transparentes / contraste)
@@ -36,7 +40,7 @@ const ALLOWED_PALETTES = new Set([
 // Paletas Tailwind prohibidas por CLAUDE.md (cada color tiene un dueño semántico).
 const FORBIDDEN_PALETTES = [
   'red', 'green', 'blue', 'yellow', 'orange', 'purple', 'pink',
-  'gray', 'zinc', 'neutral', 'stone', 'cyan', 'teal', 'lime', 'fuchsia',
+  'gray', 'zinc', 'neutral', 'stone', 'teal', 'lime', 'fuchsia',
 ];
 
 // Shades claros que típicamente necesitan dark variant para no quedar blancos en dark mode.
@@ -215,16 +219,43 @@ function audit(opts = {}) {
   for (const file of files) {
     const content = fs.readFileSync(file, 'utf8');
     const lines = content.split('\n');
+
+    // §54: detectar comentarios "audit:ignore-file <DS01|DS02|...|all>" en
+    // las primeras 5 líneas del archivo. Permite silenciar reglas para
+    // archivos que tienen excepciones documentadas (ej. constants.ts con
+    // PEER_COLOR_PALETTE de 10 paletas para distinguir N peers).
+    const fileHeader = lines.slice(0, 5).join('\n');
+    const fileIgnoreMatch = fileHeader.match(/audit:ignore-file\s+([A-Z0-9,\s]+|all)/);
+    const fileIgnoredRules = new Set();
+    if (fileIgnoreMatch) {
+      const tokens = fileIgnoreMatch[1].split(/[,\s]+/).filter(Boolean);
+      tokens.forEach(t => fileIgnoredRules.add(t.toUpperCase()));
+    }
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       // ignora líneas de comentario puro
       if (/^\s*(?:\/\/|\*|\/\*)/.test(line)) continue;
+
+      // §54: detectar comentario inline `// audit:ignore <ruleId>` en la
+      // línea actual o la siguiente (a veces el comentario va arriba).
+      // Permite silenciar UNA regla en UNA línea específica.
+      const inlineIgnoreCtx = line + '\n' + (lines[i + 1] || '') + '\n' + (lines[i - 1] || '');
+      const inlineIgnore = new Set([...fileIgnoredRules]);
+      const inlineMatches = inlineIgnoreCtx.matchAll(/audit:ignore\s+([A-Z0-9,\s]+|all)/g);
+      for (const m of inlineMatches) {
+        m[1].split(/[,\s]+/).filter(Boolean).forEach(t => inlineIgnore.add(t.toUpperCase()));
+      }
+
       // Contexto: 3 líneas previas para reglas que necesitan saber si el
       // bloque actual pertenece a un <button> (ver DS06).
       const prev3 = lines.slice(Math.max(0, i - 3), i).join('\n');
       const ctx = { prev3 };
       for (const rule of RULES) {
         if (ruleFilter && rule.id !== ruleFilter && !rule.id.startsWith(ruleFilter)) continue;
+        // §54: respetar audit:ignore (file-level o inline).
+        const ruleShort = rule.id.split('-')[0]; // DS01, DS02, ...
+        if (inlineIgnore.has('ALL') || inlineIgnore.has(ruleShort)) continue;
         const violations = rule.test(line, ctx);
         for (const v of violations) {
           findings.push({

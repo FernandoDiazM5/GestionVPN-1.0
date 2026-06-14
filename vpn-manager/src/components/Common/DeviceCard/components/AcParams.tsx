@@ -16,7 +16,7 @@ export default function AcParams({ antennaStats }: AcParamsProps) {
   return (
     <div className="bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50 rounded-xl p-4 shadow-sm">
       <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3 flex items-center space-x-2">
-        <Thermometer className="w-3 h-3 text-orange-500" /><span>Parámetros AC</span>
+        <Thermometer className="w-3 h-3 text-amber-500" /><span>Parámetros AC</span>
       </p>
       <div className="flex flex-col">
         <ParamRow label="Temperatura" value={antennaStats.temperature != null ? `${antennaStats.temperature} °C` : null} />

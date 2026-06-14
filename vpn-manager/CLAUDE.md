@@ -24,6 +24,7 @@ Al crear o modificar CUALQUIER componente, respeta esto sin excepción:
 | `warning` / `amber` | ámbar | Advertencia, por expirar |
 | `info` / `sky` | celeste | Informativo neutro (subredes, datos 2º) |
 | `accent` / `violet` | violeta | SOLO etiqueta de protocolo WireGuard |
+| `cpe` / `cyan` | cian | SOLO indicadores de CPEs (clientes terminales en Monitor AP) |
 | `neutral` / `slate` | gris | Texto, estructura, datos. **~80% de la UI** |
 
 **Prohibido:**

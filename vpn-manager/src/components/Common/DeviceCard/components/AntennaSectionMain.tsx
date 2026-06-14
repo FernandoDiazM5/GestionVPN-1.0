@@ -105,7 +105,7 @@ export default function AntennaSectionMain({ antennaStats }: AntennaSectionMainP
                   <span className="font-mono text-sm font-bold text-slate-800 dark:text-white">{antennaStats.airmaxCapacity ?? '—'}%</span>
                   {antennaStats.airmaxCapacity != null && (
                     <div className="flex-1 h-2 bg-slate-200 dark:bg-black/30 rounded-full overflow-hidden">
-                      <div className="h-full bg-fuchsia-500 rounded-full shadow-[0_0_6px_#d946ef]"
+                      <div className="h-full bg-violet-500 rounded-full shadow-[0_0_6px_#8b5cf6]"
                         style={{ width: `${antennaStats.airmaxCapacity}%`, transition: 'width 1s ease' }} />
                     </div>
                   )}
