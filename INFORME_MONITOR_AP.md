@@ -147,7 +147,7 @@ Cuando el filtro está en **Activos** y no hay túnel, el cuerpo muestra "Sin t�
 | E2 | **Sparkline de señal en el detalle del CPE** | tendencia de `signal_history` sin abrir nada externo. | Medio | ✅ hecho |
 | E3 | **Umbrales de salud** (señal/CCQ) con dot + badge + filtro "solo degradados" | Detección proactiva de enlaces degradados. | Medio | ✅ hecho |
 | E4 | **Exportar CPEs a CSV** del Station List | reporte operativo; CSV sin deps (evita exceljs). | Bajo | ✅ hecho |
-| E5 | **Acción "Reiniciar AP"** (con modal de confirmación + auditoría) | Contemplado por la política §43 como reversible y con confirmación. | Medio | ⏳ pendiente |
+| E5 | **Acción "Reiniciar AP"** (con modal de confirmación + auditoría) | Contemplado por la política §43 como reversible y con confirmación. | Medio | ❌ descartada (decisión del usuario, 2026-06-14) — no se implementa. `ubiquiti.service.js` se mantiene 100% lectura. |
 | E6 | **Densidad de tabla / presets de columnas** | Mejora ergonomía en pantallas densas. | Bajo | ⏳ pendiente |
 | E7 | **Indicador "última actualización" global** + "Sincronizar todo" manual | un reloj global aclara frescura; sync masivo manual (§43-OK). | Bajo | ✅ hecho |
 
