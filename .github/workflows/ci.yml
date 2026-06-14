@@ -83,17 +83,33 @@ jobs:
       - name: Vitest (frontend)
         run: npm test
 
+  design-system:
+    name: Sistema de diseño — audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # El auditor solo usa fs/path (sin deps externas) → no requiere npm ci.
+      # Devuelve exit 1 si hay errores DS0X; warnings/infos no bloquean.
+      - name: Audit design system
+        run: npm run audit:design
+
   # Job final agregador: facilita una sola "required check" en branch protection
   ci-ok:
     name: CI ✓
-    needs: [backend, frontend]
+    needs: [backend, frontend, design-system]
     runs-on: ubuntu-latest
     if: always()
     steps:
       - name: Verificar resultados
         run: |
-          if [ "${{ needs.backend.result }}" != "success" ] || [ "${{ needs.frontend.result }}" != "success" ]; then
-            echo "CI falló: backend=${{ needs.backend.result }} frontend=${{ needs.frontend.result }}"
+          if [ "${{ needs.backend.result }}" != "success" ] || [ "${{ needs.frontend.result }}" != "success" ] || [ "${{ needs.design-system.result }}" != "success" ]; then
+            echo "CI falló: backend=${{ needs.backend.result }} frontend=${{ needs.frontend.result }} design-system=${{ needs.design-system.result }}"
             exit 1
           fi
           echo "✅ Todos los jobs pasaron"
