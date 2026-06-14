@@ -48,9 +48,11 @@ export function usePolling(devices: SavedDevice[], _activeNodeName: string | nul
     try {
       // C4: solo enviamos apId. IP, puerto, firmware y credenciales SSH se
       // resuelven server-side desde la DB (cifradas) — nunca viajan por el navegador.
+      // E2: el sync MANUAL (saveCount) persiste un punto en signal_history para el
+      // sparkline de tendencia. Los polls automáticos NO escriben historial.
       const res = await fetchWithTimeout(`${BASE}/poll-direct`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apId, saveHistory: false }),
+        body: JSON.stringify({ apId, saveHistory: saveCount }),
       }, 20_000);
       const data = await res.json();
       if (data.success) {

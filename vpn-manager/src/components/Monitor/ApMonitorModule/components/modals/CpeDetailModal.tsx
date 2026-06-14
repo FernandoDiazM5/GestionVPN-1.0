@@ -5,6 +5,7 @@ import { fetchWithTimeout } from '../../../../../utils/fetchWithTimeout';
 import { API_BASE_URL } from '../../../../../config';
 import { fmtDbm, fmtPct, fmtMbps, fmtFw } from '../../utils/formatters';
 import { sigColor, ccqColor } from '../../utils/colors';
+import Sparkline from '../Sparkline';
 
 const BASE = `${API_BASE_URL}/api/ap-monitor`;
 
@@ -23,6 +24,17 @@ function CpeDetailModal({
   const [credPass, setCredPass] = useState('');
   const [credPort, setCredPort] = useState(String(sshPort ?? 22));
   const [savingCreds, setSavingCreds] = useState(false);
+  const [signalHist, setSignalHist] = useState<(number | null)[] | null>(null);
+
+  // E2: historial de señal (signal_history) para el sparkline de tendencia.
+  // Se llena con los "Sync ahora" manuales (saveHistory). Independiente del
+  // detalle SSH: se muestra aunque la conexión al CPE falle.
+  useEffect(() => {
+    fetchWithTimeout(`${BASE}/historial/${mac}?limit=60`, {}, 8_000)
+      .then(r => r.json())
+      .then(d => { if (d.success && Array.isArray(d.historial)) setSignalHist(d.historial.map((h: { signal_dbm: number | null }) => h.signal_dbm)); })
+      .catch(() => { /* no-fatal */ });
+  }, [mac]);
 
   const isAuthError = (msg: string) =>
     /authentication|auth.*failed|configured.*method|credencial/i.test(msg);
@@ -108,6 +120,26 @@ function CpeDetailModal({
           <button onClick={onClose} className="modal-header-close"><X className="w-4 h-4" /></button>
         </div>
         <div className="overflow-y-auto p-5 space-y-4">
+          {signalHist && (() => {
+            const valid = signalHist.filter((v): v is number => v != null);
+            if (valid.length < 2) return null;
+            const last = valid[valid.length - 1];
+            return (
+              <div className="bg-slate-50 rounded-xl px-4 py-3 border border-slate-200 dark:bg-slate-800/60 dark:border-slate-700">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-2xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Tendencia de señal · {valid.length} pts</p>
+                  <span className={`text-2xs font-mono font-bold ${sigColor(last)}`}>{fmtDbm(last)}</span>
+                </div>
+                <div className={sigColor(last)}>
+                  <Sparkline values={signalHist} width={520} height={40} className="w-full" />
+                </div>
+                <div className="flex justify-between text-3xs text-slate-400 dark:text-slate-500 mt-1 font-mono">
+                  <span>min {fmtDbm(Math.min(...valid))}</span>
+                  <span>max {fmtDbm(Math.max(...valid))}</span>
+                </div>
+              </div>
+            );
+          })()}
           {loading && (
             <div className="flex items-center justify-center gap-3 py-12 text-slate-500 dark:text-slate-400">
               <Loader2 className="w-5 h-5 animate-spin" />
@@ -165,7 +197,7 @@ function CpeDetailModal({
               {rows.map(row => (
                 <div key={row.l} className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 shadow-sm hover:shadow-md transition-shadow dark:bg-slate-800/60 dark:border-slate-700">
                   <p className="text-2xs font-semibold text-slate-500 uppercase tracking-wider mb-1">{row.l}</p>
-                  <p className={`text-sm font-bold truncate ${row.color ?? 'text-slate-800'} ${row.mono ? 'font-mono tracking-tight' : ''}`}>{row.v}</p>
+                  <p className={`text-sm font-bold truncate ${row.color ?? 'text-slate-800 dark:text-slate-100'} ${row.mono ? 'font-mono tracking-tight' : ''}`}>{row.v}</p>
                 </div>
               ))}
             </div>
