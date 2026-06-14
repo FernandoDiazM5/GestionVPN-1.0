@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Loader2, X, Search, ScanSearch, ZapOff, AlertTriangle } from 'lucide-react';
+import { Loader2, X, Search, ScanSearch, ZapOff, AlertTriangle, Download } from 'lucide-react';
 import type { SavedDevice } from '../../../../types/devices';
 import type { PollResult } from '../../../../types/apMonitor';
 import { fetchWithTimeout } from '../../../../utils/fetchWithTimeout';
@@ -8,6 +8,7 @@ import CpeRow from './CpeRow';
 import ColSelector from './selectors/ColSelector';
 import { CPE_COL_DEFS, loadColPrefs, saveColPrefs } from '../utils/columnDefs';
 import { cpeHealth, degradedSummary } from '../utils/health';
+import { exportCpesCsv } from '../utils/exportCpesCsv';
 
 const BASE = `${API_BASE_URL}/api/ap-monitor`;
 
@@ -135,6 +136,15 @@ function StationTable({ poll, onCpeDetail, dev }: {
               {enriching ? 'Enriching…' : `Enrich ${needEnrich.length}`}
             </button>
           )}
+          <button
+            onClick={() => exportCpesCsv(filtered, dev.cachedStats?.deviceName ?? dev.name ?? dev.ip ?? 'cpes')}
+            disabled={filtered.length === 0}
+            title="Exportar la lista visible a CSV"
+            aria-label="Exportar CPEs a CSV"
+            className="flex items-center gap-1 px-2 py-1 rounded-lg text-2xs font-bold bg-white text-slate-500 border border-slate-200 hover:bg-slate-50 transition-colors disabled:opacity-40 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-700 dark:hover:bg-slate-800">
+            <Download className="w-3 h-3" />
+            CSV
+          </button>
           <ColSelector hidden={hiddenCols} onChange={handleColChange} />
           {poll.polledAt > 0 && (
             <span className="text-3xs text-slate-400 dark:text-slate-500 font-mono">
