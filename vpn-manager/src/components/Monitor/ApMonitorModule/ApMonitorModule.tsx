@@ -51,34 +51,9 @@ export default function ApMonitorModule() {
     const prevName = prevActiveNodeNameRef.current;
     prevActiveNodeNameRef.current = activeNodeName;
     if (prevName !== null && activeNodeName === null) {
-      Object.values(polling.pollTimers.current).forEach(clearTimeout);
-      polling.pollTimers.current = {};
       setExpandedAps(new Set());
-      polling.autoPolledRef.current = false;
     }
   }, [activeNodeName]);
-
-  useEffect(() => {
-    polling.pollIntervalRef.current = polling.pollInterval;
-    localStorage.setItem('vpn_ap_poll_ms', polling.pollInterval.toString());
-
-    if (polling.pollInterval > 0) {
-      expandedAps.forEach(apId => {
-        if (!polling.pollTimers.current[apId]) polling.pollApDirect(apId);
-      });
-    } else {
-      Object.keys(polling.pollTimers.current).forEach(apId => {
-        clearTimeout(polling.pollTimers.current[apId]); delete polling.pollTimers.current[apId];
-      });
-    }
-    Object.keys(polling.pollTimers.current).forEach(apId => {
-      if (!expandedAps.has(apId)) { clearTimeout(polling.pollTimers.current[apId]); delete polling.pollTimers.current[apId]; }
-    });
-  }, [expandedAps, polling.pollApDirect, polling.pollInterval]);
-
-  useEffect(() => () => {
-    Object.values(polling.pollTimers.current).forEach(clearTimeout);
-  }, []);
 
   // E1/Etapa 2: en vez del "burst" de SSH del navegador al montar, ahora
   //   (a) avisamos al backend que estamos mirando (heartbeat → apPollJob),
@@ -136,7 +111,7 @@ export default function ApMonitorModule() {
     [logic.filteredGroups],
   );
   const syncAllVisible = () => {
-    syncableAps.forEach((ap, i) => setTimeout(() => polling.pollApDirect(ap.id, false, true), i * 600));
+    syncableAps.forEach((ap, i) => setTimeout(() => polling.pollApDirect(ap.id, true), i * 600));
   };
 
   return (
@@ -207,35 +182,13 @@ export default function ApMonitorModule() {
             />
             {logic.apSearch && <button onClick={() => logic.setApSearch('')} aria-label="Limpiar búsqueda" title="Limpiar búsqueda" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"><X className="w-3.5 h-3.5" /></button>}
           </div>
-          <div className="flex items-center gap-1.5 border border-slate-200 rounded-xl px-2 bg-white dark:bg-slate-900 dark:border-slate-700">
-            <Clock className="w-3.5 h-3.5 text-slate-400" />
-            <select
-              value={polling.pollInterval}
-              onChange={e => polling.setPollInterval(Number(e.target.value))}
-              aria-label="Intervalo de auto-poll de CPEs"
-              className="text-xs bg-transparent focus:outline-none text-slate-600 dark:text-slate-300 font-medium py-2 appearance-none pr-4"
-              style={{ backgroundImage: `url('data:image/svg+xml;utf8,<svg fill="none" viewBox="0 0 24 24" stroke="%2394a3b8" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>')`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right center', backgroundSize: '0.8rem' }}
-            >
-              <option value={0}>Auto-poll Off</option>
-              <option value={15000}>15s</option>
-              <option value={30000}>30s</option>
-              <option value={60000}>1m</option>
-              <option value={120000}>2m</option>
-              <option value={300000}>5m</option>
-            </select>
-          </div>
           <button onClick={syncAllVisible} disabled={syncableAps.length === 0}
             className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
             title="Sincronizar ahora los CPEs de todos los APs visibles (manual)">
             <RotateCw className="w-3.5 h-3.5" />
             <span>Sincronizar todo</span>
           </button>
-          <button onClick={() => {
-            Object.values(polling.pollTimers.current).forEach(clearTimeout);
-            polling.pollTimers.current = {};
-            polling.autoPolledRef.current = false;
-            logic.loadDevices();
-          }} disabled={logic.loading}
+          <button onClick={() => { logic.loadDevices(); polling.seedFromDb(); }} disabled={logic.loading}
             className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors disabled:opacity-50 dark:text-slate-500 dark:hover:text-indigo-400 dark:hover:bg-indigo-500/10"
             title="Recargar lista de equipos">
             {logic.loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
@@ -248,7 +201,7 @@ export default function ApMonitorModule() {
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400" /> Parcial / Errores</span>
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-sky-400" /> Conectando…</span>
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-300" /> Sin datos</span>
-        <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {polling.pollInterval > 0 ? `Poll cada ${polling.pollInterval/1000}s (expandido)` : 'Auto-poll desactivado'}</span>
+        <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> En vivo (backend)</span>
         {lastPolledAt > 0 && <span className="flex items-center gap-1"><RotateCw className="w-3 h-3" /> Última actualización {fmtAgo(lastPolledAt)}</span>}
       </div>
 
@@ -309,7 +262,7 @@ export default function ApMonitorModule() {
           onApDetail={dev => logic.setApDetailDev(dev)}
           onM5Detail={dev => logic.setM5DetailDevice(dev)}
           onApView={dev => logic.setViewingApDevice(dev)}
-          onApSync={apId => polling.pollApDirect(apId, true, true)}
+          onApSync={apId => polling.pollApDirect(apId, true)}
           onApDelete={dev => logic.handleDeleteDev(dev)}
           onApMove={dev => logic.setMovingDevice(dev)}
         />

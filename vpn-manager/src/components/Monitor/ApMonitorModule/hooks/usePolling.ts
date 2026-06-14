@@ -22,21 +22,13 @@ export function usePolling(devices: SavedDevice[], _activeNodeName: string | nul
   const pollResultsRef = useRef(pollResults);
   useEffect(() => { pollResultsRef.current = pollResults; }, [pollResults]);
 
-  // B3: default Off (0). El polling SSH automático queda como opt-in explícito
-  // del usuario (política §43: no polling SSH automático por defecto).
-  const [pollInterval, setPollInterval] = useState<number>(() => {
-    const saved = localStorage.getItem('vpn_ap_poll_ms');
-    return saved ? parseInt(saved, 10) : 0;
-  });
-  const pollIntervalRef = useRef(pollInterval);
-
-  const pollTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const devicesRef = useRef(devices);
   useEffect(() => { devicesRef.current = devices; }, [devices]);
 
-  const autoPolledRef = useRef(false);
-
-  const pollApDirect = useCallback(async (apId: string, scheduleNext = true, saveCount = false) => {
+  // E1/Etapa 3: pollApDirect es una acción MANUAL de un solo tiro (botón
+  // "Sync ahora"/"Sincronizar todo"). El polling recurrente vive en el backend
+  // (apPollJob) y llega por SSE; ya no hay timers de polling en el navegador.
+  const pollApDirect = useCallback(async (apId: string, saveCount = false) => {
     const dev = devicesRef.current.find(d => d.id === apId);
     if (!dev) return;
 
@@ -48,8 +40,7 @@ export function usePolling(devices: SavedDevice[], _activeNodeName: string | nul
     try {
       // C4: solo enviamos apId. IP, puerto, firmware y credenciales SSH se
       // resuelven server-side desde la DB (cifradas) — nunca viajan por el navegador.
-      // E2: el sync MANUAL (saveCount) persiste un punto en signal_history para el
-      // sparkline de tendencia. Los polls automáticos NO escriben historial.
+      // E2: el sync MANUAL (saveCount) persiste un punto en signal_history.
       const res = await fetchWithTimeout(`${BASE}/poll-direct`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ apId, saveHistory: saveCount }),
@@ -70,14 +61,6 @@ export function usePolling(devices: SavedDevice[], _activeNodeName: string | nul
         ...prev,
         [apId]: { ...(prev[apId] ?? { stations: [] }), loading: false, error: e instanceof Error ? e.message : 'Error SSH' },
       }));
-    }
-
-    if (scheduleNext && pollIntervalRef.current > 0) {
-      if (Object.keys(pollTimers.current).some(id => id === apId)) {
-        pollTimers.current[apId] = setTimeout(() => pollApDirect(apId, true), pollIntervalRef.current);
-      } else {
-        delete pollTimers.current[apId];
-      }
     }
   }, []);
 
@@ -124,13 +107,8 @@ export function usePolling(devices: SavedDevice[], _activeNodeName: string | nul
   return {
     pollResults,
     setPollResults,
-    pollInterval,
-    setPollInterval,
-    pollIntervalRef,
-    pollTimers,
     pollApDirect,
     pollResultsRef,
-    autoPolledRef,
     pingWatch,
     seedFromDb,
     ingestApPoll,
