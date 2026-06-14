@@ -127,12 +127,12 @@ export default function ApMonitorModule() {
           </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
-          <div className="text-right text-sm text-slate-500">
-            <span className="font-bold text-indigo-600">{logic.nodeGroups.length}</span> nodos ·{' '}
-            <span className="font-bold text-indigo-600">{totalAps}</span> APs ·{' '}
-            <span className="font-bold text-violet-600">{totalCpes}</span> CPEs live
+          <div className="text-right text-sm text-slate-500 dark:text-slate-400">
+            <span className="font-bold text-indigo-600 dark:text-indigo-400">{logic.nodeGroups.length}</span> nodos ·{' '}
+            <span className="font-bold text-indigo-600 dark:text-indigo-400">{totalAps}</span> APs ·{' '}
+            <span className="font-bold text-cyan-600 dark:text-cyan-400">{totalCpes}</span> CPEs live
           </div>
-          <div className="flex items-center rounded-lg border border-slate-200 overflow-hidden text-xs shrink-0">
+          <div className="flex items-center rounded-xl border border-slate-200 overflow-hidden text-xs shrink-0 dark:border-slate-700">
             <button
               onClick={() => logic.setNodeFilter('active')}
               title="Nodos activos"
@@ -141,7 +141,7 @@ export default function ApMonitorModule() {
                   ? 'bg-emerald-500 text-white'
                   : 'bg-white text-slate-500 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'}`}>
               <CheckCircle2 className="w-3 h-3" />
-              <span className="text-2xs">Activos</span>
+              <span className="text-xs">Activos</span>
             </button>
             <button
               onClick={() => logic.setNodeFilter('inactive')}
@@ -151,7 +151,7 @@ export default function ApMonitorModule() {
                   ? 'bg-amber-500 text-white'
                   : 'bg-white text-slate-500 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'}`}>
               <ZapOff className="w-3 h-3" />
-              <span className="text-2xs">Inactivos</span>
+              <span className="text-xs">Inactivos</span>
             </button>
             <button
               onClick={() => logic.setNodeFilter('all')}
@@ -161,7 +161,7 @@ export default function ApMonitorModule() {
                   ? 'bg-indigo-500 text-white'
                   : 'bg-white text-slate-500 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'}`}>
               <Users className="w-3 h-3" />
-              <span className="text-2xs">Todos</span>
+              <span className="text-xs">Todos</span>
             </button>
           </div>
           <div className="relative">

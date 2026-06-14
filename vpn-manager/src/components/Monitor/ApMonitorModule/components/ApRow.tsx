@@ -49,18 +49,18 @@ const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCol
 
         <div>
           <span className="inline-flex text-2xs font-bold px-1.5 py-0.5 rounded-md bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-400">AP</span>
-          {freqGhz && <p className="text-3xs font-bold text-sky-600 mt-0.5">{freqGhz}</p>}
-          {netMode && <p className="text-3xs text-slate-400 truncate">{netMode}</p>}
+          {freqGhz && <p className="text-3xs font-bold text-sky-600 dark:text-sky-400 mt-0.5">{freqGhz}</p>}
+          {netMode && <p className="text-3xs text-slate-400 dark:text-slate-500 truncate">{netMode}</p>}
         </div>
 
         <div className="min-w-0 pr-2">
-          <p className="text-sm font-semibold text-slate-800 truncate" title={name || dev.ip}>{name || dev.ip}</p>
+          <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate" title={name || dev.ip}>{name || dev.ip}</p>
           <p className="font-mono text-3xs text-slate-500 dark:text-slate-400 truncate">{dev.ip}</p>
         </div>
 
         {showAp('modelo') && (
           <div className="min-w-0 pr-2">
-            {model && <p className="text-xs text-slate-600 truncate" title={model}>{model}</p>}
+            {model && <p className="text-xs text-slate-600 dark:text-slate-300 truncate" title={model}>{model}</p>}
             {firmware && <p className="text-3xs text-slate-500 dark:text-slate-400 truncate">{fmtFw(firmware)}</p>}
           </div>
         )}
@@ -111,7 +111,7 @@ const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCol
             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-bold
               ${expanded ? 'bg-indigo-600 text-white dark:bg-indigo-500'
                 : isHistorical ? 'bg-slate-100 text-slate-400 dark:bg-slate-700/50 dark:text-slate-500'
-                  : 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-400'}`}
+                  : 'bg-cyan-100 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-400'}`}
               title={isHistorical && dev.lastCpeCountAt
                 ? `Última sync: ${new Date(dev.lastCpeCountAt).toLocaleString()}`
                 : undefined}>
@@ -161,7 +161,7 @@ const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCol
             {isPolling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
           </button>
           <button onClick={onM5Detail} title="Ver estado completo del dispositivo (airOS)"
-            className="flex items-center space-x-1 px-2 py-1.5 rounded-lg text-2xs font-bold bg-violet-50 text-violet-600 hover:bg-violet-100 border border-violet-200 transition-colors dark:bg-violet-500/10 dark:hover:bg-violet-500/20 dark:border-violet-500/30 dark:text-violet-400">
+            className="flex items-center space-x-1 px-2 py-1.5 rounded-lg text-2xs font-bold bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200 transition-colors dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:border-slate-700">
             <Activity className="w-2.5 h-2.5" />
             <span>Informe</span>
           </button>

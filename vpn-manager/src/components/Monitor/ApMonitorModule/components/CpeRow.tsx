@@ -30,7 +30,7 @@ function CpeRow({ cpe, idx, onDetail, hiddenCols, gridCols }: {
 
       <div className="px-2 py-2 min-w-0">
         <div className="flex items-center gap-1 min-w-0">
-          <p className="font-mono font-semibold text-slate-700 truncate text-2xs">{cpe.mac}</p>
+          <p className="font-mono font-semibold text-slate-700 dark:text-slate-200 truncate text-2xs">{cpe.mac}</p>
           {ff && (
             <span className={`shrink-0 text-3xs font-bold px-1 py-0.5 rounded
               ${ff === 'AC' ? 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'}`}>
@@ -38,19 +38,19 @@ function CpeRow({ cpe, idx, onDetail, hiddenCols, gridCols }: {
             </span>
           )}
         </div>
-        {displayName && <p className="text-3xs text-indigo-600 truncate font-medium">{displayName}</p>}
+        {displayName && <p className="text-3xs text-indigo-600 dark:text-indigo-400 truncate font-medium">{displayName}</p>}
       </div>
 
       {show('modelo') && (
         <div className="px-2 py-2 min-w-0">
-          <p className="text-2xs text-slate-600 truncate">{displayModel || <span className="data-empty">—</span>}</p>
+          <p className="text-2xs text-slate-600 dark:text-slate-300 truncate">{displayModel || <span className="data-empty">—</span>}</p>
         </div>
       )}
 
       {show('nombre') && (
         <div className="px-2 py-2 min-w-0">
           {displayName
-            ? <p className="truncate font-semibold text-slate-800 text-2xs">{displayName}</p>
+            ? <p className="truncate font-semibold text-slate-800 dark:text-slate-100 text-2xs">{displayName}</p>
             : <p className="text-slate-400 dark:text-slate-500 italic text-3xs">Sin nombre</p>}
         </div>
       )}
@@ -68,11 +68,11 @@ function CpeRow({ cpe, idx, onDetail, hiddenCols, gridCols }: {
       )}
 
       {show('noise') && (
-        <div className="px-2 py-2 text-right font-mono text-slate-500 text-xs">{fmtDbm(cpe.noisefloor)}</div>
+        <div className="px-2 py-2 text-right font-mono text-slate-500 dark:text-slate-400 text-xs">{fmtDbm(cpe.noisefloor)}</div>
       )}
 
       {show('cinr') && (
-        <div className="px-2 py-2 text-right font-mono text-slate-600 text-xs">
+        <div className="px-2 py-2 text-right font-mono text-slate-600 dark:text-slate-300 text-xs">
           {cinrVal != null ? `${cinrVal} dB` : '—'}
         </div>
       )}
@@ -140,13 +140,13 @@ function CpeRow({ cpe, idx, onDetail, hiddenCols, gridCols }: {
       )}
 
       {show('distance') && (
-        <div className="px-2 py-2 text-right font-mono text-slate-500 text-xs">
+        <div className="px-2 py-2 text-right font-mono text-slate-500 dark:text-slate-400 text-xs">
           {cpe.distance != null ? `${cpe.distance} m` : '—'}
         </div>
       )}
 
       {show('lastip') && (
-        <div className="px-2 py-2 font-mono text-2xs text-slate-500 truncate">{cpe.lastip || '—'}</div>
+        <div className="px-2 py-2 font-mono text-2xs text-slate-500 dark:text-slate-400 truncate">{cpe.lastip || '—'}</div>
       )}
 
       <div className="px-2 py-2 flex items-center justify-end gap-0.5">

@@ -24,9 +24,10 @@ function ApDetailModal({
   const refresh = useCallback(() => {
     if (!dev.sshUser || (!('hasSshPass' in dev ? dev.hasSshPass : false) && !dev.sshPass)) { setError('Sin credenciales SSH'); return; }
     setLoading(true); setError('');
+    // C4: solo enviamos id; IP/puerto/credenciales se resuelven server-side desde la DB.
     fetchWithTimeout(`${BASE}/ap-detail-direct`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: dev.id, ip: dev.ip, port: dev.sshPort ?? 22, user: dev.sshUser, pass: dev.sshPass }),
+      body: JSON.stringify({ id: dev.id }),
     }, 35_000)
       .then(r => r.json())
       .then(d => { if (d.success) { setStats(d.stats); setSaved(false); } else setError(d.message); })
@@ -95,11 +96,11 @@ function ApDetailModal({
                   {s.firmwareVersion && <StatCard label="Firmware" value={fmtFw(s.firmwareVersion) ?? s.firmwareVersion} />}
                   {s.uptimeStr && <StatCard label="Uptime" value={s.uptimeStr} color="text-emerald-700" />}
                   {s.cpuLoad != null && <StatCard label="CPU" value={fmtCpu(s.cpuLoad)}
-                    color={s.cpuLoad > 80 ? 'text-rose-600' : s.cpuLoad > 60 ? 'text-amber-600' : 'text-slate-700'} />}
+                    color={s.cpuLoad > 80 ? 'text-rose-600 dark:text-rose-400' : s.cpuLoad > 60 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-700 dark:text-slate-200'} />}
                   {(s.memoryPercent != null || (s.memTotalKb && s.memFreeKb != null)) &&
                     <StatCard label="Memoria" value={memLabel}
                       sub={s.memTotalKb ? `${Math.round(s.memTotalKb / 1024)} MB total` : undefined}
-                      color={parseInt(memLabel) > 85 ? 'text-rose-600' : parseInt(memLabel) > 70 ? 'text-amber-600' : 'text-slate-700'} />}
+                      color={parseInt(memLabel) > 85 ? 'text-rose-600 dark:text-rose-400' : parseInt(memLabel) > 70 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-700 dark:text-slate-200'} />}
                   {s.lanMac && <StatCard label="MAC LAN" value={s.lanMac} />}
                   {s.wlanMac && <StatCard label="MAC WLAN" value={s.wlanMac} />}
                 </div>
@@ -143,8 +144,8 @@ function ApDetailModal({
                   <div className="space-y-1">
                     {trafficRows.map(([iface, v]) => (
                       <div key={iface} className="flex items-center gap-4 bg-slate-50 rounded-lg px-3 py-2 border border-slate-100 text-xs dark:bg-slate-800/60 dark:border-slate-700">
-                        <span className="font-mono font-bold text-slate-700 w-16 shrink-0">{iface}</span>
-                        <span className="flex items-center gap-1 text-sky-700"><Download className="w-3 h-3" />
+                        <span className="font-mono font-bold text-slate-700 dark:text-slate-200 w-16 shrink-0">{iface}</span>
+                        <span className="flex items-center gap-1 text-sky-700 dark:text-sky-400"><Download className="w-3 h-3" />
                           {(v.rxBytes / 1e6).toFixed(1)} MB RX
                         </span>
                         <span className="flex items-center gap-1 text-rose-600"><Upload className="w-3 h-3" />
@@ -164,8 +165,9 @@ function ApDetailModal({
           <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 shrink-0 bg-slate-50 rounded-b-2xl dark:border-slate-800 dark:bg-slate-900/60">
             <p className="text-2xs text-slate-400">Los datos de señal y tráfico son instantáneos y no se persisten</p>
             <button onClick={handleSave} disabled={saved}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all
-                ${saved ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400' : 'bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400'}`}>
+              className={saved
+                ? 'flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400'
+                : 'btn-primary btn-sm'}>
               {saved ? <><CheckCircle2 className="w-3.5 h-3.5" /> Guardado</> : 'Guardar en dispositivo'}
             </button>
           </div>

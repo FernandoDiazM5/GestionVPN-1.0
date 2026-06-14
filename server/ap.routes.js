@@ -474,22 +474,17 @@ router.post('/poll-direct', async (req, res) => {
 // ── Full AP detail direct — all 12 SSH sections (ANTENNA_CMD) ────────────
 router.post('/ap-detail-direct', async (req, res) => {
     try {
-        const { ip, port, user, pass, id } = req.body;
-        if (!ip || !user) return res.status(400).json({ success: false, message: 'ip y user requeridos' });
+        const { id } = req.body;
+        if (!id) return res.status(400).json({ success: false, message: 'id requerido' });
 
-        let actualPass = pass;
-        if (id) {
-            const db = await getDb();
-            if (!(await ownsApUuid(db, req, id))) return res.status(404).json({ success: false, message: 'AP no encontrado' });
-        }
-        if (id && !actualPass) {
-            const db = await getDb();
-            const row = await db.get('SELECT clave_ssh_enc FROM aps WHERE uuid = ?', [id]);
-            if (row && row.clave_ssh_enc) actualPass = decryptPass(row.clave_ssh_enc);
-        }
-        if (!actualPass) return res.status(400).json({ success: false, message: 'Password no provisto' });
+        const db = await getDb();
+        // C4: aislamiento + credenciales/IP resueltas server-side desde la DB (nunca del body).
+        if (!(await ownsApUuid(db, req, id))) return res.status(404).json({ success: false, message: 'AP no encontrado' });
+        const row = await db.get('SELECT ip, usuario_ssh, clave_ssh_enc, puerto_ssh FROM aps WHERE uuid = ?', [id]);
+        if (!row || !row.ip || !row.usuario_ssh) return res.status(404).json({ success: false, message: 'AP sin datos o sin credenciales SSH' });
 
-        const s = await getFullDetail(ip, parseInt(port) || 22, user, actualPass);
+        const actualPass = row.clave_ssh_enc ? decryptPass(row.clave_ssh_enc) : '';
+        const s = await getFullDetail(row.ip, row.puerto_ssh || 22, row.usuario_ssh, actualPass);
         res.json({ success: true, stats: s });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });

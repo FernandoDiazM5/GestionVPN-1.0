@@ -75,8 +75,8 @@ function StationTable({ poll, onCpeDetail, dev }: {
   );
 
   return (
-    <div className="border-t border-indigo-100 bg-gradient-to-r from-indigo-50/40 to-slate-50/20">
-      <div className="flex items-center justify-between flex-wrap gap-2 px-4 py-2 border-b border-indigo-100">
+    <div className="border-t border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/40">
+      <div className="flex items-center justify-between flex-wrap gap-2 px-4 py-2 border-b border-slate-200 dark:border-slate-800">
         <div className="flex items-center gap-2">
           {poll.loading && <Loader2 className="w-3 h-3 animate-spin text-indigo-400" />}
           <span className="text-3xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
@@ -99,7 +99,7 @@ function StationTable({ poll, onCpeDetail, dev }: {
             <button onClick={handleEnrichAll} disabled={enriching}
               title={`SSH a ${needEnrich.length} CPE(s) para obtener nombre/modelo`}
               className="flex items-center gap-1 px-2 py-1 rounded-lg text-2xs font-bold
-                bg-violet-50 text-violet-600 hover:bg-violet-100 border border-violet-200 transition-colors disabled:opacity-50 dark:bg-violet-500/10 dark:text-violet-400 dark:hover:bg-violet-500/20 dark:border-violet-500/30">
+                bg-cyan-50 text-cyan-700 hover:bg-cyan-100 border border-cyan-200 transition-colors disabled:opacity-50 dark:bg-cyan-500/10 dark:text-cyan-400 dark:hover:bg-cyan-500/20 dark:border-cyan-500/30">
               {enriching ? <Loader2 className="w-3 h-3 animate-spin" /> : <ScanSearch className="w-3 h-3" />}
               {enriching ? 'Enriching…' : `Enrich ${needEnrich.length}`}
             </button>

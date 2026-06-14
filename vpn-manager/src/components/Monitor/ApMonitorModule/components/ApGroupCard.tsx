@@ -61,16 +61,16 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelAc
         </button>
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <Radio className="w-4 h-4 text-indigo-500 shrink-0" />
-          <span className="font-bold text-slate-800">{group.nodeName}</span>
+          <span className="font-bold text-slate-800 dark:text-slate-100">{group.nodeName}</span>
           <div className="flex items-center gap-1.5 ml-2">
             <span className={`w-2 h-2 rounded-full ${statusColor} ${anyOnline ? 'status-live text-emerald-500' : ''}`} />
             <span className="text-2xs font-bold text-slate-500 dark:text-slate-400">{statusLabel}</span>
           </div>
         </div>
-        <div className="flex items-center gap-3 text-xs text-slate-500 shrink-0">
+        <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 shrink-0">
           <span className="flex items-center gap-1"><Server className="w-3 h-3" /> {group.aps.length} AP{group.aps.length !== 1 ? 's' : ''}</span>
-          {group.stas.length > 0 && <span className="flex items-center gap-1 text-cyan-600"><Users className="w-3 h-3" /> {group.stas.length} CPE{group.stas.length !== 1 ? 's' : ''}</span>}
-          {totalCpes > 0 && <span className="flex items-center gap-1"><Users className="w-3 h-3 text-violet-500" /> {totalCpes} live</span>}
+          {group.stas.length > 0 && <span className="flex items-center gap-1 text-cyan-600 dark:text-cyan-400"><Users className="w-3 h-3" /> {group.stas.length} CPE{group.stas.length !== 1 ? 's' : ''}</span>}
+          {totalCpes > 0 && <span className="flex items-center gap-1 text-cyan-600 dark:text-cyan-400"><Users className="w-3 h-3" /> {totalCpes} live</span>}
           <ApColSelector hidden={hiddenApCols} onChange={handleApColChange} />
         </div>
       </div>
@@ -125,14 +125,14 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelAc
           )}
 
           {group.stas.length > 0 && (
-            <div className="border-t border-cyan-100 bg-cyan-50/30">
-              <div className="px-4 py-2 flex items-center gap-2 border-b border-cyan-100">
-                <span className="text-3xs font-bold text-cyan-600 uppercase tracking-wider">CPEs guardados · {group.stas.length}</span>
+            <div className="border-t border-cyan-100 bg-cyan-50/30 dark:border-cyan-500/20 dark:bg-cyan-500/5">
+              <div className="px-4 py-2 flex items-center gap-2 border-b border-cyan-100 dark:border-cyan-500/20">
+                <span className="text-3xs font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-wider">CPEs guardados · {group.stas.length}</span>
               </div>
               {group.stas.map(sta => (
-                <div key={sta.id} className="flex items-center gap-3 px-4 py-2.5 border-b border-cyan-100/60 last:border-0 hover:bg-cyan-50 transition-colors text-xs">
-                  <span className="shrink-0 text-3xs font-bold px-1.5 py-0.5 rounded-md bg-cyan-100 text-cyan-700 border border-cyan-200">CPE</span>
-                  <span className="font-semibold text-slate-700 truncate min-w-0 max-w-[160px]" title={sta.name || sta.ip}>{sta.name || sta.ip}</span>
+                <div key={sta.id} className="flex items-center gap-3 px-4 py-2.5 border-b border-cyan-100/60 last:border-0 hover:bg-cyan-50 transition-colors text-xs dark:border-cyan-500/10 dark:hover:bg-cyan-500/10">
+                  <span className="shrink-0 text-3xs font-bold px-1.5 py-0.5 rounded-md bg-cyan-100 text-cyan-700 border border-cyan-200 dark:bg-cyan-500/15 dark:text-cyan-400 dark:border-cyan-500/30">CPE</span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-200 truncate min-w-0 max-w-[160px]" title={sta.name || sta.ip}>{sta.name || sta.ip}</span>
                   <span className="font-mono text-2xs text-slate-500 dark:text-slate-400 shrink-0">{sta.ip}</span>
                   {sta.mac && <span className="font-mono text-2xs text-slate-500 dark:text-slate-400 shrink-0 hidden sm:block">{sta.mac}</span>}
                   {sta.model && <span className="text-2xs text-slate-500 truncate shrink-0 hidden md:block">{sta.model}</span>}
