@@ -3,6 +3,8 @@
 //
 //   POST /node/edit         → cambia user/password/IP/comment/subnets
 //   POST /node/label/save   → etiqueta MySQL (anula comment de MikroTik)
+//
+//  Fase F5.A: shape uniforme (sendOk/AppError) + Zod.
 // ============================================================
 
 const express = require('express');
@@ -15,13 +17,16 @@ const {
 const { IPV4_REGEX } = require('../../ubiquiti.service');
 const { getDb, saveNode, deleteNode } = require('../../db.service');
 const { nodeBelongsToRequester } = require('./_shared');
+const { sendOk, AppError, asyncHandler } = require('../../lib/apiResponse');
+const { requireMikrotik } = require('../../lib/routeGuards');
 
-router.post('/node/edit', async (req, res) => {
-  if (!req.mikrotik) return res.status(503).json({ success: false, needsConfig: true, message: 'Configura las credenciales MikroTik en Ajustes antes de continuar.' });
-  const { ip, user, pass } = req.mikrotik;
+router.post('/node/edit', asyncHandler(async (req, res) => {
+  const { ip, user, pass } = requireMikrotik(req);
   const { pppUser, newPppUser, newPassword, newRemoteAddress, newComment, vrfName, addSubnets, removeSubnets } = req.body;
-  if (!(await nodeBelongsToRequester(req, pppUser))) return res.status(404).json({ success: false, message: 'Nodo no encontrado en tu workspace' });
-  if (!pppUser) return res.status(400).json({ success: false, message: 'pppUser requerido' });
+  if (!pppUser) throw new AppError('pppUser requerido', 400, 'VALIDATION_ERROR');
+  if (!(await nodeBelongsToRequester(req, pppUser))) {
+    throw new AppError('Nodo no encontrado en tu workspace', 404, 'NOT_FOUND');
+  }
   const isWG = pppUser.startsWith('WG-ND') || pppUser.startsWith('VPN-WG-');
   const hasVrf = !!vrfName;
   const ifaceName = isWG ? pppUser : (hasVrf ? vrfName.replace(/^VRF-/, 'VPN-SSTP-') : '');
@@ -146,8 +151,10 @@ router.post('/node/edit', async (req, res) => {
     }
 
     await api.close();
-    if (steps.length === 0)
-      return res.json({ success: false, message: 'Sin cambios para aplicar', steps });
+    if (steps.length === 0) {
+      // No es error — solo "nada que hacer". Devolvemos sendOk con flag.
+      return sendOk(res, { noChanges: true, message: 'Sin cambios para aplicar', steps });
+    }
 
     // --- Actualizar nodo en MySQL ---
     try {
@@ -169,22 +176,27 @@ router.post('/node/edit', async (req, res) => {
       log.error({ err: dbErr.message }, 'DB: actualizar nodo en MySQL');
     }
 
-    res.json({ success: true, message: 'Nodo actualizado correctamente', steps });
+    return sendOk(res, { message: 'Nodo actualizado correctamente', steps });
   } catch (error) {
-    if (api) try { await api.close(); } catch (_) { }
-    res.status(500).json({ success: false, message: getErrorMessage(error, ip, user), steps, failedAt: steps.length + 1 });
+    if (api) try { await api.close(); } catch (_) { /* ignore */ }
+    if (error instanceof AppError) throw error;
+    throw new AppError(
+      getErrorMessage(error, ip, user),
+      500, 'MIKROTIK_ERROR',
+      { steps, failedAt: steps.length + 1 }
+    );
   }
-});
+}));
 
-router.post('/node/label/save', async (req, res) => {
+router.post('/node/label/save', asyncHandler(async (req, res) => {
   const { pppUser, label } = req.body;
-  if (!pppUser) return res.status(400).json({ success: false, message: 'pppUser requerido' });
-  if (!(await nodeBelongsToRequester(req, pppUser))) return res.status(404).json({ success: false, message: 'Nodo no encontrado en tu workspace' });
-  try {
-    const db = await getDb();
-    await db.run('UPDATE nodes SET label = ? WHERE ppp_user = ?', [label || '', pppUser]);
-    res.json({ success: true });
-  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
-});
+  if (!pppUser) throw new AppError('pppUser requerido', 400, 'VALIDATION_ERROR');
+  if (!(await nodeBelongsToRequester(req, pppUser))) {
+    throw new AppError('Nodo no encontrado en tu workspace', 404, 'NOT_FOUND');
+  }
+  const db = await getDb();
+  await db.run('UPDATE nodes SET label = ? WHERE ppp_user = ?', [label || '', pppUser]);
+  return sendOk(res);
+}));
 
 module.exports = router;

@@ -3,37 +3,39 @@
 //
 //   POST /connect    → login RouterOS API + /system/resource/print
 //   POST /diagnose   → TCP probe :8728/:8729 + login test
+//
+//  Fase F5.A: shape uniforme (sendOk/AppError) + Zod.
 // ============================================================
-
 const express = require('express');
 const net = require('net');
 const router = express.Router();
 
 const log = require('../../lib/logger').child({ scope: 'core:connection' });
 const { connectToMikrotik, safeWrite, getErrorMessage } = require('../../routeros.service');
+const { sendOk, AppError, asyncHandler } = require('../../lib/apiResponse');
+const { requireMikrotik } = require('../../lib/routeGuards');
 
-router.post('/connect', async (req, res) => {
-  if (!req.mikrotik) return res.status(503).json({ success: false, needsConfig: true, message: 'Configura las credenciales MikroTik en Ajustes antes de continuar.' });
-  const { ip, user, pass } = req.mikrotik;
-  if (!ip || !user) return res.status(400).json({ success: false, message: 'Faltan credenciales' });
+router.post('/connect', asyncHandler(async (req, res) => {
+  const { ip, user, pass } = requireMikrotik(req);
+  if (!ip || !user) throw new AppError('Faltan credenciales', 400, 'BAD_REQUEST');
   let api;
   try {
     api = await connectToMikrotik(ip, user, pass);
     const resource = await safeWrite(api, ['/system/resource/print']);
     await api.close();
-    res.json({ success: true, message: 'Conectado exitosamente', data: resource });
+    return sendOk(res, { message: 'Conectado exitosamente', data: resource });
   } catch (error) {
-    if (api) try { await api.close(); } catch (_) { }
-    const msg = getErrorMessage(error, ip, user);
+    if (api) try { await api.close(); } catch (_) { /* ignore */ }
+    if (error instanceof AppError) throw error;
     log.error({ ip, user, errno: error?.errno, code: error?.code, err: error?.message }, 'CONNECT fallo');
-    res.status(500).json({ success: false, message: msg });
+    throw new AppError(getErrorMessage(error, ip, user), 500, 'MIKROTIK_ERROR');
   }
-});
+}));
 
-router.post('/diagnose', async (req, res) => {
-  if (!req.mikrotik) return res.status(503).json({ success: false, needsConfig: true, message: 'Configura las credenciales MikroTik en Ajustes antes de continuar.' });
-  const { ip, user, pass } = req.mikrotik;
-  if (!ip) return res.status(400).json({ success: false });
+router.post('/diagnose', asyncHandler(async (req, res) => {
+  const { ip, user, pass } = requireMikrotik(req);
+  if (!ip) throw new AppError('Falta IP', 400, 'BAD_REQUEST');
+
   const steps = [];
   const probe = (port) => new Promise((resolve) => {
     const s = net.createConnection({ host: ip, port, timeout: 5000 });
@@ -55,7 +57,9 @@ router.post('/diagnose', async (req, res) => {
       authMsg = getErrorMessage(e, ip, user);
     }
   }
-  res.json({ steps, authOk, authMsg, apiReachable: r8728.open || r8729.open });
-});
+  // Endpoint /diagnose históricamente NO envuelve en { success } — devuelve el
+  // objeto plano. Mantengo el shape para no romper la UI que lo lee directo.
+  return res.json({ steps, authOk, authMsg, apiReachable: r8728.open || r8729.open });
+}));
 
 module.exports = router;

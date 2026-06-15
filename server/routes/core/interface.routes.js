@@ -4,17 +4,25 @@
 //   POST /interface/activate    → enable existing SSTP/WG-server binding
 //                                  (lo crea si falta)
 //   POST /interface/deactivate  → disable binding (sin borrarlo)
+//
+//  Fase F5.A: shape uniforme (sendOk/AppError) + Zod.
 // ============================================================
-
 const express = require('express');
+const { z } = require('zod');
 const router = express.Router();
 
 const { connectToMikrotik, safeWrite } = require('../../routeros.service');
+const { sendOk, AppError, asyncHandler } = require('../../lib/apiResponse');
+const { requireMikrotik } = require('../../lib/routeGuards');
 
-router.post('/interface/activate', async (req, res) => {
-  if (!req.mikrotik) return res.status(503).json({ success: false, needsConfig: true, message: 'Configura las credenciales MikroTik en Ajustes antes de continuar.' });
-  const { ip, user, pass } = req.mikrotik;
-  const { vpnName, vpnService } = req.body;
+const InterfaceBodySchema = z.object({
+  vpnName: z.string().min(1, 'vpnName requerido'),
+  vpnService: z.enum(['sstp', 'pptp', 'l2tp', 'ovpn']),
+});
+
+router.post('/interface/activate', asyncHandler(async (req, res) => {
+  const { ip, user, pass } = requireMikrotik(req);
+  const { vpnName, vpnService } = InterfaceBodySchema.parse(req.body);
   let api;
   try {
     api = await connectToMikrotik(ip, user, pass);
@@ -30,17 +38,17 @@ router.post('/interface/activate', async (req, res) => {
     }
     const allActive = await safeWrite(api, ['/ppp/active/print']);
     await api.close();
-    res.json({ success: true, ip: allActive.find(s => s.name === vpnName)?.address });
+    return sendOk(res, { ip: allActive.find(s => s.name === vpnName)?.address });
   } catch (error) {
-    if (api) try { await api.close(); } catch (_) { }
-    res.status(500).json({ success: false, message: error.message || 'Error activando interface' });
+    if (api) try { await api.close(); } catch (_) { /* ignore */ }
+    if (error instanceof AppError) throw error;
+    throw new AppError(error.message || 'Error activando interface', 500, 'MIKROTIK_ERROR');
   }
-});
+}));
 
-router.post('/interface/deactivate', async (req, res) => {
-  if (!req.mikrotik) return res.status(503).json({ success: false, needsConfig: true, message: 'Configura las credenciales MikroTik en Ajustes antes de continuar.' });
-  const { ip, user, pass } = req.mikrotik;
-  const { vpnName, vpnService } = req.body;
+router.post('/interface/deactivate', asyncHandler(async (req, res) => {
+  const { ip, user, pass } = requireMikrotik(req);
+  const { vpnName, vpnService } = InterfaceBodySchema.parse(req.body);
   let api;
   try {
     api = await connectToMikrotik(ip, user, pass);
@@ -49,11 +57,12 @@ router.post('/interface/deactivate', async (req, res) => {
     const existingIface = allIfaces.find(i => i.user === vpnName);
     if (existingIface?.['.id']) await safeWrite(api, [`${bindingMenu}/disable`, `=.id=${existingIface['.id']}`]);
     await api.close();
-    res.json({ success: true });
+    return sendOk(res);
   } catch (error) {
-    if (api) try { await api.close(); } catch (_) { }
-    res.status(500).json({ success: false, message: error.message || 'Error desactivando interface' });
+    if (api) try { await api.close(); } catch (_) { /* ignore */ }
+    if (error instanceof AppError) throw error;
+    throw new AppError(error.message || 'Error desactivando interface', 500, 'MIKROTIK_ERROR');
   }
-});
+}));
 
 module.exports = router;

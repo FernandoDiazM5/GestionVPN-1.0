@@ -16,10 +16,14 @@ const {
 } = require('../../routeros.service');
 const { getDb, saveNode, getNodes } = require('../../db.service');
 const { annotateSessions, filterNodesForRole, nodeBelongsToRequester } = require('./_shared');
+const { sendOk, AppError, asyncHandler } = require('../../lib/apiResponse');
+const { requireMikrotik } = require('../../lib/routeGuards');
 
-router.post('/nodes', async (req, res) => {
-  if (!req.mikrotik) return res.status(503).json({ success: false, needsConfig: true, message: 'Configura las credenciales MikroTik en Ajustes antes de continuar.' });
-  const { ip, user, pass } = req.mikrotik;
+// NOTA: el endpoint /nodes históricamente responde con un ARRAY plano (no shape
+// { success, ... }). El frontend lo consume así. Mantengo el shape legacy para
+// no romper la UI. F5.C considera migrarlo a sendOk(res, { nodes: [...] }).
+router.post('/nodes', asyncHandler(async (req, res) => {
+  const { ip, user, pass } = requireMikrotik(req);
   let api;
   try {
     api = await connectToMikrotik(ip, user, pass);
@@ -132,9 +136,9 @@ router.post('/nodes', async (req, res) => {
       log.error({ err: dbErr.message }, 'DB: actualizar caché de nodos');
     }
 
-    res.json(await annotateSessions(req, await filterNodesForRole(req, nodes)));
+    return res.json(await annotateSessions(req, await filterNodesForRole(req, nodes)));
   } catch (error) {
-    if (api) try { await api.close(); } catch (_) { }
+    if (api) try { await api.close(); } catch (_) { /* ignore */ }
 
     // --- Fallback: retornar nodos desde caché MySQL si MikroTik no responde ---
     try {
@@ -154,13 +158,13 @@ router.post('/nodes', async (req, res) => {
       log.error({ err: dbErr.message }, 'DB: leer caché de nodos');
     }
 
-    res.status(500).json({ success: false, message: getErrorMessage(error, ip, user) });
+    if (error instanceof AppError) throw error;
+    throw new AppError(getErrorMessage(error, ip, user), 500, 'MIKROTIK_ERROR');
   }
-});
+}));
 
-router.post('/node/details', async (req, res) => {
-  if (!req.mikrotik) return res.status(503).json({ success: false, needsConfig: true, message: 'Configura las credenciales MikroTik en Ajustes antes de continuar.' });
-  const { ip, user, pass } = req.mikrotik;
+router.post('/node/details', asyncHandler(async (req, res) => {
+  const { ip, user, pass } = requireMikrotik(req);
   const { vrfName, pppUser } = req.body;
   let api;
   try {
@@ -186,23 +190,24 @@ router.post('/node/details', async (req, res) => {
     }
 
     await api.close();
-    res.json({
-      success: true,
+    return sendOk(res, {
       lanSubnets: lanSubnets.length > 0 ? lanSubnets : vrfSubnets,
       remoteAddress: isWG ? ipTunnel : (secret?.['remote-address'] || ipTunnel || ''),
       currentPppUser: isWG ? pppUser : (secret?.name || pppUser || ''),
       pppPassword: '********',   // Nunca enviar la contraseña real al frontend
     });
   } catch (error) {
-    if (api) try { await api.close(); } catch (_) { }
-    res.status(500).json({ success: false, message: getErrorMessage(error, ip, user) });
+    if (api) try { await api.close(); } catch (_) { /* ignore */ }
+    if (error instanceof AppError) throw error;
+    throw new AppError(getErrorMessage(error, ip, user), 500, 'MIKROTIK_ERROR');
   }
-});
+}));
 
-router.post('/node/script', async (req, res) => {
+router.post('/node/script', asyncHandler(async (req, res) => {
   const { pppUser, pppPassword, serverPublicIP } = req.body;
-  if (!pppUser || !serverPublicIP)
-    return res.status(400).json({ success: false, message: 'pppUser y serverPublicIP son requeridos' });
+  if (!pppUser || !serverPublicIP) {
+    throw new AppError('pppUser y serverPublicIP son requeridos', 400, 'VALIDATION_ERROR');
+  }
 
   const isWG = pppUser.startsWith('WG-ND') || pppUser.startsWith('VPN-WG-');
 
@@ -249,10 +254,10 @@ router.post('/node/script', async (req, res) => {
       { title: 'Agregar peer (servidor Core)', cmd: `/interface wireguard peers add interface=WG-CORE-ISP public-key="${serverPublicKey}" endpoint-address=${serverPublicIP} endpoint-port=${wgPort} allowed-address=192.168.21.0/24,${tunnelNet30} persistent-keepalive=25s comment="Conexion al Servidor Core"` },
       { title: 'Ruta de retorno hacia administración', cmd: `/ip route add dst-address=192.168.21.0/24 distance=20 gateway=WG-CORE-ISP comment="Retorno hacia Administracion/Software"` },
     ];
-    return res.json({ success: true, script, cpeSteps });
+    return sendOk(res, { script, cpeSteps });
   }
 
-  if (!pppPassword) return res.status(400).json({ success: false, message: 'pppPassword es requerido para SSTP' });
+  if (!pppPassword) throw new AppError('pppPassword es requerido para SSTP', 400, 'VALIDATION_ERROR');
   // Si sstp-out1 ya existe, solo actualiza sus parámetros (evita crear interfaz dinámica duplicada DR).
   // Si no existe, la crea desde cero.
   const script = `/interface sstp-client
@@ -264,16 +269,19 @@ router.post('/node/script', async (req, res) => {
   const cpeSteps = [
     { title: 'Configurar Cliente SSTP', cmd: `/interface sstp-client\n:if ([find name=sstp-out1] = "") do={\n  add authentication=mschap2 connect-to=${serverPublicIP} disabled=no http-proxy=0.0.0.0 name=sstp-out1 profile=default-encryption tls-version=only-1.2 user=${pppUser} password=${pppPassword}\n} else={\n  set [find name=sstp-out1] connect-to=${serverPublicIP} disabled=no user=${pppUser} password=${pppPassword}\n}` },
   ];
-  res.json({ success: true, script, cpeSteps });
-});
+  return sendOk(res, { script, cpeSteps });
+}));
 
 // POST /node/wg/set-peer — Agrega o actualiza el peer CPE en un nodo WireGuard existente
-router.post('/node/wg/set-peer', async (req, res) => {
-  if (!req.mikrotik) return res.status(503).json({ success: false, needsConfig: true, message: 'Configura las credenciales MikroTik primero.' });
-  const { ip, user, pass } = req.mikrotik;
+router.post('/node/wg/set-peer', asyncHandler(async (req, res) => {
+  const { ip, user, pass } = requireMikrotik(req);
   const { pppUser, cpePublicKey } = req.body;
-  if (!pppUser || !cpePublicKey) return res.status(400).json({ success: false, message: 'pppUser y cpePublicKey son requeridos' });
-  if (!(await nodeBelongsToRequester(req, pppUser))) return res.status(404).json({ success: false, message: 'Nodo no encontrado en tu workspace' });
+  if (!pppUser || !cpePublicKey) {
+    throw new AppError('pppUser y cpePublicKey son requeridos', 400, 'VALIDATION_ERROR');
+  }
+  if (!(await nodeBelongsToRequester(req, pppUser))) {
+    throw new AppError('Nodo no encontrado en tu workspace', 404, 'NOT_FOUND');
+  }
 
   let api;
   try {
@@ -284,7 +292,7 @@ router.post('/node/wg/set-peer', async (req, res) => {
     const wgAddr = allAddrs.find(a => a.interface === pppUser && (a.address || '').startsWith('10.10.251.'));
     if (!wgAddr) {
       await api.close();
-      return res.status(404).json({ success: false, message: `No se encontró IP WireGuard para ${pppUser}` });
+      throw new AppError(`No se encontró IP WireGuard para ${pppUser}`, 404, 'NOT_FOUND');
     }
     // Server IP es .X en la dirección, peer IP es .X+1
     // Ej: address=10.10.251.1/30 → serverOct=1 → peerOct=2
@@ -317,11 +325,12 @@ router.post('/node/wg/set-peer', async (req, res) => {
     ]);
 
     await api.close();
-    res.json({ success: true, message: `Peer CPE configurado: ${peerIP} + ${lanSubnets.join(', ')}`, peerIP, allowedAddress });
+    return sendOk(res, { message: `Peer CPE configurado: ${peerIP} + ${lanSubnets.join(', ')}`, peerIP, allowedAddress });
   } catch (error) {
-    if (api) try { await api.close(); } catch (_) { }
-    res.status(500).json({ success: false, message: getErrorMessage(error, ip, user, pass) });
+    if (api) try { await api.close(); } catch (_) { /* ignore */ }
+    if (error instanceof AppError) throw error;
+    throw new AppError(getErrorMessage(error, ip, user, pass), 500, 'MIKROTIK_ERROR');
   }
-});
+}));
 
 module.exports = router;

@@ -16,10 +16,11 @@ const {
 const { IPV4_REGEX, CIDR_REGEX } = require('../../ubiquiti.service');
 const { getDb, encryptPass, saveNode, deleteNode } = require('../../db.service');
 const { nodeBelongsToRequester } = require('./_shared');
+const { sendOk, AppError, asyncHandler } = require('../../lib/apiResponse');
+const { requireMikrotik } = require('../../lib/routeGuards');
 
-router.post('/node/next', async (req, res) => {
-  if (!req.mikrotik) return res.status(503).json({ success: false, needsConfig: true, message: 'Configura las credenciales MikroTik en Ajustes antes de continuar.' });
-  const { ip, user, pass } = req.mikrotik;
+router.post('/node/next', asyncHandler(async (req, res) => {
+  const { ip, user, pass } = requireMikrotik(req);
   let api;
   try {
     api = await connectToMikrotik(ip, user, pass);
@@ -44,25 +45,25 @@ router.post('/node/next', async (req, res) => {
     const maxRemote = usedRemote.length > 0 ? Math.max(...usedRemote) : 200;
     const nextRemote = `10.10.250.${maxRemote + 1}`;
 
-    res.json({ success: true, nextNode, nextRemote });
+    return sendOk(res, { nextNode, nextRemote });
   } catch (error) {
-    if (api) try { await api.close(); } catch (_) { }
-    res.status(500).json({ success: false, message: getErrorMessage(error, ip, user) });
+    if (api) try { await api.close(); } catch (_) { /* ignore */ }
+    if (error instanceof AppError) throw error;
+    throw new AppError(getErrorMessage(error, ip, user), 500, 'MIKROTIK_ERROR');
   }
-});
+}));
 
-router.post('/node/provision', async (req, res) => {
-  if (!req.mikrotik) return res.status(503).json({ success: false, needsConfig: true, message: 'Configura las credenciales MikroTik en Ajustes antes de continuar.' });
-  const { ip, user, pass } = req.mikrotik;
+router.post('/node/provision', asyncHandler(async (req, res) => {
+  const { ip, user, pass } = requireMikrotik(req);
   const { nodeNumber, nodeName, pppUser, pppPassword, lanSubnet, lanSubnets, remoteAddress, protocol, cpePublicKey, wgListenPort } = req.body;
   const isWG = protocol === 'wireguard';
   const allSubnets = Array.isArray(lanSubnets) && lanSubnets.length > 0 ? lanSubnets : [lanSubnet].filter(Boolean);
   if (allSubnets.length === 0 || !allSubnets.every(s => CIDR_REGEX.test(s)))
-    return res.status(400).json({ success: false, message: 'CIDRs de LAN inválidos' });
+    throw new AppError('CIDRs de LAN inválidos', 400, 'VALIDATION_ERROR');
   if (!isWG && !IPV4_REGEX.test(remoteAddress))
-    return res.status(400).json({ success: false, message: 'IP remota inválida' });
+    throw new AppError('IP remota inválida', 400, 'VALIDATION_ERROR');
   // cpePublicKey es opcional en WireGuard — el peer se agrega después si no se proporcionó
-  if (!isWG && (!pppUser || !pppPassword)) return res.status(400).json({ success: false, message: 'Usuario y Contraseña requeridos para SSTP' });
+  if (!isWG && (!pppUser || !pppPassword)) throw new AppError('Usuario y Contraseña requeridos para SSTP', 400, 'VALIDATION_ERROR');
 
   const steps = []; let api;
   const ndNum = parseInt(nodeNumber, 10);
@@ -202,8 +203,7 @@ router.post('/node/provision', async (req, res) => {
         } catch (txErr) { await db.run('ROLLBACK'); throw txErr; }
       } catch (dbErr) { log.error({ err: dbErr.message }, 'DB: guardar nodo WG'); }
 
-      return res.json({
-        success: true,
+      return sendOk(res, {
         message: `Nodo WG ND${ndNum} provisionado correctamente`,
         ifaceName, vrfName, remoteAddress: wgPeerIP,
         steps, serverPublicKey, wgPort, peerIP: wgPeerIP,
@@ -305,8 +305,7 @@ router.post('/node/provision', async (req, res) => {
       log.error({ err: dbErr.message }, 'DB: guardar nodo en MySQL');
     }
 
-    res.json({
-      success: true,
+    return sendOk(res, {
       message: `Nodo ND${nodeNumber} provisionado correctamente`,
       ifaceName, vrfName, remoteAddress, steps,
       protocol, wgPort, serverPublicKey,
@@ -314,18 +313,23 @@ router.post('/node/provision', async (req, res) => {
       listenPort: isWG ? wgPort : undefined,
     });
   } catch (error) {
-    if (api) try { await api.close(); } catch (_) { }
-    res.status(500).json({ success: false, message: getErrorMessage(error, ip, user), steps, failedAt: steps.length + 1 });
+    if (api) try { await api.close(); } catch (_) { /* ignore */ }
+    if (error instanceof AppError) throw error;
+    throw new AppError(
+      getErrorMessage(error, ip, user),
+      500, 'MIKROTIK_ERROR',
+      { steps, failedAt: steps.length + 1 }
+    );
   }
-});
+}));
 
-router.post('/node/deprovision', async (req, res) => {
-  if (!req.mikrotik) return res.status(503).json({ success: false, needsConfig: true, message: 'Configura las credenciales MikroTik en Ajustes antes de continuar.' });
-  const { ip, user, pass } = req.mikrotik;
+router.post('/node/deprovision', asyncHandler(async (req, res) => {
+  const { ip, user, pass } = requireMikrotik(req);
   const { vrfName, pppUser, protocol } = req.body;
-  if (!pppUser)
-    return res.status(400).json({ success: false, message: 'pppUser es requerido' });
-  if (!(await nodeBelongsToRequester(req, pppUser))) return res.status(404).json({ success: false, message: 'Nodo no encontrado en tu workspace' });
+  if (!pppUser) throw new AppError('pppUser es requerido', 400, 'VALIDATION_ERROR');
+  if (!(await nodeBelongsToRequester(req, pppUser))) {
+    throw new AppError('Nodo no encontrado en tu workspace', 404, 'NOT_FOUND');
+  }
 
   const isWireGuard = protocol === 'wireguard' || pppUser.startsWith('WG-ND') || pppUser.startsWith('VPN-WG-');
   const hasVrf = !!vrfName;
@@ -462,11 +466,16 @@ router.post('/node/deprovision', async (req, res) => {
       steps.push({ step: 8, obj: 'Base de datos', name: `Error: ${dbErr.message}`, status: 'warn' });
     }
 
-    res.json({ success: true, message: `Nodo eliminado correctamente`, steps, deletedDeviceIds });
+    return sendOk(res, { message: `Nodo eliminado correctamente`, steps, deletedDeviceIds });
   } catch (error) {
-    if (api) try { await api.close(); } catch (_) { }
-    res.status(500).json({ success: false, message: getErrorMessage(error, ip, user), steps, failedAt: steps.length + 1 });
+    if (api) try { await api.close(); } catch (_) { /* ignore */ }
+    if (error instanceof AppError) throw error;
+    throw new AppError(
+      getErrorMessage(error, ip, user),
+      500, 'MIKROTIK_ERROR',
+      { steps, failedAt: steps.length + 1 }
+    );
   }
-});
+}));
 
 module.exports = router;

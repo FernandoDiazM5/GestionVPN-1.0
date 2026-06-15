@@ -13,12 +13,14 @@ class AppError extends Error {
    * @param {string} message  Mensaje legible para el usuario.
    * @param {number} status   HTTP status (default 400).
    * @param {string} [code]   Código máquina (ej. 'OTP_INVALID').
+   * @param {object} [data]   Campos extra a propagar al cliente (ej. needsConfig).
    */
-  constructor(message, status = 400, code = 'BAD_REQUEST') {
+  constructor(message, status = 400, code = 'BAD_REQUEST', data = null) {
     super(message);
     this.name = 'AppError';
     this.status = status;
     this.code = code;
+    this.data = data;
     this.isOperational = true;
   }
 }
@@ -29,8 +31,10 @@ function sendOk(res, data = {}, status = 200) {
 }
 
 /** Respuesta de error uniforme. */
-function sendError(res, status, message, code = 'ERROR') {
-  return res.status(status).json({ success: false, message, code });
+function sendError(res, status, message, code = 'ERROR', data = null) {
+  const body = { success: false, message, code };
+  if (data && typeof data === 'object') Object.assign(body, data);
+  return res.status(status).json(body);
 }
 
 /**
@@ -47,7 +51,7 @@ function asyncHandler(fn) {
  */
 function errorMiddleware(err, _req, res, _next) {
   if (err instanceof AppError) {
-    return sendError(res, err.status, err.message, err.code);
+    return sendError(res, err.status, err.message, err.code, err.data);
   }
   // Errores de validación zod
   if (err && err.name === 'ZodError') {

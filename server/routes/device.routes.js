@@ -1,84 +1,91 @@
+// ============================================================
+//  device.routes.js — operaciones sobre APs Ubiquiti + RouterOS aux.
+//  Fase F5.A: shape uniforme (sendOk/AppError) + asyncHandler.
+// ============================================================
 const express = require('express');
 const router = express.Router();
-const { connectToMikrotik, safeWrite, getErrorMessage, cleanTunnelRules } = require('../routeros.service');
-const { IPV4_REGEX, CIDR_REGEX, getSubnetHosts, probeUbiquiti, sshExec, parseAirOSStats, parseFullOutput, ANTENNA_CMD, trySshCredentials } = require('../ubiquiti.service');
-const { getDb, encryptPass, decryptPass, getApByUuid, getApIntId, getApGroupIntId } = require('../db.service');
+const { connectToMikrotik, safeWrite, getErrorMessage } = require('../routeros.service');
+const { sshExec, parseFullOutput, ANTENNA_CMD, trySshCredentials } = require('../ubiquiti.service');
+const { getDb, encryptPass, decryptPass, getApGroupIntId } = require('../db.service');
 const log = require('../lib/logger').child({ scope: 'device' });
 const { reqWorkspace, ownedGroupIntIds, ownsApUuid, ownsGroupUuid } = require('../lib/tenantScope');
 const { resolveOwnerNodeId } = require('../lib/apNode');
+const { sendOk, AppError, asyncHandler } = require('../lib/apiResponse');
 
-router.post('/device/auto-login', async (req, res) => {
-    const { ip, sshCredentials } = req.body;
-    try {
-        const credResult = await trySshCredentials(ip, sshCredentials);
-        if (credResult) {
-            res.json({ success: true, user: credResult.user, pass: credResult.pass, port: credResult.port, stats: credResult.stats });
-        } else {
-            res.json({ success: false, message: 'Autenticación fallida' });
-        }
-    } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+// /device/auto-login: 200 OK siempre — el flag `authenticated` señala el resultado.
+router.post('/device/auto-login', asyncHandler(async (req, res) => {
+  const { ip, sshCredentials } = req.body;
+  const credResult = await trySshCredentials(ip, sshCredentials);
+  if (credResult) {
+    return sendOk(res, {
+      authenticated: true,
+      user: credResult.user,
+      pass: credResult.pass,
+      port: credResult.port,
+      stats: credResult.stats,
+    });
+  }
+  return sendOk(res, { authenticated: false, message: 'Autenticación fallida' });
+}));
+
+// /device/antenna: errores de red/auth son ESPERADOS (200 OK con flag); solo
+// errores inesperados del servidor caen al middleware central.
+router.post('/device/antenna', asyncHandler(async (req, res) => {
+  const { deviceIP, deviceUser, devicePass, devicePort, deviceId } = req.body;
+  try {
+    let actualPass = devicePass;
+    // deviceId from frontend is the UUID
+    if (deviceId && !actualPass) {
+      const db = await getDb();
+      const row = await db.get('SELECT clave_ssh_enc FROM aps WHERE uuid = ?', [deviceId]);
+      if (row && row.clave_ssh_enc) actualPass = decryptPass(row.clave_ssh_enc);
     }
-});
 
-router.post('/device/antenna', async (req, res) => {
-    const { deviceIP, deviceUser, devicePass, devicePort, deviceId } = req.body;
-    try {
-        let actualPass = devicePass;
-        // deviceId from frontend is the UUID
-        if (deviceId && !actualPass) {
-            const db = await getDb();
-            const row = await db.get('SELECT clave_ssh_enc FROM aps WHERE uuid = ?', [deviceId]);
-            if (row && row.clave_ssh_enc) actualPass = decryptPass(row.clave_ssh_enc);
-        }
+    // Comando combinado: mca-status + system.cfg + hostname + version + ifconfig
+    const output = await sshExec(deviceIP, parseInt(devicePort) || 22, deviceUser, actualPass || '', ANTENNA_CMD, 20000, 8000);
+    return sendOk(res, { stats: parseFullOutput(output) });
+  } catch (error) {
+    const msg = error.message || '';
+    const isAuth    = /[Aa]uth|handshake|All configured|incorrect|denied/i.test(msg);
+    const isRefused = /ECONNREFUSED|connection refused/i.test(msg);
+    const isTimeout = /timeout|agotado|ETIMEDOUT|ESOCKETTIMEDOUT/i.test(msg);
+    const isUnreach = /EHOSTUNREACH|ENETUNREACH|ENOTFOUND/i.test(msg);
+    const friendly  = isAuth    ? 'Credenciales incorrectas'
+                    : isRefused ? 'SSH no disponible (puerto cerrado)'
+                    : isTimeout ? 'Tiempo de espera SSH agotado'
+                    : isUnreach ? 'Host no alcanzable'
+                    : msg;
+    log.debug({ deviceIP, friendly }, 'SSH');
+    return res.json({ success: false, message: friendly });
+  }
+}));
 
-        // Comando combinado: mca-status + system.cfg + hostname + version + ifconfig
-        const output = await sshExec(deviceIP, parseInt(devicePort) || 22, deviceUser, actualPass || '', ANTENNA_CMD, 20000, 8000);
-        res.json({ success: true, stats: parseFullOutput(output) });
-    } catch (error) {
-        const msg = error.message || '';
-        const isAuth    = /[Aa]uth|handshake|All configured|incorrect|denied/i.test(msg);
-        const isRefused = /ECONNREFUSED|connection refused/i.test(msg);
-        const isTimeout = /timeout|agotado|ETIMEDOUT|ESOCKETTIMEDOUT/i.test(msg);
-        const isUnreach = /EHOSTUNREACH|ENETUNREACH|ENOTFOUND/i.test(msg);
-        const friendly  = isAuth    ? 'Credenciales incorrectas'
-                        : isRefused ? 'SSH no disponible (puerto cerrado)'
-                        : isTimeout ? 'Tiempo de espera SSH agotado'
-                        : isUnreach ? 'Host no alcanzable'
-                        : msg;
-        log.debug({ deviceIP, friendly }, 'SSH');
-        // 200 para errores esperados (auth, red) — 500 solo para errores inesperados del servidor
-        res.json({ success: false, message: friendly });
-    }
-});
-
-router.post('/device/wifi/get', async (req, res) => {
-    const { routerIP, routerUser, routerPass } = req.body;
-    let api;
-    try {
-        api = await connectToMikrotik(routerIP, routerUser, routerPass || '');
-        // SECUENCIAL — RouterOS no soporta comandos paralelos en la misma conexión
-        const ifaces   = await safeWrite(api, ['/interface/wireless/print']).catch(() => []);
-        const profiles = await safeWrite(api, ['/interface/wireless/security-profiles/print']).catch(() => []);
-        await api.close();
-        res.json({
-            success: true,
-            interfaces: Array.isArray(ifaces) ? ifaces.map(i => ({ id: i['.id'], name: i.name, ssid: i.ssid, mode: i.mode, disabled: i.disabled === 'true' })) : [],
-            profiles: Array.isArray(profiles) ? profiles.map(p => ({ id: p['.id'], name: p.name, wpa2Key: p['wpa2-pre-shared-key'] })) : []
-        });
-    } catch (error) {
-        if (api) try { await api.close(); } catch (_) { }
-        res.status(500).json({ success: false, message: getErrorMessage(error, routerIP, routerUser) });
-    }
-});
+router.post('/device/wifi/get', asyncHandler(async (req, res) => {
+  const { routerIP, routerUser, routerPass } = req.body;
+  let api;
+  try {
+    api = await connectToMikrotik(routerIP, routerUser, routerPass || '');
+    // SECUENCIAL — RouterOS no soporta comandos paralelos en la misma conexión
+    const ifaces   = await safeWrite(api, ['/interface/wireless/print']).catch(() => []);
+    const profiles = await safeWrite(api, ['/interface/wireless/security-profiles/print']).catch(() => []);
+    await api.close();
+    return sendOk(res, {
+      interfaces: Array.isArray(ifaces) ? ifaces.map(i => ({ id: i['.id'], name: i.name, ssid: i.ssid, mode: i.mode, disabled: i.disabled === 'true' })) : [],
+      profiles: Array.isArray(profiles) ? profiles.map(p => ({ id: p['.id'], name: p.name, wpa2Key: p['wpa2-pre-shared-key'] })) : [],
+    });
+  } catch (error) {
+    if (api) try { await api.close(); } catch (_) { /* ignore */ }
+    if (error instanceof AppError) throw error;
+    throw new AppError(getErrorMessage(error, routerIP, routerUser), 500, 'MIKROTIK_ERROR');
+  }
+}));
 
 // A partir de este punto: Endpoints Migrados 100% a la tabla de Auditoria SQL "aps" (schema v2)
 
-router.get('/db/devices', async (req, res) => {
-    try {
-        const db = await getDb();
-        const gids = await ownedGroupIntIds(db, req);   // null = admin (todos)
-        let rows;
+router.get('/db/devices', asyncHandler(async (req, res) => {
+    const db = await getDb();
+    const gids = await ownedGroupIntIds(db, req);   // null = admin (todos)
+    let rows;
         if (gids === null) {
             rows = await db.all(
                 `SELECT a.*, ag.uuid AS ap_group_uuid
@@ -120,25 +127,21 @@ router.get('/db/devices', async (req, res) => {
             routerPort: r.router_port || 8075,
             lastSeen: r.last_seen || 0
         }));
-        res.json({ success: true, devices });
-    } catch (e) {
-        res.status(500).json({ success: false, message: e.message });
-    }
-});
+    return sendOk(res, { devices });
+}));
 
-router.post('/db/devices', async (req, res) => {
-    try {
-        const db = await getDb();
-        const d = req.body;
-        const now = Date.now();
+router.post('/db/devices', asyncHandler(async (req, res) => {
+    const db = await getDb();
+    const d = req.body;
+    const now = Date.now();
 
-        // Aislamiento: no sobrescribir un AP existente de otro workspace
-        if (d.id) {
-            const existing = await db.get('SELECT id FROM aps WHERE uuid = ?', [d.id]);
-            if (existing && !(await ownsApUuid(db, req, d.id))) {
-                return res.status(404).json({ success: false, message: 'AP no encontrado' });
-            }
+    // Aislamiento: no sobrescribir un AP existente de otro workspace
+    if (d.id) {
+        const existing = await db.get('SELECT id FROM aps WHERE uuid = ?', [d.id]);
+        if (existing && !(await ownsApUuid(db, req, d.id))) {
+            throw new AppError('AP no encontrado', 404, 'NOT_FOUND');
         }
+    }
 
         let cpesCount = 0;
         if (d.cachedStats && d.cachedStats.stations) {
@@ -156,7 +159,7 @@ router.post('/db/devices', async (req, res) => {
         let apGroupId = d.nodeId ? await getApGroupIntId(d.nodeId) : null;
         // Si el grupo resuelto no pertenece al workspace del solicitante, no permitir adjuntar
         if (apGroupId && d.nodeId && !(await ownsGroupUuid(db, req, d.nodeId))) {
-            return res.status(404).json({ success: false, message: 'Grupo AP no encontrado' });
+            throw new AppError('Grupo AP no encontrado', 404, 'NOT_FOUND');
         }
         if (d.nodeId && !apGroupId) {
             // Fallback: buscar ap_group por nombre (nodeName) DENTRO del workspace
@@ -224,19 +227,15 @@ router.post('/db/devices', async (req, res) => {
                 d.addedAt || now
             ]
         );
-        res.json({ success: true, id: d.id });
-    } catch (e) {
-        res.status(500).json({ success: false, message: e.message });
-    }
-});
+    return sendOk(res, { id: d.id });
+}));
 
-router.put('/db/devices/:id', async (req, res) => {
-    try {
-        const db = await getDb();
-        const uuid = req.params.id; // frontend sends UUID as :id
-        if (!(await ownsApUuid(db, req, uuid))) return res.status(404).json({ success: false, message: 'AP no encontrado' });
-        const exists = await db.get('SELECT id FROM aps WHERE uuid = ?', [uuid]);
-        if (!exists) return res.status(404).json({ success: false, message: 'AP no encontrado' });
+router.put('/db/devices/:id', asyncHandler(async (req, res) => {
+    const db = await getDb();
+    const uuid = req.params.id; // frontend sends UUID as :id
+    if (!(await ownsApUuid(db, req, uuid))) throw new AppError('AP no encontrado', 404, 'NOT_FOUND');
+    const exists = await db.get('SELECT id FROM aps WHERE uuid = ?', [uuid]);
+    if (!exists) throw new AppError('AP no encontrado', 404, 'NOT_FOUND');
 
         const d = req.body;
         const now = Date.now();
@@ -290,33 +289,25 @@ router.put('/db/devices/:id', async (req, res) => {
         sets.push('updated_at = ?'); params.push(now);
 
         params.push(uuid);
-        await db.run(`UPDATE aps SET ${sets.join(', ')} WHERE uuid = ?`, params);
-        res.json({ success: true });
-    } catch (e) {
-        res.status(500).json({ success: false, message: e.message });
-    }
-});
+    await db.run(`UPDATE aps SET ${sets.join(', ')} WHERE uuid = ?`, params);
+    return sendOk(res);
+}));
 
-router.delete('/db/devices/:id', async (req, res) => {
-    try {
-        const db = await getDb();
-        const uuid = req.params.id; // frontend sends UUID
-        if (!(await ownsApUuid(db, req, uuid))) return res.status(404).json({ success: false, message: 'AP no encontrado' });
-        await db.run('DELETE FROM aps WHERE uuid = ?', [uuid]);
-        res.json({ success: true });
-    } catch (e) {
-        res.status(500).json({ success: false, message: e.message });
-    }
-});
+router.delete('/db/devices/:id', asyncHandler(async (req, res) => {
+    const db = await getDb();
+    const uuid = req.params.id; // frontend sends UUID
+    if (!(await ownsApUuid(db, req, uuid))) throw new AppError('AP no encontrado', 404, 'NOT_FOUND');
+    await db.run('DELETE FROM aps WHERE uuid = ?', [uuid]);
+    return sendOk(res);
+}));
 
 // Limpieza basada en la relación Nodos <-> APs (schema v2)
-router.post('/db/cleanup-orphan-devices', async (req, res) => {
-    try {
-        // Mantenimiento global: solo el Administrador de plataforma puede ejecutarlo.
-        if (reqWorkspace(req) !== null) {
-            return res.json({ success: true, devicesDeleted: 0, cpesDeleted: 0, orphanIds: [], message: 'Operación reservada al administrador' });
-        }
-        const db = await getDb();
+router.post('/db/cleanup-orphan-devices', asyncHandler(async (req, res) => {
+    // Mantenimiento global: solo el Administrador de plataforma puede ejecutarlo.
+    if (reqWorkspace(req) !== null) {
+        return sendOk(res, { devicesDeleted: 0, cpesDeleted: 0, orphanIds: [], message: 'Operación reservada al administrador' });
+    }
+    const db = await getDb();
 
         // CPEs huérfanos: sin AP asociado (ap_id NULL) → no atribuibles a ningún
         // workspace. Se eliminan siempre para evitar incongruencias.
@@ -324,10 +315,10 @@ router.post('/db/cleanup-orphan-devices', async (req, res) => {
         const orphanCpesDeleted = orphanCpes.changes || 0;
 
         // v2: nodes tiene columnas directas, no JSON data
-        const validNodes = await db.all('SELECT id, ppp_user, nombre_nodo, nombre_vrf FROM nodes');
-        if (validNodes.length === 0) {
-            return res.json({ success: true, devicesDeleted: 0, cpesDeleted: 0, orphanCpesDeleted, orphanIds: [], message: 'No hay nodos válidos — limpieza de APs abortada por seguridad' });
-        }
+    const validNodes = await db.all('SELECT id, ppp_user, nombre_nodo, nombre_vrf FROM nodes');
+    if (validNodes.length === 0) {
+        return sendOk(res, { devicesDeleted: 0, cpesDeleted: 0, orphanCpesDeleted, orphanIds: [], message: 'No hay nodos válidos — limpieza de APs abortada por seguridad' });
+    }
 
         // v2: ap_groups connect APs to logical groupings; find APs whose ap_group_id
         // references a group that no longer exists (orphaned by FK)
@@ -340,28 +331,24 @@ router.post('/db/cleanup-orphan-devices', async (req, res) => {
 
         const orphans = allAPs.filter(ap => !validGroupIds.has(ap.ap_group_id));
 
-        if (orphans.length === 0) {
-            return res.json({ success: true, devicesDeleted: 0, cpesDeleted: 0, orphanCpesDeleted, orphanIds: [], message: `Sin APs huérfanos${orphanCpesDeleted ? ` · ${orphanCpesDeleted} CPE(s) huérfano(s) eliminado(s)` : ''}` });
-        }
-
-        const orphanIntIds = orphans.map(d => d.id);
-        const orphanUuids = orphans.map(d => d.uuid);
-        const placeholders = orphanIntIds.map(() => '?').join(',');
-
-        // v2: cpes table with INTEGER ap_id FK
-        const cpesResult = await db.run(`DELETE FROM cpes WHERE ap_id IN (${placeholders})`, orphanIntIds);
-        const devResult = await db.run(`DELETE FROM aps WHERE id IN (${placeholders})`, orphanIntIds);
-
-        res.json({
-            success: true,
-            devicesDeleted: devResult.changes,
-            cpesDeleted: cpesResult.changes,
-            orphanCpesDeleted,
-            orphanIds: orphanUuids,
-        });
-    } catch (e) {
-        res.status(500).json({ success: false, message: e.message });
+    if (orphans.length === 0) {
+        return sendOk(res, { devicesDeleted: 0, cpesDeleted: 0, orphanCpesDeleted, orphanIds: [], message: `Sin APs huérfanos${orphanCpesDeleted ? ` · ${orphanCpesDeleted} CPE(s) huérfano(s) eliminado(s)` : ''}` });
     }
-});
+
+    const orphanIntIds = orphans.map(d => d.id);
+    const orphanUuids = orphans.map(d => d.uuid);
+    const placeholders = orphanIntIds.map(() => '?').join(',');
+
+    // v2: cpes table with INTEGER ap_id FK
+    const cpesResult = await db.run(`DELETE FROM cpes WHERE ap_id IN (${placeholders})`, orphanIntIds);
+    const devResult = await db.run(`DELETE FROM aps WHERE id IN (${placeholders})`, orphanIntIds);
+
+    return sendOk(res, {
+        devicesDeleted: devResult.changes,
+        cpesDeleted: cpesResult.changes,
+        orphanCpesDeleted,
+        orphanIds: orphanUuids,
+    });
+}));
 
 module.exports = router;
