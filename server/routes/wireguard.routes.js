@@ -3,7 +3,6 @@
 //  Fase F5.A: shape uniforme (sendOk/AppError) + validación Zod.
 // ============================================================
 const express = require('express');
-const { z } = require('zod');
 const router = express.Router();
 
 const { connectToMikrotik, safeWrite, getErrorMessage, writeIdempotent, parseHandshakeSecs } = require('../routeros.service');
@@ -11,6 +10,10 @@ const { getDb } = require('../db.service');
 const { reqWorkspace } = require('../lib/tenantScope');
 const { sendOk, AppError, asyncHandler } = require('../lib/apiResponse');
 const { requireMikrotik } = require('../lib/routeGuards');
+const {
+  PeerAddRequestSchema, PeerEditRequestSchema,
+  PeerColorRequestSchema, PeerAliasRequestSchema,
+} = require('@gestionvpn/contracts');
 const log = require('../lib/logger').child({ scope: 'wireguard' });
 
 // ─────────────────────────────────────────────────────────────
@@ -111,14 +114,9 @@ router.post('/wireguard/peers', asyncHandler(async (req, res) => {
 // ─────────────────────────────────────────────────────────────
 //  POST /wireguard/peer/add
 // ─────────────────────────────────────────────────────────────
-const PeerAddSchema = z.object({
-  name: z.string().max(128).optional(),
-  publicKey: z.string().min(1, 'Se requiere la clave pública WireGuard'),
-});
-
 router.post('/wireguard/peer/add', asyncHandler(async (req, res) => {
   const { ip, user, pass } = requireMikrotik(req);
-  const { name, publicKey } = PeerAddSchema.parse(req.body);
+  const { name, publicKey } = PeerAddRequestSchema.parse(req.body);
 
   let api;
   try {
@@ -166,14 +164,9 @@ router.post('/wireguard/peer/add', asyncHandler(async (req, res) => {
 // ─────────────────────────────────────────────────────────────
 //  POST /wireguard/peer/edit — renombrar peer (sólo comment)
 // ─────────────────────────────────────────────────────────────
-const PeerEditSchema = z.object({
-  peerId: z.string().min(1, 'peerId requerido'),
-  newName: z.string().max(128),
-});
-
 router.post('/wireguard/peer/edit', asyncHandler(async (req, res) => {
   const { ip, user, pass } = requireMikrotik(req);
-  const { peerId, newName } = PeerEditSchema.parse(req.body);
+  const { peerId, newName } = PeerEditRequestSchema.parse(req.body);
 
   let api;
   try {
@@ -205,13 +198,8 @@ router.post('/wireguard/peer/edit', asyncHandler(async (req, res) => {
 // ─────────────────────────────────────────────────────────────
 //  POST /wireguard/peer/color/save — UI only (no MikroTik)
 // ─────────────────────────────────────────────────────────────
-const PeerColorSchema = z.object({
-  peerAddress: z.string().min(1),
-  color: z.string().min(1).max(32),
-});
-
 router.post('/wireguard/peer/color/save', asyncHandler(async (req, res) => {
-  const { peerAddress, color } = PeerColorSchema.parse(req.body);
+  const { peerAddress, color } = PeerColorRequestSchema.parse(req.body);
   const db = await getDb();
   await db.run(
     'INSERT INTO peer_colors (peer_address, color) VALUES (?, ?) ON CONFLICT(peer_address) DO UPDATE SET color = excluded.color',
@@ -233,13 +221,8 @@ router.get('/wireguard/peer/colors', asyncHandler(async (_req, res) => {
 //   - alias '' o undefined → borra la entrada.
 //   - Aislado por workspace. Admin (ws null) escribe sobre workspace_id = ''.
 // ─────────────────────────────────────────────────────────────
-const PeerAliasSchema = z.object({
-  peerAddress: z.string().min(1, 'peerAddress requerido'),
-  alias: z.string().max(120, 'alias máximo 120 caracteres').optional(),
-});
-
 router.post('/wireguard/peer/alias/save', asyncHandler(async (req, res) => {
-  const { peerAddress, alias } = PeerAliasSchema.parse(req.body || {});
+  const { peerAddress, alias } = PeerAliasRequestSchema.parse(req.body || {});
   const trimmed = (alias || '').trim();
   const ws = reqWorkspace(req) ?? '';
   const db = await getDb();

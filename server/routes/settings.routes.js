@@ -3,22 +3,16 @@
 //  Fase F5.A: shape uniforme (sendOk/AppError) + validación Zod.
 // ============================================================
 const express = require('express');
-const { z } = require('zod');
 const router = express.Router();
 
 const { getDb, encryptPass } = require('../db.service');
 const { sendOk, AppError, asyncHandler } = require('../lib/apiResponse');
+const { SaveSettingRequestSchema, CORE_ROUTER_KEYS } = require('@gestionvpn/contracts');
 
-// Credenciales del router core (MikroTik compartido). Son infraestructura de
-// plataforma: solo el Administrador (platform_admin) puede verlas/editarlas.
-// El resto de claves (server_public_ip, wg_endpoint_ip, etc.) son operativas
-// y las usan los moderadores en Nodos/Usuarios.
-const CORE_ROUTER_KEYS = ['MT_IP', 'MT_USER', 'MT_PASS'];
-
-const SaveSettingSchema = z.object({
-  key: z.string().min(1, 'key requerido').max(64),
-  value: z.union([z.string(), z.number(), z.boolean(), z.null()]).optional(),
-});
+// CORE_ROUTER_KEYS: las claves del router core (MT_IP, MT_USER, MT_PASS) viven
+// en @gestionvpn/contracts. Son infraestructura de plataforma: solo el
+// Administrador (platform_admin) puede verlas/editarlas. El resto de claves
+// (server_public_ip, wg_endpoint_ip, etc.) son operativas para moderadores.
 
 router.get('/settings/get', asyncHandler(async (req, res) => {
   const db = await getDb();
@@ -44,7 +38,7 @@ const requireAdmin = (req, _res, next) => {
 };
 
 router.post('/settings/save', requireAdmin, asyncHandler(async (req, res) => {
-  const { key, value } = SaveSettingSchema.parse(req.body);
+  const { key, value } = SaveSettingRequestSchema.parse(req.body);
 
   if (CORE_ROUTER_KEYS.includes(key) && !req.account?.platform_admin) {
     throw new AppError('Solo el Administrador puede modificar la configuración del router core.', 403, 'FORBIDDEN');

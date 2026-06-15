@@ -13,3 +13,9 @@ export * from './notifications';
 export * from './diagnostics';
 export * from './audit';
 export * from './dashboard';
+// Fase F5.B — schemas del dominio operativo
+export * from './wireguard';
+export * from './tunnel';
+export * from './nodes';
+export * from './device';
+export * from './settings';

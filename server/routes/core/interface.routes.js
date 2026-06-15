@@ -8,21 +8,16 @@
 //  Fase F5.A: shape uniforme (sendOk/AppError) + Zod.
 // ============================================================
 const express = require('express');
-const { z } = require('zod');
 const router = express.Router();
 
 const { connectToMikrotik, safeWrite } = require('../../routeros.service');
 const { sendOk, AppError, asyncHandler } = require('../../lib/apiResponse');
 const { requireMikrotik } = require('../../lib/routeGuards');
-
-const InterfaceBodySchema = z.object({
-  vpnName: z.string().min(1, 'vpnName requerido'),
-  vpnService: z.enum(['sstp', 'pptp', 'l2tp', 'ovpn']),
-});
+const { InterfaceActionRequestSchema } = require('@gestionvpn/contracts');
 
 router.post('/interface/activate', asyncHandler(async (req, res) => {
   const { ip, user, pass } = requireMikrotik(req);
-  const { vpnName, vpnService } = InterfaceBodySchema.parse(req.body);
+  const { vpnName, vpnService } = InterfaceActionRequestSchema.parse(req.body);
   let api;
   try {
     api = await connectToMikrotik(ip, user, pass);
@@ -48,7 +43,7 @@ router.post('/interface/activate', asyncHandler(async (req, res) => {
 
 router.post('/interface/deactivate', asyncHandler(async (req, res) => {
   const { ip, user, pass } = requireMikrotik(req);
-  const { vpnName, vpnService } = InterfaceBodySchema.parse(req.body);
+  const { vpnName, vpnService } = InterfaceActionRequestSchema.parse(req.body);
   let api;
   try {
     api = await connectToMikrotik(ip, user, pass);
