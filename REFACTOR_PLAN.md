@@ -44,10 +44,12 @@ Refactor **incremental** en 13 fases, manteniendo SIEMPRE la app funcionando. Ca
 | **6** ✅ | Split `node.routes.js` | 2 | 🟠 Medio | — |
 | **7** ✅ | Split `core.routes.js` | 2 | 🟠 Medio | — |
 | **8** ✅ | Split `NetworkDevicesModule.tsx` | 3 | 🟠 Medio | F10 |
-| **9** | Health check enriquecido + métricas Prometheus | 1 | 🟢 Bajo | — |
-| **10** | Code-splitting frontend (lazy modules) | 1 | 🟢 Bajo | — |
-| **11** | Performance MySQL (índices + prepared) | 1 | 🟠 Medio | — |
-| **12** | Audit pass final + docs | 1 | 🟢 Bajo | — |
+| **9** ✅ | Health check enriquecido + métricas Prometheus | 1 | 🟢 Bajo | — |
+| **10** ✅ | Code-splitting frontend (lazy modules) | 1 | 🟢 Bajo | — |
+| **11** ✅ | Performance MySQL (índices + prepared) | 1 | 🟠 Medio | — |
+| **12** ✅ | Audit pass final + docs | 1 | 🟢 Bajo | — |
+
+**Estado actual (2026-06-15): 13/13 fases marcadas ✅** — el refactor cumplió su objetivo. F9, F10 y F11 ya estaban implementados (`/api/health`, `lib/metrics.js`, `lazy()` en App.tsx, `db/migratePerf.js`) — F5 sólo lo formalizó como tracking. F12 cerró con `npm audit --omit=dev = 0 vulns backend` y documentó las 2 vulns moderate transitivas de `exceljs→uuid` en frontend como aceptadas.
 
 **Total estimado:** 21.5 días (~3 semanas). Buffer 30% → 28 días (~4 semanas).
 
