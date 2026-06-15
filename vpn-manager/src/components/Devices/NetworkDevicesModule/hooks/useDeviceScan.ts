@@ -91,6 +91,26 @@ export function useDeviceScan(input: UseDeviceScanInput) {
   // Cancelar reader si el componente se desmonta a mitad de scan
   useEffect(() => () => { readerRef.current?.cancel(); }, []);
 
+  // H14 — Re-hidratar las contraseñas SSH desde credCache (IndexedDB cifrado)
+  // al cargar de sessionStorage, donde ya NO se persisten en claro. Necesita
+  // efecto async porque el descifrado del caché es asíncrono.
+  useEffect(() => {
+    if (!cached?.results?.length) return;
+    let cancelled = false;
+    (async () => {
+      const byIp: Record<string, string> = {};
+      for (const r of cached.results) {
+        if (r.sshPass) continue;
+        const devId = r.mac ? r.mac.replace(/:/g, '') : r.ip.replace(/\./g, '');
+        const c = await credCache.get(devId);
+        if (c?.pass) byIp[r.ip] = c.pass;
+      }
+      if (cancelled || Object.keys(byIp).length === 0) return;
+      setScanResults(prev => prev.map(r => byIp[r.ip] ? { ...r, sshPass: byIp[r.ip] } : r));
+    })();
+    return () => { cancelled = true; };
+  }, [cached]);
+
   // Reset COMPLETO al cambiar de túnel activo (otro VRF = otra LAN = otro escaneo)
   const lastActiveNodeRef = useRef<string | null>(activeNodeVrf);
   useEffect(() => {
@@ -151,9 +171,18 @@ export function useDeviceScan(input: UseDeviceScanInput) {
   // futuro pueda descartar limpiamente los datos del schema viejo.
   useEffect(() => {
     if (scanState.phase === 'done' && scanResults.length > 0) {
+      // H14: NO persistir la contraseña SSH en sessionStorage (texto plano).
+      // La cred que funcionó ya está en credCache (IndexedDB, cifrada) y se
+      // re-hidrata al cargar. El sshUser no es secreto y se conserva.
+      const safeResults = scanResults.map(r => {
+        if (!r.sshPass) return r;
+        const copy = { ...r };
+        delete copy.sshPass;
+        return copy;
+      });
       const payload: CachedScanPayload = {
         v: SCAN_CACHE_VERSION,
-        results: scanResults,
+        results: safeResults,
         allIPs: allScannedIPs,
         count: scannedCount,
         debug: debugMsg,

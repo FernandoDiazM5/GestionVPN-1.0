@@ -26,7 +26,7 @@ Archivos revisados:
 | H12 | 🟢 Bajo | Frontend | Alta WG no exigía IP pública (comandos CPE incorrectos); no se detectaba solape LAN contra otros nodos. | ✅ **Corregido** (bloqueo WG sin IP + aviso de solape) |
 | H10 | 🟢 Bajo | Frontend | Barra de progreso del alta **simulada** con `setInterval` (no refleja el router real). | ✅ **Corregido** (progreso real por SSE + `provisionId`) |
 | H13 | 🟠 Alto | Frontend / Bug | **`cidrOverlaps` rota para redes con bit alto** (signo vs unsigned): el solape con **192.168.21.0/24 (gestión)** nunca se detectaba. Descubierto por los tests de H12. | ✅ **Corregido** |
-| H14 | 🔴 **Crítico** | Backend + Frontend / Seguridad | **Credenciales de equipos (Escanear/NetworkDevices):** `/device/antenna`, `/device/auto-login` tomaban **IP y contraseña del body** sin `ownsApUuid` → **SSRF**; el caché cliente (IndexedDB) guardaba las claves SSH en **texto plano**. Inconsistencia vs Monitor AP (§C4). | ✅ **Corregido** (Fases 1-2; resto menor en §6) |
+| H14 | 🔴 **Crítico** | Backend + Frontend / Seguridad | **Credenciales de equipos (Escanear/NetworkDevices):** `/device/antenna`, `/device/auto-login` tomaban **IP y contraseña del body** sin `ownsApUuid` → **SSRF**; el caché cliente (IndexedDB + sessionStorage) guardaba las claves SSH en **texto plano**. Inconsistencia vs Monitor AP (§C4). | ✅ **Corregido** (Fases 1-2-3 completas) |
 
 > **Verificación:** **191 tests backend + 73 frontend verde** (backend: 170 base + 15 RBAC `nodesAccessControl.test.js` + 6 provisión `provisionAllocation.test.js`; frontend: 64 base + 9 `utils/subnet.test.ts`). Frontend `tsc -b`: 0 errores nuevos (3 preexistentes ajenos a este trabajo).
 > **Nota H3 residual:** se cierra el caso común (preview obsoleto / alta en paralelo no simultánea) recalculando ND/IP autoritativos en el commit. Dos provisiones *exactamente* simultáneas (ventana read→write de segundos) aún podrían colisionar; cerrarlo del todo requiere serializar las altas con un lock/cola (follow-up sugerido).
@@ -198,7 +198,7 @@ Las credenciales SSH de los equipos Ubiquiti **se usan en todo el sistema**: se 
 **✅ Fase 2 — Caché cliente — HECHO (parcial):**
 - `credCache` (IndexedDB) **cifra la contraseña en reposo** con `encryptText` (AES-GCM, mismo esquema que el JWT) + migración compat de entradas legacy en claro. `deviceDb.ts`.
 - Comentario inexacto ("NO viaja al servidor") corregido.
-- ⏳ *Pendiente menor:* el caché de escaneo en `sessionStorage` (`SESSION_SCAN_KEY`) aún guarda el `sshPass` del resultado en claro (dato transitorio por sesión). Strippearlo/cifrarlo requiere volver async el persist/load de `useDeviceScan` — follow-up de bajo riesgo.
+- **`sessionStorage` del escaneo (`SESSION_SCAN_KEY`): ya NO persiste el `sshPass` en claro** (`useDeviceScan`); se strippea al guardar y se **re-hidrata del `credCache` cifrado** al cargar (efecto async). El `sshUser` (no secreto) se conserva.
 
 **✅ Fase 3 — Tests — HECHO:** `deviceSecurity.test.js` (6 tests, espejo de `apMonitorSecurity`): resolución server-side + ignora body, AP ajeno → 404, escaneo fuera de subred propia → 403 en `/device/antenna` y `/device/auto-login`.
 
