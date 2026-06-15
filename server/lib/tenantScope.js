@@ -63,6 +63,41 @@ async function cpeForeign(db, req, mac) {
   return row.w !== ws;
 }
 
+/**
+ * ¿La IP cae dentro de alguna subred (segmento_lan / lan_subnets) de los nodos
+ * del workspace del solicitante? Admin → siempre true.
+ *
+ * Anti-SSRF: limita los endpoints SSH/diagnóstico a IPs de redes que el
+ * moderador realmente posee (no a una IP arbitraria del body). El `>>> 0` en
+ * ambos lados de la comparación es deliberado: sin él, subredes con el bit alto
+ * activo (p.ej. 192.168.x) quedan con signo y la comparación falla.
+ */
+async function ipInOwnedSubnet(db, req, ip) {
+  const ws = reqWorkspace(req);
+  if (ws === null) return true;   // admin sin restricción
+  if (!ip || !/^(\d{1,3}\.){3}\d{1,3}$/.test(ip)) return false;
+
+  const rows = await db.all('SELECT segmento_lan, lan_subnets FROM nodes WHERE workspace_id = ?', [ws]);
+  const cidrs = [];
+  for (const r of rows) {
+    if (r.segmento_lan) cidrs.push(String(r.segmento_lan).trim());
+    try { (JSON.parse(r.lan_subnets || '[]') || []).forEach(s => cidrs.push(String(s).trim())); } catch (_) { /* noop */ }
+  }
+
+  const toNum = (a) => a.split('.').reduce((acc, o) => ((acc << 8) | parseInt(o, 10)) >>> 0, 0) >>> 0;
+  const ipN = toNum(ip);
+  for (const cidr of cidrs) {
+    const [net, prefStr] = cidr.split('/');
+    if (!net || !/^(\d{1,3}\.){3}\d{1,3}$/.test(net)) continue;
+    const pref = parseInt(prefStr, 10);
+    if (!(pref >= 0 && pref <= 32)) continue;
+    const mask = pref === 0 ? 0 : (~0 << (32 - pref)) >>> 0;
+    if (((ipN & mask) >>> 0) === ((toNum(net) & mask) >>> 0)) return true;
+  }
+  return false;
+}
+
 module.exports = {
   reqWorkspace, ownedGroupIntIds, ownedApIntIds, ownsGroupUuid, ownsApUuid, cpeForeign,
+  ipInOwnedSubnet,
 };

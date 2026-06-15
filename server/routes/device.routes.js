@@ -8,13 +8,18 @@ const { connectToMikrotik, safeWrite, getErrorMessage } = require('../routeros.s
 const { sshExec, parseFullOutput, ANTENNA_CMD, trySshCredentials } = require('../ubiquiti.service');
 const { getDb, encryptPass, decryptPass, getApGroupIntId } = require('../db.service');
 const log = require('../lib/logger').child({ scope: 'device' });
-const { reqWorkspace, ownedGroupIntIds, ownsApUuid, ownsGroupUuid } = require('../lib/tenantScope');
+const { reqWorkspace, ownedGroupIntIds, ownsApUuid, ownsGroupUuid, ipInOwnedSubnet } = require('../lib/tenantScope');
 const { resolveOwnerNodeId } = require('../lib/apNode');
 const { sendOk, AppError, asyncHandler } = require('../lib/apiResponse');
 
 // /device/auto-login: 200 OK siempre — el flag `authenticated` señala el resultado.
 router.post('/device/auto-login', asyncHandler(async (req, res) => {
   const { ip, sshCredentials } = req.body;
+  // H14 — Anti-SSRF: solo se puede sondear SSH contra IPs de subredes propias.
+  const db = await getDb();
+  if (!(await ipInOwnedSubnet(db, req, ip))) {
+    throw new AppError('La IP no pertenece a ninguna de tus subredes', 403, 'FORBIDDEN');
+  }
   const credResult = await trySshCredentials(ip, sshCredentials);
   if (credResult) {
     return sendOk(res, {
@@ -33,18 +38,37 @@ router.post('/device/auto-login', asyncHandler(async (req, res) => {
 router.post('/device/antenna', asyncHandler(async (req, res) => {
   const { deviceIP, deviceUser, devicePass, devicePort, deviceId } = req.body;
   try {
-    let actualPass = devicePass;
-    // deviceId from frontend is the UUID
-    if (deviceId && !actualPass) {
-      const db = await getDb();
-      const row = await db.get('SELECT clave_ssh_enc FROM aps WHERE uuid = ?', [deviceId]);
-      if (row && row.clave_ssh_enc) actualPass = decryptPass(row.clave_ssh_enc);
+    const db = await getDb();
+    let targetIP = deviceIP;
+    let targetUser = deviceUser;
+    let targetPass = devicePass;
+    let targetPort = parseInt(devicePort) || 22;
+
+    if (deviceId) {
+      // H14 — Device GUARDADO: resolver IP + credencial SERVER-SIDE del AP propio.
+      // Anti-SSRF (ignora deviceIP del body) y deja de depender del caché cliente
+      // en claro. Solo cae al pass del body si el AP no tiene credencial guardada.
+      if (!(await ownsApUuid(db, req, deviceId))) throw new AppError('AP no encontrado', 404, 'NOT_FOUND');
+      const row = await db.get('SELECT ip, usuario_ssh, clave_ssh_enc, puerto_ssh FROM aps WHERE uuid = ?', [deviceId]);
+      if (!row) throw new AppError('AP no encontrado', 404, 'NOT_FOUND');
+      targetIP = row.ip;
+      targetUser = row.usuario_ssh || deviceUser;
+      targetPass = row.clave_ssh_enc ? decryptPass(row.clave_ssh_enc) : (devicePass || '');
+      targetPort = row.puerto_ssh || targetPort;
+    } else {
+      // H14 — Escaneo (device aún no guardado): la IP debe pertenecer a una de
+      // TUS subredes (anti-SSRF a IPs arbitrarias). La credencial sí viene del
+      // body porque el equipo todavía no existe en la BD.
+      if (!(await ipInOwnedSubnet(db, req, deviceIP))) {
+        throw new AppError('La IP no pertenece a ninguna de tus subredes', 403, 'FORBIDDEN');
+      }
     }
 
     // Comando combinado: mca-status + system.cfg + hostname + version + ifconfig
-    const output = await sshExec(deviceIP, parseInt(devicePort) || 22, deviceUser, actualPass || '', ANTENNA_CMD, 20000, 8000);
+    const output = await sshExec(targetIP, targetPort, targetUser, targetPass || '', ANTENNA_CMD, 20000, 8000);
     return sendOk(res, { stats: parseFullOutput(output) });
   } catch (error) {
+    if (error instanceof AppError) throw error;   // 403/404 → middleware central
     const msg = error.message || '';
     const isAuth    = /[Aa]uth|handshake|All configured|incorrect|denied/i.test(msg);
     const isRefused = /ECONNREFUSED|connection refused/i.test(msg);

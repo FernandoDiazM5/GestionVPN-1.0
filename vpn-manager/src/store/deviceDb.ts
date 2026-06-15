@@ -2,6 +2,7 @@ import localforage from 'localforage';
 import { API_BASE_URL } from '../config';
 import type { SavedDevice, AntennaStats } from '../types/devices';
 import { apiFetch } from '../utils/apiClient';
+import { encryptText, decryptText } from '../utils/crypto';
 
 // ── Store separado de IndexedDB para diagnóstico completo de antenas ──────
 // NO viaja al servidor. Solo vive en el navegador.
@@ -12,18 +13,37 @@ const statsStore = localforage.createInstance({
 });
 
 // ── Credentials Cache (IndexedDB local) ──────────────────────────────────
-// Guarda credenciales SSH que funcionaron durante el escaneo.
-// NO viaja al servidor. Solo vive en el navegador (se persiste entre recargas).
+// Guarda credenciales SSH que funcionaron durante el escaneo, para el flujo de
+// guardado. La contraseña se cifra en reposo con AES-GCM (mismo esquema que el
+// JWT, src/utils/crypto). H14: antes se guardaba en texto plano.
+//
+// Aclaración: la contraseña SÍ se envía al backend al guardar el equipo (allí se
+// re-cifra en `aps.clave_ssh_enc`); este caché es solo una copia local cifrada.
 const credStore = localforage.createInstance({
   name: 'MikroTikVPNManager',
   storeName: 'device_credentials_cache',
-  description: 'Cache de credenciales SSH validadas por dispositivo',
+  description: 'Cache de credenciales SSH validadas por dispositivo (pass cifrada)',
 });
+
+// Forma en reposo: { user, passEnc, port, enc: true }. Las entradas legacy
+// (texto plano `{ user, pass, port }`) se leen por compatibilidad.
+type StoredCred = { user: string; passEnc?: string; pass?: string; port?: number; enc?: boolean };
+
+async function decodeCred(v: StoredCred | null): Promise<{ user: string; pass: string; port: number } | null> {
+  if (!v) return null;
+  if (v.enc && v.passEnc) {
+    try { return { user: v.user, pass: await decryptText(v.passEnc), port: v.port ?? 22 }; }
+    catch { return null; }
+  }
+  if (typeof v.pass === 'string') return { user: v.user, pass: v.pass, port: v.port ?? 22 }; // legacy plano
+  return null;
+}
 
 export const credCache = {
   async save(deviceId: string, user: string, pass: string, port?: number): Promise<void> {
     try {
-      await credStore.setItem(deviceId, { user, pass, port: port ?? 22 });
+      const passEnc = await encryptText(pass);
+      await credStore.setItem(deviceId, { user, passEnc, port: port ?? 22, enc: true } as StoredCred);
     } catch (err) {
       console.error('[CredCache] Error guardando credenciales:', err);
     }
@@ -31,7 +51,7 @@ export const credCache = {
 
   async get(deviceId: string): Promise<{ user: string; pass: string; port: number } | null> {
     try {
-      return await credStore.getItem(deviceId);
+      return await decodeCred(await credStore.getItem<StoredCred>(deviceId));
     } catch {
       return null;
     }
@@ -45,12 +65,15 @@ export const credCache = {
 
   async clear() { await credStore.clear(); },
   async getAll(): Promise<Record<string, { user: string; pass: string; port: number }>> {
-    const result: Record<string, { user: string; pass: string; port: number }> = {};
+    const raw: Record<string, StoredCred> = {};
     try {
-      await credStore.iterate((value, key) => {
-        result[key] = value as { user: string; pass: string; port: number };
-      });
+      await credStore.iterate((value, key) => { raw[key] = value as StoredCred; });
     } catch { /* ignore */ }
+    const result: Record<string, { user: string; pass: string; port: number }> = {};
+    for (const [key, v] of Object.entries(raw)) {
+      const decoded = await decodeCred(v);
+      if (decoded) result[key] = decoded;
+    }
     return result;
   },
 };
