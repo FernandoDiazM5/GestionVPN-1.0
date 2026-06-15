@@ -1,25 +1,27 @@
 // ============================================================
-//  apiClient.ts — wrapper sobre fetch para las APIs del backend.
+//  apiClient.ts — capa fetch base para todo el código legacy.
 //
-//  FASE 5: dejó de inyectar `Authorization: Bearer`. La sesión
-//  ahora viaja en la cookie HttpOnly `vpn_session` que el navegador
-//  manda sola gracias a `credentials: 'include'`. setApiToken/
-//  getApiToken se conservan como NO-OP por compatibilidad (hay
-//  componentes legacy que aún los importan, pero ya no hacen falta).
+//  Es la capa MÁS BAJA: sólo añade cookies + intercepta eventos
+//  globales (auth_expired, mikrotik_needs_config). NO tiene tipos
+//  ni helpers HTTP — para código nuevo usar `services/sessionClient.ts`
+//  (get/post/patch/del con tipos compartidos desde @gestionvpn/contracts).
 //
-//  Para código nuevo, prefiere `services/sessionClient.ts` (get/post/
-//  patch/del con tipos y disparo de 'auth_expired' en 401).
+//  Histórico:
+//    • F5 (legacy): eliminó la inyección de `Authorization: Bearer`
+//      cuando se migró a cookie HttpOnly `vpn_session`.
+//    • F5.C (este refactor): eliminó setApiToken/getApiToken no-op
+//      y modernizó el detector de `needsConfig` para preferir el
+//      código máquina `NEEDS_CONFIG` sobre el campo legacy.
 // ============================================================
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export const setApiToken = (_token: string) => { /* no-op tras F5: cookie HttpOnly */ };
-export const getApiToken = (): string => '';
+import type { TunnelErrorCode } from '@gestionvpn/contracts';
 
 /**
  * Wrapper tipado de fetch que:
- *  - añade `credentials: 'include'` para enviar la cookie de sesión RBAC,
+ *  - añade `credentials: 'include'` para enviar la cookie HttpOnly de sesión,
  *  - dispara 'auth_expired' en 401/403 fuera de /api/auth/,
- *  - emite 'mikrotik_needs_config' al recibir 503 con `needsConfig: true`.
+ *  - emite 'mikrotik_needs_config' cuando el backend devuelve 503 con
+ *    `code: 'NEEDS_CONFIG'` (preferido) o `needsConfig: true` (legacy).
  */
 export const apiFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
   const headers = new Headers(init?.headers);
@@ -45,13 +47,14 @@ export const apiFetch = async (input: RequestInfo | URL, init?: RequestInit): Pr
     window.dispatchEvent(new Event('auth_expired'));
   }
 
-  // Interceptar 503 Service Unavailable — MikroTik no configurado
+  // Interceptar 503 Service Unavailable — MikroTik no configurado.
+  // F5.C: aceptar tanto `code: 'NEEDS_CONFIG'` (forma nueva post-harmonización)
+  // como `needsConfig: true` (forma legacy mantenida por backwards-compat).
   if (response.status === 503) {
-    // Clonar para no consumir el body original
     const clone = response.clone();
     try {
-      const data = await clone.json();
-      if (data.needsConfig) {
+      const data: { code?: TunnelErrorCode | string; needsConfig?: boolean; message?: string } = await clone.json();
+      if (data.code === 'NEEDS_CONFIG' || data.needsConfig === true) {
         window.dispatchEvent(new CustomEvent('mikrotik_needs_config', { detail: data.message }));
       }
     } catch { /* no-op si el body no es JSON */ }

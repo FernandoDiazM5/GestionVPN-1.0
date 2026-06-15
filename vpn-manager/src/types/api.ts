@@ -1,3 +1,23 @@
+// ============================================================
+//  api.ts — tipos de las respuestas del backend.
+//
+//  Fase F5.C: los tipos que tienen su origen autoritativo en el
+//  backend (peer WG, tunnel responses) se re-exportan de
+//  @gestionvpn/contracts para evitar drift. Los tipos puramente
+//  cliente (anotaciones, agregados de UI) se mantienen aquí.
+// ============================================================
+
+// ── Tipos derivados de schemas Zod compartidos (origen: backend) ──
+export type { WgPeer } from '@gestionvpn/contracts';
+export type {
+  TunnelActivateResponse,
+  TunnelStatusResponse,
+  KeepaliveResponse,
+  TunnelErrorCode,
+} from '@gestionvpn/contracts';
+
+// ── Tipos exclusivos del frontend (no salen del cliente) ──
+
 /** Respuesta de /api/connect */
 export interface ConnectResponse {
   success: boolean;
@@ -43,7 +63,16 @@ export interface DeactivateResponse {
   message?: string;
 }
 
-/** Nodo remoto enriquecido devuelto por /api/nodes */
+/**
+ * Nodo enriquecido devuelto por /api/nodes.
+ *
+ * NOTA: comparte ~70% de campos con `NodeListItem` de @gestionvpn/contracts,
+ * pero el frontend añade campos derivados que el backend NO emite directamente:
+ *   • running_by_you / active_by_other — anotación multi-usuario hecha por
+ *     `annotateSessions()` en la respuesta.
+ *   • cached / last_seen / created_at — metadatos del caché MySQL.
+ * Por eso se mantiene este interface en lugar de re-exportar.
+ */
 export interface NodeInfo {
   id: string;
   nombre_nodo: string;
@@ -76,50 +105,13 @@ export interface NodeInfo {
   active_by_other?: string | null;
 }
 
-/** Peer WireGuard devuelto por /api/wireguard/peers */
-export interface WgPeer {
-  id: string;
-  name: string;
-  allowedAddress: string;
-  publicKey: string;
-  lastHandshakeSecs: number | null;
-  active: boolean;
-  /**
-   * Email del usuario dueño del peer, derivado server-side por JOIN con
-   * `member_wireguard` o `user_mgmt_ips`. `undefined` si el peer no está
-   * mapeado a un user concreto (p. ej. peers legacy del moderador).
-   */
-  email?: string;
-  /**
-   * Alias humano libre del peer (anotación del moderador: "PC casa",
-   * "Celular Personal", etc.). Vive solo en BD del panel; el `comment`
-   * del peer en MikroTik no se altera para preservar trazabilidad.
-   */
-  alias?: string;
-}
-
-/** Respuesta de /api/tunnel/activate */
-export interface TunnelActivateResponse {
-  success: boolean;
-  message?: string;
-  vrf?: string;
-  ipCliente?: string;
-  deletedCount?: number;
-  /** id de la sesión creada (multi-usuario) */
-  sessionId?: string;
-  /** timestamp Unix ms de expiración de la sesión */
-  tunnelExpiry?: number;
-  /** código de error de negocio (ej. NO_MGMT_IP) */
-  code?: string;
-}
-
 /** Respuesta de /api/tunnel/deactivate */
 export interface TunnelDeactivateResponse {
   success: boolean;
   message?: string;
 }
 
-/** Respuesta de /api/tunnel/mangle-access */
+/** Respuesta de /api/tunnel/mangle-access (legacy single-user) */
 export interface MangleAccessResponse {
   success: boolean;
   message?: string;
@@ -128,4 +120,3 @@ export interface MangleAccessResponse {
   ipCliente?: string;
   deletedCount?: number;
 }
-
