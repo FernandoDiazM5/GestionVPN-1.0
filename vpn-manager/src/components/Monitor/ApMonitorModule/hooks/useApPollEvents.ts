@@ -5,10 +5,11 @@
 // ============================================================
 import { useEffect, useRef } from 'react';
 import { API_BASE_URL } from '../../../../config';
+import type { LiveCpe } from '../../../../types/apMonitor';
 
 interface ApPollEvent {
   apId: string;
-  stations?: unknown[];
+  stations?: LiveCpe[];
   polledAt?: number;
   error?: string;
 }

@@ -16,11 +16,11 @@ const {
 } = require('../../routeros.service');
 const { IPV4_REGEX } = require('../../ubiquiti.service');
 const { getDb, saveNode, deleteNode } = require('../../db.service');
-const { nodeBelongsToRequester } = require('./_shared');
+const { nodeBelongsToRequester, requireOperator } = require('./_shared');
 const { sendOk, AppError, asyncHandler } = require('../../lib/apiResponse');
 const { requireMikrotik } = require('../../lib/routeGuards');
 
-router.post('/node/edit', asyncHandler(async (req, res) => {
+router.post('/node/edit', requireOperator, asyncHandler(async (req, res) => {
   const { ip, user, pass } = requireMikrotik(req);
   const { pppUser, newPppUser, newPassword, newRemoteAddress, newComment, vrfName, addSubnets, removeSubnets } = req.body;
   if (!pppUser) throw new AppError('pppUser requerido', 400, 'VALIDATION_ERROR');
@@ -188,7 +188,7 @@ router.post('/node/edit', asyncHandler(async (req, res) => {
   }
 }));
 
-router.post('/node/label/save', asyncHandler(async (req, res) => {
+router.post('/node/label/save', requireOperator, asyncHandler(async (req, res) => {
   const { pppUser, label } = req.body;
   if (!pppUser) throw new AppError('pppUser requerido', 400, 'VALIDATION_ERROR');
   if (!(await nodeBelongsToRequester(req, pppUser))) {

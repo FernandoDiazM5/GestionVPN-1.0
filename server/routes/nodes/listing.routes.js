@@ -15,7 +15,7 @@ const {
   connectToMikrotik, safeWrite, getErrorMessage, parseHandshakeSecs,
 } = require('../../routeros.service');
 const { getDb, saveNode, getNodes } = require('../../db.service');
-const { annotateSessions, filterNodesForRole, nodeBelongsToRequester } = require('./_shared');
+const { annotateSessions, filterNodesForRole, nodeBelongsToRequester, requireOperator } = require('./_shared');
 const { sendOk, AppError, asyncHandler } = require('../../lib/apiResponse');
 const { requireMikrotik } = require('../../lib/routeGuards');
 
@@ -273,7 +273,7 @@ router.post('/node/script', asyncHandler(async (req, res) => {
 }));
 
 // POST /node/wg/set-peer — Agrega o actualiza el peer CPE en un nodo WireGuard existente
-router.post('/node/wg/set-peer', asyncHandler(async (req, res) => {
+router.post('/node/wg/set-peer', requireOperator, asyncHandler(async (req, res) => {
   const { ip, user, pass } = requireMikrotik(req);
   const { pppUser, cpePublicKey } = req.body;
   if (!pppUser || !cpePublicKey) {

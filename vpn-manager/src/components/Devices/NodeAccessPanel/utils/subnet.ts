@@ -18,14 +18,20 @@ export function cidrOverlaps(a: string, b: string): boolean {
   const maskB = prefB ? (0xFFFFFFFF << (32 - parseInt(prefB))) >>> 0 : 0xFFFFFFFF;
   const netA = (ipToInt(ipA) & maskA) >>> 0;
   const netB = (ipToInt(ipB) & maskB) >>> 0;
-  return (netA & maskB) === netB || (netB & maskA) === netA;
+  // `>>> 0` en AMBOS lados: sin él, redes con el bit alto activo (p.ej.
+  // 192.168.x) quedaban con signo en (netA & maskB) y la comparación contra
+  // netB (unsigned) nunca coincidía → el solape con 192.168.21.0/24 (gestión)
+  // pasaba inadvertido.
+  return ((netA & maskB) >>> 0) === netB || ((netB & maskA) >>> 0) === netA;
 }
 
-// ── Helper: obtener conflictos de subnets
+const CIDR_RE = /^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}$/;
+
+// ── Helper: obtener conflictos de subnets contra redes RESERVADAS (bloqueante)
 export function getSubnetConflicts(subnets: string[]): string[] {
   const conflicts: string[] = [];
   for (const s of subnets) {
-    if (!/^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}$/.test(s.trim())) continue;
+    if (!CIDR_RE.test(s.trim())) continue;
     for (const p of PROTECTED_NETS) {
       try {
         if (cidrOverlaps(s.trim(), p.cidr)) {
@@ -35,4 +41,32 @@ export function getSubnetConflicts(subnets: string[]): string[] {
     }
   }
   return conflicts;
+}
+
+// ── Helper: solapamiento contra las LAN de OTROS nodos ya existentes (advertencia).
+// No es bloqueante: rutas en VRFs distintos pueden coexistir, pero el operador
+// debe saberlo (suele indicar un error de planificación de direccionamiento).
+export function getNodeSubnetConflicts(
+  candidates: string[],
+  nodes: { nombre_nodo?: string; lan_subnets?: string[]; segmento_lan?: string }[],
+): string[] {
+  const out: string[] = [];
+  for (const c of candidates) {
+    const cc = c.trim();
+    if (!CIDR_RE.test(cc)) continue;
+    for (const n of nodes) {
+      const subs = (n.lan_subnets && n.lan_subnets.length ? n.lan_subnets
+        : (n.segmento_lan ? [n.segmento_lan] : []));
+      for (const s of subs) {
+        const ss = (s || '').trim();
+        if (!CIDR_RE.test(ss)) continue;
+        try {
+          if (cidrOverlaps(cc, ss)) {
+            out.push(`${cc} se solapa con ${ss} del nodo ${n.nombre_nodo || '—'}`);
+          }
+        } catch { /* ignorar CIDRs malformados */ }
+      }
+    }
+  }
+  return out;
 }

@@ -9,18 +9,25 @@ const express = require('express');
 const router = express.Router();
 
 const { getDb, getNodeId } = require('../../db.service');
-const { nodeBelongsToRequester } = require('./_shared');
+const { nodeBelongsToRequester, requireOperator } = require('./_shared');
 
 router.get('/node/tags', async (req, res) => {
   try {
     const db = await getDb();
-    const rows = await db.all(
+    // Aislamiento multi-tenant: un moderador solo ve etiquetas de SU workspace.
+    // El admin de plataforma (y tokens legacy sin RBAC) ven todo.
+    const acc = req.account;
+    const scoped = acc && !acc.platform_admin;
+    const baseSql =
       `SELECT n.ppp_user, GROUP_CONCAT(t.name, ',') as tags_csv
        FROM nodes n
        LEFT JOIN node_tags nt ON nt.node_id = n.id
        LEFT JOIN tags t ON t.id = nt.tag_id
-       GROUP BY n.id`
-    );
+       ${scoped ? 'WHERE n.workspace_id = ?' : ''}
+       GROUP BY n.id`;
+    const rows = scoped
+      ? await db.all(baseSql, [acc.workspace_id])
+      : await db.all(baseSql);
     const result = {};
     rows.forEach(r => {
       result[r.ppp_user] = r.tags_csv ? r.tags_csv.split(',') : [];
@@ -29,7 +36,7 @@ router.get('/node/tags', async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
-router.post('/node/tag/save', async (req, res) => {
+router.post('/node/tag/save', requireOperator, async (req, res) => {
   const { pppUser, tags } = req.body;
   if (!pppUser) return res.status(400).json({ success: false, message: 'pppUser requerido' });
   if (!(await nodeBelongsToRequester(req, pppUser))) return res.status(404).json({ success: false, message: 'Nodo no encontrado en tu workspace' });

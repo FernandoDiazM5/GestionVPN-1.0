@@ -38,7 +38,7 @@ export function useNodeActivation(node: NodeInfo) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ targetVRF: node.nombre_vrf }),
       }, 25_000);
-      let data: TunnelActivateResponse & { success: boolean; message?: string };
+      let data: TunnelActivateResponse & { success: boolean; message?: string; code?: string };
       try { data = await res.json(); } catch { throw new Error(`Error del servidor (HTTP ${res.status})`); }
       if (!res.ok || !data.success) {
         // Contención UX: sin IP de gestión registrada

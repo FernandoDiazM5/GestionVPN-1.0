@@ -17,8 +17,9 @@ const { connectToMikrotik, safeWrite, getErrorMessage, writeIdempotent } = requi
 const { getDb } = require('../../db.service');
 const provisioner = require('../../lib/tunnelProvisioner');
 const sessionRepo = require('../../db/repos/sessionRepo');
+const { requireOperator } = require('../nodes/_shared');
 
-router.post('/tunnel/repair', async (req, res) => {
+router.post('/tunnel/repair', requireOperator, async (req, res) => {
   if (!req.mikrotik) return res.status(503).json({ success: false, needsConfig: true, message: 'Configura las credenciales MikroTik en Ajustes antes de continuar.' });
   const { ip, user, pass } = req.mikrotik;
   const { pppUser, vrfName, lanSubnets, adminWgNet } = req.body;

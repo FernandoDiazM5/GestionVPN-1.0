@@ -97,7 +97,6 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
     nodes.setNodes([]);
     nodes.setActiveNodeVrf(null);
     nodes.setTunnelExpiry(null);
-    nodes.setAdminIP('192.168.21.20');
     await dbService.clearStore();
     auth.isLoggingOutRef.current = false;
   };

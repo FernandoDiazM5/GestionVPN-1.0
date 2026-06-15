@@ -113,11 +113,13 @@ export default function ScriptModal({ node, onClose }: { node: NodeInfo; onClose
               <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                 IP pública del servidor VPN <span className="text-rose-500">*</span>
               </label>
-              <input value={serverIP} onChange={e => {
-                setServerIP(e.target.value);
-                localStorage.setItem('server_public_ip', e.target.value.trim());
-                apiFetch(`${API_BASE_URL}/api/settings/save`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'server_public_ip', value: e.target.value.trim() }) }).catch(() => { });
-              }}
+              <input value={serverIP}
+                onChange={e => setServerIP(e.target.value)}
+                onBlur={e => {
+                  const v = e.target.value.trim();
+                  localStorage.setItem('server_public_ip', v);
+                  if (v) apiFetch(`${API_BASE_URL}/api/settings/save`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'server_public_ip', value: v }) }).catch(() => { });
+                }}
                 placeholder="Ej: 213.173.36.232"
                 className={`w-full px-3 py-2 text-sm border rounded-xl focus:outline-none focus:ring-2 font-mono
                   ${serverIP && !IPV4_RE.test(serverIP.trim()) ? 'border-rose-300 focus:ring-rose-300' : 'border-slate-200 dark:border-slate-700 focus:ring-emerald-300'}`} />

@@ -6,7 +6,7 @@ import {
 import { useVpn } from '../../../../context';
 import { fetchWithTimeout } from '../../../../utils/fetchWithTimeout';
 import { API_BASE_URL } from '../../../../config';
-import { generateSecurePassword, getSubnetConflicts } from '../utils';
+import { generateSecurePassword, getSubnetConflicts, getNodeSubnetConflicts } from '../utils';
 import { ProvisionSteps } from '../components';
 import type { ProvisionResult } from '../types';
 
@@ -16,7 +16,7 @@ interface NuevoNodoProps {
 }
 
 export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
-  const { credentials } = useVpn();
+  const { credentials, nodes } = useVpn();
 
   const [nextNode, setNextNode] = useState<number | null>(null);
   const [nextRemote, setNextRemote] = useState<string>('');
@@ -33,7 +33,11 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
   const [protocol, setProtocol] = useState<'sstp' | 'wireguard'>('sstp');
   const [cpePublicKey, setCpePublicKey] = useState('');
   const [serverPublicKey, setServerPublicKey] = useState('');
-  const [wanIp, setWanIp] = useState<string>(() => localStorage.getItem('wg_wan_ip') ?? '');
+  // IP pública del servidor = dato GLOBAL del sistema (un solo router core).
+  // Fuente de verdad única: setting `server_public_ip` en BD. La llave legacy
+  // `wg_wan_ip` (solo-localStorage, por-navegador) queda como fallback de migración.
+  const [wanIp, setWanIp] = useState<string>(() =>
+    localStorage.getItem('server_public_ip') ?? localStorage.getItem('wg_wan_ip') ?? '');
 
   useEffect(() => { setPppPass(generateSecurePassword()); }, []);
 
@@ -48,6 +52,7 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
   const [result, setResult] = useState<ProvisionResult | null>(null);
   const [visibleSteps, setVisibleSteps] = useState(0);
   const [provStep, setProvStep] = useState(0);
+  const [provisionId, setProvisionId] = useState('');
 
   const nameClean = nombre.toUpperCase().replace(/[^A-Z0-9]/g, '');
   const ndNum = nextNode ?? '?';
@@ -64,8 +69,13 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
   }, [suggestedPppUser]);
 
   const CIDR_RE = /^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}$/;
+  const IPV4_RE = /^(\d{1,3}\.){3}\d{1,3}$/;
   const validSubnets = lanSubnets.filter(s => CIDR_RE.test(s.trim()));
   const subnetConflicts = getSubnetConflicts(validSubnets);
+  // Solape con LANs de otros nodos — advertencia no bloqueante (H12)
+  const nodeOverlaps = getNodeSubnetConflicts(validSubnets, nodes);
+  // IP pública requerida para WG: los comandos del CPE la necesitan (H12)
+  const wgIpValid = protocol !== 'wireguard' || IPV4_RE.test(wanIp.trim());
 
   const loadNext = useCallback(async () => {
     if (!credentials) return;
@@ -84,17 +94,54 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
 
   useEffect(() => { loadNext(); }, [loadNext]);
 
-  const TOTAL_STEPS = 7;
+  // Cargar la IP pública global del setting `server_public_ip` (una sola vez).
+  // Así no se pide por-nodo: se configura una vez y se reutiliza en todos.
   useEffect(() => {
-    if (!provisioning) { setProvStep(0); return; }
+    fetchWithTimeout(`${API_BASE_URL}/api/settings/get`, {}, 8_000)
+      .then(r => r.json())
+      .then(d => {
+        const ip = d?.settings?.server_public_ip;
+        if (ip) { setWanIp(ip); localStorage.setItem('server_public_ip', ip); }
+      })
+      .catch(() => { });
+  }, []);
+
+  // Persiste la IP pública en BD (setting global) al perder foco — NO por tecla.
+  const persistWanIp = (val: string) => {
+    const v = val.trim();
+    localStorage.setItem('server_public_ip', v);
+    if (!v) return;
+    fetchWithTimeout(`${API_BASE_URL}/api/settings/save`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'server_public_ip', value: v }),
+    }, 5_000).catch(() => { });
+  };
+
+  const TOTAL_STEPS = 7;
+  // H10 — progreso REAL: la barra avanza con los pasos que el backend publica
+  // por SSE (event 'node-provision', filtrado por provisionId), no con un
+  // setInterval simulado. Si el stream falla, la barra simplemente no avanza
+  // pero el resultado final sigue llegando por la respuesta del POST.
+  useEffect(() => {
+    if (!provisioning || !provisionId) { setProvStep(0); return; }
     setProvStep(0);
-    let i = 0;
-    const id = setInterval(() => {
-      i = Math.min(i + 1, TOTAL_STEPS - 1);
-      setProvStep(i);
-    }, 1800);
-    return () => clearInterval(id);
-  }, [provisioning]);
+    let count = 0;
+    const es = new EventSource(`${API_BASE_URL}/api/events/stream`, { withCredentials: true });
+    const handler = (e: MessageEvent) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.provisionId === provisionId) {
+          count += 1;
+          setProvStep(Math.min(count, TOTAL_STEPS - 1));
+        }
+      } catch { /* ignora payloads no-JSON */ }
+    };
+    es.addEventListener('node-provision', handler as EventListener);
+    return () => {
+      es.removeEventListener('node-provision', handler as EventListener);
+      es.close();
+    };
+  }, [provisioning, provisionId]);
 
   useEffect(() => {
     if (!result) { setVisibleSteps(0); return; }
@@ -110,7 +157,8 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
 
   const canSubmit = nameClean.length >= 2
     && (protocol === 'sstp' ? (!!pppUser.trim() && !!pppPass.trim()) : true)
-    && validSubnets.length > 0 && nextNode != null && !provisioning && subnetConflicts.length === 0;
+    && validSubnets.length > 0 && nextNode != null && !provisioning && subnetConflicts.length === 0
+    && wgIpValid;
 
   const PASOS_LABELS = protocol === 'wireguard' ? [
     'WireGuard Interface',
@@ -132,6 +180,10 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
 
   const handleSubmit = async () => {
     if (!credentials || !canSubmit || nextNode == null) return;
+    // ID de correlación para el progreso en vivo (SSE) — debe fijarse ANTES de
+    // provisionar para que el efecto suscriba el stream con el mismo id.
+    const pid = (crypto.randomUUID?.() ?? `prov-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    setProvisionId(pid);
     setProvisioning(true);
     try {
       const r = await fetchWithTimeout(`${API_BASE_URL}/api/node/provision`, {
@@ -144,6 +196,7 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
           remoteAddress: nextRemote,
           protocol,
           cpePublicKey: protocol === 'wireguard' ? cpePublicKey.trim() : undefined,
+          provisionId: pid,
         }),
       }, 90_000);
       const d: ProvisionResult = await r.json();
@@ -218,6 +271,13 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                     {result.success ? '¡Nodo provisionado exitosamente!' : 'Error en el provisionamiento'}
                   </p>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{result.message}</p>
+                  {!result.success && (
+                    <p className="text-2xs mt-1.5 font-semibold">
+                      {result.rolledBack
+                        ? <span className="text-emerald-600">✓ Se revirtieron los cambios parciales en el router — puedes reintentar.</span>
+                        : <span className="text-amber-600">⚠ Pudo quedar configuración parcial. Usa “Verificar y reparar” para completarla o “Eliminar nodo” para limpiarla.</span>}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -466,11 +526,17 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                     <label className="text-2xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1 block">IP Pública WAN del Servidor</label>
                     <input
                       value={wanIp}
-                      onChange={e => { setWanIp(e.target.value); localStorage.setItem('wg_wan_ip', e.target.value); }}
+                      onChange={e => setWanIp(e.target.value)}
+                      onBlur={e => persistWanIp(e.target.value)}
                       placeholder="213.173.36.232"
                       className="input-field w-full font-mono text-sm"
                     />
-                    <p className="text-2xs text-slate-500 dark:text-slate-400 mt-1">IP pública del MikroTik. Se guarda automáticamente para próximos nodos.</p>
+                    <p className="text-2xs text-slate-500 dark:text-slate-400 mt-1">IP pública del MikroTik (global del sistema). Se configura una vez y se reutiliza en todos los nodos.</p>
+                    {!wgIpValid && (
+                      <p className="text-2xs text-rose-500 mt-1 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3 shrink-0" /> Ingresa una IP pública válida — los comandos del CPE la necesitan.
+                      </p>
+                    )}
                   </div>
                 )}
 
@@ -531,6 +597,20 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                             <p className="font-bold text-rose-700">Conflicto de red detectado</p>
                             <p className="text-rose-600 mt-0.5">{msg}</p>
                             <p className="text-rose-500 mt-0.5">Esta subred se solapa con la red de gestión y puede causar pérdida de conectividad con el router.</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {nodeOverlaps.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {nodeOverlaps.map((msg, i) => (
+                        <div key={i} className="flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-500/10 border border-amber-200 text-xs">
+                          <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="font-bold text-amber-700">Solapamiento con otro nodo</p>
+                            <p className="text-amber-600 mt-0.5">{msg}</p>
+                            <p className="text-amber-500 mt-0.5">Puedes continuar, pero revisa el direccionamiento: dos torres con la misma LAN suelen indicar un error de planificación.</p>
                           </div>
                         </div>
                       ))}

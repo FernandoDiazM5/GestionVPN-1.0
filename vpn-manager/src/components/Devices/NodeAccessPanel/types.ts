@@ -14,6 +14,8 @@ export interface ProvisionResult {
   steps: ProvisionStep[];
   failedAt?: number;
   serverPublicKey?: string;
+  /** true si, al fallar, el backend revirtió los objetos parciales en el router (H4). */
+  rolledBack?: boolean;
 }
 
 export interface Toast {

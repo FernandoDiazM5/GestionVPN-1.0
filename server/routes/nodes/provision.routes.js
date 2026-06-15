@@ -15,36 +15,111 @@ const {
 } = require('../../routeros.service');
 const { IPV4_REGEX, CIDR_REGEX } = require('../../ubiquiti.service');
 const { getDb, encryptPass, saveNode, deleteNode } = require('../../db.service');
-const { nodeBelongsToRequester } = require('./_shared');
+const { nodeBelongsToRequester, requireOperator } = require('./_shared');
 const { sendOk, AppError, asyncHandler } = require('../../lib/apiResponse');
 const { requireMikrotik } = require('../../lib/routeGuards');
+const sse = require('../../lib/sse');
 
-router.post('/node/next', asyncHandler(async (req, res) => {
+// Calcula la asignación AUTORITATIVA (siguiente ND + IP remota libre) desde el
+// estado VIVO del router. La comparten /node/next (preview) y /node/provision
+// (commit) para que ambos usen exactamente la misma lógica: así, si el preview
+// quedó obsoleto (modal abierto mucho rato u otra alta en paralelo), el commit
+// recalcula y no colisiona en el número de nodo / IP remota (H3 — TOCTOU).
+// Devuelve también los conjuntos `usedNd`/`usedRemote` para que el commit pueda
+// respetar el valor del cliente si aún está libre (preview fiel) o reasignar.
+async function computeNextAllocation(api) {
+  // SECUENCIAL — RouterOS no soporta comandos paralelos en la misma conexión
+  const vrfs    = await safeWrite(api, ['/ip/vrf/print']);
+  const secrets = await safeWrite(api, ['/ppp/secret/print']);
+
+  // Números de nodo en uso (VRF-ND1-..., VRF-ND2-...)
+  const usedNd = new Set(
+    vrfs
+      .map(v => { const m = (v.name || '').match(/ND(\d+)/i); return m ? parseInt(m[1]) : 0; })
+      .filter(n => n > 0)
+  );
+  const maxNd = usedNd.size > 0 ? Math.max(...usedNd) : 0;
+  const nextNode = maxNd + 1;
+
+  // IPs remotas usadas (10.10.250.x)
+  const usedRemote = new Set(
+    secrets.map(s => s['remote-address'] || '').filter(a => a.startsWith('10.10.250.'))
+  );
+  const usedOcts = [...usedRemote].map(a => parseInt(a.split('.')[3])).filter(n => !isNaN(n));
+  const maxRemote = usedOcts.length > 0 ? Math.max(...usedOcts) : 200;
+  const nextRemote = `10.10.250.${maxRemote + 1}`;
+
+  return { nextNode, nextRemote, usedNd, usedRemote };
+}
+
+// H4 — Rollback best-effort de una provisión que falló a mitad de camino.
+// Elimina SOLO los objetos que esta llamada creó, usando los nombres
+// determinísticos del nodo. Se ejecuta en una conexión fresca y es 100%
+// tolerante a fallos (un router caído simplemente no limpia nada).
+//
+// Seguridad: el VRF y sus rutas SOLO se borran si `vrfCreatedByUs` (no en el
+// merge a un VRF de un nodo SSTP preexistente — ese VRF es ajeno/compartido).
+async function rollbackProvision(creds, { isWG, ifaceName, vrfName, pppUser, allSubnets, vrfCreatedByUs }) {
+  if (!ifaceName || !vrfName) return false;
+  let api;
+  try {
+    api = await connectToMikrotik(creds.ip, creds.user, creds.pass);
+    const read = (cmd) => safeWrite(api, [cmd], 6000).catch(() => []);
+    const rm = (cmd, id) => safeWrite(api, [cmd, `=.id=${id}`], 8000).catch(() => {});
+
+    const members = await read('/interface/list/member/print');
+
+    if (isWG) {
+      for (const p of (await read('/interface/wireguard/peers/print')).filter(p => p.interface === ifaceName && p['.id']))
+        await rm('/interface/wireguard/peers/remove', p['.id']);
+      for (const a of (await read('/ip/address/print')).filter(a => a.interface === ifaceName && a['.id']))
+        await rm('/ip/address/remove', a['.id']);
+      const wgI = (await read('/interface/wireguard/print')).find(i => i.name === ifaceName);
+      if (wgI && wgI['.id']) await rm('/interface/wireguard/remove', wgI['.id']);
+      for (const list of ['LIST-VPN-TOWERS', 'LIST-VPN-WG']) {
+        const m = members.find(m => m.interface === ifaceName && m.list === list);
+        if (m && m['.id']) await rm('/interface/list/member/remove', m['.id']);
+      }
+    } else {
+      const sec = (await read('/ppp/secret/print')).find(s => s.name === pppUser);
+      if (sec && sec['.id']) await rm('/ppp/secret/remove', sec['.id']);
+      const si = (await read('/interface/sstp-server/print')).find(i => i.name === ifaceName || i.user === pppUser);
+      if (si && si['.id']) await rm('/interface/sstp-server/remove', si['.id']);
+      for (const list of ['LIST-VPN-TOWERS', 'LIST-VPN-SSTP']) {
+        const m = members.find(m => m.interface === ifaceName && m.list === list);
+        if (m && m['.id']) await rm('/interface/list/member/remove', m['.id']);
+      }
+    }
+
+    // Address-list: solo nuestras subredes
+    for (const a of (await read('/ip/firewall/address-list/print'))
+      .filter(a => a.list === 'LIST-NET-REMOTE-TOWERS' && allSubnets.includes(a.address) && a['.id']))
+      await rm('/ip/firewall/address-list/remove', a['.id']);
+
+    // VRF + rutas: SOLO si lo creamos nosotros (nunca en merge a VRF ajeno)
+    if (vrfCreatedByUs) {
+      for (const r of (await read('/ip/route/print'))
+        .filter(r => r['routing-table'] === vrfName && r.dynamic !== 'true' && r['.id']))
+        await rm('/ip/route/remove', r['.id']);
+      const v = (await read('/ip/vrf/print')).find(v => v.name === vrfName);
+      if (v && v['.id']) await rm('/ip/vrf/remove', v['.id']);
+    }
+
+    await api.close().catch(() => {});
+    return true;
+  } catch (_) {
+    if (api) try { await api.close(); } catch (_) { /* ignore */ }
+    return false;
+  }
+}
+
+router.post('/node/next', requireOperator, asyncHandler(async (req, res) => {
   const { ip, user, pass } = requireMikrotik(req);
   let api;
   try {
     api = await connectToMikrotik(ip, user, pass);
-    // SECUENCIAL — RouterOS no soporta comandos paralelos en la misma conexión
-    const vrfs    = await safeWrite(api, ['/ip/vrf/print']);
-    const secrets = await safeWrite(api, ['/ppp/secret/print']);
+    const { nextNode, nextRemote } = await computeNextAllocation(api);
     await api.close();
-
-    // Extraer números de nodo de los VRFs existentes (VRF-ND1-..., VRF-ND2-...)
-    const ndNumbers = vrfs
-      .map(v => { const m = (v.name || '').match(/ND(\d+)/i); return m ? parseInt(m[1]) : 0; })
-      .filter(n => n > 0);
-    const maxNd = ndNumbers.length > 0 ? Math.max(...ndNumbers) : 0;
-    const nextNode = maxNd + 1;
-
-    // Extraer IPs remotas usadas (10.10.250.x) para evitar colisiones
-    const usedRemote = secrets
-      .map(s => s['remote-address'] || '')
-      .filter(a => a.startsWith('10.10.250.'))
-      .map(a => parseInt(a.split('.')[3]))
-      .filter(n => !isNaN(n));
-    const maxRemote = usedRemote.length > 0 ? Math.max(...usedRemote) : 200;
-    const nextRemote = `10.10.250.${maxRemote + 1}`;
-
     return sendOk(res, { nextNode, nextRemote });
   } catch (error) {
     if (api) try { await api.close(); } catch (_) { /* ignore */ }
@@ -53,32 +128,59 @@ router.post('/node/next', asyncHandler(async (req, res) => {
   }
 }));
 
-router.post('/node/provision', asyncHandler(async (req, res) => {
+router.post('/node/provision', requireOperator, asyncHandler(async (req, res) => {
   const { ip, user, pass } = requireMikrotik(req);
-  const { nodeNumber, nodeName, pppUser, pppPassword, lanSubnet, lanSubnets, remoteAddress, protocol, cpePublicKey, wgListenPort } = req.body;
+  const { nodeNumber, nodeName, pppUser, pppPassword, lanSubnet, lanSubnets, remoteAddress, protocol, cpePublicKey, wgListenPort, provisionId } = req.body;
   const isWG = protocol === 'wireguard';
   const allSubnets = Array.isArray(lanSubnets) && lanSubnets.length > 0 ? lanSubnets : [lanSubnet].filter(Boolean);
   if (allSubnets.length === 0 || !allSubnets.every(s => CIDR_REGEX.test(s)))
     throw new AppError('CIDRs de LAN inválidos', 400, 'VALIDATION_ERROR');
-  if (!isWG && !IPV4_REGEX.test(remoteAddress))
-    throw new AppError('IP remota inválida', 400, 'VALIDATION_ERROR');
+  // La IP remota (SSTP) es server-authoritative: si no llega o es inválida, se
+  // recalcula tras conectar. No se exige al cliente (cierra el caso preview obsoleto).
   // cpePublicKey es opcional en WireGuard — el peer se agrega después si no se proporcionó
   if (!isWG && (!pppUser || !pppPassword)) throw new AppError('Usuario y Contraseña requeridos para SSTP', 400, 'VALIDATION_ERROR');
 
+  // H6 — validación de nombre server-side (evita VRF-ND…- sin nombre)
+  const nameUpper = (nodeName || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (nameUpper.length < 2)
+    throw new AppError('Nombre de nodo inválido (mínimo 2 caracteres alfanuméricos)', 400, 'VALIDATION_ERROR');
+
   const steps = []; let api;
-  const ndNum = parseInt(nodeNumber, 10);
-  const nameUpper = nodeName.toUpperCase().replace(/[^A-Z0-9]/g, '');
-  // WG usa nombre sin prefijo VPN-; SSTP mantiene prefijo VPN-SSTP-
-  const ifaceName = isWG ? `WG-ND${ndNum}-${nameUpper}` : `VPN-SSTP-ND${ndNum}-${nameUpper}`;
-  const vrfName = `VRF-ND${ndNum}-${nameUpper}`;
-  const ndComment = `ND${ndNum}`;
-  // Puerto: 13300 + número de nodo (ej. ND1=13301, ND7=13307)
-  const wgPort = wgListenPort ? parseInt(wgListenPort, 10) : (13300 + ndNum);
+  // H10 — progreso real: cada paso completado se publica por SSE al room del
+  // workspace; el frontend (con el mismo provisionId) avanza la barra con el
+  // conteo real. `steps[steps.length]=s` en vez de `.push` para que el
+  // replace_all global de la ruta no toque este helper. Nunca rompe el flujo.
+  const wsId = req.account?.workspace_id || null;
+  const pushStep = (s) => {
+    steps[steps.length] = s;
+    try { if (wsId && provisionId) sse.publish(wsId, 'node-provision', { provisionId, step: s }); } catch (_) { /* noop */ }
+  };
   let wgPeerIP = '';
   let serverPublicKey = '';
+  // Variables de scope externo: el catch las necesita para el rollback (H4).
+  let ndNum, effectiveRemote, ifaceName, vrfName, ndComment, wgPort;
+  // Solo eliminamos el VRF en rollback si LO CREAMOS nosotros (no en el merge a
+  // un VRF de un nodo SSTP preexistente — ahí el VRF es ajeno y compartido).
+  let vrfCreatedByUs = false;
 
   try {
     api = await connectToMikrotik(ip, user, pass);
+
+    // H3 — Asignación AUTORITATIVA desde el estado vivo (cierra el TOCTOU del
+    // preview). Se respeta el valor del cliente solo si sigue libre; si colisiona
+    // (otra alta lo tomó, o el modal quedó obsoleto), se reasigna el siguiente.
+    const alloc = await computeNextAllocation(api);
+    const clientNd = parseInt(nodeNumber, 10);
+    ndNum = (Number.isInteger(clientNd) && clientNd > 0 && !alloc.usedNd.has(clientNd))
+      ? clientNd : alloc.nextNode;
+    effectiveRemote = (!isWG && IPV4_REGEX.test(remoteAddress || '') && !alloc.usedRemote.has(remoteAddress))
+      ? remoteAddress : alloc.nextRemote;
+    // WG usa nombre sin prefijo VPN-; SSTP mantiene prefijo VPN-SSTP-
+    ifaceName = isWG ? `WG-ND${ndNum}-${nameUpper}` : `VPN-SSTP-ND${ndNum}-${nameUpper}`;
+    vrfName = `VRF-ND${ndNum}-${nameUpper}`;
+    ndComment = `ND${ndNum}`;
+    // Puerto: 13300 + número de nodo (ej. ND1=13301, ND7=13307)
+    wgPort = wgListenPort ? parseInt(wgListenPort, 10) : (13300 + ndNum);
 
     if (isWG) {
       // Calcular siguiente bloque /30 disponible en 10.10.251.0/24
@@ -103,7 +205,7 @@ router.post('/node/provision', asyncHandler(async (req, res) => {
       // Paso 1 — Interface WG (comment = nombre real del nodo para mostrarse en la UI)
       await writeIdempotent(api, ['/interface/wireguard/add',
         `=name=${ifaceName}`, `=listen-port=${wgPort}`, `=mtu=1420`, `=comment=${nodeName}`]);
-      steps.push({ step: 1, obj: 'WG Interface', name: `${ifaceName} port=${wgPort}`, status: 'ok' });
+      pushStep({ step: 1, obj: 'WG Interface', name: `${ifaceName} port=${wgPort}`, status: 'ok' });
 
       // Obtener Server Public Key
       const wgInfo = await safeWrite(api, ['/interface/wireguard/print', `?name=${ifaceName}`]);
@@ -113,7 +215,7 @@ router.post('/node/provision', asyncHandler(async (req, res) => {
       await writeIdempotent(api, ['/ip/address/add',
         `=address=${serverIPAddr}`, `=network=${blockNetwork}`,
         `=interface=${ifaceName}`, `=comment=IP Core a ${ndComment}`]);
-      steps.push({ step: 2, obj: 'WG IP', name: `${serverIPAddr} (peer=${wgPeerIP})`, status: 'ok' });
+      pushStep({ step: 2, obj: 'WG IP', name: `${serverIPAddr} (peer=${wgPeerIP})`, status: 'ok' });
 
       // Paso 3 — Peer WG (CPE) — solo si se proporcionó la clave pública del CPE
       const subnetsList = allSubnets.join(',');
@@ -121,9 +223,9 @@ router.post('/node/provision', asyncHandler(async (req, res) => {
         await writeIdempotent(api, ['/interface/wireguard/peers/add',
           `=interface=${ifaceName}`, `=public-key=${cpePublicKey}`,
           `=allowed-address=${wgPeerIP}/32,${subnetsList}`, `=comment=Cliente ${ndComment}`]);
-        steps.push({ step: 3, obj: 'WG Peer', name: `${wgPeerIP}/32 + ${subnetsList}`, status: 'ok' });
+        pushStep({ step: 3, obj: 'WG Peer', name: `${wgPeerIP}/32 + ${subnetsList}`, status: 'ok' });
       } else {
-        steps.push({ step: 3, obj: 'WG Peer', name: 'Omitido — sin clave CPE (agregar después)', status: 'ok' });
+        pushStep({ step: 3, obj: 'WG Peer', name: 'Omitido — sin clave CPE (agregar después)', status: 'ok' });
       }
 
       // Paso 4 — LIST-VPN-TOWERS (y LIST-VPN-WG para Wireguard)
@@ -131,13 +233,14 @@ router.post('/node/provision', asyncHandler(async (req, res) => {
         `=interface=${ifaceName}`, '=list=LIST-VPN-TOWERS']);
       await writeIdempotent(api, ['/interface/list/member/add',
         `=interface=${ifaceName}`, '=list=LIST-VPN-WG']);
-      steps.push({ step: 4, obj: 'Interface List (LIST-VPN-TOWERS & WG)', name: ifaceName, status: 'ok' });
+      pushStep({ step: 4, obj: 'Interface List (LIST-VPN-TOWERS & WG)', name: ifaceName, status: 'ok' });
 
       // Paso 5 — VRF: si ya existe (nodo SSTP previo), agregar interfaz WG; si no, crear
       // VRF: traer todos sin filtro (evita timeout con ?name=) y buscar en JS
       let allVrfs = [];
       try { allVrfs = (await safeWrite(api, ['/ip/vrf/print'])) || []; } catch (_) { allVrfs = []; }
       const existingVrfEntry = allVrfs.find(v => v.name === vrfName);
+      vrfCreatedByUs = !existingVrfEntry;   // H4: solo borrable en rollback si lo creamos
       if (existingVrfEntry) {
         const currentIfaces = existingVrfEntry.interfaces || '';
         const ifaceAlreadyIn = currentIfaces.split(',').map(s => s.trim()).includes(ifaceName);
@@ -145,16 +248,16 @@ router.post('/node/provision', asyncHandler(async (req, res) => {
           const ifaceList = currentIfaces ? `${currentIfaces},${ifaceName}` : ifaceName;
           await safeWrite(api, ['/ip/vrf/set', `=numbers=${existingVrfEntry['.id']}`, `=interfaces=${ifaceList}`]);
         }
-        steps.push({ step: 5, obj: 'VRF (WG agregada al VRF existente)', name: `${vrfName} ← ${ifaceName}`, status: 'ok' });
+        pushStep({ step: 5, obj: 'VRF (WG agregada al VRF existente)', name: `${vrfName} ← ${ifaceName}`, status: 'ok' });
       } else {
         await safeWrite(api, ['/ip/vrf/add', `=name=${vrfName}`, `=interfaces=${ifaceName}`]);
-        steps.push({ step: 5, obj: 'VRF', name: vrfName, status: 'ok' });
+        pushStep({ step: 5, obj: 'VRF', name: vrfName, status: 'ok' });
         await new Promise(r => setTimeout(r, 800));
       }
 
       // Paso 6 — Firewall: el rango 13300-13400 ya está cubierto por la regla global
       // "Permitir todos los tuneles WG Nodos" — no se crean reglas individuales por nodo
-      steps.push({ step: 6, obj: 'Firewall UDP', name: `puerto ${wgPort} cubierto por regla global 13300-13400`, status: 'ok' });
+      pushStep({ step: 6, obj: 'Firewall UDP', name: `puerto ${wgPort} cubierto por regla global 13300-13400`, status: 'ok' });
 
       // Paso 7a — Rutas LAN con distance=2 (backup al SSTP si coexisten)
       const subnets = allSubnets;
@@ -167,7 +270,7 @@ router.post('/node/provision', asyncHandler(async (req, res) => {
           '=scope=30', '=target-scope=10',
           `=comment=Ruta WG ${ndComment}`]);
       }
-      steps.push({ step: '7a', obj: 'Rutas LAN remota(s)', name: `${subnets.join(', ')} (distance=2)`, status: 'ok' });
+      pushStep({ step: '7a', obj: 'Rutas LAN remota(s)', name: `${subnets.join(', ')} (distance=2)`, status: 'ok' });
 
       // Paso 7b — Ruta retorno MGMT
       await writeIdempotent(api, ['/ip/route/add',
@@ -176,7 +279,7 @@ router.post('/node/provision', asyncHandler(async (req, res) => {
         `=routing-table=${vrfName}`,
         '=scope=30', '=target-scope=10',
         `=comment=Route-${ndComment}-MGMT`]);
-      steps.push({ step: '7b', obj: 'Ruta retorno MGMT', name: `VPN-WG-MGMT en ${vrfName}`, status: 'ok' });
+      pushStep({ step: '7b', obj: 'Ruta retorno MGMT', name: `VPN-WG-MGMT en ${vrfName}`, status: 'ok' });
 
       // Paso 7c — Address List LIST-NET-REMOTE-TOWERS (LANs + Red WG)
       const redWG = `${blockNetwork}/30`;
@@ -184,7 +287,7 @@ router.post('/node/provision', asyncHandler(async (req, res) => {
         await writeIdempotent(api, ['/ip/firewall/address-list/add',
           '=list=LIST-NET-REMOTE-TOWERS', `=address=${subnet}`, `=comment=Ruta ${nameUpper}`]);
       }
-      steps.push({ step: '7c', obj: 'Address List (LIST-NET-REMOTE-TOWERS)', name: [...allSubnets, redWG].join(', '), status: 'ok' });
+      pushStep({ step: '7c', obj: 'Address List (LIST-NET-REMOTE-TOWERS)', name: [...allSubnets, redWG].join(', '), status: 'ok' });
 
       await api.close();
 
@@ -195,7 +298,7 @@ router.post('/node/provision', asyncHandler(async (req, res) => {
         try {
           await saveNode({
             ppp_user: ifaceName, nombre_nodo: nameUpper, nombre_vrf: vrfName,
-            iface_name: ifaceName, node_number: nodeNumber, lan_subnets: allSubnets,
+            iface_name: ifaceName, node_number: ndNum, lan_subnets: allSubnets,
             segmento_lan: allSubnets[0] || '', ip_tunnel: wgPeerIP, protocol: 'wireguard',
             workspace_id: req.account?.workspace_id || null,
           });
@@ -213,13 +316,13 @@ router.post('/node/provision', asyncHandler(async (req, res) => {
       await writeIdempotent(api, ['/ppp/secret/add',
         `=name=${pppUser}`, `=password=${pppPassword}`,
         '=service=sstp', '=profile=PROF-VPN-TOWERS',
-        `=remote-address=${remoteAddress}`, `=comment=${ndComment}`]);
-      steps.push({ step: 1, obj: 'PPP Secret', name: pppUser, status: 'ok' });
+        `=remote-address=${effectiveRemote}`, `=comment=${ndComment}`]);
+      pushStep({ step: 1, obj: 'PPP Secret', name: pppUser, status: 'ok' });
 
       // Paso 2 — Interfaz SSTP
       await writeIdempotent(api, ['/interface/sstp-server/add',
         `=name=${ifaceName}`, `=user=${pppUser}`]);
-      steps.push({ step: 2, obj: 'SSTP Interface', name: ifaceName, status: 'ok' });
+      pushStep({ step: 2, obj: 'SSTP Interface', name: ifaceName, status: 'ok' });
     }
 
     // Paso 3 — Agregar a LIST-VPN-TOWERS y LIST-VPN-SSTP
@@ -227,7 +330,7 @@ router.post('/node/provision', asyncHandler(async (req, res) => {
       `=interface=${ifaceName}`, '=list=LIST-VPN-TOWERS']);
     await writeIdempotent(api, ['/interface/list/member/add',
       `=interface=${ifaceName}`, '=list=LIST-VPN-SSTP']);
-    steps.push({ step: 3, obj: 'Interface Lists (LIST-VPN-TOWERS + LIST-VPN-SSTP)', name: ifaceName, status: 'ok' });
+    pushStep({ step: 3, obj: 'Interface Lists (LIST-VPN-TOWERS + LIST-VPN-SSTP)', name: ifaceName, status: 'ok' });
 
     // Paso 4 — Address List LIST-NET-REMOTE-TOWERS (una entrada por subred)
     const subnets = Array.isArray(lanSubnets) ? lanSubnets : [lanSubnet].filter(Boolean);
@@ -235,12 +338,13 @@ router.post('/node/provision', asyncHandler(async (req, res) => {
       await writeIdempotent(api, ['/ip/firewall/address-list/add',
         '=list=LIST-NET-REMOTE-TOWERS', `=address=${subnet}`, `=comment=LAN ${nameUpper}`]);
     }
-    steps.push({ step: 4, obj: 'Address List (LIST-NET-REMOTE-TOWERS)', name: subnets.join(', '), status: 'ok' });
+    pushStep({ step: 4, obj: 'Address List (LIST-NET-REMOTE-TOWERS)', name: subnets.join(', '), status: 'ok' });
 
-    // Paso 5 — VRF (con la interfaz SSTP asignada)
+    // Paso 5 — VRF (con la interfaz SSTP asignada). ND autoritativo-único ⇒ VRF nuevo.
     await writeIdempotent(api, ['/ip/vrf/add',
       `=name=${vrfName}`, `=interfaces=${ifaceName}`]);
-    steps.push({ step: 5, obj: 'VRF', name: vrfName, status: 'ok' });
+    vrfCreatedByUs = true;   // H4: VRF creado por nosotros → borrable en rollback
+    pushStep({ step: 5, obj: 'VRF', name: vrfName, status: 'ok' });
 
     // RouterOS necesita un momento para registrar la routing-table del VRF recién creado
     await new Promise(r => setTimeout(r, 800));
@@ -254,7 +358,7 @@ router.post('/node/provision', asyncHandler(async (req, res) => {
         '=scope=30', '=target-scope=10',
         `=comment=Route-${ndComment}`]);
     }
-    steps.push({ step: '6a', obj: 'Ruta(s) LAN remota', name: subnets.join(', '), status: 'ok' });
+    pushStep({ step: '6a', obj: 'Ruta(s) LAN remota', name: subnets.join(', '), status: 'ok' });
 
     // Paso 6b — Ruta de retorno hacia red de gestión WireGuard (en tabla VRF)
     await writeIdempotent(api, ['/ip/route/add',
@@ -263,7 +367,7 @@ router.post('/node/provision', asyncHandler(async (req, res) => {
       `=routing-table=${vrfName}`,
       '=scope=30', '=target-scope=10',
       `=comment=Route-${ndComment}-MGMT`]);
-    steps.push({ step: '6b', obj: 'Ruta retorno MGMT (192.168.21.0/24)', name: `VPN-WG-MGMT en ${vrfName}`, status: 'ok' });
+    pushStep({ step: '6b', obj: 'Ruta retorno MGMT (192.168.21.0/24)', name: `VPN-WG-MGMT en ${vrfName}`, status: 'ok' });
 
     await api.close();
 
@@ -279,10 +383,10 @@ router.post('/node/provision', asyncHandler(async (req, res) => {
           nombre_nodo: nameUpper,
           nombre_vrf: vrfName,
           iface_name: ifaceName,
-          node_number: nodeNumber,
+          node_number: ndNum,
           lan_subnets: allSubnets,
           segmento_lan: allSubnets[0] || '',
-          ip_tunnel: remoteAddress,
+          ip_tunnel: effectiveRemote,
           protocol: isWG ? 'wireguard' : 'sstp',
           workspace_id: req.account?.workspace_id || null,
         });
@@ -306,24 +410,34 @@ router.post('/node/provision', asyncHandler(async (req, res) => {
     }
 
     return sendOk(res, {
-      message: `Nodo ND${nodeNumber} provisionado correctamente`,
-      ifaceName, vrfName, remoteAddress, steps,
+      message: `Nodo ND${ndNum} provisionado correctamente`,
+      ifaceName, vrfName, remoteAddress: effectiveRemote, steps,
       protocol, wgPort, serverPublicKey,
       peerIP: isWG ? wgPeerIP : undefined,
       listenPort: isWG ? wgPort : undefined,
     });
   } catch (error) {
     if (api) try { await api.close(); } catch (_) { /* ignore */ }
+
+    // H4 — Rollback best-effort de lo creado (evita orfanatos en el router
+    // compartido). Solo intentamos si llegamos a derivar los nombres del nodo.
+    let rolledBack = false;
+    if (ifaceName && vrfName) {
+      rolledBack = await rollbackProvision({ ip, user, pass },
+        { isWG, ifaceName, vrfName, pppUser, allSubnets, vrfCreatedByUs });
+      log.warn({ ifaceName, vrfName, rolledBack, vrfCreatedByUs }, 'PROVISION falló — rollback ejecutado');
+    }
+
     if (error instanceof AppError) throw error;
     throw new AppError(
       getErrorMessage(error, ip, user),
       500, 'MIKROTIK_ERROR',
-      { steps, failedAt: steps.length + 1 }
+      { steps, failedAt: steps.length + 1, rolledBack }
     );
   }
 }));
 
-router.post('/node/deprovision', asyncHandler(async (req, res) => {
+router.post('/node/deprovision', requireOperator, asyncHandler(async (req, res) => {
   const { ip, user, pass } = requireMikrotik(req);
   const { vrfName, pppUser, protocol } = req.body;
   if (!pppUser) throw new AppError('pppUser es requerido', 400, 'VALIDATION_ERROR');
@@ -338,6 +452,9 @@ router.post('/node/deprovision', asyncHandler(async (req, res) => {
   const ifaceName = isWireGuard ? pppUser : (hasVrf ? vrfName.replace(/^VRF-/, 'VPN-SSTP-') : '');
 
   const steps = []; let api;
+  // pushStep local (sin SSE): deprovision no necesita progreso en vivo, pero
+  // comparte el rename de `steps.push`→`pushStep` del replace_all de la ruta.
+  const pushStep = (s) => { steps[steps.length] = s; };
   try {
     // ── CONEXIÓN 1: Leer TODOS los datos SECUENCIALMENTE ──────────────────────
     // RouterOS (node-routeros) es protocolo secuencial: comandos concurrentes en
@@ -377,7 +494,7 @@ router.post('/node/deprovision', asyncHandler(async (req, res) => {
     if (hasVrf) {
       const mangleMatch = mangle.filter(m => m['new-routing-mark'] === vrfName && m['.id']);
       for (const m of mangleMatch) await silentRemove('/ip/firewall/mangle/remove', m['.id']);
-      steps.push({ step: 1, obj: 'Reglas Mangle', name: `${mangleMatch.length} eliminadas`, status: 'ok' });
+      pushStep({ step: 1, obj: 'Reglas Mangle', name: `${mangleMatch.length} eliminadas`, status: 'ok' });
     }
 
     if (isWireGuard) {
@@ -386,17 +503,17 @@ router.post('/node/deprovision', asyncHandler(async (req, res) => {
       // Paso 2: Peers WG (buscar por interface === ifaceName)
       const peersToRemove = wgPeers.filter(p => p.interface === ifaceName && p['.id']);
       for (const p of peersToRemove) await silentRemove('/interface/wireguard/peers/remove', p['.id']);
-      steps.push({ step: 2, obj: 'WG Peers', name: `${peersToRemove.length} peer(s)`, status: 'ok' });
+      pushStep({ step: 2, obj: 'WG Peers', name: `${peersToRemove.length} peer(s)`, status: 'ok' });
 
       // Paso 3: IP address de la interface WG
       const wgAddrs = addrs.filter(a => a.interface === ifaceName && a['.id']);
       for (const a of wgAddrs) await silentRemove('/ip/address/remove', a['.id']);
-      steps.push({ step: 3, obj: 'WG IP Address', name: `${wgAddrs.length} IP(s)`, status: 'ok' });
+      pushStep({ step: 3, obj: 'WG IP Address', name: `${wgAddrs.length} IP(s)`, status: 'ok' });
 
       // Paso 4: Interface WireGuard
       const wgIface = wgIfaces.find(i => i.name === ifaceName);
       if (wgIface) await silentRemove('/interface/wireguard/remove', wgIface['.id']);
-      steps.push({ step: 4, obj: 'WG Interface', name: ifaceName, status: 'ok' });
+      pushStep({ step: 4, obj: 'WG Interface', name: ifaceName, status: 'ok' });
 
       if (hasVrf) {
         // Paso 5: Interface Lists — LIST-VPN-TOWERS + LIST-VPN-WG
@@ -405,7 +522,7 @@ router.post('/node/deprovision', asyncHandler(async (req, res) => {
           const entry = members.find(m => m.interface === ifaceName && m.list === list);
           if (entry) { await silentRemove('/interface/list/member/remove', entry['.id']); membersRemoved++; }
         }
-        steps.push({ step: 5, obj: 'Interface Lists (TOWERS + WG)', name: `${membersRemoved} entradas`, status: 'ok' });
+        pushStep({ step: 5, obj: 'Interface Lists (TOWERS + WG)', name: `${membersRemoved} entradas`, status: 'ok' });
       }
 
     } else {
@@ -414,19 +531,19 @@ router.post('/node/deprovision', asyncHandler(async (req, res) => {
       // Paso 2: Desconectar sesión PPP activa (evita que RouterOS rechace el remove del secret)
       const activeSession = actives.find(a => a.name === pppUser);
       if (activeSession) await silentRemove('/ppp/active/remove', activeSession['.id']);
-      steps.push({ step: 2, obj: 'Sesión PPP Activa', name: activeSession ? `desconectada (${pppUser})` : 'sin sesión activa', status: 'ok' });
+      pushStep({ step: 2, obj: 'Sesión PPP Activa', name: activeSession ? `desconectada (${pppUser})` : 'sin sesión activa', status: 'ok' });
 
       // Paso 3: PPP Secret
       const secret = secrets.find(s => s.name === pppUser);
       if (secret) await silentRemove('/ppp/secret/remove', secret['.id']);
-      steps.push({ step: 3, obj: 'PPP Secret', name: pppUser, status: 'ok' });
+      pushStep({ step: 3, obj: 'PPP Secret', name: pppUser, status: 'ok' });
 
       if (hasVrf) {
         // Paso 4: SSTP Interface — buscar primero por user (más robusto), fallback por name
         const iface = sstpIfaces.find(i => i.user === pppUser)
                    || sstpIfaces.find(i => i.name === ifaceName);
         if (iface) await silentRemove('/interface/sstp-server/remove', iface['.id']);
-        steps.push({ step: 4, obj: 'SSTP Interface', name: ifaceName, status: 'ok' });
+        pushStep({ step: 4, obj: 'SSTP Interface', name: ifaceName, status: 'ok' });
 
         // Paso 5: Interface Lists — LIST-VPN-TOWERS + LIST-VPN-SSTP
         let membersRemoved = 0;
@@ -434,7 +551,7 @@ router.post('/node/deprovision', asyncHandler(async (req, res) => {
           const entry = members.find(m => m.interface === ifaceName && m.list === list);
           if (entry) { await silentRemove('/interface/list/member/remove', entry['.id']); membersRemoved++; }
         }
-        steps.push({ step: 5, obj: 'Interface Lists (TOWERS + SSTP)', name: `${membersRemoved} entradas`, status: 'ok' });
+        pushStep({ step: 5, obj: 'Interface Lists (TOWERS + SSTP)', name: `${membersRemoved} entradas`, status: 'ok' });
       }
     }
 
@@ -445,12 +562,12 @@ router.post('/node/deprovision', asyncHandler(async (req, res) => {
         r['routing-table'] === vrfName && r.dynamic !== 'true' && r['.id']
       );
       for (const r of vrfRoutes) await silentRemove('/ip/route/remove', r['.id']);
-      steps.push({ step: 6, obj: 'Rutas VRF (ida + vuelta)', name: `${vrfRoutes.length} rutas eliminadas`, status: 'ok' });
+      pushStep({ step: 6, obj: 'Rutas VRF (ida + vuelta)', name: `${vrfRoutes.length} rutas eliminadas`, status: 'ok' });
 
       // Paso 7: VRF — 1 VRF por nodo, se elimina completo
       const vrf = vrfs.find(v => v.name === vrfName);
       if (vrf) await silentRemove('/ip/vrf/remove', vrf['.id']);
-      steps.push({ step: 7, obj: 'VRF', name: vrf ? `${vrfName} eliminado` : 'no encontrado (ya eliminado)', status: 'ok' });
+      pushStep({ step: 7, obj: 'VRF', name: vrf ? `${vrfName} eliminado` : 'no encontrado (ya eliminado)', status: 'ok' });
     }
 
     await api.close();
@@ -460,10 +577,10 @@ router.post('/node/deprovision', asyncHandler(async (req, res) => {
     try {
       const result = await deleteNode(pppUser);
       deletedDeviceIds = result?.deviceIds || [];
-      steps.push({ step: 8, obj: 'Base de datos', name: `${deletedDeviceIds.length} APs + cascadas eliminados`, status: 'ok' });
+      pushStep({ step: 8, obj: 'Base de datos', name: `${deletedDeviceIds.length} APs + cascadas eliminados`, status: 'ok' });
     } catch (dbErr) {
       log.error({ err: dbErr.message }, 'DB: eliminar nodo de la BD');
-      steps.push({ step: 8, obj: 'Base de datos', name: `Error: ${dbErr.message}`, status: 'warn' });
+      pushStep({ step: 8, obj: 'Base de datos', name: `Error: ${dbErr.message}`, status: 'warn' });
     }
 
     return sendOk(res, { message: `Nodo eliminado correctamente`, steps, deletedDeviceIds });
