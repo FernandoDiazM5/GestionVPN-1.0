@@ -206,10 +206,17 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
         setServerPublicKey(d.serverPublicKey);
       }
       if (d.success) {
-        fetchWithTimeout(`${API_BASE_URL}/api/node/label/save`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pppUser: pppUser.trim(), label: nombre.trim() }),
-        }, 5_000).catch(() => { });
+        // Identificador del nodo tal como lo persistió el backend:
+        //  - SSTP: ppp_user === pppUser
+        //  - WG:   ppp_user === ifaceName (el campo pppUser del form está vacío en WG)
+        // Sin esto, en WG se enviaba pppUser='' y label/save respondía 404.
+        const savedNodeId = protocol === 'wireguard' ? (d.ifaceName ?? '') : pppUser.trim();
+        if (savedNodeId) {
+          fetchWithTimeout(`${API_BASE_URL}/api/node/label/save`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pppUser: savedNodeId, label: nombre.trim() }),
+          }, 5_000).catch(() => { });
+        }
       }
     } catch (e) {
       setResult({ success: false, message: e instanceof Error ? e.message : 'Error', steps: [], failedAt: 0 });
