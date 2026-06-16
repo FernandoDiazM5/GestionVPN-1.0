@@ -30,6 +30,7 @@ const {
   addSseClient, removeSseClient, emitToUser, clientIpOf,
 } = require('./_shared');
 const { sendOk, AppError, asyncHandler } = require('../../lib/apiResponse');
+const { mikrotikAppError } = require('../../lib/mikrotikError');
 const { requireMikrotik } = require('../../lib/routeGuards');
 
 // ── POST /tunnel/activate — delega en lib/tunnelService (compartido con bot M1)
@@ -42,6 +43,7 @@ router.post('/tunnel/activate', asyncHandler(async (req, res) => {
     clientIp: clientIpOf(req),
   });
   if (!result.ok) {
+    if (result.unreachable) throw new AppError(result.message, 503, 'MIKROTIK_UNREACHABLE', { unreachable: true });
     const code = result.code === 409 ? 'NO_MGMT_IP' : 'TUNNEL_ERROR';
     throw new AppError(result.message, result.code, code);
   }
@@ -102,7 +104,7 @@ router.post('/tunnel/keepalive', asyncHandler(async (req, res) => {
     if (apiWrite) try { await apiWrite.close(); } catch (_) { /* ignore */ }
     if (error instanceof AppError) throw error;
     log.error({ err: error?.message }, 'KEEPALIVE Error');
-    throw new AppError(getErrorMessage(error, ip, user), 500, 'MIKROTIK_ERROR');
+    throw mikrotikAppError(error, ip, user);
   }
 }));
 
@@ -248,7 +250,7 @@ router.post('/tunnel/register-my-ip', asyncHandler(async (req, res) => {
     // p.ej. uq_umi_ip → la IP ya pertenece a otro usuario
     const dup = /uq_umi_ip|Duplicate entry/i.test(error?.message || '');
     if (dup) throw new AppError('Esa IP ya está asignada a otro usuario', 409, 'DUPLICATE');
-    throw new AppError(getErrorMessage(error, ip, user), 500, 'MIKROTIK_ERROR');
+    throw mikrotikAppError(error, ip, user);
   }
 }));
 

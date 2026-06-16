@@ -17,6 +17,7 @@ const { IPV4_REGEX, CIDR_REGEX } = require('../../ubiquiti.service');
 const { getDb, encryptPass, saveNode, deleteNode } = require('../../db.service');
 const { nodeBelongsToRequester, requireOperator } = require('./_shared');
 const { sendOk, AppError, asyncHandler } = require('../../lib/apiResponse');
+const { mikrotikAppError } = require('../../lib/mikrotikError');
 const { requireMikrotik } = require('../../lib/routeGuards');
 const sse = require('../../lib/sse');
 
@@ -124,7 +125,7 @@ router.post('/node/next', requireOperator, asyncHandler(async (req, res) => {
   } catch (error) {
     if (api) try { await api.close(); } catch (_) { /* ignore */ }
     if (error instanceof AppError) throw error;
-    throw new AppError(getErrorMessage(error, ip, user), 500, 'MIKROTIK_ERROR');
+    throw mikrotikAppError(error, ip, user);
   }
 }));
 

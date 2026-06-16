@@ -10,7 +10,7 @@
 // ============================================================
 
 const log = require('./logger').child({ scope: 'tunnel-service' });
-const { connectToMikrotik, getErrorMessage } = require('../routeros.service');
+const { connectToMikrotik, getErrorMessage, isUnreachable } = require('../routeros.service');
 const { IPV4_REGEX } = require('../ubiquiti.service');
 const sessionRepo = require('../db/repos/sessionRepo');
 const mgmtIpRepo = require('../db/repos/mgmtIpRepo');
@@ -112,9 +112,10 @@ async function activateTunnel({ account, targetVRF, mikrotik, clientIp = '-' }) 
       }
     } catch (_) { /* best-effort */ }
     const msg = getErrorMessage(error, ip, user);
-    await sessionRepo.log({ workspaceId: account.workspace_id, userId: account.sub, tunnelId: targetVRF, action: 'ERROR', statusCode: 500, message: msg, ipAddress: clientIp });
+    const unreachable = isUnreachable(error);
+    await sessionRepo.log({ workspaceId: account.workspace_id, userId: account.sub, tunnelId: targetVRF, action: 'ERROR', statusCode: unreachable ? 503 : 500, message: msg, ipAddress: clientIp });
     log.error({ err: error?.message, code: error?.code }, 'ACTIVATE error');
-    return { ok: false, code: 500, message: msg };
+    return { ok: false, code: unreachable ? 503 : 500, message: msg, unreachable };
   }
 }
 

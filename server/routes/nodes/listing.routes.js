@@ -17,6 +17,7 @@ const {
 const { getDb, saveNode, getNodes } = require('../../db.service');
 const { annotateSessions, filterNodesForRole, nodeBelongsToRequester, requireOperator } = require('./_shared');
 const { sendOk, AppError, asyncHandler } = require('../../lib/apiResponse');
+const { mikrotikAppError } = require('../../lib/mikrotikError');
 const { requireMikrotik } = require('../../lib/routeGuards');
 
 // NOTA: el endpoint /nodes históricamente responde con un ARRAY plano (no shape
@@ -159,7 +160,7 @@ router.post('/nodes', asyncHandler(async (req, res) => {
     }
 
     if (error instanceof AppError) throw error;
-    throw new AppError(getErrorMessage(error, ip, user), 500, 'MIKROTIK_ERROR');
+    throw mikrotikAppError(error, ip, user);
   }
 }));
 
@@ -199,7 +200,7 @@ router.post('/node/details', asyncHandler(async (req, res) => {
   } catch (error) {
     if (api) try { await api.close(); } catch (_) { /* ignore */ }
     if (error instanceof AppError) throw error;
-    throw new AppError(getErrorMessage(error, ip, user), 500, 'MIKROTIK_ERROR');
+    throw mikrotikAppError(error, ip, user);
   }
 }));
 
@@ -329,7 +330,7 @@ router.post('/node/wg/set-peer', requireOperator, asyncHandler(async (req, res) 
   } catch (error) {
     if (api) try { await api.close(); } catch (_) { /* ignore */ }
     if (error instanceof AppError) throw error;
-    throw new AppError(getErrorMessage(error, ip, user, pass), 500, 'MIKROTIK_ERROR');
+    throw mikrotikAppError(error, ip, user, pass);
   }
 }));
 

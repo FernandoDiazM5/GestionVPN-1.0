@@ -5,6 +5,7 @@ import { VpnProvider, useVpn } from './context';
 import Sidebar from './components/Layout/Sidebar';
 import { WorkspaceSessionProvider } from './context/WorkspaceSession';
 import ModuleSkeleton from './components/Common/ModuleSkeleton';
+import RouterMaintenanceOverlay from './components/Common/RouterMaintenanceOverlay';
 
 // ── Code-splitting (FASE 10 del REFACTOR_PLAN) ─────────────────────
 //  Cada módulo se carga bajo demanda en su propio chunk. Esto baja el
@@ -106,6 +107,7 @@ function AppContent() {
 
   return (
     <WorkspaceSessionProvider>
+    <RouterMaintenanceOverlay />
     <div className="page-bg text-slate-900 flex flex-col lg:flex-row min-h-screen">
       {/* Sidebar (desktop) + barra superior y drawer (móvil) */}
       <Sidebar />

@@ -9,6 +9,7 @@ const { connectToMikrotik, safeWrite, getErrorMessage, writeIdempotent, parseHan
 const { getDb } = require('../db.service');
 const { reqWorkspace } = require('../lib/tenantScope');
 const { sendOk, AppError, asyncHandler } = require('../lib/apiResponse');
+const { mikrotikAppError } = require('../lib/mikrotikError');
 const { requireMikrotik } = require('../lib/routeGuards');
 const {
   PeerAddRequestSchema, PeerEditRequestSchema,
@@ -107,7 +108,7 @@ router.post('/wireguard/peers', asyncHandler(async (req, res) => {
     if (api) try { await api.close(); } catch (_) { /* ignore */ }
     if (error instanceof AppError) throw error;
     log.error({ ip, errno: error?.errno, code: error?.code, err: error?.message }, 'WG-PEERS fallo');
-    throw new AppError(getErrorMessage(error, ip, user), 500, 'MIKROTIK_ERROR');
+    throw mikrotikAppError(error, ip, user);
   }
 }));
 
@@ -157,7 +158,7 @@ router.post('/wireguard/peer/add', asyncHandler(async (req, res) => {
   } catch (error) {
     if (api) try { await api.close(); } catch (_) { /* ignore */ }
     if (error instanceof AppError) throw error;
-    throw new AppError(getErrorMessage(error, ip, user), 500, 'MIKROTIK_ERROR');
+    throw mikrotikAppError(error, ip, user);
   }
 }));
 
@@ -191,7 +192,7 @@ router.post('/wireguard/peer/edit', asyncHandler(async (req, res) => {
   } catch (error) {
     if (api) try { await api.close(); } catch (_) { /* ignore */ }
     if (error instanceof AppError) throw error;
-    throw new AppError(getErrorMessage(error, ip, user), 500, 'MIKROTIK_ERROR');
+    throw mikrotikAppError(error, ip, user);
   }
 }));
 

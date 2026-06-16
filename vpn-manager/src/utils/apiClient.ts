@@ -53,9 +53,14 @@ export const apiFetch = async (input: RequestInfo | URL, init?: RequestInit): Pr
   if (response.status === 503) {
     const clone = response.clone();
     try {
-      const data: { code?: TunnelErrorCode | string; needsConfig?: boolean; message?: string } = await clone.json();
+      const data: { code?: TunnelErrorCode | string; needsConfig?: boolean; unreachable?: boolean; message?: string } = await clone.json();
       if (data.code === 'NEEDS_CONFIG' || data.needsConfig === true) {
         window.dispatchEvent(new CustomEvent('mikrotik_needs_config', { detail: data.message }));
+      }
+      // Router configurado pero inalcanzable (timeout/refused) → pantalla
+      // "router de gestión no disponible" (activa tu WireGuard).
+      if (data.code === 'MIKROTIK_UNREACHABLE' || data.unreachable === true) {
+        window.dispatchEvent(new CustomEvent('router_unreachable', { detail: data.message }));
       }
     } catch { /* no-op si el body no es JSON */ }
   }

@@ -217,6 +217,26 @@ const getErrorMessage = (error, ip, user = '') => {
 };
 
 /**
+ * ¿El error indica que el router NO es alcanzable (vs. un error de lógica)?
+ * Cubre: timeout (SOCKTMOUT/ETIMEDOUT), conexión rechazada (ECONNREFUSED),
+ * host/red inalcanzable, y el "Sin respuesta del router" de safeWrite.
+ * Lo usa la capa HTTP para devolver 503 MIKROTIK_UNREACHABLE y que el frontend
+ * muestre la pantalla de "router de gestión no disponible".
+ */
+const isUnreachable = (error) => {
+    const errno = error?.errno;
+    const code = error?.code;
+    const msgLc = (error?.message || '').toLowerCase();
+    return (
+        errno === -4078 || code === 'ECONNREFUSED' || msgLc.includes('connection refused') ||
+        errno === -4039 || errno === 'SOCKTMOUT' || code === 'ETIMEDOUT' ||
+        error?.name === 'TimeoutError' || msgLc.includes('timed out') ||
+        msgLc.includes('sin respuesta del router') || msgLc.includes('timeout') ||
+        code === 'ENOTFOUND' || code === 'EHOSTUNREACH' || code === 'ENETUNREACH'
+    );
+};
+
+/**
  * cleanTunnelRules — Elimina las reglas mangle de acceso dinámico.
  * Borra todas las entradas con comment=ACCESO-ADMIN o comment=ACCESO-DINAMICO.
  * vpn-activa NO se toca (192.168.21.0/24 es estático en MikroTik).
@@ -278,4 +298,4 @@ const parseHandshakeSecs = (str) => {
     return total || Infinity;
 };
 
-module.exports = { connectToMikrotik, safeWrite, getErrorMessage, cleanTunnelRules, writeIdempotent, parseHandshakeSecs, getLastSafeWriteOkAt };
+module.exports = { connectToMikrotik, safeWrite, getErrorMessage, isUnreachable, cleanTunnelRules, writeIdempotent, parseHandshakeSecs, getLastSafeWriteOkAt };

@@ -13,6 +13,7 @@ const router = express.Router();
 const log = require('../../lib/logger').child({ scope: 'core:connection' });
 const { connectToMikrotik, safeWrite, getErrorMessage } = require('../../routeros.service');
 const { sendOk, AppError, asyncHandler } = require('../../lib/apiResponse');
+const { mikrotikAppError } = require('../../lib/mikrotikError');
 const { requireMikrotik } = require('../../lib/routeGuards');
 
 router.post('/connect', asyncHandler(async (req, res) => {
@@ -28,7 +29,7 @@ router.post('/connect', asyncHandler(async (req, res) => {
     if (api) try { await api.close(); } catch (_) { /* ignore */ }
     if (error instanceof AppError) throw error;
     log.error({ ip, user, errno: error?.errno, code: error?.code, err: error?.message }, 'CONNECT fallo');
-    throw new AppError(getErrorMessage(error, ip, user), 500, 'MIKROTIK_ERROR');
+    throw mikrotikAppError(error, ip, user);
   }
 }));
 
