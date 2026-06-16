@@ -101,7 +101,7 @@ export default function RouterMaintenanceOverlay() {
               </div>
             ) : (
               <img
-                src={`${import.meta.env.BASE_URL}wireguard-logo.png`}
+                src={`${import.meta.env.BASE_URL}logo_wg.png`}
                 alt="WireGuard"
                 onError={() => setLogoFailed(true)}
                 className="w-44 h-auto select-none drop-shadow-sm animate-in fade-in zoom-in-95 duration-300"
