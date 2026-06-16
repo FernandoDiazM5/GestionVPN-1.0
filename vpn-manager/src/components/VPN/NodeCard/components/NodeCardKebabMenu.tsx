@@ -96,17 +96,17 @@ export function NodeCardKebabMenu({
 
           <button
             onClick={() => { onEdit?.(); }}
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-600 hover:bg-slate-100 hover:text-slate-800 transition-colors text-left dark:text-slate-300 dark:hover:bg-slate-700/60 dark:hover:text-slate-100"
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 transition-colors text-left dark:text-slate-300 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-400"
           >
-            <Pencil className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <Pencil className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
             <span>Editar nodo</span>
           </button>
 
           <button
             onClick={() => { onOpenSshForm(); }}
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-600 hover:bg-slate-100 hover:text-slate-800 transition-colors text-left dark:text-slate-300 dark:hover:bg-slate-700/60 dark:hover:text-slate-100"
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-600 hover:bg-sky-50 hover:text-sky-700 transition-colors text-left dark:text-slate-300 dark:hover:bg-sky-500/10 dark:hover:text-sky-400"
           >
-            <KeyRound className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <KeyRound className="w-3.5 h-3.5 text-sky-500 shrink-0" />
             <span>Credenciales SSH</span>
           </button>
 
@@ -116,33 +116,33 @@ export function NodeCardKebabMenu({
 
           <button
             onClick={() => { onScript?.(); }}
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-600 hover:bg-slate-100 hover:text-slate-800 transition-colors text-left dark:text-slate-300 dark:hover:bg-slate-700/60 dark:hover:text-slate-100"
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 transition-colors text-left dark:text-slate-300 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-400"
           >
-            <FileCode className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <FileCode className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
             <span>Script de configuración</span>
           </button>
 
           <button
             onClick={() => { onHistory?.(); }}
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-600 hover:bg-slate-100 hover:text-slate-800 transition-colors text-left dark:text-slate-300 dark:hover:bg-slate-700/60 dark:hover:text-slate-100"
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-600 hover:bg-sky-50 hover:text-sky-700 transition-colors text-left dark:text-slate-300 dark:hover:bg-sky-500/10 dark:hover:text-sky-400"
           >
-            <History className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <History className="w-3.5 h-3.5 text-sky-400 shrink-0" />
             <span>Historial de conexión</span>
           </button>
 
           <button
             onClick={() => { onDiagnose?.(); }}
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-600 hover:bg-slate-100 hover:text-slate-800 transition-colors text-left dark:text-slate-300 dark:hover:bg-slate-700/60 dark:hover:text-slate-100"
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 transition-colors text-left dark:text-slate-300 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-400"
           >
-            <Network className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <Network className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
             <span>Diagnosticar (ping/trace)</span>
           </button>
 
           <button
             onClick={() => { onTagClick?.(); }}
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-600 hover:bg-slate-100 hover:text-slate-800 transition-colors text-left dark:text-slate-300 dark:hover:bg-slate-700/60 dark:hover:text-slate-100"
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-600 hover:bg-amber-50 hover:text-amber-700 transition-colors text-left dark:text-slate-300 dark:hover:bg-amber-500/10 dark:hover:text-amber-400"
           >
-            <Tag className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <Tag className="w-3.5 h-3.5 text-amber-400 shrink-0" />
             <span>Gestionar etiquetas</span>
           </button>
 

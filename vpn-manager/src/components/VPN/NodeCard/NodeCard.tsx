@@ -147,6 +147,15 @@ export default function NodeCard({
     setShowKebab(false);
   };
 
+  // Cierran el kebab al elegir la acción: si no, el dropdown (portal z-[9999])
+  // queda abierto sobre el modal y permite abrir una segunda acción (modales
+  // apilados). Antes solo lo hacían repair/ssh/diagnose.
+  const handleEditClick = () => { onEdit?.(); setShowKebab(false); };
+  const handleScriptClick = () => { onScript?.(); setShowKebab(false); };
+  const handleTagClick = () => { onTagClick?.(); setShowKebab(false); };
+  const handleHistoryClick = () => { onHistory?.(); setShowKebab(false); };
+  const handleDeleteClick = () => { onDelete?.(); setShowKebab(false); };
+
   return (
     <Fragment>
       {/* ── Fila principal ── */}
@@ -230,11 +239,11 @@ export default function NodeCard({
                   onToggleWgPeerForm={handleWgPeerClick}
                   onHandleRepair={handleRepairClick}
                   onOpenSshForm={handleOpenSshForm}
-                  onEdit={onEdit}
-                  onScript={onScript}
-                  onTagClick={onTagClick}
-                  onHistory={onHistory}
-                  onDelete={onDelete}
+                  onEdit={handleEditClick}
+                  onScript={handleScriptClick}
+                  onTagClick={handleTagClick}
+                  onHistory={handleHistoryClick}
+                  onDelete={handleDeleteClick}
                   onDiagnose={onDiagnose ? handleDiagnoseClick : undefined}
                 />
               </>

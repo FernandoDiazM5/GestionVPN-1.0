@@ -18,6 +18,18 @@ export default function ScriptModal({ node, onClose }: { node: NodeInfo; onClose
   const [copied, setCopied] = useState(false);
   const [loadingPass, setLoadingPass] = useState(true);
 
+  // Cargar la IP pública del setting GLOBAL (server_public_ip) — fuente única.
+  // Así el script se auto-genera sin pedirla: el dato ya existe en el sistema.
+  useEffect(() => {
+    apiFetch(`${API_BASE_URL}/api/settings/get`)
+      .then(r => r.json())
+      .then(d => {
+        const ip = d?.settings?.server_public_ip;
+        if (ip) { setServerIP(ip); localStorage.setItem('server_public_ip', ip); }
+      })
+      .catch(() => { });
+  }, []);
+
   useEffect(() => {
     if (!node.ppp_user) { setLoadingPass(false); return; }
     fetchWithTimeout(`${API_BASE_URL}/api/node/creds/get`, {
