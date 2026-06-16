@@ -24,6 +24,7 @@ export default function RouterMaintenanceOverlay() {
   const [detail, setDetail] = useState('');
   const [checking, setChecking] = useState(false);
   const [notYet, setNotYet] = useState(false);
+  const [logoFailed, setLogoFailed] = useState(false);
 
   useEffect(() => {
     const onDown = (e: Event) => {
@@ -89,12 +90,23 @@ export default function RouterMaintenanceOverlay() {
         <div className="h-1.5 w-full bg-rose-600" />
 
         <div className="p-8 sm:p-12 text-center">
-          {/* Ícono de seguridad con anillo de pulso */}
-          <div className="relative mx-auto w-24 h-24 mb-8">
-            <span className="absolute inset-0 rounded-full bg-rose-500/30 animate-ping" />
-            <div className="absolute inset-0 rounded-full bg-rose-50 dark:bg-rose-500/10 ring-1 ring-rose-200 dark:ring-rose-500/30 flex items-center justify-center">
-              <ShieldAlert className="w-11 h-11 text-rose-600 dark:text-rose-400" />
-            </div>
+          {/* Logo WireGuard (asset local en /public; cae al icono si falta) */}
+          <div className="mx-auto mb-8 flex items-center justify-center">
+            {logoFailed ? (
+              <div className="relative w-24 h-24">
+                <span className="absolute inset-0 rounded-full bg-rose-500/30 animate-ping" />
+                <div className="absolute inset-0 rounded-full bg-rose-50 dark:bg-rose-500/10 ring-1 ring-rose-200 dark:ring-rose-500/30 flex items-center justify-center">
+                  <ShieldAlert className="w-11 h-11 text-rose-600 dark:text-rose-400" />
+                </div>
+              </div>
+            ) : (
+              <img
+                src={`${import.meta.env.BASE_URL}wireguard-logo.png`}
+                alt="WireGuard"
+                onError={() => setLogoFailed(true)}
+                className="w-44 h-auto select-none drop-shadow-sm animate-in fade-in zoom-in-95 duration-300"
+              />
+            )}
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-slate-50 tracking-tight">
