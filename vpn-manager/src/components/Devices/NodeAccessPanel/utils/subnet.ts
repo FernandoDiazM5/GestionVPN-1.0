@@ -42,31 +42,3 @@ export function getSubnetConflicts(subnets: string[]): string[] {
   }
   return conflicts;
 }
-
-// ── Helper: solapamiento contra las LAN de OTROS nodos ya existentes (advertencia).
-// No es bloqueante: rutas en VRFs distintos pueden coexistir, pero el operador
-// debe saberlo (suele indicar un error de planificación de direccionamiento).
-export function getNodeSubnetConflicts(
-  candidates: string[],
-  nodes: { nombre_nodo?: string; lan_subnets?: string[]; segmento_lan?: string }[],
-): string[] {
-  const out: string[] = [];
-  for (const c of candidates) {
-    const cc = c.trim();
-    if (!CIDR_RE.test(cc)) continue;
-    for (const n of nodes) {
-      const subs = (n.lan_subnets && n.lan_subnets.length ? n.lan_subnets
-        : (n.segmento_lan ? [n.segmento_lan] : []));
-      for (const s of subs) {
-        const ss = (s || '').trim();
-        if (!CIDR_RE.test(ss)) continue;
-        try {
-          if (cidrOverlaps(cc, ss)) {
-            out.push(`${cc} se solapa con ${ss} del nodo ${n.nombre_nodo || '—'}`);
-          }
-        } catch { /* ignorar CIDRs malformados */ }
-      }
-    }
-  }
-  return out;
-}

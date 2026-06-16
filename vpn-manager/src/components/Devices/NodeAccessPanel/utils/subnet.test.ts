@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cidrOverlaps, getSubnetConflicts, getNodeSubnetConflicts } from './subnet';
+import { cidrOverlaps, getSubnetConflicts } from './subnet';
 
 describe('cidrOverlaps', () => {
   it('detecta solapamiento exacto y por contención', () => {
@@ -23,32 +23,5 @@ describe('getSubnetConflicts — redes reservadas (bloqueante)', () => {
   });
   it('ignora CIDRs malformados', () => {
     expect(getSubnetConflicts(['no-cidr', '10.3.0.0'])).toHaveLength(0);
-  });
-});
-
-describe('getNodeSubnetConflicts — solape con otros nodos (advertencia)', () => {
-  const nodes = [
-    { nombre_nodo: 'TORREVIC', lan_subnets: ['10.3.0.0/24', '10.4.0.0/24'] },
-    { nombre_nodo: 'FIWIS', segmento_lan: '10.5.0.0/24' },
-  ];
-
-  it('detecta solape con lan_subnets de un nodo existente', () => {
-    const r = getNodeSubnetConflicts(['10.3.0.0/24'], nodes);
-    expect(r).toHaveLength(1);
-    expect(r[0]).toMatch(/TORREVIC/);
-  });
-
-  it('detecta solape con segmento_lan (nodo sin lan_subnets)', () => {
-    const r = getNodeSubnetConflicts(['10.5.0.128/25'], nodes);
-    expect(r).toHaveLength(1);
-    expect(r[0]).toMatch(/FIWIS/);
-  });
-
-  it('subred nueva sin solape → sin advertencias', () => {
-    expect(getNodeSubnetConflicts(['10.9.0.0/24'], nodes)).toHaveLength(0);
-  });
-
-  it('sin nodos → sin advertencias', () => {
-    expect(getNodeSubnetConflicts(['10.3.0.0/24'], [])).toHaveLength(0);
   });
 });

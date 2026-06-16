@@ -6,7 +6,7 @@ import {
 import { useVpn } from '../../../../context';
 import { fetchWithTimeout } from '../../../../utils/fetchWithTimeout';
 import { API_BASE_URL } from '../../../../config';
-import { generateSecurePassword, getSubnetConflicts, getNodeSubnetConflicts } from '../utils';
+import { generateSecurePassword, getSubnetConflicts } from '../utils';
 import { ProvisionSteps } from '../components';
 import type { ProvisionResult } from '../types';
 
@@ -16,7 +16,7 @@ interface NuevoNodoProps {
 }
 
 export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
-  const { credentials, nodes } = useVpn();
+  const { credentials } = useVpn();
 
   const [nextNode, setNextNode] = useState<number | null>(null);
   const [nextRemote, setNextRemote] = useState<string>('');
@@ -72,8 +72,9 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
   const IPV4_RE = /^(\d{1,3}\.){3}\d{1,3}$/;
   const validSubnets = lanSubnets.filter(s => CIDR_RE.test(s.trim()));
   const subnetConflicts = getSubnetConflicts(validSubnets);
-  // Solape con LANs de otros nodos — advertencia no bloqueante (H12)
-  const nodeOverlaps = getNodeSubnetConflicts(validSubnets, nodes);
+  // NOTA: NO se valida solape de LAN contra otros nodos a propósito — la
+  // arquitectura usa VRF + mangle, así que varios nodos pueden compartir la
+  // misma LAN legítimamente (cada uno aislado en su VRF).
   // IP pública requerida para WG: los comandos del CPE la necesitan (H12)
   const wgIpValid = protocol !== 'wireguard' || IPV4_RE.test(wanIp.trim());
 
@@ -597,20 +598,6 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                             <p className="font-bold text-rose-700">Conflicto de red detectado</p>
                             <p className="text-rose-600 mt-0.5">{msg}</p>
                             <p className="text-rose-500 mt-0.5">Esta subred se solapa con la red de gestión y puede causar pérdida de conectividad con el router.</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {nodeOverlaps.length > 0 && (
-                    <div className="mt-2 space-y-1">
-                      {nodeOverlaps.map((msg, i) => (
-                        <div key={i} className="flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-500/10 border border-amber-200 text-xs">
-                          <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
-                          <div>
-                            <p className="font-bold text-amber-700">Solapamiento con otro nodo</p>
-                            <p className="text-amber-600 mt-0.5">{msg}</p>
-                            <p className="text-amber-500 mt-0.5">Puedes continuar, pero revisa el direccionamiento: dos torres con la misma LAN suelen indicar un error de planificación.</p>
                           </div>
                         </div>
                       ))}

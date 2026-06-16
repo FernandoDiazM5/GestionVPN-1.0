@@ -1,5 +1,5 @@
 // Subnet utilities
-export { ipToInt, cidrOverlaps, getSubnetConflicts, getNodeSubnetConflicts, PROTECTED_NETS } from './subnet';
+export { ipToInt, cidrOverlaps, getSubnetConflicts, PROTECTED_NETS } from './subnet';
 
 // Password utilities
 export { generateSecurePassword } from './password';

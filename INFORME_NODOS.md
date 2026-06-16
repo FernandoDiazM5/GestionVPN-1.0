@@ -23,7 +23,7 @@ Archivos revisados:
 | H7 | 🟢 Bajo | UX | Numeración `ND` nunca reutiliza huecos; el menú no diferencia acciones de **lectura** vs **destructivas**; faltan confirmaciones server-side. | 🟡 Parcial (menú agrupado vía H11; ND monótono documentado a propósito; autorización reforzada por H1) |
 | H11 | 🟢 Bajo | UX / Diseño | Menú kebab sin separar lectura/configuración/peligro + colores ámbar duplicados (SSH/reparar/etiquetas) → "color como decoración". | ✅ **Corregido** (3 secciones + neutro 80% + color solo intencional: violeta WG, ámbar reparar, rosa eliminar). `audit:design` 0 errores, total 23→21 |
 | H8 | 🟢 Bajo | Frontend | `ScriptModal` persistía la IP con un POST **por cada tecla**. | ✅ **Corregido** (`onBlur`) |
-| H12 | 🟢 Bajo | Frontend | Alta WG no exigía IP pública (comandos CPE incorrectos); no se detectaba solape LAN contra otros nodos. | ✅ **Corregido** (bloqueo WG sin IP + aviso de solape) |
+| H12 | 🟢 Bajo | Frontend | Alta WG no exigía IP pública (comandos CPE incorrectos). | ✅ **Corregido** (bloqueo WG sin IP). ⚠️ El aviso de "solape LAN entre nodos" se **revirtió**: la arquitectura usa VRF+mangle, varios nodos pueden compartir LAN legítimamente. |
 | H10 | 🟢 Bajo | Frontend | Barra de progreso del alta **simulada** con `setInterval` (no refleja el router real). | ✅ **Corregido** (progreso real por SSE + `provisionId`) |
 | H13 | 🟠 Alto | Frontend / Bug | **`cidrOverlaps` rota para redes con bit alto** (signo vs unsigned): el solape con **192.168.21.0/24 (gestión)** nunca se detectaba. Descubierto por los tests de H12. | ✅ **Corregido** |
 | H14 | 🔴 **Crítico** | Backend + Frontend / Seguridad | **Credenciales de equipos (Escanear/NetworkDevices):** `/device/antenna`, `/device/auto-login` tomaban **IP y contraseña del body** sin `ownsApUuid` → **SSRF**; el caché cliente (IndexedDB + sessionStorage) guardaba las claves SSH en **texto plano**. Inconsistencia vs Monitor AP (§C4). | ✅ **Corregido** (Fases 1-2-3 completas) |
@@ -118,7 +118,7 @@ Antes: los 7 pasos avanzaban con un `setInterval` de 1800 ms, sin reflejar el ro
 
 ### 🟢 H12 — Validaciones del formulario de alta
 - `canSubmit` (`NuevoNodo.tsx:111`) **no** bloquea WireGuard por falta de IP pública WAN, aunque esa IP es necesaria para los comandos del CPE que se muestran después. Se permite crear el nodo y luego el bloque CPE muestra `<IP-servidor>` o cae a `credentials?.ip` (la IP de gestión, **no** la pública) → comando incorrecto.
-- El conflicto de subred (`getSubnetConflicts`) solo compara contra la red de gestión; **no** detecta solापamiento contra subredes de **otros nodos ya existentes** (colisión LAN entre torres), que es un error operativo común.
+- ~~El conflicto de subred no detecta solapamiento contra otros nodos~~ → **descartado a propósito.** La arquitectura usa **VRF + mangle**: varios nodos pueden compartir la misma LAN legítimamente (cada uno aislado en su VRF, el camino se resuelve por mangle). Avisar de "solape entre nodos" era un falso positivo, así que se **revirtió** (función `getNodeSubnetConflicts` eliminada). Se mantiene solo el conflicto **bloqueante** contra la red de gestión (`getSubnetConflicts`).
 
 ---
 
