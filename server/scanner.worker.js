@@ -14,7 +14,9 @@ async function pLimit(tasks, concurrency = 50) {
 }
 
 async function runWorker() {
-    const { hostIPs, BATCH = 40 } = workerData;
+    // localAddress (Opción C): scan-IP del moderador para atar el SSH/HTTP del
+    // escaneo y que la mangle por-origen del MikroTik lo enrute a su VRF.
+    const { hostIPs, BATCH = 40, localAddress = null } = workerData;
     let scannedCount = 0;
     const totalCount = hostIPs.length;
     const allDevices = [];
@@ -29,7 +31,7 @@ async function runWorker() {
             if (isAborted) break;
             const batchIPs = hostIPs.slice(i, i + BATCH);
             // Execute SSH checks with concurrency limiter to avoid fd/socket exhaustion
-            const batchResults = await pLimit(batchIPs.map(ip => () => probeUbiquiti(ip)), 50);
+            const batchResults = await pLimit(batchIPs.map(ip => () => probeUbiquiti(ip, localAddress)), 50);
 
             const foundDevices = batchResults
                 .filter(r => r.status === 'fulfilled' && r.value !== null)

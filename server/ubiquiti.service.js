@@ -52,17 +52,20 @@ const getSubnetHosts = (cidr) => {
     return ips;
 };
 
-const probeStatusCgi = (deviceIP, port, useHttps) => {
+const probeStatusCgi = (deviceIP, port, useHttps, localAddress = null) => {
     return new Promise((resolve) => {
         const lib = useHttps ? https : http;
         // rejectUnauthorized:false intencional — airOS sirve HTTPS con cert
         // autofirmado de fábrica. Igual que RouterOS: emitir certs reales
         // queda fuera del scope del software.
         // nosemgrep: bypass-tls-verification
-        const req = lib.request({
+        const reqOpts = {
             hostname: deviceIP, port, path: '/status.cgi', method: 'GET', timeout: 2000,
             headers: { Accept: 'application/json, */*', Connection: 'close' }, rejectUnauthorized: false,
-        }, (res) => {
+        };
+        // Opción C: atar la sonda a la scan-IP del moderador (enrutamiento por VRF).
+        if (localAddress) reqOpts.localAddress = localAddress;
+        const req = lib.request(reqOpts, (res) => {
             if ((res.statusCode === 301 || res.statusCode === 302) && res.headers.location) return resolve(null);
             let body = '';
             res.on('data', chunk => { body += chunk; });
@@ -90,27 +93,32 @@ const probeStatusCgi = (deviceIP, port, useHttps) => {
     });
 };
 
-const getSSHBanner = (host, port = 22, timeout = 2000) => new Promise((resolve) => {
+const getSSHBanner = (host, port = 22, timeout = 2000, localAddress = null) => new Promise((resolve) => {
     const sock = new net.Socket();
     let banner = '';
     const timer = setTimeout(() => { sock.destroy(); resolve(null); }, timeout);
-    sock.connect(port, host, () => { });
+    // Opción C: atar el socket a la scan-IP del moderador (enrutamiento por VRF).
+    sock.connect(localAddress ? { port, host, localAddress } : { port, host }, () => { });
     sock.on('data', (data) => { banner += data.toString(); clearTimeout(timer); sock.destroy(); resolve(banner); });
     sock.on('error', () => { clearTimeout(timer); resolve(null); });
     sock.on('timeout', () => { sock.destroy(); clearTimeout(timer); resolve(null); });
 });
 
-const probeUbiquiti = async (deviceIP) => {
-    const [http80, https443] = await Promise.all([probeStatusCgi(deviceIP, 80, false), probeStatusCgi(deviceIP, 443, true)]);
+const probeUbiquiti = async (deviceIP, localAddress = null) => {
+    const [http80, https443] = await Promise.all([probeStatusCgi(deviceIP, 80, false, localAddress), probeStatusCgi(deviceIP, 443, true, localAddress)]);
     if (http80 || https443) return http80 || https443;
-    const banner = await getSSHBanner(deviceIP, 22, 2000);
+    const banner = await getSSHBanner(deviceIP, 22, 2000, localAddress);
     if (banner && banner.toLowerCase().includes('dropbear')) {
         return { ip: deviceIP, mac: '', name: deviceIP, model: 'Ubiquiti airOS (SSH)', firmware: 'desconocido', role: 'unknown', parentAp: '', essid: '', frequency: 0 };
     }
     return null;
 };
 
-const sshExec = (host, port, username, password, command, timeoutMs = 10000, readyTimeoutMs = 8000) => {
+// localAddress (Opción C): IP de origen a la que atar el socket SSH. Cuando el
+// backend corre en el VPS, escanear EN NOMBRE de un moderador requiere salir por
+// SU scan-IP (ej. 192.168.21.20X) para que la mangle por-origen del MikroTik
+// enrute el SSH al VRF correcto. Opcional → sin él, comportamiento idéntico al previo.
+const sshExec = (host, port, username, password, command, timeoutMs = 10000, readyTimeoutMs = 8000, localAddress = null) => {
     return new Promise((resolve, reject) => {
         const conn = new SSH2Client();
         let output = '';
@@ -124,14 +132,16 @@ const sshExec = (host, port, username, password, command, timeoutMs = 10000, rea
             });
         });
         conn.on('error', err => { clearTimeout(globalTimer); reject(err); });
-        conn.connect({
+        const connectOpts = {
             host, port: port || 22, username, password, readyTimeout: readyTimeoutMs,
             algorithms: {
                 kex: ['ecdh-sha2-nistp256', 'diffie-hellman-group14-sha1', 'diffie-hellman-group1-sha1'],
                 serverHostKey: ['ssh-rsa', 'ssh-dss', 'ecdsa-sha2-nistp256'],
                 cipher: ['aes128-ctr', 'aes256-ctr', 'aes128-cbc', '3des-cbc'], hmac: ['hmac-sha1', 'hmac-sha2-256', 'hmac-md5'],
             },
-        });
+        };
+        if (localAddress) connectOpts.localAddress = localAddress;
+        conn.connect(connectOpts);
     });
 };
 
