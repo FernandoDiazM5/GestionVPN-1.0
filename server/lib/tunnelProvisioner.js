@@ -29,6 +29,13 @@ function mangleComment(userId) {
   return `ACCESO-USER-${userTag(userId)}`;
 }
 
+/** comment de la mangle de ESCANEO de un workspace (Opción C).
+ *  Namespace separado de la de túnel para no pisar el acceso del usuario:
+ *  marca SOLO el tráfico de la scan-IP del VPS hacia el VRF a escanear. */
+function scanMangleComment(workspaceId) {
+  return `SCAN-WS-${userTag(workspaceId)}`;
+}
+
 // ── LECTURAS (conexión de solo-lectura) ─────────────────────────────────────
 //  IMPORTANTE: estas funciones NO enmascaran errores de `print`. Si el router
 //  no responde, PROPAGAN la excepción para que el caller falle de forma segura
@@ -44,6 +51,13 @@ async function vrfExists(api, vrfName) {
 /** .id de las mangle del usuario (por comment). Lanza si el print falla. */
 async function findUserMangleIds(api, userId) {
   const comment = mangleComment(userId);
+  const all = await safeWrite(api, ['/ip/firewall/mangle/print'], 12000);
+  return all.filter(m => m.comment === comment && m['.id']).map(m => m['.id']);
+}
+
+/** .id de las mangle de ESCANEO del workspace (por comment). Lanza si falla. */
+async function findScanMangleIds(api, workspaceId) {
+  const comment = scanMangleComment(workspaceId);
   const all = await safeWrite(api, ['/ip/firewall/mangle/print'], 12000);
   return all.filter(m => m.comment === comment && m['.id']).map(m => m['.id']);
 }
@@ -120,10 +134,29 @@ async function addUserMangle(api, { userId, mgmtIp, vrfName }) {
   ], 12000);
 }
 
+/** Crea la mangle de ESCANEO del VPS (Opción C): src=scan-IP del workspace → VRF.
+ *  El caller DEBE remover primero la scan-mangle previa del workspace (el VRF
+ *  cambia entre escaneos); ver lib/scanMangle.setup. */
+async function addScanMangle(api, { workspaceId, scanIp, vrfName }) {
+  if (!scanIp) throw new Error('scanIp requerido');
+  if (!vrfName) throw new Error('vrfName requerido');
+  await writeIdempotent(api, [
+    '/ip/firewall/mangle/add',
+    '=chain=prerouting',
+    '=action=mark-routing',
+    `=comment=${scanMangleComment(workspaceId)}`,
+    `=dst-address-list=${DST_LIST}`,
+    `=new-routing-mark=${vrfName}`,
+    `=src-address=${scanIp}`,
+    '=passthrough=yes',
+  ], 12000);
+}
+
 module.exports = {
   DST_LIST,
   LEGACY_GLOBAL_COMMENTS,
-  userTag, mangleComment,
+  userTag, mangleComment, scanMangleComment,
   vrfExists, findUserMangleIds, findLegacyGlobalMangleIds, hasUserMangle,
-  removeMangleIds, addUserMangle,
+  findScanMangleIds,
+  removeMangleIds, addUserMangle, addScanMangle,
 };

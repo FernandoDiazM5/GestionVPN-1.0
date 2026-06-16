@@ -13,6 +13,7 @@
     "migrate:notifications": "node db/migrateNotifications.js",
     "migrate:monitoring": "node db/migrateMonitoring.js",
     "migrate:apnode": "node db/migrateApNode.js",
+    "migrate:scanip": "node db/migrateScanIp.js",
     "seed:roles": "node db/seedRoles.js",
     "analyze:queries": "node tools/analyze-queries.js",
     "test": "vitest run",

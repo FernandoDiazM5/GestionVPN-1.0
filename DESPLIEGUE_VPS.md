@@ -471,9 +471,27 @@ Se eligió un sub-rango dentro de `192.168.21.0/24` (no un `/24` aparte como `19
 
 #### Fases de entrega
 
-- **Fase 0:** merge `dev → main` + despliegue base (gestión multi-usuario, ya funciona) + resolver HTTPS-sobre-IP.
-- **Fase 1 (Opción C — Escanear):** capas 3 + 4 (sshExec/localAddress, addScanMangle, ciclo de vida en scan.routes, repo workspace_scan_ip) + pool de red (capas 1-2).
-- **Fase 2 (Opción C — Monitor AP):** mangle persistente por dueño en apPollJob.
+- **Fase 0:** ✅ archivos de despliegue (ver banner arriba). Pendiente: merge `dev → main` + despliegue en el VPS.
+- **Fase 1 (Opción C — Escanear):** ✅ **IMPLEMENTADA** (commits `9626777` + Fase 1b). Capas 3 y 4 del escaneo + 7 tests verdes (suite total 209). Capas 1-2 (red/MikroTik) son operativas en el VPS.
+- **Fase 2 (Opción C — Monitor AP):** pendiente — mangle persistente por dueño + `localAddress` por AP en `apPollJob.js`.
+
+#### Estado de implementación Fase 1 (código en `dev`)
+
+| Pieza | Archivo | Estado |
+|---|---|---|
+| `localAddress` en la sonda | `ubiquiti.service.js` (`sshExec`, `probeStatusCgi`, `getSSHBanner`, `probeUbiquiti`) + `scanner.worker.js` | ✅ aditivo, retrocompatible |
+| Mangle de escaneo | `lib/tunnelProvisioner.js` (`addScanMangle`, `findScanMangleIds`, `scanMangleComment` con `comment=SCAN-WS-<ws>`) | ✅ |
+| Ciclo de vida | `lib/scanMangle.js` (`setup`/`teardown`) + integración en `routes/nodes/scan.routes.js` | ✅ |
+| Repo + tabla | `db/repos/scanIpRepo.js` + `sql/schema_scan_ip.sql` + `db/migrateScanIp.js` (`npm run migrate:scanip`, ya en `entrypoint.sh`) | ✅ |
+| Tests | `test/unit/scanMangle.test.js` (7) | ✅ |
+
+**Comportamiento:** si el workspace tiene scan-IP asignada → monta `src=scan-IP → VRF` y ata el SSH a esa IP; si **no** la tiene → escaneo legacy sin `localAddress` (preserva el dev local). Si la mangle falla, el escaneo devuelve `503` accionable en vez de "no encontró nada".
+
+**Provisión operativa (por workspace, al alta del moderador):**
+1. `scanIpRepo.allocate(workspaceId)` asigna la siguiente IP libre del pool `.200–.230` (idempotente).
+2. Pool en `wg0` y `allowed-address` en MikroTik: ya cubiertos por la config 1-vez (capas 1-2).
+
+> **Limitación conocida:** la scan-IP es **una por workspace** → si un mismo moderador tiene la misma LAN en dos nodos (VRF distintos), el escaneo de esa LAN usa el primer VRF que matchee. Moderadores **distintos** sí escanean en paralelo sin colisión.
 
 ---
 

@@ -6,6 +6,13 @@
 //  ★ Guarda multi-tenant: un moderador solo escanea subredes
 //    (segmento_lan / lan_subnets) de SUS propios nodos. Admin sin
 //    restricción.
+//
+//  ★ Opción C (multi-VRF desde el VPS): si el workspace tiene una
+//    scan-IP asignada (workspace_scan_ip), se monta en el MikroTik una
+//    mangle src=scan-IP → VRF del nodo y el escaneo se ata a esa IP
+//    (localAddress). Así N moderadores escanean VRFs distintos en
+//    paralelo aunque las LAN se solapen. Sin scan-IP → escaneo legacy
+//    (sin localAddress), útil en desarrollo local.
 // ============================================================
 
 const express = require('express');
@@ -15,6 +22,9 @@ const path = require('path');
 
 const { CIDR_REGEX, getSubnetHosts } = require('../../ubiquiti.service');
 const { getDb } = require('../../db.service');
+const scanIpRepo = require('../../db/repos/scanIpRepo');
+const scanMangle = require('../../lib/scanMangle');
+const log = require('../../lib/logger').child({ scope: 'scan' });
 
 router.post('/node/scan-stream', async (req, res) => {
   const { nodeLan } = req.body;
@@ -22,25 +32,52 @@ router.post('/node/scan-stream', async (req, res) => {
     return res.status(400).json({ success: false, message: 'CIDR inválido o muy grande' });
   }
 
-  // Aislamiento: el escaneo deriva de un túnel. Un moderador solo puede
-  // escanear subredes (segmento_lan / lan_subnets) de SUS propios nodos.
-  // El Administrador de plataforma no tiene restricción.
+  // Aislamiento + resolución del VRF dueño de la subred. Un moderador solo
+  // puede escanear subredes de SUS nodos. El platform_admin no tiene workspace
+  // ni scan-IP → escaneo legacy.
   const acc = req.account;
+  let targetVrf = null;
   if (acc && !acc.platform_admin) {
     try {
       const db = await getDb();
-      const rows = await db.all('SELECT segmento_lan, lan_subnets FROM nodes WHERE workspace_id = ?', [acc.workspace_id]);
-      const owned = new Set();
-      rows.forEach(r => {
-        if (r.segmento_lan) owned.add(String(r.segmento_lan).trim());
-        try { (JSON.parse(r.lan_subnets || '[]') || []).forEach(s => owned.add(String(s).trim())); } catch (_) { /* noop */ }
-      });
-      if (!owned.has(String(nodeLan).trim())) {
+      const rows = await db.all('SELECT nombre_vrf, segmento_lan, lan_subnets FROM nodes WHERE workspace_id = ?', [acc.workspace_id]);
+      let owns = false;
+      for (const r of rows) {
+        const subs = new Set();
+        if (r.segmento_lan) subs.add(String(r.segmento_lan).trim());
+        try { (JSON.parse(r.lan_subnets || '[]') || []).forEach(s => subs.add(String(s).trim())); } catch (_) { /* noop */ }
+        if (subs.has(String(nodeLan).trim())) {
+          owns = true;
+          // Primer match: si la misma LAN está en varios nodos del workspace,
+          // la scan-IP única solo puede apuntar a un VRF (limitación documentada).
+          if (!targetVrf) targetVrf = r.nombre_vrf || null;
+          break;
+        }
+      }
+      if (!owns) {
         return res.status(403).json({ success: false, message: 'La subred no pertenece a ninguno de tus túneles' });
       }
     } catch (_) {
       return res.status(403).json({ success: false, message: 'No autorizado' });
     }
+  }
+
+  // ── Opción C: montar la mangle de escaneo si el workspace tiene scan-IP ──
+  let localAddress = null;
+  let scanMangleUp = false;
+  if (acc && !acc.platform_admin && targetVrf && req.mikrotik) {
+    const scanIp = await scanIpRepo.getScanIpForWorkspace(acc.workspace_id).catch(() => null);
+    if (scanIp) {
+      try {
+        await scanMangle.setup({ workspaceId: acc.workspace_id, scanIp, vrfName: targetVrf, mikrotik: req.mikrotik });
+        localAddress = scanIp;
+        scanMangleUp = true;
+      } catch (e) {
+        log.warn({ ws: acc.workspace_id, vrf: targetVrf, err: e?.message }, 'no se pudo montar la scan mangle');
+        return res.status(503).json({ success: false, message: `No se pudo preparar el escaneo en el router: ${e.message}` });
+      }
+    }
+    // Sin scan-IP asignada → escaneo legacy (sin localAddress).
   }
 
   // SSE-like streaming over fetch
@@ -56,12 +93,20 @@ router.post('/node/scan-stream', async (req, res) => {
     res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   };
 
+  // Limpieza idempotente de la scan mangle (best-effort, en segundo plano).
+  let cleaned = false;
+  const cleanup = () => {
+    if (!scanMangleUp || cleaned) return;
+    cleaned = true;
+    scanMangle.teardown({ workspaceId: acc.workspace_id, mikrotik: req.mikrotik });
+  };
+
   sendEvent('start', { total: totalCount });
 
   // Instanciar el hilo (Worker). El worker vive en server/scanner.worker.js;
   // como este archivo está dos niveles más arriba (routes/nodes/), retrocedemos dos veces.
   const worker = new Worker(path.resolve(__dirname, '..', '..', 'scanner.worker.js'), {
-    workerData: { hostIPs, BATCH: 40 },
+    workerData: { hostIPs, BATCH: 40, localAddress },
   });
 
   worker.on('message', (msg) => {
@@ -70,15 +115,18 @@ router.post('/node/scan-stream', async (req, res) => {
     } else if (msg.type === 'complete') {
       sendEvent('complete', msg.data);
       res.end();
+      cleanup();
     } else if (msg.type === 'error') {
       sendEvent('error', msg.data);
       res.end();
+      cleanup();
     }
   });
 
   worker.on('error', (error) => {
     sendEvent('error', { message: error.message });
     res.end();
+    cleanup();
   });
 
   worker.on('exit', (code) => {
@@ -86,6 +134,7 @@ router.post('/node/scan-stream', async (req, res) => {
       sendEvent('error', { message: `Worker finalizó con código ${code}` });
       res.end();
     }
+    cleanup();
   });
 
   // Abortar hilo gracefully si el cliente cierra la conexión HTTP
@@ -95,6 +144,7 @@ router.post('/node/scan-stream', async (req, res) => {
     setTimeout(() => {
       try { worker.terminate(); } catch (_) { /* noop */ }
     }, 5000);
+    cleanup();
   });
 });
 
