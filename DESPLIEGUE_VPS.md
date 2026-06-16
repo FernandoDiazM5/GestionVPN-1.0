@@ -512,3 +512,31 @@ Se eligió un sub-rango dentro de `192.168.21.0/24` (no un `/24` aparte como `19
 | **Monitor AP — Opción C (Fase 2)** | ✏️ mangle persistente por dueño + `localAddress` en `apPollJob.js` (§11) |
 
 > **Lo más crítico, en orden:** (1) WireGuard estable (`ping 192.168.21.1`), (2) secretos en `/data` (C1), (3) build de backend desde monorepo (C2), (4) HTTPS para que la cookie funcione, (5) Opción C para escaneo multi-moderador (§11).
+
+---
+
+## ✅ Checklist operativo final (en el VPS)
+
+> Todo el código está cerrado y en `main`/`dev` (tip `9f785c1`, historial purgado). Lo que queda es operativo en el servidor.
+
+### Seguridad (hacer al desplegar)
+- [ ] **Cerrar el puerto 3001:** `sudo ufw deny 3001/tcp` (el backend en `network_mode: host` lo expone; solo nginx en 443 debe ser público). Verificar: `sudo ufw status`.
+- [ ] **Rotar credenciales históricas:** cambiar en los equipos las contraseñas SSH de antenas y la `MT_PASS` que existieron en el viejo `database.sqlite` (estaba junto a su `.db_secret` → descifrables). Producción usa secretos nuevos, pero los valores antiguos deben considerarse comprometidos.
+- [ ] Firewall: `22/tcp`, `80/tcp`, `443/tcp`, `51820/udp` abiertos; `3001` y `3307` NO.
+
+### Red / WireGuard (1 vez)
+- [ ] `ping 192.168.21.1` y `nc -zv 192.168.21.1 8728` responden desde el VPS.
+- [ ] Pool `.200–.230` en `wg0` (`PostUp`/`PostDown`) + `allowed-address` del peer VPS en el MikroTik (o `192.168.21.0/24`).
+
+### Despliegue
+- [ ] `git pull` (rama `main`) en `/opt/GestionVPN-1.0`.
+- [ ] `server/.env.production` y `.env` raíz desde las plantillas; cert autofirmado en `./ssl` (`/CN=134.199.212.232`).
+- [ ] `docker compose -f docker-compose.prod.yml up -d --build` → 3 servicios arriba; `curl -s http://localhost:3001/api/health | jq` OK.
+- [ ] Login admin → **Ajustes → Configurar router** (`MT_IP=192.168.21.1`) → activar un nodo → confirmar que "Acceso Restringido" desaparece.
+
+### Por cada moderador (alta)
+- [ ] `docker exec vpn-backend npm run scan:assign <workspaceId>` (asigna scan-IP del pool; sin arg lista).
+
+### Operación continua
+- [ ] Cron de backup (`mysqldump` + secretos del volumen) — ver §9.
+- [ ] Cron de renovación del cert si migras a dominio + Let's Encrypt (el autofirmado dura 10 años).
