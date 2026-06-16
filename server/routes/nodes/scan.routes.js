@@ -24,6 +24,7 @@ const { CIDR_REGEX, getSubnetHosts } = require('../../ubiquiti.service');
 const { getDb } = require('../../db.service');
 const scanIpRepo = require('../../db/repos/scanIpRepo');
 const scanMangle = require('../../lib/scanMangle');
+const scanLock = require('../../lib/scanLock');
 const log = require('../../lib/logger').child({ scope: 'scan' });
 
 router.post('/node/scan-stream', async (req, res) => {
@@ -65,14 +66,18 @@ router.post('/node/scan-stream', async (req, res) => {
   // ── Opción C: montar la mangle de escaneo si el workspace tiene scan-IP ──
   let localAddress = null;
   let scanMangleUp = false;
+  let releaseLock = null;
   if (acc && !acc.platform_admin && targetVrf && req.mikrotik) {
     const scanIp = await scanIpRepo.getScanIpForWorkspace(acc.workspace_id).catch(() => null);
     if (scanIp) {
+      // Serializa contra el job de Monitor AP del mismo workspace (misma scan-IP).
+      releaseLock = await scanLock.acquire(acc.workspace_id);
       try {
         await scanMangle.setup({ workspaceId: acc.workspace_id, scanIp, vrfName: targetVrf, mikrotik: req.mikrotik });
         localAddress = scanIp;
         scanMangleUp = true;
       } catch (e) {
+        releaseLock(); releaseLock = null;
         log.warn({ ws: acc.workspace_id, vrf: targetVrf, err: e?.message }, 'no se pudo montar la scan mangle');
         return res.status(503).json({ success: false, message: `No se pudo preparar el escaneo en el router: ${e.message}` });
       }
@@ -93,12 +98,19 @@ router.post('/node/scan-stream', async (req, res) => {
     res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   };
 
-  // Limpieza idempotente de la scan mangle (best-effort, en segundo plano).
+  // Limpieza idempotente: borra la scan mangle y libera el lock DESPUÉS de que
+  // el teardown termine (para no soltar el workspace mientras el router aún
+  // tiene la regla → evita carrera con el job de Monitor AP).
   let cleaned = false;
   const cleanup = () => {
-    if (!scanMangleUp || cleaned) return;
+    if (cleaned) return;
     cleaned = true;
-    scanMangle.teardown({ workspaceId: acc.workspace_id, mikrotik: req.mikrotik });
+    if (scanMangleUp) {
+      scanMangle.teardown({ workspaceId: acc.workspace_id, mikrotik: req.mikrotik })
+        .finally(() => { if (releaseLock) { releaseLock(); releaseLock = null; } });
+    } else if (releaseLock) {
+      releaseLock(); releaseLock = null;
+    }
   };
 
   sendEvent('start', { total: totalCount });

@@ -473,7 +473,7 @@ Se eligió un sub-rango dentro de `192.168.21.0/24` (no un `/24` aparte como `19
 
 - **Fase 0:** ✅ archivos de despliegue (ver banner arriba). Pendiente: merge `dev → main` + despliegue en el VPS.
 - **Fase 1 (Opción C — Escanear):** ✅ **IMPLEMENTADA** (commits `9626777` + Fase 1b). Capas 3 y 4 del escaneo + 7 tests verdes (suite total 209). Capas 1-2 (red/MikroTik) son operativas en el VPS.
-- **Fase 2 (Opción C — Monitor AP):** pendiente — mangle persistente por dueño + `localAddress` por AP en `apPollJob.js`.
+- **Fase 2 (Opción C — Monitor AP):** ✅ **IMPLEMENTADA**. `apPollJob` agrupa los APs por VRF, conmuta la mangle de la scan-IP por grupo y atea el SSH (`localAddress`); `lib/scanLock.js` serializa por workspace contra el escaneo interactivo (misma scan-IP = una mangle activa). +5 tests (suite total 214).
 
 #### Estado de implementación Fase 1 (código en `dev`)
 

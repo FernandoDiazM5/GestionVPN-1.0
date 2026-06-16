@@ -165,9 +165,9 @@ const formatUptime = (sec) => {
 };
 
 // ── Poll AP via wstalist (AC) o /usr/www/sta.cgi (M5) ────────────────────
-const pollAp = async (apId, ip, port, user, pass, firmware = '') => {
+const pollAp = async (apId, ip, port, user, pass, firmware = '', localAddress = null) => {
     const cmd = isM5Firmware(firmware) ? '/usr/www/sta.cgi 2>/dev/null' : 'wstalist 2>/dev/null';
-    const output = await sshExec(ip, port || 22, user, pass, cmd, 15000, 8000);
+    const output = await sshExec(ip, port || 22, user, pass, cmd, 15000, 8000, localAddress);
     const stations = parseWstalist(output);
     const now = Date.now();
     if (!bytesCache[apId]) bytesCache[apId] = {};
@@ -207,14 +207,14 @@ const DETAIL_CMD = [
     'echo __IFC__',  'ifconfig 2>/dev/null',
 ].join('; ');
 
-const getDetail = async (ip, port, user, pass) => {
-    const output = await sshExec(ip, port || 22, user, pass, DETAIL_CMD, 20000, 8000);
+const getDetail = async (ip, port, user, pass, localAddress = null) => {
+    const output = await sshExec(ip, port || 22, user, pass, DETAIL_CMD, 20000, 8000, localAddress);
     return parseFullOutput(output);
 };
 
 // ── Full AP detail — uses ANTENNA_CMD (12 sections, more data) ────────────
-const getFullDetail = async (ip, port, user, pass) => {
-    const output = await sshExec(ip, port || 22, user, pass, ANTENNA_CMD, 30000, 10000);
+const getFullDetail = async (ip, port, user, pass, localAddress = null) => {
+    const output = await sshExec(ip, port || 22, user, pass, ANTENNA_CMD, 30000, 10000, localAddress);
     return parseFullOutput(output);
 };
 

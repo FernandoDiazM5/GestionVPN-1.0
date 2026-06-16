@@ -9,7 +9,7 @@ const db = {
   get: vi.fn().mockResolvedValue(null),
   all: vi.fn(async (sql) => {
     if (/FROM aps a JOIN ap_groups/.test(sql)) {
-      return [{ id: 7, uuid: 'ap1', ip: '10.0.0.5', usuario_ssh: 'ubnt', clave_ssh_enc: 'secret', puerto_ssh: 22, node_id: 2, nombre_nodo: 'N', firmware: 'XW' }];
+      return [{ id: 7, uuid: 'ap1', ip: '10.0.0.5', usuario_ssh: 'ubnt', clave_ssh_enc: 'secret', puerto_ssh: 22, node_id: 2, nombre_nodo: 'N', firmware: 'XW', nombre_vrf: 'VRF-A' }];
     }
     if (/FROM cpes WHERE mac IN/.test(sql)) return [{ mac: 'AA:BB:CC:DD:EE:FF', hostname: 'Casa', modelo: 'LBE' }];
     return [];
@@ -21,11 +21,24 @@ stubModule(__dirname, '../../db.service', {
   getApIntId: vi.fn().mockResolvedValue(7),
   getCpeIntId: vi.fn().mockResolvedValue(11),
   decryptPass: (s) => s,
+  getAppSetting: vi.fn().mockResolvedValue('cfg'),
 });
 const apSvc = stubModule(__dirname, '../../ap.service', {
   pollAp: vi.fn().mockResolvedValue([{ mac: 'AA:BB:CC:DD:EE:FF', signal: -60, ccq: 90, lastip: '10.0.0.9' }]),
 });
 const sseMock = stubModule(__dirname, '../../lib/sse', { publish: vi.fn() });
+// Opción C: por defecto SIN scan-IP → camino legacy (evita MySQL real).
+const scanIpRepoMock = stubModule(__dirname, '../../db/repos/scanIpRepo', {
+  getScanIpForWorkspace: vi.fn().mockResolvedValue(null),
+});
+const scanMangleMock = stubModule(__dirname, '../../lib/scanMangle', {
+  setup: vi.fn().mockResolvedValue(undefined),
+  teardown: vi.fn().mockResolvedValue(undefined),
+});
+stubModule(__dirname, '../../lib/scanLock', {
+  withLock: vi.fn(async (_k, fn) => fn()),
+  acquire: vi.fn(),
+});
 
 const JOB_PATH = require.resolve(path.join(__dirname, '..', '..', 'lib', 'apPollJob'));
 const apWatch = require('../../lib/apWatch');
@@ -36,6 +49,7 @@ beforeEach(() => {
   apWatch._reset();
   db.run.mockResolvedValue(undefined);
   apSvc.pollAp.mockResolvedValue([{ mac: 'AA:BB:CC:DD:EE:FF', signal: -60, ccq: 90, lastip: '10.0.0.9' }]);
+  scanIpRepoMock.getScanIpForWorkspace.mockResolvedValue(null); // default: legacy
 });
 
 afterAll(() => { delete require.cache[JOB_PATH]; });
@@ -84,5 +98,20 @@ describe('apPollJob.runOnce', () => {
     const [, ev, payload] = sseMock.publish.mock.calls[0];
     expect(ev).toBe('ap-poll');
     expect(payload.error).toBe('SSH timeout');
+  });
+
+  it('Opción C: con scan-IP, monta mangle por VRF y ata el SSH (localAddress)', async () => {
+    apWatch.touch('ws-1');
+    scanIpRepoMock.getScanIpForWorkspace.mockResolvedValue('192.168.21.205');
+
+    await apPollJob.runOnce();
+
+    // mangle src=scan-IP → VRF del AP, y limpieza al final del ciclo
+    expect(scanMangleMock.setup).toHaveBeenCalledWith(
+      expect.objectContaining({ workspaceId: 'ws-1', scanIp: '192.168.21.205', vrfName: 'VRF-A' })
+    );
+    expect(scanMangleMock.teardown).toHaveBeenCalled();
+    // pollAp recibió la scan-IP como localAddress (7º argumento)
+    expect(apSvc.pollAp.mock.calls[0][6]).toBe('192.168.21.205');
   });
 });
