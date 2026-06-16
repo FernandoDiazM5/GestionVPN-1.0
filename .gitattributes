@@ -1,0 +1,9 @@
+# Scripts de shell SIEMPRE con LF — un CRLF rompe el entrypoint en el contenedor Linux.
+*.sh            text eol=lf
+entrypoint.sh   text eol=lf
+
+# Archivos de despliegue: LF para consistencia en el VPS Linux.
+Dockerfile*     text eol=lf
+*.conf          text eol=lf
+*.yml           text eol=lf
+*.yaml           text eol=lf

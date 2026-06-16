@@ -1,0 +1,17 @@
+# Contexto de build = raíz del monorepo. Excluir lo pesado/secreto.
+**/node_modules
+**/dist
+**/coverage
+.git
+.github
+.claude
+**/.env
+**/.env.*
+!**/.env.production.example
+server/.db_secret
+server/.jwt_secret
+server/_legacy_sqlite
+server/database*.sqlite*
+**/*.log
+*.md
+secretos/

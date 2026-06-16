@@ -1,0 +1,46 @@
+# ── Backend MikroTik VPN Manager — Producción (monorepo) ────────────────────
+#  Contexto de build = RAÍZ del monorepo (no ./server), porque el backend
+#  depende del workspace @gestionvpn/contracts y debe compilarlo.
+#    docker build -f server/Dockerfile.prod .
+FROM node:22-alpine
+
+# ssh2 (cpu-features) puede requerir toolchain nativo. mysql2/bcryptjs son JS puro.
+RUN apk add --no-cache python3 make g++
+
+WORKDIR /repo
+
+# 1. Manifiestos de TODOS los workspaces (npm ci valida el workspaces field
+#    completo; si falta uno declarado, falla). Solo manifiestos → cachea bien.
+COPY package*.json ./
+COPY packages/contracts/package*.json ./packages/contracts/
+COPY server/package*.json ./server/
+COPY vpn-manager/package*.json ./vpn-manager/
+
+# 2. Instala el monorepo. NO usamos --omit=dev aquí porque compilar
+#    @gestionvpn/contracts necesita TypeScript (devDep del paquete).
+#    (La imagen arrastra deps de vpn-manager por el lockfile compartido; una
+#     imagen más fina con multi-stage queda como optimización futura.)
+RUN npm ci
+
+# 3. Código de los workspaces que usa el backend
+COPY packages/ ./packages/
+COPY server/ ./server/
+
+# 4. Compila contracts → dist/cjs (lo que el backend hace require() en runtime)
+RUN npm run build:contracts
+
+# 5. Datos persistentes + usuario no-root
+RUN mkdir -p /data /repo/server/uploads \
+ && addgroup -g 1001 -S app && adduser -S app -u 1001 -G app \
+ && chown -R app:app /repo /data
+USER app
+
+WORKDIR /repo/server
+EXPOSE 3001
+
+# Health check interno (mismo endpoint que usa /api/health enriquecido)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+  CMD wget -qO- http://localhost:3001/api/health || exit 1
+
+# Invocado vía `sh` para no depender del bit +x (git en Windows no lo preserva)
+CMD ["sh", "entrypoint.sh"]

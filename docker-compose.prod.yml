@@ -1,0 +1,75 @@
+# ── Producción: MariaDB + backend (host-mode) + frontend nginx (HTTPS) ──────
+#  Uso:  docker compose -f docker-compose.prod.yml up -d --build
+#  Requiere:  .env (DB_*),  server/.env.production,  ./ssl/{fullchain,privkey}.pem
+services:
+
+  db:
+    image: mariadb:11
+    container_name: vpn-db
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MARIADB_DATABASE: vpn_manager
+      MARIADB_USER: vpn_app
+      MARIADB_PASSWORD: ${DB_APP_PASSWORD}
+    ports:
+      # Solo localhost del host. Lo consume el backend (host-mode) en 127.0.0.1:3307.
+      - "127.0.0.1:3307:3306"
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 40s
+    command: >
+      --innodb-buffer-pool-size=256M
+      --max-connections=50
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+
+  backend:
+    build:
+      context: .                      # raíz del monorepo (necesita packages/contracts)
+      dockerfile: server/Dockerfile.prod
+    container_name: vpn-backend
+    restart: unless-stopped
+    # network_mode: host es OBLIGATORIO → el backend alcanza 192.168.21.1 vía wg0 del host.
+    network_mode: host
+    env_file:
+      - server/.env.production
+    environment:
+      # En host-mode, MariaDB se ve por el puerto publicado en el host.
+      MYSQL_HOST: "127.0.0.1"
+      MYSQL_PORT: "3307"
+    volumes:
+      # .db_secret y .jwt_secret viven aquí (DATA_DIR=/data). NO bind a /app.
+      - backend-data:/data
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      dockerfile: vpn-manager/Dockerfile.prod
+      args:
+        VITE_API_URL: ""
+    container_name: vpn-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Certificados (autofirmado para IP, o Let's Encrypt si hay dominio — ver §6)
+      - ./ssl:/etc/nginx/ssl:ro
+    extra_hosts:
+      # nginx (bridge) alcanza el backend (host) por el gateway del host
+      - "backend:host-gateway"
+    depends_on:
+      - backend
+
+volumes:
+  db-data:
+  backend-data:
