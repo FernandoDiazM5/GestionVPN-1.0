@@ -29,6 +29,11 @@ const { initDb } = require('./db.service');
 const app  = express();
 const PORT = process.env.PORT || 3001;
 
+// Detrás de nginx en producción: confiar en 1 nivel de proxy para que req.ip y
+// el rate-limit de login usen la IP real del cliente (X-Forwarded-For), no la
+// del contenedor nginx. (Auditoría despliegue VPS, hallazgo 4.)
+if (process.env.NODE_ENV === 'production') app.set('trust proxy', 1);
+
 // ── Guard global: errores asincrónicos de node-routeros ──────────────────────
 const SAFE_CODES = new Set([
     'ECONNREFUSED','ETIMEDOUT','ECONNRESET','EPIPE',

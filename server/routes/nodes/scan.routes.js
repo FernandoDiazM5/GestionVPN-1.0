@@ -71,7 +71,14 @@ router.post('/node/scan-stream', async (req, res) => {
     const scanIp = await scanIpRepo.getScanIpForWorkspace(acc.workspace_id).catch(() => null);
     if (scanIp) {
       // Serializa contra el job de Monitor AP del mismo workspace (misma scan-IP).
-      releaseLock = await scanLock.acquire(acc.workspace_id);
+      // El timeout de seguridad del lock se dimensiona al tamaño del escaneo:
+      // un /16 puede tardar bastante; con un timeout fijo de 5 min el lock se
+      // auto-liberaría a mitad y el job podría conmutar la mangle a otro VRF
+      // (resultados del VRF equivocado). ~60ms/host, mín 5 min, máx 30 min.
+      const prefix = parseInt(nodeLan.split('/')[1], 10);
+      const estHosts = Math.max(1, (2 ** (32 - prefix)) - 2);
+      const lockMs = Math.min(30 * 60 * 1000, Math.max(5 * 60 * 1000, estHosts * 60));
+      releaseLock = await scanLock.acquire(acc.workspace_id, lockMs);
       try {
         await scanMangle.setup({ workspaceId: acc.workspace_id, scanIp, vrfName: targetVrf, mikrotik: req.mikrotik });
         localAddress = scanIp;
