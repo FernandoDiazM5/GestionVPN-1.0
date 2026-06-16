@@ -33,6 +33,24 @@ router.post('/connect', asyncHandler(async (req, res) => {
   }
 }));
 
+// GET /router/check — sonda LIVE de alcanzabilidad del router core.
+// Responde SIEMPRE 200 con { reachable } (no lanza 503, para no re-disparar la
+// pantalla "Acceso Restringido"). Lo usa el botón "Ya lo activé, recargar" del
+// overlay para verificar de verdad antes de recargar.
+router.get('/router/check', asyncHandler(async (req, res) => {
+  if (!req.mikrotik) return sendOk(res, { reachable: false, reason: 'not-configured' });
+  const { ip, user, pass } = req.mikrotik;
+  let api;
+  try {
+    api = await connectToMikrotik(ip, user, pass);
+    await api.close().catch(() => {});
+    return sendOk(res, { reachable: true });
+  } catch (error) {
+    if (api) try { await api.close(); } catch (_) { /* ignore */ }
+    return sendOk(res, { reachable: false });
+  }
+}));
+
 router.post('/diagnose', asyncHandler(async (req, res) => {
   const { ip, user, pass } = requireMikrotik(req);
   if (!ip) throw new AppError('Falta IP', 400, 'BAD_REQUEST');

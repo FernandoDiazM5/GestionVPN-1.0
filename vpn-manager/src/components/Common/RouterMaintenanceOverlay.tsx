@@ -15,11 +15,15 @@
 // ============================================================
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ShieldAlert, RefreshCw, Download, Wifi } from 'lucide-react';
+import { ShieldAlert, RefreshCw, Download, Wifi, Loader2, AlertCircle } from 'lucide-react';
+import { apiFetch } from '../../utils/apiClient';
+import { API_BASE_URL } from '../../config';
 
 export default function RouterMaintenanceOverlay() {
   const [visible, setVisible] = useState(false);
   const [detail, setDetail] = useState('');
+  const [checking, setChecking] = useState(false);
+  const [notYet, setNotYet] = useState(false);
 
   useEffect(() => {
     const onDown = (e: Event) => {
@@ -30,6 +34,24 @@ export default function RouterMaintenanceOverlay() {
     window.addEventListener('router_unreachable', onDown);
     return () => window.removeEventListener('router_unreachable', onDown);
   }, []);
+
+  // Verifica de verdad si el router ya responde antes de recargar. Si sí →
+  // entra a la app; si no → persiste la pantalla con un aviso. Evita el
+  // "recargar a ciegas" que devolvía a la misma pantalla sin comprobar nada.
+  const handleVerify = async () => {
+    setChecking(true);
+    setNotYet(false);
+    try {
+      const r = await apiFetch(`${API_BASE_URL}/api/router/check`);
+      const d = await r.json();
+      if (d?.reachable) {
+        window.location.reload();   // conexión OK → recargar y entrar
+        return;
+      }
+    } catch { /* tratamos como no-alcanzable */ }
+    setChecking(false);
+    setNotYet(true);                // sigue sin responder → persiste el bloqueo
+  };
 
   // Bloquea el scroll del body mientras la pantalla está activa.
   useEffect(() => {
@@ -52,6 +74,15 @@ export default function RouterMaintenanceOverlay() {
         backgroundSize: '24px 24px',
       }}
     >
+      {/* Capa de verificación: tapa todo mientras se comprueba la conexión */}
+      {checking && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/85 dark:bg-slate-950/85 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="h-16 w-16 rounded-full border-4 border-rose-200 dark:border-rose-500/20 border-t-rose-600 dark:border-t-rose-400 animate-spin mb-6" />
+          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 animate-pulse">Verificando conexión VPN…</h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1.5">Por favor espera un momento</p>
+        </div>
+      )}
+
       <main className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl shadow-2xl shadow-slate-900/20 dark:shadow-black/50
                        overflow-hidden border border-slate-100 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-200">
         {/* Barra superior de alerta */}
@@ -85,13 +116,26 @@ export default function RouterMaintenanceOverlay() {
             </p>
           )}
 
+          {/* Aviso: verificación previa sin éxito */}
+          {notYet && (
+            <div className="mt-5 flex items-start gap-2 px-3 py-2.5 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 text-left">
+              <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-700 dark:text-amber-300">
+                Aún no detectamos la conexión. Confirma que tu <strong>WireGuard de gestión</strong> esté activo y vuelve a intentar.
+              </p>
+            </div>
+          )}
+
           {/* Acciones */}
           <div className="flex flex-col gap-3 mt-8">
             <button
-              onClick={() => window.location.reload()}
-              className="btn-primary btn-md w-full inline-flex items-center justify-center gap-2"
+              onClick={handleVerify}
+              disabled={checking}
+              className="btn-primary btn-md w-full inline-flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <RefreshCw className="w-4 h-4" /> Ya lo activé, recargar página
+              {checking
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> Verificando…</>
+                : <><RefreshCw className="w-4 h-4" /> Ya lo activé, recargar página</>}
             </button>
             <a
               href="https://www.wireguard.com/install/"
