@@ -488,7 +488,7 @@ Se eligió un sub-rango dentro de `192.168.21.0/24` (no un `/24` aparte como `19
 **Comportamiento:** si el workspace tiene scan-IP asignada → monta `src=scan-IP → VRF` y ata el SSH a esa IP; si **no** la tiene → escaneo legacy sin `localAddress` (preserva el dev local). Si la mangle falla, el escaneo devuelve `503` accionable en vez de "no encontró nada".
 
 **Provisión operativa (por workspace, al alta del moderador):**
-1. `scanIpRepo.allocate(workspaceId)` asigna la siguiente IP libre del pool `.200–.230` (idempotente).
+1. `docker exec vpn-backend npm run scan:assign <workspaceId>` → asigna la siguiente IP libre del pool `.200–.230` (idempotente). Sin argumento lista las asignaciones.
 2. Pool en `wg0` y `allowed-address` en MikroTik: ya cubiertos por la config 1-vez (capas 1-2).
 
 > **Limitación conocida:** la scan-IP es **una por workspace** → si un mismo moderador tiene la misma LAN en dos nodos (VRF distintos), el escaneo de esa LAN usa el primer VRF que matchee. Moderadores **distintos** sí escanean en paralelo sin colisión.
