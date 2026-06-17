@@ -41,7 +41,8 @@ export default function WgConfigModal({ peer, onClose }: { peer: WgPeer; onClose
 
   const downloadConf = () => {
     if (!conf) return;
-    const blob = new Blob([conf], { type: 'text/plain' });
+    // octet-stream (no text/plain): evita que el navegador añada ".txt" al .conf.
+    const blob = new Blob([conf], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
