@@ -1,18 +1,33 @@
 import { useState, useEffect } from 'react';
 import {
   UserCog, UserPlus, Loader2, RefreshCw, X, Briefcase, Mail, KeyRound,
-  Pencil, Trash2, Ban, Power, AlertTriangle,
+  Pencil, Trash2, Ban, Power, AlertTriangle, Link2, Copy, Check, Clock,
 } from 'lucide-react';
 import { adminApi } from '../../../services/adminApi';
+import type { PendingInvitation } from '../../../services/adminApi';
 import { useWorkspaceSession } from '../../../context/WorkspaceSession';
 import { isPlatformAdmin } from '../../../utils/permissions';
 import type { Moderator } from '../../../types/account';
+
+/** Copia texto al portapapeles con fallback para navegadores sin clipboard API. */
+async function copyToClipboard(text: string) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); return true; }
+  } catch { /* fallback abajo */ }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    const ok = document.execCommand('copy'); document.body.removeChild(ta); return ok;
+  } catch { return false; }
+}
 
 const inputCls = 'w-full px-3 py-2.5 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 text-slate-700 placeholder:text-slate-400 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500';
 const iconBtn = 'p-2 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed';
 
 export default function ModeratorsModule() {
   const [moderators, setModerators] = useState<Moderator[]>([]);
+  const [invites, setInvites] = useState<PendingInvitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<Moderator | null>(null);
@@ -26,7 +41,14 @@ export default function ModeratorsModule() {
   const load = async () => {
     if (!canAdmin) { setLoading(false); return; }   // solo el Administrador consulta /api/admin
     setLoading(true);
-    try { const r = await adminApi.listModerators(); setModerators(r.moderators); }
+    try {
+      const [mods, invs] = await Promise.all([
+        adminApi.listModerators(),
+        adminApi.listInvitations().catch(() => ({ invitations: [] as PendingInvitation[] })),
+      ]);
+      setModerators(mods.moderators);
+      setInvites(invs.invitations);
+    }
     catch { /* sesión/MySQL */ }
     finally { setLoading(false); }
   };
@@ -163,6 +185,8 @@ export default function ModeratorsModule() {
         </div>
       </div>
 
+      {invites.length > 0 && <PendingInvitationsCard invites={invites} />}
+
       {showCreate && <CreateModeratorModal onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); load(); }} />}
       {editing && <EditModeratorModal mod={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
       {resetting && <ResetPasswordModal mod={resetting} onClose={() => setResetting(null)} onSaved={() => setResetting(null)} />}
@@ -193,6 +217,67 @@ function ModalShell({ icon, title, danger, busy, onClose, children }: {
   );
 }
 
+// ── Invitaciones pendientes por aceptar ───────────────────────────────────
+//  Lista los moderadores invitados que aún NO aceptaron. Como el correo puede
+//  no llegar (proveedor que bloquea SMTP saliente), cada fila permite copiar un
+//  enlace de aceptación válido para compartirlo a mano (regenera el OTP).
+function PendingInvitationsCard({ invites }: { invites: PendingInvitation[] }) {
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  const copyLink = async (id: string) => {
+    setBusyId(id); setErr(null);
+    try {
+      const r = await adminApi.invitationLink(id);
+      const ok = await copyToClipboard(r.acceptUrl);
+      if (ok) { setCopiedId(id); setTimeout(() => setCopiedId(null), 2500); }
+      else { window.prompt('Copia este enlace y compártelo con el moderador:', r.acceptUrl); }
+    } catch (e) { setErr(e instanceof Error ? e.message : 'No se pudo generar el enlace'); }
+    finally { setBusyId(null); }
+  };
+
+  const expired = (ms: number) => ms < Date.now();
+
+  return (
+    <div className="card overflow-hidden border border-slate-200 dark:border-slate-800">
+      <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
+        <Clock className="w-4 h-4 text-amber-500" />
+        <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">Invitaciones pendientes</h3>
+        <span className="badge badge-warning text-2xs ml-1">{invites.length}</span>
+        <p className="text-2xs text-slate-400 dark:text-slate-500 ml-auto hidden sm:block">
+          ¿No llegó el correo? Copia el enlace y compártelo manualmente.
+        </p>
+      </div>
+      {err && <p className="px-6 py-2 text-xs text-rose-600 dark:text-rose-400 font-medium">{err}</p>}
+      <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+        {invites.map((inv) => (
+          <li key={inv.id} className="px-6 py-3 flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-sm text-slate-800 dark:text-slate-100 truncate">{inv.name || inv.email.split('@')[0]}</p>
+              <p className="data-muted text-2xs truncate">{inv.email}{inv.workspace_name ? ` · ${inv.workspace_name}` : ''}</p>
+            </div>
+            <span className={`badge text-2xs shrink-0 ${expired(inv.expires_at) ? 'badge-danger' : 'badge-neutral'}`}>
+              {expired(inv.expires_at) ? 'expirada' : 'pendiente'}
+            </span>
+            <button
+              onClick={() => copyLink(inv.id)}
+              disabled={busyId === inv.id}
+              className="btn-outline px-3 py-2 flex items-center gap-2 text-xs shrink-0 disabled:opacity-40"
+              title="Genera y copia un enlace de aceptación para compartirlo a mano"
+            >
+              {busyId === inv.id ? <Loader2 className="w-4 h-4 animate-spin" />
+                : copiedId === inv.id ? <Check className="w-4 h-4 text-emerald-500" />
+                : <Link2 className="w-4 h-4" />}
+              {copiedId === inv.id ? 'Copiado' : 'Copiar enlace'}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 // ── Crear (Invitar) ───────────────────────────────────────────────────────
 //  Mismo UX que invitar un miembro: solo email, le llega correo con link, el
 //  invitado define su contraseña y genera su WG, y queda como OWNER de su ws.
@@ -202,7 +287,8 @@ function CreateModeratorModal({ onClose, onCreated }: { onClose: () => void; onC
   const [workspaceName, setWorkspaceName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sent, setSent] = useState<string | null>(null);
+  const [sent, setSent] = useState<{ email: string; acceptUrl: string; emailSent: boolean } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const submit = async () => {
     setBusy(true); setError(null);
@@ -212,20 +298,41 @@ function CreateModeratorModal({ onClose, onCreated }: { onClose: () => void; onC
         name: name.trim() || undefined,
         workspaceName: workspaceName.trim() || undefined,
       });
-      setSent(r.email);
+      setSent({ email: r.email, acceptUrl: r.acceptUrl, emailSent: r.emailSent });
     } catch (e) { setError(e instanceof Error ? e.message : 'Error'); }
     finally { setBusy(false); }
   };
 
   if (sent) {
+    const copy = async () => {
+      const ok = await copyToClipboard(sent.acceptUrl);
+      if (ok) { setCopied(true); setTimeout(() => setCopied(false), 2500); }
+      else window.prompt('Copia este enlace y compártelo con el moderador:', sent.acceptUrl);
+    };
     return (
-      <ModalShell icon={<UserPlus className="w-4 h-4 text-white" />} title="Invitación enviada" busy={false} onClose={onClose}>
+      <ModalShell icon={<UserPlus className="w-4 h-4 text-white" />} title="Invitación creada" busy={false} onClose={onClose}>
         <div className="space-y-3">
-          <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4">
-            <p className="text-sm text-emerald-700 dark:text-emerald-300 font-semibold mb-1">✉ Correo enviado</p>
-            <p className="text-xs text-emerald-700 dark:text-emerald-400">
-              Le enviamos un correo a <span className="font-mono">{sent}</span> con el código y un enlace.
-              Al aceptar definirá su contraseña y generará su acceso WireGuard automáticamente.
+          {sent.emailSent ? (
+            <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-3">
+              <p className="text-xs text-emerald-700 dark:text-emerald-300 font-semibold">✉ Correo enviado a <span className="font-mono">{sent.email}</span></p>
+            </div>
+          ) : (
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-3">
+              <p className="text-xs text-amber-700 dark:text-amber-300 font-semibold">⚠ El correo no se pudo enviar.</p>
+              <p className="text-2xs text-amber-700 dark:text-amber-400 mt-0.5">Comparte tú mismo el enlace de abajo con <span className="font-mono">{sent.email}</span>.</p>
+            </div>
+          )}
+          <div>
+            <p className="text-2xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Enlace de aceptación (válido 24 h)</p>
+            <div className="flex items-stretch gap-2">
+              <input readOnly value={sent.acceptUrl} onFocus={e => e.currentTarget.select()}
+                className={inputCls + ' font-mono text-2xs'} />
+              <button onClick={copy} className="btn-primary px-3 flex items-center gap-2 text-xs shrink-0">
+                {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}{copied ? 'Copiado' : 'Copiar'}
+              </button>
+            </div>
+            <p className="text-2xs text-slate-400 dark:text-slate-500 mt-1">
+              Al abrirlo, el moderador define su contraseña y genera su acceso WireGuard. Queda como OWNER de su workspace.
             </p>
           </div>
         </div>

@@ -25,6 +25,14 @@ const { setPeersEnabled, removeUserMangles } = require('../lib/routerPeerState')
 
 const INVITE_TTL_MS = 24 * 60 * 60 * 1000; // 24h — igual que team.routes.js
 const genOtp = () => String(crypto.randomInt(100000, 1000000));
+const log = require('../lib/logger').child({ scope: 'admin' });
+
+// Enlace público de aceptación (mismo formato que lib/mailer.sendInvitation):
+// el moderador lo abre y queda con email + OTP precargados.
+function buildAcceptUrl(email, otp) {
+  const base = (process.env.APP_BASE_URL || 'http://localhost:5173/GestionVPN-1.0/').replace(/\/+$/, '/');
+  return `${base}?accept=1&email=${encodeURIComponent(email)}&otp=${encodeURIComponent(otp)}`;
+}
 
 const router = express.Router();
 router.use(requireSession, requirePlatformAdmin);
@@ -323,23 +331,66 @@ router.post('/invite-moderator', asyncHandler(async (req, res) => {
     );
   });
 
-  // Email con link → AcceptInvitationForm (mismo que miembros)
-  const delivery = await sendInvitation({
-    email,
-    code: otp,
-    inviterName: 'El administrador de la plataforma',
-    workspaceName: wsName,
-    tunnelId: null,
-    role: 'OWNER',
-  });
+  // Email con link → AcceptInvitationForm (mismo que miembros). El envío NO es
+  // fatal: si el SMTP falla (ej. proveedor que bloquea el puerto saliente), la
+  // invitación queda creada igual y devolvemos el enlace para compartirlo a mano.
+  let emailSent = false;
+  let emailError;
+  try {
+    await sendInvitation({
+      email,
+      code: otp,
+      inviterName: 'El administrador de la plataforma',
+      workspaceName: wsName,
+      tunnelId: null,
+      role: 'OWNER',
+    });
+    emailSent = true;
+  } catch (e) {
+    emailError = e.message;
+    log.warn({ email, err: e.message }, 'invitación creada pero el email no se pudo enviar; se comparte el enlace manualmente');
+  }
 
   return sendOk(res, {
-    message: 'Invitación enviada',
+    message: emailSent ? 'Invitación enviada' : 'Invitación creada (correo no enviado: comparte el enlace)',
     email,
     workspace_id: wsId,
     workspace_name: wsName,
-    dev: delivery.dev || undefined,
+    acceptUrl: buildAcceptUrl(email, otp),
+    code: otp,
+    emailSent,
+    emailError,
   }, 201);
+}));
+
+// ── GET /api/admin/invitations — moderadores PENDIENTES por aceptar ──
+router.get('/invitations', asyncHandler(async (req, res) => {
+  const rows = await query(
+    `SELECT i.id, i.email, i.name, i.expires_at, i.created_at, w.name AS workspace_name
+       FROM invitations i
+       LEFT JOIN workspaces w ON w.id = i.workspace_id
+      WHERE i.status = 'PENDING' AND i.role = 'OWNER'
+      ORDER BY i.created_at DESC`
+  );
+  return sendOk(res, { invitations: rows });
+}));
+
+// ── POST /api/admin/invitations/:id/link — regenera OTP y devuelve enlace ──
+//  El OTP original no se almacena en claro (solo su hash), así que para volver a
+//  obtener un enlace válido de un pendiente generamos un OTP nuevo (el anterior
+//  queda invalidado) y reseteamos el TTL.
+router.post('/invitations/:id/link', asyncHandler(async (req, res) => {
+  const inv = await invitationRepo.findById(req.params.id);
+  if (!inv || inv.status !== 'PENDING' || inv.role !== 'OWNER') {
+    throw new AppError('Invitación no encontrada o ya aceptada', 404, 'NOT_FOUND');
+  }
+  const otp = genOtp();
+  const otpHash = await bcrypt.hash(otp, 8);
+  await query(
+    'UPDATE invitations SET otp_hash = ?, attempts = 0, expires_at = ? WHERE id = ?',
+    [otpHash, Date.now() + INVITE_TTL_MS, inv.id]
+  );
+  return sendOk(res, { email: inv.email, acceptUrl: buildAcceptUrl(inv.email, otp), code: otp });
 }));
 
 module.exports = router;
