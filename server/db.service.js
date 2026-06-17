@@ -131,7 +131,10 @@ const shim = {
 function splitStatements(raw) {
     return raw
         .split('\n')
-        .filter(line => !line.trim().startsWith('--'))
+        // Quita comentarios -- (de línea e inline). CRÍTICO: un comentario inline
+        // con ';' (ej. schema_ops "-- (Fase 2-B; resuelto...)") rompería el split(';')
+        // y truncaría el CREATE TABLE (aps) → FK errno 150 / tabla inexistente.
+        .map(line => line.replace(/--.*$/, ''))
         .join('\n')
         .split(';')
         .map(s => s.trim())
