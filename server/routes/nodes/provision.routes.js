@@ -21,6 +21,23 @@ const { mikrotikAppError } = require('../../lib/mikrotikError');
 const { requireMikrotik } = require('../../lib/routeGuards');
 const sse = require('../../lib/sse');
 
+// Opción C: si las scan-IP del VPS viven en un /24 FUERA de la red de gestión
+// (ej. 192.168.30.0/24), cada VRF necesita una ruta de retorno hacia ese /24
+// además de la de 192.168.21.0/24. Vacío = scan-IP dentro de .21 → no hace falta.
+//   server/.env.production:  SCAN_RETURN_SUBNET=192.168.30.0/24
+const SCAN_RETURN_SUBNET = (process.env.SCAN_RETURN_SUBNET || '').trim();
+
+/** Añade la ruta de retorno del /24 de scan-IP a un VRF (idempotente). No-op si no está configurado. */
+async function addScanReturnRoute(api, vrfName, ndComment) {
+  if (!SCAN_RETURN_SUBNET) return;
+  await writeIdempotent(api, ['/ip/route/add',
+    `=dst-address=${SCAN_RETURN_SUBNET}`,
+    '=gateway=VPN-WG-MGMT',
+    `=routing-table=${vrfName}`,
+    '=scope=30', '=target-scope=10',
+    `=comment=Route-${ndComment}-SCAN`]);
+}
+
 // Calcula la asignación AUTORITATIVA (siguiente ND + IP remota libre) desde el
 // estado VIVO del router. La comparten /node/next (preview) y /node/provision
 // (commit) para que ambos usen exactamente la misma lógica: así, si el preview
@@ -282,6 +299,9 @@ router.post('/node/provision', requireOperator, asyncHandler(async (req, res) =>
         `=comment=Route-${ndComment}-MGMT`]);
       pushStep({ step: '7b', obj: 'Ruta retorno MGMT', name: `VPN-WG-MGMT en ${vrfName}`, status: 'ok' });
 
+      // Paso 7b' — Ruta retorno scan-IP del VPS (Opción C, si vive fuera de .21)
+      await addScanReturnRoute(api, vrfName, ndComment);
+
       // Paso 7c — Address List LIST-NET-REMOTE-TOWERS (LANs + Red WG)
       const redWG = `${blockNetwork}/30`;
       for (const subnet of [...allSubnets, redWG]) {
@@ -369,6 +389,9 @@ router.post('/node/provision', requireOperator, asyncHandler(async (req, res) =>
       '=scope=30', '=target-scope=10',
       `=comment=Route-${ndComment}-MGMT`]);
     pushStep({ step: '6b', obj: 'Ruta retorno MGMT (192.168.21.0/24)', name: `VPN-WG-MGMT en ${vrfName}`, status: 'ok' });
+
+    // Paso 6b' — Ruta retorno scan-IP del VPS (Opción C, si vive fuera de .21)
+    await addScanReturnRoute(api, vrfName, ndComment);
 
     await api.close();
 
