@@ -540,3 +540,44 @@ Se eligió un sub-rango dentro de `192.168.21.0/24` (no un `/24` aparte como `19
 ### Operación continua
 - [ ] Cron de backup (`mysqldump` + secretos del volumen) — ver §9.
 - [ ] Cron de renovación del cert si migras a dominio + Let's Encrypt (el autofirmado dura 10 años).
+
+---
+
+## 🧪 Notas de la puesta en marcha real (2026-06-17)
+
+Despliegue ejecutado en el droplet DigitalOcean (`134.199.212.232`, repo en **`/root/GestionVPN-1.0`**, proyecto compose `gestionvpn-10`). El panel quedó **operativo** (admin creado, login OK). Problemas reales encontrados y su solución — léelos antes de re-desplegar:
+
+### Gotchas confirmados
+1. **ufw rompía nginx→backend (504).** El backend en `network_mode: host` se alcanza desde nginx (bridge) por `172.17.0.1:3001`. `ufw deny 3001` bloquea TAMBIÉN ese tráfico. **Fix (orden importa, ufw es first-match):**
+   ```bash
+   ufw insert 1 allow from 172.16.0.0/12 to any port 3001 proto tcp
+   ufw deny 3001/tcp           # el ALLOW debe quedar ARRIBA del DENY
+   ufw reload
+   ```
+   Verifica `ufw status numbered`: el ALLOW del bridge debe estar **antes** del DENY.
+
+2. **DigitalOcean bloquea SMTP saliente (25/465/587).** El email (invitaciones/OTP/reset) **no sale**. Síntoma: `health` → `smtp: verify timeout`; invitar moderador → 500 con `connect ENETUNREACH ...:587` (IPv6) o timeout (IPv4). Mitigaciones aplicadas:
+   - `NODE_OPTIONS=--dns-result-order=ipv4first` en `server/.env.production` (evita el intento IPv6 fallido).
+   - El flujo de invitación ya **no depende del email**: en el panel (Moderadores) se crea la invitación y se **copia el enlace** para compartirlo a mano. Pendiente real: **relay** (SendGrid/Brevo/Mailgun) por puerto **2525**, o pedir desbloqueo a DO.
+
+3. **Splitter SQL vs comentarios con `;`.** Resuelto en código (`c43e53f`/`9427798`): los parsers de `initRbac`/`initMultiuser`/`db.service` ignoran comentarios `--` (línea e inline) antes de `split(';')`. Si en el futuro un `CREATE TABLE` falla con `ER_PARSE_ERROR "near ''"` o FK `errno 150`, sospecha de un `;` dentro de un comentario en el `.sql`.
+
+4. **MariaDB:** `MARIADB_PASSWORD` solo se aplica al **crear** el volumen. Si cambias la clave después, hay que `docker volume rm gestionvpn-10_db-data` y volver a `up`.
+
+5. **Consola web de DO** filtra el marcador de *bracketed paste* → `--build` llega como `--build~`. Termina los comandos con ` #` o escríbelos a mano.
+
+6. **Historial reescrito** (purga de secretos): en el VPS **siempre** `git fetch origin && git reset --hard origin/main`, nunca `git pull`.
+
+7. **Telegram 409:** un solo poller por token. Apaga el bot en dev/PC o usa otro token en prod (`TELEGRAM_BOT_ENABLED=false` si no lo usas aún).
+
+### Direccionamiento aplicado (definitivo)
+- **Usuarios:** `192.168.21.0/24` (como hoy, sin cambios).
+- **scan-IPs del VPS:** **`192.168.30.0/24`** (no el sub-rango `.21.200-.230`). Pool activo `.30.2–.40` en `wg0` (`PostUp`/`PostDown`).
+- MikroTik: peer del VPS `allowed-address=192.168.21.60/32,192.168.30.0/24` + `Route-SCAN` (`dst=192.168.30.0/24 gw=VPN-WG-MGMT`) en los 14 VRF.
+- `server/.env.production`: `SCAN_IP_POOL_BASE=192.168.30.`, `SCAN_IP_POOL_START=2`, `SCAN_IP_POOL_END=40`, `SCAN_RETURN_SUBNET=192.168.30.0/24`, `NODE_OPTIONS=--dns-result-order=ipv4first`.
+
+### Crear moderadores SIN email (estado actual)
+1. Panel → **Moderadores → Nuevo Moderador** → se crea la invitación y se muestra el **enlace de aceptación** (botón Copiar).
+2. La tarjeta **"Invitaciones pendientes"** lista a quienes no han aceptado; "Copiar enlace" regenera un enlace válido.
+3. Comparte el enlace (WhatsApp/Telegram). El moderador define su contraseña + WireGuard y queda como OWNER.
+4. Luego, por cada moderador: `docker exec vpn-backend npm run scan:assign <workspaceId>`.
