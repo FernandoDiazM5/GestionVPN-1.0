@@ -14,7 +14,14 @@ node db/migrateNotifications.js
 node db/migrateMonitoring.js
 node db/migrateApNode.js        # FK aps.node_id
 node db/migrateScanIp.js        # tabla workspace_scan_ip (Opción C)
-node db/seedRoles.js           # seed idempotente de roles
+
+# Siembra de usuarios demo (admin/admin + moderador fernando) SOLO si se pide.
+# En producción se deja apagada → BD sin usuarios → el panel muestra el
+# "Setup Inicial" para que el operador cree el Administrador con su propia clave.
+if [ "$SEED_DEMO_USERS" = "true" ]; then
+  echo "🌱 [entrypoint] SEED_DEMO_USERS=true → sembrando usuarios demo..."
+  node db/seedRoles.js
+fi
 
 echo "✅ [entrypoint] Migraciones OK. Iniciando servidor..."
 exec node index.js
