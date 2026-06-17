@@ -50,16 +50,22 @@ async function main() {
   // 2) Reconexión directa a la DB y aplicar sentencias una por una.
   const conn = await mysql.createConnection({ host, port, user, password, database });
   try {
-    // Limpieza previa: elimina tablas (incluidas las corruptas de un crash anterior).
-    // Seguro en Fase 1 (sin datos). FK checks off para poder dropear en cualquier orden.
-    await conn.query('SET FOREIGN_KEY_CHECKS = 0;');
-    for (const tbl of ['auth_attempts', 'tunnel_logs', 'workspace_routers',
-                       'invitations', 'workspace_members', 'workspaces', 'users']) {
-      try { await conn.query(`DROP TABLE IF EXISTS \`${tbl}\`;`); }
-      catch (e) { console.warn(`[init:rbac] aviso al dropear ${tbl}: ${e.message}`); }
+    // ⚠️ Limpieza previa DESTRUCTIVA — SOLO si RBAC_RESET=true (reset intencional).
+    // Por defecto NO se ejecuta: el esquema usa CREATE TABLE IF NOT EXISTS, así que
+    // initRbac es IDEMPOTENTE y PRESERVA los datos en cada arranque/redespliegue.
+    // (Antes dropeaba siempre → borraba users/workspaces/invitations en cada deploy.)
+    if (process.env.RBAC_RESET === 'true') {
+      await conn.query('SET FOREIGN_KEY_CHECKS = 0;');
+      for (const tbl of ['auth_attempts', 'tunnel_logs', 'workspace_routers',
+                         'invitations', 'workspace_members', 'workspaces', 'users']) {
+        try { await conn.query(`DROP TABLE IF EXISTS \`${tbl}\`;`); }
+        catch (e) { console.warn(`[init:rbac] aviso al dropear ${tbl}: ${e.message}`); }
+      }
+      await conn.query('SET FOREIGN_KEY_CHECKS = 1;');
+      console.log('[init:rbac] ⚠️ RBAC_RESET=true → tablas RBAC ELIMINADAS y recreadas.');
+    } else {
+      console.log('[init:rbac] Modo idempotente (sin DROP): se crean tablas faltantes y se preservan los datos.');
     }
-    await conn.query('SET FOREIGN_KEY_CHECKS = 1;');
-    console.log('[init:rbac] Limpieza previa completada.');
 
     let applied = 0;
     for (const stmt of statements) {
