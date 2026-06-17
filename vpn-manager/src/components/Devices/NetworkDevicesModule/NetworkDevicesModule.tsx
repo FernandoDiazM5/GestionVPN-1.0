@@ -45,8 +45,7 @@ import { useDeviceList } from './hooks/useDeviceList';
 import { useColumnPrefs } from './hooks/useColumnPrefs';
 import { useDeviceLibrary } from './hooks/useDeviceLibrary';
 import { useScanPreferences } from './hooks/useScanPreferences';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { API_BASE_URL } from '../../../config';
 
 export default function NetworkDevicesModule() {
   const { credentials, activeNodeVrf, nodes, setNodes } = useVpn();

@@ -17,8 +17,7 @@ import type { ScannedDevice, SavedDevice, AntennaStats } from '../../../../types
 import type { NodeInfo } from '../../../../types/api';
 import { SESSION_SCAN_KEY, estimateIpCount } from '../constants';
 import type { SshAuthStatus, ScanCred, ScanState } from '../types';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { API_BASE_URL } from '../../../../config';
 
 interface UseDeviceScanInput {
   activeNodeVrf: string | null;

@@ -19,8 +19,7 @@ import type { ScannedDevice, SavedDevice } from '../../../../types/devices';
 import type { NodeInfo } from '../../../../types/api';
 import type { SshAuthStatus } from '../types';
 import { ipInCidr } from '../constants';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { API_BASE_URL } from '../../../../config';
 
 interface UseDeviceLibraryInput {
   nodesLength: number;
