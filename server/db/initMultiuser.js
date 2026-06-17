@@ -17,7 +17,9 @@ const mysql = require('mysql2/promise');
 function splitStatements(sql) {
   return sql
     .split('\n')
-    .filter(line => !line.trim().startsWith('--'))
+    // Quita comentarios -- (de línea e inline) para que un ';' dentro de un
+    // comentario no parta la sentencia (ER_PARSE_ERROR). Ver initRbac.js.
+    .map(line => line.replace(/--.*$/, ''))
     .join('\n')
     .split(';')
     .map(s => s.trim())

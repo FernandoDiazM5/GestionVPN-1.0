@@ -16,7 +16,10 @@ const mysql = require('mysql2/promise');
 function splitStatements(sql) {
   return sql
     .split('\n')
-    .filter(line => !line.trim().startsWith('--'))  // quita comentarios de línea
+    // Quita comentarios -- (de línea E inline). CRÍTICO: un comentario inline
+    // puede contener ';' (ej. "-- login bloqueado; NULL = activo") y el split(';')
+    // de abajo cortaría la sentencia a la mitad → ER_PARSE_ERROR "near ''".
+    .map(line => line.replace(/--.*$/, ''))
     .join('\n')
     .split(';')
     .map(s => s.trim())
