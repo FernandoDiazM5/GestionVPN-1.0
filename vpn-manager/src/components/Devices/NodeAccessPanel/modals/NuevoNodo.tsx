@@ -96,7 +96,8 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
   useEffect(() => { loadNext(); }, [loadNext]);
 
   // Cargar la IP pública global del setting `server_public_ip` (una sola vez).
-  // Así no se pide por-nodo: se configura una vez y se reutiliza en todos.
+  // La define el Administrador en Ajustes; aquí es SOLO-LECTURA: el moderador
+  // no la ingresa, se reutiliza automáticamente en todos los nodos WireGuard.
   useEffect(() => {
     fetchWithTimeout(`${API_BASE_URL}/api/settings/get`, {}, 8_000)
       .then(r => r.json())
@@ -106,17 +107,6 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
       })
       .catch(() => { });
   }, []);
-
-  // Persiste la IP pública en BD (setting global) al perder foco — NO por tecla.
-  const persistWanIp = (val: string) => {
-    const v = val.trim();
-    localStorage.setItem('server_public_ip', v);
-    if (!v) return;
-    fetchWithTimeout(`${API_BASE_URL}/api/settings/save`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key: 'server_public_ip', value: v }),
-    }, 5_000).catch(() => { });
-  };
 
   const TOTAL_STEPS = 7;
   // H10 — progreso REAL: la barra avanza con los pasos que el backend publica
@@ -532,18 +522,23 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                 {protocol === 'wireguard' && (
                   <div>
                     <label className="text-2xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1 block">IP Pública WAN del Servidor</label>
-                    <input
-                      value={wanIp}
-                      onChange={e => setWanIp(e.target.value)}
-                      onBlur={e => persistWanIp(e.target.value)}
-                      placeholder="213.173.36.232"
-                      className="input-field w-full font-mono text-sm"
-                    />
-                    <p className="text-2xs text-slate-500 dark:text-slate-400 mt-1">IP pública del MikroTik (global del sistema). Se configura una vez y se reutiliza en todos los nodos.</p>
-                    {!wgIpValid && (
-                      <p className="text-2xs text-rose-500 mt-1 flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3 shrink-0" /> Ingresa una IP pública válida — los comandos del CPE la necesitan.
-                      </p>
+                    {wgIpValid ? (
+                      <>
+                        <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                          <Globe className="w-4 h-4 text-slate-400 shrink-0" />
+                          <span className="font-mono text-sm font-bold text-slate-700 dark:text-slate-200">{wanIp.trim()}</span>
+                          <span className="badge badge-neutral ml-auto text-3xs">Configurada por el Administrador</span>
+                        </div>
+                        <p className="text-2xs text-slate-500 dark:text-slate-400 mt-1">IP pública del MikroTik (global del sistema). Se define una vez en <span className="font-semibold">Ajustes</span> y se reutiliza en todos los nodos.</p>
+                      </>
+                    ) : (
+                      <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30">
+                        <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-2xs font-bold text-amber-700">Falta la IP pública del servidor</p>
+                          <p className="text-2xs text-amber-600 mt-0.5">El Administrador debe configurarla en <span className="font-semibold">Ajustes → IP Pública WAN del Servidor</span> antes de crear nodos WireGuard (los comandos del CPE la necesitan).</p>
+                        </div>
+                      </div>
                     )}
                   </div>
                 )}

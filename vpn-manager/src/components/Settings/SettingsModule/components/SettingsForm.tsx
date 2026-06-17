@@ -1,4 +1,4 @@
-import { Server, Shield, Key, Save, Loader2 } from 'lucide-react';
+import { Server, Shield, Key, Save, Loader2, Globe } from 'lucide-react';
 import type { AppSettings } from '../types';
 import { SETTINGS_LABELS, SETTINGS_PLACEHOLDERS, SETTINGS_HINTS } from '../constants';
 
@@ -72,6 +72,23 @@ export function SettingsForm({
             />
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 font-medium">{SETTINGS_HINTS.MT_PASS}</p>
+        </div>
+
+        <div className="md:col-span-2">
+          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+            {SETTINGS_LABELS.server_public_ip}
+          </label>
+          <div className="relative">
+            <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
+            <input
+              type="text"
+              value={settings.server_public_ip ?? ''}
+              onChange={(e) => handleInputChange('server_public_ip', e.target.value)}
+              className="input-field pl-10 h-11 font-mono"
+              placeholder={SETTINGS_PLACEHOLDERS.server_public_ip}
+            />
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 font-medium">{SETTINGS_HINTS.server_public_ip}</p>
         </div>
       </div>
 

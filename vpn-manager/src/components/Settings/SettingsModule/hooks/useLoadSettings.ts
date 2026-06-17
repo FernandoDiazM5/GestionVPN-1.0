@@ -5,7 +5,7 @@ import type { AppSettings } from '../types';
 import { SETTINGS_MESSAGES } from '../constants';
 
 export function useLoadSettings() {
-  const [settings, setSettings] = useState<AppSettings>({ MT_IP: '', MT_USER: '', MT_PASS: '' });
+  const [settings, setSettings] = useState<AppSettings>({ MT_IP: '', MT_USER: '', MT_PASS: '', server_public_ip: '' });
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -22,6 +22,7 @@ export function useLoadSettings() {
           MT_IP: data.settings.MT_IP || '',
           MT_USER: data.settings.MT_USER || '',
           MT_PASS: data.settings.MT_PASS || '',
+          server_public_ip: data.settings.server_public_ip || '',
         });
       } else {
         setErrorMsg(SETTINGS_MESSAGES.LOAD_ERROR);

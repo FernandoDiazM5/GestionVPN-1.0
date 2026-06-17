@@ -27,6 +27,7 @@ export function useSaveSettings() {
       await saveSetting('MT_IP', settings.MT_IP || '');
       await saveSetting('MT_USER', settings.MT_USER || '');
       await saveSetting('MT_PASS', settings.MT_PASS || '');
+      await saveSetting('server_public_ip', settings.server_public_ip || '');
       setSuccessMsg(SETTINGS_MESSAGES.SAVE_SUCCESS);
     } catch (e: any) {
       setErrorMsg(e.message || SETTINGS_MESSAGES.SAVE_ERROR);
