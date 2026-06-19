@@ -25,7 +25,8 @@ export function useLogsAndRepair(node: NodeInfo) {
           pppUser: node.ppp_user,
           vrfName: node.nombre_vrf,
           lanSubnets: node.lan_subnets || [],
-          adminWgNet: '192.168.21.0/24',
+          // adminWgNet se omite: el backend inyecta las rutas de retorno de los
+          // 3 segmentos de gestión (CLIENTES/ADMIN/VPS) desde server/lib/mgmtNet.js.
         }),
       }, 30_000);
       const data = await res.json() as { success?: boolean; message?: string; steps?: Array<{ obj: string; action?: string; status?: string }>; repaired?: number };

@@ -35,7 +35,7 @@ services:
       dockerfile: server/Dockerfile.prod
     container_name: vpn-backend
     restart: unless-stopped
-    # network_mode: host es OBLIGATORIO → el backend alcanza 192.168.21.1 vía wg0 del host.
+    # network_mode: host es OBLIGATORIO → el backend alcanza el MikroTik (MT_IP) vía wg0 del host.
     network_mode: host
     env_file:
       - server/.env.production

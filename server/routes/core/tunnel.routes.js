@@ -32,6 +32,7 @@ const {
 const { sendOk, AppError, asyncHandler } = require('../../lib/apiResponse');
 const { mikrotikAppError } = require('../../lib/mikrotikError');
 const { requireMikrotik } = require('../../lib/routeGuards');
+const mgmtNet = require('../../lib/mgmtNet');
 
 // ── POST /tunnel/activate — delega en lib/tunnelService (compartido con bot M1)
 router.post('/tunnel/activate', asyncHandler(async (req, res) => {
@@ -196,8 +197,8 @@ router.post('/tunnel/register-my-ip', asyncHandler(async (req, res) => {
   const { mgmtIp } = req.body;
   if (!acc?.sub || !acc?.workspace_id) throw new AppError('Sesión inválida', 401, 'UNAUTHORIZED');
   const cleanIp = String(mgmtIp || '').split('/')[0].trim();
-  if (!IPV4_REGEX.test(cleanIp) || !cleanIp.startsWith('192.168.21.')) {
-    throw new AppError('IP de gestión inválida (debe ser 192.168.21.x)', 400, 'VALIDATION_ERROR');
+  if (!IPV4_REGEX.test(cleanIp) || !mgmtNet.isMgmtIp(cleanIp)) {
+    throw new AppError(`IP de gestión inválida (debe ser ${mgmtNet.clients.net} o ${mgmtNet.admin.net})`, 400, 'VALIDATION_ERROR');
   }
   let api;
   try {
@@ -205,7 +206,7 @@ router.post('/tunnel/register-my-ip', asyncHandler(async (req, res) => {
     const peers = await safeWrite(api, ['/interface/wireguard/peers/print']);
     await api.close().catch(() => {});
     const peer = (peers || []).find(p =>
-      p.interface === 'VPN-WG-MGMT' &&
+      mgmtNet.userIfaces.includes(p.interface) &&
       (p['allowed-address'] || '').split(',').some(a => a.split('/')[0].trim() === cleanIp)
     );
     if (!peer) {
@@ -256,7 +257,7 @@ router.post('/tunnel/register-my-ip', asyncHandler(async (req, res) => {
 
 // ── POST /tunnel/mangle-access (legacy single-user) ─────────────────────────
 // Limpia todas las reglas mangle con comment="ACCESO-DINAMICO" o "ACCESO-ADMIN"
-// e inyecta UNA sola regla ACCESO-ADMIN con src-address=192.168.21.0/24.
+// e inyecta una regla ACCESO-ADMIN por cada /24 de gestión (CLIENTES/ADMIN/VPS).
 //
 // Body: { vrfSeleccionado: "VRF-ND4-TORREVICTORN2" }
 router.post('/tunnel/mangle-access', asyncHandler(async (req, res) => {
@@ -329,28 +330,33 @@ router.post('/tunnel/mangle-access', asyncHandler(async (req, res) => {
   await new Promise(r => setTimeout(r, 300));
 
   // ── Fase 2: Add en conexión fresca ────────────────────────────────────────
-  // Una sola regla ACCESO-ADMIN con src-address=192.168.21.0/24 cubre todo el pool.
+  // Legacy single-user: una regla ACCESO-ADMIN por cada /24 de gestión
+  // (CLIENTES + ADMIN + VPS) cubre todo el plano. El modelo moderno usa
+  // mangle POR-IP de usuario (tunnelProvisioner.addUserMangle).
+  const mgmtSrcNets = [mgmtNet.clients.net, mgmtNet.admin.net, mgmtNet.vps.net];
   let api2;
   try {
     api2 = await connectToMikrotik(ip, user, pass);
 
-    log.debug({ vrf }, 'MANGLE-ACCESS Creando regla ACCESO-ADMIN');
-    await writeIdempotent(api2, [
-      '/ip/firewall/mangle/add',
-      '=chain=prerouting',
-      '=action=mark-routing',
-      '=comment=ACCESO-ADMIN',
-      '=dst-address-list=LIST-NET-REMOTE-TOWERS',
-      `=new-routing-mark=${vrf}`,
-      '=src-address=192.168.21.0/24',
-      '=passthrough=yes',
-    ], 12000);
-    log.info('MANGLE-ACCESS Regla ACCESO-ADMIN creada');
+    log.debug({ vrf }, 'MANGLE-ACCESS Creando reglas ACCESO-ADMIN');
+    for (const srcNet of mgmtSrcNets) {
+      await writeIdempotent(api2, [
+        '/ip/firewall/mangle/add',
+        '=chain=prerouting',
+        '=action=mark-routing',
+        '=comment=ACCESO-ADMIN',
+        '=dst-address-list=LIST-NET-REMOTE-TOWERS',
+        `=new-routing-mark=${vrf}`,
+        `=src-address=${srcNet}`,
+        '=passthrough=yes',
+      ], 12000);
+    }
+    log.info('MANGLE-ACCESS Reglas ACCESO-ADMIN creadas');
 
     try { await api2.close(); } catch (_) { /* noop */ }
 
     return sendOk(res, {
-      message: `Regla ACCESO-ADMIN aplicada: 192.168.21.0/24 → ${vrf}`,
+      message: `Regla ACCESO-ADMIN aplicada: ${mgmtSrcNets.join(', ')} → ${vrf}`,
       vrf,
       ipCliente,
       deletedCount,

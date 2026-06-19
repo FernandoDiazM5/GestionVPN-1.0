@@ -5,7 +5,7 @@ export const TAG_PALETTE = [
 
 export const TAG_COLORS: Record<string, string> = {};
 
-export const ADMIN_WG_NET = '192.168.21.0/24';
+export { ADMIN_WG_NET } from '../../../config';
 export const MAX_LOGS = 8;
 export const LOG_CLEAR_DELAY = 1500;
 export const REPAIR_LOG_CLEAR_DELAY = 3000;

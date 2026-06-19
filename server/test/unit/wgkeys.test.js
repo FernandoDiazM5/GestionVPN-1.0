@@ -28,7 +28,7 @@ describe('generateKeyPair', () => {
 describe('buildClientConf', () => {
   const baseParams = {
     privateKey: 'PRIVKEY1234567890abcdef==',
-    address: '192.168.21.50',
+    address: '10.13.250.50',
     serverPublicKey: 'SRVPUB1234567890abcdefxx==',
     endpoint: '203.0.113.10:13231',
   };
@@ -48,12 +48,12 @@ describe('buildClientConf', () => {
 
   it('agrega /32 al Address (asume IP única, no subred)', () => {
     const conf = buildClientConf(baseParams);
-    expect(conf).toContain('Address = 192.168.21.50/32');
+    expect(conf).toContain('Address = 10.13.250.50/32');
   });
 
   it('respeta overrides de allowedIps y dns', () => {
-    const conf = buildClientConf({ ...baseParams, allowedIps: '192.168.21.0/24', dns: '1.1.1.1' });
-    expect(conf).toContain('AllowedIPs = 192.168.21.0/24');
+    const conf = buildClientConf({ ...baseParams, allowedIps: '10.13.250.0/24', dns: '1.1.1.1' });
+    expect(conf).toContain('AllowedIPs = 10.13.250.0/24');
     expect(conf).toContain('DNS = 1.1.1.1');
   });
 

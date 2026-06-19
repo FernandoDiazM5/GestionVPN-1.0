@@ -3,7 +3,7 @@
 # Versión: 1.0  |  Fecha: 2026-04-15
 #
 # Propósito: Llamar al backend VPN-Manager cuando un peer del pool de
-# administración WireGuard (VPN-WG-MGMT, 192.168.21.0/24) se conecta
+# administración WireGuard (VPN-WG-ADMIN, 10.14.250.0/24) se conecta
 # o desconecta, para que el sistema cree/elimine automáticamente la
 # regla mangle ACCESO-ADMIN correspondiente.
 #
@@ -12,12 +12,12 @@
 #   2. Agregar los scripts wg-peer-up y wg-peer-down en RouterOS:
 #      /system/script/add name=wg-peer-up source=<contenido_del_script_1>
 #      /system/script/add name=wg-peer-down source=<contenido_del_script_2>
-#   3. Configurar los event handlers en la interfaz WireGuard VPN-WG-MGMT.
+#   3. Configurar los event handlers en la interfaz WireGuard VPN-WG-ADMIN.
 #
 # ============================================================================
 
 # ─── Variables globales (ajustar según entorno) ───────────────────────────
-:local backendUrl "http://192.168.21.60:3001/api"
+:local backendUrl "http://10.12.250.60:3001/api"
 
 # ─── SCRIPT 1: wg-peer-up ─────────────────────────────────────────────────
 # Llamado automáticamente cuando un peer WireGuard establece handshake.
@@ -25,7 +25,7 @@
 # a través de la variable de entorno del script de eventos.
 #
 # Para registrar este script como handler:
-#   /interface/wireguard/peers/set [find where interface=VPN-WG-MGMT] \
+#   /interface/wireguard/peers/set [find where interface=VPN-WG-ADMIN] \
 #     script=wg-peer-up
 #
 # Nota: RouterOS pasa la IP del peer en $address (sin máscara de subred)
@@ -39,7 +39,7 @@
 #     :error "peer-address requerida"
 #   }
 #
-#   # Extraer solo la IP sin máscara (ej: "192.168.21.15/32" → "192.168.21.15")
+#   # Extraer solo la IP sin máscara (ej: "10.14.250.15/32" → "10.14.250.15")
 #   :local peerIP $peerAddress
 #   :local slashPos [:find $peerAddress "/"]
 #   :if ($slashPos > 0) do={
@@ -108,8 +108,8 @@
 #
 # /system/script/add name="wg-admin-pool-poll" source={
 #
-#   :local backendUrl "http://192.168.21.60:3001/api"
-#   :local wgInterface "VPN-WG-MGMT"
+#   :local backendUrl "http://10.12.250.60:3001/api"
+#   :local wgInterface "VPN-WG-ADMIN"
 #
 #   # Leer peers con handshake reciente (últimos 3 minutos = 180 segundos)
 #   :foreach peer in=[/interface/wireguard/peers/find where interface=$wgInterface] do={
@@ -117,8 +117,8 @@
 #     :local lastHandshake ($peerData->"last-handshake")
 #     :local allowedAddr ($peerData->"allowed-address")
 #
-#     # Solo procesar peers del pool admin 192.168.21.x
-#     :if ([:find $allowedAddr "192.168.21."] >= 0) do={
+#     # Solo procesar peers del pool admin 10.14.250.x
+#     :if ([:find $allowedAddr "10.14.250."] >= 0) do={
 #       :local peerIP $allowedAddr
 #       :local slashPos [:find $allowedAddr "/"]
 #       :if ($slashPos > 0) do={ :set peerIP [:pick $allowedAddr 0 $slashPos] }
@@ -147,22 +147,22 @@
 # ─── Comandos para instalar scripts (ejecutar en Terminal MikroTik) ───────
 #
 # 1) Definir variable de URL del backend:
-#    :global backendUrl "http://192.168.21.60:3001/api"
+#    :global backendUrl "http://10.12.250.60:3001/api"
 #
 # 2) Ver peers WireGuard activos del pool admin:
-#    /interface/wireguard/peers/print where interface=VPN-WG-MGMT
+#    /interface/wireguard/peers/print where interface=VPN-WG-ADMIN
 #
-# 3) Test manual (simular conexión de peer 192.168.21.10):
-#    /tool/fetch url="http://192.168.21.60:3001/api/tunnel/admin-peer-connected" \
+# 3) Test manual (simular conexión de peer 10.14.250.10):
+#    /tool/fetch url="http://10.12.250.60:3001/api/tunnel/admin-peer-connected" \
 #      http-method=post \
 #      http-header-field="Content-Type: application/json" \
-#      http-data="{\"peerIP\":\"192.168.21.10\"}" \
+#      http-data="{\"peerIP\":\"10.14.250.10\"}" \
 #      output=user
 #
 # 4) Ver reglas creadas en MikroTik:
 #    /ip/firewall/mangle/print where comment=ACCESO-ADMIN
 #
 # 5) Verificar estado desde backend:
-#    GET http://192.168.21.60:3001/api/tunnel/admin-peers-status
+#    GET http://10.12.250.60:3001/api/tunnel/admin-peers-status
 #
 # ─────────────────────────────────────────────────────────────────────────

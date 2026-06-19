@@ -19,12 +19,13 @@ const { nodeBelongsToRequester, requireOperator } = require('./_shared');
 const { sendOk, AppError, asyncHandler } = require('../../lib/apiResponse');
 const { mikrotikAppError } = require('../../lib/mikrotikError');
 const { requireMikrotik } = require('../../lib/routeGuards');
+const mgmtNet = require('../../lib/mgmtNet');
 const sse = require('../../lib/sse');
 
-// Opción C: si las scan-IP del VPS viven en un /24 FUERA de la red de gestión
-// (ej. 192.168.30.0/24), cada VRF necesita una ruta de retorno hacia ese /24
-// además de la de 192.168.21.0/24. Vacío = scan-IP dentro de .21 → no hace falta.
-//   server/.env.production:  SCAN_RETURN_SUBNET=192.168.30.0/24
+// Opción C: el /24 de scan-IP del VPS (por defecto 10.11.252.0/24). Cada VRF
+// necesita una ruta de retorno hacia ese /24, vía la interfaz del VPS (el
+// origen del escaneo). Vacío = no se añade (escaneo legacy en dev local).
+//   server/.env.production:  SCAN_RETURN_SUBNET=10.11.252.0/24
 const SCAN_RETURN_SUBNET = (process.env.SCAN_RETURN_SUBNET || '').trim();
 
 /** Añade la ruta de retorno del /24 de scan-IP a un VRF (idempotente). No-op si no está configurado. */
@@ -32,10 +33,22 @@ async function addScanReturnRoute(api, vrfName, ndComment) {
   if (!SCAN_RETURN_SUBNET) return;
   await writeIdempotent(api, ['/ip/route/add',
     `=dst-address=${SCAN_RETURN_SUBNET}`,
-    '=gateway=VPN-WG-MGMT',
+    `=gateway=${mgmtNet.vps.iface}`,
     `=routing-table=${vrfName}`,
     '=scope=30', '=target-scope=10',
     `=comment=Route-${ndComment}-SCAN`]);
+}
+
+/** Añade las rutas de retorno del plano de gestión (CLIENTES/ADMIN/VPS) a un VRF. */
+async function addMgmtReturnRoutes(api, vrfName, ndComment) {
+  for (const rt of mgmtNet.returnRoutes()) {
+    await writeIdempotent(api, ['/ip/route/add',
+      `=dst-address=${rt.subnet}`,
+      `=gateway=${rt.gateway}`,
+      `=routing-table=${vrfName}`,
+      '=scope=30', '=target-scope=10',
+      `=comment=Route-${ndComment}-${rt.tag}`]);
+  }
 }
 
 // Calcula la asignación AUTORITATIVA (siguiente ND + IP remota libre) desde el
@@ -199,6 +212,9 @@ router.post('/node/provision', requireOperator, asyncHandler(async (req, res) =>
     ndComment = `ND${ndNum}`;
     // Puerto: 13300 + número de nodo (ej. ND1=13301, ND7=13307)
     wgPort = wgListenPort ? parseInt(wgListenPort, 10) : (13300 + ndNum);
+    // IP de gestión por nodo (ND-N → 10.11.250.N WG / 10.11.251.N SSTP).
+    // Se materializa en el CPE; el Core la rutea al VRF y la marca en el mangle.
+    const nodeMgmt = mgmtNet.nodeMgmtIp(ndNum, isWG);
 
     if (isWG) {
       // Calcular siguiente bloque /30 disponible en 10.10.251.0/24
@@ -237,11 +253,14 @@ router.post('/node/provision', requireOperator, asyncHandler(async (req, res) =>
 
       // Paso 3 — Peer WG (CPE) — solo si se proporcionó la clave pública del CPE
       const subnetsList = allSubnets.join(',');
+      // allowed-address incluye: /32 del túnel + LAN(s) + IP de gestión del nodo.
+      const peerAllowed = [`${wgPeerIP}/32`, subnetsList, nodeMgmt ? `${nodeMgmt}/32` : '']
+        .filter(Boolean).join(',');
       if (cpePublicKey) {
         await writeIdempotent(api, ['/interface/wireguard/peers/add',
           `=interface=${ifaceName}`, `=public-key=${cpePublicKey}`,
-          `=allowed-address=${wgPeerIP}/32,${subnetsList}`, `=comment=Cliente ${ndComment}`]);
-        pushStep({ step: 3, obj: 'WG Peer', name: `${wgPeerIP}/32 + ${subnetsList}`, status: 'ok' });
+          `=allowed-address=${peerAllowed}`, `=comment=Cliente ${ndComment}`]);
+        pushStep({ step: 3, obj: 'WG Peer', name: peerAllowed, status: 'ok' });
       } else {
         pushStep({ step: 3, obj: 'WG Peer', name: 'Omitido — sin clave CPE (agregar después)', status: 'ok' });
       }
@@ -290,25 +309,32 @@ router.post('/node/provision', requireOperator, asyncHandler(async (req, res) =>
       }
       pushStep({ step: '7a', obj: 'Rutas LAN remota(s)', name: `${subnets.join(', ')} (distance=2)`, status: 'ok' });
 
-      // Paso 7b — Ruta retorno MGMT
-      await writeIdempotent(api, ['/ip/route/add',
-        '=dst-address=192.168.21.0/24',
-        '=gateway=VPN-WG-MGMT',
-        `=routing-table=${vrfName}`,
-        '=scope=30', '=target-scope=10',
-        `=comment=Route-${ndComment}-MGMT`]);
-      pushStep({ step: '7b', obj: 'Ruta retorno MGMT', name: `VPN-WG-MGMT en ${vrfName}`, status: 'ok' });
+      // Paso 7b — Rutas de retorno del plano de gestión (CLIENTES/ADMIN/VPS)
+      await addMgmtReturnRoutes(api, vrfName, ndComment);
+      pushStep({ step: '7b', obj: 'Rutas retorno MGMT', name: mgmtNet.returnRoutes().map(r => r.gateway).join(', '), status: 'ok' });
 
-      // Paso 7b' — Ruta retorno scan-IP del VPS (Opción C, si vive fuera de .21)
+      // Paso 7b' — Ruta retorno scan-IP del VPS (Opción C)
       await addScanReturnRoute(api, vrfName, ndComment);
 
-      // Paso 7c — Address List LIST-NET-REMOTE-TOWERS (LANs + Red WG)
+      // Paso 7b'' — IP de gestión del nodo: ruta /32 al túnel del CPE
+      if (nodeMgmt) {
+        await writeIdempotent(api, ['/ip/route/add',
+          `=dst-address=${nodeMgmt}/32`,
+          `=gateway=${ifaceName}@${vrfName}`,
+          `=routing-table=${vrfName}`,
+          '=scope=30', '=target-scope=10',
+          `=comment=Route-${ndComment}-MGMTIP`]);
+        pushStep({ step: '7b″', obj: 'IP gestión del nodo', name: `${nodeMgmt}/32 → ${ifaceName}`, status: 'ok' });
+      }
+
+      // Paso 7c — Address List LIST-NET-REMOTE-TOWERS (LANs + Red WG + IP gestión nodo)
       const redWG = `${blockNetwork}/30`;
-      for (const subnet of [...allSubnets, redWG]) {
+      const towerEntries = [...allSubnets, redWG, ...(nodeMgmt ? [`${nodeMgmt}/32`] : [])];
+      for (const subnet of towerEntries) {
         await writeIdempotent(api, ['/ip/firewall/address-list/add',
           '=list=LIST-NET-REMOTE-TOWERS', `=address=${subnet}`, `=comment=Ruta ${nameUpper}`]);
       }
-      pushStep({ step: '7c', obj: 'Address List (LIST-NET-REMOTE-TOWERS)', name: [...allSubnets, redWG].join(', '), status: 'ok' });
+      pushStep({ step: '7c', obj: 'Address List (LIST-NET-REMOTE-TOWERS)', name: towerEntries.join(', '), status: 'ok' });
 
       await api.close();
 
@@ -381,14 +407,22 @@ router.post('/node/provision', requireOperator, asyncHandler(async (req, res) =>
     }
     pushStep({ step: '6a', obj: 'Ruta(s) LAN remota', name: subnets.join(', '), status: 'ok' });
 
-    // Paso 6b — Ruta de retorno hacia red de gestión WireGuard (en tabla VRF)
-    await writeIdempotent(api, ['/ip/route/add',
-      '=dst-address=192.168.21.0/24',
-      '=gateway=VPN-WG-MGMT',
-      `=routing-table=${vrfName}`,
-      '=scope=30', '=target-scope=10',
-      `=comment=Route-${ndComment}-MGMT`]);
-    pushStep({ step: '6b', obj: 'Ruta retorno MGMT (192.168.21.0/24)', name: `VPN-WG-MGMT en ${vrfName}`, status: 'ok' });
+    // Paso 6b — Rutas de retorno del plano de gestión (CLIENTES/ADMIN/VPS)
+    await addMgmtReturnRoutes(api, vrfName, ndComment);
+    pushStep({ step: '6b', obj: 'Rutas retorno MGMT', name: mgmtNet.returnRoutes().map(r => r.gateway).join(', '), status: 'ok' });
+
+    // Paso 6b'' — IP de gestión del nodo (ruta /32 al túnel + address-list)
+    if (nodeMgmt) {
+      await writeIdempotent(api, ['/ip/route/add',
+        `=dst-address=${nodeMgmt}/32`,
+        `=gateway=${ifaceName}@${vrfName}`,
+        `=routing-table=${vrfName}`,
+        '=scope=30', '=target-scope=10',
+        `=comment=Route-${ndComment}-MGMTIP`]);
+      await writeIdempotent(api, ['/ip/firewall/address-list/add',
+        '=list=LIST-NET-REMOTE-TOWERS', `=address=${nodeMgmt}/32`, `=comment=Ruta ${nameUpper}`]);
+      pushStep({ step: '6b″', obj: 'IP gestión del nodo', name: `${nodeMgmt}/32 → ${ifaceName}`, status: 'ok' });
+    }
 
     // Paso 6b' — Ruta retorno scan-IP del VPS (Opción C, si vive fuera de .21)
     await addScanReturnRoute(api, vrfName, ndComment);

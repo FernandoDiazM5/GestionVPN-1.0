@@ -14,14 +14,14 @@
 
 SET NAMES utf8mb4;
 
--- ── 1. Mapeo usuario de la app → su IP de gestión (192.168.21.x) ──
+-- ── 1. Mapeo usuario de la app → su IP de gestión (10.13.250.x / 10.14.250.x) ──
 --  Fuente de verdad para el src-address de la mangle. NUNCA se confía
 --  en la IP que envía el cliente.
 CREATE TABLE IF NOT EXISTS user_mgmt_ips (
   id            CHAR(36)     NOT NULL,
   workspace_id  CHAR(36)     NOT NULL,
   user_id       CHAR(36)     NOT NULL,
-  mgmt_ip       VARCHAR(64)  NOT NULL,                 -- 192.168.21.x (sin /32)
+  mgmt_ip       VARCHAR(64)  NOT NULL,                 -- 10.13.250.x / 10.14.250.x (sin /32)
   public_key    VARCHAR(120) DEFAULT NULL,             -- peer WG asociado (si aplica)
   source        ENUM('member_wg','mgmt_peer','manual') NOT NULL DEFAULT 'manual',
   created_at    BIGINT       NOT NULL,

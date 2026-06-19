@@ -18,6 +18,7 @@ const { getDb } = require('../../db.service');
 const provisioner = require('../../lib/tunnelProvisioner');
 const sessionRepo = require('../../db/repos/sessionRepo');
 const { requireOperator } = require('../nodes/_shared');
+const mgmtNet = require('../../lib/mgmtNet');
 
 router.post('/tunnel/repair', requireOperator, async (req, res) => {
   if (!req.mikrotik) return res.status(503).json({ success: false, needsConfig: true, message: 'Configura las credenciales MikroTik en Ajustes antes de continuar.' });
@@ -33,7 +34,10 @@ router.post('/tunnel/repair', requireOperator, async (req, res) => {
   const isWG       = (pppUser || '').startsWith('WG-ND') || (pppUser || '').startsWith('VPN-WG-');
   // ifaceName: para WG === pppUser; para SSTP se deriva del VRF
   const ifaceName  = isWG ? pppUser : vrfName.replace(/^VRF-/, 'VPN-SSTP-');
-  const wgMgmtNet  = adminWgNet || '192.168.21.0/24';
+  // Rutas de retorno del plano de gestión (CLIENTES/ADMIN/VPS). `adminWgNet`
+  // del body solo se respeta como override puntual de la primera (compat).
+  const mgmtReturnRoutes = mgmtNet.returnRoutes();
+  if (adminWgNet) mgmtReturnRoutes[0] = { subnet: adminWgNet, gateway: mgmtNet.clients.iface, tag: 'MGMT-CLIENTES' };
   const steps      = [];
   let   repaired   = 0;
 
@@ -245,28 +249,30 @@ router.post('/tunnel/repair', requireOperator, async (req, res) => {
       }
     }
 
-    // Ruta de retorno MGMT hacia VPN-WG-MGMT
-    try {
-      const existsMgmtRoute = allRoutes.some(r =>
-        r['dst-address'] === wgMgmtNet &&
-        r['routing-table'] === vrfName &&
-        r.dynamic !== 'true'
-      );
-      if (existsMgmtRoute) {
-        steps.push({ step: 4, obj: 'VRF Route MGMT', name: wgMgmtNet, status: 'ok', action: 'exists' });
-      } else {
-        await writeIdempotent(api, [
-          '/ip/route/add',
-          `=dst-address=${wgMgmtNet}`,
-          '=gateway=VPN-WG-MGMT',
-          `=routing-table=${vrfName}`,
-          '=distance=2',
-        ]);
-        steps.push({ step: 4, obj: 'VRF Route MGMT', name: wgMgmtNet, status: 'created', action: 'created' });
-        repaired++;
+    // Rutas de retorno del plano de gestión (una por segmento: CLIENTES/ADMIN/VPS)
+    for (const rt of mgmtReturnRoutes) {
+      try {
+        const existsMgmtRoute = allRoutes.some(r =>
+          r['dst-address'] === rt.subnet &&
+          r['routing-table'] === vrfName &&
+          r.dynamic !== 'true'
+        );
+        if (existsMgmtRoute) {
+          steps.push({ step: 4, obj: 'VRF Route MGMT', name: rt.subnet, status: 'ok', action: 'exists' });
+        } else {
+          await writeIdempotent(api, [
+            '/ip/route/add',
+            `=dst-address=${rt.subnet}`,
+            `=gateway=${rt.gateway}`,
+            `=routing-table=${vrfName}`,
+            '=distance=2',
+          ]);
+          steps.push({ step: 4, obj: 'VRF Route MGMT', name: rt.subnet, status: 'created', action: 'created' });
+          repaired++;
+        }
+      } catch (e) {
+        steps.push({ step: 4, obj: 'VRF Route MGMT', name: rt.subnet, status: 'error', action: e.message });
       }
-    } catch (e) {
-      steps.push({ step: 4, obj: 'VRF Route MGMT', name: wgMgmtNet, status: 'error', action: e.message });
     }
 
     // ── Paso 5: LIST-NET-REMOTE-TOWERS (subredes LAN) ───────────────────────
@@ -292,26 +298,28 @@ router.post('/tunnel/repair', requireOperator, async (req, res) => {
       }
     }
 
-    // ── Paso 6: vpn-activa (pool admin completo) ────────────────────────────
-    const ADMIN_POOL_REPAIR = '192.168.21.0/24';
-    try {
-      const existsInVpnActiva = allAddrs.some(a =>
-        a.list === 'vpn-activa' && a.address === ADMIN_POOL_REPAIR
-      );
-      if (existsInVpnActiva) {
-        steps.push({ step: 6, obj: 'vpn-activa', name: ADMIN_POOL_REPAIR, status: 'ok', action: 'exists' });
-      } else {
-        await writeIdempotent(api, [
-          '/ip/firewall/address-list/add',
-          '=list=vpn-activa',
-          `=address=${ADMIN_POOL_REPAIR}`,
-          '=comment=User Access',
-        ]);
-        steps.push({ step: 6, obj: 'vpn-activa', name: ADMIN_POOL_REPAIR, status: 'created', action: 'created' });
-        repaired++;
+    // ── Paso 6: vpn-activa (pool de gestión completo: CLIENTES/ADMIN/VPS) ────
+    const ADMIN_POOLS_REPAIR = [mgmtNet.clients.net, mgmtNet.admin.net, mgmtNet.vps.net];
+    for (const pool of ADMIN_POOLS_REPAIR) {
+      try {
+        const existsInVpnActiva = allAddrs.some(a =>
+          a.list === 'vpn-activa' && a.address === pool
+        );
+        if (existsInVpnActiva) {
+          steps.push({ step: 6, obj: 'vpn-activa', name: pool, status: 'ok', action: 'exists' });
+        } else {
+          await writeIdempotent(api, [
+            '/ip/firewall/address-list/add',
+            '=list=vpn-activa',
+            `=address=${pool}`,
+            '=comment=User Access',
+          ]);
+          steps.push({ step: 6, obj: 'vpn-activa', name: pool, status: 'created', action: 'created' });
+          repaired++;
+        }
+      } catch (e) {
+        steps.push({ step: 6, obj: 'vpn-activa', name: pool, status: 'error', action: e.message });
       }
-    } catch (e) {
-      steps.push({ step: 6, obj: 'vpn-activa', name: ADMIN_POOL_REPAIR, status: 'error', action: e.message });
     }
 
     // ── Paso 7: Mangle de acceso POR-USUARIO (modelo multi-tenant) ─────────

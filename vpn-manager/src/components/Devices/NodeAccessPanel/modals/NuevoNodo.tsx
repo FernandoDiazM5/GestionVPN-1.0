@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { useVpn } from '../../../../context';
 import { fetchWithTimeout } from '../../../../utils/fetchWithTimeout';
-import { API_BASE_URL } from '../../../../config';
+import { API_BASE_URL, MGMT_RETURN_NETS, nodeMgmtIp } from '../../../../config';
 import { generateSecurePassword, getSubnetConflicts } from '../utils';
 import { ProvisionSteps } from '../components';
 import type { ProvisionResult } from '../types';
@@ -359,15 +359,18 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                 const peerOct = parseInt(peerIP.split('.')[3] ?? '2');
                 const blockBase30 = peerOct - 2;
                 const tunnelNet30 = `10.10.251.${blockBase30}/30`;
+                const nodeMgmt = nodeMgmtIp(wgNodeNum, true);
+                const allowedCsv = [...MGMT_RETURN_NETS, tunnelNet30].join(',');
                 const cpeSteps = [
                   { n: 1, title: 'Crear interfaz WireGuard', cmd: `/interface wireguard add name=WG-CORE-ISP mtu=1420 comment="Conexion al Servidor Core"` },
                   { n: 2, title: 'Asignar IP al túnel (/30)', cmd: `/ip address add address=${peerIP}/30 interface=WG-CORE-ISP network=10.10.251.${blockBase30} comment="IP WG Cliente ND${wgNodeNum}"` },
+                  { n: 3, title: 'IP de gestión del nodo', cmd: `/ip address add address=${nodeMgmt}/32 interface=WG-CORE-ISP comment="IP de gestion del nodo ND${wgNodeNum}"` },
                   {
-                    n: 3, title: 'Agregar peer (servidor Core)', cmd: serverPublicKey
-                      ? `/interface wireguard peers add interface=WG-CORE-ISP public-key="${serverPublicKey}" endpoint-address=${serverIP} endpoint-port=${wgPort} allowed-address=192.168.21.0/24,${tunnelNet30} persistent-keepalive=25s comment="Conexion al Servidor Core"`
+                    n: 4, title: 'Agregar peer (servidor Core)', cmd: serverPublicKey
+                      ? `/interface wireguard peers add interface=WG-CORE-ISP public-key="${serverPublicKey}" endpoint-address=${serverIP} endpoint-port=${wgPort} allowed-address=${allowedCsv} persistent-keepalive=25s comment="Conexion al Servidor Core"`
                       : '(esperando clave pública del servidor)'
                   },
-                  { n: 4, title: 'Ruta de retorno hacia administración', cmd: `/ip route add dst-address=192.168.21.0/24 distance=2 gateway=WG-CORE-ISP comment="Retorno hacia Administracion/Software"` },
+                  { n: 5, title: 'Rutas de retorno hacia administración', cmd: MGMT_RETURN_NETS.map(net => `/ip route add dst-address=${net} distance=2 gateway=WG-CORE-ISP comment="Retorno hacia Administracion/Software"`).join('\n') },
                 ];
                 return (
                   <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-4">

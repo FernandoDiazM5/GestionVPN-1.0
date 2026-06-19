@@ -1,7 +1,6 @@
 import { AlertCircle, Server, WifiOff } from 'lucide-react';
 import type { WgPeer } from '../../../../../types/api';
-
-const VPS_IP = '192.168.21.60';
+import { VPS_IP } from '../../../../../config';
 
 interface WireGuardSectionProps {
   vpsPeer: WgPeer | undefined;

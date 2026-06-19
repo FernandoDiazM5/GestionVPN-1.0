@@ -31,7 +31,7 @@ const scanMangle = require('../../lib/scanMangle');
 
 const MIKROTIK = { ip: '192.168.21.1', user: 'admin', pass: 'x' };
 const WS = 'ws-1';
-const SCAN_IP = '192.168.21.205';
+const SCAN_IP = '10.11.252.205';
 const VRF = 'VRF-A';
 
 const findCall = (predicate) => calls.find(predicate);

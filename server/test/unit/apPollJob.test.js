@@ -102,16 +102,16 @@ describe('apPollJob.runOnce', () => {
 
   it('Opción C: con scan-IP, monta mangle por VRF y ata el SSH (localAddress)', async () => {
     apWatch.touch('ws-1');
-    scanIpRepoMock.getScanIpForWorkspace.mockResolvedValue('192.168.21.205');
+    scanIpRepoMock.getScanIpForWorkspace.mockResolvedValue('10.11.252.205');
 
     await apPollJob.runOnce();
 
     // mangle src=scan-IP → VRF del AP, y limpieza al final del ciclo
     expect(scanMangleMock.setup).toHaveBeenCalledWith(
-      expect.objectContaining({ workspaceId: 'ws-1', scanIp: '192.168.21.205', vrfName: 'VRF-A' })
+      expect.objectContaining({ workspaceId: 'ws-1', scanIp: '10.11.252.205', vrfName: 'VRF-A' })
     );
     expect(scanMangleMock.teardown).toHaveBeenCalled();
     // pollAp recibió la scan-IP como localAddress (7º argumento)
-    expect(apSvc.pollAp.mock.calls[0][6]).toBe('192.168.21.205');
+    expect(apSvc.pollAp.mock.calls[0][6]).toBe('10.11.252.205');
   });
 });

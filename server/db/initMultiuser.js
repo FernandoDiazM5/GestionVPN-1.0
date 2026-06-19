@@ -55,7 +55,7 @@ async function main() {
     console.log(`[init:multiuser] ${applied} sentencias DDL aplicadas ✓`);
 
     // 2) Backfill: member_wireguard (user_id ↔ allowed_ip) → user_mgmt_ips
-    //    Solo inserta los que faltan. allowed_ip viene como "192.168.21.x/32".
+    //    Solo inserta los que faltan. allowed_ip viene como "10.13.250.x/32".
     const [members] = await conn.query(
       `SELECT mw.workspace_id, mw.user_id, mw.allowed_ip, mw.public_key
          FROM member_wireguard mw

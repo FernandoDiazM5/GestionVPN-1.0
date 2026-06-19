@@ -3,6 +3,12 @@
 #
 # model = RB750GL
 # serial number = 3B0602A9CEE4
+#
+# ⚠️ SNAPSHOT HISTÓRICO (plano de gestión PRE-migración, 192.168.21.0/24).
+#    El esquema vigente migró a segmentos 10.x:
+#      VPN-WG-VPS 10.12.250.1/24 :13232 · VPN-WG-CLIENTES 10.13.250.1/24 :13233
+#      VPN-WG-ADMIN 10.14.250.1/24 :13234 · nodos 10.11.250/251.<ND> · scan 10.11.252.0/24
+#    Fuente de verdad: server/lib/mgmtNet.js · Migración: server/scripts/migrate-mgmt-net.rsc
 /interface bridge
 add comment="Bridge Local LAN" name=BR-LAN
 /interface sstp-server

@@ -3,7 +3,7 @@
 //  Uso:
 //     node db/mapUserMgmtIp.js <email|nombre> <mgmt_ip> [publicKey]
 //  Ej:
-//     node db/mapUserMgmtIp.js fernando 192.168.21.20
+//     node db/mapUserMgmtIp.js fernando 10.13.250.20
 //
 //  Busca el usuario por email exacto o por nombre (LIKE), resuelve su
 //  workspace (OWNER preferente) y hace upsert en user_mgmt_ips.

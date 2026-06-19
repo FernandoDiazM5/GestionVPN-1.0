@@ -1,9 +1,7 @@
 // ── Redes reservadas que no deben usarse como LAN remota de un nodo
-export const PROTECTED_NETS = [
-  { cidr: '192.168.21.0/24', label: 'WireGuard gestión (192.168.21.0/24)' },
-  { cidr: '10.10.250.0/24', label: 'Pool PPP túnel (10.10.250.0/24)' },
-  { cidr: '10.10.251.0/24', label: 'Pool WG túnel core (10.10.251.0/24)' },
-];
+//    (fuente única en src/config.ts, espejo de server/lib/mgmtNet.js)
+import { PROTECTED_NETS } from '../../../../config';
+export { PROTECTED_NETS };
 
 // ── Helper: conversión de IP a entero
 export function ipToInt(ip: string): number {

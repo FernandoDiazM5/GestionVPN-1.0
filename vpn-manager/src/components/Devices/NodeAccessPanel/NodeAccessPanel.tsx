@@ -19,6 +19,7 @@ import {
   DiagnosticsModal,
 } from './modals';
 import type { NodeInfo } from '../../../types/api';
+import { VPS_IP } from '../../../config';
 
 // ── Componentes (nuevos)
 import {
@@ -71,9 +72,6 @@ export default function NodeAccessPanel() {
   // Modal de diagnóstico (Q3) — local; no merece entrar a useNodeModals porque
   // sólo se abre/cierra desde NodeCard y no es parte del lifecycle de nodos.
   const [diagnoseNode, setDiagnoseNode] = useState<NodeInfo | null>(null);
-
-  // ── Constantes
-  const VPS_IP = '192.168.21.60';
 
   // ── Inicializar hooks de lógica compleja
   const { fetchNodes, handleLoadNodes } = useNodeFetching({

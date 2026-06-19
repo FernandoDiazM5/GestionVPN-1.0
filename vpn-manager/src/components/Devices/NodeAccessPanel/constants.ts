@@ -13,15 +13,9 @@
 // fuera del sistema) para todo este archivo. Las demás reglas (DS02-DS06)
 // siguen activas.
 
-import type { ProtectedNet } from './types';
-
-export const VPS_IP = '192.168.21.60';
-
-export const PROTECTED_NETS: ProtectedNet[] = [
-  { cidr: '192.168.21.0/24', label: 'WireGuard gestión (192.168.21.0/24)' },
-  { cidr: '10.10.250.0/24', label: 'Pool PPP túnel (10.10.250.0/24)' },
-  { cidr: '10.10.251.0/24', label: 'Pool WG túnel core (10.10.251.0/24)' },
-];
+// VPS_IP y PROTECTED_NETS viven en src/config.ts (fuente única, espejo de
+// server/lib/mgmtNet.js). Se re-exportan aquí para no romper imports existentes.
+export { VPS_IP, PROTECTED_NETS } from '../../../config';
 
 // NOTA: pink/orange/teal/cyan/blue/green/yellow/red/purple son paletas FUERA
 // del sistema (CLAUDE.md). Quedan así como DS01 explícita para Fase 5 del

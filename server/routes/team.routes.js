@@ -28,6 +28,7 @@ const invitationRepo = require('../db/repos/invitationRepo');
 const assignmentRepo = require('../db/repos/assignmentRepo');
 const memberWgRepo = require('../db/repos/memberWgRepo');
 const mgmtIpRepo = require('../db/repos/mgmtIpRepo');
+const mgmtNet = require('../lib/mgmtNet');
 const { generateKeyPair, buildClientConf } = require('../lib/wgkeys');
 const { encrypt, decrypt } = require('../lib/crypto');
 const { connectToMikrotik, safeWrite, writeIdempotent, getErrorMessage } = require('../routeros.service');
@@ -83,7 +84,7 @@ async function provisionMemberWgByPublicKey(mikrotik, { workspaceId, userId, pub
     const peers = await safeWrite(api, ['/interface/wireguard/peers/print']);
     const ifaces = await safeWrite(api, ['/interface/wireguard/print']).catch(() => []);
     const cloud = await safeWrite(api, ['/ip/cloud/print']).catch(() => []);
-    const mgmt = peers.filter(p => p.interface === 'VPN-WG-MGMT');
+    const mgmt = peers.filter(p => p.interface === mgmtNet.clients.iface);
     // Reutiliza el peer si ya existe esa clave pública (idempotente)
     const existing = mgmt.find(p => p['public-key'] === publicKey);
     let nextIp;
@@ -98,15 +99,15 @@ async function provisionMemberWgByPublicKey(mikrotik, { workspaceId, userId, pub
       }
     } else {
       const used = mgmt.map(p => (p['allowed-address'] || '').split('/')[0])
-        .filter(a => a.startsWith('192.168.21.')).map(a => parseInt(a.split('.')[3])).filter(n => !isNaN(n));
-      nextIp = `192.168.21.${(used.length ? Math.max(...used) : 19) + 1}`;
+        .filter(a => a.startsWith(mgmtNet.clients.base)).map(a => parseInt(a.split('.')[3])).filter(n => !isNaN(n));
+      nextIp = `${mgmtNet.clients.base}${(used.length ? Math.max(...used) : mgmtNet.clients.start - 1) + 1}`;
       await writeIdempotent(api, ['/interface/wireguard/peers/add',
-        '=interface=VPN-WG-MGMT', `=public-key=${publicKey}`,
+        `=interface=${mgmtNet.clients.iface}`, `=public-key=${publicKey}`,
         `=allowed-address=${nextIp}/32`, `=comment=${peerComment}`]);
     }
-    const mgmtIface = ifaces.find(i => i.name === 'VPN-WG-MGMT');
+    const mgmtIface = ifaces.find(i => i.name === mgmtNet.clients.iface);
     const serverPub = mgmtIface?.['public-key'] || '';
-    const listenPort = parseInt(mgmtIface?.['listen-port'] || '0') || 13231;
+    const listenPort = parseInt(mgmtIface?.['listen-port'] || '0') || mgmtNet.clients.port;
     // Prioridad para la IP pública del endpoint:
     //   1) ENV WG_PUBLIC_IP (fija — útil cuando el router tiene IP cambiante o NAT)
     //   2) app_settings.server_public_ip (configurable desde la UI por moderador)
@@ -142,7 +143,7 @@ async function provisionMemberWgByPublicKey(mikrotik, { workspaceId, userId, pub
       // No bloqueamos la provisión; el operador puede limpiar con mapUserMgmtIp.js.
       log.warn({ err: e?.message, userId, mgmtIp: nextIp }, 'user_mgmt_ips upsert falló (no bloqueante)');
     }
-    return { allowedIp: nextIp, serverPublicKey: serverPub, endpoint, allowedIps: '192.168.21.0/24' };
+    return { allowedIp: nextIp, serverPublicKey: serverPub, endpoint, allowedIps: mgmtNet.clients.net };
   } catch (e) {
     if (api) try { await api.close(); } catch (_) { /* noop */ }
     throw e;
@@ -605,15 +606,15 @@ router.post('/member/:id/wireguard', requireSession, requireRole('OWNER', 'CO_MO
       const peers = await safeWrite(api, ['/interface/wireguard/peers/print']);
       const ifaces = await safeWrite(api, ['/interface/wireguard/print']).catch(() => []);
       const cloud = await safeWrite(api, ['/ip/cloud/print']).catch(() => []);
-      const mgmt = peers.filter(p => p.interface === 'VPN-WG-MGMT');
+      const mgmt = peers.filter(p => p.interface === mgmtNet.clients.iface);
       const used = mgmt.map(p => (p['allowed-address'] || '').split('/')[0])
-        .filter(a => a.startsWith('192.168.21.')).map(a => parseInt(a.split('.')[3])).filter(n => !isNaN(n));
-      const nextIp = `192.168.21.${(used.length ? Math.max(...used) : 19) + 1}`;
+        .filter(a => a.startsWith(mgmtNet.clients.base)).map(a => parseInt(a.split('.')[3])).filter(n => !isNaN(n));
+      const nextIp = `${mgmtNet.clients.base}${(used.length ? Math.max(...used) : mgmtNet.clients.start - 1) + 1}`;
       await writeIdempotent(api, ['/interface/wireguard/peers/add',
-        '=interface=VPN-WG-MGMT', `=public-key=${peerPub}`,
+        `=interface=${mgmtNet.clients.iface}`, `=public-key=${peerPub}`,
         `=allowed-address=${nextIp}/32`, `=comment=${peerComment}`]);
-      const serverPub = ifaces.find(i => i.name === 'VPN-WG-MGMT')?.['public-key'] || '';
-      const listenPort = parseInt(ifaces.find(i => i.name === 'VPN-WG-MGMT')?.['listen-port'] || '0') || 13231;
+      const serverPub = ifaces.find(i => i.name === mgmtNet.clients.iface)?.['public-key'] || '';
+      const listenPort = parseInt(ifaces.find(i => i.name === mgmtNet.clients.iface)?.['listen-port'] || '0') || mgmtNet.clients.port;
       // Misma jerarquía que provisionMemberWgByPublicKey (ENV → setting → cloud → MT_IP)
       const settingPubIp = await getAppSetting('server_public_ip').catch(() => null);
       const publicIp = (process.env.WG_PUBLIC_IP || settingPubIp || cloud?.[0]?.['public-address'] || ip).trim();
@@ -673,7 +674,7 @@ router.get('/member/:id/wireguard', requireSession, asyncHandler(async (req, res
       allowedIp: row.allowed_ip, publicKey: row.public_key,
       serverPublicKey: row.server_public_key || null,
       endpoint: row.endpoint || null,
-      allowedIps: '192.168.21.0/24',
+      allowedIps: mgmtNet.clients.net,
       conf: row.config_enc ? decrypt(row.config_enc) : null,
     },
   });

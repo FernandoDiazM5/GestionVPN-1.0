@@ -221,7 +221,7 @@ describe('handleMessage — con auth', () => {
 
   it('/activar VRF-X → activa directo vía tunnelService', async () => {
     tunnelServiceMocks.activateTunnel.mockResolvedValue({
-      ok: true, vrf: 'VRF-A', mgmtIp: '192.168.21.20',
+      ok: true, vrf: 'VRF-A', mgmtIp: '10.13.250.20',
       sessionId: 's1', expiresAt: Date.now() + 30 * 60 * 1000, switched: false,
     });
     await bot.handleMessage({ chat: { id: 1 }, text: '/activar VRF-A' });
@@ -232,7 +232,7 @@ describe('handleMessage — con auth', () => {
     const last = telegramMocks.sendMessage.mock.calls.at(-1)[0].text;
     expect(last).toContain('Acceso abierto');
     expect(last).toContain('VRF-A');
-    expect(last).toContain('192.168.21.20');
+    expect(last).toContain('10.13.250.20');
   });
 
   it('/activar VRF-X con error del service → reporta', async () => {
@@ -258,7 +258,7 @@ describe('handleMessage — con auth', () => {
     // Setup pending
     await bot.handleMessage({ chat: { id: 1 }, text: '/activar' });
     tunnelServiceMocks.activateTunnel.mockResolvedValue({
-      ok: true, vrf: 'VRF-B', mgmtIp: '192.168.21.20',
+      ok: true, vrf: 'VRF-B', mgmtIp: '10.13.250.20',
       sessionId: 's1', expiresAt: Date.now() + 30 * 60 * 1000, switched: false,
     });
     await bot.handleMessage({ chat: { id: 1 }, text: '2' });

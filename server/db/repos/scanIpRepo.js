@@ -4,18 +4,19 @@
 //  y para el localAddress del SSH/HTTP del escaneo.
 //  ⚠️ La IP NUNCA se toma del request del cliente — siempre de aquí.
 //
-//  Pool por defecto: 192.168.21.200 .. 192.168.21.230 (1 por moderador).
+//  Pool por defecto: 10.11.252.2 .. 10.11.252.254 (1 por workspace).
+//  /24 DEDICADO, separado de la gestión por nodo (10.11.250/251).
 //  Configurable por env: SCAN_IP_POOL_BASE / _START / _END.
 // ============================================================
 const crypto = require('crypto');
 const { query } = require('../mysql');
 
-const POOL_BASE  = process.env.SCAN_IP_POOL_BASE  || '192.168.21.';
-const POOL_START = Number(process.env.SCAN_IP_POOL_START || 200);
-const POOL_END   = Number(process.env.SCAN_IP_POOL_END   || 230);
+const POOL_BASE  = process.env.SCAN_IP_POOL_BASE  || '10.11.252.';
+const POOL_START = Number(process.env.SCAN_IP_POOL_START || 2);
+const POOL_END   = Number(process.env.SCAN_IP_POOL_END   || 254);
 
 /**
- * Devuelve la scan-IP (ej. "192.168.21.205") del workspace, o null si no tiene
+ * Devuelve la scan-IP (ej. "10.11.252.5") del workspace, o null si no tiene
  * una asignada. Sin asignación → el escaneo cae al comportamiento legacy
  * (sin localAddress ni mangle), útil en desarrollo local donde el backend
  * ES la máquina del moderador.

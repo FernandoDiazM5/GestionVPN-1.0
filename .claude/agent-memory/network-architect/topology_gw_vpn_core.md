@@ -13,14 +13,18 @@ type: project
 ### LAN
 - BR-LAN (bridge ether2+ether3): 192.168.37.1/24, DHCP pool 192.168.37.2-254
 
-### Admin VPN
-- VPN-WG-MGMT (WireGuard, port 13231): 192.168.21.1/24
-  - peer1: 192.168.21.30/32 (Celular)
-  - peer2: 192.168.21.20/32 (Laptop)
-  - peer3: 192.168.21.50/32 (PC FiWis)
-  - peer4: 192.168.21.51/32 (Laptop Plopis)
-  - VPS: 192.168.21.60/32
-  - LIST-MGMT-TRUSTED contains 192.168.21.0/24, 192.168.37.0/24, and specific public IPs
+### Admin VPN — MIGRADO a segmentos 10.x (2026-06-19)
+> El plano de gestión `192.168.21.0/24` (interfaz única VPN-WG-MGMT :13231) se
+> migró a 3 interfaces + IP de gestión por nodo. Fuente de verdad:
+> `server/lib/mgmtNet.js`. Runbook: `MIGRACION_RED_GESTION.md`. La interfaz vieja
+> se elimina en el corte final.
+- VPN-WG-VPS (port 13232): 10.12.250.1/24 — peer VPS 10.12.250.60/32
+- VPN-WG-CLIENTES (port 13233): 10.13.250.1/24 — moderadores/members (.20+)
+- VPN-WG-ADMIN (port 13234): 10.14.250.1/24 — dispositivos del admin (.20+)
+- IP de gestión por nodo: WG → 10.11.250.<ND> · SSTP → 10.11.251.<ND> (en el CPE)
+- scan-pool VPS: 10.11.252.0/24
+- LIST-MGMT-TRUSTED: 10.12.250.0/24, 10.13.250.0/24, 10.14.250.0/24, 192.168.37.0/24, IPs públicas
+- (LEGACY pre-migración) VPN-WG-MGMT 192.168.21.1/24 — peers .20/.30/.50/.51, VPS .60
 
 ### Remote Node Tunnels (management only, NO internet via VPN)
 - VPN-SSTP-ND1-HOUSENET: tunnel to 10.10.250.201, remote LAN 10.1.1.0/24, VRF-ND1-HOUSENET
@@ -39,13 +43,17 @@ type: project
 - vpn-activa: DYNAMICALLY managed by software — only tunnel endpoint IPs added when tunnel is active
 
 ### VRF Tables (per node)
-Each VRF has: remote LAN route via its tunnel + 192.168.21.0/24 via VPN-WG-MGMT
+Each VRF has: remote LAN route via its tunnel + return routes per mgmt segment
+(10.13.250.0/24→VPN-WG-CLIENTES, 10.14.250.0/24→VPN-WG-ADMIN, 10.12.250.0/24→VPN-WG-VPS,
+10.11.252.0/24→VPN-WG-VPS for scan) + node mgmt IP /32 via its tunnel.
+(LEGACY pre-migración: una sola ruta 192.168.21.0/24 via VPN-WG-MGMT.)
 VRFs do NOT have default routes (0.0.0.0/0) by default — this must be added.
 
 ### Software-Managed Mangle Rules (dynamic)
-- ACCESO-ADMIN: src=192.168.21.0/24, dst=LIST-NET-REMOTE-TOWERS, new-routing-mark=VRF-NDx, passthrough=yes
-- ACCESO-DINAMICO: src=specific-tunnel-IP/32, dst=LIST-NET-REMOTE-TOWERS, new-routing-mark=VRF-NDx, passthrough=yes
-- Rule: vpn-activa must NEVER contain 192.168.21.0/24 (admin subnet)
+- ACCESO-USER-<userTag>: src=<mgmt_ip del usuario> (10.13.250.x / 10.14.250.x), dst=LIST-NET-REMOTE-TOWERS, new-routing-mark=VRF-NDx — modelo POR-USUARIO vigente
+- SCAN-WS-<wsTag>: src=<scan-IP 10.11.252.x>, dst=LIST-NET-REMOTE-TOWERS, new-routing-mark=VRF-NDx
+- ACCESO-ADMIN / ACCESO-DINAMICO: LEGACY single-user (el provisioner los elimina)
+- Rule: vpn-activa must NEVER contain LAN subnets de torre
 
 ### SSTP
 - Profile PROF-VPN-TOWERS: local=10.10.250.1, pool 10.10.250.2-100

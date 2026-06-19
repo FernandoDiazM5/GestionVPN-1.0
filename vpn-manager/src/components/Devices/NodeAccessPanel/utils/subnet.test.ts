@@ -15,7 +15,7 @@ describe('cidrOverlaps', () => {
 
 describe('getSubnetConflicts — redes reservadas (bloqueante)', () => {
   it('marca solape con la red de gestión', () => {
-    expect(getSubnetConflicts(['192.168.21.0/24'])).toHaveLength(1);
+    expect(getSubnetConflicts(['10.13.250.0/24'])).toHaveLength(1);
     expect(getSubnetConflicts(['10.10.250.0/25'])).toHaveLength(1);
   });
   it('una LAN normal no genera conflicto', () => {

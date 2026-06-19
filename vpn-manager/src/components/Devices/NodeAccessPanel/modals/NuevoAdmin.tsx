@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { UserPlus, X, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import { useVpn } from '../../../../context';
 import { fetchWithTimeout } from '../../../../utils/fetchWithTimeout';
-import { API_BASE_URL } from '../../../../config';
+import { API_BASE_URL, MGMT_NET } from '../../../../config';
 import type { WgPeer } from '../../../../types/api';
 
 interface NuevoAdminProps {
@@ -21,11 +21,11 @@ export default function NuevoAdmin({ peers, onClose, onSuccess }: NuevoAdminProp
 
   const usedIPs = peers
     .map(p => p.allowedAddress)
-    .filter(a => a?.startsWith('192.168.21.'))
+    .filter(a => a?.startsWith(MGMT_NET.admin.base))
     .map(a => parseInt(a.split('.')[3]))
     .filter(n => !isNaN(n));
-  const maxIP = usedIPs.length > 0 ? Math.max(...usedIPs) : 19;
-  const nextIP = `192.168.21.${maxIP + 1}`;
+  const maxIP = usedIPs.length > 0 ? Math.max(...usedIPs) : MGMT_NET.admin.start - 1;
+  const nextIP = `${MGMT_NET.admin.base}${maxIP + 1}`;
 
   const handleCreate = async () => {
     if (!credentials || !pubKey.trim()) return;

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
 import { UserCircle, Waypoints, Shield, Loader2, Download, Copy, Check, Smartphone, KeyRound } from 'lucide-react';
 import { teamApi } from '../../../../services/teamApi';
+import { ADMIN_WG_NET } from '../../../../config';
 import type { Assignment, MemberWireguard, SessionUser } from '../../../../types/account';
 
 interface Props {
@@ -21,7 +22,7 @@ function buildWgTemplate(wg: MemberWireguard | null): string | null {
     '[Peer]',
     `PublicKey = ${wg.serverPublicKey}`,
     `Endpoint = ${wg.endpoint}`,
-    `AllowedIPs = ${wg.allowedIps || '192.168.21.0/24'}`,
+    `AllowedIPs = ${wg.allowedIps || ADMIN_WG_NET}`,
     'PersistentKeepalive = 25',
   ].join('\n');
 }

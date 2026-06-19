@@ -10,8 +10,7 @@ import {
 } from '../../Devices/NodeAccessPanel/hooks';
 import UsersTable from './components/UsersTable';
 import WgConfigModal from './components/WgConfigModal';
-
-const VPS_IP = '192.168.21.60';
+import { VPS_IP } from '../../../config';
 
 interface UserManagementPanelProps {
   /** Embedido como tab del módulo Workspace: oculta su header propio. */

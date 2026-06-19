@@ -18,13 +18,13 @@ const peer: WgPeer = {
   id: '*1',
   name: 'FIWIS - test@x.com - MEMBER',
   publicKey: 'PUBKEY1234567890abcdef==',
-  allowedAddress: '192.168.21.50',
+  allowedAddress: '10.13.250.50',
   lastHandshakeSecs: 5,
   active: true,
 };
 
 const sampleConf =
-  '[Interface]\nPrivateKey = ABC123==\nAddress = 192.168.21.50/32\n' +
+  '[Interface]\nPrivateKey = ABC123==\nAddress = 10.13.250.50/32\n' +
   'DNS = 8.8.8.8\n\n[Peer]\nPublicKey = SRVPUB==\nAllowedIPs = 0.0.0.0/0\n' +
   'Endpoint = 1.2.3.4:13231\nPersistentKeepalive = 25\n';
 
@@ -34,7 +34,7 @@ describe('<WgConfigModal />', () => {
       HttpResponse.json({
         success: true,
         wireguard: {
-          allowedIp: '192.168.21.50',
+          allowedIp: '10.13.250.50',
           publicKey: peer.publicKey,
           conf: sampleConf,
         },
@@ -57,7 +57,7 @@ describe('<WgConfigModal />', () => {
     server.use(http.get(`${API_BASE_URL}/api/team/wireguard/by-key/:pk`, () =>
       HttpResponse.json({
         success: true,
-        wireguard: { allowedIp: '192.168.21.50', publicKey: peer.publicKey, conf: sampleConf },
+        wireguard: { allowedIp: '10.13.250.50', publicKey: peer.publicKey, conf: sampleConf },
       })));
 
     renderWithProviders(<WgConfigModal peer={peer} onClose={() => {}} />);
@@ -72,7 +72,7 @@ describe('<WgConfigModal />', () => {
     server.use(http.get(`${API_BASE_URL}/api/team/wireguard/by-key/:pk`, () =>
       HttpResponse.json({
         success: true,
-        wireguard: { allowedIp: '192.168.21.50', publicKey: peer.publicKey, conf: null },
+        wireguard: { allowedIp: '10.13.250.50', publicKey: peer.publicKey, conf: null },
       })));
 
     renderWithProviders(<WgConfigModal peer={peer} onClose={() => {}} />);
@@ -102,7 +102,7 @@ describe('<WgConfigModal />', () => {
     server.use(http.get(`${API_BASE_URL}/api/team/wireguard/by-key/:pk`, () =>
       HttpResponse.json({
         success: true,
-        wireguard: { allowedIp: '192.168.21.50', publicKey: peer.publicKey, conf: sampleConf },
+        wireguard: { allowedIp: '10.13.250.50', publicKey: peer.publicKey, conf: sampleConf },
       })));
 
     const onClose = vi.fn();

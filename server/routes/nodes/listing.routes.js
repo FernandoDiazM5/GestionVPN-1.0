@@ -19,6 +19,10 @@ const { annotateSessions, filterNodesForRole, nodeBelongsToRequester, requireOpe
 const { sendOk, AppError, asyncHandler } = require('../../lib/apiResponse');
 const { mikrotikAppError } = require('../../lib/mikrotikError');
 const { requireMikrotik } = require('../../lib/routeGuards');
+const mgmtNet = require('../../lib/mgmtNet');
+
+// /24 del plano de gestión — se excluyen del listado de "LANs de nodo".
+const MGMT_NETS = new Set(mgmtNet.allNets);
 
 // NOTA: el endpoint /nodes históricamente responde con un ARRAY plano (no shape
 // { success, ... }). El frontend lo consume así. Mantengo el shape legacy para
@@ -41,7 +45,7 @@ router.post('/nodes', asyncHandler(async (req, res) => {
     const vrfByInterface = {}; vrfs.forEach(vrf => (vrf.interfaces || '').split(',').forEach(i => { if (i.trim()) vrfByInterface[i.trim()] = vrf.name; }));
     const sstpIfaceByUser = {}; sstpIfaces.forEach(i => { if (i.user && i.name) sstpIfaceByUser[i.user] = i.name; });
     const activeByName = {}; active.forEach(s => { if (s.name) activeByName[s.name] = { address: s.address, uptime: s.uptime }; });
-    const sysRoutesByVrf = {}; (routes || []).forEach(r => { if (r['routing-table'] && r['routing-table'] !== 'main' && !r['dst-address']?.endsWith('/32') && r['dst-address'] !== '192.168.21.0/24' && r.dynamic !== 'true') { if (!sysRoutesByVrf[r['routing-table']]) sysRoutesByVrf[r['routing-table']] = []; sysRoutesByVrf[r['routing-table']].push(r['dst-address']); } });
+    const sysRoutesByVrf = {}; (routes || []).forEach(r => { if (r['routing-table'] && r['routing-table'] !== 'main' && !r['dst-address']?.endsWith('/32') && !MGMT_NETS.has(r['dst-address']) && r.dynamic !== 'true') { if (!sysRoutesByVrf[r['routing-table']]) sysRoutesByVrf[r['routing-table']] = []; sysRoutesByVrf[r['routing-table']].push(r['dst-address']); } });
 
     // ── Nodos SSTP (PPP secrets con service=sstp) ───────────────────────────
     const sstpNodes = secrets.filter(s => s.service === 'sstp').map(secret => {
@@ -65,7 +69,7 @@ router.post('/nodes', asyncHandler(async (req, res) => {
       const vrfRoutes = (routes || []).filter(r =>
         r['routing-table'] === vrfName &&
         !r['dst-address']?.endsWith('/32') &&
-        r['dst-address'] !== '192.168.21.0/24' &&
+        !MGMT_NETS.has(r['dst-address']) &&
         r.dynamic !== 'true'
       );
       const lanSubnets = vrfRoutes.map(r => r['dst-address']).filter(Boolean);
@@ -175,7 +179,7 @@ router.post('/node/details', asyncHandler(async (req, res) => {
     const addrList = vrfName ? await safeWrite(api, ['/ip/firewall/address-list/print']) : [];
     const secrets  = pppUser ? await safeWrite(api, ['/ppp/secret/print']) : [];
     const vrfSubnets = routes
-      .filter(r => r['routing-table'] === vrfName && r['dst-address'] !== '192.168.21.0/24')
+      .filter(r => r['routing-table'] === vrfName && !MGMT_NETS.has(r['dst-address']))
       .map(r => r['dst-address']);
     const lanSubnets = addrList
       .filter(a => a.list === 'LIST-NET-REMOTE-TOWERS' && vrfSubnets.includes(a.address))
@@ -243,17 +247,34 @@ router.post('/node/script', asyncHandler(async (req, res) => {
     const peerOct = parseInt((ipTunnel || '10.10.251.2').split('.')[3] ?? '2');
     const blockBase30 = peerOct - 2;
     const tunnelNet30 = `10.10.251.${blockBase30}/30`;
+    const tunnelAddr = ipTunnel || `10.10.251.${wgNodeNum * 4 - 2}`;
 
-    const script = `/interface wireguard add name=WG-CORE-ISP mtu=1420 comment="Conexion al Servidor Core"
-/ip address add address=${ipTunnel || `10.10.251.${wgNodeNum * 4 - 2}`}/30 interface=WG-CORE-ISP network=10.10.251.${blockBase30} comment="IP WG Cliente ND${wgNodeNum}"
-/interface wireguard peers add interface=WG-CORE-ISP public-key="${serverPublicKey}" endpoint-address=${serverPublicIP} endpoint-port=${wgPort} allowed-address=192.168.21.0/24,${tunnelNet30} persistent-keepalive=25s comment="Conexion al Servidor Core"
-/ip route add dst-address=192.168.21.0/24 distance=20 gateway=WG-CORE-ISP comment="Retorno hacia Administracion/Software"
-`;
+    // Redes de gestión que el CPE debe alcanzar de vuelta (CLIENTES/ADMIN/VPS)
+    // + el /24 del scan-pool del VPS (si está configurado) + IP de gestión del nodo.
+    const SCAN_RETURN_SUBNET = (process.env.SCAN_RETURN_SUBNET || '').trim();
+    const mgmtNets = mgmtNet.returnRoutes().map(r => r.subnet);
+    const returnNets = [...mgmtNets, ...(SCAN_RETURN_SUBNET ? [SCAN_RETURN_SUBNET] : [])];
+    const allowedCsv = [...returnNets, tunnelNet30].join(',');
+    const nodeMgmt = mgmtNet.nodeMgmtIp(wgNodeNum, true);
+    const mgmtIpLine = nodeMgmt
+      ? `/ip address add address=${nodeMgmt}/32 interface=WG-CORE-ISP comment="IP de gestion del nodo ND${wgNodeNum}"`
+      : '';
+    const peerLine = `/interface wireguard peers add interface=WG-CORE-ISP public-key="${serverPublicKey}" endpoint-address=${serverPublicIP} endpoint-port=${wgPort} allowed-address=${allowedCsv} persistent-keepalive=25s comment="Conexion al Servidor Core"`;
+    const routeLines = returnNets.map(n => `/ip route add dst-address=${n} distance=20 gateway=WG-CORE-ISP comment="Retorno hacia Administracion/Software"`);
+
+    const script = [
+      `/interface wireguard add name=WG-CORE-ISP mtu=1420 comment="Conexion al Servidor Core"`,
+      `/ip address add address=${tunnelAddr}/30 interface=WG-CORE-ISP network=10.10.251.${blockBase30} comment="IP WG Cliente ND${wgNodeNum}"`,
+      ...(mgmtIpLine ? [mgmtIpLine] : []),
+      peerLine,
+      ...routeLines,
+    ].join('\n') + '\n';
     const cpeSteps = [
       { title: 'Crear interfaz WireGuard', cmd: `/interface wireguard add name=WG-CORE-ISP mtu=1420 comment="Conexion al Servidor Core"` },
-      { title: 'Asignar IP al túnel (/30)', cmd: `/ip address add address=${ipTunnel || `10.10.251.${wgNodeNum * 4 - 2}`}/30 interface=WG-CORE-ISP network=10.10.251.${blockBase30} comment="IP WG Cliente ND${wgNodeNum}"` },
-      { title: 'Agregar peer (servidor Core)', cmd: `/interface wireguard peers add interface=WG-CORE-ISP public-key="${serverPublicKey}" endpoint-address=${serverPublicIP} endpoint-port=${wgPort} allowed-address=192.168.21.0/24,${tunnelNet30} persistent-keepalive=25s comment="Conexion al Servidor Core"` },
-      { title: 'Ruta de retorno hacia administración', cmd: `/ip route add dst-address=192.168.21.0/24 distance=20 gateway=WG-CORE-ISP comment="Retorno hacia Administracion/Software"` },
+      { title: 'Asignar IP al túnel (/30)', cmd: `/ip address add address=${tunnelAddr}/30 interface=WG-CORE-ISP network=10.10.251.${blockBase30} comment="IP WG Cliente ND${wgNodeNum}"` },
+      ...(mgmtIpLine ? [{ title: 'IP de gestión del nodo', cmd: mgmtIpLine }] : []),
+      { title: 'Agregar peer (servidor Core)', cmd: peerLine },
+      ...returnNets.map(n => ({ title: `Ruta de retorno (${n})`, cmd: `/ip route add dst-address=${n} distance=20 gateway=WG-CORE-ISP comment="Retorno hacia Administracion/Software"` })),
     ];
     return sendOk(res, { script, cpeSteps });
   }

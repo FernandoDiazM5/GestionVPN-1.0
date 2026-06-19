@@ -7,8 +7,9 @@ const crypto = require('crypto');
 const { query } = require('../mysql');
 
 /**
- * Devuelve la IP de gestión (192.168.21.x) del usuario, o null si no tiene.
- * @returns {Promise<string|null>} mgmt_ip sin máscara, ej. "192.168.21.20"
+ * Devuelve la IP de gestión del usuario (10.13.250.x mod/members · 10.14.250.x
+ * admin), o null si no tiene.
+ * @returns {Promise<string|null>} mgmt_ip sin máscara, ej. "10.13.250.20"
  */
 async function getMgmtIpForUser(workspaceId, userId) {
   const rows = await query(

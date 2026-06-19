@@ -15,6 +15,7 @@ const {
   PeerAddRequestSchema, PeerEditRequestSchema,
   PeerColorRequestSchema, PeerAliasRequestSchema,
 } = require('@gestionvpn/contracts');
+const mgmtNet = require('../lib/mgmtNet');
 const log = require('../lib/logger').child({ scope: 'wireguard' });
 
 // ─────────────────────────────────────────────────────────────
@@ -30,10 +31,12 @@ router.post('/wireguard/peers', asyncHandler(async (req, res) => {
     const ifaces = await safeWrite(api, ['/interface/wireguard/print']).catch(() => []);
     const cloud  = await safeWrite(api, ['/ip/cloud/print']).catch(() => []);
     await api.close();
-    const mgmtIface = ifaces.find(i => i.name === 'VPN-WG-MGMT');
+    // El servidor que se reporta para construir .conf de nuevos peers admin
+    // es la interfaz ADMIN; el listado muestra peers de usuario (CLIENTES + ADMIN).
+    const mgmtIface = ifaces.find(i => i.name === mgmtNet.admin.iface);
     const publicIP = cloud?.[0]?.['public-address'] || '';
     let result = peers
-      .filter(p => p.interface === 'VPN-WG-MGMT')
+      .filter(p => mgmtNet.userIfaces.includes(p.interface))
       .map(p => {
         const secs = parseHandshakeSecs(p['last-handshake'] || '');
         return {
@@ -123,17 +126,17 @@ router.post('/wireguard/peer/add', asyncHandler(async (req, res) => {
   try {
     api = await connectToMikrotik(ip, user, pass);
     const peers = await safeWrite(api, ['/interface/wireguard/peers/print']);
-    const mgmtPeers = peers.filter(p => p.interface === 'VPN-WG-MGMT');
+    const mgmtPeers = peers.filter(p => p.interface === mgmtNet.admin.iface);
     const usedIPs = mgmtPeers
       .map(p => (p['allowed-address'] || '').split('/')[0])
-      .filter(a => a.startsWith('192.168.21.'))
+      .filter(a => a.startsWith(mgmtNet.admin.base))
       .map(a => parseInt(a.split('.')[3]))
       .filter(n => !isNaN(n));
-    const maxIP = usedIPs.length > 0 ? Math.max(...usedIPs) : 19;
-    const nextIP = `192.168.21.${maxIP + 1}`;
+    const maxIP = usedIPs.length > 0 ? Math.max(...usedIPs) : mgmtNet.admin.start - 1;
+    const nextIP = `${mgmtNet.admin.base}${maxIP + 1}`;
     await writeIdempotent(api, [
       '/interface/wireguard/peers/add',
-      '=interface=VPN-WG-MGMT',
+      `=interface=${mgmtNet.admin.iface}`,
       `=public-key=${publicKey}`,
       `=allowed-address=${nextIP}/32`,
       `=comment=${name || 'Admin'}`,
