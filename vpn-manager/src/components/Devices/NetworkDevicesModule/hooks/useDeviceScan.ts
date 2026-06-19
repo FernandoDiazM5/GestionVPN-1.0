@@ -195,7 +195,14 @@ export function useDeviceScan(input: UseDeviceScanInput) {
 
   // ── Fase de autenticación SSH (por batches de 3 para no saturar) ──
   const runAuthPhase = useCallback(async (devices: ScannedDevice[], baseCreds: ScanCred[]) => {
-    if (devices.length === 0) return;
+    // Sin dispositivos no hay fase de auth, pero IGUAL hay que cerrar el ciclo:
+    // pasar a 'done' para que el botón salga de "Escaneando…" y se pueda
+    // relanzar. Antes el early-return dejaba phase='discovering' colgado
+    // (isScanning=true para siempre) → la UI "se quedaba pensando" con 0 hallazgos.
+    if (devices.length === 0) {
+      setScanState(s => ({ ...s, phase: 'done' }));
+      return;
+    }
 
     const initialStatus: Record<string, SshAuthStatus> = {};
     devices.forEach(d => { initialStatus[d.ip] = 'pending'; });
@@ -328,6 +335,7 @@ export function useDeviceScan(input: UseDeviceScanInput) {
       const decoder = new TextDecoder();
       let buffer = '';
       let discoveredDevices: ScannedDevice[] = [];
+      let gotComplete = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -372,14 +380,16 @@ export function useDeviceScan(input: UseDeviceScanInput) {
             setAllScannedIPs(discoveredDevices.map((dev: ScannedDevice) => dev.ip));
             setScannedCount(d.total);
             setDebugMsg(`Escaneadas ${d.total} IPs — ${discoveredDevices.length} encontrados`);
+            gotComplete = true;
           } else if (eventName === 'error') {
             const d = data as { message?: string };
             throw new Error(d.message);
           }
         }
+        // El backend mantiene el SSE abierto tras 'complete' (scan-mangle viva
+        // para la fase de auth). Salimos del bucle sin esperar el cierre del server.
+        if (gotComplete) break;
       }
-
-      readerRef.current = null;
 
       let creds: ScanCred[] = nodeSshCreds;
       const activeNode2 = activeNodeVrf ? nodes.find(n => n.nombre_vrf === activeNodeVrf) : null;
@@ -398,6 +408,11 @@ export function useDeviceScan(input: UseDeviceScanInput) {
       }
 
       await runAuthPhase(discoveredDevices, creds);
+
+      // Fin de la fase de auth → cerrar el SSE → el backend desmonta la scan-mangle
+      // (su teardown está atado al cierre de esta conexión, req 'close').
+      try { await readerRef.current?.cancel(); } catch { /* noop */ }
+      readerRef.current = null;
     } catch (err: unknown) {
       readerRef.current?.cancel();
       readerRef.current = null;

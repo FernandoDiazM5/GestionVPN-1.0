@@ -27,6 +27,12 @@ const scanMangle = require('../../lib/scanMangle');
 const scanLock = require('../../lib/scanLock');
 const log = require('../../lib/logger').child({ scope: 'scan' });
 
+// El SSE se mantiene ABIERTO tras 'complete' mientras el cliente corre la fase de
+// auth SSH, para que la scan-mangle siga viva (las antenas solo-SSH necesitan esa
+// fase para que el SSH enrute al VRF). El teardown ocurre al cerrar el cliente la
+// conexión (fin de la auth) o, como respaldo, tras este margen de seguridad.
+const AUTH_GRACE_MS = parseInt(process.env.SCAN_AUTH_GRACE_MS || '300000', 10); // 5 min
+
 router.post('/node/scan-stream', async (req, res) => {
   const { nodeLan } = req.body;
   if (!nodeLan || !CIDR_REGEX.test(nodeLan) || parseInt(nodeLan.split('/')[1], 10) < 16) {
@@ -68,7 +74,7 @@ router.post('/node/scan-stream', async (req, res) => {
   let scanMangleUp = false;
   let releaseLock = null;
   if (acc && !acc.platform_admin && targetVrf && req.mikrotik) {
-    const scanIp = await scanIpRepo.getScanIpForWorkspace(acc.workspace_id).catch(() => null);
+    const scanIp = await scanIpRepo.resolveForWorkspace(acc.workspace_id).catch(() => null);
     if (scanIp) {
       // Serializa contra el job de Monitor AP del mismo workspace (misma scan-IP).
       // El timeout de seguridad del lock se dimensiona al tamaño del escaneo:
@@ -77,7 +83,9 @@ router.post('/node/scan-stream', async (req, res) => {
       // (resultados del VRF equivocado). ~60ms/host, mín 5 min, máx 30 min.
       const prefix = parseInt(nodeLan.split('/')[1], 10);
       const estHosts = Math.max(1, (2 ** (32 - prefix)) - 2);
-      const lockMs = Math.min(30 * 60 * 1000, Math.max(5 * 60 * 1000, estHosts * 60));
+      // El lock debe cubrir descubrimiento + fase de auth (SSE abierto) para que
+      // el job de Monitor AP no conmute la mangle a otro VRF a mitad de la auth.
+      const lockMs = Math.min(30 * 60 * 1000, Math.max(AUTH_GRACE_MS + 120000, estHosts * 60));
       releaseLock = await scanLock.acquire(acc.workspace_id, lockMs);
       try {
         await scanMangle.setup({ workspaceId: acc.workspace_id, scanIp, vrfName: targetVrf, mikrotik: req.mikrotik });
@@ -108,10 +116,13 @@ router.post('/node/scan-stream', async (req, res) => {
   // Limpieza idempotente: borra la scan mangle y libera el lock DESPUÉS de que
   // el teardown termine (para no soltar el workspace mientras el router aún
   // tiene la regla → evita carrera con el job de Monitor AP).
+  let completed = false;
+  let safetyTimer = null;
   let cleaned = false;
   const cleanup = () => {
     if (cleaned) return;
     cleaned = true;
+    if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = null; }
     if (scanMangleUp) {
       scanMangle.teardown({ workspaceId: acc.workspace_id, mikrotik: req.mikrotik })
         .finally(() => { if (releaseLock) { releaseLock(); releaseLock = null; } });
@@ -133,8 +144,11 @@ router.post('/node/scan-stream', async (req, res) => {
       sendEvent('progress', msg.data);
     } else if (msg.type === 'complete') {
       sendEvent('complete', msg.data);
-      res.end();
-      cleanup();
+      completed = true;
+      // NO cerramos ni desmontamos aquí: el cliente mantiene el SSE abierto y
+      // corre la fase de auth SSH con la scan-mangle aún viva. El teardown se
+      // dispara al cerrar el cliente (req 'close') o por el timer de seguridad.
+      safetyTimer = setTimeout(() => { try { res.end(); } catch (_) { /* noop */ } cleanup(); }, AUTH_GRACE_MS);
     } else if (msg.type === 'error') {
       sendEvent('error', msg.data);
       res.end();
@@ -149,11 +163,13 @@ router.post('/node/scan-stream', async (req, res) => {
   });
 
   worker.on('exit', (code) => {
-    if (code !== 0 && code !== 1) {
+    if (code !== 0 && code !== 1 && !completed) {
       sendEvent('error', { message: `Worker finalizó con código ${code}` });
-      res.end();
+      try { res.end(); } catch (_) { /* noop */ }
     }
-    cleanup();
+    // Tras 'complete' (salida normal del worker) NO limpiamos: la mangle sigue
+    // viva para la fase de auth; el cliente disparará el teardown al cerrar.
+    if (!completed) cleanup();
   });
 
   // Abortar hilo gracefully si el cliente cierra la conexión HTTP

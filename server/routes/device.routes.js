@@ -11,6 +11,7 @@ const log = require('../lib/logger').child({ scope: 'device' });
 const { reqWorkspace, ownedGroupIntIds, ownsApUuid, ownsGroupUuid, ipInOwnedSubnet } = require('../lib/tenantScope');
 const { resolveOwnerNodeId } = require('../lib/apNode');
 const { sendOk, AppError, asyncHandler } = require('../lib/apiResponse');
+const scanIpRepo = require('../db/repos/scanIpRepo');
 
 // /device/auto-login: 200 OK siempre — el flag `authenticated` señala el resultado.
 router.post('/device/auto-login', asyncHandler(async (req, res) => {
@@ -64,8 +65,15 @@ router.post('/device/antenna', asyncHandler(async (req, res) => {
       }
     }
 
+    // Opción C / modo local: atar el SSH a la scan-IP del workspace para que la
+    // mangle de escaneo (que sigue viva durante la fase de auth) lo enrute al VRF
+    // del nodo. Sin esto el SSH sale sin routing-mark → host inalcanzable → se
+    // confunde con "credenciales incorrectas". Admin/sin-scan-IP → localAddress null.
+    const ws = req.account && !req.account.platform_admin ? req.account.workspace_id : null;
+    const localAddress = ws ? await scanIpRepo.resolveForWorkspace(ws).catch(() => null) : null;
+
     // Comando combinado: mca-status + system.cfg + hostname + version + ifconfig
-    const output = await sshExec(targetIP, targetPort, targetUser, targetPass || '', ANTENNA_CMD, 20000, 8000);
+    const output = await sshExec(targetIP, targetPort, targetUser, targetPass || '', ANTENNA_CMD, 20000, 8000, localAddress);
     return sendOk(res, { stats: parseFullOutput(output) });
   } catch (error) {
     if (error instanceof AppError) throw error;   // 403/404 → middleware central

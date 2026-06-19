@@ -1,3 +1,5 @@
+export type ScanMode = 'local' | 'vps';
+
 export interface AppSettings {
   MT_IP?: string;
   MT_USER?: string;
@@ -5,6 +7,12 @@ export interface AppSettings {
   /** IP pública WAN del MikroTik core. Global del sistema: la define el
    *  Administrador aquí y se reutiliza (solo-lectura) al crear nodos WireGuard. */
   server_public_ip?: string;
+  /** Modo global de escaneo de red. 'vps' (default) usa el pool de scan-IPs por
+   *  workspace (multi-tenant). 'local' usa una sola IP (local_scan_ip) cuando el
+   *  backend corre en el mismo equipo del moderador. */
+  scan_mode?: ScanMode;
+  /** IP WG de gestión de ESTA máquina — origen del escaneo en modo 'local'. */
+  local_scan_ip?: string;
 }
 
 export interface SettingsState {

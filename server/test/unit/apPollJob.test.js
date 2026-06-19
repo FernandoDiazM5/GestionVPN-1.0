@@ -30,6 +30,8 @@ const sseMock = stubModule(__dirname, '../../lib/sse', { publish: vi.fn() });
 // Opción C: por defecto SIN scan-IP → camino legacy (evita MySQL real).
 const scanIpRepoMock = stubModule(__dirname, '../../db/repos/scanIpRepo', {
   getScanIpForWorkspace: vi.fn().mockResolvedValue(null),
+  // apPollJob resuelve la scan-IP según el modo global (local/vps) vía resolveForWorkspace.
+  resolveForWorkspace: vi.fn().mockResolvedValue(null),
 });
 const scanMangleMock = stubModule(__dirname, '../../lib/scanMangle', {
   setup: vi.fn().mockResolvedValue(undefined),
@@ -50,6 +52,7 @@ beforeEach(() => {
   db.run.mockResolvedValue(undefined);
   apSvc.pollAp.mockResolvedValue([{ mac: 'AA:BB:CC:DD:EE:FF', signal: -60, ccq: 90, lastip: '10.0.0.9' }]);
   scanIpRepoMock.getScanIpForWorkspace.mockResolvedValue(null); // default: legacy
+  scanIpRepoMock.resolveForWorkspace.mockResolvedValue(null);   // default: legacy
 });
 
 afterAll(() => { delete require.cache[JOB_PATH]; });
@@ -102,7 +105,7 @@ describe('apPollJob.runOnce', () => {
 
   it('Opción C: con scan-IP, monta mangle por VRF y ata el SSH (localAddress)', async () => {
     apWatch.touch('ws-1');
-    scanIpRepoMock.getScanIpForWorkspace.mockResolvedValue('10.11.252.205');
+    scanIpRepoMock.resolveForWorkspace.mockResolvedValue('10.11.252.205');
 
     await apPollJob.runOnce();
 

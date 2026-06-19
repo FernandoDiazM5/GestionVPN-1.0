@@ -3,6 +3,7 @@ import {
   SettingsForm,
   SettingsMessages,
   SettingsLoadingState,
+  ScanModeToggle,
 } from './components';
 import { useLoadSettings, useSaveSettings } from './hooks';
 
@@ -40,6 +41,15 @@ export default function SettingsModule() {
           )}
         </div>
       </div>
+
+      {/* Modo de escaneo Producción(VPS) ↔ Local — persiste al instante */}
+      {!loadState.isLoading && (
+        <ScanModeToggle
+          scanMode={loadState.settings.scan_mode ?? 'vps'}
+          localScanIp={loadState.settings.local_scan_ip ?? ''}
+          onChange={(patch) => loadState.setSettings({ ...loadState.settings, ...patch })}
+        />
+      )}
     </div>
   );
 }

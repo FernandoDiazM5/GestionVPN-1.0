@@ -135,7 +135,7 @@ async function runOnce() {
       if (!aps.length) continue;
 
       // Opción C activa si el workspace tiene scan-IP y el router está configurado.
-      const scanIp = await scanIpRepo.getScanIpForWorkspace(ws).catch(() => null);
+      const scanIp = await scanIpRepo.resolveForWorkspace(ws).catch(() => null);
       const mikrotik = scanIp ? await loadMikrotik() : null;
 
       if (scanIp && mikrotik) {
