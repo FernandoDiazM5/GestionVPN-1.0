@@ -244,35 +244,30 @@ router.post('/node/script', asyncHandler(async (req, res) => {
       }
     } catch (_) { /* derivar lo que se pueda — script lleva placeholders */ }
 
-    const peerOct = parseInt((ipTunnel || '10.10.251.2').split('.')[3] ?? '2');
-    const blockBase30 = peerOct - 2;
-    const tunnelNet30 = `10.10.251.${blockBase30}/30`;
-    const tunnelAddr = ipTunnel || `10.10.251.${wgNodeNum * 4 - 2}`;
+    // Modelo unificado: el CPE tiene UNA sola IP (= IP del nodo), que es a la vez
+    // el extremo del túnel WG. Sin /30 de transporte.
+    const nodeMgmt = mgmtNet.nodeMgmtIp(wgNodeNum, true);
+    if (!nodeMgmt) throw new AppError(`Número de nodo inválido (ND${wgNodeNum}); use ND ≥ 2`, 400, 'VALIDATION_ERROR');
 
     // Redes de gestión que el CPE debe alcanzar de vuelta (CLIENTES/ADMIN/VPS)
-    // + el /24 del scan-pool del VPS (si está configurado) + IP de gestión del nodo.
+    // + el /24 del scan-pool del VPS (si está configurado).
     const SCAN_RETURN_SUBNET = (process.env.SCAN_RETURN_SUBNET || '').trim();
     const mgmtNets = mgmtNet.returnRoutes().map(r => r.subnet);
     const returnNets = [...mgmtNets, ...(SCAN_RETURN_SUBNET ? [SCAN_RETURN_SUBNET] : [])];
-    const allowedCsv = [...returnNets, tunnelNet30].join(',');
-    const nodeMgmt = mgmtNet.nodeMgmtIp(wgNodeNum, true);
-    const mgmtIpLine = nodeMgmt
-      ? `/ip address add address=${nodeMgmt}/32 interface=WG-CORE-ISP comment="IP de gestion del nodo ND${wgNodeNum}"`
-      : '';
+    const allowedCsv = returnNets.join(',');
+    const tunnelIpLine = `/ip address add address=${nodeMgmt}/32 interface=WG-CORE-ISP comment="IP del nodo ND${wgNodeNum} (gestion + tunel)"`;
     const peerLine = `/interface wireguard peers add interface=WG-CORE-ISP public-key="${serverPublicKey}" endpoint-address=${serverPublicIP} endpoint-port=${wgPort} allowed-address=${allowedCsv} persistent-keepalive=25s comment="Conexion al Servidor Core"`;
     const routeLines = returnNets.map(n => `/ip route add dst-address=${n} distance=20 gateway=WG-CORE-ISP comment="Retorno hacia Administracion/Software"`);
 
     const script = [
       `/interface wireguard add name=WG-CORE-ISP mtu=1420 comment="Conexion al Servidor Core"`,
-      `/ip address add address=${tunnelAddr}/30 interface=WG-CORE-ISP network=10.10.251.${blockBase30} comment="IP WG Cliente ND${wgNodeNum}"`,
-      ...(mgmtIpLine ? [mgmtIpLine] : []),
+      tunnelIpLine,
       peerLine,
       ...routeLines,
     ].join('\n') + '\n';
     const cpeSteps = [
       { title: 'Crear interfaz WireGuard', cmd: `/interface wireguard add name=WG-CORE-ISP mtu=1420 comment="Conexion al Servidor Core"` },
-      { title: 'Asignar IP al túnel (/30)', cmd: `/ip address add address=${tunnelAddr}/30 interface=WG-CORE-ISP network=10.10.251.${blockBase30} comment="IP WG Cliente ND${wgNodeNum}"` },
-      ...(mgmtIpLine ? [{ title: 'IP de gestión del nodo', cmd: mgmtIpLine }] : []),
+      { title: 'Asignar IP única del nodo (/32)', cmd: tunnelIpLine },
       { title: 'Agregar peer (servidor Core)', cmd: peerLine },
       ...returnNets.map(n => ({ title: `Ruta de retorno (${n})`, cmd: `/ip route add dst-address=${n} distance=20 gateway=WG-CORE-ISP comment="Retorno hacia Administracion/Software"` })),
     ];
@@ -309,18 +304,13 @@ router.post('/node/wg/set-peer', requireOperator, asyncHandler(async (req, res) 
   try {
     api = await connectToMikrotik(ip, user, pass);
 
-    // Leer IPs de la interfaz WG para calcular peerIP
-    const allAddrs = (await safeWrite(api, ['/ip/address/print'])) || [];
-    const wgAddr = allAddrs.find(a => a.interface === pppUser && (a.address || '').startsWith('10.10.251.'));
-    if (!wgAddr) {
+    // IP única del nodo (transporte + gestión) derivada del número de nodo.
+    const wgNodeNum = parseInt((pppUser.match(/ND(\d+)/) || [])[1] || '0', 10);
+    const nodeMgmt = mgmtNet.nodeMgmtIp(wgNodeNum, true);
+    if (!nodeMgmt) {
       await api.close();
-      throw new AppError(`No se encontró IP WireGuard para ${pppUser}`, 404, 'NOT_FOUND');
+      throw new AppError(`No se pudo derivar la IP del nodo para ${pppUser} (ND ≥ 2)`, 400, 'VALIDATION_ERROR');
     }
-    // Server IP es .X en la dirección, peer IP es .X+1
-    // Ej: address=10.10.251.1/30 → serverOct=1 → peerOct=2
-    const serverOct = parseInt((wgAddr.address || '').split('/')[0].split('.')[3]);
-    const peerOct = serverOct + 1;
-    const peerIP = `10.10.251.${peerOct}`;
 
     // Obtener LAN subnets del nodo desde MySQL
     const db = await getDb();
@@ -329,7 +319,7 @@ router.post('/node/wg/set-peer', requireOperator, asyncHandler(async (req, res) 
     if (nodeRow) {
       if (nodeRow.segmento_lan) lanSubnets = [nodeRow.segmento_lan];
     }
-    const allowedAddress = [`${peerIP}/32`, ...lanSubnets].join(',');
+    const allowedAddress = [`${nodeMgmt}/32`, ...lanSubnets].join(',');
 
     // Eliminar peer existente si hay uno en esta interfaz
     const existingPeers = (await safeWrite(api, ['/interface/wireguard/peers/print']).catch(() => [])) || [];

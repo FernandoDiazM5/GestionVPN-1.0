@@ -109,8 +109,9 @@ router.post('/tunnel/repair', requireOperator, async (req, res) => {
           wgPubKey = nodeRowDB.wg_public_key || nodeRowDB.cpe_public_key || '';
         }
 
-        // Restaurar IP Address WG
-        if (ipTunnel) {
+        // Restaurar IP Address WG — SOLO modelo legacy (/30 en 10.10.251). En el
+        // modelo unificado la interfaz WG del Core NO lleva IP de transporte.
+        if (ipTunnel && /^10\.10\.251\./.test(ipTunnel)) {
           const existsIp = allIpAddrs.some(a => a.interface === ifaceName && a.address.startsWith(ipTunnel.split('/')[0]));
           if (existsIp) {
             steps.push({ step: 1.1, obj: 'WG IP', name: ipTunnel, status: 'ok', action: 'exists' });
@@ -126,6 +127,8 @@ router.post('/tunnel/repair', requireOperator, async (req, res) => {
             steps.push({ step: 1.1, obj: 'WG IP', name: ipTunnel, status: 'created', action: 'created' });
             repaired++;
           }
+        } else {
+          steps.push({ step: 1.1, obj: 'WG IP', name: 'sin IP de transporte (modelo unificado)', status: 'ok', action: 'n/a' });
         }
 
         // Restaurar Peer WG
@@ -136,14 +139,17 @@ router.post('/tunnel/repair', requireOperator, async (req, res) => {
           } else {
             const ndMatch = ifaceName.match(/ND(\d+)/i);
             const ndComment = ndMatch ? `ND${ndMatch[1]}` : '';
-            // Derivar IP del Peer usando el bloque WG
-            const ipMatch = (ipTunnel || '').match(/10\.10\.251\.(\d+)/);
-            let peerIp = '';
-            if (ipMatch) {
-              const blockBase = Math.floor(parseInt(ipMatch[1]) / 4) * 4;
-              peerIp = `10.10.251.${blockBase + 2}/32`;
+            // IP única del nodo (= ip_tunnel en el modelo unificado) + LAN(s).
+            // Compat: si es legacy /30 (10.10.251.x), deriva el .X+2 del bloque.
+            const legacyMatch = (ipTunnel || '').match(/10\.10\.251\.(\d+)/);
+            let nodeIp = '';
+            if (legacyMatch) {
+              const blockBase = Math.floor(parseInt(legacyMatch[1]) / 4) * 4;
+              nodeIp = `10.10.251.${blockBase + 2}/32`;
+            } else if (ipTunnel) {
+              nodeIp = `${ipTunnel.split('/')[0]}/32`;
             }
-            const allowedIps = peerIp ? `${peerIp},${(lanSubnets || []).join(',')}` : (lanSubnets || []).join(',');
+            const allowedIps = [nodeIp, ...(lanSubnets || [])].filter(Boolean).join(',');
             await writeIdempotent(api, [
               '/interface/wireguard/peers/add',
               `=interface=${ifaceName}`,
@@ -298,8 +304,14 @@ router.post('/tunnel/repair', requireOperator, async (req, res) => {
       }
     }
 
-    // ── Paso 6: vpn-activa (pool de gestión completo: CLIENTES/ADMIN/VPS) ────
-    const ADMIN_POOLS_REPAIR = [mgmtNet.clients.net, mgmtNet.admin.net, mgmtNet.vps.net];
+    // ── Paso 6: vpn-activa (pool de gestión: CLIENTES/ADMIN/VPS + scan-pool) ──
+    // El scan-pool DEBE ir aquí: sin él, el escaneo (src=scan-IP) no pasa el
+    // filtro forward "Permitir acceso a red remota" (src-address-list=vpn-activa).
+    const scanNet = (process.env.SCAN_RETURN_SUBNET || '').trim();
+    const ADMIN_POOLS_REPAIR = [
+      mgmtNet.clients.net, mgmtNet.admin.net, mgmtNet.vps.net,
+      ...(scanNet ? [scanNet] : []),
+    ];
     for (const pool of ADMIN_POOLS_REPAIR) {
       try {
         const existsInVpnActiva = allAddrs.some(a =>

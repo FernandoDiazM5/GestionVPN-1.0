@@ -13,7 +13,7 @@ const log = require('../../lib/logger').child({ scope: 'nodes:provision' });
 const {
   connectToMikrotik, safeWrite, getErrorMessage, writeIdempotent,
 } = require('../../routeros.service');
-const { IPV4_REGEX, CIDR_REGEX } = require('../../ubiquiti.service');
+const { CIDR_REGEX } = require('../../ubiquiti.service');
 const { getDb, encryptPass, saveNode, deleteNode } = require('../../db.service');
 const { nodeBelongsToRequester, requireOperator } = require('./_shared');
 const { sendOk, AppError, asyncHandler } = require('../../lib/apiResponse');
@@ -56,31 +56,26 @@ async function addMgmtReturnRoutes(api, vrfName, ndComment) {
 // (commit) para que ambos usen exactamente la misma lógica: así, si el preview
 // quedó obsoleto (modal abierto mucho rato u otra alta en paralelo), el commit
 // recalcula y no colisiona en el número de nodo / IP remota (H3 — TOCTOU).
-// Devuelve también los conjuntos `usedNd`/`usedRemote` para que el commit pueda
-// respetar el valor del cliente si aún está libre (preview fiel) o reasignar.
+// Devuelve también el conjunto `usedNd` para que el commit pueda respetar el ND
+// del cliente si aún está libre (preview fiel) o reasignar el siguiente.
 async function computeNextAllocation(api) {
   // SECUENCIAL — RouterOS no soporta comandos paralelos en la misma conexión
-  const vrfs    = await safeWrite(api, ['/ip/vrf/print']);
-  const secrets = await safeWrite(api, ['/ppp/secret/print']);
+  const vrfs = await safeWrite(api, ['/ip/vrf/print']);
 
-  // Números de nodo en uso (VRF-ND1-..., VRF-ND2-...)
+  // Números de nodo en uso (VRF-ND2-..., VRF-ND3-...)
   const usedNd = new Set(
     vrfs
       .map(v => { const m = (v.name || '').match(/ND(\d+)/i); return m ? parseInt(m[1]) : 0; })
       .filter(n => n > 0)
   );
-  const maxNd = usedNd.size > 0 ? Math.max(...usedNd) : 0;
-  const nextNode = maxNd + 1;
+  const maxNd = usedNd.size > 0 ? Math.max(...usedNd) : 1;  // ND1 reservado (.1 del Core)
+  const nextNode = Math.max(maxNd + 1, 2);                  // los nodos arrancan en ND2
 
-  // IPs remotas usadas (10.10.250.x)
-  const usedRemote = new Set(
-    secrets.map(s => s['remote-address'] || '').filter(a => a.startsWith('10.10.250.'))
-  );
-  const usedOcts = [...usedRemote].map(a => parseInt(a.split('.')[3])).filter(n => !isNaN(n));
-  const maxRemote = usedOcts.length > 0 ? Math.max(...usedOcts) : 200;
-  const nextRemote = `10.10.250.${maxRemote + 1}`;
+  // En el modelo unificado la IP del nodo (= remote-address SSTP) se deriva del
+  // número de nodo, no de un pool de transporte. `nextRemote` es solo preview.
+  const nextRemote = mgmtNet.nodeMgmtIp(nextNode, false);
 
-  return { nextNode, nextRemote, usedNd, usedRemote };
+  return { nextNode, nextRemote, usedNd };
 }
 
 // H4 — Rollback best-effort de una provisión que falló a mitad de camino.
@@ -202,39 +197,27 @@ router.post('/node/provision', requireOperator, asyncHandler(async (req, res) =>
     // (otra alta lo tomó, o el modal quedó obsoleto), se reasigna el siguiente.
     const alloc = await computeNextAllocation(api);
     const clientNd = parseInt(nodeNumber, 10);
-    ndNum = (Number.isInteger(clientNd) && clientNd > 0 && !alloc.usedNd.has(clientNd))
+    // ND1 reservado para el endpoint del Core (.1) → los nodos arrancan en ND2.
+    ndNum = (Number.isInteger(clientNd) && clientNd >= 2 && !alloc.usedNd.has(clientNd))
       ? clientNd : alloc.nextNode;
-    effectiveRemote = (!isWG && IPV4_REGEX.test(remoteAddress || '') && !alloc.usedRemote.has(remoteAddress))
-      ? remoteAddress : alloc.nextRemote;
     // WG usa nombre sin prefijo VPN-; SSTP mantiene prefijo VPN-SSTP-
     ifaceName = isWG ? `WG-ND${ndNum}-${nameUpper}` : `VPN-SSTP-ND${ndNum}-${nameUpper}`;
     vrfName = `VRF-ND${ndNum}-${nameUpper}`;
     ndComment = `ND${ndNum}`;
-    // Puerto: 13300 + número de nodo (ej. ND1=13301, ND7=13307)
+    // Puerto: 13300 + número de nodo (ej. ND2=13302, ND7=13307)
     wgPort = wgListenPort ? parseInt(wgListenPort, 10) : (13300 + ndNum);
-    // IP de gestión por nodo (ND-N → 10.11.250.N WG / 10.11.251.N SSTP).
-    // Se materializa en el CPE; el Core la rutea al VRF y la marca en el mangle.
+    // IP ÚNICA del nodo (transporte + gestión): WG 10.11.250.<ND> / SSTP 10.11.251.<ND>.
+    // Vive en el CPE; el Core la rutea al VRF y la marca en el mangle.
     const nodeMgmt = mgmtNet.nodeMgmtIp(ndNum, isWG);
+    if (!nodeMgmt) throw new AppError(`Número de nodo inválido (ND${ndNum}); use ND ≥ 2 (ND1 reservado)`, 400, 'VALIDATION_ERROR');
+    // SSTP: el remote-address ES la IP del nodo (determinístico, sin pool de transporte).
+    effectiveRemote = isWG ? null : nodeMgmt;
 
     if (isWG) {
-      // Calcular siguiente bloque /30 disponible en 10.10.251.0/24
-      // Cada nodo WG ocupa un /30: bloque 0=.0/30(.1/.2), bloque 1=.4/30(.5/.6), etc.
-      const allAddrs = await safeWrite(api, ['/ip/address/print']) || [];
-      let highestBase = -4;
-      for (const a of allAddrs) {
-        if ((a.interface || '').match(/^WG-ND\d+/)) {
-          const m = (a.address || '').match(/10\.10\.251\.(\d+)/);
-          if (m) {
-            const oct = parseInt(m[1]);
-            const base = Math.floor(oct / 4) * 4;
-            if (base > highestBase) highestBase = base;
-          }
-        }
-      }
-      const blockBase = highestBase + 4;
-      const serverIPAddr = `10.10.251.${blockBase + 1}/30`;
-      const blockNetwork = `10.10.251.${blockBase}`;
-      wgPeerIP = `10.10.251.${blockBase + 2}`;
+      // Modelo unificado: el nodo tiene UNA sola IP (transporte + gestión) =
+      // 10.11.250.<ND>. La interfaz WG del Core NO lleva IP de transporte; el
+      // tráfico se enruta por gateway=iface@VRF + allowed-address del peer.
+      wgPeerIP = nodeMgmt;
 
       // Paso 1 — Interface WG (comment = nombre real del nodo para mostrarse en la UI)
       await writeIdempotent(api, ['/interface/wireguard/add',
@@ -245,17 +228,13 @@ router.post('/node/provision', requireOperator, asyncHandler(async (req, res) =>
       const wgInfo = await safeWrite(api, ['/interface/wireguard/print', `?name=${ifaceName}`]);
       if (wgInfo && wgInfo.length > 0) serverPublicKey = wgInfo[0]['public-key'];
 
-      // Paso 2 — IP /30 en la interface del servidor
-      await writeIdempotent(api, ['/ip/address/add',
-        `=address=${serverIPAddr}`, `=network=${blockNetwork}`,
-        `=interface=${ifaceName}`, `=comment=IP Core a ${ndComment}`]);
-      pushStep({ step: 2, obj: 'WG IP', name: `${serverIPAddr} (peer=${wgPeerIP})`, status: 'ok' });
+      // Paso 2 — (modelo unificado) sin IP de transporte en el Core
+      pushStep({ step: 2, obj: 'WG IP', name: `sin IP de transporte (modelo unificado, túnel=${wgPeerIP})`, status: 'ok' });
 
       // Paso 3 — Peer WG (CPE) — solo si se proporcionó la clave pública del CPE
       const subnetsList = allSubnets.join(',');
-      // allowed-address incluye: /32 del túnel + LAN(s) + IP de gestión del nodo.
-      const peerAllowed = [`${wgPeerIP}/32`, subnetsList, nodeMgmt ? `${nodeMgmt}/32` : '']
-        .filter(Boolean).join(',');
+      // allowed-address: la IP única del nodo (/32) + LAN(s) de la torre.
+      const peerAllowed = [`${nodeMgmt}/32`, subnetsList].filter(Boolean).join(',');
       if (cpePublicKey) {
         await writeIdempotent(api, ['/interface/wireguard/peers/add',
           `=interface=${ifaceName}`, `=public-key=${cpePublicKey}`,
@@ -327,9 +306,8 @@ router.post('/node/provision', requireOperator, asyncHandler(async (req, res) =>
         pushStep({ step: '7b″', obj: 'IP gestión del nodo', name: `${nodeMgmt}/32 → ${ifaceName}`, status: 'ok' });
       }
 
-      // Paso 7c — Address List LIST-NET-REMOTE-TOWERS (LANs + Red WG + IP gestión nodo)
-      const redWG = `${blockNetwork}/30`;
-      const towerEntries = [...allSubnets, redWG, ...(nodeMgmt ? [`${nodeMgmt}/32`] : [])];
+      // Paso 7c — Address List LIST-NET-REMOTE-TOWERS (LANs + IP única del nodo)
+      const towerEntries = [...allSubnets, `${nodeMgmt}/32`];
       for (const subnet of towerEntries) {
         await writeIdempotent(api, ['/ip/firewall/address-list/add',
           '=list=LIST-NET-REMOTE-TOWERS', `=address=${subnet}`, `=comment=Ruta ${nameUpper}`]);

@@ -12,14 +12,18 @@
 //    • CLIENTES (VPN-WG-CLIENTES, 10.13.250.0/24, :13233) → moderadores / members
 //    • ADMIN    (VPN-WG-ADMIN,    10.14.250.0/24, :13234) → dispositivos del admin
 //
-//    ── IP de gestión POR NODO (no son peers de gestión; viven en el CPE) ──
+//    ── IP ÚNICA POR NODO = transporte + gestión unificados (vive en el CPE) ──
 //    • Nodo WireGuard → 10.11.250.<ndNum>   (ej. ND7 → 10.11.250.7)
-//    • Nodo SSTP      → 10.11.251.<ndNum>
+//    • Nodo SSTP      → 10.11.251.<ndNum>   (= remote-address del PPP)
+//    La `.1` de cada /24 está RESERVADA para el endpoint del Core (SSTP
+//    local-address), así que los nodos arrancan en ND2 (ND1 no se usa).
 //
 //    ── Scan-pool del VPS (Opción C) → 10.11.252.0/24 (ver scanIpRepo) ──
 //
-//  El transporte de los túneles (10.10.250/251) NO pertenece a este
-//  módulo y NO se migra.
+//  Las viejas redes de transporte separado (10.10.250 SSTP / 10.10.251 WG /30)
+//  quedaron OBSOLETAS: cada nodo tiene ahora una sola IP que es a la vez
+//  extremo del túnel e IP de gestión. WG no necesita /30 (enruta por
+//  allowed-address); SSTP usa esa IP como remote-address.
 //
 //  El mangle de acceso sigue siendo POR-IP de usuario (src=<mgmt_ip>),
 //  así que cambiar de segmento solo cambia la IP, no el modelo.
@@ -70,12 +74,19 @@ const nodes = {
   wgNet:    env('MGMT_NODE_WG_NET',    '10.11.250.0/24'),
   sstpBase: env('MGMT_NODE_SSTP_BASE', '10.11.251.'),
   sstpNet:  env('MGMT_NODE_SSTP_NET',  '10.11.251.0/24'),
+  // Endpoint del Core para SSTP (PPP local-address). La `.1` está reservada.
+  sstpLocal: env('MGMT_NODE_SSTP_LOCAL', '10.11.251.1'),
 };
 
-/** IP de gestión de un nodo a partir de su número (ND-N) y protocolo. */
+/**
+ * IP ÚNICA de un nodo (transporte + gestión) a partir de su número (ND-N) y
+ * protocolo: WG → 10.11.250.<ND> · SSTP → 10.11.251.<ND>.
+ * La `.1` está reservada para el endpoint del Core → nodos desde ND2.
+ * ND < 2 (o fuera de rango) devuelve null.
+ */
 function nodeMgmtIp(ndNum, isWG) {
   const n = parseInt(ndNum, 10);
-  if (!Number.isInteger(n) || n < 1 || n > 254) return null;
+  if (!Number.isInteger(n) || n < 2 || n > 254) return null;
   return `${isWG ? nodes.wgBase : nodes.sstpBase}${n}`;
 }
 

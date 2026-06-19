@@ -126,8 +126,12 @@ router.post('/node/edit', requireOperator, asyncHandler(async (req, res) => {
         // segmento_lan stores the primary subnet; for multi-subnet, read routes from MikroTik
         currentSubnets = nodeRow.segmento_lan ? [nodeRow.segmento_lan] : [];
         if (nodeRow.ip_tunnel) {
-          const match = nodeRow.ip_tunnel.match(/10\.10\.251\.(\d+)/);
-          if (match) wgPeerIp = `10.10.251.${Math.floor(parseInt(match[1]) / 4) * 4 + 2}/32`;
+          // Modelo unificado: ip_tunnel = IP única del nodo → /32 directo.
+          // Compat: legacy /30 en 10.10.251.x → deriva el .X+2 del bloque.
+          const legacyMatch = nodeRow.ip_tunnel.match(/10\.10\.251\.(\d+)/);
+          wgPeerIp = legacyMatch
+            ? `10.10.251.${Math.floor(parseInt(legacyMatch[1]) / 4) * 4 + 2}/32`
+            : `${nodeRow.ip_tunnel.split('/')[0]}/32`;
         }
         wgPubKey = nodeRow.wg_public_key || '';
       }

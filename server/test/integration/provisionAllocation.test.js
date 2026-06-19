@@ -112,15 +112,15 @@ describe('H3 — el ND se recalcula si el valor del cliente colisiona', () => {
     expect(r.body.vrfName).toBe('VRF-ND4-TEST');
   });
 
-  it('IP remota del cliente ya usada → reasigna la siguiente libre', async () => {
-    secretPrint = [{ name: 'x', 'remote-address': '10.10.250.205' }];
+  it('SSTP remote-address = IP única determinística del nodo (= gestión)', async () => {
+    // Modelo unificado: el remote-address se deriva del nº de nodo, no de un
+    // pool. Sin VRF previos → primer nodo es ND2 (ND1 reservado) → 10.11.251.2.
     const r = await request(app).post('/api/node/provision')
-      .send({ ...baseSstp, nodeNumber: 1, remoteAddress: '10.10.250.205' });
+      .send({ ...baseSstp, nodeNumber: 2 });
     expect(r.status).toBe(200);
-    // 205 ocupada → nextRemote = max(205)+1 = 206
-    expect(r.body.remoteAddress).toBe('10.10.250.206');
+    expect(r.body.remoteAddress).toBe('10.11.251.2');
     expect(callFor('/ppp/secret/add')).toEqual(
-      expect.arrayContaining(['=remote-address=10.10.250.206'])
+      expect.arrayContaining(['=remote-address=10.11.251.2'])
     );
   });
 });
