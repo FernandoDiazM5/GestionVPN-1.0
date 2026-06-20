@@ -23,8 +23,10 @@ const path = require('path');
 const { CIDR_REGEX, getSubnetHosts } = require('../../ubiquiti.service');
 const { getDb } = require('../../db.service');
 const scanIpRepo = require('../../db/repos/scanIpRepo');
+const sessionRepo = require('../../db/repos/sessionRepo');
 const scanMangle = require('../../lib/scanMangle');
 const scanLock = require('../../lib/scanLock');
+const { resolveScanTargetVrf } = require('../../lib/scanTarget');
 const log = require('../../lib/logger').child({ scope: 'scan' });
 
 // El SSE se mantiene ABIERTO tras 'complete' mientras el cliente corre la fase de
@@ -39,34 +41,26 @@ router.post('/node/scan-stream', async (req, res) => {
     return res.status(400).json({ success: false, message: 'CIDR inválido o muy grande' });
   }
 
-  // Aislamiento + resolución del VRF dueño de la subred. Un moderador solo
-  // puede escanear subredes de SUS nodos. El platform_admin no tiene workspace
-  // ni scan-IP → escaneo legacy.
+  // Aislamiento + resolución del VRF a escanear. Un moderador solo puede escanear
+  // subredes de SUS nodos. Con LANs solapadas entre nodos, se PREFIERE el VRF del
+  // túnel activo del usuario (no el "primer nodo con la subred") → el escaneo
+  // apunta al túnel que el moderador realmente tiene abierto. Admin → escaneo legacy.
   const acc = req.account;
   let targetVrf = null;
   if (acc && !acc.platform_admin) {
+    let resolved;
     try {
       const db = await getDb();
-      const rows = await db.all('SELECT nombre_vrf, segmento_lan, lan_subnets FROM nodes WHERE workspace_id = ?', [acc.workspace_id]);
-      let owns = false;
-      for (const r of rows) {
-        const subs = new Set();
-        if (r.segmento_lan) subs.add(String(r.segmento_lan).trim());
-        try { (JSON.parse(r.lan_subnets || '[]') || []).forEach(s => subs.add(String(s).trim())); } catch (_) { /* noop */ }
-        if (subs.has(String(nodeLan).trim())) {
-          owns = true;
-          // Primer match: si la misma LAN está en varios nodos del workspace,
-          // la scan-IP única solo puede apuntar a un VRF (limitación documentada).
-          if (!targetVrf) targetVrf = r.nombre_vrf || null;
-          break;
-        }
-      }
-      if (!owns) {
-        return res.status(403).json({ success: false, message: 'La subred no pertenece a ninguno de tus túneles' });
-      }
+      resolved = await resolveScanTargetVrf({
+        db, sessionRepo, workspaceId: acc.workspace_id, userId: acc.sub, nodeLan,
+      });
     } catch (_) {
       return res.status(403).json({ success: false, message: 'No autorizado' });
     }
+    if (!resolved.owns) {
+      return res.status(403).json({ success: false, message: 'La subred no pertenece a ninguno de tus túneles' });
+    }
+    targetVrf = resolved.vrf;
   }
 
   // ── Opción C: montar la mangle de escaneo si el workspace tiene scan-IP ──
