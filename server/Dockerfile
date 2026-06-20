@@ -15,8 +15,13 @@ COPY *.js ./
 COPY *.sql ./
 COPY routes/ ./routes/
 
-# Directorio de datos persistente (montado como volumen en docker-compose)
-RUN mkdir -p /data /app/uploads
+# Directorio de datos persistente (montado como volumen en docker-compose) +
+# usuario no-root (B1). node:22-alpine trae el usuario `node` (uid 1000); el
+# backend escucha en :3001 (>1024) → no requiere privilegios. Espeja el patrón
+# ya probado en Dockerfile.prod.
+RUN mkdir -p /data /app/uploads \
+ && chown -R node:node /data /app
+USER node
 
 EXPOSE 3001
 
