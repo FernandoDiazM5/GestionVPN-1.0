@@ -117,4 +117,14 @@ async function resolveForWorkspace(workspaceId) {
   return getScanIpForWorkspace(workspaceId);
 }
 
-module.exports = { getScanIpForWorkspace, getByWorkspace, upsert, allocate, list, resolveForWorkspace, getSetting, POOL_BASE, POOL_START, POOL_END };
+/**
+ * /24 del pool de scan-IPs (10.11.252. → 10.11.252.0/24). ÚNICA fuente de verdad
+ * para la ruta de retorno del scan en cada VRF y para vpn-activa, de modo que la
+ * provisión y el "reparar" la deriven solos (sin depender de un env que pueda
+ * driftear). El env SCAN_RETURN_SUBNET queda como override opcional.
+ */
+function poolSubnet() {
+  return POOL_BASE ? `${POOL_BASE}0/24` : '';
+}
+
+module.exports = { getScanIpForWorkspace, getByWorkspace, upsert, allocate, list, resolveForWorkspace, getSetting, poolSubnet, POOL_BASE, POOL_START, POOL_END };

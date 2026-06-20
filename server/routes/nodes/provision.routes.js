@@ -22,22 +22,32 @@ const { requireMikrotik } = require('../../lib/routeGuards');
 const mgmtNet = require('../../lib/mgmtNet');
 const sse = require('../../lib/sse');
 const { entriesToAdd } = require('../../lib/addressList');
+const scanIpRepo = require('../../db/repos/scanIpRepo');
 
-// Opción C: el /24 de scan-IP del VPS (por defecto 10.11.252.0/24). Cada VRF
-// necesita una ruta de retorno hacia ese /24, vía la interfaz del VPS (el
-// origen del escaneo). Vacío = no se añade (escaneo legacy en dev local).
-//   server/.env.production:  SCAN_RETURN_SUBNET=10.11.252.0/24
-const SCAN_RETURN_SUBNET = (process.env.SCAN_RETURN_SUBNET || '').trim();
+// Opción C: el /24 del pool de scan-IP del VPS (por defecto 10.11.252.0/24). Cada
+// VRF necesita una ruta de retorno hacia ese /24 vía la interfaz del VPS (el
+// origen del escaneo). Se DERIVA del pool (única fuente) para que se cree SOLA al
+// provisionar sin depender de un env que pueda estar sin setear; el env queda
+// como override opcional.
+const SCAN_RETURN_SUBNET = (process.env.SCAN_RETURN_SUBNET || scanIpRepo.poolSubnet() || '').trim();
 
-/** Añade la ruta de retorno del /24 de scan-IP a un VRF (idempotente). No-op si no está configurado. */
+/** Añade la ruta de retorno del /24 de scan-IP a un VRF (idempotente, best-effort). */
 async function addScanReturnRoute(api, vrfName, ndComment) {
   if (!SCAN_RETURN_SUBNET) return;
-  await writeIdempotent(api, ['/ip/route/add',
-    `=dst-address=${SCAN_RETURN_SUBNET}`,
-    `=gateway=${mgmtNet.vps.iface}`,
-    `=routing-table=${vrfName}`,
-    '=scope=30', '=target-scope=10',
-    `=comment=Route-${ndComment}-SCAN`]);
+  // Best-effort: si la interfaz VPN-WG-VPS no existe en este router, NO debe
+  // tumbar la provisión del túnel (la ruta de scan no es crítica para el túnel;
+  // se rellena luego con "Verificar y reparar").
+  try {
+    await writeIdempotent(api, ['/ip/route/add',
+      `=dst-address=${SCAN_RETURN_SUBNET}`,
+      `=gateway=${mgmtNet.vps.iface}`,
+      `=routing-table=${vrfName}`,
+      '=scope=30', '=target-scope=10',
+      `=comment=Route-${ndComment}-SCAN`]);
+  } catch (e) {
+    log.warn({ vrf: vrfName, err: e.message }, 'addScanReturnRoute best-effort falló');
+    return;
+  }
 }
 
 /** Añade las rutas de retorno del plano de gestión (CLIENTES/ADMIN/VPS) a un VRF. */

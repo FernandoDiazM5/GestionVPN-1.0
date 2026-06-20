@@ -19,6 +19,7 @@ const provisioner = require('../../lib/tunnelProvisioner');
 const sessionRepo = require('../../db/repos/sessionRepo');
 const { requireOperator } = require('../nodes/_shared');
 const mgmtNet = require('../../lib/mgmtNet');
+const scanIpRepo = require('../../db/repos/scanIpRepo');
 
 router.post('/tunnel/repair', requireOperator, async (req, res) => {
   if (!req.mikrotik) return res.status(503).json({ success: false, needsConfig: true, message: 'Configura las credenciales MikroTik en Ajustes antes de continuar.' });
@@ -38,6 +39,9 @@ router.post('/tunnel/repair', requireOperator, async (req, res) => {
   // del body solo se respeta como override puntual de la primera (compat).
   const mgmtReturnRoutes = mgmtNet.returnRoutes();
   if (adminWgNet) mgmtReturnRoutes[0] = { subnet: adminWgNet, gateway: mgmtNet.clients.iface, tag: 'MGMT-CLIENTES' };
+  // /24 del pool de scan (Opción C): DERIVADO del pool (no de un env que pueda
+  // estar sin setear) → el "reparar" crea la ruta de retorno del scan sola.
+  const scanNet = (process.env.SCAN_RETURN_SUBNET || scanIpRepo.poolSubnet() || '').trim();
   const steps      = [];
   let   repaired   = 0;
 
@@ -281,6 +285,33 @@ router.post('/tunnel/repair', requireOperator, async (req, res) => {
       }
     }
 
+    // Ruta de retorno del pool de scan (Opción C): dst=<scan-pool> → VPN-WG-VPS.
+    // Sin ella, la respuesta de las antenas al escanear desde el VPS no vuelve al
+    // VRF. Antes solo la creaba la provisión (y gated por env) → el reparar no la
+    // rellenaba. Ahora "Verificar y reparar" la crea sola (idempotente).
+    if (scanNet) {
+      try {
+        const existsScanRoute = allRoutes.some(r =>
+          r['dst-address'] === scanNet && r['routing-table'] === vrfName && r.dynamic !== 'true'
+        );
+        if (existsScanRoute) {
+          steps.push({ step: 4, obj: 'VRF Route SCAN', name: scanNet, status: 'ok', action: 'exists' });
+        } else {
+          await writeIdempotent(api, [
+            '/ip/route/add',
+            `=dst-address=${scanNet}`,
+            `=gateway=${mgmtNet.vps.iface}`,
+            `=routing-table=${vrfName}`,
+            '=distance=2',
+          ]);
+          steps.push({ step: 4, obj: 'VRF Route SCAN', name: scanNet, status: 'created', action: 'created' });
+          repaired++;
+        }
+      } catch (e) {
+        steps.push({ step: 4, obj: 'VRF Route SCAN', name: scanNet, status: 'error', action: e.message });
+      }
+    }
+
     // ── Paso 5: LIST-NET-REMOTE-TOWERS (subredes LAN) ───────────────────────
     for (const subnet of lanSubnets) {
       try {
@@ -307,7 +338,7 @@ router.post('/tunnel/repair', requireOperator, async (req, res) => {
     // ── Paso 6: vpn-activa (pool de gestión: CLIENTES/ADMIN/VPS + scan-pool) ──
     // El scan-pool DEBE ir aquí: sin él, el escaneo (src=scan-IP) no pasa el
     // filtro forward "Permitir acceso a red remota" (src-address-list=vpn-activa).
-    const scanNet = (process.env.SCAN_RETURN_SUBNET || '').trim();
+    // `scanNet` se deriva del pool arriba (única fuente).
     const ADMIN_POOLS_REPAIR = [
       mgmtNet.clients.net, mgmtNet.admin.net, mgmtNet.vps.net,
       ...(scanNet ? [scanNet] : []),
