@@ -12,6 +12,7 @@
 const { getDb } = require('../../db.service');
 const assignmentRepo = require('../../db/repos/assignmentRepo');
 const sessionRepo = require('../../db/repos/sessionRepo');
+const { isModerator } = require('../../lib/routeGuards');
 
 /**
  * Anota cada nodo con el estado de sesión POR USUARIO, SIN tocar `running`.
@@ -103,12 +104,14 @@ async function nodeBelongsToRequester(req, pppUser) {
   }
 }
 
-/** Middleware: solo admin u operator pueden acceder a endpoints de credenciales. */
+/**
+ * Middleware: solo moderadores (OWNER/CO_MODERATOR) o platform_admin mutan nodos.
+ * M2: deriva de req.account (RBAC). Antes miraba req.user.role (admin/operator),
+ * mapeado por mapRbacRole, que conflaba OWNER/CO_MOD→'admin' (riesgo tipo A2).
+ */
 function requireOperator(req, res, next) {
-  if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'operator')) {
-    return res.status(403).json({ success: false, message: 'Acceso denegado: se requiere rol de operador o admin' });
-  }
-  next();
+  if (isModerator(req)) return next();
+  return res.status(403).json({ success: false, message: 'Acceso denegado: se requiere rol de operador o admin' });
 }
 
 module.exports = {

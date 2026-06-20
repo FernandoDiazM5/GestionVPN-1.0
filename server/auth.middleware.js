@@ -23,10 +23,10 @@ async function injectMikrotik(req) {
         : null;
 }
 
-// Mapea el rol RBAC (cookie) al rol legacy esperado por las rutas existentes
-function mapRbacRole(role) {
-    return role === 'MEMBER' ? 'viewer' : 'admin'; // OWNER / CO_MODERATOR → admin
-}
+// M2: las guardas de autorización derivan de req.account (RBAC). Ya no se mapea el
+// rol RBAC a un rol legacy (`mapRbacRole` eliminado): conflaba OWNER/CO_MOD→'admin'
+// y era el origen del gap A2. `req.user` solo se conserva para tokens LEGACY puros
+// (sin RBAC), que el bridge legacy→RBAC necesita por username.
 
 const verifyToken = async (req, res, next) => {
     // ── 1) Sesión RBAC por cookie (sistema unificado) ──
@@ -35,8 +35,7 @@ const verifyToken = async (req, res, next) => {
         try {
             const s = jwt.verify(cookieTok, JWT_SECRET);
             if (s && s.sub && s.workspace_id) {
-                req.account = s; // { sub, email, workspace_id, role }
-                req.user = { id: s.sub, username: (s.email || '').split('@')[0], role: mapRbacRole(s.role) };
+                req.account = s; // { sub, email, workspace_id, role, platform_admin }
                 await injectMikrotik(req);
                 return next();
             }
@@ -55,9 +54,8 @@ const verifyToken = async (req, res, next) => {
         if (decoded && decoded.sub && decoded.workspace_id) {
             // Token RBAC usado como Bearer (moderador/miembro)
             req.account = decoded;
-            req.user = { id: decoded.sub, username: (decoded.email || '').split('@')[0], role: mapRbacRole(decoded.role) };
         } else {
-            req.user = decoded; // token legacy { id, username, role }
+            req.user = decoded; // token LEGACY puro { id, username, role } → bridge legacy→RBAC
         }
         await injectMikrotik(req);
         next();

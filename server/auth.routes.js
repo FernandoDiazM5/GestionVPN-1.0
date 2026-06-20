@@ -132,9 +132,14 @@ router.post('/login', async (req, res) => {
     }
 });
 
-// Obtener datos del JWT activo
+// Obtener datos del JWT activo. M2: deriva de req.account (RBAC); solo cae a
+// req.user para tokens legacy puros (sin sesión RBAC). No lo usa el frontend.
 router.get('/me', require('./auth.middleware').verifyToken, (req, res) => {
-    return sendOk(res, { user: req.user.username, role: req.user.role });
+    const acc = req.account;
+    if (acc) {
+        return sendOk(res, { user: (acc.email || '').split('@')[0], role: acc.platform_admin ? 'admin' : acc.role });
+    }
+    return sendOk(res, { user: req.user?.username, role: req.user?.role });
 });
 
 // Refresh token — emite un nuevo JWT si el actual es válido

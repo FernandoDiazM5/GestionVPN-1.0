@@ -54,8 +54,8 @@ const request = require('supertest');
 const nodeRoutes = require('../../routes/nodes');
 const tunnelRepairRoutes = require('../../routes/core/tunnel-repair.routes');
 
-// Identidades de prueba — el guard requireOperator mira req.user.role.
-// El scoping de /node/tags mira req.account.platform_admin / workspace_id.
+// Identidades de prueba — M2: requireOperator y el scoping miran req.account
+// (RBAC: platform_admin / role / workspace_id). req.user queda como compat legacy.
 const IDENTITIES = {
   viewer: {
     user: { id: 'u-m', username: 'member', role: 'viewer' },

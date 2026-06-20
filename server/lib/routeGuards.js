@@ -27,4 +27,26 @@ function requireMikrotik(req) {
   return req.mikrotik;
 }
 
-module.exports = { requireMikrotik };
+// ── Predicados de rol RBAC (fuente de verdad: req.account) ───────────────────
+//  M2: las decisiones de autorización derivan de req.account (RBAC real:
+//  platform_admin + role OWNER/CO_MODERATOR/MEMBER), NUNCA del rol legacy
+//  req.user.role (que mapRbacRole conflaba OWNER/CO_MOD→'admin' — origen de A2).
+
+/** ¿El solicitante es Administrador de plataforma? */
+function isPlatformAdmin(req) {
+  return !!req.account?.platform_admin;
+}
+
+/** ¿Es moderador (OWNER/CO_MODERATOR) o admin de plataforma? (NO un MEMBER). */
+function isModerator(req) {
+  const acc = req.account;
+  return !!acc && (acc.platform_admin || acc.role === 'OWNER' || acc.role === 'CO_MODERATOR');
+}
+
+/** Guard de mutación: moderador (OWNER/CO_MOD) o platform_admin. MEMBER/anónimo → 403. */
+function requireModerator(req, res, next) {
+  if (isModerator(req)) return next();
+  return res.status(403).json({ success: false, message: 'Acceso denegado: se requiere rol de moderador o administrador.' });
+}
+
+module.exports = { requireMikrotik, isPlatformAdmin, isModerator, requireModerator };
