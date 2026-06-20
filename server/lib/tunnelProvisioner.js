@@ -48,11 +48,25 @@ async function vrfExists(api, vrfName) {
   return vrfs.some(v => v.name === vrfName);
 }
 
+/** Lee la tabla mangle UNA vez (para combinar varias búsquedas sin N prints). Lanza si falla. */
+async function readMangles(api) {
+  return safeWrite(api, ['/ip/firewall/mangle/print'], 12000);
+}
+
+/** .id de la mangle del usuario dentro de una lista YA leída (filtro puro). */
+function filterUserMangleIds(all, userId) {
+  const comment = mangleComment(userId);
+  return (all || []).filter(m => m.comment === comment && m['.id']).map(m => m['.id']);
+}
+
+/** .id de las mangle GLOBALES legacy dentro de una lista YA leída (filtro puro). */
+function filterLegacyGlobalMangleIds(all) {
+  return (all || []).filter(m => LEGACY_GLOBAL_COMMENTS.includes(m.comment) && m['.id']).map(m => m['.id']);
+}
+
 /** .id de las mangle del usuario (por comment). Lanza si el print falla. */
 async function findUserMangleIds(api, userId) {
-  const comment = mangleComment(userId);
-  const all = await safeWrite(api, ['/ip/firewall/mangle/print'], 12000);
-  return all.filter(m => m.comment === comment && m['.id']).map(m => m['.id']);
+  return filterUserMangleIds(await readMangles(api), userId);
 }
 
 /** .id de las mangle de ESCANEO del workspace (por comment). Lanza si falla. */
@@ -72,10 +86,7 @@ const LEGACY_GLOBAL_COMMENTS = ['ACCESO-ADMIN', 'ACCESO-DINAMICO'];
  * Lanza si el print falla.
  */
 async function findLegacyGlobalMangleIds(api) {
-  const all = await safeWrite(api, ['/ip/firewall/mangle/print'], 12000);
-  return all
-    .filter(m => LEGACY_GLOBAL_COMMENTS.includes(m.comment) && m['.id'])
-    .map(m => m['.id']);
+  return filterLegacyGlobalMangleIds(await readMangles(api));
 }
 
 /** ¿Existe la mangle del usuario para ese VRF? (keepalive). Lanza si el print falla. */
@@ -158,5 +169,6 @@ module.exports = {
   userTag, mangleComment, scanMangleComment,
   vrfExists, findUserMangleIds, findLegacyGlobalMangleIds, hasUserMangle,
   findScanMangleIds,
+  readMangles, filterUserMangleIds, filterLegacyGlobalMangleIds,
   removeMangleIds, addUserMangle, addScanMangle,
 };

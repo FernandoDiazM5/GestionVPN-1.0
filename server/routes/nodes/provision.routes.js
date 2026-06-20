@@ -21,6 +21,7 @@ const { mikrotikAppError } = require('../../lib/mikrotikError');
 const { requireMikrotik } = require('../../lib/routeGuards');
 const mgmtNet = require('../../lib/mgmtNet');
 const sse = require('../../lib/sse');
+const { entriesToAdd } = require('../../lib/addressList');
 
 // Opción C: el /24 de scan-IP del VPS (por defecto 10.11.252.0/24). Cada VRF
 // necesita una ruta de retorno hacia ese /24, vía la interfaz del VPS (el
@@ -49,6 +50,22 @@ async function addMgmtReturnRoutes(api, vrfName, ndComment) {
       '=scope=30', '=target-scope=10',
       `=comment=Route-${ndComment}-${rt.tag}`]);
   }
+}
+
+/**
+ * Añade direcciones a LIST-NET-REMOTE-TOWERS SIN duplicar (lee la lista una vez).
+ * La lista es un test de pertenencia → con UNA entrada por dirección basta; varios
+ * nodos pueden compartir LAN (la entrada la "posee" quien la añadió primero, por
+ * comment). Devuelve las direcciones realmente añadidas.
+ */
+async function addTowerEntries(api, addresses, comment) {
+  const existing = await safeWrite(api, ['/ip/firewall/address-list/print']).catch(() => []);
+  const toAdd = entriesToAdd(existing, 'LIST-NET-REMOTE-TOWERS', addresses);
+  for (const addr of toAdd) {
+    await writeIdempotent(api, ['/ip/firewall/address-list/add',
+      '=list=LIST-NET-REMOTE-TOWERS', `=address=${addr}`, `=comment=${comment}`]);
+  }
+  return toAdd;
 }
 
 // Calcula la asignación AUTORITATIVA (siguiente ND + IP remota libre) desde el
@@ -85,7 +102,7 @@ async function computeNextAllocation(api) {
 //
 // Seguridad: el VRF y sus rutas SOLO se borran si `vrfCreatedByUs` (no en el
 // merge a un VRF de un nodo SSTP preexistente — ese VRF es ajeno/compartido).
-async function rollbackProvision(creds, { isWG, ifaceName, vrfName, pppUser, allSubnets, vrfCreatedByUs }) {
+async function rollbackProvision(creds, { isWG, ifaceName, vrfName, pppUser, allSubnets, vrfCreatedByUs, nameUpper }) {
   if (!ifaceName || !vrfName) return false;
   let api;
   try {
@@ -117,9 +134,13 @@ async function rollbackProvision(creds, { isWG, ifaceName, vrfName, pppUser, all
       }
     }
 
-    // Address-list: solo nuestras subredes
+    // Address-list: SOLO las entradas que ESTE nodo creó (por comment), NUNCA una
+    // LAN compartida que pertenece a otro nodo. Con el dedup, la entrada de una LAN
+    // compartida la posee quien la añadió primero → borrar por dirección rompería
+    // a ese otro nodo. Por eso se filtra por el comment del nodo en rollback.
+    const ourComments = new Set([`Ruta ${nameUpper}`, `LAN ${nameUpper}`]);
     for (const a of (await read('/ip/firewall/address-list/print'))
-      .filter(a => a.list === 'LIST-NET-REMOTE-TOWERS' && allSubnets.includes(a.address) && a['.id']))
+      .filter(a => a.list === 'LIST-NET-REMOTE-TOWERS' && ourComments.has(a.comment) && a['.id']))
       await rm('/ip/firewall/address-list/remove', a['.id']);
 
     // VRF + rutas: SOLO si lo creamos nosotros (nunca en merge a VRF ajeno)
@@ -306,13 +327,10 @@ router.post('/node/provision', requireOperator, asyncHandler(async (req, res) =>
         pushStep({ step: '7b″', obj: 'IP gestión del nodo', name: `${nodeMgmt}/32 → ${ifaceName}`, status: 'ok' });
       }
 
-      // Paso 7c — Address List LIST-NET-REMOTE-TOWERS (LANs + IP única del nodo)
+      // Paso 7c — Address List LIST-NET-REMOTE-TOWERS (LANs + IP única del nodo), sin duplicar
       const towerEntries = [...allSubnets, `${nodeMgmt}/32`];
-      for (const subnet of towerEntries) {
-        await writeIdempotent(api, ['/ip/firewall/address-list/add',
-          '=list=LIST-NET-REMOTE-TOWERS', `=address=${subnet}`, `=comment=Ruta ${nameUpper}`]);
-      }
-      pushStep({ step: '7c', obj: 'Address List (LIST-NET-REMOTE-TOWERS)', name: towerEntries.join(', '), status: 'ok' });
+      const wgAdded = await addTowerEntries(api, towerEntries, `Ruta ${nameUpper}`);
+      pushStep({ step: '7c', obj: 'Address List (LIST-NET-REMOTE-TOWERS)', name: `${wgAdded.length}/${towerEntries.length} nuevas (resto ya presente)`, status: 'ok' });
 
       await api.close();
 
@@ -357,13 +375,10 @@ router.post('/node/provision', requireOperator, asyncHandler(async (req, res) =>
       `=interface=${ifaceName}`, '=list=LIST-VPN-SSTP']);
     pushStep({ step: 3, obj: 'Interface Lists (LIST-VPN-TOWERS + LIST-VPN-SSTP)', name: ifaceName, status: 'ok' });
 
-    // Paso 4 — Address List LIST-NET-REMOTE-TOWERS (una entrada por subred)
+    // Paso 4 — Address List LIST-NET-REMOTE-TOWERS (una entrada por subred), sin duplicar
     const subnets = Array.isArray(lanSubnets) ? lanSubnets : [lanSubnet].filter(Boolean);
-    for (const subnet of subnets) {
-      await writeIdempotent(api, ['/ip/firewall/address-list/add',
-        '=list=LIST-NET-REMOTE-TOWERS', `=address=${subnet}`, `=comment=LAN ${nameUpper}`]);
-    }
-    pushStep({ step: 4, obj: 'Address List (LIST-NET-REMOTE-TOWERS)', name: subnets.join(', '), status: 'ok' });
+    const sstpAdded = await addTowerEntries(api, subnets, `LAN ${nameUpper}`);
+    pushStep({ step: 4, obj: 'Address List (LIST-NET-REMOTE-TOWERS)', name: `${sstpAdded.length}/${subnets.length} nuevas (resto ya presente)`, status: 'ok' });
 
     // Paso 5 — VRF (con la interfaz SSTP asignada). ND autoritativo-único ⇒ VRF nuevo.
     await writeIdempotent(api, ['/ip/vrf/add',
@@ -397,8 +412,7 @@ router.post('/node/provision', requireOperator, asyncHandler(async (req, res) =>
         `=routing-table=${vrfName}`,
         '=scope=30', '=target-scope=10',
         `=comment=Route-${ndComment}-MGMTIP`]);
-      await writeIdempotent(api, ['/ip/firewall/address-list/add',
-        '=list=LIST-NET-REMOTE-TOWERS', `=address=${nodeMgmt}/32`, `=comment=Ruta ${nameUpper}`]);
+      await addTowerEntries(api, [`${nodeMgmt}/32`], `Ruta ${nameUpper}`);
       pushStep({ step: '6b″', obj: 'IP gestión del nodo', name: `${nodeMgmt}/32 → ${ifaceName}`, status: 'ok' });
     }
 
@@ -460,7 +474,7 @@ router.post('/node/provision', requireOperator, asyncHandler(async (req, res) =>
     let rolledBack = false;
     if (ifaceName && vrfName) {
       rolledBack = await rollbackProvision({ ip, user, pass },
-        { isWG, ifaceName, vrfName, pppUser, allSubnets, vrfCreatedByUs });
+        { isWG, ifaceName, vrfName, pppUser, allSubnets, vrfCreatedByUs, nameUpper });
       log.warn({ ifaceName, vrfName, rolledBack, vrfCreatedByUs }, 'PROVISION falló — rollback ejecutado');
     }
 

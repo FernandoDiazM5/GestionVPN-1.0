@@ -63,8 +63,11 @@ async function activateTunnel({ account, targetVRF, mikrotik, clientIp = '-' }) 
       await sessionRepo.log({ workspaceId: account.workspace_id, userId: account.sub, tunnelId: targetVRF, action: 'ERROR', statusCode: 400, message: 'VRF inexistente', ipAddress: clientIp });
       return { ok: false, code: 400, message: `El VRF ${targetVRF} no existe en el router` };
     }
-    const oldIds = await provisioner.findUserMangleIds(apiRead, account.sub);
-    const legacyIds = await provisioner.findLegacyGlobalMangleIds(apiRead);
+    // M4 — una sola lectura de la tabla mangle para ambas búsquedas (antes 2 prints
+    // completos por cada activación). Reduce carga del router en cada activate.
+    const allMangles = await provisioner.readMangles(apiRead);
+    const oldIds = provisioner.filterUserMangleIds(allMangles, account.sub);
+    const legacyIds = provisioner.filterLegacyGlobalMangleIds(allMangles);
     await apiRead.close().catch(() => {});
 
     // Fase B — escritura
