@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS nodes (
     label            VARCHAR(255) NOT NULL DEFAULT '',
     server_ip        VARCHAR(64)  NOT NULL DEFAULT '',
     wg_public_key    VARCHAR(255) NOT NULL DEFAULT '',
+    wg_cpe_public    VARCHAR(255) NOT NULL DEFAULT '',   -- clave pública del CPE (peer en el Core)
+    wg_cpe_private_enc TEXT        DEFAULT NULL,          -- clave privada del CPE (AES-256-GCM) para reembeber en el script
     lan_subnets      VARCHAR(2000) NOT NULL DEFAULT '[]',
     protocol         VARCHAR(20)  NOT NULL DEFAULT 'sstp',
     node_number      INT          DEFAULT NULL,

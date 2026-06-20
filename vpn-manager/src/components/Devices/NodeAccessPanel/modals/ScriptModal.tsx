@@ -13,6 +13,7 @@ export default function ScriptModal({ node, onClose }: { node: NodeInfo; onClose
   const [showPass, setShowPass] = useState(false);
   const [script, setScript] = useState('');
   const [cpeSteps, setCpeSteps] = useState<{title: string, cmd: string}[]>([]);
+  const [keyMode, setKeyMode] = useState<'generated' | 'manual' | ''>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
@@ -73,6 +74,7 @@ export default function ScriptModal({ node, onClose }: { node: NodeInfo; onClose
       if (!d.success) throw new Error(d.message || 'Error al generar');
       setScript(d.script);
       setCpeSteps(d.cpeSteps || []);
+      setKeyMode(d.keyMode || '');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error desconocido');
     }
@@ -163,6 +165,13 @@ export default function ScriptModal({ node, onClose }: { node: NodeInfo; onClose
 
           {cpeSteps.length > 0 ? (
             <div className="space-y-3">
+              {isWG && keyMode === 'generated' && (
+                <div className="p-2.5 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 rounded-lg">
+                  <p className="text-2xs font-semibold text-amber-700">
+                    ⚠ Este script incluye la llave privada del nodo. Trátalo como una credencial: pégalo en el router torre y no lo compartas.
+                  </p>
+                </div>
+              )}
               <div className="flex items-center justify-between">
                 <p className="text-2xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Pasos a configurar en el router torre (CPE)</p>
                 <button onClick={handleCopy}

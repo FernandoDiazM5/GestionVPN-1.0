@@ -37,6 +37,7 @@ const redactPaths = [
   'privateKey', 'private_key',
   // — Credenciales cifradas en BD (no son legibles pero por defensa en profundidad) —
   'ppp_password_enc', 'pppPasswordEnc',
+  'wg_cpe_private_enc', 'wgCpePrivateEnc',
   'ssh_pass_enc', 'sshPassEnc',
   'clave_ssh_enc', 'claveSshEnc',
   'wifi_password_enc', 'wifiPasswordEnc',
@@ -49,7 +50,7 @@ const redactPaths = [
   '*.token', '*.tokenHash', '*.token_hash',
   '*.secret', '*.secretKey',
   '*.privateKey', '*.private_key',
-  '*.ppp_password_enc', '*.ssh_pass_enc', '*.clave_ssh_enc',
+  '*.ppp_password_enc', '*.wg_cpe_private_enc', '*.ssh_pass_enc', '*.clave_ssh_enc',
   '*.wifi_password_enc', '*.config_enc', '*.password_enc',
   // — Headers HTTP sensibles —
   'req.headers.authorization',

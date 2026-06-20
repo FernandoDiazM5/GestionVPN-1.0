@@ -194,6 +194,30 @@ async function initDb() {
         log.warn({ err: e.message.substring(0, 120) }, 'ensure aps.node_id aviso');
     }
 
+    // Auto-gen llaves WG del CPE: asegurar columnas wg_cpe_public / wg_cpe_private_enc
+    // en instalaciones existentes (CREATE TABLE IF NOT EXISTS no añade columnas).
+    // Idempotente en cada boot; el backfill no aplica (las llaves se generan al
+    // (re)provisionar o regenerar el script de un nodo WG).
+    try {
+        const dbName = process.env.MYSQL_DATABASE || 'vpn_manager';
+        for (const [name, ddl] of [
+            ['wg_cpe_public', "ADD COLUMN wg_cpe_public VARCHAR(255) NOT NULL DEFAULT ''"],
+            ['wg_cpe_private_enc', 'ADD COLUMN wg_cpe_private_enc TEXT DEFAULT NULL'],
+        ]) {
+            const [col] = await getPool().query(
+                `SELECT 1 FROM information_schema.COLUMNS
+                  WHERE table_schema = ? AND table_name = 'nodes' AND column_name = ? LIMIT 1`,
+                [dbName, name]
+            );
+            if (col.length === 0) {
+                await getPool().query(`ALTER TABLE nodes ${ddl}`);
+                log.info(`Columna nodes.${name} añadida (auto-gen llaves WG del CPE)`);
+            }
+        }
+    } catch (e) {
+        log.warn({ err: e.message.substring(0, 120) }, 'ensure nodes.wg_cpe_* aviso');
+    }
+
     // Purgar historial de señal > 30 días
     const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
     await getPool().query('DELETE FROM signal_history WHERE timestamp < ?', [thirtyDaysAgo]).catch(() => {});
@@ -268,9 +292,9 @@ async function saveNode(nodeData) {
 
     await d.run(
         `INSERT INTO nodes (ppp_user, mikrotik_id, nombre_nodo, nombre_vrf, iface_name, segmento_lan,
-            ip_tunnel, server_ip, wg_public_key, label, lan_subnets, protocol, node_number, workspace_id,
+            ip_tunnel, server_ip, wg_public_key, wg_cpe_public, wg_cpe_private_enc, label, lan_subnets, protocol, node_number, workspace_id,
             created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(ppp_user) DO UPDATE SET
             mikrotik_id  = COALESCE(NULLIF(excluded.mikrotik_id, ''), nodes.mikrotik_id),
             nombre_nodo  = excluded.nombre_nodo,
@@ -280,6 +304,8 @@ async function saveNode(nodeData) {
             ip_tunnel    = excluded.ip_tunnel,
             server_ip    = COALESCE(NULLIF(excluded.server_ip, ''), nodes.server_ip),
             wg_public_key = COALESCE(NULLIF(excluded.wg_public_key, ''), nodes.wg_public_key),
+            wg_cpe_public = COALESCE(NULLIF(excluded.wg_cpe_public, ''), nodes.wg_cpe_public),
+            wg_cpe_private_enc = COALESCE(excluded.wg_cpe_private_enc, nodes.wg_cpe_private_enc),
             label        = COALESCE(NULLIF(excluded.label, ''), nodes.label),
             lan_subnets  = CASE WHEN excluded.lan_subnets != '[]' THEN excluded.lan_subnets ELSE nodes.lan_subnets END,
             protocol     = COALESCE(NULLIF(excluded.protocol, 'sstp'), nodes.protocol),
@@ -296,6 +322,8 @@ async function saveNode(nodeData) {
             nodeData.ip_tunnel || '',
             nodeData.server_ip || '',
             nodeData.wg_public_key || '',
+            nodeData.wg_cpe_public || '',
+            nodeData.wg_cpe_private_enc || null,
             nodeData.label || '',
             lanSubnetsJson,
             nodeData.protocol || 'sstp',

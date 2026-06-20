@@ -42,8 +42,9 @@ stubModule(__dirname, '../../db.service', {
   getDb: vi.fn().mockResolvedValue(db),
   saveNode: vi.fn().mockResolvedValue(undefined),
   deleteNode: vi.fn().mockResolvedValue({ deviceIds: [] }),
-  encryptPass: (s) => s,
+  encryptPass: (s) => (s ? `enc:${s}` : null),
   decryptPass: (s) => s,
+  getAppSetting: vi.fn().mockResolvedValue('203.0.113.10'),
   getNodeId: vi.fn().mockResolvedValue(1),
   getNodes: vi.fn().mockResolvedValue([]),
 });
@@ -61,6 +62,7 @@ const request = require('supertest');
 const provisionRoutes = require('../../routes/nodes/provision.routes');
 const { errorMiddleware } = require('../../lib/apiResponse');
 const { connectToMikrotik } = require('../../routeros.service');
+const { saveNode } = require('../../db.service');
 
 const app = express();
 app.use(express.json());
@@ -88,6 +90,10 @@ beforeEach(() => {
   vrfPrint = [];
   secretPrint = [];
   db.run.mockResolvedValue(undefined);
+  // clearAllMocks NO resetea implementaciones: restaurar el default de writeIdempotent
+  // para que el mockImplementation que lanza (tests H4) no se filtre a otros tests.
+  writeIdempotent.mockReset();
+  writeIdempotent.mockResolvedValue(undefined);
 });
 
 describe('H3 — el ND se recalcula si el valor del cliente colisiona', () => {
@@ -158,6 +164,84 @@ describe('H4 — rollback best-effort si la provisión falla a mitad', () => {
     const touchedVrf = safeWrite.mock.calls.some(([, args]) =>
       Array.isArray(args) && args[0] === '/ip/vrf/remove');
     expect(touchedVrf).toBe(false);
+  });
+});
+
+describe('Auto-gen de llaves WG del CPE', () => {
+  const baseWg = { nodeName: 'TORREX', protocol: 'wireguard', lanSubnets: ['10.5.0.0/24'] };
+
+  it('sin cpePublicKey → genera el par, agrega el peer y persiste pública + privada cifrada', async () => {
+    const r = await request(app).post('/api/node/provision').send({ ...baseWg, nodeNumber: 2 });
+    expect(r.status).toBe(200);
+    expect(r.body.cpeKeyMode).toBe('generated');
+
+    // El peer del Core se agrega SIEMPRE (ya no se omite) con una pública generada.
+    const peerArgs = callFor('/interface/wireguard/peers/add');
+    expect(peerArgs).toBeTruthy();
+    const pubArg = peerArgs.find(a => a.startsWith('=public-key='));
+    expect(pubArg).toMatch(/^=public-key=[A-Za-z0-9+/]{43}=$/);
+
+    // saveNode recibe la pública del CPE y la privada cifrada.
+    const saved = saveNode.mock.calls.at(-1)[0];
+    expect(saved.wg_cpe_public).toMatch(/^[A-Za-z0-9+/]{43}=$/);
+    expect(saved.wg_cpe_private_enc).toMatch(/^enc:/);
+
+    // El script devuelto trae la privada embebida y las rutas de retorno.
+    expect(r.body.cpeScript).toContain('private-key="');
+    expect(r.body.cpeScript).toContain('endpoint-address=203.0.113.10');
+  });
+
+  it('con cpePublicKey → modo manual: usa esa clave y NO almacena privada', async () => {
+    const myKey = 'A'.repeat(43) + '=';
+    const r = await request(app).post('/api/node/provision')
+      .send({ ...baseWg, nodeNumber: 2, cpePublicKey: myKey });
+    expect(r.status).toBe(200);
+    expect(r.body.cpeKeyMode).toBe('manual');
+
+    const peerArgs = callFor('/interface/wireguard/peers/add');
+    expect(peerArgs).toEqual(expect.arrayContaining([`=public-key=${myKey}`]));
+
+    const saved = saveNode.mock.calls.at(-1)[0];
+    expect(saved.wg_cpe_public).toBe(myKey);
+    expect(saved.wg_cpe_private_enc).toBeNull();
+    // Sin privada → el script no la embebe.
+    expect(r.body.cpeScript || '').not.toContain('private-key="');
+  });
+});
+
+describe('Auto-gen de credenciales PPP (SSTP)', () => {
+  const baseWgless = { nodeName: 'TORREZ', protocol: 'sstp', lanSubnets: ['10.7.0.0/24'] };
+
+  it('sin pppUser/pppPassword → genera ambos, crea el secret y devuelve el script con credenciales', async () => {
+    const r = await request(app).post('/api/node/provision').send({ ...baseWgless, nodeNumber: 2 });
+    expect(r.status).toBe(200);
+    expect(r.body.sstpCredMode).toBe('generated');
+    expect(r.body.pppUser).toBe('ppp-torrez-nd2');
+    expect(r.body.pppPassword).toMatch(/^[A-Za-z0-9]{20}$/);
+
+    // El PPP secret se crea con el usuario+contraseña generados.
+    const secretArgs = callFor('/ppp/secret/add');
+    expect(secretArgs).toEqual(expect.arrayContaining(['=name=ppp-torrez-nd2']));
+    expect(secretArgs.find(a => a.startsWith('=password='))).toBe(`=password=${r.body.pppPassword}`);
+
+    // El script del CPE trae las credenciales embebidas (autoconfigurable).
+    expect(r.body.cpeScript).toContain('user=ppp-torrez-nd2');
+    expect(r.body.cpeScript).toContain(`password=${r.body.pppPassword}`);
+
+    // saveNode persiste con el ppp_user efectivo (generado).
+    const saved = saveNode.mock.calls.at(-1)[0];
+    expect(saved.ppp_user).toBe('ppp-torrez-nd2');
+  });
+
+  it('con pppUser/pppPassword → modo manual: respeta los del cliente', async () => {
+    const r = await request(app).post('/api/node/provision')
+      .send({ ...baseWgless, nodeNumber: 2, pppUser: 'mi-usuario', pppPassword: 'mi-clave-123' });
+    expect(r.status).toBe(200);
+    expect(r.body.sstpCredMode).toBe('manual');
+    expect(r.body.pppUser).toBe('mi-usuario');
+    expect(callFor('/ppp/secret/add')).toEqual(
+      expect.arrayContaining(['=name=mi-usuario', '=password=mi-clave-123'])
+    );
   });
 });
 

@@ -41,6 +41,7 @@ function enc(plain, key) {
 const TARGETS = [
   ['app_settings', '`key`', 'value', "AND `key` = 'MT_PASS'"],
   ['nodes', 'id', 'ppp_password_enc', ''],
+  ['nodes', 'id', 'wg_cpe_private_enc', ''],
   ['node_ssh_creds', 'id', 'ssh_pass_enc', ''],
   ['aps', 'id', 'clave_ssh_enc', ''],
   ['aps', 'id', 'wifi_password_enc', ''],

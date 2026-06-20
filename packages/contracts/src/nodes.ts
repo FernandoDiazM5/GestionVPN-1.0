@@ -17,6 +17,8 @@ export const NodeProvisionRequestSchema = z.object({
   lanSubnets: z.array(z.string().regex(CIDR_RE)).optional(),
   remoteAddress: z.string().regex(IPV4_RE).optional(),
   protocol: z.enum(['sstp', 'wireguard']),
+  // WireGuard: si se omite (o vacío), el servidor GENERA el par de llaves del CPE
+  // y entrega la privada embebida en el script. Pegarla aquí fuerza el modo manual.
   cpePublicKey: z.string().optional(),
   wgListenPort: z.union([z.number(), z.string()]).optional(),
 });

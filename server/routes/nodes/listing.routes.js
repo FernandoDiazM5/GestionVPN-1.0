@@ -14,12 +14,15 @@ const log = require('../../lib/logger').child({ scope: 'nodes:listing' });
 const {
   connectToMikrotik, safeWrite, getErrorMessage, parseHandshakeSecs,
 } = require('../../routeros.service');
-const { getDb, saveNode, getNodes } = require('../../db.service');
+const { getDb, saveNode, getNodes, decryptPass, encryptPass, getAppSetting } = require('../../db.service');
+const { generateKeyPair } = require('../../lib/wgkeys');
 const { annotateSessions, filterNodesForRole, nodeBelongsToRequester, requireOperator } = require('./_shared');
 const { sendOk, AppError, asyncHandler } = require('../../lib/apiResponse');
 const { mikrotikAppError } = require('../../lib/mikrotikError');
 const { requireMikrotik } = require('../../lib/routeGuards');
 const mgmtNet = require('../../lib/mgmtNet');
+const { buildCpeWgScript, buildCpeSstpScript } = require('../../lib/cpeScript');
+const scanIpRepo = require('../../db/repos/scanIpRepo');
 
 // /24 del plano de gestión — se excluyen del listado de "LANs de nodo".
 const MGMT_NETS = new Set(mgmtNet.allNets);
@@ -217,18 +220,20 @@ router.post('/node/script', asyncHandler(async (req, res) => {
   const isWG = pppUser.startsWith('WG-ND') || pppUser.startsWith('VPN-WG-');
 
   if (isWG) {
-    let ipTunnel = '';
     let serverPublicKey = '<CLAVE_PUBLICA_SERVIDOR>';
     let wgPort = 13300;
-    let wgNodeNum = 0;
+    let wgNodeNum = parseInt(pppUser.match(/ND(\d+)/)?.[1] || '0');
+    let cpePrivateKey = '';
 
     try {
       const db = await getDb();
       const nodeRow = await db.get('SELECT * FROM nodes WHERE ppp_user = ?', [pppUser]);
       if (nodeRow) {
-        ipTunnel = nodeRow.ip_tunnel || '';
-        // Derive node number from interface name pattern (WG-NDx-NAME)
-        wgNodeNum = parseInt(pppUser.match(/ND(\d+)/)?.[1] || '0');
+        // Privada del CPE generada por el servidor → se embebe para que el nodo
+        // quede autoconfigurado sin pedir/copiar la llave (mismo modelo que el .conf
+        // de usuario). Si el nodo es legacy (sin par generado), el script cae al
+        // flujo manual (interfaz sin private-key → el CPE genera la suya).
+        cpePrivateKey = nodeRow.wg_cpe_private_enc ? decryptPass(nodeRow.wg_cpe_private_enc) : '';
       }
       if (req.mikrotik) {
         const { ip, user, pass } = req.mikrotik;
@@ -236,11 +241,11 @@ router.post('/node/script', asyncHandler(async (req, res) => {
         const info = await safeWrite(api, ['/interface/wireguard/print', `?name=${pppUser}`]);
         if (info && info.length > 0) {
           serverPublicKey = info[0]['public-key'] || serverPublicKey;
-          wgPort = parseInt(info[0]['listen-port'] || '0') || (13300 + parseInt(wgNodeNum));
+          wgPort = parseInt(info[0]['listen-port'] || '0') || (13300 + wgNodeNum);
         }
         await api.close();
       } else {
-        wgPort = 13300 + parseInt(wgNodeNum);
+        wgPort = 13300 + wgNodeNum;
       }
     } catch (_) { /* derivar lo que se pueda — script lleva placeholders */ }
 
@@ -250,55 +255,43 @@ router.post('/node/script', asyncHandler(async (req, res) => {
     if (!nodeMgmt) throw new AppError(`Número de nodo inválido (ND${wgNodeNum}); use ND ≥ 2`, 400, 'VALIDATION_ERROR');
 
     // Redes de gestión que el CPE debe alcanzar de vuelta (CLIENTES/ADMIN/VPS)
-    // + el /24 del scan-pool del VPS (si está configurado).
-    const SCAN_RETURN_SUBNET = (process.env.SCAN_RETURN_SUBNET || '').trim();
+    // + el /24 del scan-pool del VPS (derivado del pool, igual que en provisión).
+    const scanSubnet = (process.env.SCAN_RETURN_SUBNET || scanIpRepo.poolSubnet() || '').trim();
     const mgmtNets = mgmtNet.returnRoutes().map(r => r.subnet);
-    const returnNets = [...mgmtNets, ...(SCAN_RETURN_SUBNET ? [SCAN_RETURN_SUBNET] : [])];
-    const allowedCsv = returnNets.join(',');
-    const tunnelIpLine = `/ip address add address=${nodeMgmt}/32 interface=WG-CORE-ISP comment="IP del nodo ND${wgNodeNum} (gestion + tunel)"`;
-    const peerLine = `/interface wireguard peers add interface=WG-CORE-ISP public-key="${serverPublicKey}" endpoint-address=${serverPublicIP} endpoint-port=${wgPort} allowed-address=${allowedCsv} persistent-keepalive=25s comment="Conexion al Servidor Core"`;
-    const routeLines = returnNets.map(n => `/ip route add dst-address=${n} distance=20 gateway=WG-CORE-ISP comment="Retorno hacia Administracion/Software"`);
+    const returnNets = [...mgmtNets, ...(scanSubnet ? [scanSubnet] : [])];
 
-    const script = [
-      `/interface wireguard add name=WG-CORE-ISP mtu=1420 comment="Conexion al Servidor Core"`,
-      tunnelIpLine,
-      peerLine,
-      ...routeLines,
-    ].join('\n') + '\n';
-    const cpeSteps = [
-      { title: 'Crear interfaz WireGuard', cmd: `/interface wireguard add name=WG-CORE-ISP mtu=1420 comment="Conexion al Servidor Core"` },
-      { title: 'Asignar IP única del nodo (/32)', cmd: tunnelIpLine },
-      { title: 'Agregar peer (servidor Core)', cmd: peerLine },
-      ...returnNets.map(n => ({ title: `Ruta de retorno (${n})`, cmd: `/ip route add dst-address=${n} distance=20 gateway=WG-CORE-ISP comment="Retorno hacia Administracion/Software"` })),
-    ];
-    return sendOk(res, { script, cpeSteps });
+    const { script, cpeSteps } = buildCpeWgScript({
+      nodeNum: wgNodeNum, nodeMgmt, serverPublicKey, serverPublicIP, wgPort, returnNets, cpePrivateKey,
+    });
+    return sendOk(res, { script, cpeSteps, keyMode: cpePrivateKey ? 'generated' : 'manual' });
   }
 
   if (!pppPassword) throw new AppError('pppPassword es requerido para SSTP', 400, 'VALIDATION_ERROR');
-  // Si sstp-out1 ya existe, solo actualiza sus parámetros (evita crear interfaz dinámica duplicada DR).
-  // Si no existe, la crea desde cero.
-  const script = `/interface sstp-client
-:if ([find name=sstp-out1] = "") do={
-  add authentication=mschap2 connect-to=${serverPublicIP} disabled=no http-proxy=0.0.0.0 name=sstp-out1 profile=default-encryption tls-version=only-1.2 user=${pppUser} password=${pppPassword}
-} else={
-  set [find name=sstp-out1] connect-to=${serverPublicIP} disabled=no user=${pppUser} password=${pppPassword}
-}`;
-  const cpeSteps = [
-    { title: 'Configurar Cliente SSTP', cmd: `/interface sstp-client\n:if ([find name=sstp-out1] = "") do={\n  add authentication=mschap2 connect-to=${serverPublicIP} disabled=no http-proxy=0.0.0.0 name=sstp-out1 profile=default-encryption tls-version=only-1.2 user=${pppUser} password=${pppPassword}\n} else={\n  set [find name=sstp-out1] connect-to=${serverPublicIP} disabled=no user=${pppUser} password=${pppPassword}\n}` },
-  ];
+  // Script idempotente: crea sstp-out1 si no existe, o solo actualiza sus parámetros
+  // (evita duplicar la interfaz). Usuario + contraseña embebidos (autoconfigurable).
+  const { script, cpeSteps } = buildCpeSstpScript({ pppUser, pppPassword, serverPublicIP });
   return sendOk(res, { script, cpeSteps });
 }));
 
-// POST /node/wg/set-peer — Agrega o actualiza el peer CPE en un nodo WireGuard existente
+// POST /node/wg/set-peer — Agrega o actualiza el peer CPE en un nodo WireGuard existente.
+//  Modos:
+//   - cpePublicKey presente → modo manual (el operador pega la pública del CPE).
+//   - cpePublicKey ausente   → modo auto: el servidor GENERA el par, registra la
+//     pública en el peer del Core y devuelve el script con la privada embebida.
 router.post('/node/wg/set-peer', requireOperator, asyncHandler(async (req, res) => {
   const { ip, user, pass } = requireMikrotik(req);
   const { pppUser, cpePublicKey } = req.body;
-  if (!pppUser || !cpePublicKey) {
-    throw new AppError('pppUser y cpePublicKey son requeridos', 400, 'VALIDATION_ERROR');
+  if (!pppUser) {
+    throw new AppError('pppUser es requerido', 400, 'VALIDATION_ERROR');
   }
   if (!(await nodeBelongsToRequester(req, pppUser))) {
     throw new AppError('Nodo no encontrado en tu workspace', 404, 'NOT_FOUND');
   }
+
+  // Auto-gen cuando no llega una clave del CPE (mismo modelo que la provisión).
+  const cpeKeys = cpePublicKey ? null : generateKeyPair();
+  const effectiveCpePublic = cpePublicKey || cpeKeys.publicKey;
+  const keyMode = cpePublicKey ? 'manual' : 'generated';
 
   let api;
   try {
@@ -328,16 +321,50 @@ router.post('/node/wg/set-peer', requireOperator, asyncHandler(async (req, res) 
       await safeWrite(api, ['/interface/wireguard/peers/remove', `=.id=${peerToRemove['.id']}`]);
     }
 
-    // Agregar nuevo peer con la clave del CPE
+    // Agregar nuevo peer con la clave del CPE (pegada o autogenerada)
     await safeWrite(api, ['/interface/wireguard/peers/add',
       `=interface=${pppUser}`,
-      `=public-key=${cpePublicKey}`,
+      `=public-key=${effectiveCpePublic}`,
       `=allowed-address=${allowedAddress}`,
       `=comment=Cliente`,
     ]);
 
+    // Server public key + listen-port (para el script de retorno)
+    let serverPublicKey = '<CLAVE_PUBLICA_SERVIDOR>';
+    let wgPort = 13300 + wgNodeNum;
+    const info = (await safeWrite(api, ['/interface/wireguard/print', `?name=${pppUser}`]).catch(() => [])) || [];
+    if (info.length > 0) {
+      serverPublicKey = info[0]['public-key'] || serverPublicKey;
+      wgPort = parseInt(info[0]['listen-port'] || '0') || wgPort;
+    }
+
     await api.close();
-    return sendOk(res, { message: `Peer CPE configurado: ${peerIP} + ${lanSubnets.join(', ')}`, peerIP, allowedAddress });
+
+    // Persistir la pública del CPE (peer del Core) + la privada cifrada si la generamos
+    await saveNode({
+      ppp_user: pppUser,
+      nombre_nodo: nodeRow?.nombre_nodo || '', nombre_vrf: nodeRow?.nombre_vrf || '',
+      iface_name: nodeRow?.iface_name || pppUser, protocol: 'wireguard',
+      wg_cpe_public: effectiveCpePublic,
+      wg_cpe_private_enc: cpeKeys ? encryptPass(cpeKeys.privateKey) : null,
+    }).catch(e => log.warn({ err: e.message }, 'set-peer: persistir llaves CPE'));
+
+    // Script CPE listo (con privada embebida si fue autogenerada)
+    let cpeScript = null, cpeSteps = null;
+    try {
+      const serverPublicIP = (await getAppSetting('server_public_ip').catch(() => '')) || ip;
+      const scanSubnet = (process.env.SCAN_RETURN_SUBNET || scanIpRepo.poolSubnet() || '').trim();
+      const returnNets = [...mgmtNet.returnRoutes().map(r => r.subnet), ...(scanSubnet ? [scanSubnet] : [])];
+      ({ script: cpeScript, cpeSteps } = buildCpeWgScript({
+        nodeNum: wgNodeNum, nodeMgmt, serverPublicKey, serverPublicIP, wgPort, returnNets,
+        cpePrivateKey: cpeKeys ? cpeKeys.privateKey : '',
+      }));
+    } catch (e) { log.warn({ err: e.message }, 'set-peer: pre-generar script'); }
+
+    return sendOk(res, {
+      message: `Peer CPE configurado (${keyMode}): ${nodeMgmt} + ${lanSubnets.join(', ')}`,
+      peerIP: nodeMgmt, allowedAddress, keyMode, cpeScript, cpeSteps,
+    });
   } catch (error) {
     if (api) try { await api.close(); } catch (_) { /* ignore */ }
     if (error instanceof AppError) throw error;

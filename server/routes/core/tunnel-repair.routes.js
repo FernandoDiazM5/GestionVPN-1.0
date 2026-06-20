@@ -110,7 +110,7 @@ router.post('/tunnel/repair', requireOperator, async (req, res) => {
         let ipTunnel = '', wgPubKey = '';
         if (nodeRowDB) {
           ipTunnel = nodeRowDB.ip_tunnel || '';
-          wgPubKey = nodeRowDB.wg_public_key || nodeRowDB.cpe_public_key || '';
+          wgPubKey = nodeRowDB.wg_public_key || nodeRowDB.wg_cpe_public || '';
         }
 
         // Restaurar IP Address WG — SOLO modelo legacy (/30 en 10.10.251). En el

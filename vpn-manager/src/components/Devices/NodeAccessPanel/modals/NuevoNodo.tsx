@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { useVpn } from '../../../../context';
 import { fetchWithTimeout } from '../../../../utils/fetchWithTimeout';
-import { API_BASE_URL, MGMT_RETURN_NETS, nodeMgmtIp } from '../../../../config';
+import { API_BASE_URL } from '../../../../config';
 import { generateSecurePassword, getSubnetConflicts } from '../utils';
 import { ProvisionSteps } from '../components';
 import type { ProvisionResult } from '../types';
@@ -31,15 +31,18 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [lanSubnets, setLanSubnets] = useState<string[]>(['']);
   const [protocol, setProtocol] = useState<'sstp' | 'wireguard'>('sstp');
+  // Auto-gen por defecto: el servidor genera el par del CPE y entrega la privada en
+  // el script. El campo manual queda OCULTO tras "Opciones avanzadas" (modo experto).
   const [cpePublicKey, setCpePublicKey] = useState('');
-  const [serverPublicKey, setServerPublicKey] = useState('');
+  const [showAdvancedKey, setShowAdvancedKey] = useState(false);
+  // SSTP: usuario + contraseña se generan server-side por defecto. El operador solo
+  // puede sobreescribirlos desde "Opciones avanzadas" (modo experto).
+  const [showAdvancedSstp, setShowAdvancedSstp] = useState(false);
   // IP pública del servidor = dato GLOBAL del sistema (un solo router core).
   // Fuente de verdad única: setting `server_public_ip` en BD. La llave legacy
   // `wg_wan_ip` (solo-localStorage, por-navegador) queda como fallback de migración.
   const [wanIp, setWanIp] = useState<string>(() =>
     localStorage.getItem('server_public_ip') ?? localStorage.getItem('wg_wan_ip') ?? '');
-
-  useEffect(() => { setPppPass(generateSecurePassword()); }, []);
 
   const copyField = (text: string, key: string) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -58,15 +61,6 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
   const ndNum = nextNode ?? '?';
   const ifaceName = nameClean ? `VPN-${protocol === 'wireguard' ? 'WG' : 'SSTP'}-ND${ndNum}-${nameClean}` : '';
   const vrfName = nameClean ? `VRF-ND${ndNum}-${nameClean}` : '';
-
-  const suggestedPppUser = nameClean ? `ppp-pass-${nameClean.toLowerCase()}` : '';
-
-  useEffect(() => {
-    setPppUser(prev => {
-      if (!prev || prev.startsWith('ppp-pass-')) return suggestedPppUser;
-      return prev;
-    });
-  }, [suggestedPppUser]);
 
   const CIDR_RE = /^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}$/;
   const IPV4_RE = /^(\d{1,3}\.){3}\d{1,3}$/;
@@ -146,8 +140,8 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
     return () => clearInterval(id);
   }, [result]);
 
+  // SSTP ya no exige usuario/contraseña: si no se ingresan, el servidor los genera.
   const canSubmit = nameClean.length >= 2
-    && (protocol === 'sstp' ? (!!pppUser.trim() && !!pppPass.trim()) : true)
     && validSubnets.length > 0 && nextNode != null && !provisioning && subnetConflicts.length === 0
     && wgIpValid;
 
@@ -182,7 +176,10 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
         body: JSON.stringify({
           ip: credentials.ip, user: credentials.user, pass: credentials.pass,
           nodeNumber: nextNode, nodeName: nameClean,
-          pppUser: pppUser.trim(), pppPassword: pppPass,
+          // SSTP: solo se envían si el operador los sobreescribió en avanzadas;
+          // si van vacíos, el backend genera usuario + contraseña dinámicamente.
+          pppUser: protocol === 'sstp' && pppUser.trim() ? pppUser.trim() : undefined,
+          pppPassword: protocol === 'sstp' && pppPass.trim() ? pppPass : undefined,
           lanSubnets: validSubnets,
           remoteAddress: nextRemote,
           protocol,
@@ -192,15 +189,12 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
       }, 90_000);
       const d: ProvisionResult = await r.json();
       setResult(d);
-      if (d.success && d.serverPublicKey) {
-        setServerPublicKey(d.serverPublicKey);
-      }
       if (d.success) {
         // Identificador del nodo tal como lo persistió el backend:
-        //  - SSTP: ppp_user === pppUser
+        //  - SSTP: ppp_user === el usuario efectivo (puede ser autogenerado server-side)
         //  - WG:   ppp_user === ifaceName (el campo pppUser del form está vacío en WG)
         // Sin esto, en WG se enviaba pppUser='' y label/save respondía 404.
-        const savedNodeId = protocol === 'wireguard' ? (d.ifaceName ?? '') : pppUser.trim();
+        const savedNodeId = protocol === 'wireguard' ? (d.ifaceName ?? '') : (d.pppUser ?? pppUser.trim());
         if (savedNodeId) {
           fetchWithTimeout(`${API_BASE_URL}/api/node/label/save`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -296,18 +290,24 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                     ))}
                   </div>
 
-                  {protocol === 'sstp' && (
+                  {protocol === 'sstp' && (() => {
+                    const resUser = result.pppUser ?? pppUser;
+                    const resPass = result.pppPassword ?? pppPass;
+                    const wasGenerated = result.sstpCredMode !== 'manual';
+                    return (
                     <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 rounded-xl p-4 space-y-2">
                       <div className="flex items-center gap-2 mb-3">
                         <ShieldCheck className="w-4 h-4 text-amber-600" />
-                        <p className="text-xs font-bold text-amber-700 uppercase tracking-wider">Credenciales PPP — para ingresar en MikroTik</p>
+                        <p className="text-xs font-bold text-amber-700 uppercase tracking-wider">
+                          Credenciales PPP {wasGenerated ? '— generadas por el sistema' : '— ingresadas manualmente'}
+                        </p>
                       </div>
                       <div className="flex items-center justify-between bg-white dark:bg-slate-800 border border-amber-100 rounded-lg px-3 py-2.5 gap-3">
                         <div className="min-w-0">
                           <p className="text-3xs font-bold text-amber-500 uppercase tracking-wider">Usuario PPP</p>
-                          <p className="text-sm font-mono font-bold text-slate-800 dark:text-slate-100">{pppUser}</p>
+                          <p className="text-sm font-mono font-bold text-slate-800 dark:text-slate-100">{resUser}</p>
                         </div>
-                        <button onClick={() => copyField(pppUser, 'res-user')}
+                        <button onClick={() => copyField(resUser, 'res-user')}
                           className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-emerald-600 rounded-lg transition-colors shrink-0">
                           {copiedField === 'res-user' ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
                         </button>
@@ -316,7 +316,7 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                         <div className="min-w-0 flex-1">
                           <p className="text-3xs font-bold text-amber-500 uppercase tracking-wider">Contraseña PPP</p>
                           <p className={`text-sm font-mono font-bold text-slate-800 dark:text-slate-100 truncate transition-all ${showResPass ? '' : 'blur-sm select-none'}`}>
-                            {pppPass}
+                            {resPass}
                           </p>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
@@ -324,7 +324,7 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                             className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg transition-colors">
                             {showResPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                           </button>
-                          <button onClick={() => copyField(pppPass, 'res-pass')}
+                          <button onClick={() => copyField(resPass, 'res-pass')}
                             className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-emerald-600 rounded-lg transition-colors">
                             {copiedField === 'res-pass' ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
                           </button>
@@ -334,7 +334,8 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                         Guarda estas credenciales — también las encontrarás en el botón de Script del nodo.
                       </p>
                     </div>
-                  )}
+                    );
+                  })()}
                 </>
               )}
 
@@ -343,67 +344,65 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                 <ProvisionSteps steps={result.steps ?? []} failedAt={result.failedAt} visible={visibleSteps} />
               </div>
 
-              {serverPublicKey && (
-                <div className="mt-3 p-3 bg-violet-50 dark:bg-violet-500/10 border border-violet-200 rounded-lg">
-                  <p className="text-2xs font-bold text-violet-600 uppercase tracking-wider mb-1">Clave Pública del Servidor WireGuard</p>
-                  <p className="font-mono text-xs text-violet-800 break-all">{serverPublicKey}</p>
-                  <p className="text-2xs text-violet-500 mt-1">Configurar esta clave en el router torre como peer del servidor</p>
-                </div>
-              )}
-
-              {protocol === 'wireguard' && result.success && (() => {
-                const wgNodeNum = nextNode ?? 0;
-                const peerIP = (result as any).peerIP ?? `10.10.251.${wgNodeNum * 4 - 2}`;
-                const wgPort = (result as any).wgPort ?? (13300 + wgNodeNum);
-                const serverIP = wanIp || credentials?.ip || '<IP-servidor>';
-                const peerOct = parseInt(peerIP.split('.')[3] ?? '2');
-                const blockBase30 = peerOct - 2;
-                const tunnelNet30 = `10.10.251.${blockBase30}/30`;
-                const nodeMgmt = nodeMgmtIp(wgNodeNum, true);
-                const allowedCsv = [...MGMT_RETURN_NETS, tunnelNet30].join(',');
-                const cpeSteps = [
-                  { n: 1, title: 'Crear interfaz WireGuard', cmd: `/interface wireguard add name=WG-CORE-ISP mtu=1420 comment="Conexion al Servidor Core"` },
-                  { n: 2, title: 'Asignar IP al túnel (/30)', cmd: `/ip address add address=${peerIP}/30 interface=WG-CORE-ISP network=10.10.251.${blockBase30} comment="IP WG Cliente ND${wgNodeNum}"` },
-                  { n: 3, title: 'IP de gestión del nodo', cmd: `/ip address add address=${nodeMgmt}/32 interface=WG-CORE-ISP comment="IP de gestion del nodo ND${wgNodeNum}"` },
-                  {
-                    n: 4, title: 'Agregar peer (servidor Core)', cmd: serverPublicKey
-                      ? `/interface wireguard peers add interface=WG-CORE-ISP public-key="${serverPublicKey}" endpoint-address=${serverIP} endpoint-port=${wgPort} allowed-address=${allowedCsv} persistent-keepalive=25s comment="Conexion al Servidor Core"`
-                      : '(esperando clave pública del servidor)'
-                  },
-                  { n: 5, title: 'Rutas de retorno hacia administración', cmd: MGMT_RETURN_NETS.map(net => `/ip route add dst-address=${net} distance=2 gateway=WG-CORE-ISP comment="Retorno hacia Administracion/Software"`).join('\n') },
-                ];
+              {result.success && (result.cpeSteps?.length ?? 0) > 0 && (() => {
+                const isWg = protocol === 'wireguard';
+                const generated = isWg ? result.cpeKeyMode !== 'manual' : result.sstpCredMode !== 'manual';
+                const steps = result.cpeSteps ?? [];
+                const fullScript = result.cpeScript ?? steps.map(s => s.cmd).join('\n');
+                const hasSecret = generated; // WG: privada · SSTP: contraseña
                 return (
                   <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Globe className="w-4 h-4 text-slate-600 dark:text-slate-300" />
-                      <p className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">Pasos a configurar en el router torre (CPE)</p>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Globe className="w-4 h-4 text-slate-600 dark:text-slate-300" />
+                        <p className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">Script para el router torre (CPE)</p>
+                      </div>
+                      {fullScript && (
+                        <button onClick={() => copyField(fullScript, 'cpe-all')}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 hover:bg-emerald-100 transition-colors">
+                          {copiedField === 'cpe-all' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                          <span>{copiedField === 'cpe-all' ? '¡Copiado!' : 'Copiar todo'}</span>
+                        </button>
+                      )}
                     </div>
-                    {!cpePublicKey && (
+                    {generated ? (
+                      <div className="mb-3 p-2.5 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 rounded-lg">
+                        <p className="text-2xs font-semibold text-emerald-700">
+                          {isWg
+                            ? '✓ Llaves generadas por el sistema. Pega este script tal cual en el router torre — incluye la llave privada y las rutas de retorno. No necesitas buscar ni copiar la clave del CPE.'
+                            : '✓ Usuario y contraseña generados por el sistema. Pega este script tal cual en el router torre — ya trae las credenciales embebidas; no necesitas escribir nada.'}
+                        </p>
+                      </div>
+                    ) : (
                       <div className="mb-3 p-2.5 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 rounded-lg">
                         <p className="text-2xs font-semibold text-amber-700">
-                          Nodo creado sin peer CPE. Configura el router torre con los comandos de abajo, obtén su public key y agrégala desde las opciones del nodo.
+                          {isWg
+                            ? 'Modo manual: usaste tu propia clave del CPE. El script no incluye llave privada; configúrala en el router torre.'
+                            : 'Modo manual: usaste tu propio usuario/contraseña. El script los lleva embebidos igualmente.'}
                         </p>
                       </div>
                     )}
                     <ol className="space-y-2">
-                      {cpeSteps.map(step => (
-                        <li key={step.n} className="flex items-start gap-3 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-800 rounded-lg px-3 py-2.5">
-                          <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300 text-2xs font-bold flex items-center justify-center shrink-0 mt-0.5">{step.n}</span>
+                      {steps.map((step, i) => (
+                        <li key={i} className="flex items-start gap-3 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-800 rounded-lg px-3 py-2.5">
+                          <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300 text-2xs font-bold flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
                           <div className="min-w-0 flex-1">
                             <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-0.5">{step.title}</p>
-                            <p className="text-2xs font-mono text-violet-700 break-all bg-violet-50 dark:bg-violet-500/10 rounded px-2 py-1 mt-1">{step.cmd}</p>
+                            <p className="text-2xs font-mono text-violet-700 break-all bg-violet-50 dark:bg-violet-500/10 rounded px-2 py-1 mt-1 whitespace-pre-wrap">{step.cmd}</p>
                           </div>
-                          <button onClick={() => navigator.clipboard.writeText(step.cmd)}
+                          <button onClick={() => copyField(step.cmd, `cpe-${i}`)}
                             className="p-1.5 text-slate-400 hover:text-emerald-600 rounded-lg transition-colors shrink-0 mt-0.5"
                             title="Copiar">
-                            <Copy className="w-3.5 h-3.5" />
+                            {copiedField === `cpe-${i}` ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
                           </button>
                         </li>
                       ))}
                     </ol>
-                    <p className="text-2xs text-slate-500 dark:text-slate-400 mt-3">
-                      Luego obtén la public key del CPE con: <span className="font-mono">/interface wireguard print</span>
-                    </p>
+                    {hasSecret && (
+                      <p className="text-2xs text-amber-600 mt-3">
+                        ⚠ El script contiene {isWg ? 'la llave privada del nodo' : 'la contraseña del túnel'}. Trátalo como una credencial: cópialo al router y no lo compartas.
+                      </p>
+                    )}
                   </div>
                 );
               })()}
@@ -469,58 +468,57 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                   </div>
                 </div>
 
-                {protocol === 'sstp' && (<>
+                {protocol === 'sstp' && (
                   <div>
-                    <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                      Usuario PPP <span className="text-rose-500">*</span>
-                      <span className="text-2xs font-normal text-slate-500 dark:text-slate-400 ml-1">— ingresar manualmente</span>
-                    </label>
-                    <div className="relative">
-                      <input value={pppUser} onChange={e => setPppUser(e.target.value)}
-                        placeholder="Ej: TorreVirginia-ND2"
-                        className="w-full px-3 py-2 pr-10 text-sm border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300 font-mono" />
-                      {pppUser && (
-                        <button onClick={() => copyField(pppUser, 'form-user')}
-                          title="Copiar usuario"
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 hover:text-indigo-600 transition-colors">
-                          {copiedField === 'form-user' ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                        Contraseña PPP <span className="text-rose-500">*</span>
-                      </label>
-                      <span className="flex items-center gap-1 text-2xs text-emerald-600 font-medium">
-                        <ShieldCheck className="w-3 h-3" />
-                        Auto-generada · {pppPass.length} chars
-                      </span>
-                    </div>
-                    <div className="relative">
-                      <input type={showPass ? 'text' : 'password'} value={pppPass}
-                        onChange={e => setPppPass(e.target.value)}
-                        className="w-full px-3 py-2 pr-24 text-sm border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300 font-mono" />
-                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
-                        <button onClick={() => setShowPass(v => !v)} title={showPass ? 'Ocultar' : 'Ver'}
-                          className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg transition-colors">
-                          {showPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                        </button>
-                        <button onClick={() => setPppPass(generateSecurePassword())} title="Regenerar contraseña"
-                          className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-indigo-600 rounded-lg transition-colors">
-                          <RefreshCw className="w-3.5 h-3.5" />
-                        </button>
-                        <button onClick={() => copyField(pppPass, 'form-pass')} title="Copiar contraseña"
-                          className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-emerald-600 rounded-lg transition-colors">
-                          {copiedField === 'form-pass' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                        </button>
+                    <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30">
+                      <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-2xs font-bold text-emerald-700">Credenciales PPP automáticas</p>
+                        <p className="text-2xs text-emerald-600 mt-0.5">
+                          El sistema genera el usuario y la contraseña del túnel. Al crear el nodo recibirás un script completo (con las credenciales embebidas) para pegar tal cual en el router torre — sin escribir nada.
+                        </p>
                       </div>
                     </div>
-                    <p className="text-2xs text-slate-500 dark:text-slate-400 mt-0.5">Puedes editar o regenerar — se guardará en la base de datos local</p>
+                    {/* Modo experto OCULTO: definir usuario/contraseña propios */}
+                    <button type="button" onClick={() => setShowAdvancedSstp(v => !v)}
+                      className="mt-2 text-2xs font-semibold text-slate-500 dark:text-slate-400 hover:text-indigo-600 transition-colors">
+                      {showAdvancedSstp ? '− Ocultar opciones avanzadas' : '+ Opciones avanzadas (definir usuario/contraseña propios)'}
+                    </button>
+                    {showAdvancedSstp && (
+                      <div className="mt-2 space-y-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                            Usuario PPP <span className="text-2xs font-normal text-slate-500 dark:text-slate-400">(opcional)</span>
+                          </label>
+                          <input value={pppUser} onChange={e => setPppUser(e.target.value)}
+                            placeholder="Dejar vacío para generar automáticamente"
+                            className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300 font-mono" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                            Contraseña PPP <span className="text-2xs font-normal text-slate-500 dark:text-slate-400">(opcional)</span>
+                          </label>
+                          <div className="relative">
+                            <input type={showPass ? 'text' : 'password'} value={pppPass}
+                              onChange={e => setPppPass(e.target.value)}
+                              placeholder="Dejar vacío para generar automáticamente"
+                              className="w-full px-3 py-2 pr-20 text-sm border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300 font-mono" />
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+                              <button onClick={() => setShowPass(v => !v)} title={showPass ? 'Ocultar' : 'Ver'}
+                                className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg transition-colors">
+                                {showPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                              </button>
+                              <button onClick={() => setPppPass(generateSecurePassword())} title="Generar contraseña"
+                                className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-indigo-600 rounded-lg transition-colors">
+                                <RefreshCw className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </>)}
+                )}
 
                 {protocol === 'wireguard' && (
                   <div>
@@ -548,19 +546,37 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
 
                 {protocol === 'wireguard' && (
                   <div>
-                    <label className="text-2xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1 block">
-                      Clave Pública del CPE <span className="text-slate-500 dark:text-slate-400 font-normal normal-case">(opcional)</span>
-                    </label>
-                    <textarea
-                      value={cpePublicKey}
-                      onChange={e => setCpePublicKey(e.target.value)}
-                      placeholder="Dejar vacío si aún no configuraste WireGuard en el router torre..."
-                      className="input-field w-full font-mono text-xs resize-none"
-                      rows={3}
-                    />
-                    <p className="text-2xs text-slate-500 dark:text-slate-400 mt-1">
-                      Si no la tienes aún: crea el nodo primero, obtén la clave del servidor y configura el CPE. Luego agrega la clave del CPE desde el script del nodo.
-                    </p>
+                    <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30">
+                      <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-2xs font-bold text-emerald-700">Llaves WireGuard automáticas</p>
+                        <p className="text-2xs text-emerald-600 mt-0.5">
+                          El sistema genera el par de llaves del nodo. Al crearlo recibirás un script completo (con la llave privada y las rutas de retorno) para pegar tal cual en el router torre — sin buscar ni copiar claves a mano.
+                        </p>
+                      </div>
+                    </div>
+                    {/* Modo experto OCULTO: pegar una clave pública propia del CPE */}
+                    <button type="button" onClick={() => setShowAdvancedKey(v => !v)}
+                      className="mt-2 text-2xs font-semibold text-slate-500 dark:text-slate-400 hover:text-indigo-600 transition-colors">
+                      {showAdvancedKey ? '− Ocultar opciones avanzadas' : '+ Opciones avanzadas (usar mi propia clave del CPE)'}
+                    </button>
+                    {showAdvancedKey && (
+                      <div className="mt-2">
+                        <label className="text-2xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1 block">
+                          Clave Pública del CPE <span className="text-slate-500 dark:text-slate-400 font-normal normal-case">(opcional — solo si el CPE ya tiene llave)</span>
+                        </label>
+                        <textarea
+                          value={cpePublicKey}
+                          onChange={e => setCpePublicKey(e.target.value)}
+                          placeholder="Pega aquí la clave pública del router torre para NO generar una nueva..."
+                          className="input-field w-full font-mono text-xs resize-none"
+                          rows={3}
+                        />
+                        <p className="text-2xs text-slate-500 dark:text-slate-400 mt-1">
+                          Si la dejas vacía, el sistema genera el par automáticamente (recomendado).
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
 

@@ -14,7 +14,7 @@ const {
   connectToMikrotik, safeWrite, getErrorMessage, writeIdempotent,
 } = require('../../routeros.service');
 const { CIDR_REGEX } = require('../../ubiquiti.service');
-const { getDb, encryptPass, saveNode, deleteNode } = require('../../db.service');
+const { getDb, encryptPass, saveNode, deleteNode, getAppSetting } = require('../../db.service');
 const { nodeBelongsToRequester, requireOperator } = require('./_shared');
 const { sendOk, AppError, asyncHandler } = require('../../lib/apiResponse');
 const { mikrotikAppError } = require('../../lib/mikrotikError');
@@ -23,6 +23,9 @@ const mgmtNet = require('../../lib/mgmtNet');
 const sse = require('../../lib/sse');
 const { entriesToAdd } = require('../../lib/addressList');
 const scanIpRepo = require('../../db/repos/scanIpRepo');
+const { generateKeyPair } = require('../../lib/wgkeys');
+const { buildCpeWgScript, buildCpeSstpScript } = require('../../lib/cpeScript');
+const { generatePppUser, generatePppPassword } = require('../../lib/sstpCreds');
 
 // Opción C: el /24 del pool de scan-IP del VPS (por defecto 10.11.252.0/24). Cada
 // VRF necesita una ruta de retorno hacia ese /24 vía la interfaz del VPS (el
@@ -194,8 +197,9 @@ router.post('/node/provision', requireOperator, asyncHandler(async (req, res) =>
     throw new AppError('CIDRs de LAN inválidos', 400, 'VALIDATION_ERROR');
   // La IP remota (SSTP) es server-authoritative: si no llega o es inválida, se
   // recalcula tras conectar. No se exige al cliente (cierra el caso preview obsoleto).
-  // cpePublicKey es opcional en WireGuard — el peer se agrega después si no se proporcionó
-  if (!isWG && (!pppUser || !pppPassword)) throw new AppError('Usuario y Contraseña requeridos para SSTP', 400, 'VALIDATION_ERROR');
+  // SSTP auto-gen: usuario y contraseña son OPCIONALES — si no llegan, el servidor
+  // los genera dinámicamente (espejo del auto-gen de llaves WG) y los devuelve.
+  // cpePublicKey es opcional en WireGuard — el peer se agrega/genera en su rama.
 
   // H6 — validación de nombre server-side (evita VRF-ND…- sin nombre)
   const nameUpper = (nodeName || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -214,6 +218,12 @@ router.post('/node/provision', requireOperator, asyncHandler(async (req, res) =>
   };
   let wgPeerIP = '';
   let serverPublicKey = '';
+  // Par de llaves del CPE auto-generado (cuando el moderador no pega una propia).
+  let cpeKeys = null;            // { publicKey, privateKey } | null (modo manual)
+  let cpeKeyMode = 'manual';     // 'generated' | 'manual'
+  // Credenciales PPP (SSTP): si no llegan del cliente, se generan server-side.
+  let effectivePppUser = pppUser, effectivePppPassword = pppPassword;
+  let sstpCredMode = 'manual';   // 'generated' | 'manual'
   // Variables de scope externo: el catch las necesita para el rollback (H4).
   let ndNum, effectiveRemote, ifaceName, vrfName, ndComment, wgPort;
   // Solo eliminamos el VRF en rollback si LO CREAMOS nosotros (no en el merge a
@@ -262,18 +272,23 @@ router.post('/node/provision', requireOperator, asyncHandler(async (req, res) =>
       // Paso 2 — (modelo unificado) sin IP de transporte en el Core
       pushStep({ step: 2, obj: 'WG IP', name: `sin IP de transporte (modelo unificado, túnel=${wgPeerIP})`, status: 'ok' });
 
-      // Paso 3 — Peer WG (CPE) — solo si se proporcionó la clave pública del CPE
+      // Paso 3 — Peer WG (CPE). Auto-gen: si el moderador NO pegó una clave del CPE
+      // (modo avanzado/oculto), el servidor GENERA el par — la pública va en el peer
+      // del Core y la privada se entrega embebida en el script del nodo (mismo modelo
+      // que el .conf del usuario). Así el peer NUNCA se omite y el nodo queda
+      // autoconfigurable con un solo copy/paste.
       const subnetsList = allSubnets.join(',');
       // allowed-address: la IP única del nodo (/32) + LAN(s) de la torre.
       const peerAllowed = [`${nodeMgmt}/32`, subnetsList].filter(Boolean).join(',');
-      if (cpePublicKey) {
-        await writeIdempotent(api, ['/interface/wireguard/peers/add',
-          `=interface=${ifaceName}`, `=public-key=${cpePublicKey}`,
-          `=allowed-address=${peerAllowed}`, `=comment=Cliente ${ndComment}`]);
-        pushStep({ step: 3, obj: 'WG Peer', name: peerAllowed, status: 'ok' });
-      } else {
-        pushStep({ step: 3, obj: 'WG Peer', name: 'Omitido — sin clave CPE (agregar después)', status: 'ok' });
+      if (!cpePublicKey) {
+        cpeKeys = generateKeyPair();          // { publicKey, privateKey }
+        cpeKeyMode = 'generated';
       }
+      const effectiveCpePublic = cpePublicKey || cpeKeys.publicKey;
+      await writeIdempotent(api, ['/interface/wireguard/peers/add',
+        `=interface=${ifaceName}`, `=public-key=${effectiveCpePublic}`,
+        `=allowed-address=${peerAllowed}`, `=comment=Cliente ${ndComment}`]);
+      pushStep({ step: 3, obj: 'WG Peer', name: `${peerAllowed} (${cpeKeyMode})`, status: 'ok' });
 
       // Paso 4 — LIST-VPN-TOWERS (y LIST-VPN-WG para Wireguard)
       await writeIdempotent(api, ['/interface/list/member/add',
@@ -353,28 +368,55 @@ router.post('/node/provision', requireOperator, asyncHandler(async (req, res) =>
             ppp_user: ifaceName, nombre_nodo: nameUpper, nombre_vrf: vrfName,
             iface_name: ifaceName, node_number: ndNum, lan_subnets: allSubnets,
             segmento_lan: allSubnets[0] || '', ip_tunnel: wgPeerIP, protocol: 'wireguard',
+            // wg_public_key (= pública del peer/CPE) la repuebla el refresh de /nodes
+            // desde el peer vivo; aquí guardamos el par del CPE en sus columnas propias.
+            wg_cpe_public: cpeKeys ? cpeKeys.publicKey : (cpePublicKey || ''),
+            wg_cpe_private_enc: cpeKeys ? encryptPass(cpeKeys.privateKey) : null,
             workspace_id: req.account?.workspace_id || null,
           });
           await db.run('COMMIT');
         } catch (txErr) { await db.run('ROLLBACK'); throw txErr; }
       } catch (dbErr) { log.error({ err: dbErr.message }, 'DB: guardar nodo WG'); }
 
+      // Script CPE listo para copy/paste (con la privada embebida si fue autogenerada).
+      // Misma fuente de verdad que /node/script. El endpoint WAN sale del setting global.
+      let cpeScript = null, cpeSteps = null;
+      try {
+        const serverPublicIP = (await getAppSetting('server_public_ip').catch(() => '')) || ip;
+        const scanSubnet = (process.env.SCAN_RETURN_SUBNET || scanIpRepo.poolSubnet() || '').trim();
+        const returnNets = [...mgmtNet.returnRoutes().map(r => r.subnet), ...(scanSubnet ? [scanSubnet] : [])];
+        ({ script: cpeScript, cpeSteps } = buildCpeWgScript({
+          nodeNum: ndNum, nodeMgmt: wgPeerIP, serverPublicKey, serverPublicIP, wgPort, returnNets,
+          cpePrivateKey: cpeKeys ? cpeKeys.privateKey : '',
+        }));
+      } catch (e) { log.warn({ err: e.message }, 'No se pudo pre-generar el script CPE (se puede regenerar desde el nodo)'); }
+
       return sendOk(res, {
         message: `Nodo WG ND${ndNum} provisionado correctamente`,
         ifaceName, vrfName, remoteAddress: wgPeerIP,
         steps, serverPublicKey, wgPort, peerIP: wgPeerIP,
+        cpeKeyMode, cpeScript, cpeSteps,
       });
     } else {
+      // Auto-gen de credenciales PPP: si el cliente no las envió, el servidor las
+      // genera (usuario determinístico por nodo + contraseña segura). El ND ya es
+      // autoritativo aquí, así que el usuario queda único.
+      if (!pppUser || !pppPassword) {
+        effectivePppUser = (pppUser && pppUser.trim()) || generatePppUser(nameUpper, ndNum);
+        effectivePppPassword = pppPassword || generatePppPassword();
+        sstpCredMode = 'generated';
+      }
+
       // Paso 1 — PPP Secret
       await writeIdempotent(api, ['/ppp/secret/add',
-        `=name=${pppUser}`, `=password=${pppPassword}`,
+        `=name=${effectivePppUser}`, `=password=${effectivePppPassword}`,
         '=service=sstp', '=profile=PROF-VPN-TOWERS',
         `=remote-address=${effectiveRemote}`, `=comment=${ndComment}`]);
-      pushStep({ step: 1, obj: 'PPP Secret', name: pppUser, status: 'ok' });
+      pushStep({ step: 1, obj: 'PPP Secret', name: `${effectivePppUser} (${sstpCredMode})`, status: 'ok' });
 
       // Paso 2 — Interfaz SSTP
       await writeIdempotent(api, ['/interface/sstp-server/add',
-        `=name=${ifaceName}`, `=user=${pppUser}`]);
+        `=name=${ifaceName}`, `=user=${effectivePppUser}`]);
       pushStep({ step: 2, obj: 'SSTP Interface', name: ifaceName, status: 'ok' });
     }
 
@@ -434,7 +476,7 @@ router.post('/node/provision', requireOperator, asyncHandler(async (req, res) =>
     // --- Persistir nodo + credenciales en MySQL (transacción atómica) ---
     try {
       const db = await getDb();
-      const nodeId = isWG ? ifaceName : pppUser;
+      const nodeId = isWG ? ifaceName : effectivePppUser;
 
       await db.run('BEGIN');
       try {
@@ -452,10 +494,10 @@ router.post('/node/provision', requireOperator, asyncHandler(async (req, res) =>
         });
 
         if (!isWG) {
-          const encrypted = encryptPass(pppPassword);
+          const encrypted = encryptPass(effectivePppPassword);
           await db.run(
             'UPDATE nodes SET ppp_password_enc = ? WHERE ppp_user = ?',
-            [encrypted, pppUser]
+            [encrypted, effectivePppUser]
           );
         }
 
@@ -469,12 +511,25 @@ router.post('/node/provision', requireOperator, asyncHandler(async (req, res) =>
       log.error({ err: dbErr.message }, 'DB: guardar nodo en MySQL');
     }
 
+    // Script CPE (sstp-client) listo para copy/paste, con usuario+contraseña
+    // embebidos. Mismo helper que /node/script. Best-effort: no debe tumbar el alta.
+    let cpeScript = null, cpeSteps = null;
+    try {
+      const serverPublicIP = (await getAppSetting('server_public_ip').catch(() => '')) || ip;
+      ({ script: cpeScript, cpeSteps } = buildCpeSstpScript({
+        pppUser: effectivePppUser, pppPassword: effectivePppPassword, serverPublicIP,
+      }));
+    } catch (e) { log.warn({ err: e.message }, 'No se pudo pre-generar el script SSTP (se puede regenerar desde el nodo)'); }
+
     return sendOk(res, {
       message: `Nodo ND${ndNum} provisionado correctamente`,
       ifaceName, vrfName, remoteAddress: effectiveRemote, steps,
       protocol, wgPort, serverPublicKey,
       peerIP: isWG ? wgPeerIP : undefined,
       listenPort: isWG ? wgPort : undefined,
+      // SSTP: credenciales efectivas (generadas o manuales) + script listo.
+      pppUser: effectivePppUser, pppPassword: effectivePppPassword,
+      sstpCredMode, cpeScript, cpeSteps,
     });
   } catch (error) {
     if (api) try { await api.close(); } catch (_) { /* ignore */ }
@@ -484,7 +539,7 @@ router.post('/node/provision', requireOperator, asyncHandler(async (req, res) =>
     let rolledBack = false;
     if (ifaceName && vrfName) {
       rolledBack = await rollbackProvision({ ip, user, pass },
-        { isWG, ifaceName, vrfName, pppUser, allSubnets, vrfCreatedByUs, nameUpper });
+        { isWG, ifaceName, vrfName, pppUser: effectivePppUser || pppUser, allSubnets, vrfCreatedByUs, nameUpper });
       log.warn({ ifaceName, vrfName, rolledBack, vrfCreatedByUs }, 'PROVISION falló — rollback ejecutado');
     }
 
