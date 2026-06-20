@@ -15,6 +15,7 @@
     "migrate:apnode": "node db/migrateApNode.js",
     "migrate:scanip": "node db/migrateScanIp.js",
     "scan:assign": "node db/assignScanIp.js",
+    "purge:orphans": "node db/purgeOrphanNodes.js",
     "seed:roles": "node db/seedRoles.js",
     "analyze:queries": "node tools/analyze-queries.js",
     "test": "vitest run",
