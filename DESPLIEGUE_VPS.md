@@ -9,6 +9,24 @@
 
 ---
 
+> ## ⚠️ ACTUALIZACIÓN DE PLANO DE RED (2026-06-21) — leer primero
+>
+> Este documento se escribió sobre el plano de gestión **antiguo `192.168.21.0/24`** (plano + monolítico `VPN-WG-MGMT`). El proyecto **migró a un plano segmentado `10.x`**. El **runbook autoritativo de la migración es [`MIGRACION_RED_GESTION.md`](./MIGRACION_RED_GESTION.md)**; la fuente de verdad en código es `server/lib/mgmtNet.js` + `vpn-manager/src/config.ts`. Donde este doc diga `192.168.21.x` / `192.168.30.x`, sustituye por el plano nuevo:
+>
+> | Antiguo | Nuevo (`10.x`) | Qué es |
+> |---|---|---|
+> | `192.168.21.1` (`VPN-WG-MGMT`) | `VPN-WG-CLIENTES 10.13.250.1` (mod/members) · `VPN-WG-ADMIN 10.14.250.1` (admin) · `VPN-WG-VPS 10.12.250.1` (VPS) | endpoints del Core por plano |
+> | `192.168.21.60` (VPS) | **`10.12.250.60`** (peer del VPS en `VPN-WG-VPS`) | IP de control del panel |
+> | `192.168.21.2–.59` (usuarios) | `10.13.250.x` (CLIENTES) · `10.14.250.x` (ADMIN) | mgmt_ip por usuario |
+> | scan-pool `192.168.30.0/24` (o `.21.200-.230`) | **`10.11.252.0/24`** | scan-IP del VPS por workspace |
+> | nodo (gestión) | WG `10.11.250.<ND>` · SSTP `10.11.251.<ND>` | IP única por nodo |
+>
+> **Cambios de producto desde entonces (2026-06-21):**
+> - **scan:assign ya NO es manual en altas nuevas:** la scan-IP se **amarra al workspace al crearse** (`scanIpRepo.allocateInTx`). Los pasos "por cada moderador → `scan:assign`" de abajo solo aplican a workspaces creados antes de ese cambio.
+> - **Co-moderadores retirados:** cada workspace = 1 moderador (OWNER) + members. Donde se lea "OWNER/CO_MOD", es solo OWNER.
+
+---
+
 ## 0. Lo que cambia respecto a tu informe (resumen de correcciones)
 
 Tu informe está **bien encaminado en arquitectura de red**, pero tiene **5 errores que romperían el arranque o el descifrado de datos**. Los detallo aquí y los aplico en el plan:
@@ -56,25 +74,29 @@ Igual que tu informe (Ubuntu 22.04+, 2 vCPU / 2 GB / 40 GB SSD, Docker + Compose
 
 ### 3.1 IP del VPS en la red de gestión
 
-**IP real instalada: `192.168.21.60/32`.** Debe cumplir (ya lo cumple si está libre):
-- No ser `192.168.21.1` (MikroTik).
+> Plano `10.x`: el VPS vive en la interfaz **`VPN-WG-VPS` con `10.12.250.60/32`** (antes `192.168.21.60`). Debe cumplir:
+- No ser `10.12.250.1` (endpoint del Core en esa interfaz).
 - No estar asignada como `mgmt_ip` de ningún usuario en `user_mgmt_ips`.
-- Estar en el peer del MikroTik con `allowed-address=192.168.21.60/32`.
+- Estar en el peer del MikroTik (interfaz `VPN-WG-VPS`) con `allowed-address=10.12.250.60/32,10.11.252.0/24` (la `/32` de control + el scan-pool).
 
 ### 3.2 `/etc/wireguard/wg0.conf` (en el VPS)
 
 ```ini
 [Interface]
-Address = 192.168.21.60/32
+Address = 10.12.250.60/32
 PrivateKey = <PRIVATE_KEY_DEL_VPS>
+# Scan-pool (Opción C): IPs de origen del escaneo, 1 por workspace. Aditivo, no
+# recrea el túnel. Ver §11. (El backend ata el SSH del scan a una de estas IPs.)
+PostUp   = for i in $(seq 2 254); do ip addr add 10.11.252.$i/32 dev %i; done
+PostDown = for i in $(seq 2 254); do ip addr del 10.11.252.$i/32 dev %i; done
 
 [Peer]
 PublicKey = <PUBLIC_KEY_DEL_MIKROTIK>
 # IP pública FIJA del MikroTik (NO la del VPS 134.199.212.232)
-Endpoint = 213.173.36.232:51820
-# Mínimo la /24 de gestión. Si el escaneo SSH debe salir por el túnel,
-# añade aquí las LANs remotas de las torres (o usa una ruta puntual).
-AllowedIPs = 192.168.21.0/24
+Endpoint = 213.173.36.232:13232          # listen-port de VPN-WG-VPS
+# Planos de gestión + scan-pool. Si el escaneo SSH debe alcanzar LANs de torre
+# en rango público, las cubre el address-list dinámico (ver mgmtAllowedIps).
+AllowedIPs = 10.12.250.0/24, 10.13.250.0/24, 10.14.250.0/24, 10.11.250.0/24, 10.11.251.0/24, 10.11.252.0/24
 PersistentKeepalive = 25
 ```
 
@@ -84,9 +106,9 @@ PersistentKeepalive = 25
 
 ```routeros
 /interface/wireguard/peers/add \
-    interface=WG-MGMT \
+    interface=VPN-WG-VPS \
     public-key="<PUBLIC_KEY_DEL_VPS>" \
-    allowed-address=192.168.21.60/32 \
+    allowed-address=10.12.250.60/32,10.11.252.0/24 \
     comment="VPS-PANEL-PRODUCCION"
 ```
 
@@ -94,12 +116,12 @@ PersistentKeepalive = 25
 
 ```bash
 sudo wg-quick up wg0 && sudo systemctl enable wg-quick@wg0
-ping -c3 192.168.21.1            # MikroTik responde
-ip route get 192.168.21.1        # debe decir "dev wg0"
-nc -zv 192.168.21.1 8728         # API RouterOS abierta
+ping -c3 10.12.250.1             # endpoint del Core (VPN-WG-VPS) responde
+ip route get 10.12.250.1         # debe decir "dev wg0"
+nc -zv 10.12.250.1 8728          # API RouterOS abierta
 ```
 
-Si el API no responde: revisa `/ip/service/print` (api en 8728) y que el address-list de gestión incluya `192.168.21.60`.
+Si el API no responde: revisa `/ip/service/print` (api en 8728) y que el address-list de gestión incluya `10.12.250.60`.
 
 ---
 
@@ -404,7 +426,7 @@ curl -s http://localhost:3001/api/health | jq  # mysql ok, routeros ok/stale/dow
 curl -sI https://tu-dominio.com/GestionVPN-1.0/   # HTTP/2 200
 ```
 
-Luego en el panel: login admin → **Ajustes → Configurar router** (`MT_IP=192.168.21.1`, user/pass del MikroTik) → activar un nodo → confirmar que la pantalla "Acceso Restringido" desaparece (esto valida el pendiente de la sesión 2026-06-16).
+Luego en el panel: login admin → **Ajustes → Configurar router** (`MT_IP=10.12.250.1` desde el VPS — el endpoint del Core en `VPN-WG-VPS`; user/pass del MikroTik) → activar un nodo → confirmar que la pantalla "Acceso Restringido" desaparece (esto valida el pendiente de la sesión 2026-06-16).
 
 ---
 
@@ -446,28 +468,31 @@ Confirmado con el usuario (2026-06-16):
 - **Se requiere escaneo/monitoreo concurrente** de varios moderadores → descarta la Opción A (serializada).
 - ⇒ **Opción C**: cada moderador tiene una IP de origen propia en el VPS; el SSH del escaneo sale atado a ella y la mangle por-origen del MikroTik lo separa por VRF. Funciona con LANs repetidas y en paralelo.
 
-> Aclaración clave: **la scan-IP es 1 por MODERADOR (workspace), NO por miembro.** Los miembros no escanean ni usan Monitor AP (es feature de OWNER/CO_MOD); además, activar túnel es plano de control (el tráfico del miembro sale de SU dispositivo). El VPS nunca sourcea data-plane por un miembro.
+> Aclaración clave: **la scan-IP es 1 por WORKSPACE (su único moderador OWNER), NO por miembro.** Los miembros no escanean ni usan Monitor AP; además, activar túnel es plano de control (el tráfico del miembro sale de SU dispositivo). El VPS nunca sourcea data-plane por un miembro.
 
-#### Direccionamiento acordado (dentro de `192.168.21.0/24`, sin tocar enrutamiento)
+#### Direccionamiento (plano `10.x` — actualizado 2026-06-21)
 
 ```
-192.168.21.0/24   → red de gestión existente
-   .1             → MikroTik
-   .60            → VPS (IP de control del panel)
-   .2 – .59       → mgmt_ip de usuarios (moderadores + miembros), como hoy
-   .200 – .230    → scan-IPs del VPS (1 por moderador) — pool Opción C
+Planos de gestión (interfaces del Core):
+   VPN-WG-VPS       10.12.250.0/24   → VPS  (.60 = control del panel)
+   VPN-WG-CLIENTES  10.13.250.0/24   → moderadores + miembros (mgmt_ip)
+   VPN-WG-ADMIN     10.14.250.0/24   → dispositivos del admin
+IP única por nodo:
+   WG    10.11.250.<ND>      SSTP  10.11.251.<ND>
+Scan-pool del VPS (Opción C):
+   10.11.252.0/24   → scan-IP por workspace (.2–.254)
 ```
-Se eligió un sub-rango dentro de `192.168.21.0/24` (no un `/24` aparte como `192.168.30.0/24`) **porque el camino de retorno desde los VRF a la red de gestión ya está wireado**; un `/24` nuevo exigiría rutas de retorno por VRF.
+Se usa un `/24` **dedicado** para el scan-pool (`10.11.252.0/24`), separado de la gestión por nodo. La ruta de retorno por VRF (`dst=10.11.252.0/24 → VPN-WG-VPS`) se crea **automáticamente al provisionar cada nodo** (`provision.routes.addScanReturnRoute`) y se verifica/repara con `npm run check:scanroute`.
 
 #### Implementación Opción C — 4 capas
 
-1. **Red (VPS, 1 vez):** pool `.200–.230` en `wg0` vía `PostUp`/`PostDown` (`for i in $(seq 200 230); do ip addr add 192.168.21.$i/32 dev wg0; done`). Aditivo: no recrea el túnel ni las claves; la `.60` de control queda intacta.
-2. **MikroTik (1 vez):** `allowed-address` del peer del VPS abarca el rango (`...,192.168.21.200/32,...` o directamente `192.168.21.0/24`).
-3. **BD:** tabla `workspace_scan_ip(workspace_id, scan_ip)` (espejo de `mgmtIpRepo`). Alta de moderador = tomar la siguiente IP libre del pool → **solo una fila, sin tocar red**. Resolución server-side (anti-spoofing, como `getMgmtIpForUser`).
-4. **Código (3 cambios):**
-   - `sshExec` acepta `localAddress` opcional (`ubiquiti.service.js:127`) y se propaga a sus 3 llamadores: `scanner.worker.js` (vía `workerData`), `ap.service.js:170/211/217`, `device.routes.js:68`.
-   - `addScanMangle` en `tunnelProvisioner.js` (variante de `addUserMangle` con `comment=SCAN-USER-<id>`, separada de la de túnel) + ciclo de vida en `scan.routes.js`: resolver `nodeLan → nodo → VRF`, resolver scan-IP, crear mangle, escanear, borrar. Esto vuelve el escaneo **autosuficiente** (ya no depende de un túnel activo).
-   - Monitor AP (`apPollJob.js`): mangle **persistente** por moderador + `localAddress` por AP según el dueño (nodo→workspace).
+1. **Red (VPS, 1 vez):** pool `10.11.252.2–254/32` en `wg0` vía `PostUp`/`PostDown` (ver §3.2). Aditivo: no recrea el túnel ni las claves; la `.60` de control queda intacta.
+2. **MikroTik (1 vez):** `allowed-address` del peer del VPS abarca el scan-pool (`10.12.250.60/32,10.11.252.0/24`).
+3. **BD:** tabla `workspace_scan_ip(workspace_id, scan_ip)`. La scan-IP se **amarra al crear el workspace** (`scanIpRepo.allocateInTx` en `workspaceRepo.createForOwner`, menor IP libre del pool) → sin paso manual. Resolución server-side (anti-spoofing, `resolveForWorkspace`).
+4. **Código:**
+   - `sshExec` acepta `localAddress` opcional (`ubiquiti.service.js`) y se propaga a `scanner.worker.js`, `ap.service.js`, `device.routes.js`.
+   - `addScanMangle` en `tunnelProvisioner.js` (`comment=SCAN-WS-<ws>`) + ciclo de vida en `lib/scanMangle.js` (`setup`/`teardown`) integrado en `scan.routes.js`: resolver `nodeLan → VRF`, resolver scan-IP, crear mangle, escanear, borrar. Escaneo **autosuficiente**.
+   - Monitor AP (`apPollJob.js`): conmuta la mangle de la scan-IP por grupo de VRF + `localAddress`; usa `scanLock.tryAcquire` (no bloqueante) para no estancar otros workspaces durante un escaneo interactivo.
 
 #### Fases de entrega
 
@@ -487,11 +512,11 @@ Se eligió un sub-rango dentro de `192.168.21.0/24` (no un `/24` aparte como `19
 
 **Comportamiento:** si el workspace tiene scan-IP asignada → monta `src=scan-IP → VRF` y ata el SSH a esa IP; si **no** la tiene → escaneo legacy sin `localAddress` (preserva el dev local). Si la mangle falla, el escaneo devuelve `503` accionable en vez de "no encontró nada".
 
-**Provisión operativa (por workspace, al alta del moderador):**
-1. `docker exec vpn-backend npm run scan:assign <workspaceId>` → asigna la siguiente IP libre del pool `.200–.230` (idempotente). Sin argumento lista las asignaciones.
-2. Pool en `wg0` y `allowed-address` en MikroTik: ya cubiertos por la config 1-vez (capas 1-2).
+**Provisión operativa:**
+1. La scan-IP se **asigna sola al crear el workspace** (pool `10.11.252.0/24`). Para workspaces creados ANTES de ese cambio: `docker exec vpn-backend npm run scan:assign <workspaceId>` (idempotente; sin argumento lista las asignaciones).
+2. Pool en `wg0` y `allowed-address` en MikroTik: ya cubiertos por la config 1-vez (capas 1-2). Verifica la ruta de retorno con `docker exec vpn-backend npm run check:scanroute`.
 
-> **Limitación conocida:** la scan-IP es **una por workspace** → si un mismo moderador tiene la misma LAN en dos nodos (VRF distintos), el escaneo de esa LAN usa el primer VRF que matchee. Moderadores **distintos** sí escanean en paralelo sin colisión.
+> **Limitación conocida:** la scan-IP es **una por workspace** → si el moderador tiene la misma LAN en dos nodos (VRF distintos), el escaneo de esa LAN usa el VRF del túnel activo (o el primer match). Workspaces **distintos** sí escanean en paralelo sin colisión.
 
 ---
 
@@ -507,11 +532,11 @@ Se eligió un sub-rango dentro de `192.168.21.0/24` (no un `/24` aparte como `19
 | `server/index.js` | ✏️ `trust proxy` (§4.5, opcional) |
 | `docker-compose.prod.yml` | 🆕 crear (§5) |
 | `.env` (raíz) | 🆕 crear |
-| `/etc/wireguard/wg0.conf` | 🆕 en VPS — incluye pool `.200–.230` (§3.2 + §11) |
+| `/etc/wireguard/wg0.conf` | 🆕 en VPS — `Address=10.12.250.60/32` + pool scan `10.11.252.2–254` (§3.2 + §11) |
 | **Escaneo multi-VRF — Opción C (Fase 1)** | 🆕 `workspace_scan_ip` repo/tabla · `addScanMangle` + ciclo de vida en `scan.routes.js` · `localAddress` en `sshExec` + 3 llamadores (§11) |
 | **Monitor AP — Opción C (Fase 2)** | ✏️ mangle persistente por dueño + `localAddress` en `apPollJob.js` (§11) |
 
-> **Lo más crítico, en orden:** (1) WireGuard estable (`ping 192.168.21.1`), (2) secretos en `/data` (C1), (3) build de backend desde monorepo (C2), (4) HTTPS para que la cookie funcione, (5) Opción C para escaneo multi-moderador (§11).
+> **Lo más crítico, en orden:** (1) WireGuard estable (`ping 10.12.250.1`), (2) secretos en `/data` (C1), (3) build de backend desde monorepo (C2), (4) HTTPS para que la cookie funcione, (5) Opción C para escaneo multi-moderador (§11).
 
 ---
 
@@ -525,17 +550,19 @@ Se eligió un sub-rango dentro de `192.168.21.0/24` (no un `/24` aparte como `19
 - [ ] Firewall: `22/tcp`, `80/tcp`, `443/tcp`, `51820/udp` abiertos; `3001` y `3307` NO.
 
 ### Red / WireGuard (1 vez)
-- [ ] `ping 192.168.21.1` y `nc -zv 192.168.21.1 8728` responden desde el VPS.
-- [ ] Pool `.200–.230` en `wg0` (`PostUp`/`PostDown`) + `allowed-address` del peer VPS en el MikroTik (o `192.168.21.0/24`).
+- [ ] `ping 10.12.250.1` y `nc -zv 10.12.250.1 8728` responden desde el VPS.
+- [ ] Pool `10.11.252.2–254/32` en `wg0` (`PostUp`/`PostDown`) + `allowed-address` del peer VPS en el MikroTik (`10.12.250.60/32,10.11.252.0/24`).
+- [ ] Migración del plano `10.x` aplicada en el router (ver [`MIGRACION_RED_GESTION.md`](./MIGRACION_RED_GESTION.md)).
 
 ### Despliegue
-- [ ] `git pull` (rama `main`) en `/opt/GestionVPN-1.0`.
-- [ ] `server/.env.production` y `.env` raíz desde las plantillas; cert autofirmado en `./ssl` (`/CN=134.199.212.232`).
-- [ ] `docker compose -f docker-compose.prod.yml up -d --build` → 3 servicios arriba; `curl -s http://localhost:3001/api/health | jq` OK.
-- [ ] Login admin → **Ajustes → Configurar router** (`MT_IP=192.168.21.1`) → activar un nodo → confirmar que "Acceso Restringido" desaparece.
+- [ ] `git fetch origin && git reset --hard origin/main` en `/opt/GestionVPN-1.0` (NUNCA `git pull` — historial purgado).
+- [ ] `server/.env.production` (incl. `SCAN_IP_POOL_BASE=10.11.252.`, `SCAN_RETURN_SUBNET=10.11.252.0/24`) y `.env` raíz desde las plantillas; cert autofirmado en `./ssl` (`/CN=134.199.212.232`).
+- [ ] `docker compose -f docker-compose.prod.yml up -d --build` → 3 servicios arriba; `curl -s http://localhost:3001/api/health | jq` OK. (El `entrypoint.sh` corre `migrate:dropcomod` y demás migraciones.)
+- [ ] Login admin → **Ajustes → Configurar router** (`MT_IP=10.12.250.1`) → activar un nodo → confirmar que "Acceso Restringido" desaparece.
 
 ### Por cada moderador (alta)
-- [ ] `docker exec vpn-backend npm run scan:assign <workspaceId>` (asigna scan-IP del pool; sin arg lista).
+- [ ] (Altas nuevas) nada que hacer: la scan-IP se amarra al crear el workspace. Verifica con `docker exec vpn-backend npm run diagnose`.
+- [ ] (Workspaces previos al cambio) `docker exec vpn-backend npm run scan:assign <workspaceId>`.
 
 ### Operación continua
 - [ ] Cron de backup (`mysqldump` + secretos del volumen) — ver §9.
@@ -570,14 +597,20 @@ Despliegue ejecutado en el droplet DigitalOcean (`134.199.212.232`, repo en **`/
 
 7. **Telegram 409:** un solo poller por token. Apaga el bot en dev/PC o usa otro token en prod (`TELEGRAM_BOT_ENABLED=false` si no lo usas aún).
 
-### Direccionamiento aplicado (definitivo)
-- **Usuarios:** `192.168.21.0/24` (como hoy, sin cambios).
-- **scan-IPs del VPS:** **`192.168.30.0/24`** (no el sub-rango `.21.200-.230`). Pool activo `.30.2–.40` en `wg0` (`PostUp`/`PostDown`).
+### Direccionamiento aplicado
+> ⚠️ Lo de abajo fue el estado **transitorio** del 2026-06-17 (plano viejo `192.168.x`). Tras la migración (2026-06-21) el direccionamiento vigente es el plano `10.x` — ver el banner del inicio y [`MIGRACION_RED_GESTION.md`](./MIGRACION_RED_GESTION.md). Resumen vigente:
+> - **Usuarios:** `10.13.250.0/24` (CLIENTES) · `10.14.250.0/24` (ADMIN).
+> - **scan-IPs del VPS:** `10.11.252.0/24` (pool `.2–.254`).
+> - MikroTik: peer del VPS `allowed-address=10.12.250.60/32,10.11.252.0/24` + ruta de retorno `dst=10.11.252.0/24 gw=VPN-WG-VPS` por VRF (creada al provisionar nodo / `check:scanroute`).
+> - `server/.env.production`: `SCAN_IP_POOL_BASE=10.11.252.`, `SCAN_IP_POOL_START=2`, `SCAN_IP_POOL_END=254`, `SCAN_RETURN_SUBNET=10.11.252.0/24`, `NODE_OPTIONS=--dns-result-order=ipv4first`.
+
+_(Histórico 2026-06-17, plano viejo:)_
+- **Usuarios:** `192.168.21.0/24`.
+- **scan-IPs del VPS:** `192.168.30.0/24`, pool `.30.2–.40` en `wg0`.
 - MikroTik: peer del VPS `allowed-address=192.168.21.60/32,192.168.30.0/24` + `Route-SCAN` (`dst=192.168.30.0/24 gw=VPN-WG-MGMT`) en los 14 VRF.
-- `server/.env.production`: `SCAN_IP_POOL_BASE=192.168.30.`, `SCAN_IP_POOL_START=2`, `SCAN_IP_POOL_END=40`, `SCAN_RETURN_SUBNET=192.168.30.0/24`, `NODE_OPTIONS=--dns-result-order=ipv4first`.
 
 ### Crear moderadores SIN email (estado actual)
 1. Panel → **Moderadores → Nuevo Moderador** → se crea la invitación y se muestra el **enlace de aceptación** (botón Copiar).
 2. La tarjeta **"Invitaciones pendientes"** lista a quienes no han aceptado; "Copiar enlace" regenera un enlace válido.
-3. Comparte el enlace (WhatsApp/Telegram). El moderador define su contraseña + WireGuard y queda como OWNER.
-4. Luego, por cada moderador: `docker exec vpn-backend npm run scan:assign <workspaceId>`.
+3. Comparte el enlace (WhatsApp/Telegram). El moderador define su contraseña + WireGuard y queda como OWNER (único moderador del workspace; ya no hay co-moderadores).
+4. La scan-IP del workspace se asigna **automáticamente** al crearse. (Solo workspaces previos a ese cambio necesitan `docker exec vpn-backend npm run scan:assign <workspaceId>`.)

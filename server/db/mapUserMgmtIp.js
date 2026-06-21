@@ -54,7 +54,7 @@ async function main() {
     const [members] = await conn.query(
       `SELECT workspace_id, role FROM workspace_members
         WHERE user_id = ? AND deleted_at IS NULL
-        ORDER BY (role='OWNER') DESC, (role='CO_MODERATOR') DESC LIMIT 1`,
+        ORDER BY (role='OWNER') DESC LIMIT 1`,
       [userRow.id]
     );
     if (members.length === 0) { console.error(`El usuario ${userRow.email} no pertenece a ningún workspace.`); process.exit(4); }

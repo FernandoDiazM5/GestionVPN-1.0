@@ -3,6 +3,8 @@
 // ============================================================
 const crypto = require('crypto');
 const { query } = require('../mysql');
+const scanIpRepo = require('./scanIpRepo');
+const log = require('../../lib/logger').child({ scope: 'workspace-repo' });
 
 /**
  * Crea workspace + membresía OWNER dentro de una transacción (ACID).
@@ -23,6 +25,20 @@ async function createForOwner(tx, { ownerId, name }) {
      VALUES (?,?,?,'OWNER',NULL,?)`,
     [memberId, workspaceId, ownerId, now]
   );
+
+  // Opción C: la scan-IP del VPS queda amarrada al workspace DESDE su creación,
+  // de forma atómica (misma tx). Así el escaneo / Monitor AP del moderador
+  // funciona sin un `scan:assign` manual posterior. Best-effort: si el pool está
+  // agotado, NO se rompe la creación del workspace (el escaneo caería a legacy y
+  // el admin puede ampliar/liberar el pool luego). El INSERT que falla hace
+  // rollback solo de su statement (InnoDB), la tx del workspace sigue viva.
+  try {
+    const scanIp = await scanIpRepo.allocateInTx(tx, workspaceId);
+    log.info({ workspaceId, scanIp }, 'scan-IP amarrada al crear workspace');
+  } catch (e) {
+    log.warn({ workspaceId, err: e?.message }, 'no se pudo amarrar scan-IP al crear workspace (escaneo caerá a legacy)');
+  }
+
   return { workspaceId };
 }
 

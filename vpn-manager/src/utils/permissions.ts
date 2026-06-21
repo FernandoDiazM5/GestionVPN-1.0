@@ -5,7 +5,8 @@
 import type { Role, SessionUser } from '../types/account';
 
 export const isOwner = (role?: Role) => role === 'OWNER';
-export const isModerator = (role?: Role) => role === 'OWNER' || role === 'CO_MODERATOR';
+// Único rol de moderación del workspace = OWNER (CO_MODERATOR retirado).
+export const isModerator = (role?: Role) => role === 'OWNER';
 
 /** Administrador de plataforma (Sistemas). */
 export const isPlatformAdmin = (s?: SessionUser | null) => !!s?.platform_admin;
@@ -31,7 +32,7 @@ export function visibleModules(s?: SessionUser | null): ModuleId[] {
   // El ModeratorSettingsModule filtra tabs según el rol — el MEMBER solo
   // ve "Perfil" (cambiar contraseña/correo) y "Notificaciones" (solo Telegram).
   if (s.role === 'MEMBER') return ['nodes', 'team', 'settings'];
-  // Moderador (OWNER / CO_MODERATOR) → sistema operativo de su workspace.
+  // Moderador (OWNER) → sistema operativo de su workspace.
   // Ajustes para el moderador = perfil + workspace + import/export (Fase C).
   // El SettingsModule del Administrador (config del router core) NO se ve.
   // 'users' (Gestión WG) se unificó dentro de 'team' como una tab — el item del
@@ -44,9 +45,5 @@ export const canSeeModule = (s: SessionUser | null | undefined, m: ModuleId) => 
 
 /** Puede invitar miembros. */
 export const canInvite = (role?: Role) => isModerator(role);
-/** Puede asignar el rol de co-moderador (solo el propietario). */
-export const canAssignCoModerator = (role?: Role) => isOwner(role);
-/** Puede cambiar roles (promover/degradar) — solo el propietario. */
-export const canManageRoles = (role?: Role) => isOwner(role);
 /** Puede remover miembros. */
 export const canRemoveMembers = (role?: Role) => isModerator(role);

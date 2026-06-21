@@ -1,9 +1,10 @@
 -- ============================================================
 --  schema_scan_ip.sql — Opción C: scan-IP del VPS por workspace.
---  Cada moderador (workspace) tiene UNA IP de origen en el VPS
---  (pool 192.168.21.200-.230). El backend ata el SSH/HTTP del
---  escaneo a esa IP para que la mangle por-origen del MikroTik
---  enrute el tráfico al VRF correcto. Idempotente.
+--  Cada workspace (1 moderador) tiene UNA IP de origen en el VPS
+--  (pool 10.11.252.0/24 por defecto; ver scanIpRepo). El backend ata
+--  el SSH/HTTP del escaneo a esa IP para que la mangle por-origen del
+--  MikroTik enrute el tráfico al VRF correcto. La IP se amarra al crear
+--  el workspace (workspaceRepo.createForOwner → allocateInTx). Idempotente.
 -- ============================================================
 CREATE TABLE IF NOT EXISTS workspace_scan_ip (
   id           VARCHAR(36)  NOT NULL,

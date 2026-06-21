@@ -1,6 +1,6 @@
 // ============================================================
 //  Repositorio de membresías de workspace (MySQL) — Fase 3
-//  RBAC: OWNER / CO_MODERATOR / MEMBER. Respeta soft-deletes.
+//  RBAC: OWNER (único moderador) / MEMBER. Respeta soft-deletes.
 // ============================================================
 const crypto = require('crypto');
 const { query } = require('../mysql');
@@ -29,18 +29,10 @@ async function listMembers(workspaceId) {
        FROM workspace_members wm
        JOIN users u ON u.id = wm.user_id
       WHERE wm.workspace_id = ? AND wm.deleted_at IS NULL AND u.deleted_at IS NULL
-      ORDER BY FIELD(wm.role,'OWNER','CO_MODERATOR','MEMBER'), wm.created_at ASC`,
+      ORDER BY FIELD(wm.role,'OWNER','MEMBER'), wm.created_at ASC`,
     [workspaceId]
   );
   return rows.map(r => ({ ...r, disabled: !!r.disabled_at }));
-}
-
-async function updateRole(workspaceId, userId, role) {
-  const r = await query(
-    "UPDATE workspace_members SET role = ? WHERE workspace_id = ? AND user_id = ? AND deleted_at IS NULL AND role <> 'OWNER'",
-    [role, workspaceId, userId]
-  );
-  return r.affectedRows > 0;
 }
 
 async function softRemove(workspaceId, userId) {
@@ -51,4 +43,4 @@ async function softRemove(workspaceId, userId) {
   return r.affectedRows > 0;
 }
 
-module.exports = { findMembership, add, listMembers, updateRole, softRemove };
+module.exports = { findMembership, add, listMembers, softRemove };

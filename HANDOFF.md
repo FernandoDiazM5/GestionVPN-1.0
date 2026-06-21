@@ -9,9 +9,10 @@
 
 ## 0) Estado actual
 
-- **Tips:** `dev` = **`484dc0b`** · `main` = `57908cc` (se mergea a `main` tras validar la parte de RED en prod).
-- **Salud:** `tsc` frontend 0 · `node --check` 0 · **271 tests backend verdes** · `semgrep` 0 en código de app · `audit:design` 0 errores.
-- **Última línea de trabajo (2026-06-20, cont.):** ciclo de vida WireGuard de gestión + borrado en cascada real. Hecho: `.conf` SPLIT-TUNNEL (NUNCA `0.0.0.0/0`, mataba el internet) con AllowedIPs dinámico desde `LIST-NET-REMOTE-TOWERS`; recuperación WG self-service (tab Ajustes→WireGuard); cascada de borrado de moderador de-provisiona nodos del router (`nodeDeprovision`) + limpia peers en la interfaz correcta (`mgmtNet.userIfaces`); reutilización de IPs liberadas; 503 en cortes de túnel; purga de zombies RBAC.
+- **Tips:** `dev` = **`4c4b810`** + **trabajo SIN commitear** (esta sesión, ver abajo) · `main` = `57908cc` (se mergea a `main` tras validar la parte de RED en prod).
+- **Salud:** `tsc` frontend 0 · `node --check` 0 · **270 tests backend verdes** · **66 tests frontend verdes** · contratos compilan · `semgrep`/`audit:design` sin tocar.
+- **Última línea de trabajo (2026-06-21):** (1) **Opción C reforzada** — scan-IP del VPS **amarrada al workspace al crearse** (`scanIpRepo.allocateInTx` dentro de `workspaceRepo.createForOwner`, best-effort), ya no hace falta `scan:assign` manual en altas nuevas; Monitor AP usa `scanLock.tryAcquire` (no bloqueante) → un escaneo interactivo largo ya no estanca el polling de los demás workspaces. (2) **Retiro total de co-moderadores** (`CO_MODERATOR`): enum BD → `('OWNER','MEMBER')` + migración `migrate:dropcomod` (degrada co-mods existentes a MEMBER), contratos, guards, rutas `/team`, UI (sin selector de rol ni promover/degradar), tests. Endpoint `POST /team/role` eliminado.
+- **Trabajo previo (2026-06-20):** ciclo de vida WireGuard de gestión + borrado en cascada (`.conf` split-tunnel, recuperación WG self-service, `nodeDeprovision`, reutilización de IPs, 503 en cortes). Detalle en LOG.
 - **Estado de datos (limpiado hoy):** **0 nodos** en BD (ND2 TorreHousenet + ND3 TorreOmar borrados — tenían `workspace_id=NULL`); **2 workspaces** (Soporte, Espacio de admin), 4 users; zombies del soft-delete purgados.
 - **Acciones de RED pendientes del usuario:** ver §7 (pendientes) y los runbooks de §6.
 
@@ -29,7 +30,7 @@ Panel **multi-tenant (SaaS)** para administrar túneles VPN sobre un **MikroTik 
 | **Moderador** | `OWNER` de su workspace | Nodos · Escanear · Usuarios · Equipo · Monitor AP | Ajustes / config router |
 | **View** (MEMBER) | — | Sus túneles asignados + perfil WireGuard | Todo lo demás |
 
-Co-moderadores: **1 OWNER + máx 2 CO_MOD = 3 por workspace**, comparten una scan-IP (serializada por `scanLock`).
+**Un solo moderador por workspace:** cada workspace = **1 OWNER (moderador) + sus MEMBERs**. El rol `CO_MODERATOR` fue **retirado** (enum BD `('OWNER','MEMBER')`). Solo el OWNER escanea/gestiona; el MEMBER no. La scan-IP del VPS se amarra **al workspace** (no al usuario) al crearse (Opción C); el `scanLock` ahora serializa el escaneo interactivo del moderador contra el job de Monitor AP del mismo workspace.
 
 ---
 
@@ -84,6 +85,8 @@ Estas reglas son **durables**: aplican a toda sesión y a todo cambio. Si una fe
 12. **Borrar un moderador = de-provisionar sus nodos del router.** El cascade (`DELETE /admin/moderators/:id`) debe llamar `deprovisionNodeOnRouter` (`lib/nodeDeprovision.js`) por cada nodo (VRF + interfaz + rutas + mangle + peer), además de borrar peers de gestión (`routerCleanup`/`routerPeerState`, que usan `mgmtNet.userIfaces`, NO `VPN-WG-MGMT`). Best-effort: el router caído no bloquea el borrado en BD.
 13. **NUNCA tocar el address-list `LIST-NET-REMOTE-TOWERS` al de-provisionar.** Varias torres comparten la misma LAN (aislamiento por VRF+mangle) → borrar la entrada rompería a los nodos hermanos. Las entradas sin ruta/VRF quedan inertes.
 14. **IPs de gestión: amarradas al usuario, liberadas y reutilizadas.** `user_mgmt_ips` (`uq_umi_user`+`uq_umi_ip`) amarra 1 IP↔1 usuario; al borrar se libera. La asignación usa **menor octeto libre** (`lib/ipAlloc.lowestFreeOctet`), no `max+1` → reutiliza huecos de usuarios borrados.
+15. **Scan-IP del VPS = amarrada al WORKSPACE, asignada al crearse.** `workspace_scan_ip` (`uq_wsi_workspace`+`uq_wsi_ip`) liga 1 scan-IP↔1 workspace. Se asigna **automáticamente** al crear el workspace (`scanIpRepo.allocateInTx` dentro de `workspaceRepo.createForOwner`, menor IP libre del pool `10.11.252.0/24`), best-effort: pool agotado NO rompe la creación (cae a escaneo legacy). NUNCA tomar la IP del request del cliente — siempre server-side (`resolveForWorkspace`). Se eligió el **workspace** (no el usuario) porque es el contenedor estable: sobrevive a rotación del moderador y el namespace de mangle ya es `SCAN-WS-<ws>`.
+16. **Un solo moderador (OWNER) por workspace — sin co-moderadores.** El rol `CO_MODERATOR` está **retirado** del enum, contratos, guards, rutas y UI. `isModerator` = `OWNER` (o `platform_admin`). No hay promover/degradar (endpoint `/team/role` eliminado); `/team/invite` solo crea MEMBERs. El alta de un moderador la hace el Administrador (invitación rol `OWNER`). Job de Monitor AP: `scanLock.tryAcquire` (no bloqueante) para no estancar otros workspaces durante un escaneo interactivo largo.
 
 Ver también `vpn-manager/CLAUDE.md` y `DESIGN_SYSTEM.md`.
 
@@ -99,7 +102,7 @@ Ver también `vpn-manager/CLAUDE.md` y `DESIGN_SYSTEM.md`.
 - **Recuperación WireGuard self-service:** `POST /api/team/me/wireguard` — el moderador/member (re)genera su propio acceso WG si quedó sin él (la provisión al aceptar es best-effort y puede fallar si el router está caído). UI en **Ajustes → tab WireGuard** (`WireGuardTab.tsx`) con QR + descargar `.conf` + regenerar. Idempotente: limpia el peer anterior al regenerar.
 - **Enlace manual de invitaciones:** DO bloquea SMTP saliente → el correo puede no llegar. `invite-moderator` no falla si el email falla y devuelve `acceptUrl`; `GET /api/admin/invitations` lista pendientes y `POST .../:id/link` regenera el enlace. El admin lo comparte a mano hasta tener relay (Brevo por puerto 2525, pendiente activar cuenta).
 - **IP pública WAN:** setting global del admin (`server_public_ip` en Ajustes); `NuevoNodo` la consume en solo-lectura.
-- **Escaneo Opción C (VPS):** una scan-IP por workspace (`workspace_scan_ip`), mangle namespace `SCAN-WS-<ws>`, serializada por `scanLock`. Sin scan-IP → escaneo legacy (dev local).
+- **Escaneo Opción C (VPS):** una scan-IP por workspace (`workspace_scan_ip`), **asignada al crear el workspace**; mangle namespace `SCAN-WS-<ws>`; el SSH/HTTP se ata a la scan-IP (`localAddress`) y la mangle por-origen del router lo enruta al VRF. Serializado por `scanLock` (interactivo `acquire`, Monitor AP `tryAcquire`). Sin scan-IP → escaneo legacy (dev local). Ruta de retorno del scan-pool se crea sola al provisionar nodo (`provision.routes.addScanReturnRoute`); `db/checkScanRoute.js` la verifica/repara.
 
 ---
 
@@ -115,6 +118,7 @@ Ver también `vpn-manager/CLAUDE.md` y `DESIGN_SYSTEM.md`.
 7. Puerto 3001 ocupado por zombie → `Get-NetTCPConnection -LocalPort 3001` → `Stop-Process`.
 
 **Scripts útiles:** `npm run init:rbac | init:multiuser | migrate:* | seed:roles` · `npm run analyze:queries` · `npm run audit:design` · `npm run scan:assign <workspaceId>` · `npm run purge:orphans`.
+**Diagnóstico (read-only, seguro):** `npm run diagnose` (IPs de gestión/scan, sesiones, salud de cifrado MT_* — sin imprimir secretos) · `npm run check:scanroute [-- --apply]` (verifica/repara la ruta de retorno del scan-pool en cada VRF). Reemplazan los scripts sueltos de depuración ya retirados.
 
 **Runbooks de RED (acciones del usuario en VPS/MikroTik):** [`DESPLIEGUE_VPS.md`](./DESPLIEGUE_VPS.md) · [`MIGRACION_RED_GESTION.md`](./MIGRACION_RED_GESTION.md) · `PLAN_IP_UNIFICADA.md`.
 
@@ -126,8 +130,8 @@ Ver también `vpn-manager/CLAUDE.md` y `DESIGN_SYSTEM.md`.
 
 | Prioridad | Tarea |
 |---|---|
-| 🔴 Una vez tras pull | `cd server && npm run migrate:notifications && npm run migrate:monitoring` (sin esto Q1/M5 caen en defensa). |
-| 🟡 RED en VPS | Aplicar runbook de migración `10.x` (fases del `migrate-mgmt-net.rsc`, corte final que elimina `VPN-WG-MGMT`) · activar cuenta Brevo (relay SMTP 2525) · `scan:assign` por moderador · cerrar puertos sobrantes en `ufw`. |
+| 🔴 Una vez tras pull | `cd server && npm run migrate:notifications && npm run migrate:monitoring && npm run migrate:dropcomod` (este último degrada co-mods existentes a MEMBER y estrecha el enum). En prod ya van en `entrypoint.sh`. |
+| 🟡 RED en VPS | Aplicar runbook de migración `10.x` (fases del `migrate-mgmt-net.rsc`, corte final que elimina `VPN-WG-MGMT`) · activar cuenta Brevo (relay SMTP 2525) · cerrar puertos sobrantes en `ufw`. (`scan:assign` ya NO es necesario en altas nuevas: la scan-IP se amarra al crear el workspace; úsalo solo para workspaces creados antes de este cambio.) |
 | 🟡 Prueba en vivo | Alta WG/SSTP → script en CPE → handshake + ping gestión + escaneo > 0 · 2 moderadores contra el router (aislamiento mangle por-usuario). |
 | 🟡 Router | **Limpieza puntual** de peers WG YA huérfanos en el router (del moderador borrado ANTES del fix de cascada) — el código nuevo solo cubre borrados futuros. Revisar en Winbox `/interface wireguard peers print` y borrar los que tengan comment de un email inexistente. |
 | 🟡 Router | **Dedup del address-list** `LIST-NET-REMOTE-TOWERS`: pueden quedar entradas duplicadas/inertes (M3 solo evita NUEVAS; el borrado de nodo NO las toca a propósito). Un `:foreach` de limpieza puntual cuando convenga. |

@@ -56,6 +56,15 @@ async function upsert({ workspaceId, scanIp }) {
   return ip;
 }
 
+/** Elige la siguiente scan-IP libre del pool a partir de un set de IPs usadas. */
+function nextFree(used) {
+  for (let i = POOL_START; i <= POOL_END; i++) {
+    const candidate = `${POOL_BASE}${i}`;
+    if (!used.has(candidate)) return candidate;
+  }
+  throw new Error(`Pool de scan-IPs agotado (${POOL_BASE}${POOL_START}-${POOL_END})`);
+}
+
 /**
  * Asigna al workspace la siguiente scan-IP libre del pool (idempotente: si ya
  * tiene una, la devuelve). Lanza si el pool está agotado.
@@ -67,14 +76,35 @@ async function allocate(workspaceId) {
   const used = new Set(
     (await query('SELECT scan_ip FROM workspace_scan_ip')).map(r => r.scan_ip)
   );
-  for (let i = POOL_START; i <= POOL_END; i++) {
-    const candidate = `${POOL_BASE}${i}`;
-    if (!used.has(candidate)) {
-      await upsert({ workspaceId, scanIp: candidate });
-      return candidate;
-    }
-  }
-  throw new Error(`Pool de scan-IPs agotado (${POOL_BASE}${POOL_START}-${POOL_END})`);
+  const candidate = nextFree(used);
+  await upsert({ workspaceId, scanIp: candidate });
+  return candidate;
+}
+
+/**
+ * Variante TRANSACCIONAL de allocate(): amarra la scan-IP usando la MISMA
+ * conexión que crea el workspace, de modo que la IP queda asociada de forma
+ * atómica al nacer el workspace (Opción C — sin paso manual posterior).
+ * Idempotente. Lanza si el pool está agotado o por colisión (uq_wsi_ip); el
+ * caller la trata como best-effort: NO debe romper la creación del workspace.
+ * @param {{query: Function}} tx  — el `tx` de withTransaction
+ * @returns {Promise<string>} la scan-IP asignada (o la existente)
+ */
+async function allocateInTx(tx, workspaceId) {
+  const existing = await tx.query(
+    'SELECT scan_ip FROM workspace_scan_ip WHERE workspace_id = ? LIMIT 1', [workspaceId]
+  );
+  if (existing[0]) return existing[0].scan_ip;
+
+  const used = new Set((await tx.query('SELECT scan_ip FROM workspace_scan_ip')).map(r => r.scan_ip));
+  const candidate = nextFree(used);
+  const now = Date.now();
+  await tx.query(
+    `INSERT INTO workspace_scan_ip (id, workspace_id, scan_ip, created_at, updated_at)
+     VALUES (?,?,?,?,?)`,
+    [crypto.randomUUID(), workspaceId, candidate, now, now]
+  );
+  return candidate;
 }
 
 /** Lista el mapeo completo (admin). */
@@ -103,8 +133,8 @@ async function getSetting(key) {
  *    a su VRF. No requiere pool ni asignación por workspace.
  *
  *  • 'vps' (default, multi-tenant) → usa la scan-IP del POOL asignada por
- *    workspace (10.11.252.x). Cada workspace tiene la suya → co-moderadores
- *    escanean en paralelo sin colisión.
+ *    workspace (10.11.252.x). Cada workspace tiene la suya → moderadores de
+ *    distintos workspaces escanean en paralelo sin colisión.
  *
  * Devuelve null si no hay IP resoluble → el escaneo cae a modo legacy.
  */
@@ -127,4 +157,4 @@ function poolSubnet() {
   return POOL_BASE ? `${POOL_BASE}0/24` : '';
 }
 
-module.exports = { getScanIpForWorkspace, getByWorkspace, upsert, allocate, list, resolveForWorkspace, getSetting, poolSubnet, POOL_BASE, POOL_START, POOL_END };
+module.exports = { getScanIpForWorkspace, getByWorkspace, upsert, allocate, allocateInTx, list, resolveForWorkspace, getSetting, poolSubnet, POOL_BASE, POOL_START, POOL_END };

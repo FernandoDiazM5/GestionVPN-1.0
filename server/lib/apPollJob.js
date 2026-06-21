@@ -81,6 +81,13 @@ async function pollLegacy(db, ws, aps, batch) {
  * conmuta la mangle (src=scan-IP → VRF) por grupo y pollea esos APs atando el
  * SSH a la scan-IP. El lock serializa contra el escaneo interactivo del mismo
  * workspace (misma scan-IP = una sola mangle activa a la vez).
+ *
+ * ⚠️ tryAcquire (NO bloqueante): si el moderador está escaneando interactivamente
+ * (lock tomado, hasta minutos cubriendo la fase de auth SSH), este job SE SALTA
+ * ese workspace en este tick y reintenta al próximo. Antes usaba withLock, que
+ * bloqueaba el `for (const ws ...)` del tick global de runOnce → un escaneo largo
+ * en UN workspace estancaba el Monitor AP de TODOS los demás. El escaneo
+ * interactivo es además dato más fresco, así que saltar el tick no pierde nada.
  */
 async function pollOptionC(db, ws, aps, batch, scanIp, mikrotik) {
   const byVrf = new Map();
@@ -94,20 +101,27 @@ async function pollOptionC(db, ws, aps, batch, scanIp, mikrotik) {
     }
   }
 
-  await scanLock.withLock(ws, async () => {
-    for (const [vrf, vrfAps] of byVrf) {
-      try {
-        await scanMangle.setup({ workspaceId: ws, scanIp, vrfName: vrf, mikrotik });
-      } catch (e) {
-        log.warn({ ws, vrf, err: e.message }, 'no se pudo montar la scan mangle (grupo omitido)');
-        continue;
+  const release = scanLock.tryAcquire(ws);
+  if (!release) {
+    log.debug({ ws }, 'scan-IP ocupada (escaneo interactivo); Monitor AP omite este tick');
+  } else {
+    try {
+      for (const [vrf, vrfAps] of byVrf) {
+        try {
+          await scanMangle.setup({ workspaceId: ws, scanIp, vrfName: vrf, mikrotik });
+        } catch (e) {
+          log.warn({ ws, vrf, err: e.message }, 'no se pudo montar la scan mangle (grupo omitido)');
+          continue;
+        }
+        for (let i = 0; i < vrfAps.length; i += batch) {
+          await Promise.allSettled(vrfAps.slice(i, i + batch).map(ap => pollOne(db, ws, ap, scanIp)));
+        }
       }
-      for (let i = 0; i < vrfAps.length; i += batch) {
-        await Promise.allSettled(vrfAps.slice(i, i + batch).map(ap => pollOne(db, ws, ap, scanIp)));
-      }
+      await scanMangle.teardown({ workspaceId: ws, mikrotik });
+    } finally {
+      release();
     }
-    await scanMangle.teardown({ workspaceId: ws, mikrotik });
-  });
+  }
 
   // APs sin VRF asignado (node_id null): poll legacy (no rutea desde el VPS).
   if (noVrf.length) await pollLegacy(db, ws, noVrf, batch);

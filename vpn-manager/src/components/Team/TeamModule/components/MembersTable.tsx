@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Crown, ShieldCheck, User, ChevronUp, ChevronDown, Trash2, Loader2, Shield, PowerOff, Power, Waypoints } from 'lucide-react';
+import { Crown, User, Trash2, Loader2, Shield, PowerOff, Power, Waypoints } from 'lucide-react';
 import type { Member, Role } from '../../../../types/account';
 import { ROLE_LABEL } from '../../../../types/account';
-import { canManageRoles, canRemoveMembers, isOwner, isModerator } from '../../../../utils/permissions';
+import { canRemoveMembers, isOwner, isModerator } from '../../../../utils/permissions';
 import MemberWireGuardModal from './MemberWireGuardModal';
 import AssignTunnelsModal from './AssignTunnelsModal';
 
@@ -12,7 +12,6 @@ interface MembersTableProps {
   currentRole: Role;
   currentUserId: string;
   busyId: string | null;
-  onChangeRole: (userId: string, role: Exclude<Role, 'OWNER'>) => void;
   onRemove: (member: Member) => void;
   /** Suspende/reactiva al miembro; el backend sincroniza el peer WG en MikroTik. */
   onSetDisabled: (userId: string, disabled: boolean) => void;
@@ -20,18 +19,16 @@ interface MembersTableProps {
 
 const ROLE_ICON: Record<Role, typeof Crown> = {
   OWNER: Crown,
-  CO_MODERATOR: ShieldCheck,
   MEMBER: User,
 };
 
 function roleBadgeClass(role: Role) {
   if (role === 'OWNER') return 'badge badge-warning';
-  if (role === 'CO_MODERATOR') return 'badge badge-info';
   return 'badge badge-neutral';
 }
 
 export default function MembersTable({
-  members, loading = false, currentRole, currentUserId, busyId, onChangeRole, onRemove, onSetDisabled,
+  members, loading = false, currentRole, currentUserId, busyId, onRemove, onSetDisabled,
 }: MembersTableProps) {
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [confirmDisableId, setConfirmDisableId] = useState<string | null>(null);
@@ -120,7 +117,7 @@ export default function MembersTable({
                         </button>
                       )}
 
-                      {/* Asignar túneles — solo MEMBER. CO_MOD/OWNER ya ven todos. */}
+                      {/* Asignar túneles — solo MEMBER. El OWNER ya ve todos. */}
                       {canManage && m.role === 'MEMBER' && !busy && (
                         <button onClick={() => setAssignFor(m)}
                           title="Asignar túneles" aria-label="Asignar túneles"
@@ -147,23 +144,6 @@ export default function MembersTable({
                             title="Deshabilitar miembro" aria-label="Deshabilitar miembro"
                             className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors dark:hover:text-amber-400 dark:hover:bg-amber-500/10">
                             <PowerOff className="w-3.5 h-3.5" />
-                          </button>
-                        )
-                      )}
-
-                      {/* Promover / degradar (solo OWNER, no sobre sí mismo ni sobre el OWNER) */}
-                      {canManageRoles(currentRole) && !ownerRow && !isSelf && !busy && (
-                        m.role === 'MEMBER' ? (
-                          <button onClick={() => onChangeRole(m.user_id, 'CO_MODERATOR')}
-                            title="Promover a co-moderador" aria-label="Promover"
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition-colors dark:hover:text-sky-400 dark:hover:bg-sky-500/10">
-                            <ChevronUp className="w-3.5 h-3.5" />
-                          </button>
-                        ) : (
-                          <button onClick={() => onChangeRole(m.user_id, 'MEMBER')}
-                            title="Degradar a miembro" aria-label="Degradar"
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors dark:hover:text-slate-200 dark:hover:bg-slate-700">
-                            <ChevronDown className="w-3.5 h-3.5" />
                           </button>
                         )
                       )}

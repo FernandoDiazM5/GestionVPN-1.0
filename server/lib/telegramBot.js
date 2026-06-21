@@ -118,7 +118,7 @@ function clearPending(chatId) {
 /**
  * Devuelve los túneles que el usuario puede activar (según rol).
  *  - MEMBER  → solo asignados
- *  - OWNER/CO_MOD → todos del workspace
+ *  - OWNER (moderador) → todos del workspace
  * Devuelve hasta 30 (mismo límite que /tuneles antes).
  */
 async function fetchUserTunnels(userId) {

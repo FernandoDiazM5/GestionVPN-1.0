@@ -74,12 +74,12 @@ async function sendOtp(email, code, purpose = 'verificación') {
  * @param {string} opts.inviterName Nombre o email de quien invita
  * @param {string} opts.workspaceName Nombre del workspace al que se le invita
  * @param {string} [opts.tunnelId] Túnel pre-asignado (opcional)
- * @param {string} [opts.role]     'CO_MODERATOR' | 'MEMBER'
+ * @param {string} [opts.role]     'OWNER' (moderador) | 'MEMBER'
  */
 async function sendInvitation({ email, code, inviterName, workspaceName, tunnelId, role }) {
   const baseUrl = (process.env.APP_BASE_URL || 'http://localhost:5173/GestionVPN-1.0/').replace(/\/+$/, '/');
   const acceptUrl = `${baseUrl}?accept=1&email=${encodeURIComponent(email)}&otp=${encodeURIComponent(code)}`;
-  const roleLabel = role === 'CO_MODERATOR' ? 'Co-Moderador' : 'Miembro';
+  const roleLabel = role === 'OWNER' ? 'Moderador' : 'Miembro';
 
   const tx = getTransporter();
   if (!tx) {

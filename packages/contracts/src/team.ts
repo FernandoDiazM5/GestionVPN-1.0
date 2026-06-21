@@ -9,7 +9,9 @@ import { EmailSchema, OtpSchema, PasswordSchema, PublicKeySchema, Role } from '.
 export const InviteRequestSchema = z.object({
   email: EmailSchema,
   name: z.string().max(120).optional(),
-  role: z.enum(['MEMBER', 'CO_MODERATOR']).default('MEMBER'),
+  // El workspace solo invita MIEMBROS (View). Su único moderador (OWNER) se
+  // crea por el flujo de "Crear Moderador" del Administrador, no por aquí.
+  role: z.enum(['MEMBER']).default('MEMBER'),
   tunnelId: z.string().max(160).optional(),
 });
 export type InviteRequest = z.infer<typeof InviteRequestSchema>;
@@ -28,13 +30,6 @@ export const InAppAcceptRequestSchema = z.object({
   publicKey: PublicKeySchema.optional(),
 });
 export type InAppAcceptRequest = z.infer<typeof InAppAcceptRequestSchema>;
-
-/** POST /api/team/role */
-export const ChangeRoleRequestSchema = z.object({
-  userId: z.string().min(1),
-  role: z.enum(['MEMBER', 'CO_MODERATOR']),
-});
-export type ChangeRoleRequest = z.infer<typeof ChangeRoleRequestSchema>;
 
 /** PATCH /api/team/member/:userId */
 export const MemberPatchRequestSchema = z
@@ -137,6 +132,5 @@ export interface MemberWireguard {
 /** Etiqueta legible por rol — la mantenemos aquí para que ambos lados la importen. */
 export const ROLE_LABEL: Record<Role, string> = {
   OWNER: 'Propietario',
-  CO_MODERATOR: 'Co-moderador',
   MEMBER: 'Miembro',
 };

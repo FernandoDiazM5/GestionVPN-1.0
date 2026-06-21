@@ -2,19 +2,16 @@ import { useState } from 'react';
 import { UserPlus, Loader2, Mail, X, Clock, User } from 'lucide-react';
 import type { Invitation, Role } from '../../../../types/account';
 import { ROLE_LABEL } from '../../../../types/account';
-import { canAssignCoModerator } from '../../../../utils/permissions';
 
 interface InvitePanelProps {
-  currentRole: Role;
   invitations: Invitation[];
   onInvite: (email: string, role: Exclude<Role, 'OWNER'>, tunnelId?: string, name?: string) => Promise<string | null>;
   onRevoke: (id: string) => void;
 }
 
-export default function InvitePanel({ currentRole, invitations, onInvite, onRevoke }: InvitePanelProps) {
+export default function InvitePanel({ invitations, onInvite, onRevoke }: InvitePanelProps) {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
-  const [role, setRole] = useState<Exclude<Role, 'OWNER'>>('MEMBER');
   const [sending, setSending] = useState(false);
   const [devHint, setDevHint] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -24,8 +21,9 @@ export default function InvitePanel({ currentRole, invitations, onInvite, onRevo
     setSending(true); setError(null); setDevHint(null);
     try {
       // El túnel se asigna dinámicamente cuando el miembro acepta y se le
-      // genera su WireGuard, no es necesario pedirlo aquí.
-      const dev = await onInvite(email.trim(), role, undefined, name.trim() || undefined);
+      // genera su WireGuard, no es necesario pedirlo aquí. El único rol
+      // invitable es MEMBER (View): el moderador del workspace es el OWNER.
+      const dev = await onInvite(email.trim(), 'MEMBER', undefined, name.trim() || undefined);
       setEmail(''); setName('');
       if (dev) setDevHint(`Invitación creada. En modo dev, el código OTP está en la consola del backend para ${email.trim()}.`);
     } catch (e) {
@@ -65,12 +63,6 @@ export default function InvitePanel({ currentRole, invitations, onInvite, onRevo
                        text-slate-700 placeholder:text-slate-400 transition-all"
           />
         </div>
-        <select value={role} onChange={e => setRole(e.target.value as Exclude<Role, 'OWNER'>)}
-          className="px-3 py-2.5 text-sm rounded-xl border border-slate-200 bg-white text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100
-                     focus:outline-none focus:ring-2 focus:ring-indigo-300">
-          <option value="MEMBER">{ROLE_LABEL.MEMBER}</option>
-          {canAssignCoModerator(currentRole) && <option value="CO_MODERATOR">{ROLE_LABEL.CO_MODERATOR}</option>}
-        </select>
         <button onClick={submit} disabled={sending || !email.trim()}
           className="btn-primary px-4 py-2.5 flex items-center gap-2 text-sm disabled:opacity-50">
           {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}

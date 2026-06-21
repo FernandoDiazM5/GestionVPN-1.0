@@ -50,7 +50,7 @@ async function annotateSessions(req, nodes) {
 /**
  * Filtra los nodos según el rol RBAC (Roles v2) con aislamiento multi-tenant:
  *  - Admin de plataforma: ve TODOS los túneles del router.
- *  - Moderador (OWNER/CO_MODERATOR): solo los nodos de SU workspace
+ *  - Moderador (OWNER): solo los nodos de SU workspace
  *    (nodes.workspace_id = su workspace).
  *  - View (MEMBER): solo sus túneles asignados, dentro de su workspace.
  * Ante error de DB no expone túneles (seguro por defecto) para roles no-admin.
@@ -105,9 +105,9 @@ async function nodeBelongsToRequester(req, pppUser) {
 }
 
 /**
- * Middleware: solo moderadores (OWNER/CO_MODERATOR) o platform_admin mutan nodos.
+ * Middleware: solo moderador (OWNER) o platform_admin mutan nodos.
  * M2: deriva de req.account (RBAC). Antes miraba req.user.role (admin/operator),
- * mapeado por mapRbacRole, que conflaba OWNER/CO_MOD→'admin' (riesgo tipo A2).
+ * mapeado por mapRbacRole, que conflaba OWNER→'admin' (riesgo tipo A2).
  */
 function requireOperator(req, res, next) {
   if (isModerator(req)) return next();

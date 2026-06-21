@@ -29,7 +29,7 @@ type Tab = 'members' | 'vpn';
  *
  * • MEMBER  → solo "Usuarios" (sin switch — la tab "Usuarios VPN" es gestión
  *   de moderador). Mantiene MyInvitationsInbox + MemberProfile.
- * • OWNER / CO_MODERATOR → ambas tabs.
+ * • OWNER (moderador) → ambas tabs.
  * • platform_admin → no entra aquí (no es miembro de un workspace).
  */
 export default function TeamModule() {
@@ -77,11 +77,6 @@ export default function TeamModule() {
   };
   const onInvitationAccepted = () => { refresh(); loadData(); };
   const handleRevoke = async (id: string) => { await teamApi.revokeInvitation(id); await loadData(); };
-  const handleChangeRole = async (userId: string, role: Exclude<Role, 'OWNER'>) => {
-    setBusyId(userId);
-    try { await teamApi.changeRole(userId, role); await loadData(); }
-    finally { setBusyId(null); }
-  };
   const handleRemove = async (m: Member) => {
     setBusyId(m.user_id);
     try { await teamApi.removeMember(m.user_id); await loadData(); }
@@ -169,7 +164,7 @@ export default function TeamModule() {
     );
   }
 
-  // ── Moderador (OWNER / CO_MOD): header + tabs + cuerpo ──
+  // ── Moderador (OWNER): header + tabs + cuerpo ──
   return (
     <div className="space-y-5 reveal-stagger">
       {/* Invitaciones dirigidas a este usuario (puede ser invitado a otro workspace) */}
@@ -206,7 +201,6 @@ export default function TeamModule() {
         <>
           {canInvite(session.role) && (
             <InvitePanel
-              currentRole={session.role}
               invitations={invitations}
               onInvite={handleInvite}
               onRevoke={handleRevoke}
@@ -219,7 +213,6 @@ export default function TeamModule() {
             currentRole={session.role}
             currentUserId={session.id}
             busyId={busyId}
-            onChangeRole={handleChangeRole}
             onRemove={handleRemove}
             onSetDisabled={handleSetDisabled}
           />

@@ -183,7 +183,7 @@ router.get('/tunnel/my-mgmt-ip', asyncHandler(async (req, res) => {
 //  del peer, dejando que un MEMBER reclamara IP de otro usuario):
 //
 //   • platform_admin → cualquier peer del router.
-//   • OWNER / CO_MODERATOR → el peer debe pertenecer al workspace del usuario
+//   • OWNER (moderador) → el peer debe pertenecer al workspace del usuario
 //     (mgmt_peer_owners.workspace_id === acc.workspace_id). El moderador
 //     administra sus propios peers; aceptar cualquiera del workspace es ok.
 //   • MEMBER → el peer.public-key DEBE coincidir con su member_wireguard
@@ -226,7 +226,7 @@ router.post('/tunnel/register-my-ip', asyncHandler(async (req, res) => {
           throw new AppError('Ese peer no te pertenece. Pide al moderador que te asigne uno.', 403, 'NOT_YOUR_PEER');
         }
       } else {
-        // OWNER / CO_MODERATOR: el peer debe pertenecer al workspace.
+        // OWNER (moderador): el peer debe pertenecer al workspace.
         const db = await getDb();
         const owner = await db.get(
           'SELECT workspace_id FROM mgmt_peer_owners WHERE public_key = ?',

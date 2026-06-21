@@ -32,7 +32,7 @@ router.get('/settings/get', asyncHandler(async (req, res) => {
 
 // Solo el Administrador de PLATAFORMA puede escribir settings globales.
 // ⚠️ Antes miraba el rol legacy `admin`, pero `mapRbacRole` se lo otorga también
-// a OWNER/CO_MODERATOR → un moderador podía mutar settings GLOBALES del sistema
+// a OWNER → un moderador podía mutar settings GLOBALES del sistema
 // (scan_mode, server_public_ip, local_scan_ip) por API, fuera de su tenant.
 // Estos settings son plataforma-global: el gate correcto es `platform_admin`.
 const requireAdmin = (req, _res, next) => {

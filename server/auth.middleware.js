@@ -24,7 +24,7 @@ async function injectMikrotik(req) {
 }
 
 // M2: las guardas de autorización derivan de req.account (RBAC). Ya no se mapea el
-// rol RBAC a un rol legacy (`mapRbacRole` eliminado): conflaba OWNER/CO_MOD→'admin'
+// rol RBAC a un rol legacy (`mapRbacRole` eliminado): conflaba OWNER→'admin'
 // y era el origen del gap A2. `req.user` solo se conserva para tokens LEGACY puros
 // (sin RBAC), que el bridge legacy→RBAC necesita por username.
 

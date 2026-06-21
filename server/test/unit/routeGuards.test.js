@@ -1,5 +1,5 @@
 // M2 — las guardas de autorización derivan de req.account (RBAC), nunca del rol
-// legacy req.user.role (que mapRbacRole conflaba OWNER/CO_MOD→'admin' = origen A2).
+// legacy req.user.role (que mapRbacRole conflaba OWNER→'admin' = origen A2).
 import { describe, it, expect, vi } from 'vitest';
 const { isPlatformAdmin, isModerator, requireModerator } = require('../../lib/routeGuards');
 
@@ -13,10 +13,9 @@ describe('routeGuards — predicados RBAC (M2)', () => {
     expect(isPlatformAdmin(reqWith(null))).toBe(false);
   });
 
-  it('isModerator: platform_admin / OWNER / CO_MODERATOR true; MEMBER false', () => {
+  it('isModerator: platform_admin / OWNER true; MEMBER false (CO_MODERATOR retirado)', () => {
     expect(isModerator(reqWith({ platform_admin: true }))).toBe(true);
     expect(isModerator(reqWith({ role: 'OWNER' }))).toBe(true);
-    expect(isModerator(reqWith({ role: 'CO_MODERATOR' }))).toBe(true);
     expect(isModerator(reqWith({ role: 'MEMBER' }))).toBe(false);
     expect(isModerator(reqWith(null))).toBe(false);
   });

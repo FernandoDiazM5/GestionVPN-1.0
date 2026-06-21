@@ -54,7 +54,6 @@ router.get('/summary', asyncHandler(async (_req, res) => {
   const roles = (await query(
     `SELECT
        SUM(role='OWNER') AS moderadores,
-       SUM(role='CO_MODERATOR') AS comoderadores,
        SUM(role='MEMBER') AS miembros,
        COUNT(*) AS total
      FROM workspace_members WHERE deleted_at IS NULL`
@@ -73,7 +72,6 @@ router.get('/summary', asyncHandler(async (_req, res) => {
       workspaces: Number(ws.total || 0),
       usuarios: Number(usr.total || 0),
       moderadores: Number(roles.moderadores || 0),
-      comoderadores: Number(roles.comoderadores || 0),
       miembros: Number(roles.miembros || 0),
       acciones_24h: Number(acts.total || 0),
     },

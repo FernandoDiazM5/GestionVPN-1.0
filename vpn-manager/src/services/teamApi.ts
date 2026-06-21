@@ -25,9 +25,6 @@ export const teamApi = {
   acceptInApp: (id: string, publicKey?: string) =>
     post<AcceptResult>(`/api/team/invitations/${id}/accept`, { publicKey }),
 
-  changeRole: (userId: string, role: Exclude<Role, 'OWNER'>) =>
-    post('/api/team/role', { userId, role }),
-
   removeMember: (userId: string) => del(`/api/team/member/${userId}`),
 
   /** Suspende o reactiva al miembro (sin borrarlo) y sincroniza el peer WG en MikroTik. */

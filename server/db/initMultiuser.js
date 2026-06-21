@@ -90,7 +90,7 @@ async function main() {
     console.log('[init:multiuser] Tablas presentes:', tables.map(t => Object.values(t)[0]).join(', '));
     console.log('\n[init:multiuser] ⚠️  Verifica el mapeo usuario↔IP:');
     console.log('     SELECT u.email, umi.mgmt_ip, umi.source FROM user_mgmt_ips umi JOIN users u ON u.id=umi.user_id;');
-    console.log('     Los OWNER/CO_MOD sin peer registrado deben mapearse manual (ver §2.2 del plan).');
+    console.log('     Los OWNER (moderadores) sin peer registrado deben mapearse manual (ver §2.2 del plan).');
   } finally {
     await conn.end();
   }

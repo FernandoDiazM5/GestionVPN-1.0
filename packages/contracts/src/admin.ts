@@ -54,7 +54,6 @@ export interface AdminSummary {
   workspaces: number;
   usuarios: number;
   moderadores: number;
-  comoderadores: number;
   miembros: number;
   acciones_24h: number;
 }

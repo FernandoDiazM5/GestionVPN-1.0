@@ -20,7 +20,7 @@ const ALL_TABS: TabDef[] = [
 ];
 
 // MEMBER: perfil + su WireGuard + notificaciones (sin workspace ni import/export).
-// El moderador (OWNER/CO_MOD) ve todo.
+// El moderador (OWNER) ve todo.
 const MEMBER_TAB_IDS: TabId[] = ['profile', 'wireguard', 'notifications'];
 
 /**

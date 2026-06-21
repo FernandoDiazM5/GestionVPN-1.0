@@ -65,10 +65,6 @@ const IDENTITIES = {
     user: { id: 'u-o', username: 'owner', role: 'admin' },
     account: { sub: 'u-o', workspace_id: 'ws-1', role: 'OWNER', platform_admin: false },
   },
-  operator: {
-    user: { id: 'u-op', username: 'operator', role: 'operator' },
-    account: { sub: 'u-op', workspace_id: 'ws-1', role: 'CO_MODERATOR', platform_admin: false },
-  },
   platformAdmin: {
     user: { id: 'u-a', username: 'admin', role: 'admin' },
     account: { sub: 'u-a', workspace_id: 'ws-0', role: 'OWNER', platform_admin: true },
@@ -120,8 +116,8 @@ describe('H1 — RBAC: un MEMBER (viewer) recibe 403 en mutaciones de nodos', ()
   }
 });
 
-describe('H1 — RBAC: OWNER / operator pasan el guard (no 403)', () => {
-  for (const identity of ['owner', 'operator']) {
+describe('H1 — RBAC: OWNER pasa el guard (no 403)', () => {
+  for (const identity of ['owner']) {
     it(`POST /api/node/provision NO devuelve 403 para ${identity}`, async () => {
       const r = await request(app).post('/api/node/provision')
         .set('x-test-identity', identity)

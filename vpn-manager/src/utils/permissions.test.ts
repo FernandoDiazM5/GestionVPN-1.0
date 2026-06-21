@@ -13,8 +13,6 @@ import {
   visibleModules,
   canSeeModule,
   canInvite,
-  canAssignCoModerator,
-  canManageRoles,
   canRemoveMembers,
 } from './permissions';
 import type { SessionUser } from '../types/account';
@@ -32,14 +30,12 @@ const u = (p: Partial<SessionUser> = {}): SessionUser => ({
 describe('role predicates', () => {
   it('isOwner solo verdadero para OWNER', () => {
     expect(isOwner('OWNER')).toBe(true);
-    expect(isOwner('CO_MODERATOR')).toBe(false);
     expect(isOwner('MEMBER')).toBe(false);
     expect(isOwner(undefined)).toBe(false);
   });
 
-  it('isModerator: OWNER y CO_MODERATOR', () => {
+  it('isModerator: solo OWNER (CO_MODERATOR retirado)', () => {
     expect(isModerator('OWNER')).toBe(true);
-    expect(isModerator('CO_MODERATOR')).toBe(true);
     expect(isModerator('MEMBER')).toBe(false);
   });
 
@@ -80,11 +76,6 @@ describe('visibleModules', () => {
     expect(mods).not.toContain('moderators');
   });
 
-  it('CO_MODERATOR ve lo mismo que OWNER', () => {
-    expect(visibleModules(u({ role: 'CO_MODERATOR' }))).toEqual(
-      visibleModules(u({ role: 'OWNER' })),
-    );
-  });
 });
 
 describe('canSeeModule', () => {
@@ -93,7 +84,6 @@ describe('canSeeModule', () => {
   it('Nadie ve "users" como módulo independiente (unificado en team)', () => {
     expect(canSeeModule(u({ role: 'MEMBER' }), 'users')).toBe(false);
     expect(canSeeModule(u({ role: 'OWNER' }), 'users')).toBe(false);
-    expect(canSeeModule(u({ role: 'CO_MODERATOR' }), 'users')).toBe(false);
     expect(canSeeModule(u({ platform_admin: true }), 'users')).toBe(false);
   });
 
@@ -108,34 +98,17 @@ describe('canSeeModule', () => {
 
 describe('action predicates', () => {
   describe('canInvite (envía invitaciones)', () => {
-    it('OWNER y CO_MODERATOR pueden', () => {
+    it('OWNER puede', () => {
       expect(canInvite('OWNER')).toBe(true);
-      expect(canInvite('CO_MODERATOR')).toBe(true);
     });
     it('MEMBER NO puede', () => {
       expect(canInvite('MEMBER')).toBe(false);
     });
   });
 
-  describe('canAssignCoModerator (asigna rol co-mod)', () => {
-    it('SOLO el OWNER puede (regla del backend)', () => {
-      expect(canAssignCoModerator('OWNER')).toBe(true);
-      expect(canAssignCoModerator('CO_MODERATOR')).toBe(false);
-      expect(canAssignCoModerator('MEMBER')).toBe(false);
-    });
-  });
-
-  describe('canManageRoles (promover/degradar)', () => {
-    it('SOLO el OWNER puede', () => {
-      expect(canManageRoles('OWNER')).toBe(true);
-      expect(canManageRoles('CO_MODERATOR')).toBe(false);
-    });
-  });
-
   describe('canRemoveMembers', () => {
-    it('OWNER y CO_MODERATOR pueden remover', () => {
+    it('OWNER puede remover', () => {
       expect(canRemoveMembers('OWNER')).toBe(true);
-      expect(canRemoveMembers('CO_MODERATOR')).toBe(true);
     });
     it('MEMBER no puede', () => {
       expect(canRemoveMembers('MEMBER')).toBe(false);

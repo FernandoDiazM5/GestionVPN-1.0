@@ -1,7 +1,7 @@
 // ============================================================
 //  A2 — /settings/save debe exigir platform_admin (no el rol legacy 'admin').
-//  Regresión: mapRbacRole otorga 'admin' legacy a OWNER/CO_MODERATOR → antes
-//  un moderador podía mutar settings GLOBALES (scan_mode, server_public_ip).
+//  Regresión: mapRbacRole otorga 'admin' legacy a OWNER → antes un moderador
+//  podía mutar settings GLOBALES (scan_mode, server_public_ip).
 // ============================================================
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 const { stubModule } = require('../helpers/moduleMock');
@@ -20,12 +20,11 @@ const request = require('supertest');
 const settingsRoutes = require('../../routes/settings.routes');
 const { errorMiddleware } = require('../../lib/apiResponse');
 
-// OWNER y CO_MODERATOR llevan user.role='admin' (legacy mapRbacRole) PERO
-// platform_admin=false → el gate correcto es platform_admin.
+// El OWNER lleva user.role='admin' (legacy mapRbacRole) PERO platform_admin=false
+// → el gate correcto es platform_admin.
 const IDENTITIES = {
   member:        { user: { id: 'u-m', role: 'viewer' }, account: { sub: 'u-m', workspace_id: 'ws-1', role: 'MEMBER', platform_admin: false } },
   owner:         { user: { id: 'u-o', role: 'admin' },  account: { sub: 'u-o', workspace_id: 'ws-1', role: 'OWNER', platform_admin: false } },
-  coMod:         { user: { id: 'u-c', role: 'admin' },  account: { sub: 'u-c', workspace_id: 'ws-1', role: 'CO_MODERATOR', platform_admin: false } },
   platformAdmin: { user: { id: 'u-a', role: 'admin' },  account: { sub: 'u-a', workspace_id: 'ws-0', role: 'OWNER', platform_admin: true } },
 };
 
@@ -47,7 +46,7 @@ beforeEach(() => {
 });
 
 describe('A2 — escritura de settings solo para platform_admin', () => {
-  for (const id of ['owner', 'coMod', 'member']) {
+  for (const id of ['owner', 'member']) {
     it(`${id} (no platform_admin) → 403 al guardar scan_mode (y no toca BD)`, async () => {
       const r = await request(app).post('/api/settings/save')
         .set('x-test-identity', id)

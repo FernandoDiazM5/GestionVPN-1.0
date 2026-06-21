@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS workspace_members (
   id           CHAR(36) NOT NULL,
   workspace_id CHAR(36) NOT NULL,
   user_id      CHAR(36) NOT NULL,
-  role         ENUM('OWNER','CO_MODERATOR','MEMBER') NOT NULL DEFAULT 'MEMBER',
+  role         ENUM('OWNER','MEMBER') NOT NULL DEFAULT 'MEMBER',
   invited_by   CHAR(36) DEFAULT NULL,
   created_at   BIGINT   NOT NULL,
   deleted_at   BIGINT   DEFAULT NULL,
@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS invitations (
   email        VARCHAR(255) NOT NULL,
   name         VARCHAR(120) DEFAULT NULL,              -- nombre del invitado (lo escribe quien invita)
   otp_hash     VARCHAR(255) NOT NULL,                  -- HASH del OTP, nunca el código en claro
-  role         ENUM('OWNER','CO_MODERATOR','MEMBER') NOT NULL DEFAULT 'MEMBER',
+  role         ENUM('OWNER','MEMBER') NOT NULL DEFAULT 'MEMBER',
   status       ENUM('PENDING','ACCEPTED','EXPIRED','REVOKED') NOT NULL DEFAULT 'PENDING',
   tunnel_id    VARCHAR(160) DEFAULT NULL,                -- túnel a asignar al aceptar (nombre_vrf/ppp_user)
   invited_by   CHAR(36)     DEFAULT NULL,

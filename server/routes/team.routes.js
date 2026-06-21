@@ -10,7 +10,6 @@ const {
   InviteRequestSchema,
   AcceptRequestSchema,
   InAppAcceptRequestSchema,
-  ChangeRoleRequestSchema,
   MemberPatchRequestSchema,
   MemberWireguardProvisionSchema,
   AssignmentCreateSchema,
@@ -39,7 +38,8 @@ const { removePeersFromRouter } = require('../lib/routerCleanup');
 const { setPeersEnabled, removeUserMangles } = require('../lib/routerPeerState');
 const log = require('../lib/logger').child({ scope: 'team' });
 
-const isModeratorRole = (role) => role === 'OWNER' || role === 'CO_MODERATOR';
+// Único rol de moderación del workspace = OWNER (CO_MODERATOR retirado).
+const isModeratorRole = (role) => role === 'OWNER';
 
 // Credenciales del router core desde app_settings (las rutas públicas/in-app no
 // pasan por verifyToken, así que se inyectan aquí). Devuelve null si no hay config.
@@ -180,20 +180,14 @@ const INVITE_MAX_ATTEMPTS = 5;
 // Schemas centralizados en @gestionvpn/contracts (F5).
 const inviteSchema = InviteRequestSchema;
 const acceptSchema = AcceptRequestSchema;
-const roleSchema = ChangeRoleRequestSchema;
 
 const genOtp = () => String(crypto.randomInt(100000, 1000000));
 
-// ── POST /invite  (OWNER, CO_MODERATOR) ──────────────────────
-router.post('/invite', requireSession, requireRole('OWNER', 'CO_MODERATOR'),
+// ── POST /invite  (solo OWNER) — invita un MIEMBRO al workspace ──
+router.post('/invite', requireSession, requireRole('OWNER'),
   asyncHandler(async (req, res) => {
     const { email, name, role, tunnelId } = inviteSchema.parse(req.body);
     const wsId = req.account.workspace_id;
-
-    // Un CO_MODERATOR no puede crear otros CO_MODERATOR (solo el OWNER)
-    if (role === 'CO_MODERATOR' && req.account.role !== 'OWNER') {
-      throw new AppError('Solo el moderador principal puede asignar co-moderadores', 403, 'FORBIDDEN');
-    }
 
     // ¿Ya es miembro?
     const existingUser = await userRepo.findByEmail(email);
@@ -404,33 +398,23 @@ router.get('/members', requireSession, asyncHandler(async (req, res) => {
   return sendOk(res, { members });
 }));
 
-// ── GET /invitations  (OWNER, CO_MODERATOR) ──────────────────
-router.get('/invitations', requireSession, requireRole('OWNER', 'CO_MODERATOR'),
+// ── GET /invitations  (solo OWNER) ───────────────────────────
+router.get('/invitations', requireSession, requireRole('OWNER'),
   asyncHandler(async (req, res) => {
     const invitations = await invitationRepo.listPending(req.account.workspace_id);
     return sendOk(res, { invitations });
   }));
 
-// ── POST /role  (solo OWNER) — promover/degradar ─────────────
-router.post('/role', requireSession, requireRole('OWNER'),
-  asyncHandler(async (req, res) => {
-    const { userId, role } = roleSchema.parse(req.body);
-    if (userId === req.account.sub) throw new AppError('No puedes cambiar tu propio rol', 400, 'SELF_ROLE');
-    const target = await memberRepo.findMembership(req.account.workspace_id, userId);
-    if (!target) throw new AppError('El usuario no es miembro', 404, 'NOT_MEMBER');
-    if (target.role === 'OWNER') throw new AppError('No se puede cambiar el rol del propietario', 403, 'OWNER_LOCKED');
-    const ok = await memberRepo.updateRole(req.account.workspace_id, userId, role);
-    if (!ok) throw new AppError('No se pudo actualizar el rol', 400, 'ROLE_UPDATE_FAILED');
-    return sendOk(res, { message: 'Rol actualizado', userId, role });
-  }));
+// (Retirado) POST /role — con un único moderador (OWNER) por workspace y solo
+// MIEMBROS además, no hay promoción/degradación de roles que gestionar.
 
-// ── PATCH /member/:userId  (OWNER, CO_MODERATOR) — habilitar/deshabilitar ──
+// ── PATCH /member/:userId  (solo OWNER) — habilitar/deshabilitar ──
 //  Suspende sin borrar: pone disabled_at, sincroniza =disabled= en el peer WG
 //  del MikroTik, cierra la sesión activa del usuario e invalida su cache de auth.
 //  Al rehabilitar, solo limpia disabled_at + re-habilita el peer.
 const memberPatchSchema = MemberPatchRequestSchema;
 
-router.patch('/member/:userId', requireSession, requireRole('OWNER', 'CO_MODERATOR'),
+router.patch('/member/:userId', requireSession, requireRole('OWNER'),
   asyncHandler(async (req, res) => {
     const { userId } = req.params;
     const wsId = req.account.workspace_id;
@@ -442,9 +426,6 @@ router.patch('/member/:userId', requireSession, requireRole('OWNER', 'CO_MODERAT
     const target = await memberRepo.findMembership(wsId, userId);
     if (!target) throw new AppError('El usuario no es miembro', 404, 'NOT_MEMBER');
     if (target.role === 'OWNER') throw new AppError('No se puede deshabilitar al propietario', 403, 'OWNER_LOCKED');
-    if (req.account.role === 'CO_MODERATOR' && target.role !== 'MEMBER') {
-      throw new AppError('Permisos insuficientes', 403, 'FORBIDDEN');
-    }
 
     const now = Date.now();
     const db = await getDb();
@@ -487,11 +468,11 @@ router.patch('/member/:userId', requireSession, requireRole('OWNER', 'CO_MODERAT
     });
   }));
 
-// ── DELETE /member/:userId  (OWNER, CO_MODERATOR) ────────────
+// ── DELETE /member/:userId  (solo OWNER) ─────────────────────
 //  HARD DELETE en cascada: peer WG del router + member_wireguard +
 //  mgmt_peer_owners + tunnel_assignments + user_mgmt_ips + sesiones +
 //  workspace_members. El user se borra solo si no pertenece a otros ws.
-router.delete('/member/:userId', requireSession, requireRole('OWNER', 'CO_MODERATOR'),
+router.delete('/member/:userId', requireSession, requireRole('OWNER'),
   asyncHandler(async (req, res) => {
     const { userId } = req.params;
     const wsId = req.account.workspace_id;
@@ -499,10 +480,6 @@ router.delete('/member/:userId', requireSession, requireRole('OWNER', 'CO_MODERA
     const target = await memberRepo.findMembership(wsId, userId);
     if (!target) throw new AppError('El usuario no es miembro', 404, 'NOT_MEMBER');
     if (target.role === 'OWNER') throw new AppError('No se puede remover al propietario', 403, 'OWNER_LOCKED');
-    // Un CO_MODERATOR solo puede remover MEMBERs
-    if (req.account.role === 'CO_MODERATOR' && target.role !== 'MEMBER') {
-      throw new AppError('Permisos insuficientes para remover a este usuario', 403, 'FORBIDDEN');
-    }
 
     // 1) Recolectar las public-keys WG del miembro para limpiar el router.
     //    Antes filtrábamos mgmt_peer_owners por comment="member:<userId>";
@@ -550,8 +527,8 @@ router.delete('/member/:userId', requireSession, requireRole('OWNER', 'CO_MODERA
     });
   }));
 
-// ── POST /invitation/:id/revoke  (OWNER, CO_MODERATOR) ───────
-router.post('/invitation/:id/revoke', requireSession, requireRole('OWNER', 'CO_MODERATOR'),
+// ── POST /invitation/:id/revoke  (solo OWNER) ────────────────
+router.post('/invitation/:id/revoke', requireSession, requireRole('OWNER'),
   asyncHandler(async (req, res) => {
     const ok = await invitationRepo.revoke(req.params.id, req.account.workspace_id);
     if (!ok) throw new AppError('Invitación no encontrada o ya procesada', 404, 'NO_INVITE');
@@ -560,8 +537,8 @@ router.post('/invitation/:id/revoke', requireSession, requireRole('OWNER', 'CO_M
 
 // ── GET /workspace-tunnels — lista de túneles del workspace (ligero, sin RouterOS) ──
 //  Util para el picker del modal "Asignar túneles". Lee de MySQL directo, ms.
-//  Acceso: moderadores (OWNER/CO_MOD).
-router.get('/workspace-tunnels', requireSession, requireRole('OWNER', 'CO_MODERATOR'),
+//  Acceso: moderador (OWNER).
+router.get('/workspace-tunnels', requireSession, requireRole('OWNER'),
   asyncHandler(async (req, res) => {
     const wsId = req.account.workspace_id;
     const rows = await query(
@@ -575,7 +552,7 @@ router.get('/workspace-tunnels', requireSession, requireRole('OWNER', 'CO_MODERA
   }));
 
 // ── GET /assignments — asignaciones de túneles ──────────────
-//  Moderador (OWNER/CO_MOD): todas las del workspace.
+//  Moderador (OWNER): todas las del workspace.
 //  View (MEMBER): solo las suyas.
 router.get('/assignments', requireSession, asyncHandler(async (req, res) => {
   const wsId = req.account.workspace_id;
@@ -586,7 +563,7 @@ router.get('/assignments', requireSession, asyncHandler(async (req, res) => {
 }));
 
 // ── POST /assignments — asignar túnel a miembro (Moderador) ──
-router.post('/assignments', requireSession, requireRole('OWNER', 'CO_MODERATOR'),
+router.post('/assignments', requireSession, requireRole('OWNER'),
   asyncHandler(async (req, res) => {
     const { userId, tunnelId } = AssignmentCreateSchema.parse(req.body);
     const member = await memberRepo.findMembership(req.account.workspace_id, userId);
@@ -598,7 +575,7 @@ router.post('/assignments', requireSession, requireRole('OWNER', 'CO_MODERATOR')
   }));
 
 // ── DELETE /assignments/:id — quitar asignación (Moderador) ──
-router.delete('/assignments/:id', requireSession, requireRole('OWNER', 'CO_MODERATOR'),
+router.delete('/assignments/:id', requireSession, requireRole('OWNER'),
   asyncHandler(async (req, res) => {
     const ok = await assignmentRepo.remove(req.params.id, req.account.workspace_id);
     if (!ok) throw new AppError('Asignación no encontrada', 404, 'NOT_FOUND');
@@ -609,7 +586,7 @@ router.delete('/assignments/:id', requireSession, requireRole('OWNER', 'CO_MODER
 //  El Moderador genera el peer WireGuard (en MikroTik) para el equipo del
 //  miembro (móvil/PC) y guarda su .conf cifrado. Devuelve el .conf una vez.
 const wgSchema = MemberWireguardProvisionSchema;
-router.post('/member/:id/wireguard', requireSession, requireRole('OWNER', 'CO_MODERATOR'),
+router.post('/member/:id/wireguard', requireSession, requireRole('OWNER'),
   asyncHandler(async (req, res) => {
     if (!req.mikrotik) throw new AppError('Configura el router MikroTik en Ajustes', 503, 'NO_ROUTER');
     const { mode, publicKey } = wgSchema.parse(req.body);
@@ -742,7 +719,7 @@ router.get('/member/:id/wireguard', requireSession, asyncHandler(async (req, res
 // ── GET /wireguard/by-key/:publicKey — Config completa por clave pública ──
 //  Devuelve la conf descifrada del peer, restringida al workspace del moderador.
 //  Usado por la tabla "Gestión de Usuarios" para mostrar la conf en un modal.
-router.get('/wireguard/by-key/:publicKey', requireSession, requireRole('OWNER', 'CO_MODERATOR'),
+router.get('/wireguard/by-key/:publicKey', requireSession, requireRole('OWNER'),
   asyncHandler(async (req, res) => {
     const row = await memberWgRepo.getByPublicKey(req.account.workspace_id, req.params.publicKey);
     if (!row) throw new AppError('Peer no encontrado en este workspace', 404, 'NO_WG');

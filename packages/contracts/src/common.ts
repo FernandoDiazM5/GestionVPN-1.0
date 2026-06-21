@@ -4,7 +4,9 @@ import { z } from 'zod';
 //  Tipos compartidos básicos
 // ────────────────────────────────────────────────────────────────────
 
-export const RoleSchema = z.enum(['OWNER', 'CO_MODERATOR', 'MEMBER']);
+// Roles RBAC del workspace: un único moderador (OWNER) + sus miembros (MEMBER).
+// El rol CO_MODERATOR fue retirado (cada workspace tiene un solo moderador).
+export const RoleSchema = z.enum(['OWNER', 'MEMBER']);
 export type Role = z.infer<typeof RoleSchema>;
 
 export const EmailSchema = z.string().email('Email inválido').max(255);

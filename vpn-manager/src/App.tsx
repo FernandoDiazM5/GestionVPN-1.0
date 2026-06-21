@@ -148,7 +148,7 @@ function AppContent() {
 
 // Decide qué módulo de Ajustes mostrar según el rol:
 //  • platform_admin → SettingsModule (config del router MikroTik core)
-//  • Moderador (OWNER/CO_MOD) → ModeratorSettingsModule (perfil + workspace + I/O)
+//  • Moderador (OWNER) → ModeratorSettingsModule (perfil + workspace + I/O)
 function SettingsModuleRouter() {
   const { session } = useWorkspaceSession();
   if (isPlatformAdmin(session)) return <SettingsModule />;
