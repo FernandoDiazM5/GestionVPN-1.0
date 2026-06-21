@@ -29,7 +29,7 @@ const assignmentRepo = require('../db/repos/assignmentRepo');
 const memberWgRepo = require('../db/repos/memberWgRepo');
 const mgmtIpRepo = require('../db/repos/mgmtIpRepo');
 const mgmtNet = require('../lib/mgmtNet');
-const { mgmtAllowedIpsFor } = require('../lib/mgmtAllowedIps');
+const { mgmtAllowedIpsFor, readTowerLans } = require('../lib/mgmtAllowedIps');
 const { generateKeyPair, buildClientConf } = require('../lib/wgkeys');
 const { lowestFreeOctet } = require('../lib/ipAlloc');
 const { encrypt, decrypt } = require('../lib/crypto');
@@ -117,6 +117,8 @@ async function provisionMemberWgByPublicKey(mikrotik, { workspaceId, userId, pub
     //   4) MT_IP (último recurso)
     const settingPubIp = await getAppSetting('server_public_ip').catch(() => null);
     const publicIp = (process.env.WG_PUBLIC_IP || settingPubIp || cloud?.[0]?.['public-address'] || ip).trim();
+    // LAN de torre del address-list (fuente autoritativa, incl. nodos sin workspace_id).
+    const towerLans = await readTowerLans(api, safeWrite);
     await api.close();
     const endpoint = `${publicIp}:${listenPort}`;
     await memberWgRepo.upsert({
@@ -145,7 +147,9 @@ async function provisionMemberWgByPublicKey(mikrotik, { workspaceId, userId, pub
       // No bloqueamos la provisión; el operador puede limpiar con mapUserMgmtIp.js.
       log.warn({ err: e?.message, userId, mgmtIp: nextIp }, 'user_mgmt_ips upsert falló (no bloqueante)');
     }
-    return { allowedIp: nextIp, serverPublicKey: serverPub, endpoint, allowedIps: mgmtNet.clients.net };
+    // AllowedIPs split-tunnel = base RFC1918 + LAN de torre públicas (DB + address-list).
+    const allowedIps = await mgmtAllowedIpsFor(workspaceId, { addressList: towerLans });
+    return { allowedIp: nextIp, serverPublicKey: serverPub, endpoint, allowedIps };
   } catch (e) {
     if (api) try { await api.close(); } catch (_) { /* noop */ }
     throw e;
@@ -319,7 +323,7 @@ router.post('/accept', rl.guard('OTP'), asyncHandler(async (req, res) => {
           address: wireguard.allowedIp,
           serverPublicKey: wireguard.serverPublicKey,
           endpoint: wireguard.endpoint,
-          allowedIps: await mgmtAllowedIpsFor(inv.workspace_id), // split-tunnel: gestión + LAN de torres del ws (NO 0.0.0.0/0)
+          allowedIps: wireguard.allowedIps, // split-tunnel: base RFC1918 + LAN públicas de torre (NO 0.0.0.0/0)
         });
         // Persistir el .conf cifrado para que el moderador pueda re-mostrarlo
         // luego (botón "Config WG" en Gestión de Usuarios). Si el invitado
@@ -636,14 +640,16 @@ router.post('/member/:id/wireguard', requireSession, requireRole('OWNER', 'CO_MO
       // Misma jerarquía que provisionMemberWgByPublicKey (ENV → setting → cloud → MT_IP)
       const settingPubIp = await getAppSetting('server_public_ip').catch(() => null);
       const publicIp = (process.env.WG_PUBLIC_IP || settingPubIp || cloud?.[0]?.['public-address'] || ip).trim();
+      const towerLans = await readTowerLans(api, safeWrite);
       await api.close();
 
+      const allowedIps = await mgmtAllowedIpsFor(req.account.workspace_id, { addressList: towerLans });
       let conf = null;
       if (mode === 'generate') {
         conf = buildClientConf({
           privateKey: keys.privateKey, address: nextIp,
           serverPublicKey: serverPub, endpoint: `${publicIp}:${listenPort}`,
-          allowedIps: await mgmtAllowedIpsFor(req.account.workspace_id), // split-tunnel: gestión + LAN de torres del ws (NO 0.0.0.0/0)
+          allowedIps, // split-tunnel: base RFC1918 + LAN públicas de torre (NO 0.0.0.0/0)
         });
       }
       await memberWgRepo.upsert({
@@ -708,7 +714,7 @@ router.post('/me/wireguard', requireSession, asyncHandler(async (req, res) => {
   const conf = buildClientConf({
     privateKey: generated.privateKey, address: wireguard.allowedIp,
     serverPublicKey: wireguard.serverPublicKey, endpoint: wireguard.endpoint,
-    allowedIps: await mgmtAllowedIpsFor(wsId), // split-tunnel: gestión + LAN de torres del ws (NO 0.0.0.0/0)
+    allowedIps: wireguard.allowedIps, // split-tunnel: base RFC1918 + LAN públicas de torre (NO 0.0.0.0/0)
   });
   await memberWgRepo.updateConfig({ workspaceId: wsId, userId, configEnc: encrypt(conf) });
   return sendOk(res, { wireguard, conf }, 201);

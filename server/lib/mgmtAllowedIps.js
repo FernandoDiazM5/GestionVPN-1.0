@@ -20,24 +20,29 @@ const isPrivate = (c) =>
 
 /**
  * AllowedIPs split-tunnel para un peer de gestión del workspace.
- * @param {string|null} workspaceId  null → solo la base de gestión.
- * @returns {Promise<string>}  "10.0.0.0/8, 192.168.30.0/24, ..."
+ * @param {string|null} workspaceId  null → solo base + addressList.
+ * @param {object} [opts]
+ * @param {string[]} [opts.addressList]  CIDRs del address-list LIST-NET-REMOTE-TOWERS
+ *   leídos del router (fuente autoritativa de LAN de torre — incluye nodos sin
+ *   workspace_id). Solo se añaden los PÚBLICOS (los privados ya están en la base).
+ * @returns {Promise<string>}  "10.0.0.0/8, ..., 142.152.7.0/24"
  */
-async function mgmtAllowedIpsFor(workspaceId) {
+async function mgmtAllowedIpsFor(workspaceId, opts = {}) {
   // La base puede traer varias redes separadas por coma (env MGMT_ALLOWED_IPS).
   const nets = new Set(
     String(mgmtNet.mgmtAllowedIps || '10.0.0.0/8')
       .split(',').map(s => s.trim()).filter(Boolean)
   );
+  // Solo LAN en rango PÚBLICO (la base ya cubre todo RFC1918) → evita redundancia
+  // y cubre casos como 142.152.7.0/24 / 142.153.0.0/24.
+  const add = (s) => { const c = String(s || '').trim(); if (isCidr(c) && !isPrivate(c)) nets.add(c); };
+
   if (workspaceId) {
     try {
       const rows = await query(
         'SELECT segmento_lan, lan_subnets FROM nodes WHERE workspace_id = ?',
         [workspaceId]
       );
-      // Solo se añaden las LAN de torre en rango PÚBLICO (la base ya cubre todo
-      // RFC1918). Evita redundancia y cubre casos como 142.152.7.0/24.
-      const add = (s) => { const c = String(s || '').trim(); if (isCidr(c) && !isPrivate(c)) nets.add(c); };
       for (const r of rows) {
         add(r.segmento_lan);
         try {
@@ -45,9 +50,24 @@ async function mgmtAllowedIpsFor(workspaceId) {
           if (Array.isArray(arr)) arr.forEach(add);
         } catch { /* lan_subnets malformado: ignorar */ }
       }
-    } catch { /* BD inaccesible: degradar a solo la base de gestión */ }
+    } catch { /* BD inaccesible: degradar a solo la base + addressList */ }
   }
+
+  // Entradas del address-list del router (autoritativo, incl. workspace_id NULL).
+  if (Array.isArray(opts.addressList)) opts.addressList.forEach(add);
+
   return [...nets].join(', ');
 }
 
-module.exports = { mgmtAllowedIpsFor };
+/**
+ * Lee los CIDR del address-list LIST-NET-REMOTE-TOWERS desde una conexión
+ * RouterOS ya abierta. Best-effort: devuelve [] si falla.
+ * @param {object} api   conexión node-routeros abierta
+ * @param {Function} safeWrite  helper safeWrite(api, words) de routeros.service
+ */
+async function readTowerLans(api, safeWrite, listName = 'LIST-NET-REMOTE-TOWERS') {
+  const rows = await safeWrite(api, ['/ip/firewall/address-list/print']).catch(() => []);
+  return rows.filter(r => r.list === listName).map(r => r.address).filter(Boolean);
+}
+
+module.exports = { mgmtAllowedIpsFor, readTowerLans };
