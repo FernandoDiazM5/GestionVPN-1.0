@@ -20,6 +20,8 @@
 > - **Motivo:** un `.conf` con `0.0.0.0/1, 128.0.0.0/1` (= `0.0.0.0/0` disfrazado) dejaba sin internet; y la derivación por-workspace de LAN públicas fallaba con nodos `workspace_id=NULL`. **Aclaración de arquitectura:** el plano **ADMIN** (`VPN-WG-ADMIN`) SÍ tiene internet (regla `Admin MGMT libre` + NAT); **CLIENTES** NO (solo torres) → por eso el mismo `0.0.0.0/0` "funcionaba antes" en el túnel admin pero no en el de moderador.
 > - **Fix:** `mgmtAllowedIpsFor(ws, {addressList})` + `readTowerLans(api, safeWrite)` (`lib/mgmtAllowedIps.js`) leen el address-list `LIST-NET-REMOTE-TOWERS` en vivo y añaden SOLO las entradas **públicas** (las privadas ya están en la base RFC1918). `provisionMemberWgByPublicKey` lo lee y devuelve `allowedIps`; accept/me/POST member usan ese valor. Cubre nodos sin `workspace_id`. Test `mgmtAllowedIps` (4).
 > - **Para el config YA generado del usuario:** usar AllowedIPs `10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16` (+ pública de torre si administra una). El túnel CLIENTES da internet por la conexión local (split) + torres por el túnel.
+> - **Winbox del moderador (CLIENTES):** conectar a la IP interna `10.13.250.1` (por el túnel, permitido en `LIST-MGMT-TRUSTED`), NO a la pública `213.173.36.232` (= Endpoint, va directo y el firewall la rechaza). La **API** (8728) sigue restringida a 10.12/10.14 (`/ip service api address=`) → el panel/backend necesita el plano ADMIN.
+> - **ND2/ND3 ELIMINADOS:** TorreHousenet (SSTP) + TorreOmar (WG) tenían `workspace_id=NULL`; se borraron router (`.rsc` por Winbox, replicando `deprovisionNodeOnRouter`, sin tocar `LIST-NET-REMOTE-TOWERS`) + BD (`deleteNode`, backup `Desktop/GestionVPN_delete_nodes_*.json`). BD = 0 nodos. Las entradas del address-list quedaron inertes y preservadas.
 
 ---
 
