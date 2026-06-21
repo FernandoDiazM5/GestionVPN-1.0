@@ -29,7 +29,9 @@ const assignmentRepo = require('../db/repos/assignmentRepo');
 const memberWgRepo = require('../db/repos/memberWgRepo');
 const mgmtIpRepo = require('../db/repos/mgmtIpRepo');
 const mgmtNet = require('../lib/mgmtNet');
+const { mgmtAllowedIpsFor } = require('../lib/mgmtAllowedIps');
 const { generateKeyPair, buildClientConf } = require('../lib/wgkeys');
+const { lowestFreeOctet } = require('../lib/ipAlloc');
 const { encrypt, decrypt } = require('../lib/crypto');
 const { connectToMikrotik, safeWrite, writeIdempotent, getErrorMessage } = require('../routeros.service');
 const { getAppSetting, decryptPass, getDb } = require('../db.service');
@@ -100,7 +102,7 @@ async function provisionMemberWgByPublicKey(mikrotik, { workspaceId, userId, pub
     } else {
       const used = mgmt.map(p => (p['allowed-address'] || '').split('/')[0])
         .filter(a => a.startsWith(mgmtNet.clients.base)).map(a => parseInt(a.split('.')[3])).filter(n => !isNaN(n));
-      nextIp = `${mgmtNet.clients.base}${(used.length ? Math.max(...used) : mgmtNet.clients.start - 1) + 1}`;
+      nextIp = `${mgmtNet.clients.base}${lowestFreeOctet(used, mgmtNet.clients.start)}`;
       await writeIdempotent(api, ['/interface/wireguard/peers/add',
         `=interface=${mgmtNet.clients.iface}`, `=public-key=${publicKey}`,
         `=allowed-address=${nextIp}/32`, `=comment=${peerComment}`]);
@@ -147,6 +149,22 @@ async function provisionMemberWgByPublicKey(mikrotik, { workspaceId, userId, pub
   } catch (e) {
     if (api) try { await api.close(); } catch (_) { /* noop */ }
     throw e;
+  }
+}
+
+// Elimina un peer del router por su clave pública (cualquier interfaz). Se usa
+// al REGENERAR el acceso de un usuario para no dejar el peer viejo huérfano.
+async function removePeerByPublicKey(mikrotik, publicKey) {
+  if (!publicKey) return;
+  const { ip, user, pass } = mikrotik;
+  let api;
+  try {
+    api = await connectToMikrotik(ip, user, pass);
+    const peers = await safeWrite(api, ['/interface/wireguard/peers/print']);
+    const match = peers.find(p => p['public-key'] === publicKey);
+    if (match) await safeWrite(api, ['/interface/wireguard/peers/remove', `=.id=${match['.id']}`]);
+  } finally {
+    if (api) try { await api.close(); } catch (_) { /* noop */ }
   }
 }
 
@@ -301,7 +319,7 @@ router.post('/accept', rl.guard('OTP'), asyncHandler(async (req, res) => {
           address: wireguard.allowedIp,
           serverPublicKey: wireguard.serverPublicKey,
           endpoint: wireguard.endpoint,
-          allowedIps: '0.0.0.0/0',
+          allowedIps: await mgmtAllowedIpsFor(inv.workspace_id), // split-tunnel: gestión + LAN de torres del ws (NO 0.0.0.0/0)
         });
         // Persistir el .conf cifrado para que el moderador pueda re-mostrarlo
         // luego (botón "Config WG" en Gestión de Usuarios). Si el invitado
@@ -609,7 +627,7 @@ router.post('/member/:id/wireguard', requireSession, requireRole('OWNER', 'CO_MO
       const mgmt = peers.filter(p => p.interface === mgmtNet.clients.iface);
       const used = mgmt.map(p => (p['allowed-address'] || '').split('/')[0])
         .filter(a => a.startsWith(mgmtNet.clients.base)).map(a => parseInt(a.split('.')[3])).filter(n => !isNaN(n));
-      const nextIp = `${mgmtNet.clients.base}${(used.length ? Math.max(...used) : mgmtNet.clients.start - 1) + 1}`;
+      const nextIp = `${mgmtNet.clients.base}${lowestFreeOctet(used, mgmtNet.clients.start)}`;
       await writeIdempotent(api, ['/interface/wireguard/peers/add',
         `=interface=${mgmtNet.clients.iface}`, `=public-key=${peerPub}`,
         `=allowed-address=${nextIp}/32`, `=comment=${peerComment}`]);
@@ -625,7 +643,7 @@ router.post('/member/:id/wireguard', requireSession, requireRole('OWNER', 'CO_MO
         conf = buildClientConf({
           privateKey: keys.privateKey, address: nextIp,
           serverPublicKey: serverPub, endpoint: `${publicIp}:${listenPort}`,
-          allowedIps: '0.0.0.0/0',
+          allowedIps: await mgmtAllowedIpsFor(req.account.workspace_id), // split-tunnel: gestión + LAN de torres del ws (NO 0.0.0.0/0)
         });
       }
       await memberWgRepo.upsert({
@@ -661,6 +679,41 @@ router.post('/member/:id/wireguard', requireSession, requireRole('OWNER', 'CO_MO
     }
   }));
 
+// ── POST /me/wireguard — el usuario en sesión (RE)GENERA su propio acceso WG ──
+//  Self-service de RECUPERACIÓN: si la provisión falló al aceptar la invitación
+//  (router caído / migración a medias), el moderador (o member) quedaba sin
+//  WireGuard y sin forma de obtenerlo. Aquí genera el par server-side, crea su
+//  peer en la interfaz de gestión que le corresponde por rol y devuelve el .conf
+//  una sola vez (mismo modelo que /accept). Idempotente: al regenerar limpia el
+//  peer anterior para no dejar huérfanos.
+router.post('/me/wireguard', requireSession, asyncHandler(async (req, res) => {
+  const mt = await getMikrotik();
+  if (!mt) throw new AppError('El router no está configurado o no responde. Inténtalo de nuevo en unos minutos.', 503, 'NO_ROUTER');
+  const userId = req.account.sub;
+  const wsId = req.account.workspace_id;
+
+  // Si ya tenía un peer, lo quitamos (router + atribución) antes de crear el nuevo.
+  const prev = await memberWgRepo.getByUser(wsId, userId);
+  if (prev?.public_key) {
+    try {
+      await removePeerByPublicKey(mt, prev.public_key);
+      await (await getDb()).run('DELETE FROM mgmt_peer_owners WHERE public_key = ?', [prev.public_key]);
+    } catch (e) { log.warn({ err: e.message }, 'me/wireguard: no se pudo limpiar el peer anterior (no bloqueante)'); }
+  }
+
+  const generated = generateKeyPair();
+  const wireguard = await provisionMemberWgByPublicKey(mt, {
+    workspaceId: wsId, userId, publicKey: generated.publicKey, role: req.account.role,
+  });
+  const conf = buildClientConf({
+    privateKey: generated.privateKey, address: wireguard.allowedIp,
+    serverPublicKey: wireguard.serverPublicKey, endpoint: wireguard.endpoint,
+    allowedIps: await mgmtAllowedIpsFor(wsId), // split-tunnel: gestión + LAN de torres del ws (NO 0.0.0.0/0)
+  });
+  await memberWgRepo.updateConfig({ workspaceId: wsId, userId, configEnc: encrypt(conf) });
+  return sendOk(res, { wireguard, conf }, 201);
+}));
+
 // ── GET /member/:id/wireguard — config del miembro (él o un moderador) ──
 router.get('/member/:id/wireguard', requireSession, asyncHandler(async (req, res) => {
   const targetId = req.params.id === 'me' ? req.account.sub : req.params.id;
@@ -674,7 +727,7 @@ router.get('/member/:id/wireguard', requireSession, asyncHandler(async (req, res
       allowedIp: row.allowed_ip, publicKey: row.public_key,
       serverPublicKey: row.server_public_key || null,
       endpoint: row.endpoint || null,
-      allowedIps: mgmtNet.clients.net,
+      allowedIps: await mgmtAllowedIpsFor(req.account.workspace_id),
       conf: row.config_enc ? decrypt(row.config_enc) : null,
     },
   });
@@ -693,7 +746,7 @@ router.get('/wireguard/by-key/:publicKey', requireSession, requireRole('OWNER', 
         publicKey: row.public_key,
         serverPublicKey: row.server_public_key || null,
         endpoint: row.endpoint || null,
-        allowedIps: '0.0.0.0/0',
+        allowedIps: await mgmtAllowedIpsFor(req.account.workspace_id),
         peerName: row.peer_name,
         conf: row.config_enc ? decrypt(row.config_enc) : null,
       },

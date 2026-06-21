@@ -65,6 +65,10 @@ export const teamApi = {
   myWireguard: () =>
     get<{ success: true; wireguard: MemberWireguard }>('/api/team/member/me/wireguard'),
 
+  /** (Re)genera el acceso WireGuard del propio usuario en sesión (recuperación). */
+  provisionMyWireguard: () =>
+    post<{ success: true; wireguard: MemberWireguard; conf: string | null }>('/api/team/me/wireguard'),
+
   /** Conf completa de un peer por su clave pública (solo moderador). */
   wireguardByKey: (publicKey: string) =>
     get<{ success: true; wireguard: MemberWireguard & { peerName?: string } }>(

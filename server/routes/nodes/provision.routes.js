@@ -26,6 +26,7 @@ const scanIpRepo = require('../../db/repos/scanIpRepo');
 const { generateKeyPair } = require('../../lib/wgkeys');
 const { buildCpeWgScript, buildCpeSstpScript } = require('../../lib/cpeScript');
 const { generatePppUser, generatePppPassword } = require('../../lib/sstpCreds');
+const { deprovisionNodeOnRouter } = require('../../lib/nodeDeprovision');
 
 // Opción C: el /24 del pool de scan-IP del VPS (por defecto 10.11.252.0/24). Cada
 // VRF necesita una ruta de retorno hacia ese /24 vía la interfaz del VPS (el
@@ -560,147 +561,12 @@ router.post('/node/deprovision', requireOperator, asyncHandler(async (req, res) 
     throw new AppError('Nodo no encontrado en tu workspace', 404, 'NOT_FOUND');
   }
 
-  const isWireGuard = protocol === 'wireguard' || pppUser.startsWith('WG-ND') || pppUser.startsWith('VPN-WG-');
-  const hasVrf = !!vrfName;
-  // Para WG: ifaceName === pppUser (ej. "WG-ND4-TORREVICTORN2")
-  // Para SSTP: ifaceName se deriva del VRF (ej. "VPN-SSTP-ND1-HOUSENET")
-  const ifaceName = isWireGuard ? pppUser : (hasVrf ? vrfName.replace(/^VRF-/, 'VPN-SSTP-') : '');
-
-  const steps = []; let api;
-  // pushStep local (sin SSE): deprovision no necesita progreso en vivo, pero
-  // comparte el rename de `steps.push`→`pushStep` del replace_all de la ruta.
-  const pushStep = (s) => { steps[steps.length] = s; };
+  // Limpieza en el router delegada al helper compartido (misma lógica que usa la
+  // cascada de borrado de moderador). NO toca el address-list LIST-NET-REMOTE-TOWERS.
+  let steps = [];
   try {
-    // ── CONEXIÓN 1: Leer TODOS los datos SECUENCIALMENTE ──────────────────────
-    // RouterOS (node-routeros) es protocolo secuencial: comandos concurrentes en
-    // la misma conexión causan "expected !re or !done" y corrupción. Leemos uno
-    // por uno con timeouts cortos (6s). Worst-case 10×6s=60s (suficiente margen),
-    // caso típico ~3-8s total porque /print sin filtro responde inmediato.
-    const apiRead = await connectToMikrotik(ip, user, pass);
-    const safeRead = (cmd) =>
-      safeWrite(apiRead, [cmd], 6000).catch(e => {
-        log.warn({ cmd, err: e?.message }, 'DEPROVISION read falló');
-        return [];
-      });
-
-    const mangle     = await safeRead('/ip/firewall/mangle/print');
-    const members    = await safeRead('/interface/list/member/print');
-    const secrets    = !isWireGuard ? await safeRead('/ppp/secret/print')                : [];
-    const sstpIfaces = !isWireGuard ? await safeRead('/interface/sstp-server/print')     : [];
-    const actives    = !isWireGuard ? await safeRead('/ppp/active/print')                : [];
-    const wgPeers    =  isWireGuard ? await safeRead('/interface/wireguard/peers/print') : [];
-    const wgIfaces   =  isWireGuard ? await safeRead('/interface/wireguard/print')       : [];
-    const addrs      =  isWireGuard ? await safeRead('/ip/address/print')                : [];
-    const vrfs       = hasVrf       ? await safeRead('/ip/vrf/print')                    : [];
-    const routes     = hasVrf       ? await safeRead('/ip/route/print')                  : [];
-
-    // Cerramos apiRead antes de abrir la conexión de escritura para que no haya
-    // api.write() pendientes (por !empty) que contaminen los removes posteriores.
-    await apiRead.close().catch(() => {});
-
-    // ── CONEXIÓN 2: Removes secuenciales en conexión limpia ───────────────────
-    api = await connectToMikrotik(ip, user, pass);
-    const silentRemove = (cmd, id) =>
-      safeWrite(api, [cmd, `=.id=${id}`], 10000).catch(e =>
-        log.warn({ cmd, id, err: e?.message }, 'DEPROVISION ignorado')
-      );
-
-    // ── Paso 1: Reglas Mangle (new-routing-mark === vrfName) ─────────────────
-    if (hasVrf) {
-      const mangleMatch = mangle.filter(m => m['new-routing-mark'] === vrfName && m['.id']);
-      for (const m of mangleMatch) await silentRemove('/ip/firewall/mangle/remove', m['.id']);
-      pushStep({ step: 1, obj: 'Reglas Mangle', name: `${mangleMatch.length} eliminadas`, status: 'ok' });
-    }
-
-    if (isWireGuard) {
-      // ── Flujo WireGuard ───────────────────────────────────────────────────
-
-      // Paso 2: Peers WG (buscar por interface === ifaceName)
-      const peersToRemove = wgPeers.filter(p => p.interface === ifaceName && p['.id']);
-      for (const p of peersToRemove) await silentRemove('/interface/wireguard/peers/remove', p['.id']);
-      pushStep({ step: 2, obj: 'WG Peers', name: `${peersToRemove.length} peer(s)`, status: 'ok' });
-
-      // Paso 3: IP address de la interface WG
-      const wgAddrs = addrs.filter(a => a.interface === ifaceName && a['.id']);
-      for (const a of wgAddrs) await silentRemove('/ip/address/remove', a['.id']);
-      pushStep({ step: 3, obj: 'WG IP Address', name: `${wgAddrs.length} IP(s)`, status: 'ok' });
-
-      // Paso 4: Interface WireGuard
-      const wgIface = wgIfaces.find(i => i.name === ifaceName);
-      if (wgIface) await silentRemove('/interface/wireguard/remove', wgIface['.id']);
-      pushStep({ step: 4, obj: 'WG Interface', name: ifaceName, status: 'ok' });
-
-      if (hasVrf) {
-        // Paso 5: Interface Lists — LIST-VPN-TOWERS + LIST-VPN-WG
-        let membersRemoved = 0;
-        for (const list of ['LIST-VPN-TOWERS', 'LIST-VPN-WG']) {
-          const entry = members.find(m => m.interface === ifaceName && m.list === list);
-          if (entry) { await silentRemove('/interface/list/member/remove', entry['.id']); membersRemoved++; }
-        }
-        pushStep({ step: 5, obj: 'Interface Lists (TOWERS + WG)', name: `${membersRemoved} entradas`, status: 'ok' });
-      }
-
-    } else {
-      // ── Flujo SSTP ────────────────────────────────────────────────────────
-
-      // Paso 2: Desconectar sesión PPP activa (evita que RouterOS rechace el remove del secret)
-      const activeSession = actives.find(a => a.name === pppUser);
-      if (activeSession) await silentRemove('/ppp/active/remove', activeSession['.id']);
-      pushStep({ step: 2, obj: 'Sesión PPP Activa', name: activeSession ? `desconectada (${pppUser})` : 'sin sesión activa', status: 'ok' });
-
-      // Paso 3: PPP Secret
-      const secret = secrets.find(s => s.name === pppUser);
-      if (secret) await silentRemove('/ppp/secret/remove', secret['.id']);
-      pushStep({ step: 3, obj: 'PPP Secret', name: pppUser, status: 'ok' });
-
-      if (hasVrf) {
-        // Paso 4: SSTP Interface — buscar primero por user (más robusto), fallback por name
-        const iface = sstpIfaces.find(i => i.user === pppUser)
-                   || sstpIfaces.find(i => i.name === ifaceName);
-        if (iface) await silentRemove('/interface/sstp-server/remove', iface['.id']);
-        pushStep({ step: 4, obj: 'SSTP Interface', name: ifaceName, status: 'ok' });
-
-        // Paso 5: Interface Lists — LIST-VPN-TOWERS + LIST-VPN-SSTP
-        let membersRemoved = 0;
-        for (const list of ['LIST-VPN-TOWERS', 'LIST-VPN-SSTP']) {
-          const entry = members.find(m => m.interface === ifaceName && m.list === list);
-          if (entry) { await silentRemove('/interface/list/member/remove', entry['.id']); membersRemoved++; }
-        }
-        pushStep({ step: 5, obj: 'Interface Lists (TOWERS + SSTP)', name: `${membersRemoved} entradas`, status: 'ok' });
-      }
-    }
-
-    if (hasVrf) {
-      // Paso 6: Rutas — eliminar TODAS las de esta routing-table (ida LAN + vuelta MGMT)
-      // Hay exactamente 1 VRF por nodo → se eliminan todas las rutas estáticas del VRF
-      const vrfRoutes = routes.filter(r =>
-        r['routing-table'] === vrfName && r.dynamic !== 'true' && r['.id']
-      );
-      for (const r of vrfRoutes) await silentRemove('/ip/route/remove', r['.id']);
-      pushStep({ step: 6, obj: 'Rutas VRF (ida + vuelta)', name: `${vrfRoutes.length} rutas eliminadas`, status: 'ok' });
-
-      // Paso 7: VRF — 1 VRF por nodo, se elimina completo
-      const vrf = vrfs.find(v => v.name === vrfName);
-      if (vrf) await silentRemove('/ip/vrf/remove', vrf['.id']);
-      pushStep({ step: 7, obj: 'VRF', name: vrf ? `${vrfName} eliminado` : 'no encontrado (ya eliminado)', status: 'ok' });
-    }
-
-    await api.close();
-
-    // Paso 8: cascade en BD (nodes, aps, cpes, signal_history, node_*)
-    let deletedDeviceIds = [];
-    try {
-      const result = await deleteNode(pppUser);
-      deletedDeviceIds = result?.deviceIds || [];
-      pushStep({ step: 8, obj: 'Base de datos', name: `${deletedDeviceIds.length} APs + cascadas eliminados`, status: 'ok' });
-    } catch (dbErr) {
-      log.error({ err: dbErr.message }, 'DB: eliminar nodo de la BD');
-      pushStep({ step: 8, obj: 'Base de datos', name: `Error: ${dbErr.message}`, status: 'warn' });
-    }
-
-    return sendOk(res, { message: `Nodo eliminado correctamente`, steps, deletedDeviceIds });
+    ({ steps } = await deprovisionNodeOnRouter({ ip, user, pass }, { pppUser, vrfName, protocol }));
   } catch (error) {
-    if (api) try { await api.close(); } catch (_) { /* ignore */ }
     if (error instanceof AppError) throw error;
     throw new AppError(
       getErrorMessage(error, ip, user),
@@ -708,6 +574,19 @@ router.post('/node/deprovision', requireOperator, asyncHandler(async (req, res) 
       { steps, failedAt: steps.length + 1 }
     );
   }
+
+  // Paso 8: cascade en BD (nodes, aps, cpes, signal_history, node_*)
+  let deletedDeviceIds = [];
+  try {
+    const result = await deleteNode(pppUser);
+    deletedDeviceIds = result?.deviceIds || [];
+    steps.push({ step: 8, obj: 'Base de datos', name: `${deletedDeviceIds.length} APs + cascadas eliminados`, status: 'ok' });
+  } catch (dbErr) {
+    log.error({ err: dbErr.message }, 'DB: eliminar nodo de la BD');
+    steps.push({ step: 8, obj: 'Base de datos', name: `Error: ${dbErr.message}`, status: 'warn' });
+  }
+
+  return sendOk(res, { message: `Nodo eliminado correctamente`, steps, deletedDeviceIds });
 }));
 
 module.exports = router;

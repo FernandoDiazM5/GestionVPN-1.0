@@ -16,6 +16,7 @@
     "migrate:scanip": "node db/migrateScanIp.js",
     "scan:assign": "node db/assignScanIp.js",
     "purge:orphans": "node db/purgeOrphanNodes.js",
+    "purge:rbac": "node db/purgeDeletedRbac.js",
     "migrate:assignments": "node db/normalizeTunnelAssignments.js",
     "seed:roles": "node db/seedRoles.js",
     "analyze:queries": "node tools/analyze-queries.js",

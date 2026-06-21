@@ -22,6 +22,18 @@ const userRepo = require('../db/repos/userRepo');
 const { sendInvitation } = require('../lib/mailer');
 const { removePeersFromRouter } = require('../lib/routerCleanup');
 const { setPeersEnabled, removeUserMangles } = require('../lib/routerPeerState');
+const { deprovisionNodeOnRouter } = require('../lib/nodeDeprovision');
+const { getAppSetting, decryptPass } = require('../db.service');
+
+// Credenciales del router core desde app_settings (las rutas admin no pasan por
+// el middleware legacy que inyecta req.mikrotik). null si no hay config.
+async function getMikrotikCreds() {
+  const ip = await getAppSetting('MT_IP');
+  const user = await getAppSetting('MT_USER');
+  const passData = await getAppSetting('MT_PASS');
+  if (!ip || !user || !passData) return null;
+  return { ip, user, pass: decryptPass(passData) };
+}
 
 const INVITE_TTL_MS = 24 * 60 * 60 * 1000; // 24h — igual que team.routes.js
 const genOtp = () => String(crypto.randomInt(100000, 1000000));
@@ -195,6 +207,27 @@ router.delete('/moderators/:id', asyncHandler(async (req, res) => {
   );
   const mangleCleanup = await removeUserMangles(wsUserRows.map(r => r.user_id));
 
+  // 0c) De-provisionar los NODOS del workspace en el router (VRF + interfaz WG/SSTP
+  //     + rutas + mangle + peer del CPE). Best-effort: si el router está caído NO
+  //     bloquea el borrado en BD. ⚠️ NO toca LIST-NET-REMOTE-TOWERS (LAN compartidas
+  //     entre nodos — borrarlas rompería a los hermanos).
+  let nodesDeprovisioned = 0;
+  const mtCreds = await getMikrotikCreds();
+  if (mtCreds) {
+    const nodeRows = await query(
+      'SELECT ppp_user, nombre_vrf FROM nodes WHERE workspace_id = ? AND ppp_user IS NOT NULL',
+      [wsId]
+    );
+    for (const n of nodeRows) {
+      try {
+        await deprovisionNodeOnRouter(mtCreds, { pppUser: n.ppp_user, vrfName: n.nombre_vrf });
+        nodesDeprovisioned++;
+      } catch (e) {
+        log.warn({ pppUser: n.ppp_user, err: e.message }, 'deprovision de nodo falló (no bloquea el borrado en BD)');
+      }
+    }
+  }
+
   await withTransaction(async (tx) => {
     // 1) Usuarios del workspace (OWNER + MEMBERs) — se usarán al final
     const memberRows = await tx.query(
@@ -257,8 +290,9 @@ router.delete('/moderators/:id', asyncHandler(async (req, res) => {
 
   return sendOk(res, {
     message: 'Moderador eliminado completamente',
-    router: routerCleanup, // peers WG eliminados: { removed, failed, skipped }
-    mangle: mangleCleanup, // reglas mangle eliminadas: { removed, failed, skipped }
+    router: routerCleanup,            // peers WG eliminados: { removed, failed, skipped }
+    mangle: mangleCleanup,            // reglas mangle eliminadas: { removed, failed, skipped }
+    nodesDeprovisioned,               // nodos/VRF de-provisionados del router
   });
 }));
 

@@ -1,25 +1,27 @@
 import { useState, useMemo } from 'react';
-import { Settings as SettingsIcon, User, Briefcase, Database, Bell } from 'lucide-react';
+import { Settings as SettingsIcon, User, Briefcase, Database, Bell, Shield } from 'lucide-react';
 import ProfileTab from './tabs/ProfileTab';
+import WireGuardTab from './tabs/WireGuardTab';
 import WorkspaceTab from './tabs/WorkspaceTab';
 import ImportExportTab from './tabs/ImportExportTab';
 import NotificationsTab from './tabs/NotificationsTab';
 import { useWorkspaceSession } from '../../../context/WorkspaceSession';
 
-type TabId = 'profile' | 'workspace' | 'notifications' | 'import-export';
+type TabId = 'profile' | 'wireguard' | 'workspace' | 'notifications' | 'import-export';
 
 interface TabDef { id: TabId; label: string; icon: typeof User; description: string }
 
 const ALL_TABS: TabDef[] = [
   { id: 'profile',       label: 'Perfil',           icon: User,      description: 'Tu correo y contraseña' },
+  { id: 'wireguard',     label: 'WireGuard',        icon: Shield,    description: 'Tu acceso VPN + QR' },
   { id: 'workspace',     label: 'Workspace',        icon: Briefcase, description: 'Nombre de tu espacio' },
   { id: 'notifications', label: 'Notificaciones',   icon: Bell,      description: 'Email y Telegram' },
   { id: 'import-export', label: 'Respaldo y datos', icon: Database,  description: 'Exportar / importar JSON' },
 ];
 
-// MEMBER: solo perfil + notificaciones (sin workspace ni import/export).
+// MEMBER: perfil + su WireGuard + notificaciones (sin workspace ni import/export).
 // El moderador (OWNER/CO_MOD) ve todo.
-const MEMBER_TAB_IDS: TabId[] = ['profile', 'notifications'];
+const MEMBER_TAB_IDS: TabId[] = ['profile', 'wireguard', 'notifications'];
 
 /**
  * Ajustes del Moderador (Fase C).
@@ -88,6 +90,7 @@ export default function ModeratorSettingsModule() {
         {/* Contenido */}
         <div>
           {tab === 'profile'       && <ProfileTab />}
+          {tab === 'wireguard'     && <WireGuardTab />}
           {tab === 'workspace'     && !isMember && <WorkspaceTab />}
           {tab === 'notifications' && <NotificationsTab memberMode={isMember} />}
           {tab === 'import-export' && !isMember && <ImportExportTab />}

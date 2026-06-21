@@ -1,7 +1,7 @@
 import { useCallback, useEffect } from 'react';
 import { apiFetch } from '../../../../utils/apiClient';
 import { fetchWithTimeout } from '../../../../utils/fetchWithTimeout';
-import { API_BASE_URL } from '../../../../config';
+import { API_BASE_URL, MGMT_ALLOWED_IPS } from '../../../../config';
 import type { WgPeer } from '../../../../types/api';
 
 interface UseWireGuardPeersProps {
@@ -170,7 +170,8 @@ export function useWireGuardPeers(props: UseWireGuardPeersProps) {
       '',
       '[Peer]',
       `PublicKey = ${serverPublicKey || '<CLAVE_PUBLICA_SERVIDOR>'}`,
-      'AllowedIPs = 0.0.0.0/0',
+      // Split-tunnel de gestión — NUNCA 0.0.0.0/0 (dejaría al admin sin internet).
+      `AllowedIPs = ${MGMT_ALLOWED_IPS}`,
       `Endpoint = ${endpoint}`,
     ].join('\n');
     navigator.clipboard.writeText(config).then(() => {

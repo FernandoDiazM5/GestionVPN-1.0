@@ -90,6 +90,19 @@ function nodeMgmtIp(ndNum, isWG) {
   return `${isWG ? nodes.wgBase : nodes.sstpBase}${n}`;
 }
 
+// BASE de AllowedIPs del .conf de un peer de gestión (split-tunnel).
+// ⚠️ NUNCA 0.0.0.0/0: este es un túnel de GESTIÓN. El router NO da salida a
+// internet a los clientes de gestión (firewall "Bloqueo preventivo" + sin NAT),
+// así que 0.0.0.0/0 enrutaría TODO el tráfico al router → cliente SIN INTERNET.
+// La base cubre TODO RFC1918 (10/8 → planos de gestión 10.1x.250.*, IPs de nodo
+// 10.11.*, scan-pool y torres en 10.x; 172.16/12 y 192.168/16 → LAN de torre
+// privadas). Robusto aunque un nodo no tenga workspace_id. Las LAN de torre en
+// rango PÚBLICO (ej. 142.152.7.0/24) se añaden POR WORKSPACE desde `nodes`
+// (ver lib/mgmtAllowedIps.js). Trade-off asumido: capturar 192.168/16 puede
+// solapar la LAN local del moderador mientras el túnel está activo — aceptable
+// para una herramienta de gestión (prioridad: alcanzar las torres).
+const mgmtAllowedIps = env('MGMT_ALLOWED_IPS', '10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16');
+
 // Interfaces WG de gestión (todas — para búsquedas/lookup de peers).
 const ifaces = [vps.iface, clients.iface, admin.iface];
 
@@ -127,6 +140,6 @@ const allNets = [nodes.wgNet, nodes.sstpNet, vps.net, clients.net, admin.net];
 
 module.exports = {
   vps, clients, admin, nodes,
-  ifaces, userIfaces, mgmtIpBases, allNets,
+  ifaces, userIfaces, mgmtIpBases, allNets, mgmtAllowedIps,
   isMgmtIp, nodeMgmtIp, returnRoutes,
 };

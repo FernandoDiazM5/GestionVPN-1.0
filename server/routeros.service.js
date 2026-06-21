@@ -232,7 +232,12 @@ const isUnreachable = (error) => {
         errno === -4039 || errno === 'SOCKTMOUT' || code === 'ETIMEDOUT' ||
         error?.name === 'TimeoutError' || msgLc.includes('timed out') ||
         msgLc.includes('sin respuesta del router') || msgLc.includes('timeout') ||
-        code === 'ENOTFOUND' || code === 'EHOSTUNREACH' || code === 'ENETUNREACH'
+        code === 'ENOTFOUND' || code === 'EHOSTUNREACH' || code === 'ENETUNREACH' ||
+        // Cortes transitorios del túnel (WG flapea a mitad de la conexión): el
+        // socket se resetea/cierra. Son "inalcanzable" (→ 503 + Reintentar), no
+        // un 500 duro. Coherente con classifyError() que ya los marca 'network'.
+        code === 'ECONNRESET' || code === 'EPIPE' || code === 'EHOSTDOWN' ||
+        msgLc.includes('socket hang up') || msgLc.includes('cannot connect')
     );
 };
 

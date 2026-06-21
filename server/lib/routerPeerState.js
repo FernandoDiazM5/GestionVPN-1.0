@@ -10,6 +10,7 @@
 const { connectToMikrotik, safeWrite } = require('../routeros.service');
 const { getAppSetting, decryptPass } = require('../db.service');
 const { findUserMangleIds, removeMangleIds } = require('./tunnelProvisioner');
+const mgmtNet = require('./mgmtNet');
 const log = require('./logger').child({ scope: 'router-peer-state' });
 
 async function getMikrotikCreds() {
@@ -41,7 +42,9 @@ async function setPeersEnabled(publicKeys, enabled) {
     api = await connectToMikrotik(mt.ip, mt.user, mt.pass);
     const peers = await safeWrite(api, ['/interface/wireguard/peers/print']).catch(() => []);
     const keySet = new Set(keys);
-    const targets = peers.filter(p => p.interface === 'VPN-WG-MGMT' && keySet.has(p['public-key']));
+    // Interfaces de gestión de usuario del plano 10.x (CLIENTES + ADMIN). Antes
+    // 'VPN-WG-MGMT' hardcodeado → no encontraba el peer y no lo suspendía/reactivaba.
+    const targets = peers.filter(p => mgmtNet.userIfaces.includes(p.interface) && keySet.has(p['public-key']));
     const foundKeys = new Set(targets.map(p => p['public-key']));
     notFound = keys.filter(k => !foundKeys.has(k)).length;
 

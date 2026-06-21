@@ -8,6 +8,7 @@
 // ============================================================
 const { connectToMikrotik, safeWrite } = require('../routeros.service');
 const { getAppSetting, decryptPass } = require('../db.service');
+const mgmtNet = require('./mgmtNet');
 const log = require('./logger').child({ scope: 'router-cleanup' });
 
 async function getMikrotikCreds() {
@@ -39,7 +40,10 @@ async function removePeersFromRouter(publicKeys) {
     api = await connectToMikrotik(mt.ip, mt.user, mt.pass);
     const peers = await safeWrite(api, ['/interface/wireguard/peers/print']).catch(() => []);
     const keySet = new Set(keys);
-    const targets = peers.filter(p => p.interface === 'VPN-WG-MGMT' && keySet.has(p['public-key']));
+    // Interfaces de gestión de usuario del plano 10.x (CLIENTES + ADMIN). Antes
+    // estaba hardcodeado 'VPN-WG-MGMT' (plano viejo) → no encontraba los peers y
+    // NO borraba nada al eliminar un moderador/member.
+    const targets = peers.filter(p => mgmtNet.userIfaces.includes(p.interface) && keySet.has(p['public-key']));
     for (const peer of targets) {
       try {
         await safeWrite(api, ['/interface/wireguard/peers/remove', `=.id=${peer['.id']}`]);

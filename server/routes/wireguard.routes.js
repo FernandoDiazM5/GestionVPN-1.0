@@ -16,6 +16,7 @@ const {
   PeerColorRequestSchema, PeerAliasRequestSchema,
 } = require('@gestionvpn/contracts');
 const mgmtNet = require('../lib/mgmtNet');
+const { lowestFreeOctet } = require('../lib/ipAlloc');
 const log = require('../lib/logger').child({ scope: 'wireguard' });
 
 // ─────────────────────────────────────────────────────────────
@@ -132,8 +133,7 @@ router.post('/wireguard/peer/add', asyncHandler(async (req, res) => {
       .filter(a => a.startsWith(mgmtNet.admin.base))
       .map(a => parseInt(a.split('.')[3]))
       .filter(n => !isNaN(n));
-    const maxIP = usedIPs.length > 0 ? Math.max(...usedIPs) : mgmtNet.admin.start - 1;
-    const nextIP = `${mgmtNet.admin.base}${maxIP + 1}`;
+    const nextIP = `${mgmtNet.admin.base}${lowestFreeOctet(usedIPs, mgmtNet.admin.start)}`;
     await writeIdempotent(api, [
       '/interface/wireguard/peers/add',
       `=interface=${mgmtNet.admin.iface}`,
