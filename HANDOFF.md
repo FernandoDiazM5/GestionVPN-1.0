@@ -9,11 +9,11 @@
 
 ## 0) Estado actual
 
-- **Tips:** `dev` = **`276c368`** · `main` = `d56df21` (se mergea a `main` tras validar la parte de RED en prod).
-- **Salud:** `tsc` frontend 0 · `node --check` 0 · **261 tests backend verdes** · `semgrep` 0 en código de app (solo hallazgos de infra aceptados) · `npm run audit:design` 0 errores (sistema de diseño 100% migrado).
-- **Última línea de trabajo (2026-06-20):** auto-generación de credenciales del nodo remoto/CPE (WG + SSTP) → el alta entrega un único **script copy/paste**; el servidor genera llaves y usuario/contraseña si no se ingresan.
-- **Pendiente de prueba en vivo:** crear nodo WG/SSTP, pegar script en el CPE, confirmar handshake + `ping 10.11.250.<ND>` / `10.11.251.<ND>` + escaneo > 0.
-- **Acciones de RED pendientes del usuario:** ver §6 (runbooks) y los docs de despliegue.
+- **Tips:** `dev` = **`484dc0b`** · `main` = `57908cc` (se mergea a `main` tras validar la parte de RED en prod).
+- **Salud:** `tsc` frontend 0 · `node --check` 0 · **271 tests backend verdes** · `semgrep` 0 en código de app · `audit:design` 0 errores.
+- **Última línea de trabajo (2026-06-20, cont.):** ciclo de vida WireGuard de gestión + borrado en cascada real. Hecho: `.conf` SPLIT-TUNNEL (NUNCA `0.0.0.0/0`, mataba el internet) con AllowedIPs dinámico desde `LIST-NET-REMOTE-TOWERS`; recuperación WG self-service (tab Ajustes→WireGuard); cascada de borrado de moderador de-provisiona nodos del router (`nodeDeprovision`) + limpia peers en la interfaz correcta (`mgmtNet.userIfaces`); reutilización de IPs liberadas; 503 en cortes de túnel; purga de zombies RBAC.
+- **Estado de datos (limpiado hoy):** **0 nodos** en BD (ND2 TorreHousenet + ND3 TorreOmar borrados — tenían `workspace_id=NULL`); **2 workspaces** (Soporte, Espacio de admin), 4 users; zombies del soft-delete purgados.
+- **Acciones de RED pendientes del usuario:** ver §7 (pendientes) y los runbooks de §6.
 
 > Resumen de cada sesión anterior: ver [`HANDOFF_LOG.md`](./HANDOFF_LOG.md). Para no inflar este doc, **aquí solo va lo que sigue siendo cierto hoy.**
 
@@ -129,10 +129,10 @@ Ver también `vpn-manager/CLAUDE.md` y `DESIGN_SYSTEM.md`.
 | 🔴 Una vez tras pull | `cd server && npm run migrate:notifications && npm run migrate:monitoring` (sin esto Q1/M5 caen en defensa). |
 | 🟡 RED en VPS | Aplicar runbook de migración `10.x` (fases del `migrate-mgmt-net.rsc`, corte final que elimina `VPN-WG-MGMT`) · activar cuenta Brevo (relay SMTP 2525) · `scan:assign` por moderador · cerrar puertos sobrantes en `ufw`. |
 | 🟡 Prueba en vivo | Alta WG/SSTP → script en CPE → handshake + ping gestión + escaneo > 0 · 2 moderadores contra el router (aislamiento mangle por-usuario). |
-| 🟢 Hecho | ~~Purgar zombies legacy del soft-delete~~ ✅ `purge:rbac --apply`: 13 workspaces + 13 users + huérfanos eliminados. BD = 2 workspaces (Soporte, Espacio de admin), 4 users. Backup `Desktop/GestionVPN_purge_rbac_*.json`. |
-| 🟡 Router | **Limpieza puntual** de peers/VRF YA huérfanos en el router (del moderador borrado ANTES del fix de cascada) — el código nuevo solo cubre borrados futuros. |
-| 🟢 Hecho | ~~ELIMINAR ND2 TorreHousenet + ND3 TorreOmar (`workspace_id=NULL`)~~ ✅ **Borrados** (router vía `.rsc` en Winbox + BD vía `deleteNode`, backup en `Desktop/GestionVPN_delete_nodes_*.json`). BD ahora con **0 nodos**. Las entradas de `LIST-NET-REMOTE-TOWERS` (`10.1.1.0/24`, `192.168.30.0/24`, etc.) **se conservaron** (inertes, por LAN compartidas). |
+| 🟡 Router | **Limpieza puntual** de peers WG YA huérfanos en el router (del moderador borrado ANTES del fix de cascada) — el código nuevo solo cubre borrados futuros. Revisar en Winbox `/interface wireguard peers print` y borrar los que tengan comment de un email inexistente. |
+| 🟡 Router | **Dedup del address-list** `LIST-NET-REMOTE-TOWERS`: pueden quedar entradas duplicadas/inertes (M3 solo evita NUEVAS; el borrado de nodo NO las toca a propósito). Un `:foreach` de limpieza puntual cuando convenga. |
 | 🟡 Mejora | `/team/accept` traga el error de provisión WG con `log.warn` (`conf=null` silencioso) → la UI debería mostrar el motivo + ofrecer reintento (ya existe la red: tab WireGuard self-service). |
+| 🟡 Datos | El alta de nodo debe setear `workspace_id` (ND2/ND3 salieron NULL). Verificar que `provision.routes` lo persiste; si no, es la raíz del problema de cascada/aislamiento. |
 | 🟡 Feature | Toggle **Local/VPS** para `MT_IP`/endpoint del router (local `10.14.250.1` / VPS `10.12.250.1`), análogo a `ScanModeToggle`. |
 | 🟡 Backlog | M2 API pública con tokens scoped · M3 Webhooks · M4 Speed test iperf3 (con confirmación) · L1 Reportes SLA · L2 Diagnóstico con LLM · L3 PWA móvil · L4 Predicción de degradación. |
 
