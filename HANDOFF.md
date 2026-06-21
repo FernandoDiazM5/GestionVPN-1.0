@@ -79,6 +79,11 @@ Estas reglas son **durables**: aplican a toda sesión y a todo cambio. Si una fe
 7. **Sistema de diseño:** color = intención, movimiento = estado (no decorativo). Usar clases del sistema (`.btn-*`, `.badge-*`, `.card`, `.modal-overlay/.modal-panel`, `.skeleton`, `.status-live`). Dark mode por clase; toda animación respeta `prefers-reduced-motion`. `text-xs` mínimo. Gate CI `audit:design` debe quedar en **0 errores**. Menús de acción **con color** (no gris) — memoria `pref-menu-accion-con-color`.
 8. **No versionar secretos:** `.jwt_secret`, `.db_secret`, `database.sqlite*`, `.claude/worktrees/`, binarios. (El historial ya se purgó 2×; en el VPS usar `git fetch && git reset --hard origin/main`, NUNCA `git pull`.)
 9. **`/settings/save` y config del router core = solo `platform_admin`.** Un moderador no muta settings globales por API.
+10. **`.conf` de gestión = SPLIT-TUNNEL, NUNCA `AllowedIPs = 0.0.0.0/0`.** El router no da salida a internet a los clientes de gestión (firewall "Bloqueo preventivo" + sin NAT) → `0.0.0.0/0` deja al cliente **sin internet**. Usar `mgmtNet.mgmtAllowedIps` (`10.0.0.0/8, 192.168.0.0/16`; env `MGMT_ALLOWED_IPS`). Cubre planos de gestión + IPs de nodo + scan-pool + LAN de torres privadas; añadir rangos públicos de torre (ej. `142.152.7.0/24`) por env si hace falta.
+11. **Clasificar caídas del túnel como inalcanzable (503), no 500.** `isUnreachable` debe incluir cortes transitorios (`ECONNRESET`/`EPIPE`/`EHOSTDOWN`/`socket hang up`) para que la UI muestre el overlay "Router no alcanzable · Reintentar" en vez de un 500 duro.
+12. **Borrar un moderador = de-provisionar sus nodos del router.** El cascade (`DELETE /admin/moderators/:id`) debe llamar `deprovisionNodeOnRouter` (`lib/nodeDeprovision.js`) por cada nodo (VRF + interfaz + rutas + mangle + peer), además de borrar peers de gestión (`routerCleanup`/`routerPeerState`, que usan `mgmtNet.userIfaces`, NO `VPN-WG-MGMT`). Best-effort: el router caído no bloquea el borrado en BD.
+13. **NUNCA tocar el address-list `LIST-NET-REMOTE-TOWERS` al de-provisionar.** Varias torres comparten la misma LAN (aislamiento por VRF+mangle) → borrar la entrada rompería a los nodos hermanos. Las entradas sin ruta/VRF quedan inertes.
+14. **IPs de gestión: amarradas al usuario, liberadas y reutilizadas.** `user_mgmt_ips` (`uq_umi_user`+`uq_umi_ip`) amarra 1 IP↔1 usuario; al borrar se libera. La asignación usa **menor octeto libre** (`lib/ipAlloc.lowestFreeOctet`), no `max+1` → reutiliza huecos de usuarios borrados.
 
 Ver también `vpn-manager/CLAUDE.md` y `DESIGN_SYSTEM.md`.
 
@@ -91,6 +96,7 @@ Ver también `vpn-manager/CLAUDE.md` y `DESIGN_SYSTEM.md`.
 - **Alta de nodo (WG):** backend genera el par de llaves si no se pega una propia, registra la pública en el peer del Core, embebe la privada en el script + rutas de retorno. Columnas `nodes.wg_cpe_public` + `wg_cpe_private_enc` (AES-GCM). Salida: script autocontenido.
 - **Alta de nodo (SSTP):** no requiere ruta de retorno (RouterOS la arma con la `remote-address` del PPP). Usuario/contraseña PPP se generan server-side (`ppp-<nombre>-nd<ND>` + pass segura) y se embeben en el script.
 - **Invitación de MEMBER (modelo seguro):** el invitado envía **solo su public key**; el server crea el peer, asigna el túnel de la invitación y devuelve `{allowedIp, serverPublicKey, endpoint, allowedIps}` para que arme su `.conf` (la clave privada nunca sale del dispositivo). Provisión WG = best-effort.
+- **Recuperación WireGuard self-service:** `POST /api/team/me/wireguard` — el moderador/member (re)genera su propio acceso WG si quedó sin él (la provisión al aceptar es best-effort y puede fallar si el router está caído). UI en **Ajustes → tab WireGuard** (`WireGuardTab.tsx`) con QR + descargar `.conf` + regenerar. Idempotente: limpia el peer anterior al regenerar.
 - **Enlace manual de invitaciones:** DO bloquea SMTP saliente → el correo puede no llegar. `invite-moderator` no falla si el email falla y devuelve `acceptUrl`; `GET /api/admin/invitations` lista pendientes y `POST .../:id/link` regenera el enlace. El admin lo comparte a mano hasta tener relay (Brevo por puerto 2525, pendiente activar cuenta).
 - **IP pública WAN:** setting global del admin (`server_public_ip` en Ajustes); `NuevoNodo` la consume en solo-lectura.
 - **Escaneo Opción C (VPS):** una scan-IP por workspace (`workspace_scan_ip`), mangle namespace `SCAN-WS-<ws>`, serializada por `scanLock`. Sin scan-IP → escaneo legacy (dev local).
@@ -123,6 +129,11 @@ Ver también `vpn-manager/CLAUDE.md` y `DESIGN_SYSTEM.md`.
 | 🔴 Una vez tras pull | `cd server && npm run migrate:notifications && npm run migrate:monitoring` (sin esto Q1/M5 caen en defensa). |
 | 🟡 RED en VPS | Aplicar runbook de migración `10.x` (fases del `migrate-mgmt-net.rsc`, corte final que elimina `VPN-WG-MGMT`) · activar cuenta Brevo (relay SMTP 2525) · `scan:assign` por moderador · cerrar puertos sobrantes en `ufw`. |
 | 🟡 Prueba en vivo | Alta WG/SSTP → script en CPE → handshake + ping gestión + escaneo > 0 · 2 moderadores contra el router (aislamiento mangle por-usuario). |
+| 🟡 Una vez | **Purgar zombies legacy del soft-delete:** `cd server && npm run purge:rbac` (dry-run) → `--apply` (con backup). Hay ~13 workspaces + 13 users con `deleted_at` que el hard-delete no alcanza. |
+| 🟡 Router | **Limpieza puntual** de peers/VRF YA huérfanos en el router (del moderador borrado ANTES del fix de cascada) — el código nuevo solo cubre borrados futuros. |
+| 🔴 Router (túnel arriba) | **ELIMINAR los nodos `TorreHousenet` (ND2, SSTP) y `TorreOmar` (ND3, WG)** — tienen `workspace_id=NULL`. El usuario decidió **borrado completo** (router + BD vía `deprovisionNodeOnRouter`) cuando el túnel WG esté activo (el router estaba caído al decidirlo). Son túneles reales con APs/CPEs → el borrado los tira. |
+| 🟡 Mejora | `/team/accept` traga el error de provisión WG con `log.warn` (`conf=null` silencioso) → la UI debería mostrar el motivo + ofrecer reintento (ya existe la red: tab WireGuard self-service). |
+| 🟡 Feature | Toggle **Local/VPS** para `MT_IP`/endpoint del router (local `10.14.250.1` / VPS `10.12.250.1`), análogo a `ScanModeToggle`. |
 | 🟡 Backlog | M2 API pública con tokens scoped · M3 Webhooks · M4 Speed test iperf3 (con confirmación) · L1 Reportes SLA · L2 Diagnóstico con LLM · L3 PWA móvil · L4 Predicción de degradación. |
 
 ---
