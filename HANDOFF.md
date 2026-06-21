@@ -129,7 +129,7 @@ Ver también `vpn-manager/CLAUDE.md` y `DESIGN_SYSTEM.md`.
 | 🔴 Una vez tras pull | `cd server && npm run migrate:notifications && npm run migrate:monitoring` (sin esto Q1/M5 caen en defensa). |
 | 🟡 RED en VPS | Aplicar runbook de migración `10.x` (fases del `migrate-mgmt-net.rsc`, corte final que elimina `VPN-WG-MGMT`) · activar cuenta Brevo (relay SMTP 2525) · `scan:assign` por moderador · cerrar puertos sobrantes en `ufw`. |
 | 🟡 Prueba en vivo | Alta WG/SSTP → script en CPE → handshake + ping gestión + escaneo > 0 · 2 moderadores contra el router (aislamiento mangle por-usuario). |
-| 🟡 Una vez | **Purgar zombies legacy del soft-delete:** `cd server && npm run purge:rbac` (dry-run) → `--apply` (con backup). Hay ~13 workspaces + 13 users con `deleted_at` que el hard-delete no alcanza. |
+| 🟢 Hecho | ~~Purgar zombies legacy del soft-delete~~ ✅ `purge:rbac --apply`: 13 workspaces + 13 users + huérfanos eliminados. BD = 2 workspaces (Soporte, Espacio de admin), 4 users. Backup `Desktop/GestionVPN_purge_rbac_*.json`. |
 | 🟡 Router | **Limpieza puntual** de peers/VRF YA huérfanos en el router (del moderador borrado ANTES del fix de cascada) — el código nuevo solo cubre borrados futuros. |
 | 🟢 Hecho | ~~ELIMINAR ND2 TorreHousenet + ND3 TorreOmar (`workspace_id=NULL`)~~ ✅ **Borrados** (router vía `.rsc` en Winbox + BD vía `deleteNode`, backup en `Desktop/GestionVPN_delete_nodes_*.json`). BD ahora con **0 nodos**. Las entradas de `LIST-NET-REMOTE-TOWERS` (`10.1.1.0/24`, `192.168.30.0/24`, etc.) **se conservaron** (inertes, por LAN compartidas). |
 | 🟡 Mejora | `/team/accept` traga el error de provisión WG con `log.warn` (`conf=null` silencioso) → la UI debería mostrar el motivo + ofrecer reintento (ya existe la red: tab WireGuard self-service). |
