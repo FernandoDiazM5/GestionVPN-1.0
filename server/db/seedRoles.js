@@ -61,12 +61,18 @@ async function main() {
   const del = await db.run("DELETE FROM vpn_users WHERE username <> 'admin'");
   console.log(`[seed] vpn_users: admin asegurado (admin/admin); ${del.changes || 0} usuario(s) legacy eliminados.`);
 
-  // 2) MySQL — Administrador + Moderador fernando
-  await ensureMysqlUser({ email: 'admin@local.app', name: 'admin', password: 'admin', platformAdmin: true });
-  await ensureMysqlUser({ email: 'fernando@local.app', name: 'fernando', password: '48523451', platformAdmin: false });
+  // 2) MySQL — Administrador + Moderador fernando.
+  // Contraseñas overridables por env (prod/CI NO deben usar el default de dev).
+  const adminPass = process.env.SEED_ADMIN_PASSWORD || 'admin';
+  const modPass = process.env.SEED_MOD_PASSWORD || '48523451';
+  if (!process.env.SEED_ADMIN_PASSWORD || !process.env.SEED_MOD_PASSWORD) {
+    console.warn('[seed] ⚠ Usando contraseña(s) DEFAULT de dev. Define SEED_ADMIN_PASSWORD / SEED_MOD_PASSWORD en prod.');
+  }
+  await ensureMysqlUser({ email: 'admin@local.app', name: 'admin', password: adminPass, platformAdmin: true });
+  await ensureMysqlUser({ email: 'fernando@local.app', name: 'fernando', password: modPass, platformAdmin: false });
 
   await closePool();
-  console.log('[seed] Completado. Login: admin/admin (Administrador) · fernando/48523451 (Moderador).');
+  console.log('[seed] Completado. Login: admin (Administrador) · fernando (Moderador).');
 }
 
 main().then(() => process.exit(0)).catch((e) => {

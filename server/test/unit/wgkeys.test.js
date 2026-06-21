@@ -31,6 +31,7 @@ describe('buildClientConf', () => {
     address: '10.13.250.50',
     serverPublicKey: 'SRVPUB1234567890abcdefxx==',
     endpoint: '203.0.113.10:13231',
+    allowedIps: '10.0.0.0/8, 192.168.0.0/16', // split-tunnel de gestión
   };
 
   it('genera un .conf con secciones [Interface] y [Peer]', () => {
@@ -39,11 +40,15 @@ describe('buildClientConf', () => {
     expect(conf).toContain('[Peer]');
   });
 
-  it('usa los defaults solicitados por el sistema (DNS 8.8.8.8, AllowedIPs 0.0.0.0/0)', () => {
+  it('usa el DNS default 8.8.8.8 y PersistentKeepalive', () => {
     const conf = buildClientConf(baseParams);
     expect(conf).toContain('DNS = 8.8.8.8');
-    expect(conf).toContain('AllowedIPs = 0.0.0.0/0');
     expect(conf).toContain('PersistentKeepalive = 25');
+  });
+
+  it('lanza si falta allowedIps (NUNCA 0.0.0.0/0 en túnel de gestión — §4.10)', () => {
+    expect(() => buildClientConf({ ...baseParams, allowedIps: undefined })).toThrow(/allowedIps/);
+    expect(() => buildClientConf({ ...baseParams, allowedIps: '   ' })).toThrow(/allowedIps/);
   });
 
   it('agrega /32 al Address (asume IP única, no subred)', () => {

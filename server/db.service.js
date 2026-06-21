@@ -130,7 +130,10 @@ const shim = {
 
 function splitStatements(raw) {
     return raw
-        .split('\n')
+        // split(/\r?\n/) y NO split('\n'): con CRLF (checkout Windows) el '\r'
+        // sobrevive y rompe el strip de abajo (en JS, '.' no cruza '\r' y '$' no
+        // matchea antes de '\r'), dejando pasar el ';' del comentario inline.
+        .split(/\r?\n/)
         // Quita comentarios -- (de línea e inline). CRÍTICO: un comentario inline
         // con ';' (ej. schema_ops "-- (Fase 2-B; resuelto...)") rompería el split(';')
         // y truncaría el CREATE TABLE (aps) → FK errno 150 / tabla inexistente.

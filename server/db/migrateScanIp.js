@@ -31,7 +31,24 @@ async function main() {
 
   try {
     for (const s of statements) await conn.query(s);
-    console.log('[migrate:scanip] Listo. Tabla workspace_scan_ip creada o ya existente.');
+
+    // Alinear collation con el resto de la BD (utf8mb4_general_ci). Un schema
+    // viejo creó la tabla como utf8mb4_unicode_ci → cualquier JOIN con
+    // workspaces/users falla con "Illegal mix of collations". Idempotente:
+    // solo convierte si difiere. Aplica a instalaciones existentes (local + prod).
+    const [[row]] = await conn.query(
+      `SELECT table_collation AS tc FROM information_schema.tables
+        WHERE table_schema = ? AND table_name = 'workspace_scan_ip'`,
+      [cfg.database]
+    );
+    if (row && row.tc && row.tc !== 'utf8mb4_general_ci') {
+      console.log(`[migrate:scanip] Convirtiendo collation ${row.tc} → utf8mb4_general_ci ...`);
+      await conn.query(
+        'ALTER TABLE workspace_scan_ip CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci'
+      );
+    }
+
+    console.log('[migrate:scanip] Listo. Tabla workspace_scan_ip creada/alineada.');
     process.exit(0);
   } finally { await conn.end(); }
 }

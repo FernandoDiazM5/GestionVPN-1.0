@@ -19,8 +19,17 @@ function generateKeyPair() {
 
 /**
  * Construye el contenido de un archivo .conf de cliente WireGuard.
+ *
+ * `allowedIps` es OBLIGATORIO: estos son túneles de GESTIÓN split-tunnel y el
+ * router NO da salida a internet a los clientes de gestión. Un default a
+ * 0.0.0.0/0 enrutaría TODO el tráfico al router → cliente SIN INTERNET (HANDOFF
+ * §4.10; fue el corte del 2026-06-20). Si falta, fallamos ruidosamente en vez de
+ * generar silenciosamente un .conf que mata la conexión del cliente.
  */
 function buildClientConf({ privateKey, address, serverPublicKey, endpoint, allowedIps, dns }) {
+  if (!allowedIps || !String(allowedIps).trim()) {
+    throw new Error('buildClientConf: allowedIps es obligatorio (split-tunnel). NUNCA 0.0.0.0/0 en un túnel de gestión.');
+  }
   return [
     '[Interface]',
     `PrivateKey = ${privateKey}`,
@@ -29,7 +38,7 @@ function buildClientConf({ privateKey, address, serverPublicKey, endpoint, allow
     '',
     '[Peer]',
     `PublicKey = ${serverPublicKey}`,
-    `AllowedIPs = ${allowedIps || '0.0.0.0/0'}`,
+    `AllowedIPs = ${allowedIps}`,
     `Endpoint = ${endpoint}`,
     'PersistentKeepalive = 25',
     '',

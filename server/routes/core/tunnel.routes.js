@@ -8,7 +8,6 @@
 //   GET  /tunnel/status           → estado actual del túnel del usuario
 //   GET  /tunnel/my-mgmt-ip       → IP de gestión registrada
 //   POST /tunnel/register-my-ip   → declara mi IP (server-side valida peer)
-//   POST /tunnel/mangle-access    → legacy single-user (limpieza + 1 regla)
 //
 //  ★ Aislamiento: la IP de gestión SIEMPRE se resuelve server-side desde
 //    user_mgmt_ips. NUNCA se acepta del body — anti-spoofing.
@@ -18,7 +17,7 @@ const express = require('express');
 const router = express.Router();
 
 const log = require('../../lib/logger').child({ scope: 'core:tunnel' });
-const { connectToMikrotik, safeWrite, getErrorMessage, writeIdempotent } = require('../../routeros.service');
+const { connectToMikrotik, safeWrite } = require('../../routeros.service');
 const { IPV4_REGEX } = require('../../ubiquiti.service');
 const sessionRepo = require('../../db/repos/sessionRepo');
 const mgmtIpRepo = require('../../db/repos/mgmtIpRepo');
@@ -252,121 +251,6 @@ router.post('/tunnel/register-my-ip', asyncHandler(async (req, res) => {
     const dup = /uq_umi_ip|Duplicate entry/i.test(error?.message || '');
     if (dup) throw new AppError('Esa IP ya está asignada a otro usuario', 409, 'DUPLICATE');
     throw mikrotikAppError(error, ip, user);
-  }
-}));
-
-// ── POST /tunnel/mangle-access (legacy single-user) ─────────────────────────
-// Limpia todas las reglas mangle con comment="ACCESO-DINAMICO" o "ACCESO-ADMIN"
-// e inyecta una regla ACCESO-ADMIN por cada /24 de gestión (CLIENTES/ADMIN/VPS).
-//
-// Body: { vrfSeleccionado: "VRF-ND4-TORREVICTORN2" }
-router.post('/tunnel/mangle-access', asyncHandler(async (req, res) => {
-  const { ip, user, pass } = requireMikrotik(req);
-
-  const { vrfSeleccionado, ipCliente: ipClienteBody } = req.body;
-  if (!vrfSeleccionado || typeof vrfSeleccionado !== 'string' || !vrfSeleccionado.trim()) {
-    throw new AppError('vrfSeleccionado es requerido en el body.', 400, 'VALIDATION_ERROR');
-  }
-
-  // Prioridad: body.ipCliente → X-Forwarded-For → socket remoteAddress
-  let ipCliente = '';
-  if (ipClienteBody && typeof ipClienteBody === 'string') {
-    ipCliente = ipClienteBody.trim();
-  } else {
-    ipCliente = clientIpOf(req);
-  }
-  log.debug({ ipCliente, vrf: vrfSeleccionado }, 'MANGLE-ACCESS request');
-
-  if (!ipCliente) {
-    throw new AppError('No se pudo determinar la IP del operador.', 400, 'VALIDATION_ERROR');
-  }
-
-  // Validar que sea una IPv4 válida antes de enviar a RouterOS
-  if (!IPV4_REGEX.test(ipCliente)) {
-    throw new AppError(`IP del operador no es IPv4 válida: "${ipCliente}"`, 400, 'VALIDATION_ERROR');
-  }
-
-  const vrf = vrfSeleccionado.trim();
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // ESTRATEGIA: usar conexiones separadas por fase para evitar desincronización
-  // del protocolo node-routeros cuando se hacen múltiples add consecutivos.
-  // Fase 1: conn1 → print + cleanup de ACCESO-DINAMICO y ACCESO-ADMIN
-  // Fase 2: conn2 → add única regla ACCESO-ADMIN (con writeIdempotent)
-  // ──────────────────────────────────────────────────────────────────────────
-
-  // ── Fase 1: Limpieza ──────────────────────────────────────────────────────
-  let api1;
-  let deletedCount = 0;
-  try {
-    api1 = await connectToMikrotik(ip, user, pass);
-    const allMangle = await safeWrite(api1, ['/ip/firewall/mangle/print'], 15000).catch((e) => {
-      log.warn({ err: e?.message }, 'MANGLE-ACCESS print falló');
-      return [];
-    });
-    const toDelete = allMangle.filter(m =>
-      (m.comment === 'ACCESO-DINAMICO' || m.comment === 'ACCESO-ADMIN') && m['.id']
-    );
-    log.debug({ total: allMangle.length, toDelete: toDelete.length }, 'MANGLE-ACCESS inventario');
-
-    for (const rule of toDelete) {
-      try {
-        await safeWrite(api1, ['/ip/firewall/mangle/remove', `=.id=${rule['.id']}`], 10000);
-        deletedCount++;
-      } catch (e) {
-        log.warn({ id: rule['.id'], err: e?.message }, 'MANGLE-ACCESS remove falló');
-      }
-    }
-    log.debug({ deletedCount }, 'MANGLE-ACCESS Cleanup terminado');
-  } catch (error) {
-    if (api1) try { await api1.close(); } catch (_) { /* ignore */ }
-    const msg = getErrorMessage(error, ip, user);
-    log.error({ err: error?.message || String(error) }, 'MANGLE-ACCESS fase 1 cleanup');
-    throw new AppError(`Cleanup falló: ${msg}`, 500, 'MIKROTIK_ERROR');
-  }
-  try { await api1.close(); } catch (_) { /* noop */ }
-
-  // Pausa entre fases para que RouterOS asiente los removes
-  await new Promise(r => setTimeout(r, 300));
-
-  // ── Fase 2: Add en conexión fresca ────────────────────────────────────────
-  // Legacy single-user: una regla ACCESO-ADMIN por cada /24 de gestión
-  // (CLIENTES + ADMIN + VPS) cubre todo el plano. El modelo moderno usa
-  // mangle POR-IP de usuario (tunnelProvisioner.addUserMangle).
-  const mgmtSrcNets = [mgmtNet.clients.net, mgmtNet.admin.net, mgmtNet.vps.net];
-  let api2;
-  try {
-    api2 = await connectToMikrotik(ip, user, pass);
-
-    log.debug({ vrf }, 'MANGLE-ACCESS Creando reglas ACCESO-ADMIN');
-    for (const srcNet of mgmtSrcNets) {
-      await writeIdempotent(api2, [
-        '/ip/firewall/mangle/add',
-        '=chain=prerouting',
-        '=action=mark-routing',
-        '=comment=ACCESO-ADMIN',
-        '=dst-address-list=LIST-NET-REMOTE-TOWERS',
-        `=new-routing-mark=${vrf}`,
-        `=src-address=${srcNet}`,
-        '=passthrough=yes',
-      ], 12000);
-    }
-    log.info('MANGLE-ACCESS Reglas ACCESO-ADMIN creadas');
-
-    try { await api2.close(); } catch (_) { /* noop */ }
-
-    return sendOk(res, {
-      message: `Regla ACCESO-ADMIN aplicada: ${mgmtSrcNets.join(', ')} → ${vrf}`,
-      vrf,
-      ipCliente,
-      deletedCount,
-    });
-  } catch (error) {
-    if (api2) try { await api2.close(); } catch (_) { /* ignore */ }
-    if (error instanceof AppError) throw error;
-    const msg = getErrorMessage(error, ip, user);
-    log.error({ err: error?.message || String(error) }, 'MANGLE-ACCESS fase 2 add');
-    throw new AppError(`Add falló: ${msg}`, 500, 'MIKROTIK_ERROR');
   }
 }));
 

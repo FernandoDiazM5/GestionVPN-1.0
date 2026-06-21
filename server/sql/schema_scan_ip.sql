@@ -15,4 +15,4 @@ CREATE TABLE IF NOT EXISTS workspace_scan_ip (
   PRIMARY KEY (id),
   UNIQUE KEY uq_wsi_workspace (workspace_id),
   UNIQUE KEY uq_wsi_ip (scan_ip)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

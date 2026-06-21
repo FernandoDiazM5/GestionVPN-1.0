@@ -110,13 +110,3 @@ export interface TunnelDeactivateResponse {
   success: boolean;
   message?: string;
 }
-
-/** Respuesta de /api/tunnel/mangle-access (legacy single-user) */
-export interface MangleAccessResponse {
-  success: boolean;
-  message?: string;
-  vrf?: string;
-  ipVps?: string;
-  ipCliente?: string;
-  deletedCount?: number;
-}
