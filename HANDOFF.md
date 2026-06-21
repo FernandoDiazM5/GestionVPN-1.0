@@ -9,7 +9,7 @@
 
 ## 0) Estado actual
 
-- **Tips:** `dev` = **`4c4b810`** + **trabajo SIN commitear** (esta sesión, ver abajo) · `main` = `57908cc` (se mergea a `main` tras validar la parte de RED en prod).
+- **Tips:** `dev` = **`bdaac72`** (esta sesión) · `main` = `57908cc` (se mergea a `main` tras validar la parte de RED en prod).
 - **Salud:** `tsc` frontend 0 · `node --check` 0 · **270 tests backend verdes** · **66 tests frontend verdes** · contratos compilan · `semgrep`/`audit:design` sin tocar.
 - **Última línea de trabajo (2026-06-21):** (1) **Opción C reforzada** — scan-IP del VPS **amarrada al workspace al crearse** (`scanIpRepo.allocateInTx` dentro de `workspaceRepo.createForOwner`, best-effort), ya no hace falta `scan:assign` manual en altas nuevas; Monitor AP usa `scanLock.tryAcquire` (no bloqueante) → un escaneo interactivo largo ya no estanca el polling de los demás workspaces. (2) **Retiro total de co-moderadores** (`CO_MODERATOR`): enum BD → `('OWNER','MEMBER')` + migración `migrate:dropcomod` (degrada co-mods existentes a MEMBER), contratos, guards, rutas `/team`, UI (sin selector de rol ni promover/degradar), tests. Endpoint `POST /team/role` eliminado.
 - **Trabajo previo (2026-06-20):** ciclo de vida WireGuard de gestión + borrado en cascada (`.conf` split-tunnel, recuperación WG self-service, `nodeDeprovision`, reutilización de IPs, 503 en cortes). Detalle en LOG.
