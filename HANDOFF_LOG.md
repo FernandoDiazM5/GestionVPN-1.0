@@ -16,6 +16,13 @@
 
 ---
 
+> **Sesión 2026-06-20 (cont. 3) — AllowedIPs dinámico desde el address-list `LIST-NET-REMOTE-TOWERS`.** Rama `dev`. **271 tests backend verdes · `tsc` 0.**
+> - **Motivo:** un `.conf` con `0.0.0.0/1, 128.0.0.0/1` (= `0.0.0.0/0` disfrazado) dejaba sin internet; y la derivación por-workspace de LAN públicas fallaba con nodos `workspace_id=NULL`. **Aclaración de arquitectura:** el plano **ADMIN** (`VPN-WG-ADMIN`) SÍ tiene internet (regla `Admin MGMT libre` + NAT); **CLIENTES** NO (solo torres) → por eso el mismo `0.0.0.0/0` "funcionaba antes" en el túnel admin pero no en el de moderador.
+> - **Fix:** `mgmtAllowedIpsFor(ws, {addressList})` + `readTowerLans(api, safeWrite)` (`lib/mgmtAllowedIps.js`) leen el address-list `LIST-NET-REMOTE-TOWERS` en vivo y añaden SOLO las entradas **públicas** (las privadas ya están en la base RFC1918). `provisionMemberWgByPublicKey` lo lee y devuelve `allowedIps`; accept/me/POST member usan ese valor. Cubre nodos sin `workspace_id`. Test `mgmtAllowedIps` (4).
+> - **Para el config YA generado del usuario:** usar AllowedIPs `10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16` (+ pública de torre si administra una). El túnel CLIENTES da internet por la conexión local (split) + torres por el túnel.
+
+---
+
 > **Sesión 2026-06-20 (cont. 2) — Cascada de borrado real + split-tunnel por torres + reutilización de IPs.** Rama `dev`. **267 tests backend verdes · `tsc` frontend 0.** Análisis profundo (skill `mikrotik-vpn-expert`) con evidencia router vs BD en vivo.
 > - **AllowedIPs derivado de las LAN reales (`nodes.lan_subnets`/`segmento_lan`):** nuevo `lib/mgmtAllowedIps.js` `mgmtAllowedIpsFor(ws)` = base `10.0.0.0/8` + LAN de las torres del workspace fuera de 10.x (incluye públicos como `142.152.7.0/24`). Cableado en los 5 puntos de `team.routes.js`. Base de `mgmtNet.mgmtAllowedIps` bajada a `10.0.0.0/8` (no `192.168.0.0/16`, para no capturar la LAN local del moderador). Config admin (`useWireGuardPeers.ts`) → `MGMT_ALLOWED_IPS` (`config.ts`), ya NO `0.0.0.0/0`.
 > - **Fix 1 — peers se borran/suspenden de verdad:** `routerCleanup.js` + `routerPeerState.js` cambian el filtro hardcodeado `VPN-WG-MGMT` → `mgmtNet.userIfaces` (CLIENTES+ADMIN). Antes el cleanup no encontraba ningún peer → no borraba nada.
