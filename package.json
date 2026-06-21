@@ -26,7 +26,9 @@
     "e2e": "playwright test",
     "e2e:install": "playwright install --with-deps chromium",
     "audit:design": "node scripts/audit-design.js",
-    "audit:design:json": "node scripts/audit-design.js --json"
+    "audit:design:json": "node scripts/audit-design.js --json",
+    "audit:semgrep": "node scripts/semgrep.js",
+    "audit:semgrep:json": "node scripts/semgrep.js --json"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",
