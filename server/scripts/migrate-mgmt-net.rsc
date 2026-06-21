@@ -54,6 +54,19 @@
 
 
 # ════════════════════════════════════════════════════════════════════════
+#  FASE 2b — Servicio API accesible desde el NUEVO plano de gestión
+#    `/ip service api` tiene su PROPIA allow-list por `address=` (independiente
+#    del firewall y de LIST-MGMT-TRUSTED). Si el origen no está aquí, RouterOS
+#    ACEPTA el TCP pero descarta el login en silencio → el backend (que sale por
+#    10.13/10.14.250.x) se cuelga esperando una respuesta que nunca llega.
+#    `set ... address=` REEMPLAZA la lista entera: incluimos viejo + nuevo
+#    durante la migración (el 192.168.21.0/24 se retira en el corte final).
+# ════════════════════════════════════════════════════════════════════════
+/ip/service/set api address=10.12.250.0/24,10.13.250.0/24,10.14.250.0/24,192.168.21.0/24,132.251.0.223/32,179.6.29.241/32,213.173.36.233/32
+/ip/service/set api-ssl address=10.12.250.0/24,10.13.250.0/24,10.14.250.0/24,192.168.21.0/24,132.251.0.223/32,179.6.29.241/32,213.173.36.233/32
+
+
+# ════════════════════════════════════════════════════════════════════════
 #  FASE 3 — Rutas de retorno por VRF (CLIENTES/ADMIN/VPS + scan)
 #           Itera TODOS los VRF y añade las 4 rutas hacia las nuevas
 #           interfaces. Idempotente: comprueba antes de añadir.
@@ -121,6 +134,10 @@
 #
 # 6c. Address-lists viejas:
 #   /ip/firewall/address-list/remove [find where address="192.168.21.0/24"]
+#
+# 6c-bis. Servicio API: retirar el plano viejo de su allow-list (lo agregó FASE 2b):
+#   /ip/service/set api     address=10.12.250.0/24,10.13.250.0/24,10.14.250.0/24,132.251.0.223/32,179.6.29.241/32,213.173.36.233/32
+#   /ip/service/set api-ssl address=10.12.250.0/24,10.13.250.0/24,10.14.250.0/24,132.251.0.223/32,179.6.29.241/32,213.173.36.233/32
 #
 # 6d. Interfaz vieja (libera el puerto 13231) — ESTO TE DESCONECTA si sigues
 #     en 192.168.21.x. Hazlo SOLO desde 10.14.250.x:

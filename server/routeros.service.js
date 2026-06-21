@@ -112,11 +112,48 @@ function attachErrorGuard(api, host) {
     return api;
 }
 
+// Deadline DURO para connect + login. La opción `timeout` de node-routeros se
+// apoya en `socket.setTimeout`, que NO dispara de forma fiable durante el
+// handshake de login de la API (el router acepta el TCP — puerto abierto — pero
+// si el login no completa, la promesa de `api.connect()` queda colgada para
+// siempre). Sin este deadline propio, CUALQUIER operación de router (escaneo,
+// provisión, limpieza al borrar moderador) cuelga la petición HTTP indefinidamente
+// porque tampoco hay timeout en el cliente del navegador.
+const CONNECT_DEADLINE_MS = 9000;
+
+// Envuelve `new RouterOSAPI().connect()` en un deadline que, al vencer, DESTRUYE
+// el socket y rechaza. Garantiza que connectToMikrotik termina siempre acotado.
+function connectWithDeadline(opts) {
+    const api = new RouterOSAPI(opts);
+    return new Promise((resolve, reject) => {
+        let settled = false;
+        const timer = setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            // Mata el socket subyacente para no fugar la conexión a medio login.
+            try { api.connector && api.connector.destroy(); } catch (_) { /* noop */ }
+            const err = new Error('Sin respuesta del router en el login (timeout)');
+            err.code = 'SOCKTMOUT';
+            reject(err);
+        }, CONNECT_DEADLINE_MS);
+        api.connect().then(() => {
+            if (settled) { try { api.close(); } catch (_) { /* noop */ } return; }
+            settled = true;
+            clearTimeout(timer);
+            resolve(api);
+        }).catch((err) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            reject(err);
+        });
+    });
+}
+
 const connectToMikrotik = async (host, user, password) => {
     // ── Intento 1: puerto 8728 (plain API) ──────────────────────────────────
     try {
-        const api = new RouterOSAPI({ host, user, password, port: 8728, timeout: 8, keepalive: false });
-        await api.connect();
+        const api = await connectWithDeadline({ host, user, password, port: 8728, timeout: 8, keepalive: false });
         log.debug({ host, port: 8728, mode: 'plain' }, 'Conectado a MikroTik');
         return attachErrorGuard(api, host);
     } catch (err) {
@@ -124,7 +161,7 @@ const connectToMikrotik = async (host, user, password) => {
         const code = err?.code;
         // Solo reintentamos en ECONNREFUSED (puerto cerrado activamente).
         // Si el puerto está filtrado/firewall (SOCKTMOUT/ETIMEDOUT), ambos puertos
-        // tendrán el mismo problema y no tiene sentido esperar 8s extra en 8729.
+        // tendrán el mismo problema y no tiene sentido esperar otros 9s en 8729.
         if (errno !== -4078 && code !== 'ECONNREFUSED') throw err;
         log.debug({ host }, '8728 rechazado, reintentando con SSL 8729');
     }
@@ -135,8 +172,7 @@ const connectToMikrotik = async (host, user, password) => {
         // del software emitir certs reales; los operadores podrían instalar uno
         // manualmente, pero no es el flujo soportado.
         // nosemgrep: bypass-tls-verification
-        const api = new RouterOSAPI({ host, user, password, port: 8729, tls: { rejectUnauthorized: false }, timeout: 8, keepalive: false });
-        await api.connect();
+        const api = await connectWithDeadline({ host, user, password, port: 8729, tls: { rejectUnauthorized: false }, timeout: 8, keepalive: false });
         log.debug({ host, port: 8729, mode: 'ssl' }, 'Conectado a MikroTik');
         return attachErrorGuard(api, host);
     } catch (err) {

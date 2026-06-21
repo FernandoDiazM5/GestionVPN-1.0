@@ -35,6 +35,31 @@ async function getMikrotikCreds() {
   return { ip, user, pass: decryptPass(passData) };
 }
 
+// Limpieza best-effort del MikroTik tras borrar un workspace/moderador. Se ejecuta
+// FUERA de la respuesta HTTP (en segundo plano): si el router está caído o el login
+// de la API cuelga (acotado a ~9s por conexión en routeros.service), el borrado en
+// BD ya se hizo y la UI NO queda esperando. Los peers/mangles que no se puedan
+// limpiar quedan inertes y se purgan a mano (ver pendientes del handoff).
+//   ⚠️ NO toca LIST-NET-REMOTE-TOWERS (LAN compartidas entre nodos hermanos).
+async function cleanupWorkspaceOnRouter({ wsId, publicKeys, userIds, nodeRows }) {
+  const routerCleanup = await removePeersFromRouter(publicKeys);   // peers WG del ws
+  const mangleCleanup = await removeUserMangles(userIds);          // mangles por-usuario
+  let nodesDeprovisioned = 0;
+  const mtCreds = await getMikrotikCreds();
+  if (mtCreds) {
+    for (const n of nodeRows) {
+      try {
+        await deprovisionNodeOnRouter(mtCreds, { pppUser: n.ppp_user, vrfName: n.nombre_vrf });
+        nodesDeprovisioned++;
+      } catch (e) {
+        log.warn({ pppUser: n.ppp_user, err: e.message }, 'deprovision de nodo falló (best-effort)');
+      }
+    }
+  }
+  log.info({ wsId, routerCleanup, mangleCleanup, nodesDeprovisioned },
+    'cleanup de router tras borrar moderador completado');
+}
+
 const INVITE_TTL_MS = 24 * 60 * 60 * 1000; // 24h — igual que team.routes.js
 const genOtp = () => String(crypto.randomInt(100000, 1000000));
 const log = require('../lib/logger').child({ scope: 'admin' });
@@ -188,7 +213,11 @@ router.delete('/moderators/:id', asyncHandler(async (req, res) => {
   const mod = await findModeratorOr404(req.params.id);
   const wsId = mod.workspace_id;
 
-  // 0a) Cleanup MikroTik: peers WG del workspace (moderador + miembros)
+  // ── Snapshot de lo que habrá que limpiar en el router, leído ANTES de borrar
+  //    en BD. La limpieza del MikroTik es best-effort y NO debe bloquear el
+  //    borrado: se hace en segundo plano tras responder (cleanupWorkspaceOnRouter).
+  //    Antes se hacía aquí, en línea, y si el login al router colgaba la petición
+  //    HTTP nunca respondía → el modal "Eliminar" se quedaba pensando para siempre.
   const peerKeyRows = await query(
     `SELECT public_key FROM mgmt_peer_owners WHERE workspace_id = ?
      UNION
@@ -196,35 +225,17 @@ router.delete('/moderators/:id', asyncHandler(async (req, res) => {
     [wsId, wsId]
   );
   const publicKeys = peerKeyRows.map(r => r.public_key).filter(Boolean);
-  const routerCleanup = await removePeersFromRouter(publicKeys);
 
-  // 0b) Cleanup MikroTik: mangles activos de los users del workspace (no dejar huérfanas)
   const wsUserRows = await query(
     'SELECT user_id FROM workspace_members WHERE workspace_id = ?',
     [wsId]
   );
-  const mangleCleanup = await removeUserMangles(wsUserRows.map(r => r.user_id));
+  const userIds = wsUserRows.map(r => r.user_id);
 
-  // 0c) De-provisionar los NODOS del workspace en el router (VRF + interfaz WG/SSTP
-  //     + rutas + mangle + peer del CPE). Best-effort: si el router está caído NO
-  //     bloquea el borrado en BD. ⚠️ NO toca LIST-NET-REMOTE-TOWERS (LAN compartidas
-  //     entre nodos — borrarlas rompería a los hermanos).
-  let nodesDeprovisioned = 0;
-  const mtCreds = await getMikrotikCreds();
-  if (mtCreds) {
-    const nodeRows = await query(
-      'SELECT ppp_user, nombre_vrf FROM nodes WHERE workspace_id = ? AND ppp_user IS NOT NULL',
-      [wsId]
-    );
-    for (const n of nodeRows) {
-      try {
-        await deprovisionNodeOnRouter(mtCreds, { pppUser: n.ppp_user, vrfName: n.nombre_vrf });
-        nodesDeprovisioned++;
-      } catch (e) {
-        log.warn({ pppUser: n.ppp_user, err: e.message }, 'deprovision de nodo falló (no bloquea el borrado en BD)');
-      }
-    }
-  }
+  const nodeRows = await query(
+    'SELECT ppp_user, nombre_vrf FROM nodes WHERE workspace_id = ? AND ppp_user IS NOT NULL',
+    [wsId]
+  );
 
   await withTransaction(async (tx) => {
     // 1) Usuarios del workspace (OWNER + MEMBERs) — se usarán al final
@@ -286,12 +297,14 @@ router.delete('/moderators/:id', asyncHandler(async (req, res) => {
     }
   });
 
-  return sendOk(res, {
-    message: 'Moderador eliminado completamente',
-    router: routerCleanup,            // peers WG eliminados: { removed, failed, skipped }
-    mangle: mangleCleanup,            // reglas mangle eliminadas: { removed, failed, skipped }
-    nodesDeprovisioned,               // nodos/VRF de-provisionados del router
-  });
+  // Responder de inmediato: el borrado en BD ya está hecho. La limpieza del
+  // router (peers WG + mangles + de-provisión de nodos) corre en segundo plano
+  // y es best-effort — si el router está caído o el login cuelga, no afecta a
+  // la respuesta ni deja al usuario esperando.
+  sendOk(res, { message: 'Moderador eliminado completamente' });
+
+  cleanupWorkspaceOnRouter({ wsId, publicKeys, userIds, nodeRows })
+    .catch(err => log.warn({ wsId, err: err.message }, 'cleanup de router tras borrar moderador falló'));
 }));
 
 // ── POST /api/admin/moderators — alta directa de un Moderador ──
