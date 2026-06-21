@@ -6,6 +6,17 @@
 
 ---
 
+> **Sesión 2026-06-21 (cont. 2) — Fix: el modal "Eliminar moderador" se quedaba pensando para siempre.** Rama `dev` (commit `654b09d`). **271 tests backend verdes · node --check OK.**
+> - **Síntoma:** al confirmar el borrado de un moderador, el spinner del modal nunca paraba (`fetch` sin timeout; backend nunca respondía).
+> - **Diagnóstico (con `mikrotik-vpn-expert` + traza `DEBUG=routeros-api:*`):** el DELETE hacía limpieza del router (`removePeersFromRouter`/`removeUserMangles` → `connectToMikrotik`) **en línea antes de responder**. El `connect()` se colgaba en la fase de **login** de la API: TCP a `10.13.250.1:8728` abría en **17ms**, se enviaba `/login`, y el router **nunca respondía** (probe crudo confirmó 8728/8729 OPEN en ambos planos). El `timeout` de `node-routeros` (`socket.setTimeout`) **no dispara durante el login** → promesa colgada para siempre.
+> - **Causa raíz #1 (código):** sin deadline propio en `connectToMikrotik`. Fix: `connectWithDeadline` (9s, destruye socket + rechaza). Verificado: rechaza en **9001ms**. Además el DELETE ahora borra en BD y responde primero; la limpieza del router corre en 2.º plano best-effort (`cleanupWorkspaceOnRouter`). El frontend ya ignoraba el body de la respuesta y no hay tests sobre su forma → seguro.
+> - **Causa raíz #2 (router):** `/ip service api address=` solo tenía `192.168.21.0/24` (plano viejo) + 3 IP públicas. El backend sale por `10.13.250.x` → RouterOS aceptaba el TCP pero descartaba el login en silencio. El servicio API tiene allow-list PROPIA, aparte del firewall/`LIST-MGMT-TRUSTED`. **Usuario aplicó en vivo** `/ip service set api/api-ssl address=<10.x + viejo>`; verificado: login OK en **~130ms** a `10.13.250.1` y `10.14.250.1` (identity `GW-VPN-CORE-ISP`). `migrate-mgmt-net.rsc` ganó **FASE 2b** (+ nota de retiro del viejo en corte final).
+> - **Nuevos invariantes:** §4.17 (deadline propio en toda conexión al router; nunca confiar en el timeout de node-routeros) y §4.18 (plano de gestión en `/ip service api address=`, no solo firewall).
+> - **Observado:** corrían varias instancias de backend a la vez (2 nodemon + un `index.js` suelto) — conviene dejar una sola. La clave del router salió en texto plano en el debug → rotar (ya marcada como comprometida).
+> - **Pendiente:** validar el borrado en la UI en vivo (ahora limpia BD + peers/mangles del router de verdad).
+
+---
+
 > **Sesión 2026-06-21 (cont.) — Auditoría integral del branch (`/auditoria-completa`) + 5 fixes + tooling semgrep.** Rama `dev` (commits `b964309` fixes, `64adc7b` tooling). **271 tests backend · 66 frontend · tsc 0 · audit:semgrep 0 findings.**
 > - **Skill nueva `/auditoria-completa`** (`.claude/skills/auditoria-completa/`): orquesta los 5 dominios (seguridad/lógica/eficiencia/BD/validación) en un flujo read-only con informe por severidad; encadena `/code-review`, `/security-review`, `npm run audit:semgrep`, `api-contract`, `diagnose`, `verify`. Decisión: NO instalar skills externas del ecosistema (todas <100 installs); reusar el toolkit ya instalado.
 > - **Auditoría ejecutada** sobre `dev` vs `main` (120 archivos). 0 críticos. **5 hallazgos 🟡 arreglados** (commit `b964309`):
