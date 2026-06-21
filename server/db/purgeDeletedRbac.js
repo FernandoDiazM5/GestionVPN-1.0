@@ -76,7 +76,8 @@ async function main() {
       backup.tables[t] = await query(`SELECT * FROM ${t} WHERE workspace_id IN (${ph})`, [...targetWs]);
     } catch { /* ignore */ }
   }
-  const backupPath = path.resolve(__dirname, `../../GestionVPN_purge_rbac_${Date.now()}.json`);
+  // FUERA del repo (server/db → server → repo → Desktop): el backup tiene emails.
+  const backupPath = path.resolve(__dirname, `../../../GestionVPN_purge_rbac_${Date.now()}.json`);
   fs.writeFileSync(backupPath, JSON.stringify(backup, null, 2));
   console.log(`\n💾 Backup: ${backupPath}`);
 
