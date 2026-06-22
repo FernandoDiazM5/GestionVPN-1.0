@@ -1,4 +1,13 @@
-try { require('dotenv').config(); } catch (_) { /* opcional */ }
+// Carga el .env de la RAÍZ del repo por ruta absoluta (no dependas del cwd):
+// `npm run dev` se corre desde server/, pero el .env vive en la raíz. Sin esto,
+// dotenv buscaba server/.env (inexistente) y TELEGRAM_BOT_TOKEN/SMTP_* quedaban
+// sin cargar. En prod, compose ya inyecta env vía env_file y dotenv no sobreescribe.
+try {
+  const path = require('path');
+  require('dotenv').config({ path: path.resolve(__dirname, '..', '.env'), quiet: true });
+  // Fallback: si existiera un server/.env local, también lo respeta (sin override).
+  require('dotenv').config({ quiet: true });
+} catch (_) { /* opcional */ }
 const express = require('express');
 const cors    = require('cors');
 const cookieParser = require('cookie-parser');
