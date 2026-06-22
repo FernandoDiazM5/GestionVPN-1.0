@@ -557,7 +557,7 @@ router.post('/node/deprovision', requireOperator, asyncHandler(async (req, res) 
   const { ip, user, pass } = requireMikrotik(req);
   const { vrfName, pppUser, protocol } = req.body;
   if (!pppUser) throw new AppError('pppUser es requerido', 400, 'VALIDATION_ERROR');
-  if (!(await nodeBelongsToRequester(req, pppUser))) {
+  if (!(await nodeBelongsToRequester(req, pppUser, vrfName))) {
     throw new AppError('Nodo no encontrado en tu workspace', 404, 'NOT_FOUND');
   }
 
@@ -578,7 +578,7 @@ router.post('/node/deprovision', requireOperator, asyncHandler(async (req, res) 
   // Paso 8: cascade en BD (nodes, aps, cpes, signal_history, node_*)
   let deletedDeviceIds = [];
   try {
-    const result = await deleteNode(pppUser);
+    const result = await deleteNode(pppUser, vrfName);
     deletedDeviceIds = result?.deviceIds || [];
     steps.push({ step: 8, obj: 'Base de datos', name: `${deletedDeviceIds.length} APs + cascadas eliminados`, status: 'ok' });
   } catch (dbErr) {

@@ -50,9 +50,14 @@ export default function EliminarNodo({ node, onClose, onSuccess }: EliminarNodoP
   }, [deleting]);
 
   useEffect(() => {
-    if (!result) { setVisibleSteps(0); return; }
+    // Una respuesta de error (404/500) puede no traer `steps` (p.ej. AppError
+    // "Nodo no encontrado en tu workspace"). En ese caso no animamos pasos: el
+    // bloque de error ya muestra `result.message`. Sin esta guarda, leer
+    // `result.steps.length` reventaba el modal con un TypeError.
+    const steps = result?.steps;
+    if (!steps || steps.length === 0) { setVisibleSteps(0); return; }
     let i = 0;
-    const id = setInterval(() => { i++; setVisibleSteps(i); if (i >= result.steps.length) clearInterval(id); }, 300);
+    const id = setInterval(() => { i++; setVisibleSteps(i); if (i >= steps.length) clearInterval(id); }, 300);
     return () => clearInterval(id);
   }, [result]);
 

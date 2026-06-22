@@ -388,13 +388,19 @@ async function getNodeId(pppUser) {
     return row?.id || null;
 }
 
-async function deleteNode(pppUser) {
-    if (!pppUser) return { devicesDeleted: 0, deviceIds: [] };
+async function deleteNode(pppUser, vrfName = null) {
+    if (!pppUser && !vrfName) return { devicesDeleted: 0, deviceIds: [] };
     const d = await getDb();
-    const nodeRow = await d.get('SELECT id FROM nodes WHERE ppp_user = ?', [pppUser]);
-    if (!nodeRow) return { devicesDeleted: 0, deviceIds: [] };
-    await d.run('DELETE FROM nodes WHERE id = ?', [nodeRow.id]);
-    log.debug({ pppUser }, 'Nodo eliminado (cascade): FK limpiaron dependencias');
+    // Borra TODAS las filas del nodo físico. En nodos legacy puede coexistir el
+    // registro de provisión (keyed por ppp_user) con la caché del router (keyed
+    // por el nombre del secret); ambas comparten nombre_vrf, que es único por nodo.
+    const rows = await d.all(
+        'SELECT id FROM nodes WHERE ppp_user = ? OR (? IS NOT NULL AND nombre_vrf = ?)',
+        [pppUser || null, vrfName, vrfName],
+    );
+    if (rows.length === 0) return { devicesDeleted: 0, deviceIds: [] };
+    for (const r of rows) await d.run('DELETE FROM nodes WHERE id = ?', [r.id]);
+    log.debug({ pppUser, vrfName, removed: rows.length }, 'Nodo eliminado (cascade): FK limpiaron dependencias');
     return { devicesDeleted: 0, deviceIds: [] };
 }
 

@@ -73,7 +73,18 @@ async function filterNodesForRole(req, nodes) {
   } catch (_) {
     return [];   // sin poder verificar pertenencia → no exponer
   }
-  let scoped = nodes.filter(n => wsUsers.has(n.ppp_user) || wsUsers.has(n.nombre_vrf));
+  // Los nodos servidos desde la caché MySQL (fallback con router caído) llevan su
+  // PROPIO workspace_id → se respeta tal cual (incluido NULL, que NO matchea).
+  // Esto evita que una fila huérfana (workspace_id NULL o de otro workspace) que
+  // COMPARTE nombre_vrf con un nodo legítimo se cuele en la vista por el match
+  // laxo de wsUsers. Los nodos que vienen del router NO traen la propiedad
+  // workspace_id → caen al match por ppp_user/vrf. Distinguimos por PRESENCIA de
+  // la propiedad (no por valor): un cacheado con NULL sí la tiene.
+  let scoped = nodes.filter(n =>
+    Object.prototype.hasOwnProperty.call(n, 'workspace_id')
+      ? n.workspace_id === acc.workspace_id
+      : (wsUsers.has(n.ppp_user) || wsUsers.has(n.nombre_vrf))
+  );
 
   if (acc.role === 'MEMBER') {
     try {
@@ -87,18 +98,31 @@ async function filterNodesForRole(req, nodes) {
 }
 
 /**
- * Verifica que el nodo (por ppp_user) pertenezca al workspace del solicitante.
+ * Verifica que el nodo pertenezca al workspace del solicitante.
  * Admin de plataforma y tokens legacy (sin RBAC) no tienen restricción.
- * Impide que un moderador mute/borre túneles de OTRO workspace por ppp_user.
+ * Impide que un moderador mute/borre túneles de OTRO workspace.
+ *
+ * Identidad CONSISTENTE con filterNodesForRole: match por `ppp_user` O por
+ * `nombre_vrf`. El VRF (`VRF-ND<n>-<NOMBRE>`) es el identificador ESTABLE del
+ * nodo físico; el `ppp_user` (nombre del secret en el router) puede divergir del
+ * registro de provisión en nodos legacy/manuales. Si solo comprobáramos
+ * `ppp_user`, un nodo VISIBLE (que matchea por VRF) sería IMBORRABLE (404).
  */
-async function nodeBelongsToRequester(req, pppUser) {
+async function nodeBelongsToRequester(req, pppUser, vrfName = null) {
   const acc = req.account;
   if (!acc || acc.platform_admin) return true;
-  if (!pppUser) return false;
+  if (!pppUser && !vrfName) return false;
   try {
     const db = await getDb();
-    const row = await db.get('SELECT workspace_id FROM nodes WHERE ppp_user = ?', [pppUser]);
-    return !!row && row.workspace_id === acc.workspace_id;
+    // Pertenece si EXISTE algún nodo de MI workspace que matchee por ppp_user o vrf.
+    const row = await db.get(
+      `SELECT 1 FROM nodes
+        WHERE workspace_id = ?
+          AND (ppp_user = ? OR (? IS NOT NULL AND nombre_vrf = ?))
+        LIMIT 1`,
+      [acc.workspace_id, pppUser || null, vrfName, vrfName],
+    );
+    return !!row;
   } catch (_) {
     return false;
   }
