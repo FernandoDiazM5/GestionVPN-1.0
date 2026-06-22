@@ -8,6 +8,7 @@ const router = express.Router();
 const { getDb, encryptPass } = require('../db.service');
 const { sendOk, AppError, asyncHandler } = require('../lib/apiResponse');
 const { SaveSettingRequestSchema, CORE_ROUTER_KEYS } = require('@gestionvpn/contracts');
+const wgDetect = require('../lib/wgDetect');
 
 // CORE_ROUTER_KEYS: las claves del router core (MT_IP, MT_USER, MT_PASS) viven
 // en @gestionvpn/contracts. Son infraestructura de plataforma: solo el
@@ -41,6 +42,20 @@ const requireAdmin = (req, _res, next) => {
   }
   next();
 };
+
+// Chequeo READ-ONLY (solo admin): ¿la local_scan_ip configurada está viva en
+// este equipo? Solo relevante en modo 'local'. Alimenta la alerta de la UI sin
+// modificar nada. `ok=true` cuando no aplica (modo VPS) o la IP sí está activa.
+router.get('/settings/scan-local-check', requireAdmin, asyncHandler(async (req, res) => {
+  const db = await getDb();
+  const modeRow = await db.get("SELECT value FROM app_settings WHERE `key` = 'scan_mode'");
+  const ipRow = await db.get("SELECT value FROM app_settings WHERE `key` = 'local_scan_ip'");
+  const mode = modeRow?.value || 'vps';
+  const configured = (ipRow?.value || '').trim();
+  const candidates = wgDetect.listLocalMgmtIps();
+  const ok = mode !== 'local' ? true : (!!configured && wgDetect.isLocalIpv4(configured));
+  return sendOk(res, { mode, configured, ok, candidates });
+}));
 
 router.post('/settings/save', requireAdmin, asyncHandler(async (req, res) => {
   const { key, value } = SaveSettingRequestSchema.parse(req.body);

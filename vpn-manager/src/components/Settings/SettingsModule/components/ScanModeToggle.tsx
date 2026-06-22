@@ -1,8 +1,14 @@
-import { useEffect, useState } from 'react';
-import { Radar, Server, MonitorSmartphone, Check, Loader2, Network } from 'lucide-react';
+import { useEffect, useState, useCallback } from 'react';
+import { Radar, Server, MonitorSmartphone, Check, Loader2, Network, AlertTriangle } from 'lucide-react';
 import { apiFetch } from '../../../../utils/apiClient';
 import { API_BASE_URL } from '../../../../config';
 import type { ScanMode } from '../types';
+
+interface ScanLocalCheck {
+  ok: boolean;
+  configured: string;
+  candidates: { ip: string; iface: string; plane: string }[];
+}
 
 interface ScanModeToggleProps {
   scanMode: ScanMode;
@@ -24,12 +30,25 @@ export function ScanModeToggle({ scanMode, localScanIp, onChange }: ScanModeTogg
   const [saving, setSaving] = useState<null | 'mode' | 'ip'>(null);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+  const [check, setCheck] = useState<ScanLocalCheck | null>(null);
 
   // Re-sincroniza si el padre recarga los settings.
   useEffect(() => { setMode(scanMode); }, [scanMode]);
   useEffect(() => { setIp(localScanIp); }, [localScanIp]);
 
   const isLocal = mode === 'local';
+
+  // Chequeo READ-ONLY: ¿la IP de escaneo local está viva en este equipo?
+  // Solo aplica en modo local; alimenta la alerta de abajo sin tocar config.
+  const refreshCheck = useCallback(async () => {
+    try {
+      const resp = await apiFetch(`${API_BASE_URL}/api/settings/scan-local-check`);
+      const data = await resp.json();
+      if (data?.success) setCheck({ ok: data.ok, configured: data.configured, candidates: data.candidates || [] });
+    } catch { /* sin chequeo → no bloquea la UI */ }
+  }, []);
+
+  useEffect(() => { if (isLocal) refreshCheck(); else setCheck(null); }, [isLocal, refreshCheck]);
 
   const persist = async (key: string, value: string) => {
     const resp = await apiFetch(`${API_BASE_URL}/api/settings/save`, {
@@ -56,6 +75,7 @@ export function ScanModeToggle({ scanMode, localScanIp, onChange }: ScanModeTogg
       await persist('scan_mode', next);
       onChange({ scan_mode: next });
       flashSaved();
+      if (next === 'local') refreshCheck();
     } catch (e) {
       setMode(prev); // rollback óptimista
       setError(e instanceof Error ? e.message : 'Error al cambiar el modo');
@@ -73,6 +93,7 @@ export function ScanModeToggle({ scanMode, localScanIp, onChange }: ScanModeTogg
       await persist('local_scan_ip', clean);
       onChange({ local_scan_ip: clean });
       flashSaved();
+      refreshCheck();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al guardar la IP');
     } finally {
@@ -185,7 +206,7 @@ export function ScanModeToggle({ scanMode, localScanIp, onChange }: ScanModeTogg
                 onBlur={saveIp}
                 onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
                 className="input-field pl-10 h-11 font-mono"
-                placeholder="10.14.250.20"
+                placeholder="ej. 10.13.250.20 (tu IP real de WireGuard)"
                 aria-describedby="local-scan-ip-hint"
               />
               {saving === 'ip' && (
@@ -196,6 +217,33 @@ export function ScanModeToggle({ scanMode, localScanIp, onChange }: ScanModeTogg
               La IP del túnel de gestión que ves en WireGuard en esta PC. El escaneo se ata a ella
               y el mangle del router la enruta a tu VRF activo. Se guarda al salir del campo.
             </p>
+
+            {/* Alerta: la IP configurada NO está viva en este equipo → el escaneo
+                fallaría en silencio. Solo en modo local. */}
+            {check && !check.ok && (
+              <div
+                role="alert"
+                className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs leading-relaxed
+                  text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300"
+              >
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <div>
+                    <strong>Hay que cambiar la IP de escaneo.</strong>{' '}
+                    {check.configured
+                      ? <>La IP configurada <span className="font-mono">{check.configured}</span> no está activa en este equipo.</>
+                      : <>No hay ninguna IP de escaneo local configurada.</>}{' '}
+                    El escaneo fallaría sin encontrar dispositivos. Actualízala arriba con tu IP real de WireGuard.
+                    {check.candidates.length > 0 && (
+                      <>
+                        {' '}IP WG detectada en este equipo:{' '}
+                        <span className="font-mono">{check.candidates.map((c) => c.ip).join(', ')}</span>.
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
