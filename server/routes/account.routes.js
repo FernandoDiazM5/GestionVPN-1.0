@@ -353,6 +353,7 @@ router.get('/notifications', requireSession, asyncHandler(async (req, res) => {
     paused: sub.paused,
     telegramLinked: !!sub.telegram_chat_id,
     telegramBotConfigured: telegram.isConfigured(),
+    telegramBotUsername: await telegram.getBotUsername(),
   });
 }));
 

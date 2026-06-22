@@ -6,7 +6,7 @@
 //  código de 6 chars (anti-spoofing).
 // ============================================================
 import { useEffect, useState } from 'react';
-import { Bell, Mail, Send, Loader2, AlertCircle, Check, Pause, Play, Copy, X } from 'lucide-react';
+import { Bell, Mail, Send, Loader2, AlertCircle, Check, Pause, Play, Copy, X, Smartphone, ExternalLink } from 'lucide-react';
 import { accountApi } from '../../../../services/accountApi';
 import type { NotificationEvent, NotificationStatus } from '@gestionvpn/contracts';
 
@@ -122,7 +122,9 @@ export default function NotificationsTab({ memberMode = false }: NotificationsTa
       onChange={(v) => update('channels', { ...status.channels, telegram: v })}
       extra={
         status.telegramBotConfigured && !status.telegramLinked ? (
-          <button onClick={startLink} className="btn-outline text-xs">Vincular</button>
+          <button onClick={startLink} className="btn-primary inline-flex items-center gap-1.5 px-4 py-2 text-xs shrink-0">
+            <Send className="w-3.5 h-3.5" /> Vincular
+          </button>
         ) : status.telegramLinked ? (
           <button onClick={unlink} className="btn-outline text-xs text-rose-600 border-rose-200"><X className="w-3.5 h-3.5" /> Desvincular</button>
         ) : null
@@ -154,22 +156,7 @@ export default function NotificationsTab({ memberMode = false }: NotificationsTa
           {telegramRow}
 
           {linkCode && (
-            <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-500/10 p-4 space-y-2">
-              <p className="text-sm text-indigo-800 dark:text-indigo-200">
-                Abre el bot de Telegram y envíale el comando:
-              </p>
-              <div className="flex items-center gap-2">
-                <code className="font-mono px-3 py-2 bg-white dark:bg-slate-900 rounded-lg text-sm">/link {linkCode.code}</code>
-                <button
-                  onClick={() => navigator.clipboard.writeText(`/link ${linkCode.code}`)}
-                  className="btn-outline text-xs"
-                  title="Copiar"
-                ><Copy className="w-3.5 h-3.5" /></button>
-              </div>
-              <p className="text-xs text-indigo-700 dark:text-indigo-300">
-                Expira: {new Date(linkCode.expiresAt).toLocaleString()}
-              </p>
-            </div>
+            <TelegramLinkSteps code={linkCode.code} expiresAt={linkCode.expiresAt} botUsername={status.telegramBotUsername} />
           )}
 
           {err && <p className="text-sm text-rose-600 flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5" /> {err}</p>}
@@ -197,7 +184,7 @@ export default function NotificationsTab({ memberMode = false }: NotificationsTa
         </div>
         <button
           onClick={() => update('paused', !status.paused)}
-          className={status.paused ? 'btn-success' : 'btn-outline'}
+          className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm shrink-0 ${status.paused ? 'btn-success' : 'btn-outline'}`}
         >
           {status.paused ? <><Play className="w-3.5 h-3.5" /> Reanudar</> : <><Pause className="w-3.5 h-3.5" /> Pausar</>}
         </button>
@@ -218,22 +205,7 @@ export default function NotificationsTab({ memberMode = false }: NotificationsTa
         {telegramRow}
 
         {linkCode && (
-          <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-500/10 p-4 space-y-2">
-            <p className="text-sm text-indigo-800 dark:text-indigo-200">
-              Abre el bot de Telegram y envíale el comando:
-            </p>
-            <div className="flex items-center gap-2">
-              <code className="font-mono px-3 py-2 bg-white dark:bg-slate-900 rounded-lg text-sm">/link {linkCode.code}</code>
-              <button
-                onClick={() => navigator.clipboard.writeText(`/link ${linkCode.code}`)}
-                className="btn-outline text-xs"
-                title="Copiar"
-              ><Copy className="w-3.5 h-3.5" /></button>
-            </div>
-            <p className="text-xs text-indigo-700 dark:text-indigo-300">
-              Expira: {new Date(linkCode.expiresAt).toLocaleString()}
-            </p>
-          </div>
+          <TelegramLinkSteps code={linkCode.code} expiresAt={linkCode.expiresAt} botUsername={status.telegramBotUsername} />
         )}
       </div>
 
@@ -300,6 +272,97 @@ function ChannelRow({ icon: Icon, title, desc, checked, disabled, onChange, extr
           disabled={disabled}
           onChange={(e) => onChange(e.target.checked)}
         />
+      </div>
+    </div>
+  );
+}
+
+// URL oficial de la app de Telegram en Google Play.
+const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=org.telegram.messenger';
+
+interface TelegramLinkStepsProps {
+  code: string;
+  expiresAt: number;
+  botUsername?: string | null;
+}
+
+/**
+ * Secuencia guiada de 3 pasos para vincular Telegram: instalar la app →
+ * abrir el bot (enlace t.me directo si conocemos su @username) → enviar el
+ * código. Reemplaza al bloque "envía /link CODE" que asumía que el usuario
+ * ya tenía Telegram y sabía cuál era el bot.
+ */
+function TelegramLinkSteps({ code, expiresAt, botUsername }: TelegramLinkStepsProps) {
+  const [copied, setCopied] = useState(false);
+  const command = `/link ${code}`;
+  const botUrl = botUsername ? `https://t.me/${botUsername}` : null;
+
+  function copy() {
+    navigator.clipboard.writeText(command);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  }
+
+  return (
+    <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-500/10 p-4 space-y-3.5">
+      <p className="text-sm font-semibold text-indigo-900 dark:text-indigo-100">Vincular en 3 pasos</p>
+
+      <Step n={1} title="Instala Telegram" desc="En tu teléfono, si aún no la tienes."
+        action={
+          <a href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer"
+            className="btn-outline inline-flex items-center gap-1.5 px-3 py-1.5 text-xs shrink-0">
+            <Smartphone className="w-3.5 h-3.5" /> Play Store <ExternalLink className="w-3 h-3" />
+          </a>
+        }
+      />
+
+      <Step n={2} title="Copia tu código" desc="Lo pegarás en el bot en el paso 3.">
+        <div className="flex items-center gap-2">
+          <code className="font-mono px-3 py-2 bg-white dark:bg-slate-900 rounded-lg text-sm border border-indigo-100 dark:border-indigo-900/60 select-all">{command}</code>
+          <button onClick={copy} title="Copiar código"
+            className="btn-outline inline-flex items-center gap-1.5 px-3 py-2 text-xs shrink-0">
+            {copied ? <><Check className="w-3.5 h-3.5 text-emerald-600" /> Copiado</> : <><Copy className="w-3.5 h-3.5" /> Copiar</>}
+          </button>
+        </div>
+        <p className="text-xs text-indigo-700/80 dark:text-indigo-300/80">Expira: {new Date(expiresAt).toLocaleString()}</p>
+      </Step>
+
+      <Step n={3} title="Abre el bot y pégalo" desc={botUsername ? `@${botUsername}` : 'Busca el bot del panel en Telegram.'}
+        action={botUrl ? (
+          <a href={botUrl} target="_blank" rel="noopener noreferrer"
+            className="btn-outline inline-flex items-center gap-1.5 px-3 py-1.5 text-xs shrink-0">
+            <Send className="w-3.5 h-3.5" /> Abrir bot <ExternalLink className="w-3 h-3" />
+          </a>
+        ) : undefined}
+      />
+    </div>
+  );
+}
+
+interface StepProps {
+  n: number;
+  title: string;
+  desc?: string;
+  action?: React.ReactNode;
+  children?: React.ReactNode;
+}
+
+/** Fila de paso numerado: círculo con el número + título/descripción + acción a la derecha y contenido debajo. */
+function Step({ n, title, desc, action, children }: StepProps) {
+  return (
+    <div className="flex items-start gap-3">
+      <span className="mt-0.5 w-6 h-6 shrink-0 rounded-full bg-indigo-600 dark:bg-indigo-500 text-white text-xs font-bold flex items-center justify-center">
+        {n}
+      </span>
+      <div className="flex-1 min-w-0 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-indigo-900 dark:text-indigo-100">{title}</p>
+            {desc && <p className="text-xs text-indigo-700/80 dark:text-indigo-300/80 truncate">{desc}</p>}
+          </div>
+          {action}
+        </div>
+        {children}
       </div>
     </div>
   );

@@ -19,6 +19,37 @@ function isConfigured() {
   return !!(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_BOT_TOKEN.includes(':'));
 }
 
+// Cache del username del bot. undefined = no consultado · null = desconocido · string = ok.
+let _cachedUsername;
+
+/**
+ * Devuelve el @username del bot (sin la @) para construir `https://t.me/<user>`.
+ * Prioriza TELEGRAM_BOT_USERNAME (sin red); si no, lo resuelve una vez con
+ * getMe y lo cachea. Nunca lanza: ante fallo devuelve null y el frontend
+ * degrada (muestra el código sin enlace directo al bot).
+ * @returns {Promise<string|null>}
+ */
+async function getBotUsername() {
+  const envName = process.env.TELEGRAM_BOT_USERNAME;
+  if (envName) return envName.replace(/^@/, '');
+  if (!isConfigured()) return null;
+  if (_cachedUsername !== undefined) return _cachedUsername;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const res = await fetch(`${BASE_URL}/bot${process.env.TELEGRAM_BOT_TOKEN}/getMe`, { signal: controller.signal });
+    const data = await res.json().catch(() => ({}));
+    _cachedUsername = (data.ok && data.result && data.result.username) ? data.result.username : null;
+  } catch (err) {
+    log.debug({ err: err.message }, 'getMe falló — username de bot desconocido');
+    _cachedUsername = null;
+  } finally {
+    clearTimeout(timer);
+  }
+  return _cachedUsername;
+}
+
 /**
  * Envía un mensaje a un chat de Telegram.
  *
@@ -68,4 +99,4 @@ async function sendMessage({ chatId, text, html = true }) {
   }
 }
 
-module.exports = { sendMessage, isConfigured };
+module.exports = { sendMessage, isConfigured, getBotUsername };

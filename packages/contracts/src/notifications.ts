@@ -41,6 +41,8 @@ export interface NotificationStatus {
   paused: boolean;
   telegramLinked: boolean;
   telegramBotConfigured: boolean;
+  /** @username del bot (sin @) para armar https://t.me/<user>. null si se desconoce. */
+  telegramBotUsername?: string | null;
 }
 
 /** Respuesta de POST /api/account/telegram/link/start. */
