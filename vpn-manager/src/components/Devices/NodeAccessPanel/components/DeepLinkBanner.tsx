@@ -62,14 +62,14 @@ export function DeepLinkBanner({ onActivate, onDeactivate }: DeepLinkBannerProps
       </div>
       <button
         onClick={cancel}
-        className="btn-outline text-xs"
+        className="btn-outline inline-flex items-center gap-1.5 px-3 py-2 text-xs shrink-0"
         title="Cancelar"
       >
         <X className="w-3.5 h-3.5" /> Cancelar
       </button>
       <button
         onClick={confirm}
-        className={activateVrf ? 'btn-success text-xs' : 'btn-danger text-xs'}
+        className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs shrink-0 ${activateVrf ? 'btn-success' : 'btn-danger'}`}
       >
         {activateVrf ? <><Power className="w-3.5 h-3.5" /> Activar ahora</> : <><PowerOff className="w-3.5 h-3.5" /> Desactivar ahora</>}
       </button>

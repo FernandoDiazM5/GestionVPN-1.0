@@ -1,27 +1,14 @@
-import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, ChevronUp, ChevronDown, PlusCircle, SlidersHorizontal } from 'lucide-react';
 import type { ColumnPickerProps } from '../types';
 import { COLUMN_DEFS } from '../utils/columns';
+import { useKebabMenu } from '../../../VPN/NodeCard/hooks/useKebabMenu';
 
 export function ColumnPicker({ visibleCols, onChange }: ColumnPickerProps) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  // Cierre al click/touch fuera del dropdown. Solo escucha eventos si el
-  // dropdown está abierto — evita event dispatch innecesario cuando está
-  // cerrado (que es 99% del tiempo). Incluye touchstart para móvil/tablet.
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent | TouchEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    document.addEventListener('touchstart', handler, { passive: true });
-    return () => {
-      document.removeEventListener('mousedown', handler);
-      document.removeEventListener('touchstart', handler);
-    };
-  }, [open]);
+  // Dropdown vía PORTAL + position:fixed (useKebabMenu) para escapar del
+  // `overflow-x-auto` de la tabla y del stacking de la columna sticky-right,
+  // que antes lo recortaban/tapaban. Mismo patrón que NodesExportMenu.
+  const { showKebab, kebabCoords, kebabRef, dropdownRef, handleKebabClick } = useKebabMenu();
 
   const visibleSet = new Set(visibleCols);
   const hiddenCols = COLUMN_DEFS.filter(c => !visibleSet.has(c.key));
@@ -37,9 +24,11 @@ export function ColumnPicker({ visibleCols, onChange }: ColumnPickerProps) {
   };
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={kebabRef} className="relative">
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={handleKebabClick}
+        aria-haspopup="menu"
+        aria-expanded={showKebab}
         className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 border border-slate-200 transition-colors dark:text-slate-400 dark:hover:text-indigo-400 dark:hover:bg-indigo-500/10 dark:border-slate-700"
       >
         <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -47,11 +36,17 @@ export function ColumnPicker({ visibleCols, onChange }: ColumnPickerProps) {
         <span className="bg-indigo-100 text-indigo-600 text-3xs font-black px-1.5 py-0.5 rounded-md min-w-[18px] text-center dark:bg-indigo-500/15 dark:text-indigo-400">
           {visibleCols.length}
         </span>
-        <ChevronDown className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-3 h-3 transition-transform ${showKebab ? 'rotate-180' : ''}`} />
       </button>
 
-      {open && (
-        <div className="absolute right-0 top-full mt-1.5 z-30 bg-white border border-slate-200 rounded-xl shadow-xl p-3 w-60 max-h-[70vh] overflow-y-auto dark:bg-slate-900 dark:border-slate-700 dark:shadow-black/40">
+      {showKebab && createPortal(
+        <div
+          ref={dropdownRef}
+          role="menu"
+          aria-label="Mostrar/ocultar columnas"
+          style={{ position: 'fixed', top: kebabCoords.top, bottom: kebabCoords.bottom, right: kebabCoords.right }}
+          className="z-[60] bg-white border border-slate-200 rounded-xl shadow-xl p-3 w-60 max-h-[70vh] overflow-y-auto dark:bg-slate-900 dark:border-slate-700 dark:shadow-black/40"
+        >
 
           {visibleCols.length > 0 && (
             <>
@@ -113,7 +108,8 @@ export function ColumnPicker({ visibleCols, onChange }: ColumnPickerProps) {
               Resetear
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

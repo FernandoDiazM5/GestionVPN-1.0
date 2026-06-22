@@ -5,15 +5,17 @@
 //  columnas OPCIONALES (NODE_COLUMN_DEFS); las fijas (Estado / Nodo /
 //  Acciones) están fuera del scope del usuario.
 //
-//  • Dropdown anclado al botón "Columnas".
-//  • Re-orden con flechas ↑↓.
-//  • Toggle add/remove.
-//  • Cierre al click/touch fuera.
-//  • Accesibilidad: aria-haspopup + aria-expanded.
+//  • Dropdown anclado al botón "Columnas", renderizado vía PORTAL +
+//    position:fixed (useKebabMenu) para ESCAPAR del `overflow-x-auto`
+//    de la tabla y del stacking de la columna sticky-right (el `>`),
+//    que antes lo tapaban. Mismo patrón que NodesExportMenu.
+//  • Re-orden con flechas ↑↓. Toggle add/remove.
+//  • Cierre al click fuera / scroll. Accesibilidad: aria-haspopup + aria-expanded.
 // ============================================================
 
-import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, ChevronUp, ChevronDown, PlusCircle, SlidersHorizontal } from 'lucide-react';
+import { useKebabMenu } from '../../../../VPN/NodeCard/hooks/useKebabMenu';
 import { NODE_COLUMN_DEFS } from '../../utils/nodeColumns';
 
 interface NodeColumnPickerProps {
@@ -22,21 +24,7 @@ interface NodeColumnPickerProps {
 }
 
 export function NodeColumnPicker({ visibleCols, onChange }: NodeColumnPickerProps) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent | TouchEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    document.addEventListener('touchstart', handler, { passive: true });
-    return () => {
-      document.removeEventListener('mousedown', handler);
-      document.removeEventListener('touchstart', handler);
-    };
-  }, [open]);
+  const { showKebab, kebabCoords, kebabRef, dropdownRef, handleKebabClick } = useKebabMenu();
 
   const visibleSet = new Set(visibleCols);
   const hiddenCols = NODE_COLUMN_DEFS.filter(c => !visibleSet.has(c.key));
@@ -52,11 +40,11 @@ export function NodeColumnPicker({ visibleCols, onChange }: NodeColumnPickerProp
   };
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={kebabRef} className="relative">
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={handleKebabClick}
         aria-haspopup="menu"
-        aria-expanded={open}
+        aria-expanded={showKebab}
         title="Mostrar/ocultar columnas de la tabla"
         className="flex items-center space-x-1.5 px-3 py-2.5 rounded-lg text-xs font-bold text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 border border-slate-200 transition-colors dark:border-slate-700 dark:hover:bg-indigo-500/10 dark:text-slate-300"
       >
@@ -65,11 +53,17 @@ export function NodeColumnPicker({ visibleCols, onChange }: NodeColumnPickerProp
         <span className="bg-indigo-100 text-indigo-600 text-3xs font-black px-1.5 py-0.5 rounded-md min-w-[18px] text-center dark:bg-indigo-500/20 dark:text-indigo-300">
           {visibleCols.length}
         </span>
-        <ChevronDown className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-3 h-3 transition-transform ${showKebab ? 'rotate-180' : ''}`} />
       </button>
 
-      {open && (
-        <div className="absolute right-0 top-full mt-1.5 z-30 bg-white border border-slate-200 rounded-xl shadow-xl p-3 w-64 max-h-[70vh] overflow-y-auto dark:bg-slate-900 dark:border-slate-700">
+      {showKebab && createPortal(
+        <div
+          ref={dropdownRef}
+          role="menu"
+          aria-label="Mostrar/ocultar columnas"
+          style={{ position: 'fixed', top: kebabCoords.top, bottom: kebabCoords.bottom, right: kebabCoords.right }}
+          className="z-[60] bg-white border border-slate-200 rounded-xl shadow-xl p-3 w-64 max-h-[70vh] overflow-y-auto dark:bg-slate-900 dark:border-slate-700"
+        >
 
           {visibleCols.length > 0 && (
             <>
@@ -133,7 +127,8 @@ export function NodeColumnPicker({ visibleCols, onChange }: NodeColumnPickerProp
               Resetear
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
