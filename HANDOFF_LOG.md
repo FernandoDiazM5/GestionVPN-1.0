@@ -6,6 +6,14 @@
 
 ---
 
+> **Sesión 2026-06-21 (cont. 3) — La aceptación de invitación ahora muestra el motivo si falla la provisión WG.** Rama `dev` (commit `7ac2543`). **backend 271 · frontend 66 · tsc 0.**
+> - **Contexto:** durante el debug del cuelgue/503, el moderador veía que "se saltaba" la creación del WG sin explicación (el router estaba caído porque el usuario había borrado su propio peer admin; ver cont. 2). Era el pendiente §7: `/team/accept` se tragaba el error con `log.warn` y `conf=null`.
+> - **Backend:** `AcceptResponse` (contracts `team.ts`) gana `wgError?: WgProvisionError {code,message}` (`ROUTER_UNREACHABLE`|`ROUTER_NOT_CONFIGURED`|`PROVISION_FAILED`). `team.routes` `/accept` e `/invitations/:id/accept` lo pueblan clasificando con `isUnreachable`, sin filtrar IPs/credenciales. El alta de cuenta sigue siendo best-effort (no se revierte).
+> - **Frontend:** `AcceptInvitationForm` muestra el motivo en aviso ámbar + botón "Reintentar acceso WireGuard" que llama al self-service `/me/wireguard` (la cookie ya está puesta tras aceptar) y renderiza `.conf`/QR si tiene éxito.
+> - **Pendiente §7 cerrado.**
+
+---
+
 > **Sesión 2026-06-21 (cont. 2) — Fix: el modal "Eliminar moderador" se quedaba pensando para siempre.** Rama `dev` (commit `654b09d`). **271 tests backend verdes · node --check OK.**
 > - **Síntoma:** al confirmar el borrado de un moderador, el spinner del modal nunca paraba (`fetch` sin timeout; backend nunca respondía).
 > - **Diagnóstico (con `mikrotik-vpn-expert` + traza `DEBUG=routeros-api:*`):** el DELETE hacía limpieza del router (`removePeersFromRouter`/`removeUserMangles` → `connectToMikrotik`) **en línea antes de responder**. El `connect()` se colgaba en la fase de **login** de la API: TCP a `10.13.250.1:8728` abría en **17ms**, se enviaba `/login`, y el router **nunca respondía** (probe crudo confirmó 8728/8729 OPEN en ambos planos). El `timeout` de `node-routeros` (`socket.setTimeout`) **no dispara durante el login** → promesa colgada para siempre.

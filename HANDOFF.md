@@ -140,7 +140,7 @@ Ver también `vpn-manager/CLAUDE.md` y `DESIGN_SYSTEM.md`.
 | 🟡 Prueba en vivo | Alta WG/SSTP → script en CPE → handshake + ping gestión + escaneo > 0 · 2 moderadores contra el router (aislamiento mangle por-usuario). |
 | 🟡 Router | **Limpieza puntual** de peers WG YA huérfanos en el router (del moderador borrado ANTES del fix de cascada) — el código nuevo solo cubre borrados futuros. Revisar en Winbox `/interface wireguard peers print` y borrar los que tengan comment de un email inexistente. |
 | 🟡 Router | **Dedup del address-list** `LIST-NET-REMOTE-TOWERS`: pueden quedar entradas duplicadas/inertes (M3 solo evita NUEVAS; el borrado de nodo NO las toca a propósito). Un `:foreach` de limpieza puntual cuando convenga. |
-| 🟡 Mejora | `/team/accept` traga el error de provisión WG con `log.warn` (`conf=null` silencioso) → la UI debería mostrar el motivo + ofrecer reintento (ya existe la red: tab WireGuard self-service). |
+| ✅ Hecho (2026-06-21) | ~~`/team/accept` traga el error de provisión WG en silencio~~ → **resuelto**: `/accept` e in-app devuelven `wgError {code,message}` (contrato `AcceptResponse`); `AcceptInvitationForm` muestra el motivo + botón "Reintentar" (self-service `/me/wireguard`). |
 | 🟡 Datos | El alta de nodo debe setear `workspace_id` (ND2/ND3 salieron NULL). Verificar que `provision.routes` lo persiste; si no, es la raíz del problema de cascada/aislamiento. |
 | 🟡 Feature | Toggle **Local/VPS** para `MT_IP`/endpoint del router (local `10.14.250.1` / VPS `10.12.250.1`), análogo a `ScanModeToggle`. |
 | 🟡 Backlog | M2 API pública con tokens scoped · M3 Webhooks · M4 Speed test iperf3 (con confirmación) · L1 Reportes SLA · L2 Diagnóstico con LLM · L3 PWA móvil · L4 Predicción de degradación. |
