@@ -32,7 +32,7 @@ const { mgmtAllowedIpsFor, readTowerLans } = require('../lib/mgmtAllowedIps');
 const { generateKeyPair, buildClientConf } = require('../lib/wgkeys');
 const { lowestFreeOctet } = require('../lib/ipAlloc');
 const { encrypt, decrypt } = require('../lib/crypto');
-const { connectToMikrotik, safeWrite, writeIdempotent, getErrorMessage } = require('../routeros.service');
+const { connectToMikrotik, safeWrite, writeIdempotent, getErrorMessage, isUnreachable } = require('../routeros.service');
 const { getAppSetting, decryptPass, getDb } = require('../db.service');
 const { removePeersFromRouter } = require('../lib/routerCleanup');
 const { setPeersEnabled, removeUserMangles } = require('../lib/routerPeerState');
@@ -40,6 +40,30 @@ const log = require('../lib/logger').child({ scope: 'team' });
 
 // Único rol de moderación del workspace = OWNER (CO_MODERATOR retirado).
 const isModeratorRole = (role) => role === 'OWNER';
+
+// Traduce el fallo de provisión WG al aceptar en un motivo legible para el
+// invitado, SIN filtrar detalles internos (IPs/credenciales). El alta de cuenta
+// ya se completó; el acceso WG se recupera luego (self-service /me/wireguard).
+//   kind='not_configured' → no hay MikroTik en Ajustes.
+//   kind='failed' + err   → la provisión lanzó (router caído u otro fallo).
+function wgProvisionError(kind, err) {
+  if (kind === 'not_configured') {
+    return {
+      code: 'ROUTER_NOT_CONFIGURED',
+      message: 'El router aún no está configurado en el panel. Tu cuenta quedó creada; pídele al administrador que configure el MikroTik y luego genera tu acceso WireGuard.',
+    };
+  }
+  if (err && isUnreachable(err)) {
+    return {
+      code: 'ROUTER_UNREACHABLE',
+      message: 'El router no está accesible en este momento. Tu cuenta quedó creada; reintenta para generar tu acceso WireGuard cuando vuelva a estar en línea.',
+    };
+  }
+  return {
+    code: 'PROVISION_FAILED',
+    message: 'No se pudo crear tu acceso WireGuard ahora mismo. Tu cuenta quedó creada; reintenta o genéralo desde Ajustes → WireGuard.',
+  };
+}
 
 // Credenciales del router core desde app_settings (las rutas públicas/in-app no
 // pasan por verifyToken, así que se inyectan aquí). Devuelve null si no hay config.
@@ -303,8 +327,11 @@ router.post('/accept', rl.guard('OTP'), asyncHandler(async (req, res) => {
   // Si la envía, solo registra su peer (modo seguro: la clave privada nunca sale).
   let wireguard = null;
   let conf = null;
+  let wgError = null;
   const mt = await getMikrotik();
-  if (mt) {
+  if (!mt) {
+    wgError = wgProvisionError('not_configured');
+  } else {
     try {
       const generated = publicKey ? null : generateKeyPair();
       const pub = publicKey || generated.publicKey;
@@ -327,7 +354,11 @@ router.post('/accept', rl.guard('OTP'), asyncHandler(async (req, res) => {
         });
       }
     } catch (e) {
+      // Best-effort: el alta de cuenta NO se revierte si el router falla. Pero
+      // ya no se traga en silencio: se devuelve el motivo para que la UI lo
+      // muestre y ofrezca reintento (self-service /me/wireguard).
       log.warn({ err: e.message }, 'team/accept WG no provisionado (router)');
+      wgError = wgProvisionError('failed', e);
     }
   }
 
@@ -338,6 +369,7 @@ router.post('/accept', rl.guard('OTP'), asyncHandler(async (req, res) => {
     tunnel: inv.tunnel_id || null,
     wireguard,   // { allowedIp, serverPublicKey, endpoint, allowedIps } o null
     conf,        // contenido completo del .conf con PrivateKey real, o null si el invitado proveyó su publicKey
+    wgError,     // motivo si la provisión WG falló (router caído/no configurado), o null si OK
   });
 }));
 
@@ -374,11 +406,17 @@ router.post('/invitations/:id/accept', requireSession, asyncHandler(async (req, 
   });
 
   let wireguard = null;
+  let wgError = null;
   if (publicKey) {
     const mt = await getMikrotik();
-    if (mt) {
+    if (!mt) {
+      wgError = wgProvisionError('not_configured');
+    } else {
       try { wireguard = await provisionMemberWgByPublicKey(mt, { workspaceId: inv.workspace_id, userId, publicKey, role: inv.role }); }
-      catch (e) { log.warn({ err: e.message }, 'team/accept-in-app WG no provisionado'); }
+      catch (e) {
+        log.warn({ err: e.message }, 'team/accept-in-app WG no provisionado');
+        wgError = wgProvisionError('failed', e);
+      }
     }
   }
 
@@ -389,6 +427,7 @@ router.post('/invitations/:id/accept', requireSession, asyncHandler(async (req, 
     user: { id: userId, email: req.account.email, role: inv.role, workspace_id: inv.workspace_id },
     tunnel: inv.tunnel_id || null,
     wireguard,
+    wgError,
   });
 }));
 

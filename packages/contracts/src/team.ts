@@ -99,6 +99,13 @@ export interface WgServerConfig {
   allowedIps: string;
 }
 
+/** Motivo por el que NO se pudo aprovisionar el WireGuard al aceptar.
+ *  El alta de cuenta sí se completa; el acceso WG se recupera luego (self-service). */
+export interface WgProvisionError {
+  code: 'ROUTER_UNREACHABLE' | 'ROUTER_NOT_CONFIGURED' | 'PROVISION_FAILED';
+  message: string;
+}
+
 /** POST /api/team/accept (o in-app). */
 export interface AcceptResponse {
   success: true;
@@ -107,6 +114,8 @@ export interface AcceptResponse {
   wireguard: WgServerConfig | null;
   /** Contenido completo del .conf con PrivateKey real (sólo si el server generó las claves). */
   conf?: string | null;
+  /** Presente sólo si la provisión WG falló (router caído/no configurado); null/ausente si fue OK. */
+  wgError?: WgProvisionError | null;
 }
 
 /** Asignación de túnel a un miembro. */

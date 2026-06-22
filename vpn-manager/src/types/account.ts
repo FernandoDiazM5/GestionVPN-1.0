@@ -16,6 +16,7 @@ export type {
   Invitation,
   MyInvitation,
   WgServerConfig,
+  WgProvisionError,
   AcceptResponse,
   Assignment,
   MemberWireguard,

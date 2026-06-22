@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Mail, KeyRound, Lock, ArrowLeft, Loader2, Check, Copy, Router, ShieldCheck, Smartphone } from 'lucide-react';
+import { Mail, KeyRound, Lock, ArrowLeft, Loader2, Check, Copy, Router, ShieldCheck, Smartphone, AlertTriangle, RefreshCw } from 'lucide-react';
 import QRCode from 'qrcode';
 import { teamApi } from '../../services/teamApi';
 import type { RouterCredentials } from '../../store/db';
-import type { WgServerConfig } from '../../types/account';
+import type { WgServerConfig, WgProvisionError } from '../../types/account';
 
 /**
  * Pantalla pública para aceptar una invitación con código (OTP) — para personas
@@ -24,9 +24,10 @@ export default function AcceptInvitationForm({
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [result, setResult] = useState<{ user: { email: string; role: string }; tunnel: string | null; wg: WgServerConfig | null; conf: string | null } | null>(null);
+  const [result, setResult] = useState<{ user: { email: string; role: string }; tunnel: string | null; wg: WgServerConfig | null; conf: string | null; wgError: WgProvisionError | null } | null>(null);
   const [copied, setCopied] = useState(false);
   const [qr, setQr] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,10 +37,23 @@ export default function AcceptInvitationForm({
       // el .conf con la PrivateKey real. El nombre del invitado lo eligió
       // quien envió la invitación; no se pide aquí.
       const r = await teamApi.accept(email.trim(), otp.trim(), password || undefined);
-      setResult({ user: r.user, tunnel: r.tunnel, wg: r.wireguard, conf: r.conf ?? null });
+      setResult({ user: r.user, tunnel: r.tunnel, wg: r.wireguard, conf: r.conf ?? null, wgError: r.wgError ?? null });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo aceptar la invitación');
     } finally { setBusy(false); }
+  };
+
+  // Reintenta la provisión WG cuando falló al aceptar (router caído). La cuenta
+  // ya existe y la cookie de sesión está puesta, así que usamos el self-service
+  // /me/wireguard, que genera las claves server-side y devuelve el .conf.
+  const retryWg = async () => {
+    setRetrying(true);
+    try {
+      const r = await teamApi.provisionMyWireguard();
+      setResult(prev => prev ? { ...prev, conf: r.conf ?? null, wgError: r.conf ? null : prev.wgError } : prev);
+    } catch (err) {
+      setResult(prev => prev ? { ...prev, wgError: { code: 'PROVISION_FAILED', message: err instanceof Error ? err.message : 'El router sigue sin responder. Reinténtalo en unos segundos.' } } : prev);
+    } finally { setRetrying(false); }
   };
 
   const conf = result?.conf || '';
@@ -130,7 +144,20 @@ export default function AcceptInvitationForm({
                 ) : result.wg ? (
                   <p className="text-xs text-slate-500">Acceso WireGuard creado. Consulta los detalles en tu perfil.</p>
                 ) : (
-                  <p className="text-xs text-amber-600">Router no disponible. El acceso WireGuard se aprovisionará en cuanto vuelva.</p>
+                  <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-500/30 dark:bg-amber-500/10">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                      <p className="text-2xs text-amber-700 dark:text-amber-300">
+                        {result.wgError?.message
+                          || 'No se pudo crear tu acceso WireGuard ahora mismo. Tu cuenta quedó creada; reinténtalo.'}
+                      </p>
+                    </div>
+                    <button onClick={retryWg} disabled={retrying}
+                      className="btn-outline px-3 py-1.5 text-xs flex items-center gap-1.5 disabled:opacity-50">
+                      {retrying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                      {retrying ? 'Generando…' : 'Reintentar acceso WireGuard'}
+                    </button>
+                  </div>
                 )}
                 <button
                   onClick={() => onLoggedIn({ user: result.user.email, token: '', role: result.user.role === 'MEMBER' ? 'viewer' : 'admin' })}
