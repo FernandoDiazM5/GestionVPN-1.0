@@ -41,9 +41,11 @@ export function useNodeActivation(node: NodeInfo) {
       let data: TunnelActivateResponse & { success: boolean; message?: string; code?: string };
       try { data = await res.json(); } catch { throw new Error(`Error del servidor (HTTP ${res.status})`); }
       if (!res.ok || !data.success) {
-        // Contención UX: sin IP de gestión registrada
+        // Contención UX: sin IP de gestión registrada. El backend ya intenta
+        // auto-resolver tu peer del router; si llega aquí es que no lo encontró
+        // (o hay varios). El propio mensaje del backend ya es accionable.
         if (res.status === 409 && data.code === 'NO_MGMT_IP') {
-          throw new Error('Tu dispositivo de gestión (WireGuard) no está registrado. Ve a la sección WireGuard y registra tu IP, o pide al moderador que te asigne una.');
+          throw new Error(data.message ?? 'Tu dispositivo de gestión (WireGuard) no está registrado. Regenera tu acceso en Ajustes → WireGuard, o pide al moderador que te asigne uno.');
         }
         throw new Error(data.message ?? `Error HTTP ${res.status}`);
       }

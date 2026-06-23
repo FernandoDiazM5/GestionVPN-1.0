@@ -517,8 +517,9 @@ router.post('/node/provision', requireOperator, asyncHandler(async (req, res) =>
     let cpeScript = null, cpeSteps = null;
     try {
       const serverPublicIP = (await getAppSetting('server_public_ip').catch(() => '')) || ip;
+      const sstpPort = (await getAppSetting('sstp_port').catch(() => '')) || '';
       ({ script: cpeScript, cpeSteps } = buildCpeSstpScript({
-        pppUser: effectivePppUser, pppPassword: effectivePppPassword, serverPublicIP,
+        pppUser: effectivePppUser, pppPassword: effectivePppPassword, serverPublicIP, sstpPort,
       }));
     } catch (e) { log.warn({ err: e.message }, 'No se pudo pre-generar el script SSTP (se puede regenerar desde el nodo)'); }
 

@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS user_mgmt_ips (
   user_id       CHAR(36)     NOT NULL,
   mgmt_ip       VARCHAR(64)  NOT NULL,                 -- 10.13.250.x / 10.14.250.x (sin /32)
   public_key    VARCHAR(120) DEFAULT NULL,             -- peer WG asociado (si aplica)
-  source        ENUM('member_wg','mgmt_peer','manual') NOT NULL DEFAULT 'manual',
+  source        ENUM('member_wg','mgmt_peer','manual','auto-provision','auto-heal') NOT NULL DEFAULT 'manual',
   created_at    BIGINT       NOT NULL,
   updated_at    BIGINT       NOT NULL,
   PRIMARY KEY (id),

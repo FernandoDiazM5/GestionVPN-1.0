@@ -16,6 +16,7 @@ const sessionRepo = require('../db/repos/sessionRepo');
 const mgmtIpRepo = require('../db/repos/mgmtIpRepo');
 const notifier = require('./notifier');
 const provisioner = require('./tunnelProvisioner');
+const { resolveOwnedMgmtIps } = require('./mgmtIpResolver');
 const { canUseTunnelForAccount, emitToUser } = require('../routes/core/_shared');
 
 /**
@@ -43,9 +44,34 @@ async function activateTunnel({ account, targetVRF, mikrotik, clientIp = '-' }) 
   }
 
   // 2) IP de gestión (server-side — anti-spoofing)
-  const mgmtIp = await mgmtIpRepo.getMgmtIpForUser(account.workspace_id, account.sub);
+  let mgmtIp = await mgmtIpRepo.getMgmtIpForUser(account.workspace_id, account.sub);
+
+  // Auto-heal: el mapeo user→IP puede faltar si el peer se creó A MANO (p.ej. el
+  // peer admin del plano ADMIN) o si el usuario es legacy/migrado. Lo resolvemos
+  // desde los peers VIVOS del router (server-side, validado por pertenencia) y lo
+  // persistimos. Solo auto-curamos cuando hay UNA candidata inequívoca; con 0 o
+  // varias, mantenemos el 409 con un mensaje accionable (no adivinamos).
   if (!mgmtIp) {
-    return { ok: false, code: 409, message: 'Tu dispositivo de gestión (WireGuard) no está registrado. Pide al moderador que te asigne uno.' };
+    try {
+      const candidates = await resolveOwnedMgmtIps({ account, mikrotik });
+      if (candidates.length === 1 && IPV4_REGEX.test(candidates[0].ip)) {
+        mgmtIp = candidates[0].ip;
+        await mgmtIpRepo.upsert({
+          workspaceId: account.workspace_id, userId: account.sub,
+          mgmtIp, publicKey: candidates[0].publicKey, source: 'auto-heal',
+        }).catch((e) => log.warn({ err: e?.message, userId: account.sub, mgmtIp }, 'auto-heal upsert falló (no bloqueante)'));
+        log.info({ userId: account.sub, mgmtIp, vrf: targetVRF }, 'mgmt-ip AUTO-HEAL');
+      } else if (candidates.length > 1) {
+        return { ok: false, code: 409, message: 'Tienes varios dispositivos de gestión (WireGuard) en el router. Regenera tu acceso en Ajustes → WireGuard, o pide al moderador que registre el que vas a usar.' };
+      }
+    } catch (e) {
+      if (isUnreachable(e)) return { ok: false, code: 503, message: getErrorMessage(e, ip, user), unreachable: true };
+      log.warn({ err: e?.message, userId: account.sub }, 'auto-heal: no se pudo resolver mgmt-ip desde el router');
+    }
+  }
+
+  if (!mgmtIp) {
+    return { ok: false, code: 409, message: 'Tu dispositivo de gestión (WireGuard) no está registrado y no se encontró un peer tuyo en el router. Regenera tu acceso en Ajustes → WireGuard, o pide al moderador que te asigne uno.' };
   }
   if (!IPV4_REGEX.test(mgmtIp)) {
     return { ok: false, code: 500, message: `IP de gestión inválida en BD: "${mgmtIp}"` };

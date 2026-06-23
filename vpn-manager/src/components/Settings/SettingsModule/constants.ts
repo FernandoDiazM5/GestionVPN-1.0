@@ -10,6 +10,7 @@ export const SETTINGS_PLACEHOLDERS = {
   MT_USER: 'admin',
   MT_PASS: '••••••••',
   server_public_ip: '213.173.36.232',
+  sstp_port: '443',
 };
 
 export const SETTINGS_LABELS = {
@@ -17,6 +18,7 @@ export const SETTINGS_LABELS = {
   MT_USER: 'Usuario Full-Access RouterOS',
   MT_PASS: 'Contraseña del RouterOS',
   server_public_ip: 'IP Pública WAN del Servidor',
+  sstp_port: 'Puerto del Servidor SSTP',
 };
 
 export const SETTINGS_HINTS = {
@@ -24,6 +26,7 @@ export const SETTINGS_HINTS = {
   MT_USER: '',
   MT_PASS: 'Esta contraseña se cifrará con AES-256-GCM en la DB del servidor.',
   server_public_ip: 'IP pública del MikroTik. Se configura una sola vez aquí y se reutiliza automáticamente al crear nodos WireGuard (los comandos del CPE la necesitan).',
+  sstp_port: 'Puerto donde escucha el listener SSTP del Core (RouterOS usa 443 por defecto). Si tu Core escucha en otro puerto (ej. 4443), se embebe en el script del CPE como connect-to=<ip>:<puerto>.',
 };
 
 export const TAB_VALUES = {

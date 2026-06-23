@@ -43,6 +43,20 @@ export function visibleModules(s?: SessionUser | null): ModuleId[] {
 
 export const canSeeModule = (s: SessionUser | null | undefined, m: ModuleId) => visibleModules(s).includes(m);
 
+/**
+ * Etiqueta legible del rol para la UI (sidebar, headers). Fuente única: la
+ * sesión RBAC, NO el string `credentials.role` (que arrastra el valor legacy
+ * 'admin' y muestra "Admin" para un moderador OWNER → confuso).
+ *   platform_admin → Administrador · OWNER → Moderador · MEMBER → View.
+ */
+export function roleLabel(s?: SessionUser | null): string {
+  if (!s) return '';
+  if (s.platform_admin) return 'Administrador';
+  if (s.role === 'OWNER') return 'Moderador';
+  if (s.role === 'MEMBER') return 'View';
+  return '';
+}
+
 /** Puede invitar miembros. */
 export const canInvite = (role?: Role) => isModerator(role);
 /** Puede remover miembros. */

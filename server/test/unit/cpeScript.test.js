@@ -78,4 +78,21 @@ describe('buildCpeSstpScript', () => {
     expect(script).not.toContain('/ip route add');     // SSTP no requiere ruta de retorno
     expect(cpeSteps).toHaveLength(1);
   });
+
+  it('sin puerto (o 443) usa connect-to sin sufijo de puerto (default RouterOS)', () => {
+    expect(buildCpeSstpScript(sstp).script).toContain('connect-to=203.0.113.10 ');
+    expect(buildCpeSstpScript({ ...sstp, sstpPort: 443 }).script).toContain('connect-to=203.0.113.10 ');
+    expect(buildCpeSstpScript(sstp).script).not.toContain('203.0.113.10:');
+  });
+
+  it('con puerto distinto de 443 lo anexa a connect-to (add y set)', () => {
+    const { script } = buildCpeSstpScript({ ...sstp, sstpPort: 4443 });
+    expect(script).toContain('connect-to=203.0.113.10:4443 disabled=no http-proxy=0.0.0.0');
+    expect(script).toContain('set [find name=sstp-out1] connect-to=203.0.113.10:4443');
+  });
+
+  it('ignora un puerto inválido y cae a connect-to sin puerto', () => {
+    expect(buildCpeSstpScript({ ...sstp, sstpPort: 'abc' }).script).toContain('connect-to=203.0.113.10 ');
+    expect(buildCpeSstpScript({ ...sstp, sstpPort: '' }).script).toContain('connect-to=203.0.113.10 ');
+  });
 });

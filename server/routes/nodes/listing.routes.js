@@ -269,7 +269,9 @@ router.post('/node/script', asyncHandler(async (req, res) => {
   if (!pppPassword) throw new AppError('pppPassword es requerido para SSTP', 400, 'VALIDATION_ERROR');
   // Script idempotente: crea sstp-out1 si no existe, o solo actualiza sus parámetros
   // (evita duplicar la interfaz). Usuario + contraseña embebidos (autoconfigurable).
-  const { script, cpeSteps } = buildCpeSstpScript({ pppUser, pppPassword, serverPublicIP });
+  // El puerto del listener SSTP del Core sale del setting global (default 443).
+  const sstpPort = (await getAppSetting('sstp_port').catch(() => '')) || '';
+  const { script, cpeSteps } = buildCpeSstpScript({ pppUser, pppPassword, serverPublicIP, sstpPort });
   return sendOk(res, { script, cpeSteps });
 }));
 

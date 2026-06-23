@@ -15,6 +15,7 @@
     "migrate:apnode": "node db/migrateApNode.js",
     "migrate:scanip": "node db/migrateScanIp.js",
     "migrate:dropcomod": "node db/migrateDropCoModerator.js",
+    "migrate:mgmtipsource": "node db/migrateMgmtIpSource.js",
     "diagnose": "node db/diagnostics.js",
     "check:scanroute": "node db/checkScanRoute.js",
     "scan:assign": "node db/assignScanIp.js",

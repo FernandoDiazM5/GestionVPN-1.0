@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { useVpn } from '../../context';
 import { useWorkspaceSession } from '../../context/WorkspaceSession';
-import { visibleModules, type ModuleId } from '../../utils/permissions';
+import { visibleModules, roleLabel, type ModuleId } from '../../utils/permissions';
 
 interface NavItem {
   id: ModuleId;
@@ -203,7 +203,7 @@ export default function Sidebar() {
           {!mini && (
             <div className="min-w-0 flex-1">
               <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate leading-none">@{credentials?.user}</p>
-              <p className="text-2xs text-slate-400 dark:text-slate-500 mt-0.5 capitalize">{credentials?.role}</p>
+              <p className="text-2xs text-slate-400 dark:text-slate-500 mt-0.5">{roleLabel(session) || credentials?.role}</p>
             </div>
           )}
         </div>

@@ -58,11 +58,20 @@ function buildCpeWgScript({ nodeNum, nodeMgmt, serverPublicKey, serverPublicIP, 
  * @param {string} o.pppUser
  * @param {string} o.pppPassword
  * @param {string} o.serverPublicIP  endpoint WAN del Core
+ * @param {number|string} [o.sstpPort] puerto del listener SSTP del Core (default 443).
+ *        Si difiere de 443 se emite como `connect-to=<ip>:<puerto>` (el sstp-client
+ *        de RouterOS usa 443 por defecto cuando no se especifica puerto).
  * @returns {{ script: string, cpeSteps: {title:string, cmd:string}[] }}
  */
-function buildCpeSstpScript({ pppUser, pppPassword, serverPublicIP }) {
-  const addLine = `add authentication=mschap2 connect-to=${serverPublicIP} disabled=no http-proxy=0.0.0.0 name=sstp-out1 profile=default-encryption tls-version=only-1.2 user=${pppUser} password=${pppPassword}`;
-  const setLine = `set [find name=sstp-out1] connect-to=${serverPublicIP} disabled=no user=${pppUser} password=${pppPassword}`;
+function buildCpeSstpScript({ pppUser, pppPassword, serverPublicIP, sstpPort }) {
+  // El sstp-client de RouterOS marca 443 si `connect-to` no lleva puerto. Solo
+  // anexamos `:<puerto>` cuando se configuró uno distinto, para no alterar la
+  // salida por defecto (443 implícito).
+  const port = parseInt(sstpPort, 10);
+  const portPart = Number.isInteger(port) && port > 0 && port !== 443 ? `:${port}` : '';
+  const connectTo = `${serverPublicIP}${portPart}`;
+  const addLine = `add authentication=mschap2 connect-to=${connectTo} disabled=no http-proxy=0.0.0.0 name=sstp-out1 profile=default-encryption tls-version=only-1.2 user=${pppUser} password=${pppPassword}`;
+  const setLine = `set [find name=sstp-out1] connect-to=${connectTo} disabled=no user=${pppUser} password=${pppPassword}`;
   const block = `/interface sstp-client\n:if ([find name=sstp-out1] = "") do={\n  ${addLine}\n} else={\n  ${setLine}\n}`;
   return { script: block, cpeSteps: [{ title: 'Configurar Cliente SSTP', cmd: block }] };
 }
