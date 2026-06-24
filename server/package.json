@@ -18,6 +18,7 @@
     "migrate:mgmtipsource": "node db/migrateMgmtIpSource.js",
     "diagnose": "node db/diagnostics.js",
     "check:scanroute": "node db/checkScanRoute.js",
+    "sync:wg0": "node db/syncWg0.js",
     "scan:assign": "node db/assignScanIp.js",
     "purge:orphans": "node db/purgeOrphanNodes.js",
     "purge:rbac": "node db/purgeDeletedRbac.js",
