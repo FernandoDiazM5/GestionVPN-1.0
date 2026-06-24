@@ -1,0 +1,13 @@
+# Red de seguridad: reconcilia cada 5 min por si se perdiera un evento inotify
+# (p. ej. el backend escribió mientras el .path estaba parado). Opcional pero
+# recomendado. La guarda de idempotencia hace que un tick sin cambios sea no-op.
+[Unit]
+Description=Reconciliación periódica del wg0 (red de seguridad del autosync)
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Unit=wg0-autosync.service
+
+[Install]
+WantedBy=timers.target

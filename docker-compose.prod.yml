@@ -46,6 +46,10 @@ services:
     volumes:
       # .db_secret y .jwt_secret viven aquí (DATA_DIR=/data). NO bind a /app.
       - backend-data:/data
+      # wg0-autosync (§4.27): el backend escribe la intención del wg0 aquí; un
+      # watcher del host (systemd path) la aplica. Ver deploy/wg0-autosync/.
+      # Requiere en el host: install -d -o 1001 -g 1001 /opt/wg0-autosync
+      - /opt/wg0-autosync:/wg0sync
     depends_on:
       db:
         condition: service_healthy

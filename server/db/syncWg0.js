@@ -42,14 +42,8 @@ const { connectToMikrotik, safeWrite } = require('../routeros.service');
 const mgmtNet = require('../lib/mgmtNet');
 const { readTowerLans } = require('../lib/mgmtAllowedIps');
 const scanIpRepo = require('./repos/scanIpRepo');
-
-const isCidr = (s) => /^\d{1,3}(\.\d{1,3}){3}\/\d{1,2}$/.test(String(s || '').trim());
-// Normaliza una IP suelta a /32; deja los CIDR como están.
-const toCidr = (s) => {
-  const v = String(s || '').trim();
-  if (!v) return '';
-  return v.includes('/') ? v : `${v}/32`;
-};
+// Fuente de verdad del parseo del wg0.conf (compartida con el hook event-driven).
+const { parseWg0Conf, isCidr, toCidr } = require('../lib/wg0Sync');
 
 // ── argumentos ──
 const args = process.argv.slice(2);
@@ -59,38 +53,6 @@ const confPath = (args[args.indexOf('--conf') + 1] && args.includes('--conf'))
   ? args[args.indexOf('--conf') + 1] : '/etc/wireguard/wg0.conf';
 const iface = (args[args.indexOf('--iface') + 1] && args.includes('--iface'))
   ? args[args.indexOf('--iface') + 1] : 'wg0';
-
-/**
- * Parsea un wg0.conf en sus secciones, recogiendo los CIDR de [Interface].Address
- * y de [Peer].AllowedIPs. Devuelve { lines, ifaceAddrs, peerAllowed, hasPostUpScan }.
- * No interpreta nada más: el resto del archivo (llaves, Endpoint, PostUp…) se
- * preserva tal cual al reescribir.
- */
-function parseConf(text) {
-  const lines = text.split(/\r?\n/);
-  let section = null;
-  const ifaceAddrs = new Set();
-  const peerAllowed = new Set();
-  let hasPostUpScan = false;
-  const scanBase = scanIpRepo.POOL_BASE; // '10.11.252.'
-  for (const raw of lines) {
-    const line = raw.trim();
-    if (/^\[interface\]/i.test(line)) { section = 'interface'; continue; }
-    if (/^\[peer\]/i.test(line)) { section = 'peer'; continue; }
-    if (!line || line.startsWith('#')) continue;
-    const m = line.match(/^([A-Za-z]+)\s*=\s*(.+)$/);
-    if (!m) continue;
-    const key = m[1].toLowerCase();
-    const val = m[2].split('#')[0].trim();
-    const cidrs = val.split(',').map((s) => s.trim()).filter(Boolean);
-    if (section === 'interface' && key === 'address') cidrs.forEach((c) => ifaceAddrs.add(toCidr(c)));
-    if (section === 'peer' && key === 'allowedips') cidrs.forEach((c) => peerAllowed.add(c));
-    // Si el scan-pool se asigna por PostUp `ip addr add`, NO lo tocamos en Address
-    // (lo duplicaría → wg-quick up fallaría).
-    if (section === 'interface' && key === 'postup' && val.includes(scanBase)) hasPostUpScan = true;
-  }
-  return { lines, ifaceAddrs, peerAllowed, hasPostUpScan };
-}
 
 /** Lee las LAN de torre de la BD como fallback si el router no responde. */
 async function towerLansFromDb(db) {
@@ -139,13 +101,15 @@ async function towerLansFromDb(db) {
   // 2) Conjuntos REQUERIDOS.
   //    [Peer].AllowedIPs = planos que el VPS debe alcanzar (router API + IPs de
   //    nodo) + scan-pool (también filtra el retorno entrante) + LAN de torre.
-  const requiredAllowed = [
+  // Dedup: el address-list del router puede traer el scan-pool/planos repetidos
+  // (entrada de torre que coincide con un /24 de gestión) → unión sin duplicados.
+  const requiredAllowed = [...new Set([
     mgmtNet.vps.net,        // 10.12.250.0/24 — alcanzar el router (API)
     scanNet,                // 10.11.252.0/24 — retorno del escaneo
     mgmtNet.nodes.wgNet,    // 10.11.250.0/24 — IP de nodo WG
     mgmtNet.nodes.sstpNet,  // 10.11.251.0/24 — IP de nodo SSTP
     ...towerLans,           // LAN de torre (lo que cambia con cada torre nueva)
-  ].filter(isCidr);
+  ].filter(isCidr))];
 
   //    [Interface].Address = scan-pool host /32 (origen del escaneo).
   const requiredAddrs = [];
@@ -158,13 +122,16 @@ async function towerLansFromDb(db) {
   try { confText = fs.readFileSync(confPath, 'utf8'); } catch { /* no existe (dev) */ }
 
   const current = confText
-    ? parseConf(confText)
-    : { lines: [], ifaceAddrs: new Set(), peerAllowed: new Set(), hasPostUpScan: false };
+    ? parseWg0Conf(confText)
+    : { lines: [], ifaceAddrs: [], peerAllowed: [], hasPostUpScan: false };
+  // parseWg0Conf devuelve arrays (orden de aparición); Sets para la pertenencia.
+  const haveAllowed = new Set(current.peerAllowed);
+  const haveAddrs = new Set(current.ifaceAddrs);
 
-  const missingAllowed = requiredAllowed.filter((c) => !current.peerAllowed.has(c));
+  const missingAllowed = requiredAllowed.filter((c) => !haveAllowed.has(c));
   const manageAddr = !current.hasPostUpScan; // PostUp ya las asigna → no tocar Address
   const missingAddrs = manageAddr
-    ? requiredAddrs.filter((c) => !current.ifaceAddrs.has(c))
+    ? requiredAddrs.filter((c) => !haveAddrs.has(c))
     : [];
 
   // 4) Reporte.

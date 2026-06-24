@@ -1,0 +1,12 @@
+# Vigila el archivo de intención que escribe el backend (bind-mount compartido).
+# Cuando el backend registra una torre nueva, dispara wg0-autosync.service.
+[Unit]
+Description=Vigila la intención del wg0 y dispara la reconciliación
+
+[Path]
+# PathModified detecta la escritura del backend (close-write).
+PathModified=/opt/wg0-autosync/allowedips.desired
+Unit=wg0-autosync.service
+
+[Install]
+WantedBy=multi-user.target

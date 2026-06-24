@@ -1,0 +1,14 @@
+# Reconciliador del wg0 (lado host). Lo dispara wg0-autosync.path al cambiar el
+# archivo de intención que escribe el backend. Oneshot, root.
+[Unit]
+Description=Reconcilia el AllowedIPs del wg0 del VPS desde la intención del backend
+After=wg-quick@wg0.service
+Wants=wg-quick@wg0.service
+
+[Service]
+Type=oneshot
+# Ajusta las rutas si cambiaste el bind-mount / la interfaz.
+Environment=WG0_CONF=/etc/wireguard/wg0.conf
+Environment=WG0_IFACE=wg0
+Environment=WG0_INTENT=/opt/wg0-autosync/allowedips.desired
+ExecStart=/usr/local/sbin/wg0-autosync.sh

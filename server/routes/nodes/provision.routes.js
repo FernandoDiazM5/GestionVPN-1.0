@@ -27,6 +27,40 @@ const { generateKeyPair } = require('../../lib/wgkeys');
 const { buildCpeWgScript, buildCpeSstpScript } = require('../../lib/cpeScript');
 const { generatePppUser, generatePppPassword } = require('../../lib/sstpCreds');
 const { deprovisionNodeOnRouter } = require('../../lib/nodeDeprovision');
+const fs = require('fs');
+const path = require('path');
+const { appendWg0Intent } = require('../../lib/wg0Sync');
+
+// ── Autosync del wg0 del VPS (event-driven, §4.27 — modelo HARDENED) ──
+// Al provisionar una torre, su LAN debe estar en los AllowedIPs del wg0 del VPS
+// para poder escanearla. El backend (no-root) NO toca el wg0: solo registra la
+// INTENCIÓN en un dir compartido con el host; un watcher del host (root, systemd
+// path) la aplica con `wg syncconf`. Así el backend no gana privilegios.
+const WG0_INTENT_PATH = process.env.WG0_INTENT_PATH || '/wg0sync/allowedips.desired';
+const WG0_AUTOSYNC = process.env.WG0_AUTOSYNC !== 'false';   // on por defecto; off explícito
+
+/**
+ * Registra las LAN recién provisionadas en el archivo de intención del wg0.
+ * Event-driven y 100% best-effort: corre fuera del ciclo de respuesta
+ * (`setImmediate`), NUNCA bloquea ni rompe la provisión (§4.17). GUARDA: la lib
+ * solo escribe si llega una LAN NUEVA (si ya estaba, no-op → no dispara al watcher).
+ * No-op natural fuera del VPS: si el dir compartido no está montado, no hace nada.
+ */
+function autosyncWg0(subnets) {
+  if (!WG0_AUTOSYNC) return;
+  const cidrs = (subnets || []).filter(Boolean);
+  if (cidrs.length === 0) return;
+  setImmediate(() => {
+    try {
+      if (!fs.existsSync(path.dirname(WG0_INTENT_PATH))) return;   // dir no montado (dev)
+      const r = appendWg0Intent(WG0_INTENT_PATH, cidrs);
+      if (r.changed) log.info({ added: r.added }, 'wg0 autosync: intención actualizada (torre nueva) → el watcher del host aplicará');
+      else log.debug({ subnets: cidrs }, 'wg0 autosync: las LAN ya estaban en la intención — sin cambios');
+    } catch (e) {
+      log.warn({ err: e.message }, 'wg0 autosync best-effort falló (no afecta la provisión)');
+    }
+  });
+}
 
 // Opción C: el /24 del pool de scan-IP del VPS (por defecto 10.11.252.0/24). Cada
 // VRF necesita una ruta de retorno hacia ese /24 vía la interfaz del VPS (el
@@ -409,6 +443,9 @@ router.post('/node/provision', requireOperator, asyncHandler(async (req, res) =>
         }));
       } catch (e) { log.warn({ err: e.message }, 'No se pudo pre-generar el script CPE (se puede regenerar desde el nodo)'); }
 
+      // §4.27 — el wg0 del VPS aprende la(s) LAN nueva(s) solo (best-effort).
+      autosyncWg0(allSubnets);
+
       return sendOk(res, {
         message: `Nodo WG ND${ndNum} provisionado correctamente`,
         ifaceName, vrfName, remoteAddress: wgPeerIP,
@@ -533,6 +570,9 @@ router.post('/node/provision', requireOperator, asyncHandler(async (req, res) =>
         pppUser: effectivePppUser, pppPassword: effectivePppPassword, serverPublicIP, sstpPort,
       }));
     } catch (e) { log.warn({ err: e.message }, 'No se pudo pre-generar el script SSTP (se puede regenerar desde el nodo)'); }
+
+    // §4.27 — el wg0 del VPS aprende la(s) LAN nueva(s) solo (best-effort).
+    autosyncWg0(allSubnets);
 
     return sendOk(res, {
       message: `Nodo ND${ndNum} provisionado correctamente`,
