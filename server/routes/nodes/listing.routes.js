@@ -24,8 +24,15 @@ const mgmtNet = require('../../lib/mgmtNet');
 const { buildCpeWgScript, buildCpeSstpScript } = require('../../lib/cpeScript');
 const scanIpRepo = require('../../db/repos/scanIpRepo');
 
-// /24 del plano de gestión — se excluyen del listado de "LANs de nodo".
+// /24 del plano de gestión + scan-pool — se excluyen del listado de "LANs de nodo".
+// El scan-pool (10.11.252.0/24) es una RUTA DE RETORNO que se añade a cada VRF
+// (addScanReturnRoute), no una LAN de la torre → si no se excluye aparece como
+// "RED LAN" del nodo y se cachea como tal (saveNode).
 const MGMT_NETS = new Set(mgmtNet.allNets);
+{
+  const scanNet = (process.env.SCAN_RETURN_SUBNET || scanIpRepo.poolSubnet() || '').trim();
+  if (scanNet) MGMT_NETS.add(scanNet);
+}
 
 // NOTA: el endpoint /nodes históricamente responde con un ARRAY plano (no shape
 // { success, ... }). El frontend lo consume así. Mantengo el shape legacy para

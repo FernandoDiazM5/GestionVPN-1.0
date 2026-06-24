@@ -35,6 +35,32 @@ const { deprovisionNodeOnRouter } = require('../../lib/nodeDeprovision');
 // como override opcional.
 const SCAN_RETURN_SUBNET = (process.env.SCAN_RETURN_SUBNET || scanIpRepo.poolSubnet() || '').trim();
 
+/**
+ * Añade una ruta SOLO si no existe ya (mismo dst + routing-table).
+ *
+ * ⚠️ RouterOS PERMITE rutas duplicadas: `/ip/route/add` NO lanza "already have"
+ * cuando ya hay una ruta al mismo dst (lo trata como ECMP). Por eso
+ * `writeIdempotent` —que se apoya en ese error— NO deduplica rutas, y cada
+ * re-provisión iba ACUMULANDO duplicados (mangle global del router se ensucia).
+ * Verificamos existencia antes de añadir (misma disciplina que tunnel-repair)
+ * para que el router quede limpio sin importar cuántas veces corra la provisión.
+ * @returns {Promise<boolean>} true si la creó, false si ya existía.
+ */
+async function addRouteOnce(api, { dst, gateway, routingTable, comment, distance }) {
+  const found = await safeWrite(api, ['/ip/route/print',
+    `?dst-address=${dst}`, `?routing-table=${routingTable}`]).catch(() => []);
+  if ((found || []).some(r =>
+    r['dst-address'] === dst && r['routing-table'] === routingTable && r.dynamic !== 'true'
+  )) return false;
+  const cmd = ['/ip/route/add',
+    `=dst-address=${dst}`, `=gateway=${gateway}`, `=routing-table=${routingTable}`,
+    '=scope=30', '=target-scope=10'];
+  if (distance) cmd.push(`=distance=${distance}`);
+  if (comment) cmd.push(`=comment=${comment}`);
+  await writeIdempotent(api, cmd);
+  return true;
+}
+
 /** Añade la ruta de retorno del /24 de scan-IP a un VRF (idempotente, best-effort). */
 async function addScanReturnRoute(api, vrfName, ndComment) {
   if (!SCAN_RETURN_SUBNET) return;
@@ -42,12 +68,10 @@ async function addScanReturnRoute(api, vrfName, ndComment) {
   // tumbar la provisión del túnel (la ruta de scan no es crítica para el túnel;
   // se rellena luego con "Verificar y reparar").
   try {
-    await writeIdempotent(api, ['/ip/route/add',
-      `=dst-address=${SCAN_RETURN_SUBNET}`,
-      `=gateway=${mgmtNet.vps.iface}`,
-      `=routing-table=${vrfName}`,
-      '=scope=30', '=target-scope=10',
-      `=comment=Route-${ndComment}-SCAN`]);
+    await addRouteOnce(api, {
+      dst: SCAN_RETURN_SUBNET, gateway: mgmtNet.vps.iface,
+      routingTable: vrfName, comment: `Route-${ndComment}-SCAN`,
+    });
   } catch (e) {
     log.warn({ vrf: vrfName, err: e.message }, 'addScanReturnRoute best-effort falló');
     return;
@@ -57,12 +81,10 @@ async function addScanReturnRoute(api, vrfName, ndComment) {
 /** Añade las rutas de retorno del plano de gestión (CLIENTES/ADMIN/VPS) a un VRF. */
 async function addMgmtReturnRoutes(api, vrfName, ndComment) {
   for (const rt of mgmtNet.returnRoutes()) {
-    await writeIdempotent(api, ['/ip/route/add',
-      `=dst-address=${rt.subnet}`,
-      `=gateway=${rt.gateway}`,
-      `=routing-table=${vrfName}`,
-      '=scope=30', '=target-scope=10',
-      `=comment=Route-${ndComment}-${rt.tag}`]);
+    await addRouteOnce(api, {
+      dst: rt.subnet, gateway: rt.gateway,
+      routingTable: vrfName, comment: `Route-${ndComment}-${rt.tag}`,
+    });
   }
 }
 
@@ -325,13 +347,10 @@ router.post('/node/provision', requireOperator, asyncHandler(async (req, res) =>
       // Paso 7a — Rutas LAN con distance=2 (backup al SSTP si coexisten)
       const subnets = allSubnets;
       for (const subnet of subnets) {
-        await writeIdempotent(api, ['/ip/route/add',
-          `=dst-address=${subnet}`,
-          `=gateway=${ifaceName}@${vrfName}`,
-          `=routing-table=${vrfName}`,
-          '=distance=2',
-          '=scope=30', '=target-scope=10',
-          `=comment=Ruta WG ${ndComment}`]);
+        await addRouteOnce(api, {
+          dst: subnet, gateway: `${ifaceName}@${vrfName}`,
+          routingTable: vrfName, distance: 2, comment: `Ruta WG ${ndComment}`,
+        });
       }
       pushStep({ step: '7a', obj: 'Rutas LAN remota(s)', name: `${subnets.join(', ')} (distance=2)`, status: 'ok' });
 
@@ -344,12 +363,10 @@ router.post('/node/provision', requireOperator, asyncHandler(async (req, res) =>
 
       // Paso 7b'' — IP de gestión del nodo: ruta /32 al túnel del CPE
       if (nodeMgmt) {
-        await writeIdempotent(api, ['/ip/route/add',
-          `=dst-address=${nodeMgmt}/32`,
-          `=gateway=${ifaceName}@${vrfName}`,
-          `=routing-table=${vrfName}`,
-          '=scope=30', '=target-scope=10',
-          `=comment=Route-${ndComment}-MGMTIP`]);
+        await addRouteOnce(api, {
+          dst: `${nodeMgmt}/32`, gateway: `${ifaceName}@${vrfName}`,
+          routingTable: vrfName, comment: `Route-${ndComment}-MGMTIP`,
+        });
         pushStep({ step: '7b″', obj: 'IP gestión del nodo', name: `${nodeMgmt}/32 → ${ifaceName}`, status: 'ok' });
       }
 
@@ -444,12 +461,10 @@ router.post('/node/provision', requireOperator, asyncHandler(async (req, res) =>
 
     // Paso 6a — Ruta hacia cada LAN remota del nodo (gateway = interfaz@VRF)
     for (const subnet of subnets) {
-      await writeIdempotent(api, ['/ip/route/add',
-        `=dst-address=${subnet}`,
-        `=gateway=${ifaceName}@${vrfName}`,
-        `=routing-table=${vrfName}`,
-        '=scope=30', '=target-scope=10',
-        `=comment=Route-${ndComment}`]);
+      await addRouteOnce(api, {
+        dst: subnet, gateway: `${ifaceName}@${vrfName}`,
+        routingTable: vrfName, comment: `Route-${ndComment}`,
+      });
     }
     pushStep({ step: '6a', obj: 'Ruta(s) LAN remota', name: subnets.join(', '), status: 'ok' });
 
@@ -459,12 +474,10 @@ router.post('/node/provision', requireOperator, asyncHandler(async (req, res) =>
 
     // Paso 6b'' — IP de gestión del nodo (ruta /32 al túnel + address-list)
     if (nodeMgmt) {
-      await writeIdempotent(api, ['/ip/route/add',
-        `=dst-address=${nodeMgmt}/32`,
-        `=gateway=${ifaceName}@${vrfName}`,
-        `=routing-table=${vrfName}`,
-        '=scope=30', '=target-scope=10',
-        `=comment=Route-${ndComment}-MGMTIP`]);
+      await addRouteOnce(api, {
+        dst: `${nodeMgmt}/32`, gateway: `${ifaceName}@${vrfName}`,
+        routingTable: vrfName, comment: `Route-${ndComment}-MGMTIP`,
+      });
       await addTowerEntries(api, [`${nodeMgmt}/32`], `Ruta ${nameUpper}`);
       pushStep({ step: '6b″', obj: 'IP gestión del nodo', name: `${nodeMgmt}/32 → ${ifaceName}`, status: 'ok' });
     }
