@@ -70,7 +70,7 @@ async function addScanReturnRoute(api, vrfName, ndComment) {
   try {
     await addRouteOnce(api, {
       dst: SCAN_RETURN_SUBNET, gateway: mgmtNet.vps.iface,
-      routingTable: vrfName, comment: `Route-${ndComment}-SCAN`,
+      routingTable: vrfName, distance: 2, comment: `Route-${ndComment}-SCAN`,
     });
   } catch (e) {
     log.warn({ vrf: vrfName, err: e.message }, 'addScanReturnRoute best-effort falló');
@@ -83,7 +83,7 @@ async function addMgmtReturnRoutes(api, vrfName, ndComment) {
   for (const rt of mgmtNet.returnRoutes()) {
     await addRouteOnce(api, {
       dst: rt.subnet, gateway: rt.gateway,
-      routingTable: vrfName, comment: `Route-${ndComment}-${rt.tag}`,
+      routingTable: vrfName, distance: 2, comment: `Route-${ndComment}-${rt.tag}`,
     });
   }
 }
@@ -472,14 +472,12 @@ router.post('/node/provision', requireOperator, asyncHandler(async (req, res) =>
     await addMgmtReturnRoutes(api, vrfName, ndComment);
     pushStep({ step: '6b', obj: 'Rutas retorno MGMT', name: mgmtNet.returnRoutes().map(r => r.gateway).join(', '), status: 'ok' });
 
-    // Paso 6b'' — IP de gestión del nodo (ruta /32 al túnel + address-list)
+    // Paso 6b'' — IP de gestión del nodo SOLO en el address-list. En SSTP NO se
+    // crea ruta /32 estática: el PPP la genera dinámica (remote-address) → la
+    // estática sería redundante (informe agente MKT sobre la config funcional).
     if (nodeMgmt) {
-      await addRouteOnce(api, {
-        dst: `${nodeMgmt}/32`, gateway: `${ifaceName}@${vrfName}`,
-        routingTable: vrfName, comment: `Route-${ndComment}-MGMTIP`,
-      });
       await addTowerEntries(api, [`${nodeMgmt}/32`], `Ruta ${nameUpper}`);
-      pushStep({ step: '6b″', obj: 'IP gestión del nodo', name: `${nodeMgmt}/32 → ${ifaceName}`, status: 'ok' });
+      pushStep({ step: '6b″', obj: 'IP gestión del nodo (address-list)', name: `${nodeMgmt}/32`, status: 'ok' });
     }
 
     // Paso 6b' — Ruta retorno scan-IP del VPS (Opción C, si vive fuera de .21)
