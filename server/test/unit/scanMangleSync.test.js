@@ -79,10 +79,10 @@ describe('onTunnelClosed', () => {
     expect(teardown).not.toHaveBeenCalled();
   });
 
-  it('respeta el lock: si está ocupado, NO borra (lo hará la gracia del escaneo)', async () => {
-    const release = scanLock.tryAcquire(WS);
+  it('es AUTORITATIVO: borra aunque el lock esté ocupado (deactivate/expiración manda)', async () => {
+    const release = scanLock.tryAcquire(WS);     // lock ocupado (p.ej. gracia de un escaneo)
     await sync.onTunnelClosed({ workspaceId: WS, mikrotik: MIKROTIK });
-    expect(teardown).not.toHaveBeenCalled();
+    expect(teardown).toHaveBeenCalledTimes(1);   // NO se salta el teardown
     release();
   });
 });

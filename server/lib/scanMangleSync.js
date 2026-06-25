@@ -45,18 +45,26 @@ async function onTunnelActivated({ workspaceId, vrfName, mikrotik }) {
 /**
  * Túnel cerrado/expirado → borra la mangle de escaneo del workspace.
  * No-op si el workspace no tiene scan-IP.
+ *
+ * AUTORITATIVO: el deactivate/expiración manda — la scan mangle DEBE irse con
+ * el túnel. Intentamos tomar el lock para serializar contra Monitor AP/escaneo,
+ * pero si está ocupado (p.ej. la gracia de auth de un escaneo previo lo retiene
+ * hasta 5 min) NO nos saltamos el teardown: lo ejecutamos igual. `teardown` es
+ * idempotente (borra por comment), así que la carrera con un setup concurrente
+ * se auto-resuelve y, en el peor caso, el siguiente tick del job lo re-sincroniza.
  */
 async function onTunnelClosed({ workspaceId, mikrotik }) {
   try {
     if (!mikrotik?.ip || !workspaceId) return;
     const scanIp = await scanIpRepo.resolveForWorkspace(workspaceId).catch(() => null);
     if (!scanIp) return; // sin Opción C no hay scan mangle que limpiar
-    const release = scanLock.tryAcquire(workspaceId);
-    if (!release) { log.debug({ workspaceId }, 'scan-IP ocupada; teardown en deactivate omitido (lo hará la gracia del escaneo)'); return; }
+    const release = scanLock.tryAcquire(workspaceId); // best-effort; puede ser null
     try {
       await scanMangle.teardown({ workspaceId, mikrotik });
-      log.info({ workspaceId }, 'scan mangle removida al cerrar el túnel');
-    } finally { release(); }
+      log.info({ workspaceId, locked: !!release }, 'scan mangle removida al cerrar el túnel');
+    } finally {
+      if (release) release();
+    }
   } catch (e) {
     log.warn({ workspaceId, err: e?.message }, 'onTunnelClosed best-effort falló');
   }
