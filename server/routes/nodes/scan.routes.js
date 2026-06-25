@@ -35,6 +35,9 @@ const log = require('../../lib/logger').child({ scope: 'scan' });
 // fase para que el SSH enrute al VRF). El teardown ocurre al cerrar el cliente la
 // conexión (fin de la auth) o, como respaldo, tras este margen de seguridad.
 const AUTH_GRACE_MS = parseInt(process.env.SCAN_AUTH_GRACE_MS || '300000', 10); // 5 min
+// Espera MÁXIMA por el scan-lock antes de responder 409. Acotada para NO bloquear
+// hasta el 504 de nginx (~60s) cuando el lock está ocupado por otro escaneo/Monitor AP.
+const SCAN_LOCK_WAIT_MS = parseInt(process.env.SCAN_LOCK_WAIT_MS || '8000', 10);
 
 router.post('/node/scan-stream', async (req, res) => {
   const { nodeLan } = req.body;
@@ -68,6 +71,13 @@ router.post('/node/scan-stream', async (req, res) => {
   let localAddress = null;
   let scanMangleUp = false;
   let releaseLock = null;
+  // Se setea si el cliente cierra la conexión MIENTRAS esperamos el lock. Lo
+  // registramos ANTES del acquire para no filtrar el lock si la petición muere
+  // en la espera (causa raíz del 504 que obligaba a reiniciar el backend): el
+  // handler de cierre "principal" (req.on('close')) se registra más abajo, tras
+  // abrir el SSE, así que sin esto un abort durante el acquire dejaba el lock
+  // tomado hasta el timer de seguridad (minutos) → reintentos apilados.
+  let clientGone = false;
   if (acc && !acc.platform_admin && targetVrf && req.mikrotik) {
     const scanIp = await scanIpRepo.resolveForWorkspace(acc.workspace_id).catch(() => null);
     if (scanIp) {
@@ -98,7 +108,25 @@ router.post('/node/scan-stream', async (req, res) => {
       // El lock debe cubrir descubrimiento + fase de auth (SSE abierto) para que
       // el job de Monitor AP no conmute la mangle a otro VRF a mitad de la auth.
       const lockMs = Math.min(30 * 60 * 1000, Math.max(AUTH_GRACE_MS + 120000, estHosts * 60));
-      releaseLock = await scanLock.acquire(acc.workspace_id, lockMs);
+
+      // Si el cliente se va mientras esperamos el lock, NO lo retenemos.
+      req.once('close', () => { clientGone = true; });
+
+      // Espera ACOTADA: si el lock sigue ocupado tras SCAN_LOCK_WAIT_MS (otro
+      // escaneo o el Monitor AP), respondemos 409 accionable en vez de encolar
+      // y dejar que nginx corte con 504 (que apilaba holders → atasco).
+      releaseLock = await scanLock.acquireOrNull(acc.workspace_id, SCAN_LOCK_WAIT_MS, lockMs);
+      if (!releaseLock) {
+        return res.status(409).json({
+          success: false,
+          code: 'SCAN_BUSY',
+          message: 'Hay un escaneo o monitoreo en curso para tu equipo. Reintenta en unos segundos.',
+        });
+      }
+      // Si la petición ya murió durante la espera, soltamos y salimos (sin esto,
+      // el lock quedaría tomado hasta el timer de seguridad).
+      if (clientGone) { releaseLock(); releaseLock = null; return; }
+
       try {
         await scanMangle.setup({ workspaceId: acc.workspace_id, scanIp, vrfName: targetVrf, mikrotik: req.mikrotik });
         localAddress = scanIp;

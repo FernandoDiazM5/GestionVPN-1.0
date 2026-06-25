@@ -56,3 +56,39 @@ describe('scanLock.acquire', () => {
     release2();
   });
 });
+
+describe('scanLock.acquireOrNull', () => {
+  it('toma el lock de inmediato si está libre', async () => {
+    const release = await scanLock.acquireOrNull('ws-on-1', 50);
+    expect(typeof release).toBe('function');
+    release();
+  });
+
+  it('devuelve null si el lock sigue ocupado tras waitMs', async () => {
+    const held = await scanLock.acquire('ws-on-2', 10000);
+    const t0 = Date.now();
+    const got = await scanLock.acquireOrNull('ws-on-2', 30);
+    expect(got).toBeNull();
+    expect(Date.now() - t0).toBeGreaterThanOrEqual(20);
+    held();
+  });
+
+  it('NO filtra la cola al expirar: un acquire posterior entra al liberar el holder', async () => {
+    const held = await scanLock.acquire('ws-on-3', 10000);
+    const got = await scanLock.acquireOrNull('ws-on-3', 20); // expira → null
+    expect(got).toBeNull();
+    held(); // libera; el waiter cancelado NO debe haberse quedado con el testigo
+    // Si la cola se hubiera filtrado, este acquire se colgaría hasta el timeout.
+    const next = await scanLock.acquire('ws-on-3', 1000);
+    expect(typeof next).toBe('function');
+    next();
+  });
+
+  it('concede el lock si el holder libera DENTRO de waitMs', async () => {
+    const held = await scanLock.acquire('ws-on-4', 10000);
+    setTimeout(() => held(), 15);
+    const got = await scanLock.acquireOrNull('ws-on-4', 500);
+    expect(typeof got).toBe('function');
+    got();
+  });
+});

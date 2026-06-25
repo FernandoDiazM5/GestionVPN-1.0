@@ -16,6 +16,7 @@ const sessionRepo = require('../db/repos/sessionRepo');
 const mgmtIpRepo = require('../db/repos/mgmtIpRepo');
 const notifier = require('./notifier');
 const provisioner = require('./tunnelProvisioner');
+const scanMangleSync = require('./scanMangleSync');
 const { resolveOwnedMgmtIps } = require('./mgmtIpResolver');
 const { canUseTunnelForAccount, emitToUser } = require('../routes/core/_shared');
 
@@ -125,6 +126,10 @@ async function activateTunnel({ account, targetVRF, mikrotik, clientIp = '-' }) 
       payload: { tunnelId: targetVRF, vrf: targetVRF, expiresAt: expires_at, ip: clientIp },
     }).catch((err) => log.warn({ err: err.message }, 'notify TUNNEL_ACTIVATED falló'));
 
+    // 6) Mangle de escaneo atada al túnel: apunta la scan-IP del workspace al VRF
+    //    recién activado (fire-and-forget, best-effort — no añade latencia al activate).
+    void scanMangleSync.onTunnelActivated({ workspaceId: account.workspace_id, vrfName: targetVRF, mikrotik });
+
     return { ok: true, sessionId, expiresAt: expires_at, mgmtIp, vrf: targetVRF, switched: !!prev };
   } catch (error) {
     if (apiRead) try { await apiRead.close(); } catch (_) {}
@@ -177,6 +182,9 @@ async function deactivateTunnel({ account, mikrotik, clientIp = '-' }) {
     log.info({ userId: account.sub, count: ids.length }, 'DEACTIVATE OK');
 
     emitToUser(account.sub, null, null);
+
+    // La mangle de escaneo muere con el túnel (fire-and-forget, best-effort).
+    void scanMangleSync.onTunnelClosed({ workspaceId: account.workspace_id, mikrotik });
 
     if (session) {
       notifier.notify({
