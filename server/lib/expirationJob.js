@@ -21,6 +21,7 @@ const log = require('./logger').child({ scope: 'expiration-job' });
 const sessionRepo = require('../db/repos/sessionRepo');
 const notifier = require('./notifier');
 const scanMangleSync = require('./scanMangleSync');
+const sse = require('./sse');
 const { getAppSetting, decryptPass } = require('../db.service');
 
 /** Credenciales del router core desde app_settings (igual que apPollJob). null si faltan. */
@@ -64,6 +65,8 @@ async function runOnce() {
           event: 'SESSION_EXPIRED',
           payload: { tunnelId: s.tunnel_id, vrf: s.vrf_name },
         }).catch((err) => log.warn({ err: err.message, userId: s.user_id }, 'notify falló'));
+        // SSE 'tunnel' → la "Actividad reciente" del workspace muestra el EXPIRE en vivo.
+        try { sse.publish(s.workspace_id, 'tunnel', { tunnelId: s.tunnel_id, action: 'EXPIRE', userId: s.user_id, ts: Date.now() }); } catch (_) { /* best-effort */ }
       } catch (err) {
         log.warn({ err: err.message, sessionId: s.id }, 'fallo cerrando sesión expirada');
       }

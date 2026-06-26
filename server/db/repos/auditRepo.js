@@ -14,17 +14,26 @@ async function log({ workspaceId, tunnelId, userId, action, ip, detail }) {
   );
 }
 
+// ⚠️ La línea de tiempo lee de `tunnel_session_logs` (NO de `tunnel_logs`): ahí
+// es donde el sistema multiusuario escribe los eventos REALES de acceso a túnel
+// (ACTIVATE/SWITCH/DEACTIVATE/EXPIRE/ERROR, vía sessionRepo.log). `tunnel_logs`
+// era de un diseño de auditoría viejo (Fase 3) que nadie llena en el flujo normal
+// (el middleware `auditAction` nunca se cableó) → el panel salía SIEMPRE vacío.
+// Mapeo a la forma que espera el frontend: message → detail.
+const SESSION_LOG_COLS =
+  `sl.id, sl.tunnel_id, sl.action, sl.ip_address, sl.message AS detail, sl.created_at,
+   sl.user_id, u.email AS user_email, u.name AS user_name`;
+
 /** Línea de tiempo de auditoría del workspace (con joins de email). */
 async function list(workspaceId, { limit = 100, tunnelId = null } = {}) {
   const params = [workspaceId];
   let sql =
-    `SELECT tl.id, tl.tunnel_id, tl.action, tl.ip_address, tl.detail, tl.created_at,
-            tl.user_id, u.email AS user_email, u.name AS user_name
-       FROM tunnel_logs tl
-       LEFT JOIN users u ON u.id = tl.user_id
-      WHERE tl.workspace_id = ?`;
-  if (tunnelId) { sql += ' AND tl.tunnel_id = ?'; params.push(tunnelId); }
-  sql += ' ORDER BY tl.created_at DESC LIMIT ?';
+    `SELECT ${SESSION_LOG_COLS}
+       FROM tunnel_session_logs sl
+       LEFT JOIN users u ON u.id = sl.user_id
+      WHERE sl.workspace_id = ?`;
+  if (tunnelId) { sql += ' AND sl.tunnel_id = ?'; params.push(tunnelId); }
+  sql += ' ORDER BY sl.created_at DESC LIMIT ?';
   params.push(Number(limit));
   return query(sql, params);
 }
@@ -40,16 +49,15 @@ async function list(workspaceId, { limit = 100, tunnelId = null } = {}) {
 async function listForExport(workspaceId, { from, to, tunnelId = null, action = null, maxRows = 10000 } = {}) {
   const params = [workspaceId];
   let sql =
-    `SELECT tl.id, tl.tunnel_id, tl.action, tl.ip_address, tl.detail, tl.created_at,
-            tl.user_id, u.email AS user_email, u.name AS user_name
-       FROM tunnel_logs tl
-       LEFT JOIN users u ON u.id = tl.user_id
-      WHERE tl.workspace_id = ?`;
-  if (from != null) { sql += ' AND tl.created_at >= ?'; params.push(Number(from)); }
-  if (to != null)   { sql += ' AND tl.created_at <= ?'; params.push(Number(to)); }
-  if (tunnelId)     { sql += ' AND tl.tunnel_id = ?'; params.push(tunnelId); }
-  if (action)       { sql += ' AND tl.action = ?'; params.push(action); }
-  sql += ' ORDER BY tl.created_at DESC LIMIT ?';
+    `SELECT ${SESSION_LOG_COLS}
+       FROM tunnel_session_logs sl
+       LEFT JOIN users u ON u.id = sl.user_id
+      WHERE sl.workspace_id = ?`;
+  if (from != null) { sql += ' AND sl.created_at >= ?'; params.push(Number(from)); }
+  if (to != null)   { sql += ' AND sl.created_at <= ?'; params.push(Number(to)); }
+  if (tunnelId)     { sql += ' AND sl.tunnel_id = ?'; params.push(tunnelId); }
+  if (action)       { sql += ' AND sl.action = ?'; params.push(action); }
+  sql += ' ORDER BY sl.created_at DESC LIMIT ?';
   params.push(Math.min(Number(maxRows) || 10000, 50000));
   return query(sql, params);
 }

@@ -17,6 +17,7 @@ const mgmtIpRepo = require('../db/repos/mgmtIpRepo');
 const notifier = require('./notifier');
 const provisioner = require('./tunnelProvisioner');
 const scanMangleSync = require('./scanMangleSync');
+const sse = require('./sse');
 const { resolveOwnedMgmtIps } = require('./mgmtIpResolver');
 const { canUseTunnelForAccount, emitToUser } = require('../routes/core/_shared');
 
@@ -130,6 +131,9 @@ async function activateTunnel({ account, targetVRF, mikrotik, clientIp = '-' }) 
     //    recién activado (fire-and-forget, best-effort — no añade latencia al activate).
     void scanMangleSync.onTunnelActivated({ workspaceId: account.workspace_id, vrfName: targetVRF, mikrotik });
 
+    // 7) SSE 'tunnel' → refresca la "Actividad reciente" del workspace en vivo.
+    try { sse.publish(account.workspace_id, 'tunnel', { tunnelId: targetVRF, action: prev ? 'SWITCH' : 'ACTIVATE', userId: account.sub, ts: Date.now() }); } catch (_) { /* best-effort */ }
+
     return { ok: true, sessionId, expiresAt: expires_at, mgmtIp, vrf: targetVRF, switched: !!prev };
   } catch (error) {
     if (apiRead) try { await apiRead.close(); } catch (_) {}
@@ -185,6 +189,9 @@ async function deactivateTunnel({ account, mikrotik, clientIp = '-' }) {
 
     // La mangle de escaneo muere con el túnel (fire-and-forget, best-effort).
     void scanMangleSync.onTunnelClosed({ workspaceId: account.workspace_id, mikrotik });
+
+    // SSE 'tunnel' → refresca la "Actividad reciente" del workspace en vivo.
+    try { sse.publish(account.workspace_id, 'tunnel', { tunnelId: session?.tunnel_id || '-', action: 'DEACTIVATE', userId: account.sub, ts: Date.now() }); } catch (_) { /* best-effort */ }
 
     if (session) {
       notifier.notify({
