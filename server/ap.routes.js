@@ -1,12 +1,15 @@
 const express = require('express');
 const crypto  = require('crypto');
 const router  = express.Router();
-const { getDb, encryptPass, decryptPass, getApIntId, getCpeIntId, getApGroupIntId, getNodeByPppUser } = require('./db.service');
+const { getDb, encryptPass, decryptPass, getApIntId, getCpeIntId, getApGroupIntId, getNodeByPppUser, getAppSetting } = require('./db.service');
 const { pollAp, getDetail, getFullDetail, clearApCache }  = require('./ap.service');
 
 const { reqWorkspace, ownedGroupIntIds, ownedApIntIds, ownsGroupUuid, ownsApUuid, cpeForeign } = require('./lib/tenantScope');
 const { ipInCidr, resolveOwnerNodeId, resolveNodeCreds: resolveNodeCredsShared } = require('./lib/apNode');
 const apWatch = require('./lib/apWatch');
+const scanIpRepo = require('./db/repos/scanIpRepo');
+const scanMangle = require('./lib/scanMangle');
+const scanLock = require('./lib/scanLock');
 const log = require('./lib/logger').child({ scope: 'ap-routes' });
 
 const genUuid = () => crypto.randomBytes(8).toString('hex');
@@ -14,6 +17,16 @@ const isValidMac = (mac) => /^([0-9a-f]{2}:?){5}([0-9a-f]{2})$/i.test(mac);
 
 // C3 (Fase 2): delega en el helper compartido (lib/apNode), inyectando decryptPass.
 const resolveNodeCreds = (db, apRow) => resolveNodeCredsShared(db, apRow, decryptPass);
+
+// Credenciales del router core (igual que apPollJob). null si faltan.
+async function loadMikrotik() {
+  try {
+    const ip = await getAppSetting('MT_IP');
+    const user = await getAppSetting('MT_USER');
+    const passEnc = await getAppSetting('MT_PASS');
+    return (ip && user && passEnc) ? { ip, user, pass: decryptPass(passEnc) } : null;
+  } catch (_) { return null; }
+}
 
 // ── Nodos (ap_groups) ────────────────────────────────────────────────────
 router.get('/nodos', async (req, res) => {
@@ -376,6 +389,7 @@ router.get('/historial/:mac', async (req, res) => {
 
 // ── Poll AP directly — usa credenciales del nodo (node_ssh_creds) ────────
 router.post('/poll-direct', async (req, res) => {
+    let release = null; // lock de la scan-IP (Opción C), liberado en finally
     try {
         const { apId, saveHistory } = req.body;
         if (!apId) return res.status(400).json({ success: false, message: 'apId requerido' });
@@ -386,8 +400,12 @@ router.post('/poll-direct', async (req, res) => {
 
         // C2: IP, puerto y firmware se leen SIEMPRE de la DB — nunca del body.
         // Evita forzar una conexión SSH (con las credenciales del AP) a un host arbitrario.
+        // Se une `nodes` para el VRF del AP (necesario para la mangle de escaneo).
         const apRow = await db.get(
-            'SELECT ip, usuario_ssh, clave_ssh_enc, puerto_ssh, nombre_nodo, node_id, firmware FROM aps WHERE uuid = ?', [apId]
+            `SELECT a.ip, a.usuario_ssh, a.clave_ssh_enc, a.puerto_ssh, a.nombre_nodo, a.node_id, a.firmware,
+                    n.nombre_vrf AS nombre_vrf
+               FROM aps a LEFT JOIN nodes n ON n.id = a.node_id
+              WHERE a.uuid = ?`, [apId]
         );
         if (!apRow || !apRow.ip) return res.status(404).json({ success: false, message: 'AP no encontrado' });
 
@@ -420,7 +438,33 @@ router.post('/poll-direct', async (req, res) => {
             });
         }
 
-        const stations = await pollAp(apId, apRow.ip, apRow.puerto_ssh || 22, sshUser, sshPass, apRow.firmware || '');
+        // ── Opción C (routing): atar el SSH a la scan-IP del workspace y asegurar
+        // la mangle de escaneo (src=scan-IP → VRF del AP). SIN esto, el SSH desde
+        // el VPS sale por la ruta por defecto y NO entra al túnel → "handshake
+        // timeout" → 500. Mismo patrón que /device/antenna y apPollJob. En local
+        // (sin scan-IP) localAddress queda null y el SSH sale directo.
+        let localAddress = null;
+        const ws = reqWorkspace(req);
+        if (ws !== null && apRow.nombre_vrf) {
+            const scanIp = await scanIpRepo.resolveForWorkspace(ws).catch(() => null);
+            const mikrotik = scanIp ? await loadMikrotik() : null;
+            if (scanIp && mikrotik) {
+                // Espera acotada por el lock; si lo toma, (re)apunta la mangle al VRF
+                // del AP. Si NO lo toma (un escaneo lo retiene con su mangle viva
+                // hacia el mismo VRF), igual atamos a la scan-IP: la ruta ya existe.
+                release = await scanLock.acquireOrNull(ws, 8000);
+                if (release) {
+                    try {
+                        await scanMangle.setup({ workspaceId: ws, scanIp, vrfName: apRow.nombre_vrf, mikrotik });
+                    } catch (e) {
+                        log.warn({ ws, vrf: apRow.nombre_vrf, err: e.message }, 'poll-direct: no se pudo montar la scan mangle');
+                    }
+                }
+                localAddress = scanIp;
+            }
+        }
+
+        const stations = await pollAp(apId, apRow.ip, apRow.puerto_ssh || 22, sshUser, sshPass, apRow.firmware || '', localAddress);
 
         // B8+B17+B20: UPSERT atomico + validacion MAC + transaccion batch
         await db.run('BEGIN');
@@ -478,6 +522,7 @@ router.post('/poll-direct', async (req, res) => {
 
         res.json({ success: true, stations: enriched, polledAt: Date.now() });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+    finally { if (release) release(); }
 });
 
 // ── Revelar la credencial SSH guardada del AP (solo el workspace dueño) ──
