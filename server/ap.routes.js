@@ -408,6 +408,18 @@ router.post('/poll-direct', async (req, res) => {
             }
         }
 
+        // Sin credenciales SSH resueltas → error CLARO (no forzar pollAp con user
+        // vacío, que lanza y devuelve un 500 opaco). El AP necesita su clave
+        // guardada (se persiste al guardarlo desde Escanear con la clave que
+        // autenticó) o las del nodo dueño. Espejo de la guarda de ap-detail-direct.
+        if (!sshUser) {
+            return res.status(400).json({
+                success: false,
+                code: 'AP_NO_SSH',
+                message: 'Este AP no tiene credenciales SSH guardadas. Guárdalo desde Escanear (con la clave que autenticó) o configúralas en el nodo dueño.',
+            });
+        }
+
         const stations = await pollAp(apId, apRow.ip, apRow.puerto_ssh || 22, sshUser, sshPass, apRow.firmware || '');
 
         // B8+B17+B20: UPSERT atomico + validacion MAC + transaccion batch
@@ -466,6 +478,28 @@ router.post('/poll-direct', async (req, res) => {
 
         res.json({ success: true, stations: enriched, polledAt: Date.now() });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// ── Revelar la credencial SSH guardada del AP (solo el workspace dueño) ──
+// Monitor AP: ver la clave con la que se accedió a la antena. Vive cifrada
+// (AES-GCM) en aps.clave_ssh_enc; se descifra SERVER-SIDE y se devuelve SOLO
+// bajo la sesión autenticada del dueño (ownsApUuid). No se expone en listados:
+// solo bajo clic explícito de "revelar".
+router.post('/reveal-ssh', async (req, res) => {
+    try {
+        const { apId } = req.body;
+        if (!apId) return res.status(400).json({ success: false, message: 'apId requerido' });
+        const db = await getDb();
+        if (!(await ownsApUuid(db, req, apId))) return res.status(404).json({ success: false, message: 'AP no encontrado' });
+        const row = await db.get('SELECT usuario_ssh, clave_ssh_enc, puerto_ssh FROM aps WHERE uuid = ?', [apId]);
+        if (!row || !row.usuario_ssh) {
+            return res.status(404).json({ success: false, code: 'AP_NO_SSH', message: 'Este AP no tiene credenciales SSH guardadas' });
+        }
+        const pass = row.clave_ssh_enc ? decryptPass(row.clave_ssh_enc) : '';
+        return res.json({ success: true, user: row.usuario_ssh, pass, port: row.puerto_ssh || 22 });
+    } catch (e) {
+        return res.status(500).json({ success: false, message: e.message });
+    }
 });
 
 // ── Full AP detail direct — all 12 SSH sections (ANTENNA_CMD) ────────────

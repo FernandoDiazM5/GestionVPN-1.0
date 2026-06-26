@@ -1,5 +1,5 @@
 import React, { Fragment } from 'react';
-import { ChevronDown, ChevronRight, Eye, RefreshCw, Loader2, WifiOff, ExternalLink, Activity, ArrowRightLeft, Trash2, Users } from 'lucide-react';
+import { ChevronDown, ChevronRight, Eye, RefreshCw, Loader2, WifiOff, ExternalLink, Activity, ArrowRightLeft, Trash2, Users, KeyRound } from 'lucide-react';
 import type { SavedDevice } from '../../../../types/devices';
 import type { PollResult } from '../../../../types/apMonitor';
 import StationTable from './StationTable';
@@ -8,7 +8,7 @@ import { fmtDbm, fmtPct, fmtFw, fmtUptime, fmtCpu } from '../utils/formatters';
 import { sigColor, ccqColor } from '../utils/colors';
 import { AP_COL_DEFS } from '../utils/columnDefs';
 
-const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCols, onToggle, onCpeDetail, onM5Detail, onView, onSync, onDelete, onMove }: {
+const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCols, onToggle, onCpeDetail, onM5Detail, onView, onSync, onDelete, onMove, onRevealSsh }: {
   dev: SavedDevice;
   pollResult?: PollResult;
   expanded: boolean;
@@ -20,6 +20,7 @@ const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCol
   onSync: () => void;
   onDelete: () => void;
   onMove: () => void;
+  onRevealSsh: () => void;
 }) {
   const stats = dev.cachedStats;
   const name = stats?.deviceName ?? dev.deviceName ?? dev.name;
@@ -161,6 +162,7 @@ const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCol
             { icon: <Eye className="w-3.5 h-3.5" />, label: 'Ver ficha', onClick: onView },
             { icon: <Activity className="w-3.5 h-3.5" />, label: 'Informe airOS', onClick: onM5Detail },
             { icon: <ExternalLink className="w-3.5 h-3.5" />, label: 'Abrir web', onClick: () => window.open(`http://${dev.ip}`, '_blank', 'noopener,noreferrer') },
+            { icon: <KeyRound className="w-3.5 h-3.5" />, label: 'Ver clave SSH', onClick: onRevealSsh, disabled: noSsh },
             { icon: <ArrowRightLeft className="w-3.5 h-3.5" />, label: 'Mover a nodo', onClick: onMove },
             { icon: <Trash2 className="w-3.5 h-3.5" />, label: 'Eliminar', onClick: onDelete, danger: true },
           ]} />

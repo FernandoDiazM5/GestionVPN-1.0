@@ -22,6 +22,9 @@ export function useApMonitorLogic(nodes: NodeInfo[], activeNodeName: string | nu
   const [viewingApDevice, setViewingApDevice] = useState<SavedDevice | null>(null);
   const [movingDevice, setMovingDevice] = useState<SavedDevice | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SavedDevice | null>(null);
+  // D: revelar la clave SSH guardada del AP (la que autenticó la antena). La
+  // clave vive cifrada en el backend; se pide bajo clic explícito a /reveal-ssh.
+  const [revealSsh, setRevealSsh] = useState<{ apName: string; user: string; pass: string; port: number } | null>(null);
 
   const devicesRef = useRef(devices);
   const nodesRef = useRef(nodes);
@@ -149,6 +152,27 @@ export function useApMonitorLogic(nodes: NodeInfo[], activeNodeName: string | nu
     }
   };
 
+  const handleRevealSsh = async (dev: SavedDevice) => {
+    try {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/api/ap-monitor/reveal-ssh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apId: dev.id }),
+      }, 10_000);
+      const data = await res.json();
+      if (data.success) {
+        setRevealSsh({
+          apName: dev.cachedStats?.deviceName ?? dev.name ?? dev.ip,
+          user: data.user, pass: data.pass, port: data.port,
+        });
+      } else {
+        showToast(data.message || 'No se pudo obtener la clave SSH', 'error');
+      }
+    } catch {
+      showToast('No se pudo obtener la clave SSH', 'error');
+    }
+  };
+
   const handleSaveApDetail = async (dev: SavedDevice, newStats: AntennaStats) => {
     const updated: SavedDevice = { ...dev, cachedStats: { ...(dev.cachedStats ?? {}), ...newStats } };
     await deviceDb.saveSingle(updated);
@@ -183,6 +207,9 @@ export function useApMonitorLogic(nodes: NodeInfo[], activeNodeName: string | nu
     setMovingDevice,
     deleteTarget,
     setDeleteTarget,
+    revealSsh,
+    setRevealSsh,
+    handleRevealSsh,
     confirmDeleteDev,
     nodeGroups,
     filteredGroups,

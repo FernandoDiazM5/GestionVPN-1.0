@@ -130,6 +130,32 @@ function toSQLiteSkeleton(device: SavedDevice): Omit<SavedDevice, 'cachedStats'>
   return skeleton;
 }
 
+// Backfill: re-empuja al backend las claves SSH que están en credCache (navegador)
+// pero AUSENTES en la tabla aps (`hasSshPass=false`). Cubre APs guardados antes de
+// que saveSingle garantizara la propagación de la clave → Monitor AP (que lee del
+// backend) deja de mostrarlos "Sin SSH". Usa PUT PARCIAL (solo toca usuario_ssh/
+// clave_ssh_enc/puerto_ssh; nunca pisa hostname/modelo/etc.). Best-effort, F&F.
+async function backfillBackendCreds(
+  backendDevices: Array<SavedDevice & { hasSshPass?: boolean }>,
+  allCreds: Record<string, { user: string; pass: string; port?: number } | undefined>,
+): Promise<void> {
+  const pending = backendDevices.filter(d => !d.hasSshPass && allCreds[d.id]?.pass);
+  for (const d of pending) {
+    const cred = allCreds[d.id]!;
+    try {
+      await apiFetch(`${API_BASE_URL}/api/db/devices/${d.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sshUser: d.sshUser || cred.user,
+          sshPass: cred.pass,
+          sshPort: d.sshPort || cred.port || 22,
+        }),
+      });
+    } catch { /* best-effort: se reintenta en la próxima carga */ }
+  }
+}
+
 export const deviceDb = {
   async load(): Promise<SavedDevice[]> {
     try {
@@ -141,7 +167,7 @@ export const deviceDb = {
           statsCache.getAll(),
           credCache.getAll(),
         ]);
-        return data.devices.map((d: SavedDevice) => {
+        const enriched = data.devices.map((d: SavedDevice) => {
           const cred = allCreds[d.id];
           return {
             ...d,
@@ -152,6 +178,12 @@ export const deviceDb = {
             sshPort: d.sshPort || cred?.port,
           };
         });
+        // Cura APs que el backend tiene "Sin SSH" pero credCache sí conoce (F&F).
+        void backfillBackendCreds(
+          data.devices as Array<SavedDevice & { hasSshPass?: boolean }>,
+          allCreds,
+        );
+        return enriched;
       }
       return [];
     } catch (err) {
@@ -175,14 +207,30 @@ export const deviceDb = {
         await statsCache.save(device.id, device.cachedStats);
       }
 
-      // 2. Guardar credenciales SSH en IndexedDB (siempre que existan)
-      //    Esto garantiza que load() pueda recuperar sshPass aunque el backend no lo devuelva
-      if (device.sshUser && device.sshPass) {
-        await credCache.save(device.id, device.sshUser, device.sshPass, device.sshPort);
+      // 2. Garantizar que la clave SSH llegue al BACKEND (aps.clave_ssh_enc): si el
+      //    device perdió sshPass en memoria (p.ej. tras F5/re-login, que la borra de
+      //    sessionStorage por seguridad) la recuperamos de credCache. Así Monitor AP
+      //    —que lee la clave del backend, NO de credCache— siempre la tiene.
+      let toSave = device;
+      if (!device.sshPass) {
+        const cred = await credCache.get(device.id);
+        if (cred?.pass) {
+          toSave = {
+            ...device,
+            sshUser: device.sshUser || cred.user,
+            sshPass: cred.pass,
+            sshPort: device.sshPort ?? cred.port,
+          };
+        }
       }
 
-      // 3. Enviar SOLO el esqueleto estático a SQLite via backend
-      const skeleton = toSQLiteSkeleton(device);
+      // 3. Guardar credenciales SSH en IndexedDB (siempre que existan)
+      if (toSave.sshUser && toSave.sshPass) {
+        await credCache.save(toSave.id, toSave.sshUser, toSave.sshPass, toSave.sshPort);
+      }
+
+      // 4. Enviar el esqueleto estático a SQLite via backend (con la clave incluida)
+      const skeleton = toSQLiteSkeleton(toSave);
       await apiFetch(`${API_BASE_URL}/api/db/devices`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

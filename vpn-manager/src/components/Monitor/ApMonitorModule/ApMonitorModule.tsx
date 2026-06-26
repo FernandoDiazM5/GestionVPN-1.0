@@ -16,6 +16,7 @@ import DeviceCardModal from './components/modals/DeviceCardModal';
 import MoveToNodeModal from './components/modals/MoveToNodeModal';
 import CpeDetailModal from './components/modals/CpeDetailModal';
 import ApDetailModal from './components/modals/ApDetailModal';
+import SshRevealModal from './components/modals/SshRevealModal';
 
 import { useApMonitorLogic } from './hooks/useApMonitorLogic';
 import { usePolling } from './hooks/usePolling';
@@ -265,6 +266,7 @@ export default function ApMonitorModule() {
           onApSync={apId => polling.pollApDirect(apId, true)}
           onApDelete={dev => logic.handleDeleteDev(dev)}
           onApMove={dev => logic.setMovingDevice(dev)}
+          onApRevealSsh={dev => logic.handleRevealSsh(dev)}
         />
       ))}
 
@@ -318,6 +320,10 @@ export default function ApMonitorModule() {
           onConfirm={logic.handleMoveConfirm}
           onClose={() => logic.setMovingDevice(null)}
         />
+      )}
+
+      {logic.revealSsh && (
+        <SshRevealModal data={logic.revealSsh} onClose={() => logic.setRevealSsh(null)} />
       )}
 
       <ConfirmModal

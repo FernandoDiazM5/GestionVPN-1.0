@@ -8,7 +8,7 @@ import { AP_COL_DEFS, loadApColPrefs, saveApColPrefs } from '../utils/columnDefs
 import { getApStatus } from '../utils/statusHelpers';
 import type { NodeGroup } from '../utils/types';
 
-function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelActive, onToggleAp, onCpeDetail, onApDetail: _onApDetail, onM5Detail, onApView, onApSync, onApDelete, onApMove }: {
+function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelActive, onToggleAp, onCpeDetail, onApDetail: _onApDetail, onM5Detail, onApView, onApSync, onApDelete, onApMove, onApRevealSsh }: {
   group: NodeGroup;
   expandedAps: Set<string>;
   pollResults: Record<string, PollResult>;
@@ -22,6 +22,7 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelAc
   onApSync: (apId: string) => void;
   onApDelete: (dev: SavedDevice) => void;
   onApMove: (dev: SavedDevice) => void;
+  onApRevealSsh: (dev: SavedDevice) => void;
 }) {
   const [expanded, setExpanded] = useState(() => {
     try {
@@ -116,6 +117,7 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelAc
                         onSync={() => onApSync(dev.id)}
                         onDelete={() => onApDelete(dev)}
                         onMove={() => onApMove(dev)}
+                        onRevealSsh={() => onApRevealSsh(dev)}
                       />
                     ))}
                   </div>
