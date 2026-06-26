@@ -33,15 +33,9 @@ const scanIpRepoMock = stubModule(__dirname, '../../db/repos/scanIpRepo', {
   // apPollJob resuelve la scan-IP según el modo global (local/vps) vía resolveForWorkspace.
   resolveForWorkspace: vi.fn().mockResolvedValue(null),
 });
-const scanMangleMock = stubModule(__dirname, '../../lib/scanMangle', {
-  setup: vi.fn().mockResolvedValue(undefined),
-  teardown: vi.fn().mockResolvedValue(undefined),
-});
-// tryAcquire NO bloqueante: por defecto el lock está libre → devuelve un release().
-const scanLockMock = stubModule(__dirname, '../../lib/scanLock', {
-  tryAcquire: vi.fn(() => vi.fn()),
-  withLock: vi.fn(async (_k, fn) => fn()),
-  acquire: vi.fn(),
+// La mangle es del túnel: apPollJob solo pollea APs del VRF con sesión activa.
+const sessionRepoMock = stubModule(__dirname, '../../db/repos/sessionRepo', {
+  listActiveForWorkspace: vi.fn().mockResolvedValue([]),
 });
 
 const JOB_PATH = require.resolve(path.join(__dirname, '..', '..', 'lib', 'apPollJob'));
@@ -55,7 +49,7 @@ beforeEach(() => {
   apSvc.pollAp.mockResolvedValue([{ mac: 'AA:BB:CC:DD:EE:FF', signal: -60, ccq: 90, lastip: '10.0.0.9' }]);
   scanIpRepoMock.getScanIpForWorkspace.mockResolvedValue(null); // default: legacy
   scanIpRepoMock.resolveForWorkspace.mockResolvedValue(null);   // default: legacy
-  scanLockMock.tryAcquire.mockImplementation(() => vi.fn());    // default: lock libre
+  sessionRepoMock.listActiveForWorkspace.mockResolvedValue([]); // default: sin túnel activo
 });
 
 afterAll(() => { delete require.cache[JOB_PATH]; });
@@ -106,30 +100,25 @@ describe('apPollJob.runOnce', () => {
     expect(payload.error).toBe('SSH timeout');
   });
 
-  it('Opción C: con scan-IP, monta mangle por VRF y ata el SSH (localAddress)', async () => {
+  it('Opción C: con scan-IP y túnel ACTIVO del VRF → ata el SSH a la scan-IP (localAddress)', async () => {
     apWatch.touch('ws-1');
     scanIpRepoMock.resolveForWorkspace.mockResolvedValue('10.11.252.205');
+    sessionRepoMock.listActiveForWorkspace.mockResolvedValue([{ vrf_name: 'VRF-A' }]); // túnel activo
 
     await apPollJob.runOnce();
 
-    // mangle src=scan-IP → VRF del AP, y limpieza al final del ciclo
-    expect(scanMangleMock.setup).toHaveBeenCalledWith(
-      expect.objectContaining({ workspaceId: 'ws-1', scanIp: '10.11.252.205', vrfName: 'VRF-A' })
-    );
-    expect(scanMangleMock.teardown).toHaveBeenCalled();
-    // pollAp recibió la scan-IP como localAddress (7º argumento)
+    // No toca la mangle (es del túnel); pollAp recibió la scan-IP como localAddress.
+    expect(apSvc.pollAp).toHaveBeenCalledTimes(1);
     expect(apSvc.pollAp.mock.calls[0][6]).toBe('10.11.252.205');
   });
 
-  it('Opción C: si la scan-IP está ocupada (escaneo interactivo) → omite el tick sin bloquear', async () => {
+  it('Opción C: con scan-IP pero SIN túnel activo del VRF → NO pollea (no hay ruta)', async () => {
     apWatch.touch('ws-1');
     scanIpRepoMock.resolveForWorkspace.mockResolvedValue('10.11.252.205');
-    scanLockMock.tryAcquire.mockReturnValue(null); // lock ocupado por el escaneo interactivo
+    sessionRepoMock.listActiveForWorkspace.mockResolvedValue([]); // ningún túnel activo
 
     await apPollJob.runOnce();
 
-    // No conmuta la mangle ni pollea ese workspace este ciclo (se reintenta luego).
-    expect(scanMangleMock.setup).not.toHaveBeenCalled();
     expect(apSvc.pollAp).not.toHaveBeenCalled();
   });
 });

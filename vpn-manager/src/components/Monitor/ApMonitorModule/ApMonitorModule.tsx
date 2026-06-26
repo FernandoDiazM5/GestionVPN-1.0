@@ -17,6 +17,7 @@ import MoveToNodeModal from './components/modals/MoveToNodeModal';
 import CpeDetailModal from './components/modals/CpeDetailModal';
 import ApDetailModal from './components/modals/ApDetailModal';
 import SshRevealModal from './components/modals/SshRevealModal';
+import TunnelInactiveModal from './components/modals/TunnelInactiveModal';
 
 import { useApMonitorLogic } from './hooks/useApMonitorLogic';
 import { usePolling } from './hooks/usePolling';
@@ -29,7 +30,7 @@ export default function ApMonitorModule() {
   const activeNodeName = activeNode?.nombre_nodo ?? null;
 
   const logic = useApMonitorLogic(nodes, activeNodeName);
-  const polling = usePolling(logic.devices, activeNodeName);
+  const polling = usePolling(logic.devices, activeNodeName, logic.notifyTunnelInactive);
 
   const [expandedAps, setExpandedAps] = useState<Set<string>>(() => {
     try {
@@ -279,6 +280,7 @@ export default function ApMonitorModule() {
           sshUser={logic.cpeDetailTarget.sshUser}
           sshPass={logic.cpeDetailTarget.sshPass}
           onClose={() => logic.setCpeDetailTarget(null)}
+          onTunnelInactive={logic.notifyTunnelInactive}
         />
       )}
 
@@ -286,6 +288,7 @@ export default function ApMonitorModule() {
         <ApDetailModal
           dev={logic.apDetailDev}
           onClose={() => logic.setApDetailDev(null)}
+          onTunnelInactive={logic.notifyTunnelInactive}
           onSave={stats => {
             if (logic.apDetailDev) {
               logic.handleSaveApDetail(logic.apDetailDev, stats);
@@ -324,6 +327,14 @@ export default function ApMonitorModule() {
 
       {logic.revealSsh && (
         <SshRevealModal data={logic.revealSsh} onClose={() => logic.setRevealSsh(null)} />
+      )}
+
+      {logic.tunnelAlert && (
+        <TunnelInactiveModal
+          message={logic.tunnelAlert.message}
+          onClose={() => logic.setTunnelAlert(null)}
+          onGoActivate={() => { logic.setTunnelAlert(null); setActiveModule('nodes'); }}
+        />
       )}
 
       <ConfirmModal

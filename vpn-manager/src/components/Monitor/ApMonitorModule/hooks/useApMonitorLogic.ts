@@ -25,6 +25,12 @@ export function useApMonitorLogic(nodes: NodeInfo[], activeNodeName: string | nu
   // D: revelar la clave SSH guardada del AP (la que autenticó la antena). La
   // clave vive cifrada en el backend; se pide bajo clic explícito a /reveal-ssh.
   const [revealSsh, setRevealSsh] = useState<{ apName: string; user: string; pass: string; port: number } | null>(null);
+  // Túnel no activo: cualquier operación de Monitor AP (sync, CPE/AP detail) que
+  // dé 409 TUNNEL_NOT_ACTIVE abre este aviso con opción de ir a activar el túnel.
+  const [tunnelAlert, setTunnelAlert] = useState<{ message: string } | null>(null);
+  const notifyTunnelInactive = useCallback((message: string) => {
+    setTunnelAlert({ message: message || 'El túnel del nodo no está activo. Activá el túnel para monitorear sus equipos.' });
+  }, []);
 
   const devicesRef = useRef(devices);
   const nodesRef = useRef(nodes);
@@ -210,6 +216,9 @@ export function useApMonitorLogic(nodes: NodeInfo[], activeNodeName: string | nu
     revealSsh,
     setRevealSsh,
     handleRevealSsh,
+    tunnelAlert,
+    setTunnelAlert,
+    notifyTunnelInactive,
     confirmDeleteDev,
     nodeGroups,
     filteredGroups,

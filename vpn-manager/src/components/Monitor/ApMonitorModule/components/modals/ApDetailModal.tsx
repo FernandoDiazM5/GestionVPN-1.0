@@ -10,11 +10,12 @@ import { sigColor, ccqColor } from '../../utils/colors';
 const BASE = `${API_BASE_URL}/api/ap-monitor`;
 
 function ApDetailModal({
-  dev, onClose, onSave,
+  dev, onClose, onSave, onTunnelInactive,
 }: {
   dev: SavedDevice;
   onClose: () => void;
   onSave: (stats: AntennaStats) => void;
+  onTunnelInactive?: (message: string) => void;
 }) {
   const [stats, setStats] = useState<AntennaStats | null>(dev.cachedStats ?? null);
   const [loading, setLoading] = useState(false);
@@ -30,10 +31,14 @@ function ApDetailModal({
       body: JSON.stringify({ id: dev.id }),
     }, 35_000)
       .then(r => r.json())
-      .then(d => { if (d.success) { setStats(d.stats); setSaved(false); } else setError(d.message); })
+      .then(d => {
+        if (d.success) { setStats(d.stats); setSaved(false); }
+        else if (d.code === 'TUNNEL_NOT_ACTIVE') { onTunnelInactive?.(d.message); onClose(); }
+        else setError(d.message);
+      })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
-  }, [dev]);
+  }, [dev, onClose, onTunnelInactive]);
 
   useEffect(() => {
     if (!dev.cachedStats) {

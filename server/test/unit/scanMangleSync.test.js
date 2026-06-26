@@ -58,10 +58,10 @@ describe('onTunnelActivated', () => {
       .resolves.toBeUndefined();
   });
 
-  it('respeta el lock: si está ocupado, NO toca la mangle', async () => {
-    const release = scanLock.tryAcquire(WS);     // ocupa el lock
+  it('sincroniza la mangle SIN depender del lock (es el único gestor)', async () => {
+    const release = scanLock.tryAcquire(WS);     // aunque algo tenga el lock...
     await sync.onTunnelActivated({ workspaceId: WS, vrfName: VRF, mikrotik: MIKROTIK });
-    expect(setup).not.toHaveBeenCalled();
+    expect(setup).toHaveBeenCalledTimes(1);      // ...igual monta la mangle
     release();
   });
 });
@@ -79,10 +79,10 @@ describe('onTunnelClosed', () => {
     expect(teardown).not.toHaveBeenCalled();
   });
 
-  it('es AUTORITATIVO: borra aunque el lock esté ocupado (deactivate/expiración manda)', async () => {
-    const release = scanLock.tryAcquire(WS);     // lock ocupado (p.ej. gracia de un escaneo)
+  it('borra la mangle SIN depender del lock (deactivate/expiración manda)', async () => {
+    const release = scanLock.tryAcquire(WS);     // aunque algo tenga el lock...
     await sync.onTunnelClosed({ workspaceId: WS, mikrotik: MIKROTIK });
-    expect(teardown).toHaveBeenCalledTimes(1);   // NO se salta el teardown
+    expect(teardown).toHaveBeenCalledTimes(1);   // ...igual borra
     release();
   });
 });

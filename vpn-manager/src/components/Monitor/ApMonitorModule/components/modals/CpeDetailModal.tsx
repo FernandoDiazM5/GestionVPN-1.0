@@ -10,11 +10,12 @@ import Sparkline from '../Sparkline';
 const BASE = `${API_BASE_URL}/api/ap-monitor`;
 
 function CpeDetailModal({
-  mac, apId, cpeIp, sshPort, sshUser, sshPass, onClose,
+  mac, apId, cpeIp, sshPort, sshUser, sshPass, onClose, onTunnelInactive,
 }: {
   mac: string; apId: string; cpeIp: string | null;
   sshPort: number; sshUser: string; sshPass: string;
   onClose: () => void;
+  onTunnelInactive?: (message: string) => void;
 }) {
   const [detail, setDetail] = useState<CpeDetail | null>(null);
   const [loading, setLoading] = useState(false);
@@ -58,6 +59,8 @@ function CpeDetailModal({
       .then(d => {
         if (d.success) { setDetail(d.stats); setShowCredForm(false); }
         else {
+          // Túnel del nodo no activo → aviso accionable (no es problema de credenciales).
+          if (d.code === 'TUNNEL_NOT_ACTIVE') { onTunnelInactive?.(d.message); onClose(); return; }
           setError(d.message);
           if (isAuthError(d.message)) setShowCredForm(true);
         }

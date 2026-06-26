@@ -1,15 +1,14 @@
 const express = require('express');
 const crypto  = require('crypto');
 const router  = express.Router();
-const { getDb, encryptPass, decryptPass, getApIntId, getCpeIntId, getApGroupIntId, getNodeByPppUser, getAppSetting } = require('./db.service');
+const { getDb, encryptPass, decryptPass, getApIntId, getCpeIntId, getApGroupIntId, getNodeByPppUser } = require('./db.service');
 const { pollAp, getDetail, getFullDetail, clearApCache }  = require('./ap.service');
 
 const { reqWorkspace, ownedGroupIntIds, ownedApIntIds, ownsGroupUuid, ownsApUuid, cpeForeign } = require('./lib/tenantScope');
 const { ipInCidr, resolveOwnerNodeId, resolveNodeCreds: resolveNodeCredsShared } = require('./lib/apNode');
 const apWatch = require('./lib/apWatch');
 const scanIpRepo = require('./db/repos/scanIpRepo');
-const scanMangle = require('./lib/scanMangle');
-const scanLock = require('./lib/scanLock');
+const sessionRepo = require('./db/repos/sessionRepo');
 const log = require('./lib/logger').child({ scope: 'ap-routes' });
 
 const genUuid = () => crypto.randomBytes(8).toString('hex');
@@ -18,14 +17,30 @@ const isValidMac = (mac) => /^([0-9a-f]{2}:?){5}([0-9a-f]{2})$/i.test(mac);
 // C3 (Fase 2): delega en el helper compartido (lib/apNode), inyectando decryptPass.
 const resolveNodeCreds = (db, apRow) => resolveNodeCredsShared(db, apRow, decryptPass);
 
-// Credenciales del router core (igual que apPollJob). null si faltan.
-async function loadMikrotik() {
-  try {
-    const ip = await getAppSetting('MT_IP');
-    const user = await getAppSetting('MT_USER');
-    const passEnc = await getAppSetting('MT_PASS');
-    return (ip && user && passEnc) ? { ip, user, pass: decryptPass(passEnc) } : null;
-  } catch (_) { return null; }
+// Opción C — routing del SSH de monitoreo por el túnel del nodo.
+//   La mangle de escaneo (SCAN-WS) es propiedad EXCLUSIVA del túnel: la crea
+//   `scanMangleSync.onTunnelActivated` al activar y la destruye `onTunnelClosed`
+//   al desactivar/expirar. Las operaciones de Monitor AP NO la tocan — solo atan
+//   el SSH a la scan-IP del workspace (la mangle ya está viva si el túnel del
+//   nodo está activo). Como solo puede haber 1 túnel activo por usuario, hay 1
+//   mangle de escaneo a la vez, amarrada a ese túnel.
+//   • Sin workspace (admin) o sin scan-IP (dev local) → SSH directo (localAddress null).
+//   • Con scan-IP (VPS): el túnel del VRF DEBE estar activo (sesión viva); si no,
+//     no hay ruta → 409 TUNNEL_NOT_ACTIVE para que la UI pida activar el túnel.
+// Devuelve { ok:true, localAddress } | { ok:false, code, vrf, message }.
+async function resolveTunnelBinding(req, vrf) {
+  const ws = reqWorkspace(req);
+  if (ws === null) return { ok: true, localAddress: null };
+  const scanIp = await scanIpRepo.resolveForWorkspace(ws).catch(() => null);
+  if (!scanIp) return { ok: true, localAddress: null };
+  const session = vrf ? await sessionRepo.getActiveByUser(ws, req.account?.sub).catch(() => null) : null;
+  if (!session || session.vrf_name !== vrf) {
+    return {
+      ok: false, code: 'TUNNEL_NOT_ACTIVE', vrf: vrf || null,
+      message: 'El túnel del nodo no está activo. Activá el túnel para monitorear sus equipos.',
+    };
+  }
+  return { ok: true, localAddress: scanIp };
 }
 
 // ── Nodos (ap_groups) ────────────────────────────────────────────────────
@@ -389,7 +404,6 @@ router.get('/historial/:mac', async (req, res) => {
 
 // ── Poll AP directly — usa credenciales del nodo (node_ssh_creds) ────────
 router.post('/poll-direct', async (req, res) => {
-    let release = null; // lock de la scan-IP (Opción C), liberado en finally
     try {
         const { apId, saveHistory } = req.body;
         if (!apId) return res.status(400).json({ success: false, message: 'apId requerido' });
@@ -438,31 +452,12 @@ router.post('/poll-direct', async (req, res) => {
             });
         }
 
-        // ── Opción C (routing): atar el SSH a la scan-IP del workspace y asegurar
-        // la mangle de escaneo (src=scan-IP → VRF del AP). SIN esto, el SSH desde
-        // el VPS sale por la ruta por defecto y NO entra al túnel → "handshake
-        // timeout" → 500. Mismo patrón que /device/antenna y apPollJob. En local
-        // (sin scan-IP) localAddress queda null y el SSH sale directo.
-        let localAddress = null;
-        const ws = reqWorkspace(req);
-        if (ws !== null && apRow.nombre_vrf) {
-            const scanIp = await scanIpRepo.resolveForWorkspace(ws).catch(() => null);
-            const mikrotik = scanIp ? await loadMikrotik() : null;
-            if (scanIp && mikrotik) {
-                // Espera acotada por el lock; si lo toma, (re)apunta la mangle al VRF
-                // del AP. Si NO lo toma (un escaneo lo retiene con su mangle viva
-                // hacia el mismo VRF), igual atamos a la scan-IP: la ruta ya existe.
-                release = await scanLock.acquireOrNull(ws, 8000);
-                if (release) {
-                    try {
-                        await scanMangle.setup({ workspaceId: ws, scanIp, vrfName: apRow.nombre_vrf, mikrotik });
-                    } catch (e) {
-                        log.warn({ ws, vrf: apRow.nombre_vrf, err: e.message }, 'poll-direct: no se pudo montar la scan mangle');
-                    }
-                }
-                localAddress = scanIp;
-            }
-        }
+        // Routing por el túnel: la mangle es propiedad del túnel (no la tocamos);
+        // solo atamos el SSH a la scan-IP. Si el túnel del nodo no está activo
+        // (VPS) → 409 para que la UI pida activarlo. Sin scan-IP → SSH directo.
+        const bind = await resolveTunnelBinding(req, apRow.nombre_vrf);
+        if (!bind.ok) return res.status(409).json({ success: false, code: bind.code, vrf: bind.vrf, message: bind.message });
+        const localAddress = bind.localAddress;
 
         const stations = await pollAp(apId, apRow.ip, apRow.puerto_ssh || 22, sshUser, sshPass, apRow.firmware || '', localAddress);
 
@@ -522,7 +517,6 @@ router.post('/poll-direct', async (req, res) => {
 
         res.json({ success: true, stations: enriched, polledAt: Date.now() });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
-    finally { if (release) release(); }
 });
 
 // ── Revelar la credencial SSH guardada del AP (solo el workspace dueño) ──
@@ -556,11 +550,17 @@ router.post('/ap-detail-direct', async (req, res) => {
         const db = await getDb();
         // C4: aislamiento + credenciales/IP resueltas server-side desde la DB (nunca del body).
         if (!(await ownsApUuid(db, req, id))) return res.status(404).json({ success: false, message: 'AP no encontrado' });
-        const row = await db.get('SELECT ip, usuario_ssh, clave_ssh_enc, puerto_ssh FROM aps WHERE uuid = ?', [id]);
+        const row = await db.get(
+            `SELECT a.ip, a.usuario_ssh, a.clave_ssh_enc, a.puerto_ssh, n.nombre_vrf AS nombre_vrf
+               FROM aps a LEFT JOIN nodes n ON n.id = a.node_id WHERE a.uuid = ?`, [id]
+        );
         if (!row || !row.ip || !row.usuario_ssh) return res.status(404).json({ success: false, message: 'AP sin datos o sin credenciales SSH' });
 
+        const bind = await resolveTunnelBinding(req, row.nombre_vrf);
+        if (!bind.ok) return res.status(409).json({ success: false, code: bind.code, vrf: bind.vrf, message: bind.message });
+
         const actualPass = row.clave_ssh_enc ? decryptPass(row.clave_ssh_enc) : '';
-        const s = await getFullDetail(row.ip, row.puerto_ssh || 22, row.usuario_ssh, actualPass);
+        const s = await getFullDetail(row.ip, row.puerto_ssh || 22, row.usuario_ssh, actualPass, bind.localAddress);
         res.json({ success: true, stats: s });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
@@ -578,8 +578,16 @@ router.post('/cpes/enrich-batch', async (req, res) => {
         if (!(await ownsApUuid(db, req, apId))) return res.status(404).json({ success: false, message: 'AP no encontrado' });
 
         // C4: credenciales SSH resueltas SIEMPRE server-side desde tabla aps (cifradas), nunca del body.
-        const apRow = await db.get('SELECT usuario_ssh, clave_ssh_enc, puerto_ssh FROM aps WHERE uuid = ?', [apId]);
+        const apRow = await db.get(
+            `SELECT a.usuario_ssh, a.clave_ssh_enc, a.puerto_ssh, n.nombre_vrf AS nombre_vrf
+               FROM aps a LEFT JOIN nodes n ON n.id = a.node_id WHERE a.uuid = ?`, [apId]
+        );
         if (!apRow || !apRow.usuario_ssh) return res.status(400).json({ success: false, message: 'AP sin credenciales SSH' });
+
+        const bind = await resolveTunnelBinding(req, apRow.nombre_vrf);
+        if (!bind.ok) return res.status(409).json({ success: false, code: bind.code, vrf: bind.vrf, message: bind.message });
+        const localAddress = bind.localAddress;
+
         const user = apRow.usuario_ssh;
         const pass = apRow.clave_ssh_enc ? decryptPass(apRow.clave_ssh_enc) : '';
         const sshPort = parseInt(port) || apRow.puerto_ssh || 22;
@@ -588,7 +596,7 @@ router.post('/cpes/enrich-batch', async (req, res) => {
         for (const { mac, ip } of cpes) {
             if (!mac || !ip) continue;
             try {
-                const s = await getDetail(ip, sshPort, user, pass);
+                const s = await getDetail(ip, sshPort, user, pass, localAddress);
                 const MAC = mac.toUpperCase();
                 await db.run(
                     `INSERT INTO cpes (mac,hostname,modelo,firmware,ip_lan,mac_lan,mac_wlan,last_seen)
@@ -625,6 +633,19 @@ router.post('/cpes/:mac/detail-direct', async (req, res) => {
         // ni usar como fallback un AP ajeno.
         if (await cpeForeign(db, req, mac)) return res.status(404).json({ success: false, message: 'CPE no encontrado' });
         if (apId && !(await ownsApUuid(db, req, apId))) return res.status(404).json({ success: false, message: 'AP no encontrado' });
+
+        // Routing por el túnel: el SSH al CPE debe salir por la scan-IP (la mangle
+        // del túnel lo enruta al VRF). Resolvemos el VRF del AP padre y exigimos su
+        // túnel activo; si no, 409 para que la UI pida activarlo. Sin scan-IP → directo.
+        let apVrf = null;
+        if (apId) {
+            const vrfRow = await db.get('SELECT n.nombre_vrf AS nombre_vrf FROM aps a LEFT JOIN nodes n ON n.id = a.node_id WHERE a.uuid = ?', [apId]);
+            apVrf = vrfRow?.nombre_vrf || null;
+        }
+        const bind = await resolveTunnelBinding(req, apVrf);
+        if (!bind.ok) return res.status(409).json({ success: false, code: bind.code, vrf: bind.vrf, message: bind.message });
+        const localAddress = bind.localAddress;
+
         let credList = [];
 
         // 1. Credenciales propias del CPE (almacenadas en cpes)
@@ -679,7 +700,7 @@ router.post('/cpes/:mac/detail-direct', async (req, res) => {
         let s = null, lastError = null, usedCred = null;
         for (const cred of credList) {
             try {
-                s = await getDetail(cpe_ip, cred.port || sshPort, cred.user, cred.pass);
+                s = await getDetail(cpe_ip, cred.port || sshPort, cred.user, cred.pass, localAddress);
                 usedCred = cred;
                 break;
             } catch (e) {

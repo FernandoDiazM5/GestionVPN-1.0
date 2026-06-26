@@ -24,7 +24,6 @@ const { CIDR_REGEX, getSubnetHosts } = require('../../ubiquiti.service');
 const { getDb } = require('../../db.service');
 const scanIpRepo = require('../../db/repos/scanIpRepo');
 const sessionRepo = require('../../db/repos/sessionRepo');
-const scanMangle = require('../../lib/scanMangle');
 const scanLock = require('../../lib/scanLock');
 const wgDetect = require('../../lib/wgDetect');
 const { resolveScanTargetVrf } = require('../../lib/scanTarget');
@@ -75,9 +74,9 @@ router.post('/node/scan-stream', async (req, res) => {
     targetVrf = resolved.vrf;
   }
 
-  // ── Opción C: montar la mangle de escaneo si el workspace tiene scan-IP ──
+  // ── Opción C: atar el escaneo a la scan-IP si el workspace la tiene (la mangle
+  //    es del túnel, ya viva si el túnel del nodo está activo) ──
   let localAddress = null;
-  let scanMangleUp = false;
   let releaseLock = null;
   // Se setea si el cliente cierra la conexión MIENTRAS esperamos el lock. Lo
   // registramos ANTES del acquire para no filtrar el lock si la petición muere
@@ -145,15 +144,10 @@ router.post('/node/scan-stream', async (req, res) => {
       // el lock quedaría tomado hasta el timer de seguridad).
       if (clientGone) { releaseLock(); releaseLock = null; return; }
 
-      try {
-        await scanMangle.setup({ workspaceId: acc.workspace_id, scanIp, vrfName: targetVrf, mikrotik: req.mikrotik });
-        localAddress = scanIp;
-        scanMangleUp = true;
-      } catch (e) {
-        releaseLock(); releaseLock = null;
-        log.warn({ ws: acc.workspace_id, vrf: targetVrf, err: e?.message }, 'no se pudo montar la scan mangle');
-        return res.status(503).json({ success: false, message: `No se pudo preparar el escaneo en el router: ${e.message}` });
-      }
+      // La mangle de escaneo es propiedad del TÚNEL (ya está viva si el túnel del
+      // nodo está activo — requisito para escanear). Aquí NO la montamos ni la
+      // desmontamos: solo atamos el SSH/HTTP del escaneo a la scan-IP.
+      localAddress = scanIp;
     }
     // Sin scan-IP asignada → escaneo legacy (sin localAddress).
   }
@@ -186,12 +180,8 @@ router.post('/node/scan-stream', async (req, res) => {
       inflightScans.delete(acc.workspace_id);
     }
     if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = null; }
-    if (scanMangleUp) {
-      scanMangle.teardown({ workspaceId: acc.workspace_id, mikrotik: req.mikrotik })
-        .finally(() => { if (releaseLock) { releaseLock(); releaseLock = null; } });
-    } else if (releaseLock) {
-      releaseLock(); releaseLock = null;
-    }
+    // La mangle es del túnel (no la tocamos); solo liberamos el lock de escaneo.
+    if (releaseLock) { releaseLock(); releaseLock = null; }
   };
 
   sendEvent('start', { total: totalCount });
@@ -214,7 +204,7 @@ router.post('/node/scan-stream', async (req, res) => {
   };
   // Registramos este escaneo para que uno posterior del mismo workspace lo preempte
   // (solo Opción C: es el que retiene el lock que queremos poder liberar).
-  if (acc?.workspace_id && scanMangleUp) inflightScans.set(acc.workspace_id, abortThisScan);
+  if (acc?.workspace_id && localAddress) inflightScans.set(acc.workspace_id, abortThisScan);
 
   worker.on('message', (msg) => {
     if (msg.type === 'progress') {

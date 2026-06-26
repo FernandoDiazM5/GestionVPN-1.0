@@ -7,7 +7,7 @@ import { deviceDb } from '../../../../store/deviceDb';
 
 const BASE = `${API_BASE_URL}/api/ap-monitor`;
 
-export function usePolling(devices: SavedDevice[], _activeNodeName: string | null) {
+export function usePolling(devices: SavedDevice[], _activeNodeName: string | null, onTunnelInactive?: (message: string) => void) {
   const [pollResults, setPollResults] = useState<Record<string, PollResult>>(() => {
     try {
       const saved = sessionStorage.getItem('apMonitorPollResults');
@@ -54,6 +54,8 @@ export function usePolling(devices: SavedDevice[], _activeNodeName: string | nul
           await deviceDb.saveSingle(updatedDev);
         }
       } else {
+        // Túnel del nodo no activo → aviso con opción de activarlo (no es error de SSH).
+        if (data.code === 'TUNNEL_NOT_ACTIVE') onTunnelInactive?.(data.message);
         setPollResults(prev => ({ ...prev, [apId]: { ...(prev[apId] ?? { stations: [] }), loading: false, error: data.message } }));
       }
     } catch (e) {
@@ -62,7 +64,7 @@ export function usePolling(devices: SavedDevice[], _activeNodeName: string | nul
         [apId]: { ...(prev[apId] ?? { stations: [] }), loading: false, error: e instanceof Error ? e.message : 'Error SSH' },
       }));
     }
-  }, []);
+  }, [onTunnelInactive]);
 
   // ── E1/Etapa 2: heartbeat + seed desde BD + ingest de SSE ──────────────
   // pingWatch: avisa al backend "estoy mirando" (el apPollJob solo pollea

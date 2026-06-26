@@ -13,15 +13,14 @@
 //  Solo LECTURA sobre las antenas (pollAp = wstalist). No escribe en ellas.
 // ============================================================
 const log = require('./logger').child({ scope: 'ap-poll-job' });
-const { getDb, getApIntId, decryptPass, getAppSetting } = require('../db.service');
+const { getDb, getApIntId, decryptPass } = require('../db.service');
 const { pollAp } = require('../ap.service');
 const { resolveNodeCreds } = require('./apNode');
 const { persistStations, enrichStations } = require('./apPersist');
 const apWatch = require('./apWatch');
 const sse = require('./sse');
 const scanIpRepo = require('../db/repos/scanIpRepo');
-const scanMangle = require('./scanMangle');
-const scanLock = require('./scanLock');
+const sessionRepo = require('../db/repos/sessionRepo');
 
 const DEFAULT_INTERVAL_MS = 60 * 1000;
 const DEFAULT_BATCH = 3;
@@ -61,14 +60,6 @@ async function pollOne(db, workspaceId, ap, localAddress = null) {
   sse.publish(workspaceId, 'ap-poll', { apId: ap.uuid, stations: enriched, polledAt: Date.now() });
 }
 
-/** Credenciales del router core desde app_settings (igual que monitoringJob). */
-async function loadMikrotik() {
-  const ip = await getAppSetting('MT_IP');
-  const user = await getAppSetting('MT_USER');
-  const passEnc = await getAppSetting('MT_PASS');
-  return (ip && user && passEnc) ? { ip, user, pass: decryptPass(passEnc) } : null;
-}
-
 /** Poll en lotes sin Option C (dev local: el backend ES la máquina del moderador). */
 async function pollLegacy(db, ws, aps, batch) {
   for (let i = 0; i < aps.length; i += batch) {
@@ -77,50 +68,24 @@ async function pollLegacy(db, ws, aps, batch) {
 }
 
 /**
- * Poll con Opción C: agrupa los APs por VRF y, bajo el lock del workspace,
- * conmuta la mangle (src=scan-IP → VRF) por grupo y pollea esos APs atando el
- * SSH a la scan-IP. El lock serializa contra el escaneo interactivo del mismo
- * workspace (misma scan-IP = una sola mangle activa a la vez).
+ * Poll con Opción C: la mangle de escaneo es propiedad EXCLUSIVA del túnel
+ * (scanMangleSync la crea al activar el túnel y la destruye al desactivar/
+ * expirar). Este job NO la toca — solo pollea los APs del nodo cuyo túnel está
+ * ACTIVO (su mangle viva), atando el SSH a la scan-IP. Sin sesión activa de ese
+ * VRF no hay ruta → se salta (es de fondo, sin error y sin tocar nada).
  *
- * ⚠️ tryAcquire (NO bloqueante): si el moderador está escaneando interactivamente
- * (lock tomado, hasta minutos cubriendo la fase de auth SSH), este job SE SALTA
- * ese workspace en este tick y reintenta al próximo. Antes usaba withLock, que
- * bloqueaba el `for (const ws ...)` del tick global de runOnce → un escaneo largo
- * en UN workspace estancaba el Monitor AP de TODOS los demás. El escaneo
- * interactivo es además dato más fresco, así que saltar el tick no pierde nada.
+ * ⚠️ Antes este job montaba/desmontaba la mangle CADA tick (60s) bajo el lock, lo
+ * que la "tumbaba sola luego de un minuto" aunque el túnel siguiera activo, y
+ * chocaba con la mangle del túnel. Ahora la mangle vive y muere SOLO con el túnel.
  */
-async function pollOptionC(db, ws, aps, batch, scanIp, mikrotik) {
-  const byVrf = new Map();
-  const noVrf = [];
-  for (const ap of aps) {
-    if (ap.nombre_vrf) {
-      if (!byVrf.has(ap.nombre_vrf)) byVrf.set(ap.nombre_vrf, []);
-      byVrf.get(ap.nombre_vrf).push(ap);
-    } else {
-      noVrf.push(ap);
-    }
-  }
+async function pollOptionC(db, ws, aps, batch, scanIp) {
+  const sessions = await sessionRepo.listActiveForWorkspace(ws).catch(() => []);
+  const activeVrfs = new Set(sessions.map(s => s.vrf_name).filter(Boolean));
+  const toPoll = aps.filter(ap => ap.nombre_vrf && activeVrfs.has(ap.nombre_vrf));
+  const noVrf = aps.filter(ap => !ap.nombre_vrf);
 
-  const release = scanLock.tryAcquire(ws);
-  if (!release) {
-    log.debug({ ws }, 'scan-IP ocupada (escaneo interactivo); Monitor AP omite este tick');
-  } else {
-    try {
-      for (const [vrf, vrfAps] of byVrf) {
-        try {
-          await scanMangle.setup({ workspaceId: ws, scanIp, vrfName: vrf, mikrotik });
-        } catch (e) {
-          log.warn({ ws, vrf, err: e.message }, 'no se pudo montar la scan mangle (grupo omitido)');
-          continue;
-        }
-        for (let i = 0; i < vrfAps.length; i += batch) {
-          await Promise.allSettled(vrfAps.slice(i, i + batch).map(ap => pollOne(db, ws, ap, scanIp)));
-        }
-      }
-      await scanMangle.teardown({ workspaceId: ws, mikrotik });
-    } finally {
-      release();
-    }
+  for (let i = 0; i < toPoll.length; i += batch) {
+    await Promise.allSettled(toPoll.slice(i, i + batch).map(ap => pollOne(db, ws, ap, scanIp)));
   }
 
   // APs sin VRF asignado (node_id null): poll legacy (no rutea desde el VPS).
@@ -148,12 +113,11 @@ async function runOnce() {
       );
       if (!aps.length) continue;
 
-      // Opción C activa si el workspace tiene scan-IP y el router está configurado.
+      // Opción C activa si el workspace tiene scan-IP (VPS). La mangle ya está
+      // viva si el túnel del nodo está activo (no la monta este job).
       const scanIp = await scanIpRepo.resolveForWorkspace(ws).catch(() => null);
-      const mikrotik = scanIp ? await loadMikrotik() : null;
-
-      if (scanIp && mikrotik) {
-        await pollOptionC(db, ws, aps, cfg.batch, scanIp, mikrotik);
+      if (scanIp) {
+        await pollOptionC(db, ws, aps, cfg.batch, scanIp);
       } else {
         await pollLegacy(db, ws, aps, cfg.batch);
       }
