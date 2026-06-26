@@ -39,6 +39,14 @@ const AUTH_GRACE_MS = parseInt(process.env.SCAN_AUTH_GRACE_MS || '300000', 10); 
 // hasta el 504 de nginx (~60s) cuando el lock está ocupado por otro escaneo/Monitor AP.
 const SCAN_LOCK_WAIT_MS = parseInt(process.env.SCAN_LOCK_WAIT_MS || '8000', 10);
 
+// Registro de escaneos EN CURSO por workspace → función para abortarlos. Permite
+// la PREEMPCIÓN: si el moderador vuelve a pulsar "Escanear" mientras un escaneo
+// anterior sigue vivo (típicamente colgado en su ventana de gracia de auth, que
+// retiene el scan-lock 5 min), el nuevo aborta al anterior y toma el relevo en
+// vez de rebotar con 409. Como hay 1 moderador por workspace, el último "Escanear"
+// siempre gana. En memoria (por proceso) — suficiente: el lock también lo es.
+const inflightScans = new Map(); // workspaceId -> () => void
+
 router.post('/node/scan-stream', async (req, res) => {
   const { nodeLan } = req.body;
   if (!nodeLan || !CIDR_REGEX.test(nodeLan) || parseInt(nodeLan.split('/')[1], 10) < 16) {
@@ -109,6 +117,16 @@ router.post('/node/scan-stream', async (req, res) => {
       // el job de Monitor AP no conmute la mangle a otro VRF a mitad de la auth.
       const lockMs = Math.min(30 * 60 * 1000, Math.max(AUTH_GRACE_MS + 120000, estHosts * 60));
 
+      // PREEMPCIÓN: aborta cualquier escaneo anterior del MISMO workspace antes de
+      // pedir el lock. Su cleanup libera el lock (tras el teardown), así el nuevo
+      // escaneo lo consigue dentro de la espera acotada en vez de chocar con 409.
+      const prevAbort = inflightScans.get(acc.workspace_id);
+      if (prevAbort) {
+        inflightScans.delete(acc.workspace_id);
+        log.info({ ws: acc.workspace_id }, 'preempción: abortando escaneo anterior del workspace');
+        prevAbort();
+      }
+
       // Si el cliente se va mientras esperamos el lock, NO lo retenemos.
       req.once('close', () => { clientGone = true; });
 
@@ -162,6 +180,11 @@ router.post('/node/scan-stream', async (req, res) => {
   const cleanup = () => {
     if (cleaned) return;
     cleaned = true;
+    // Nos damos de baja del registro de preempción (solo si seguimos siendo el
+    // escaneo vigente del workspace; uno posterior pudo habernos reemplazado).
+    if (acc?.workspace_id && inflightScans.get(acc.workspace_id) === abortThisScan) {
+      inflightScans.delete(acc.workspace_id);
+    }
     if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = null; }
     if (scanMangleUp) {
       scanMangle.teardown({ workspaceId: acc.workspace_id, mikrotik: req.mikrotik })
@@ -178,6 +201,20 @@ router.post('/node/scan-stream', async (req, res) => {
   const worker = new Worker(path.resolve(__dirname, '..', '..', 'scanner.worker.js'), {
     workerData: { hostIPs, BATCH: 40, localAddress },
   });
+
+  // Cómo abortar ESTE escaneo (por preempción de uno nuevo o por cierre del
+  // cliente): aborta el worker, cierra el SSE y limpia (teardown + libera lock).
+  // Idempotente vía `cleaned`.
+  const abortThisScan = () => {
+    try { worker.postMessage({ type: 'abort' }); } catch (_) { /* noop */ }
+    // Margen para cerrar antes de forzar la terminación (que puede crashear por ssh2).
+    setTimeout(() => { try { worker.terminate(); } catch (_) { /* noop */ } }, 5000);
+    try { res.end(); } catch (_) { /* noop */ }
+    cleanup();
+  };
+  // Registramos este escaneo para que uno posterior del mismo workspace lo preempte
+  // (solo Opción C: es el que retiene el lock que queremos poder liberar).
+  if (acc?.workspace_id && scanMangleUp) inflightScans.set(acc.workspace_id, abortThisScan);
 
   worker.on('message', (msg) => {
     if (msg.type === 'progress') {
@@ -212,15 +249,8 @@ router.post('/node/scan-stream', async (req, res) => {
     if (!completed) cleanup();
   });
 
-  // Abortar hilo gracefully si el cliente cierra la conexión HTTP
-  req.on('close', () => {
-    worker.postMessage({ type: 'abort' });
-    // Darle un margen para cerrar antes de forzar su terminación (que puede crashear por ssh2)
-    setTimeout(() => {
-      try { worker.terminate(); } catch (_) { /* noop */ }
-    }, 5000);
-    cleanup();
-  });
+  // Abortar el hilo gracefully si el cliente cierra la conexión HTTP.
+  req.on('close', abortThisScan);
 });
 
 module.exports = router;
