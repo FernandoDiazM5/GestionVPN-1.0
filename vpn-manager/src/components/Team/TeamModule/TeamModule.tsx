@@ -48,7 +48,7 @@ export default function TeamModule() {
     if (!session) return;
     setLoadingData(true);
     try {
-      const [m, l] = await Promise.all([teamApi.listMembers(), auditApi.listLogs(50)]);
+      const [m, l] = await Promise.all([teamApi.listMembers(), auditApi.listLogs(200)]);
       setMembers(m.members);
       setLogs(l.logs);
       if (isModerator(session.role)) {
@@ -64,7 +64,7 @@ export default function TeamModule() {
   // Recarga ligera solo del timeline (para eventos en vivo)
   const reloadLogs = useCallback(async () => {
     if (!session) return;
-    try { const l = await auditApi.listLogs(50); setLogs(l.logs); } catch { /* noop */ }
+    try { const l = await auditApi.listLogs(200); setLogs(l.logs); } catch { /* noop */ }
   }, [session]);
 
   // SSE: refresca el timeline cuando cualquier miembro ejecuta una acción

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Activity, Power, PowerOff, ScanLine, ShieldOff, FileClock, Download, Loader2, AlertCircle } from 'lucide-react';
+import { Activity, Power, PowerOff, ScanLine, ShieldOff, FileClock, Download, Loader2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { AuditLog } from '../../../../types/account';
 import { auditApi, downloadBlob } from '../../../../services/auditApi';
 
@@ -18,6 +18,8 @@ const RANGE_MS: Record<ExportRange, number | null> = {
 const RANGE_LABEL: Record<ExportRange, string> = {
   '7d': 'Últimos 7 días', '30d': 'Últimos 30 días', '90d': 'Últimos 90 días', 'all': 'Todo el historial',
 };
+
+const PER_PAGE = 8; // entradas por página — mantiene el panel compacto
 
 function actionMeta(action: string): { icon: typeof Activity; color: string; label: string } {
   const a = action.toUpperCase();
@@ -41,6 +43,14 @@ export default function AuditTimeline({ logs, live }: AuditTimelineProps) {
   const [range, setRange] = useState<ExportRange>('30d');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+
+  // Paginación cliente. `safePage` clampa por si la lista encogió (purga/retención)
+  // o creció (evento en vivo) mientras estábamos en una página alta.
+  const total = logs.length;
+  const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
+  const safePage = Math.min(page, totalPages - 1);
+  const pageLogs = logs.slice(safePage * PER_PAGE, safePage * PER_PAGE + PER_PAGE);
 
   async function doExport(format: 'csv' | 'json') {
     setBusy(true); setErr(null);
@@ -122,8 +132,9 @@ export default function AuditTimeline({ logs, live }: AuditTimelineProps) {
           <p className="text-slate-400 dark:text-slate-500 text-sm">Sin actividad registrada aún</p>
         </div>
       ) : (
+        <>
         <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-          {logs.map(log => {
+          {pageLogs.map(log => {
             const { icon: Icon, color, label } = actionMeta(log.action);
             const actor = log.user_name || log.user_email || 'Sistema';
             return (
@@ -146,6 +157,36 @@ export default function AuditTimeline({ logs, live }: AuditTimelineProps) {
             );
           })}
         </ul>
+
+        {total > PER_PAGE && (
+          <div className="flex items-center justify-between px-6 py-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40">
+            <span className="text-2xs text-slate-400 dark:text-slate-500">
+              {safePage * PER_PAGE + 1}–{Math.min((safePage + 1) * PER_PAGE, total)} de {total}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage(p => Math.max(0, p - 1))}
+                disabled={safePage === 0}
+                aria-label="Página anterior" title="Anterior"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed dark:hover:text-slate-100 dark:hover:bg-slate-800"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="text-2xs font-semibold text-slate-500 dark:text-slate-400 tabular-nums px-1">
+                {safePage + 1} / {totalPages}
+              </span>
+              <button
+                onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                disabled={safePage >= totalPages - 1}
+                aria-label="Página siguiente" title="Siguiente"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed dark:hover:text-slate-100 dark:hover:bg-slate-800"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+        </>
       )}
     </div>
   );
