@@ -62,4 +62,22 @@ async function listForExport(workspaceId, { from, to, tunnelId = null, action = 
   return query(sql, params);
 }
 
-module.exports = { log, list, listForExport };
+/**
+ * Retención: borra los eventos de auditoría más viejos que `cutoffMs` (purga
+ * rodante — al correr a diario, va quitando el día más antiguo). Cubre las dos
+ * tablas (la nueva `tunnel_session_logs` y la vieja `tunnel_logs` por si quedan
+ * filas). Devuelve el total de filas borradas.
+ */
+async function purgeOlderThan(cutoffMs) {
+  const cutoff = Number(cutoffMs);
+  let removed = 0;
+  for (const table of ['tunnel_session_logs', 'tunnel_logs']) {
+    try {
+      const r = await query(`DELETE FROM ${table} WHERE created_at < ?`, [cutoff]);
+      removed += r?.affectedRows || 0;
+    } catch (_) { /* tabla ausente / best-effort: la retención no debe romper nada */ }
+  }
+  return removed;
+}
+
+module.exports = { log, list, listForExport, purgeOlderThan };

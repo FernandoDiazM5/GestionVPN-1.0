@@ -32,6 +32,23 @@ describe('auditRepo.list', () => {
   });
 });
 
+describe('auditRepo.purgeOlderThan', () => {
+  it('borra de ambas tablas con el corte y suma las filas borradas', async () => {
+    query.mockResolvedValue({ affectedRows: 3 });
+    const removed = await auditRepo.purgeOlderThan(1000);
+    const tables = query.mock.calls.map(c => c[0]);
+    expect(tables.some(s => /DELETE FROM tunnel_session_logs WHERE created_at < \?/.test(s))).toBe(true);
+    expect(tables.some(s => /DELETE FROM tunnel_logs WHERE created_at < \?/.test(s))).toBe(true);
+    expect(query.mock.calls.every(c => c[1][0] === 1000)).toBe(true);
+    expect(removed).toBe(6); // 3 + 3
+  });
+
+  it('best-effort: si una tabla falla, no lanza', async () => {
+    query.mockRejectedValue(new Error('tabla ausente'));
+    await expect(auditRepo.purgeOlderThan(1000)).resolves.toBe(0);
+  });
+});
+
 describe('auditRepo.listForExport', () => {
   it('consulta tunnel_session_logs con filtros de rango/acción', async () => {
     await auditRepo.listForExport('ws-1', { from: 1000, to: 2000, action: 'ACTIVATE' });

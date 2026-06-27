@@ -19,10 +19,31 @@
 // ============================================================
 const log = require('./logger').child({ scope: 'expiration-job' });
 const sessionRepo = require('../db/repos/sessionRepo');
+const auditRepo = require('../db/repos/auditRepo');
 const notifier = require('./notifier');
 const scanMangleSync = require('./scanMangleSync');
 const sse = require('./sse');
 const { getAppSetting, decryptPass } = require('../db.service');
+
+// Retención de la "Actividad reciente": guarda como MÁXIMO los últimos N días
+// (default 7) → purga rodante que va quitando el día más viejo. Se ejecuta como
+// mucho 1×/hora (throttle) dentro del mismo tick del job de expiración, para no
+// añadir otro interval. No es información crítica; solo sirve para ver la semana.
+const RETENTION_DAYS = Math.max(1, Number(process.env.AUDIT_RETENTION_DAYS || 7));
+const PURGE_THROTTLE_MS = Number(process.env.AUDIT_PURGE_THROTTLE_MS || 60 * 60 * 1000); // 1h
+let _lastPurge = 0;
+
+async function purgeOldAudit() {
+  if (Date.now() - _lastPurge < PURGE_THROTTLE_MS) return;
+  _lastPurge = Date.now();
+  try {
+    const cutoff = Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000;
+    const removed = await auditRepo.purgeOlderThan(cutoff);
+    if (removed) log.info({ removed, retentionDays: RETENTION_DAYS }, 'auditoría: purga de retención');
+  } catch (err) {
+    log.warn({ err: err.message }, 'auditoría: purga de retención falló (best-effort)');
+  }
+}
 
 /** Credenciales del router core desde app_settings (igual que apPollJob). null si faltan. */
 async function loadMikrotik() {
@@ -41,6 +62,10 @@ async function runOnce() {
   if (_running) return;
   _running = true;
   try {
+    // Retención de auditoría (throttle interno 1×/hora). Antes del early-return de
+    // abajo para que corra aunque no haya sesiones expiradas este tick.
+    await purgeOldAudit();
+
     const expired = await sessionRepo.findExpired();
     if (!expired.length) return;
     log.info({ count: expired.length }, 'Cerrando sesiones expiradas');
