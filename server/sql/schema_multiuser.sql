@@ -77,5 +77,9 @@ CREATE TABLE IF NOT EXISTS tunnel_session_logs (
   PRIMARY KEY (id),
   KEY idx_tsl_user (user_id),
   KEY idx_tsl_tunnel (tunnel_id),
-  KEY idx_tsl_action (action)
+  KEY idx_tsl_action (action),
+  -- Timeline de auditoría: WHERE workspace_id = ? ORDER BY created_at DESC.
+  -- Duplicado a propósito en schema_perf_indexes.sql (migrate:perf lo añade a
+  -- instalaciones existentes) y aquí para que una BD fresca ya nazca con él.
+  KEY idx_tsl_ws_created (workspace_id, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

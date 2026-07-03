@@ -15,7 +15,11 @@ const mysql = require('mysql2/promise');
 /** Divide un script SQL en sentencias individuales (DDL plano, sin procedures). */
 function splitStatements(sql) {
   return sql
-    .split('\n')
+    // split(/\r?\n/) y NO split('\n'): con CRLF (checkout Windows) el '\r' queda
+    // al final de la línea y el regex /--.*$/ NO matchea ('.' no cruza '\r') →
+    // el comentario sobrevive y un ';' dentro de él parte la sentencia. Mismo
+    // fix que db.service.js (commit b964309).
+    .split(/\r?\n/)
     // Quita comentarios -- (de línea E inline). CRÍTICO: un comentario inline
     // puede contener ';' (ej. "-- login bloqueado; NULL = activo") y el split(';')
     // de abajo cortaría la sentencia a la mitad → ER_PARSE_ERROR "near ''".
