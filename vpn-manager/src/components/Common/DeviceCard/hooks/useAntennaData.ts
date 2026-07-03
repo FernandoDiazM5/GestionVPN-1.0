@@ -10,7 +10,14 @@ export function useAntennaData(device: SavedDevice, _isPreview?: boolean, compac
   const autoFetched = useRef(false);
 
   const handleLoadAntenna = useCallback(async () => {
-    if (!device.sshUser || !device.sshPass) {
+    // Las credenciales SSH viven CIFRADAS en el backend (aps.clave_ssh_enc, §4.30).
+    // Si el AP está guardado (tiene id) enviamos deviceId y el backend las resuelve
+    // server-side (ownsApUuid + decrypt en device.routes H14) — NO dependemos de la
+    // clave en el navegador. Solo exigimos credenciales locales cuando el equipo aún
+    // no está guardado (flujo de escaneo, sin fila en `aps`).
+    const hasServerCreds = !!device.id && (device.hasSshPass || !!device.sshUser);
+    const hasBrowserCreds = !!device.sshUser && !!device.sshPass;
+    if (!hasServerCreds && !hasBrowserCreds) {
       setAntennaError('Sin credenciales SSH — edita el dispositivo para agregarlas');
       return;
     }
@@ -21,6 +28,7 @@ export function useAntennaData(device: SavedDevice, _isPreview?: boolean, compac
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          deviceId: device.id,   // ← el backend resuelve IP+credencial server-side
           deviceIP: device.ip,
           deviceUser: device.sshUser,
           devicePass: device.sshPass,
@@ -36,10 +44,11 @@ export function useAntennaData(device: SavedDevice, _isPreview?: boolean, compac
     } finally {
       setIsLoadingAntenna(false);
     }
-  }, [device.ip, device.sshUser, device.sshPass, device.sshPort]);
+  }, [device.id, device.ip, device.sshUser, device.sshPass, device.hasSshPass, device.sshPort]);
 
   useEffect(() => {
-    if (compact && !antennaStats && !autoFetched.current && device.sshUser && device.sshPass) {
+    const canLoad = (!!device.id && (device.hasSshPass || !!device.sshUser)) || (!!device.sshUser && !!device.sshPass);
+    if (compact && !antennaStats && !autoFetched.current && canLoad) {
       autoFetched.current = true;
       handleLoadAntenna();
     }
