@@ -27,13 +27,22 @@ const resolveNodeCreds = (db, apRow) => resolveNodeCredsShared(db, apRow, decryp
 //   • Sin workspace (admin) o sin scan-IP (dev local) → SSH directo (localAddress null).
 //   • Con scan-IP (VPS): el túnel del VRF DEBE estar activo (sesión viva); si no,
 //     no hay ruta → 409 TUNNEL_NOT_ACTIVE para que la UI pida activar el túnel.
+//   • AP sin nodo asignado (vrf null) en VPS → 409 AP_NO_NODE: no hay túnel que
+//     activar para ese AP — el mensaje pide asignarlo a un nodo (accionable),
+//     en vez del popup "Activá el túnel" que no aplicaría.
 // Devuelve { ok:true, localAddress } | { ok:false, code, vrf, message }.
 async function resolveTunnelBinding(req, vrf) {
   const ws = reqWorkspace(req);
   if (ws === null) return { ok: true, localAddress: null };
   const scanIp = await scanIpRepo.resolveForWorkspace(ws).catch(() => null);
   if (!scanIp) return { ok: true, localAddress: null };
-  const session = vrf ? await sessionRepo.getActiveByUser(ws, req.account?.sub).catch(() => null) : null;
+  if (!vrf) {
+    return {
+      ok: false, code: 'AP_NO_NODE', vrf: null,
+      message: 'El AP no está asignado a ningún nodo, así que no hay ruta para monitorearlo desde el servidor. Asignalo a su nodo (menú del AP → Mover a nodo).',
+    };
+  }
+  const session = await sessionRepo.getActiveByUser(ws, req.account?.sub).catch(() => null);
   if (!session || session.vrf_name !== vrf) {
     return {
       ok: false, code: 'TUNNEL_NOT_ACTIVE', vrf: vrf || null,

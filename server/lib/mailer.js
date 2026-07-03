@@ -259,7 +259,9 @@ async function sendPasswordReset({ email, token, name }) {
 //  Devuelve { status: 'ok' | 'error' | 'skipped', configured, latency_ms?, error? }
 //    skipped → no hay SMTP_HOST en env (modo DEV).
 const VERIFY_TTL_MS = Number(process.env.SMTP_VERIFY_TTL_MS || 45_000);
-const VERIFY_TIMEOUT_MS = Number(process.env.SMTP_VERIFY_TIMEOUT_MS || 4_000);
+// 8s: el handshake SMTP "en frío" (TLS + EHLO contra relays lentos) puede
+// exceder 4s y /api/health marcaba SMTP 'error' aunque el envío funcionara.
+const VERIFY_TIMEOUT_MS = Number(process.env.SMTP_VERIFY_TIMEOUT_MS || 8_000);
 let _verifyCache = null; // { result, expiresAt }
 
 async function verifySmtp() {

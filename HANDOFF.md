@@ -160,7 +160,7 @@ Ver también `vpn-manager/CLAUDE.md` y `DESIGN_SYSTEM.md`.
 
 **Documentación completa (manual de replicación + arquitectura):** [`docs/README.md`](./docs/README.md) — manual grado replicación (tipos de usuario, referencia función-por-función, config MikroTik core, config VPS, **Local vs VPS**, guía desde cero) + suite de arquitectura (blueprint maestro + C4 MikroTik↔funciones). Creado 2026-06-24 (cont. 11).
 
-**Credenciales prod:** `admin / 48523451Fs` (en `vpn_users`). ⚠️ Considerar comprometidas las credenciales que vivieron en el viejo `database.sqlite` / que se expusieron en chat (rotar SMTP de Brevo).
+**Credenciales prod:** usuario `admin` (en `vpn_users`); el password NO se documenta aquí (regla: sin secretos en el handoff) — de hecho el password del handoff viejo ya NO es válido en prod (login 401, ver §7: recuperar por rehash). ⚠️ Considerar comprometidas las credenciales que vivieron en el viejo `database.sqlite` / que se expusieron en chat (rotar SMTP de Brevo).
 
 ---
 
