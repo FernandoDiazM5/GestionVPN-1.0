@@ -3,6 +3,7 @@ import {
   Pencil, X, CheckCircle2, AlertCircle, Loader2, Eye, EyeOff,
   RefreshCw, Copy, Check, Plus, Minus, ShieldCheck,
 } from 'lucide-react';
+import Spinner from '../../../Common/Spinner';
 import { useVpn } from '../../../../context';
 import { fetchWithTimeout } from '../../../../utils/fetchWithTimeout';
 import { API_BASE_URL } from '../../../../config';
@@ -408,7 +409,7 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
 
           {saving && !result && (
             <div className="flex flex-col items-center justify-center py-10 space-y-3">
-              <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+              <Spinner size="lg" label="Aplicando cambios…" />
               <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">Aplicando cambios en MikroTik…</p>
             </div>
           )}
@@ -416,7 +417,7 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
 
         {!saving && !result && (
           <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-slate-100 dark:border-slate-800 shrink-0 bg-slate-50 dark:bg-slate-800/50 rounded-b-2xl">
-            <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+            <button onClick={onClose} className="btn-ghost btn-md">
               Cancelar
             </button>
             <button onClick={handleSave} disabled={!hasChanges}

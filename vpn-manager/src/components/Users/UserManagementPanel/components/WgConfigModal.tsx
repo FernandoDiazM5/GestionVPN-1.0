@@ -105,7 +105,7 @@ export default function WgConfigModal({ peer, onClose }: { peer: WgPeer; onClose
         {/* Footer */}
         <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex items-center justify-end gap-2">
           <button onClick={onClose}
-            className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors">
+            className="btn-ghost btn-md">
             Cerrar
           </button>
           <button onClick={downloadConf} disabled={!conf}

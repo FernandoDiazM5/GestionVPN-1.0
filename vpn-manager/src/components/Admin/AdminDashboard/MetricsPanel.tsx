@@ -113,7 +113,7 @@ export default function MetricsPanel() {
         </span>
         <button
           onClick={() => { setLoading(true); void refresh(); }}
-          className="ml-auto btn-outline text-2xs"
+          className="ml-auto btn-outline btn-sm inline-flex items-center"
           title="Refrescar ahora"
         >
           <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />

@@ -81,7 +81,7 @@ export default function AuditTimeline({ logs, live }: AuditTimelineProps) {
         )}
         <button
           onClick={() => { setShowExport(v => !v); setErr(null); }}
-          className="ml-auto btn-outline text-xs"
+          className="ml-auto btn-outline btn-sm inline-flex items-center"
           title="Exportar bitácora"
         >
           <Download className="w-3.5 h-3.5" /> Exportar
@@ -111,11 +111,11 @@ export default function AuditTimeline({ logs, live }: AuditTimelineProps) {
               <p className="text-xs text-rose-600 flex items-start gap-1"><AlertCircle className="w-3 h-3 mt-0.5 shrink-0" /> {err}</p>
             )}
             <div className="flex items-center gap-2 pt-1">
-              <button onClick={() => doExport('csv')} disabled={busy} className="btn-primary text-xs flex-1">
+              <button onClick={() => doExport('csv')} disabled={busy} className="btn-primary btn-sm flex-1 inline-flex items-center justify-center">
                 {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
                 CSV
               </button>
-              <button onClick={() => doExport('json')} disabled={busy} className="btn-outline text-xs flex-1">
+              <button onClick={() => doExport('json')} disabled={busy} className="btn-outline btn-sm flex-1 inline-flex items-center justify-center">
                 JSON
               </button>
             </div>

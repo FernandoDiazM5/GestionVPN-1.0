@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Briefcase, Loader2, ShieldCheck, WifiOff, RefreshCw, Crown, User as UserIcon, UsersRound, Network } from 'lucide-react';
+import Spinner from '../../Common/Spinner';
 import { useWorkspaceSession } from '../../../context/WorkspaceSession';
 import { useWorkspaceEvents } from '../../../hooks/useWorkspaceEvents';
 import { teamApi } from '../../../services/teamApi';
@@ -91,9 +92,7 @@ export default function TeamModule() {
   // ── Estado de carga ──
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
-      </div>
+      <Spinner block label="Cargando equipo…" />
     );
   }
 

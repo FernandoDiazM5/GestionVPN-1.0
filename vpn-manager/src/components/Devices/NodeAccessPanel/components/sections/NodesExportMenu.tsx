@@ -91,7 +91,7 @@ export function NodesExportMenu({ rows, meta, disabled }: NodesExportMenuProps) 
             bottom: kebabCoords.bottom,
             right: kebabCoords.right,
           }}
-          className="z-[60] w-60 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl overflow-hidden"
+          className="z-[60] w-60 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl overflow-hidden"
         >
           <div className="p-1">
             {ITEMS.map(({ key, label, hint, Icon, colorClass }) => {

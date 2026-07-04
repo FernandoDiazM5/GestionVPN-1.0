@@ -215,7 +215,7 @@ export default function ScriptModal({ node, onClose }: { node: NodeInfo; onClose
         </div>
 
         <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-slate-100 dark:border-slate-800 shrink-0 bg-slate-50 dark:bg-slate-800/50 rounded-b-2xl">
-          <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+          <button onClick={onClose} className="btn-ghost btn-md">
             Cerrar
           </button>
           <button onClick={handleGenerate} disabled={!canGenerate || loading}

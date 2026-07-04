@@ -393,6 +393,36 @@
 }
 @media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
 
+/* ── Spinner SVG canónico (componente Common/Spinner) ────────────────────
+   Arco con animación de trazo (stroke-dasharray) sobre anillo tenue.
+   Color por currentColor → el call-site decide con text-<paleta>-500.
+   Reemplaza los Loader2/animate-spin ad-hoc para una carga uniforme. */
+@keyframes spinner-rotate { 100% { transform: rotate(360deg); } }
+@keyframes spinner-dash {
+  0%   { stroke-dasharray: 1 150;  stroke-dashoffset: 0; }
+  50%  { stroke-dasharray: 90 150; stroke-dashoffset: -35; }
+  100% { stroke-dasharray: 90 150; stroke-dashoffset: -124; }
+}
+.spinner-svg {
+  animation: spinner-rotate 1.4s linear infinite;
+  transform-origin: center;
+}
+.spinner-svg .spinner-track {
+  stroke: currentColor;
+  opacity: 0.15;
+}
+.spinner-svg .spinner-arc {
+  stroke: currentColor;
+  stroke-linecap: round;
+  animation: spinner-dash 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Un loader inmóvil no comunica "cargando": degradamos a rotación LENTA
+     con arco fijo (sin morphing), suficiente señal sin movimiento agresivo. */
+  .spinner-svg { animation-duration: 3s; }
+  .spinner-svg .spinner-arc { animation: none; stroke-dasharray: 90 150; stroke-dashoffset: 0; }
+}
+
 /* ── Animaciones del modal canónico (§50) ──────────────────────────────
    Reemplazan `animate-in fade-in / zoom-in-95` del plugin tailwindcss-animate
    porque esas utilities NO funcionan dentro de `@apply` en Tailwind v3.
@@ -407,4 +437,29 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .modal-overlay, .modal-panel { animation: none; }
+}
+
+/* ── Animaciones de ENTRADA utilitarias (§55) ────────────────────────────
+   Reemplazan las clases del plugin `tailwindcss-animate` (animate-in /
+   fade-in / slide-in-from-* / zoom-in-95), que NUNCA estuvo instalado:
+   esas clases no generaban CSS y los elementos aparecían en seco (toasts,
+   drawer móvil, banners). Mismo racional que §50: keyframes propios.
+   Un elemento = una clase; todas respetan prefers-reduced-motion. */
+@keyframes anim-fade-in     { from { opacity: 0; } }
+@keyframes anim-fade-up     { from { opacity: 0; transform: translateY(12px); } }
+@keyframes anim-fade-down   { from { opacity: 0; transform: translateY(-8px); } }
+@keyframes anim-slide-left  { from { opacity: 0; transform: translateX(-16px); } }
+@keyframes anim-slide-right { from { opacity: 0; transform: translateX(16px); } }
+@keyframes anim-zoom-in     { from { opacity: 0; transform: scale(0.95); } }
+@keyframes anim-drawer-left { from { transform: translateX(-100%); } }
+.anim-fade-in     { animation: anim-fade-in 200ms ease-out both; }
+.anim-fade-up     { animation: anim-fade-up 300ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.anim-fade-down   { animation: anim-fade-down 250ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.anim-slide-left  { animation: anim-slide-left 200ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.anim-slide-right { animation: anim-slide-right 300ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.anim-zoom-in     { animation: anim-zoom-in 200ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.anim-drawer-left { animation: anim-drawer-left 200ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .anim-fade-in, .anim-fade-up, .anim-fade-down, .anim-slide-left,
+  .anim-slide-right, .anim-zoom-in, .anim-drawer-left { animation: none; }
 }

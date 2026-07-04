@@ -126,7 +126,7 @@ export default function NotificationsTab({ memberMode = false }: NotificationsTa
             <Send className="w-3.5 h-3.5" /> Vincular
           </button>
         ) : status.telegramLinked ? (
-          <button onClick={unlink} className="btn-outline text-xs text-rose-600 border-rose-200"><X className="w-3.5 h-3.5" /> Desvincular</button>
+          <button onClick={unlink} className="btn-outline btn-sm inline-flex items-center text-rose-600 border-rose-200"><X className="w-3.5 h-3.5" /> Desvincular</button>
         ) : null
       }
     />
@@ -235,7 +235,7 @@ export default function NotificationsTab({ memberMode = false }: NotificationsTa
       <div className="flex items-center justify-end gap-3">
         {err && <p className="text-sm text-rose-600 flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5" /> {err}</p>}
         {ok && <p className="text-sm text-emerald-600 flex items-center gap-1"><Check className="w-3.5 h-3.5" /> Guardado</p>}
-        <button onClick={save} disabled={saving} className="btn-primary">
+        <button onClick={save} disabled={saving} className="btn-primary btn-md inline-flex items-center">
           {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
           Guardar
         </button>

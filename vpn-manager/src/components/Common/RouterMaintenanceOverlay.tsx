@@ -77,7 +77,7 @@ export default function RouterMaintenanceOverlay() {
     >
       {/* Capa de verificación: tapa todo mientras se comprueba la conexión */}
       {checking && (
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/85 dark:bg-slate-950/85 backdrop-blur-sm animate-in fade-in duration-150">
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/85 dark:bg-slate-950/85 backdrop-blur-sm anim-fade-in">
           <div className="h-16 w-16 rounded-full border-4 border-rose-200 dark:border-rose-500/20 border-t-rose-600 dark:border-t-rose-400 animate-spin mb-6" />
           <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 animate-pulse">Verificando conexión VPN…</h3>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1.5">Por favor espera un momento</p>
@@ -85,7 +85,7 @@ export default function RouterMaintenanceOverlay() {
       )}
 
       <main className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl shadow-2xl shadow-slate-900/20 dark:shadow-black/50
-                       overflow-hidden border border-slate-100 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-200">
+                       overflow-hidden border border-slate-100 dark:border-slate-800 anim-zoom-in">
         {/* Barra superior de alerta */}
         <div className="h-1.5 w-full bg-rose-600" />
 
@@ -104,7 +104,7 @@ export default function RouterMaintenanceOverlay() {
                 src={`${import.meta.env.BASE_URL}logo_wg.png`}
                 alt="WireGuard"
                 onError={() => setLogoFailed(true)}
-                className="w-44 h-auto select-none drop-shadow-sm animate-in fade-in zoom-in-95 duration-300"
+                className="w-44 h-auto select-none drop-shadow-sm anim-zoom-in"
               />
             )}
           </div>

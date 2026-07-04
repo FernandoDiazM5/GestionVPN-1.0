@@ -11,25 +11,25 @@ export function SshRevealModal({ data, onClose }: {
   const [show, setShow] = useState(false);
   const copy = (text: string) => { navigator.clipboard?.writeText(text).catch(() => { /* noop */ }); };
 
-  const iconBtn = 'p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors dark:hover:text-slate-100 dark:hover:bg-slate-800';
-
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-panel max-w-sm w-full" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-1">
-          <h3 className="flex items-center gap-2 text-base font-semibold text-slate-800 dark:text-slate-100">
-            <KeyRound className="w-4 h-4 text-indigo-500" /> Clave SSH del AP
-          </h3>
-          <button onClick={onClose} aria-label="Cerrar" className={iconBtn}><X className="w-4 h-4" /></button>
+      <div className="modal-panel modal-panel-sm" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <div className="min-w-0">
+            <h3 className="flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
+              <KeyRound className="w-4 h-4 text-indigo-500" /> Clave SSH del AP
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 truncate" title={data.apName}>{data.apName}</p>
+          </div>
+          <button onClick={onClose} aria-label="Cerrar" className="btn-ghost btn-icon"><X className="w-4 h-4" /></button>
         </div>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 truncate" title={data.apName}>{data.apName}</p>
 
-        <div className="space-y-3">
+        <div className="modal-body space-y-3">
           <div>
             <label className="text-2xs uppercase tracking-wider text-slate-500 dark:text-slate-400">Usuario</label>
             <div className="flex items-center gap-2 mt-1">
               <code className="data-cell flex-1 truncate">{data.user || '—'}</code>
-              <button onClick={() => copy(data.user)} aria-label="Copiar usuario" title="Copiar" className={iconBtn}><Copy className="w-4 h-4" /></button>
+              <button onClick={() => copy(data.user)} aria-label="Copiar usuario" title="Copiar" className="btn-ghost btn-icon"><Copy className="w-4 h-4" /></button>
             </div>
           </div>
 
@@ -37,10 +37,10 @@ export function SshRevealModal({ data, onClose }: {
             <label className="text-2xs uppercase tracking-wider text-slate-500 dark:text-slate-400">Contraseña</label>
             <div className="flex items-center gap-2 mt-1">
               <code className="data-cell flex-1 truncate">{show ? (data.pass || '—') : '••••••••'}</code>
-              <button onClick={() => setShow(s => !s)} aria-label={show ? 'Ocultar contraseña' : 'Mostrar contraseña'} title={show ? 'Ocultar' : 'Mostrar'} className={iconBtn}>
+              <button onClick={() => setShow(s => !s)} aria-label={show ? 'Ocultar contraseña' : 'Mostrar contraseña'} title={show ? 'Ocultar' : 'Mostrar'} className="btn-ghost btn-icon">
                 {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
-              <button onClick={() => copy(data.pass)} aria-label="Copiar contraseña" title="Copiar" className={iconBtn}><Copy className="w-4 h-4" /></button>
+              <button onClick={() => copy(data.pass)} aria-label="Copiar contraseña" title="Copiar" className="btn-ghost btn-icon"><Copy className="w-4 h-4" /></button>
             </div>
           </div>
 
@@ -52,8 +52,8 @@ export function SshRevealModal({ data, onClose }: {
           </div>
         </div>
 
-        <div className="mt-5 flex justify-end">
-          <button onClick={onClose} className="btn-outline">Cerrar</button>
+        <div className="modal-footer">
+          <button onClick={onClose} className="btn-outline btn-sm">Cerrar</button>
         </div>
       </div>
     </div>

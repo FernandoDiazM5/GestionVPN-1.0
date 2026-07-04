@@ -83,7 +83,7 @@ export default function ControlBar({
         {canCreateNode && (
           <button
             onClick={onNewNode}
-            className="btn-success px-4 py-2.5 flex items-center space-x-2 text-sm"
+            className="btn-primary px-4 py-2.5 flex items-center space-x-2 text-sm"
           >
             <Plus className="w-4 h-4" />
             <span>Nuevo Nodo</span>

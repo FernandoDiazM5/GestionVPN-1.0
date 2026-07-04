@@ -60,7 +60,9 @@ Tokens semánticos en `tailwind.config.js` (`brand`, `success`, …) y variables
 ### 🎬 Motion
 
 - El movimiento **señala cambios de estado**, no decora.
-- Permitido: `active:scale-[0.98]` en botones, `animate-pulse` en estado crítico, `animate-spin` en carga.
+- Permitido: `active:scale-[0.98]` en botones, `animate-pulse` en estado crítico, `<Spinner />` (`Common/Spinner`) en carga (color por `text-<paleta>-500`; `Loader2` solo dentro de botones).
+- Entradas (toasts, banners, drawers): utilidades propias `anim-*` de `index.css` §55 (`anim-fade-up`, `anim-slide-right`, `anim-drawer-left`, …). Los modales ya animan solos (`.modal-overlay`/`.modal-panel`).
+- **PROHIBIDO `animate-in`/`fade-in`/`zoom-in-*`/`slide-in-from-*`** (plugin `tailwindcss-animate` NO instalado → clases sin CSS, el elemento aparece en seco). Regla DS09 del auditor lo vigila.
 - Evita varias animaciones infinitas simultáneas en la misma zona.
 
 ### ♿ Accesibilidad

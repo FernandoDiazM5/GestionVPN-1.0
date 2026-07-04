@@ -70,7 +70,7 @@ function ColSelector({ hidden, onChange }: {
         COLUMNAS
       </button>
       {open && (
-        <div className="absolute right-0 top-8 z-50 bg-white border border-slate-200 rounded-xl shadow-xl p-3 w-56 max-h-80 overflow-y-auto dark:bg-slate-900 dark:border-slate-700 dark:shadow-black/40">
+        <div className="absolute right-0 top-8 z-50 bg-white border border-slate-200 rounded-xl shadow-xl p-3 w-56 max-h-80 overflow-y-auto dark:bg-slate-800 dark:border-slate-700 dark:shadow-black/40">
           <p className="text-3xs font-bold text-slate-400 uppercase tracking-wider mb-2">Seleccionar columnas</p>
           {CPE_COL_DEFS.filter(c => !c.always).map(col => (
             <label key={col.key} className="flex items-center gap-2 py-1 cursor-pointer group">

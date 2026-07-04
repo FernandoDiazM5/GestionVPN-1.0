@@ -65,7 +65,7 @@ export function NodeCardSshForm({
                 className="p-1 text-slate-500 dark:text-slate-400 hover:text-amber-600 rounded transition-colors">
                 {showPasswords ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
               </button>
-              <button onClick={onCloseSshForm} className="p-1 text-slate-500 dark:text-slate-400 hover:text-slate-600 rounded transition-colors">
+              <button onClick={onCloseSshForm} aria-label="Cerrar credenciales SSH" className="btn-ghost p-1">
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>

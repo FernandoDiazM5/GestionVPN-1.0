@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { LayoutDashboard, Users, UserCog, Briefcase, Activity, Loader2, RefreshCw } from 'lucide-react';
+import { LayoutDashboard, Users, UserCog, Briefcase, Activity, RefreshCw } from 'lucide-react';
+import Spinner from '../../Common/Spinner';
 import { adminApi } from '../../../services/adminApi';
 import { useWorkspaceSession } from '../../../context/WorkspaceSession';
 import { isPlatformAdmin } from '../../../utils/permissions';
@@ -56,7 +57,7 @@ export default function AdminDashboard() {
       </div>
 
       {loading && !summary ? (
-        <div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-indigo-500" /></div>
+        <Spinner block label="Cargando resumen…" />
       ) : error ? (
         <div className="card p-8 text-center text-slate-400 dark:text-slate-500">No se pudo cargar el resumen (¿MySQL activo?).</div>
       ) : (

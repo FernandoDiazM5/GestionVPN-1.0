@@ -72,7 +72,7 @@ export default function ModeratorsModule() {
           <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">Da de alta y gestiona los clientes que usan la plataforma</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setShowCreate(true)} className="btn-success px-4 py-2.5 flex items-center gap-2 text-sm">
+          <button onClick={() => setShowCreate(true)} className="btn-primary px-4 py-2.5 flex items-center gap-2 text-sm">
             <UserPlus className="w-4 h-4" /> Nuevo Moderador
           </button>
           <button onClick={load} disabled={loading} className="btn-outline px-4 py-2.5 flex items-center gap-2 text-sm disabled:opacity-50" title="Recargar">
@@ -171,7 +171,7 @@ export default function ModeratorsModule() {
                       <p className="text-slate-600 dark:text-slate-300 font-semibold">Aún no hay moderadores</p>
                       <p className="text-slate-400 dark:text-slate-500 text-xs mt-0.5">Da de alta al primer cliente para que use la plataforma.</p>
                     </div>
-                    <button onClick={() => setShowCreate(true)} className="btn-success px-4 py-2 flex items-center gap-2 text-sm mt-1">
+                    <button onClick={() => setShowCreate(true)} className="btn-primary px-4 py-2 flex items-center gap-2 text-sm mt-1">
                       <UserPlus className="w-4 h-4" /> Nuevo Moderador
                     </button>
                   </div>
@@ -361,7 +361,7 @@ function CreateModeratorModal({ onClose, onCreated }: { onClose: () => void; onC
       </div>
       {error && <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">{error}</p>}
       <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
-        <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Cancelar</button>
+        <button onClick={onClose} className="btn-ghost btn-md">Cancelar</button>
         <button onClick={submit} disabled={busy || !email.trim()} className="btn-primary px-5 py-2.5 flex items-center gap-2 text-sm disabled:opacity-40">
           {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />} Enviar invitación
         </button>
@@ -398,7 +398,7 @@ function EditModeratorModal({ mod, onClose, onSaved }: { mod: Moderator; onClose
       </div>
       {error && <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">{error}</p>}
       <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
-        <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Cancelar</button>
+        <button onClick={onClose} className="btn-ghost btn-md">Cancelar</button>
         <button onClick={submit} disabled={busy} className="btn-primary px-5 py-2.5 flex items-center gap-2 text-sm disabled:opacity-40">
           {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pencil className="w-4 h-4" />} Guardar
         </button>
@@ -438,7 +438,7 @@ function ResetPasswordModal({ mod, onClose, onSaved }: { mod: Moderator; onClose
         ? <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">✓ Contraseña actualizada</p>
         : (
           <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
-            <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Cancelar</button>
+            <button onClick={onClose} className="btn-ghost btn-md">Cancelar</button>
             <button onClick={submit} disabled={busy || password.length < 8} className="btn-primary px-5 py-2.5 flex items-center gap-2 text-sm disabled:opacity-40">
               {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />} Actualizar
             </button>
@@ -473,7 +473,7 @@ function DeleteModeratorModal({ mod, onClose, onDeleted }: { mod: Moderator; onC
       </div>
       {error && <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">{error}</p>}
       <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
-        <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Cancelar</button>
+        <button onClick={onClose} className="btn-ghost btn-md">Cancelar</button>
         <button onClick={confirm} disabled={busy} className="btn-danger px-5 py-2.5 flex items-center gap-2 text-sm disabled:opacity-40">
           {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />} Eliminar
         </button>

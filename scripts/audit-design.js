@@ -11,6 +11,9 @@
 //   DS04 — gradiente multicolor (paletas distintas)
 //   DS05 — texto slate-300/400 — posible contraste insuficiente
 //   DS06 — botón con bg+text inline sin usar clase .btn-*
+//   DS07 — botón .btn-* de color sin padding ni tamaño (texto cortado)
+//   DS08 — botón de acción sin color ni clase del sistema
+//   DS09 — clase de animación del plugin tailwindcss-animate (no instalado)
 //
 //  Output: tabla resumen + top 10 archivos + sample lines.
 //  Uso:
@@ -192,6 +195,62 @@ const RULES = [
       const hasSolid = /\bbg-(indigo|emerald|rose|amber|sky|violet|brand|success|danger|warning|info|accent)-(500|600|700)\b.*\btext-white\b/.test(line);
       if (hasSolid) return ['botón sólido sin clase .btn-*'];
       return [];
+    },
+  },
+  {
+    id: 'DS07-btn-without-padding',
+    severity: 'warning',
+    title: 'Botón .btn-* de color sin padding ni tamaño (texto pegado/cortado)',
+    rationale: 'Las clases .btn-* NO traen padding propio (index.css:220 «Por defecto los .btn-* no traen padding»). Un .btn-primary/success/danger/warning/info/accent/outline sin un tamaño (.btn-sm/.btn-md/.btn-lg/.btn-icon) NI padding inline (px-/py-/p-) deja el texto pegado al borde o cortado dentro de la píldora. Componer con un tamaño (p.ej. .btn-md) o padding explícito.',
+    test: (line) => {
+      // Solo variantes de COLOR: ghost/icon suelen ser icon-only (btn-icon ya trae p-2).
+      const m = line.match(/\bbtn-(primary|success|danger|warning|info|accent|outline)\b/);
+      if (!m) return [];
+      // La className (donde viven padding/tamaño) está en esta misma línea en el codebase.
+      if (!/className=/.test(line) && !/\bcn\(/.test(line)) return [];
+      // ¿tiene tamaño del sistema o padding explícito en la MISMA className?
+      const hasSize    = /\bbtn-(sm|md|lg|icon)\b/.test(line);
+      const hasPadding = /\b(?:px|py|p)-(?:\d|\[)/.test(line);
+      if (hasSize || hasPadding) return [];
+      return [`btn-${m[1]} sin padding/tamaño → texto pegado al borde`];
+    },
+  },
+  {
+    id: 'DS08-colorless-button',
+    severity: 'info',
+    title: 'Botón de acción sin color ni clase del sistema',
+    rationale: 'color = intención: un <button> de acción debe llevar una clase .btn-* (o .btn-ghost si es terciario/icon). Un botón sin .btn-*, sin bg- y sin color de texto/hover queda "apagado" y rompe la jerarquía visual. El patrón de referencia es el botón WireGuard (.btn-accent: color, fondo, transición, active:scale).',
+    test: (line) => {
+      // SOLO botones single-line con className STRING literal (`<button … className="…">`):
+      // así la className evaluada es la DEL botón (no la de un hijo ícono en la
+      // línea siguiente) y es legible (no una variable `className={estilos.x}`,
+      // que el scanner no puede resolver). Los multi-línea / con className por
+      // variable se dejan pasar (evita el flood de falsos positivos).
+      if (!/<button\b[^>]*\bclassName="/.test(line)) return [];
+      // Clases de cierre/sistema (la «X» de modales) ya son ghost por diseño → OK.
+      if (/\b(modal-header-close|modal-header-btn|btn-(primary|success|danger|warning|info|accent|outline|ghost)|badge)\b/.test(line)) return [];
+      if (/\bbg-(indigo|emerald|rose|amber|sky|violet|cyan|slate|brand|success|danger|warning|info|accent)-(?:\d|\[)/.test(line)) return [];
+      // Color de texto/hover intencional (no gris) o cambio de fondo al hover → patrón ghost manual, OK.
+      if (/\b(?:hover:|focus:|dark:|active:)*text-(indigo|emerald|rose|amber|sky|violet|cyan)-\d/.test(line)) return [];
+      if (/\bhover:bg-/.test(line)) return [];
+      // className dinámica (ternario) trae su color por variable de estado → OK.
+      if (/\bclassName=\{/.test(line) && /\?/.test(line)) return [];
+      return ['botón sin color ni clase .btn-* (usar .btn-* o .btn-ghost)'];
+    },
+  },
+  {
+    id: 'DS09-dead-animation-class',
+    severity: 'error',
+    title: 'Clase de animación del plugin tailwindcss-animate (NO instalado — clase muerta)',
+    rationale: 'El plugin tailwindcss-animate NO está en package.json ni en plugins de tailwind.config.js: animate-in/fade-in/zoom-in-*/slide-in-from-* no generan CSS y el elemento aparece sin animación, sin error visible. Usa las utilidades propias anim-* (index.css §55) o las clases de modal (§50).',
+    test: (line) => {
+      const violations = [];
+      // animate-in es el gatillo del plugin; fade-in/zoom-in-N/slide-in-from-* son sus modificadores.
+      // (fade-in pelado sin animate-in también es muerto; los cazamos todos.)
+      const re = /(?:^|[\s"'`{:])(animate-in|animate-out|fade-in|fade-out|zoom-in-\d+|zoom-out-\d+|slide-in-from-[a-z]+(?:-\d+)?|slide-out-to-[a-z]+(?:-\d+)?)\b/g;
+      let m;
+      while ((m = re.exec(line)) !== null) violations.push(`'${m[1]}' es clase muerta (plugin no instalado) → usar anim-*`);
+      return violations;
     },
   },
 ];

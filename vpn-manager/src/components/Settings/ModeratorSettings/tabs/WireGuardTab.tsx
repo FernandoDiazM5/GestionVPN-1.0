@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
 import { Shield, Loader2, Download, Copy, Check, Smartphone, RefreshCw, KeyRound, AlertCircle } from 'lucide-react';
+import Spinner from '../../../Common/Spinner';
 import { teamApi } from '../../../../services/teamApi';
 import { useWorkspaceSession } from '../../../../context/WorkspaceSession';
 
@@ -79,7 +80,7 @@ export default function WireGuardTab() {
 
       <div className="p-6 space-y-4 max-w-md">
         {loading ? (
-          <div className="flex items-center justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-violet-500" /></div>
+          <Spinner block className="text-violet-500" label="Cargando acceso WireGuard…" />
         ) : conf ? (
           <>
             {allowedIp && (

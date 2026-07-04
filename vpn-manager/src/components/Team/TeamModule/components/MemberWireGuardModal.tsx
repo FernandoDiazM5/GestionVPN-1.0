@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
 import { Shield, X, Loader2, Download, Copy, Check, Smartphone, RefreshCw, KeyRound } from 'lucide-react';
+import Spinner from '../../../Common/Spinner';
 import { teamApi } from '../../../../services/teamApi';
 import type { Member } from '../../../../types/account';
 
@@ -79,7 +80,7 @@ export default function MemberWireGuardModal({ member, onClose }: Props) {
 
         <div className="p-5 space-y-4">
           {loading ? (
-            <div className="flex items-center justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-violet-500" /></div>
+            <Spinner block className="text-violet-500" label="Cargando acceso WireGuard…" />
           ) : conf ? (
             <>
               {allowedIp && (

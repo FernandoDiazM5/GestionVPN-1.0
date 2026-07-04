@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Radio, Lock, User, Server, ShieldCheck, CheckCircle, AlertCircle, Loader2, Mail } from 'lucide-react';
+import Spinner from '../Common/Spinner';
 import { useVpn } from '../../context';
 import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
 import AcceptInvitationForm from './AcceptInvitationForm';
@@ -103,7 +104,7 @@ export default function RouterAccess() {
   if (needsSetup === null) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-sky-50">
-           <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+           <Spinner size="lg" label="Verificando sesión…" />
         </div>
       );
   }

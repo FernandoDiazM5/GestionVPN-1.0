@@ -42,25 +42,25 @@ export default function SecretsTable({
       <div className="overflow-x-auto">
         <table className="w-full text-left">
           <thead>
-            <tr className="border-b border-slate-100 bg-slate-50/30">
-              <th className="px-5 py-3 text-2xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider w-12 text-center">
+            <tr className="border-b border-slate-100 bg-slate-50/30 dark:border-slate-800 dark:bg-slate-800/30">
+              <th className="px-4 py-3 text-2xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider w-12 text-center">
                 Estado
               </th>
-              <th className="px-5 py-3 text-2xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              <th className="px-4 py-3 text-2xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                 Nombre
               </th>
-              <th className="px-5 py-3 text-2xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              <th className="px-4 py-3 text-2xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                 Servicio
               </th>
-              <th className="px-5 py-3 text-2xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider hidden sm:table-cell">
+              <th className="px-4 py-3 text-2xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider hidden sm:table-cell">
                 Perfil
               </th>
-              <th className="px-5 py-3 text-2xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-center">
+              <th className="px-4 py-3 text-2xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-center">
                 Acción
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {pagedSecrets.map((secret) => (
               <SecretsTableRow
                 key={secret.id}

@@ -137,11 +137,45 @@ El movimiento **comunica cambios de estado**, no adorna.
 |-----------|--------|
 | `active:scale-[0.98]` | Feedback táctil al pulsar |
 | `animate-pulse` | Estado crítico / urgente |
-| `animate-spin` | Carga en progreso |
+| `<Spinner />` (`Common/Spinner`) | Carga en progreso (ver 6.1) |
 | `transition-all duration-200` | Hover suave |
+| `anim-*` (ver 6.2) | Entrada de toasts, banners, drawers, overlays |
 
 🚫 Evita varias animaciones infinitas simultáneas en la misma zona (distrae).
 🚫 No animes elementos que no cambian de estado.
+🚫 **PROHIBIDO `animate-in` / `fade-in` / `zoom-in-*` / `slide-in-from-*`** (clases del plugin `tailwindcss-animate`): el plugin **NO está instalado** — esas clases no generan CSS y el elemento aparece en seco, sin error visible. Usa las utilidades `anim-*` de 6.2. Lo vigila la regla **DS09** del auditor.
+
+### 6.1 Carga — Spinner SVG canónico
+
+Componente único de carga: **`Common/Spinner`** (arco SVG con animación de trazo sobre anillo tenue). Reemplaza los `<Loader2 className="animate-spin" />` ad-hoc en loaders centrales.
+
+```tsx
+<Spinner />                                  // 24px indigo inline
+<Spinner block label="Cargando resumen…" />  // loader de módulo, centrado py-12
+<Spinner className="text-violet-500" />      // color = intención del contexto (WG)
+<Spinner size="lg" />                        // xs 14 · sm 16 · md 24 · lg 32
+```
+
+- Color por `currentColor` → pásalo con `text-<paleta>-500` según el contexto semántico.
+- `role="status"` + `label` accesible incluidos.
+- `prefers-reduced-motion`: degrada a rotación lenta sin morphing (CSS `.spinner-svg`).
+- `Loader2` sigue siendo válido **dentro de botones** (spinner de acción en curso, hereda el color del botón).
+- Placeholders de contenido → `.skeleton` (shimmer con dark + reduced-motion), no un spinner pelado.
+
+### 6.2 Animaciones de ENTRADA — utilidades `anim-*` (index.css §55)
+
+Keyframes propios (mismo racional que §50: nada de plugins). Un elemento = una clase; todas respetan `prefers-reduced-motion`.
+
+| Clase | Efecto | Úsala en |
+|-------|--------|----------|
+| `anim-fade-in` | fade 200ms | Backdrops, apariciones simples |
+| `anim-fade-up` | fade + sube 12px | Contenido de módulo (`<main>` de App) |
+| `anim-fade-down` | fade + baja 8px | Banners que caen (DeepLink, progreso de escaneo) |
+| `anim-slide-left` / `anim-slide-right` | fade + 16px lateral | Pasos de provisión / toasts |
+| `anim-zoom-in` | fade + scale 0.95→1 | Paneles/imágenes destacadas |
+| `anim-drawer-left` | translateX(-100%)→0 | Drawer móvil del Sidebar |
+
+Los modales NO las necesitan: `.modal-overlay`/`.modal-panel` ya traen su animación (§50).
 
 ---
 

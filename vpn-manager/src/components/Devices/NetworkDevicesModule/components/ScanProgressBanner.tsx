@@ -34,7 +34,7 @@ function ScanProgressBannerImpl({
   return (
     <>
       {scanState.phase !== 'idle' && (
-        <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-2 dark:bg-slate-800/60 dark:border-slate-700">
+        <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3 anim-fade-down dark:bg-slate-800/60 dark:border-slate-700">
           <div className="flex justify-between items-center text-2xs font-bold text-slate-600 uppercase tracking-widest">
             <span className="flex items-center space-x-2">
               {scanState.phase === 'done' ? (

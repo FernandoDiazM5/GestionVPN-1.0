@@ -45,7 +45,7 @@ export function ColumnPicker({ visibleCols, onChange }: ColumnPickerProps) {
           role="menu"
           aria-label="Mostrar/ocultar columnas"
           style={{ position: 'fixed', top: kebabCoords.top, bottom: kebabCoords.bottom, right: kebabCoords.right }}
-          className="z-[60] bg-white border border-slate-200 rounded-xl shadow-xl p-3 w-60 max-h-[70vh] overflow-y-auto dark:bg-slate-900 dark:border-slate-700 dark:shadow-black/40"
+          className="z-[60] bg-white border border-slate-200 rounded-xl shadow-xl p-3 w-60 max-h-[70vh] overflow-y-auto dark:bg-slate-800 dark:border-slate-700 dark:shadow-black/40"
         >
 
           {visibleCols.length > 0 && (

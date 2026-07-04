@@ -103,7 +103,7 @@ export default function DiagnosticsModal({ initialTarget, nodeName, onClose }: D
               className="input-field font-mono text-xs w-full"
             />
           </div>
-          <button onClick={execute} disabled={busy || !target.trim()} className="btn-primary text-xs">
+          <button onClick={execute} disabled={busy || !target.trim()} className="btn-primary btn-sm inline-flex items-center">
             {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
             {busy ? 'Ejecutando…' : 'Ejecutar'}
           </button>

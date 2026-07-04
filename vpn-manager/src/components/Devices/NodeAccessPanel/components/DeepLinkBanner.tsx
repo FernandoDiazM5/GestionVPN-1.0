@@ -48,7 +48,7 @@ export function DeepLinkBanner({ onActivate, onDeactivate }: DeepLinkBannerProps
   }
 
   return (
-    <div className="mb-4 rounded-2xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-500/10 p-4 flex items-center gap-3 animate-in slide-in-from-top-2 duration-300">
+    <div className="mb-4 rounded-2xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-500/10 p-4 flex items-center gap-3 anim-fade-down">
       <div className="w-9 h-9 rounded-xl bg-white dark:bg-slate-900 flex items-center justify-center shrink-0">
         <Send className="w-4 h-4 text-indigo-600" />
       </div>

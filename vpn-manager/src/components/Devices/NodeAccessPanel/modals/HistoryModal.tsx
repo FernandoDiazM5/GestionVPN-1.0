@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { X, History, Loader2 } from 'lucide-react';
+import { X, History } from 'lucide-react';
+import Spinner from '../../../Common/Spinner';
 import { apiFetch } from '../../../../utils/apiClient';
 import { API_BASE_URL } from '../../../../config';
 import type { NodeInfo } from '../../../../types/api';
@@ -37,7 +38,7 @@ export default function HistoryModal({ node, onClose }: { node: NodeInfo; onClos
           </button>
         </div>
         <div className="overflow-y-auto flex-1 p-4">
-          {loading && <div className="flex items-center justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-sky-500" /></div>}
+          {loading && <Spinner block className="text-sky-500" label="Cargando historial…" />}
           {!loading && history.length === 0 && (
             <p className="text-center text-slate-500 dark:text-slate-400 text-sm py-10">Sin eventos registrados aún.</p>
           )}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
-import { UserCircle, Waypoints, Shield, Loader2, Download, Copy, Check, Smartphone, KeyRound } from 'lucide-react';
+import { UserCircle, Waypoints, Shield, Download, Copy, Check, Smartphone, KeyRound } from 'lucide-react';
+import Spinner from '../../../Common/Spinner';
 import { teamApi } from '../../../../services/teamApi';
 import { ADMIN_WG_NET } from '../../../../config';
 import type { Assignment, MemberWireguard, SessionUser } from '../../../../types/account';
@@ -83,7 +84,7 @@ export default function MemberProfile({ session }: Props) {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-indigo-500" /></div>
+        <Spinner block label="Cargando perfil…" />
       ) : (
         <>
           {/* Mis túneles asignados */}

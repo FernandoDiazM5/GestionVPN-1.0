@@ -264,8 +264,8 @@ export default function Sidebar() {
       {/* ── Drawer móvil (siempre expandido) ── */}
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
-          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setMobileOpen(false)} />
-          <aside className="relative w-64 h-full animate-in slide-in-from-left duration-200">
+          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm anim-fade-in" onClick={() => setMobileOpen(false)} />
+          <aside className="relative w-64 h-full anim-drawer-left">
             <button
               onClick={() => setMobileOpen(false)}
               className="absolute top-4 right-3 z-10 p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"

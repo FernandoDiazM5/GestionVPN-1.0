@@ -6,6 +6,7 @@ import {
   Search,
   AlertTriangle, RotateCw,
 } from 'lucide-react';
+import Spinner from '../../Common/Spinner';
 import { fmtAgo } from './utils/formatters';
 import M5FullInfoModal from '../../Common/M5FullInfoModal';
 import ConfirmModal from '../../Common/ConfirmModal';
@@ -208,7 +209,7 @@ export default function ApMonitorModule() {
       </div>
 
       {logic.loading && (
-        <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-slate-500 dark:text-slate-400" /></div>
+        <Spinner block className="text-slate-500 dark:text-slate-400" label="Cargando equipos…" />
       )}
 
       {!logic.loading && logic.nodeGroups.length === 0 && (

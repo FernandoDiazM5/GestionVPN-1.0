@@ -34,7 +34,7 @@ export function NodeCardWgPeerForm({
   return (
     <tr className={rowBg}>
       <td colSpan={7} className="px-4 pb-3 pt-0">
-        <div className="ml-10 bg-violet-50 border border-violet-200 rounded-xl p-3 space-y-2 animate-in slide-in-from-top-2 duration-200 dark:bg-violet-500/10 dark:border-violet-500/30">
+        <div className="ml-10 bg-violet-50 border border-violet-200 rounded-xl p-3 space-y-2 anim-fade-down dark:bg-violet-500/10 dark:border-violet-500/30">
           <p className="text-2xs font-bold text-violet-700 uppercase tracking-wider">Clave Pública del CPE</p>
           <p className="text-2xs text-violet-500">Obtener con: <span className="font-mono">/interface wireguard print</span></p>
           <textarea

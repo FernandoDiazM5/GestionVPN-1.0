@@ -142,7 +142,7 @@ export default function UserManagementPanel({ embedded = false }: UserManagement
         <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 items-end">
           {toasts.map(t => (
             <div key={t.id}
-              className={`flex items-center gap-3 px-4 py-3 rounded-2xl shadow-lg text-sm font-semibold max-w-xs animate-in slide-in-from-right-4 duration-300
+              className={`flex items-center gap-3 px-4 py-3 rounded-2xl shadow-lg text-sm font-semibold max-w-xs anim-slide-right
                 ${t.type === 'warn' ? 'bg-rose-600 text-white' : 'bg-indigo-600 text-white'}`}>
               <Bell className="w-4 h-4 shrink-0" />
               <span>{t.text}</span>

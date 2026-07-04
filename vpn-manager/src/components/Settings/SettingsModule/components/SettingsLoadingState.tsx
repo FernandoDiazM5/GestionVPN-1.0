@@ -1,9 +1,9 @@
-import { Loader2 } from 'lucide-react';
+import Spinner from '../../../Common/Spinner';
 
 export function SettingsLoadingState() {
   return (
     <div className="flex justify-center items-center h-48">
-      <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+      <Spinner size="lg" label="Cargando ajustes…" />
     </div>
   );
 }

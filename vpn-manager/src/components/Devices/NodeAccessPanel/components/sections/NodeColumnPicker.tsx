@@ -62,7 +62,7 @@ export function NodeColumnPicker({ visibleCols, onChange }: NodeColumnPickerProp
           role="menu"
           aria-label="Mostrar/ocultar columnas"
           style={{ position: 'fixed', top: kebabCoords.top, bottom: kebabCoords.bottom, right: kebabCoords.right }}
-          className="z-[60] bg-white border border-slate-200 rounded-xl shadow-xl p-3 w-64 max-h-[70vh] overflow-y-auto dark:bg-slate-900 dark:border-slate-700"
+          className="z-[60] bg-white border border-slate-200 rounded-xl shadow-xl p-3 w-64 max-h-[70vh] overflow-y-auto dark:bg-slate-800 dark:border-slate-700"
         >
 
           {visibleCols.length > 0 && (
