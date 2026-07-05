@@ -6,11 +6,16 @@
 const { stubModule, unstubModule } = require('../helpers/moduleMock');
 
 let scanIp = '10.11.252.7';
+let scanMode = 'vps';
+let allocatedIp = '10.11.252.9';
 const setup = vi.fn().mockResolvedValue(undefined);
 const teardown = vi.fn().mockResolvedValue(undefined);
+const allocate = vi.fn(async () => allocatedIp);
 
 stubModule(__dirname, '../../db/repos/scanIpRepo', {
   resolveForWorkspace: vi.fn(async () => scanIp),
+  getSetting: vi.fn(async () => scanMode),
+  allocate,
 });
 stubModule(__dirname, '../../lib/scanMangle', { setup, teardown });
 
@@ -23,8 +28,11 @@ const VRF = 'VRF-ND2-TORREHOUSENET';
 
 beforeEach(() => {
   scanIp = '10.11.252.7';
+  scanMode = 'vps';
+  allocatedIp = '10.11.252.9';
   setup.mockClear();
   teardown.mockClear();
+  allocate.mockClear();
 });
 
 afterAll(() => {
@@ -41,8 +49,25 @@ describe('onTunnelActivated', () => {
     }));
   });
 
-  it('no-op si el workspace no tiene scan-IP', async () => {
+  it('auto-asigna scan-IP del pool (modo vps) si el workspace no la tiene y monta la mangle', async () => {
+    scanIp = null;              // workspace sin Opción C
+    scanMode = 'vps';
+    await sync.onTunnelActivated({ workspaceId: WS, vrfName: VRF, mikrotik: MIKROTIK });
+    expect(allocate).toHaveBeenCalledWith(WS);
+    expect(setup).toHaveBeenCalledWith(expect.objectContaining({ scanIp: '10.11.252.9', vrfName: VRF }));
+  });
+
+  it('no-op en modo local si no hay scan-IP global (no asigna del pool)', async () => {
     scanIp = null;
+    scanMode = 'local';
+    await sync.onTunnelActivated({ workspaceId: WS, vrfName: VRF, mikrotik: MIKROTIK });
+    expect(allocate).not.toHaveBeenCalled();
+    expect(setup).not.toHaveBeenCalled();
+  });
+
+  it('no-op si el pool está agotado (allocate falla) — best-effort', async () => {
+    scanIp = null;
+    allocate.mockRejectedValueOnce(new Error('pool agotado'));
     await sync.onTunnelActivated({ workspaceId: WS, vrfName: VRF, mikrotik: MIKROTIK });
     expect(setup).not.toHaveBeenCalled();
   });

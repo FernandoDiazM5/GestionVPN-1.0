@@ -29,12 +29,29 @@ const log = require('./logger').child({ scope: 'scan-mangle-sync' });
 
 /**
  * Túnel activado → la mangle de escaneo del workspace apunta a ese VRF.
- * No-op si el workspace no tiene scan-IP (dev local / sin Opción C).
+ *
+ * AUTO-ASIGNACIÓN de scan-IP: un workspace creado ANTES de la Opción C (o cuya
+ * asignación best-effort al crearse falló) no tiene fila en `workspace_scan_ip`
+ * → `resolveForWorkspace` devuelve null → la mangle SCAN-WS nunca se monta y el
+ * escaneo da 0 (síntoma: en el router no aparece la mangle SCAN-WS, solo la de
+ * acceso del usuario). Antes esto obligaba a correr `scan:assign <ws>` a mano en
+ * el VPS. Ahora, en modo 'vps', si falta la scan-IP la asignamos al vuelo del
+ * pool (idempotente) para que el moderador NO tenga que entrar al VPS. En modo
+ * 'local' se usa la IP global (no hay pool que asignar) → no-op si no está.
  */
 async function onTunnelActivated({ workspaceId, vrfName, mikrotik }) {
   try {
     if (!mikrotik?.ip || !workspaceId || !vrfName) return;
-    const scanIp = await scanIpRepo.resolveForWorkspace(workspaceId).catch(() => null);
+    let scanIp = await scanIpRepo.resolveForWorkspace(workspaceId).catch(() => null);
+    if (!scanIp) {
+      const mode = await scanIpRepo.getSetting('scan_mode').catch(() => 'vps');
+      if (mode === 'local') return;   // modo local usa IP global; nada que asignar
+      scanIp = await scanIpRepo.allocate(workspaceId).catch((e) => {
+        log.warn({ workspaceId, err: e?.message }, 'no se pudo auto-asignar scan-IP (¿pool agotado?)');
+        return null;
+      });
+      if (scanIp) log.info({ workspaceId, scanIp }, 'scan-IP auto-asignada al activar túnel (workspace sin Opción C)');
+    }
     if (!scanIp) return;
     await scanMangle.setup({ workspaceId, scanIp, vrfName, mikrotik });
     log.info({ workspaceId, vrfName }, 'scan mangle sincronizada con túnel activado');
