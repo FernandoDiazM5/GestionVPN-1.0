@@ -9,9 +9,14 @@ const express = require('express');
 const router = express.Router();
 
 const { getDb, getNodeId } = require('../../db.service');
-const { nodeBelongsToRequester, requireOperator } = require('./_shared');
+const { nodeBelongsToRequester } = require('./_shared');
 
-router.post('/node/history/add', requireOperator, async (req, res) => {
+// NOTA: sin requireOperator a propósito. Registrar un evento de bitácora
+// (append-only) al activar un túnel es una acción legítima de un MEMBER sobre
+// un nodo ASIGNADO de su workspace; el gate real es nodeBelongsToRequester
+// (aislamiento multi-tenant). Con requireOperator, el MEMBER recibía 403 de
+// permisos que el frontend confundía con sesión expirada → logout en cadena.
+router.post('/node/history/add', async (req, res) => {
   const { pppUser, event } = req.body;
   if (!pppUser || !event) return res.status(400).json({ success: false, message: 'pppUser y event requeridos' });
   if (!(await nodeBelongsToRequester(req, pppUser))) return res.status(404).json({ success: false, message: 'Nodo no encontrado en tu workspace' });

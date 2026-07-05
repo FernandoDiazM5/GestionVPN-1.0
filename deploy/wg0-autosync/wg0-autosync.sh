@@ -11,6 +11,12 @@
 #  GUARDA DE IDEMPOTENCIA: si no falta nada, NO reescribe ni recarga (no-op).
 #  La unión NUNCA borra entradas: lo que ya esté en el wg0 se preserva.
 #
+#  RUTAS DEL KERNEL: `wg syncconf` actualiza los AllowedIPs internos de WireGuard
+#  pero NO crea las rutas del sistema (a diferencia de `wg-quick up`). Sin la
+#  ruta `dev wg0`, el tráfico a la LAN de la torre sale por la default (eth0) y
+#  se pierde. Por eso este script reconcila las rutas con `ip route replace`
+#  (idempotente) en CADA corrida, aunque el AllowedIPs no haya cambiado.
+#
 #  Requiere en el host: wireguard-tools (wg, wg-quick), awk. Sin node.
 #  Variables (override por entorno):
 #    WG0_CONF   (def. /etc/wireguard/wg0.conf)
@@ -57,14 +63,35 @@ NEW="$(
   ' "$CONF"
 )"
 
-# ── Guarda: sin cambios → no tocar nada ──
+# ── Aplicar cambios al AllowedIPs solo si difiere (guarda de idempotencia) ──
 if [ "$NEW" = "$(cat "$CONF")" ]; then
-  log "wg0 ya sincronizado — sin cambios"
-  exit 0
+  log "wg0 ya sincronizado — sin cambios en AllowedIPs"
+else
+  cp -a "$CONF" "$CONF.bak"
+  printf '%s\n' "$NEW" > "$CONF"
+  # Recarga en vivo sin tirar el túnel.
+  wg syncconf "$IFACE" <(wg-quick strip "$IFACE")
+  log "AllowedIPs actualizado y wg syncconf aplicado (backup en $CONF.bak)"
 fi
 
-cp -a "$CONF" "$CONF.bak"
-printf '%s\n' "$NEW" > "$CONF"
-# Recarga en vivo sin tirar el túnel.
-wg syncconf "$IFACE" <(wg-quick strip "$IFACE")
-log "AllowedIPs actualizado y wg syncconf aplicado (backup en $CONF.bak)"
+# ── Reconciliar SIEMPRE las rutas del kernel desde el AllowedIPs del [Peer] ──
+# `wg syncconf` NO crea rutas del sistema. `ip route replace` es idempotente:
+# crea la que falte y deja igual la que ya exista. Se saltan las /32 (IPs del
+# scan-pool que wg-quick gestiona vía [Interface] Address, no como red remota).
+ALLOWED="$(awk '
+  /^[[:space:]]*\[[Ii]nterface\]/ { sec="iface" }
+  /^[[:space:]]*\[[Pp]eer\]/      { sec="peer" }
+  sec=="peer" && /^[[:space:]]*[Aa]llowed[Ii][Pp]s[[:space:]]*=/ {
+    eq=index($0,"="); rest=substr($0,eq+1); gsub(/[ \t\r]/,"",rest); print rest
+  }' "$CONF")"
+
+IFS=',' read -ra CIDRS <<< "$ALLOWED"
+for cidr in "${CIDRS[@]}"; do
+  [ -z "$cidr" ] && continue
+  case "$cidr" in */32) continue ;; esac
+  if ip route replace "$cidr" dev "$IFACE" 2>/dev/null; then
+    log "ruta asegurada: $cidr dev $IFACE"
+  else
+    log "ADVERTENCIA: no se pudo asegurar ruta $cidr dev $IFACE"
+  fi
+done

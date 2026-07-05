@@ -4,7 +4,9 @@
 //  Cubre el fix H1 (broken access control): las rutas de MUTACIÓN de
 //  nodos solo tenían `verifyToken`, por lo que un MEMBER (viewer) podía
 //  crear/editar/eliminar nodos vía API directa (la UI las ocultaba pero
-//  el backend no lo reforzaba). Ahora todas exigen `requireOperator`.
+//  el backend no lo reforzaba). Ahora las MUTACIONES exigen `requireOperator`.
+//  Excepción: /node/history/add (append-only) se gatea por WORKSPACE, no por
+//  rol — un MEMBER registra eventos de sus nodos asignados.
 //
 //  Cubre también el fix H5: GET /node/tags se filtra por workspace.
 //
@@ -98,7 +100,6 @@ const MUTATION_ROUTES = [
   '/api/node/tag/save',
   '/api/node/creds/save',
   '/api/node/ssh-creds/save',
-  '/api/node/history/add',
   '/api/node/wg/set-peer',
   '/api/tunnel/repair',
 ];
@@ -114,6 +115,30 @@ describe('H1 — RBAC: un MEMBER (viewer) recibe 403 en mutaciones de nodos', ()
       expect(db.run).not.toHaveBeenCalled();
     });
   }
+});
+
+// /node/history/add es append-only y NO se protege por rol (un MEMBER registra
+// eventos de bitácora de sus nodos asignados); el gate es el WORKSPACE. Con
+// requireOperator, el 403 de permisos se confundía con sesión expirada en el
+// frontend → logout en cadena al activar el túnel.
+describe('H1 — /node/history/add: gate por workspace, no por rol', () => {
+  it('viewer con nodo AJENO a su workspace → 404 (no 403), sin escribir', async () => {
+    db.get.mockResolvedValue(null); // nodeBelongsToRequester → false
+    const r = await request(app).post('/api/node/history/add')
+      .set('x-test-identity', 'viewer')
+      .send({ pppUser: 'X', event: 'tunnel_activated' });
+    expect(r.status).toBe(404);
+    expect(db.run).not.toHaveBeenCalled();
+  });
+
+  it('viewer con nodo de SU workspace → 200 y registra el evento', async () => {
+    db.get.mockResolvedValueOnce({ '1': 1 }); // nodeBelongsToRequester → true
+    const r = await request(app).post('/api/node/history/add')
+      .set('x-test-identity', 'viewer')
+      .send({ pppUser: 'X', event: 'tunnel_activated' });
+    expect(r.status).toBe(200);
+    expect(db.run).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('H1 — RBAC: OWNER pasa el guard (no 403)', () => {

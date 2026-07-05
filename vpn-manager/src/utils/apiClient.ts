@@ -40,11 +40,25 @@ export const apiFetch = async (input: RequestInfo | URL, init?: RequestInit): Pr
     headers,
   });
 
-  // Interceptar 401 Unauthorized y 403 Forbidden (sesión inválida o expirada)
+  // Interceptar sesión inválida/expirada.
+  //  • 401 = sesión muerta SIEMPRE (token ausente/ilegible) → desloguear.
+  //  • 403 = AMBIGUO: puede ser "token expirado" (auth.middleware marca
+  //    `logout: true`) o "permiso denegado" (ej. requireOperator a un MEMBER).
+  //    SOLO el primero debe desloguear. Tratar TODO 403 como expiración
+  //    deslogueaba al usuario EN CADENA cuando un MEMBER tocaba un endpoint de
+  //    operador — p.ej. POST /node/history/add al activar su túnel asignado
+  //    devuelve 403 de permisos, no de sesión.
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : '';
   const isAuthRoute = url.includes('/api/auth/');
-  if (!isAuthRoute && (response.status === 401 || response.status === 403)) {
+  if (!isAuthRoute && response.status === 401) {
     window.dispatchEvent(new Event('auth_expired'));
+  } else if (!isAuthRoute && response.status === 403) {
+    // Desloguear solo si el backend marca la sesión como caduca (`logout: true`).
+    const clone = response.clone();
+    try {
+      const data: { logout?: boolean } = await clone.json();
+      if (data?.logout === true) window.dispatchEvent(new Event('auth_expired'));
+    } catch { /* body no-JSON → 403 de permisos, no de sesión: no desloguear */ }
   }
 
   // Interceptar 503 Service Unavailable — MikroTik no configurado.

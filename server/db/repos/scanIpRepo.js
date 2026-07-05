@@ -109,10 +109,15 @@ async function allocateInTx(tx, workspaceId) {
 
 /** Lista el mapeo completo (admin). */
 async function list() {
+  // COLLATE explícito en AMBOS lados: en MariaDB 11.4+ las tablas nuevas nacen
+  // en utf8mb4_uca1400_ai_ci, pero migrateScanIp fuerza workspace_scan_ip a
+  // general_ci → el JOIN con workspaces (uca1400) revienta "Illegal mix of
+  // collations". Forzar ambos operandos evita el mix sea cual sea el estado.
   return query(
     `SELECT wsi.workspace_id, wsi.scan_ip, w.name AS workspace_name
        FROM workspace_scan_ip wsi
-       LEFT JOIN workspaces w ON w.id = wsi.workspace_id
+       LEFT JOIN workspaces w
+         ON w.id COLLATE utf8mb4_general_ci = wsi.workspace_id COLLATE utf8mb4_general_ci
       ORDER BY wsi.scan_ip`
   );
 }

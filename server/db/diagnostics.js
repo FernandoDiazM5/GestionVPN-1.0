@@ -32,9 +32,12 @@ function decryptOk(enc) {
 
     console.log('\n=== workspace_scan_ip (scan-IP del VPS por workspace) ===');
     console.table(await db.all(
+      // COLLATE en ambos lados: MariaDB 11.4+ crea workspaces en uca1400_ai_ci
+      // pero workspace_scan_ip quedó en general_ci → el JOIN crudo revienta.
       `SELECT wsi.workspace_id, wsi.scan_ip, w.name AS workspace_name
          FROM workspace_scan_ip wsi
-         LEFT JOIN workspaces w ON w.id = wsi.workspace_id
+         LEFT JOIN workspaces w
+           ON w.id COLLATE utf8mb4_general_ci = wsi.workspace_id COLLATE utf8mb4_general_ci
         ORDER BY wsi.scan_ip`
     ));
 
