@@ -19,3 +19,4 @@ export * from './tunnel';
 export * from './nodes';
 export * from './device';
 export * from './settings';
+export * from './coreRouter';

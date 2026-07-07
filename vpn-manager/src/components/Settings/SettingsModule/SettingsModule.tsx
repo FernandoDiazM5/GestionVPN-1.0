@@ -4,6 +4,7 @@ import {
   SettingsMessages,
   SettingsLoadingState,
   ScanModeToggle,
+  CoreRouterWizard,
 } from './components';
 import { useLoadSettings, useSaveSettings } from './hooks';
 
@@ -41,6 +42,9 @@ export default function SettingsModule() {
           )}
         </div>
       </div>
+
+      {/* Habilitar un router como Servidor VPN (bootstrap del Core) */}
+      {!loadState.isLoading && <CoreRouterWizard />}
 
       {/* Modo de escaneo Producción(VPS) ↔ Local — persiste al instante */}
       {!loadState.isLoading && (
