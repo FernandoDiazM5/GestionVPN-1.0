@@ -1,5 +1,9 @@
 # Arquitectura — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> ⚠️ **DESACTUALIZADO / SUPERSEDED (2026-06-24).** Este documento quedó en 2026-06-10 (menciona `CO_MODERATOR` ya retirado, 62 tests, sin plano `10.x` ni autosync wg0).
+> El documento maestro vigente es **[`docs/arquitectura/Project_Architecture_Blueprint.md`](./docs/arquitectura/Project_Architecture_Blueprint.md)**, con los diagramas C4 MikroTik↔funciones en **[`docs/arquitectura/C4_MikroTik_Funciones.md`](./docs/arquitectura/C4_MikroTik_Funciones.md)**.
+> Se conserva como referencia histórica del REFACTOR_PLAN (fases 0-12).
+
 > Estado post-REFACTOR_PLAN (fases 0-12, 2026-06-10).
 > Para detalle por fase ver [HANDOFF.md](./HANDOFF.md).
 
