@@ -20,6 +20,7 @@ const workspaceRepo = require('../db/repos/workspaceRepo');
 const invitationRepo = require('../db/repos/invitationRepo');
 const userRepo = require('../db/repos/userRepo');
 const { sendInvitation } = require('../lib/mailer');
+const { syntheticEmail, isSyntheticEmail, isReservedUsername } = require('../lib/localAccount');
 const { removePeersFromRouter } = require('../lib/routerCleanup');
 const { setPeersEnabled, removeUserMangles } = require('../lib/routerPeerState');
 const { deprovisionNodeOnRouter } = require('../lib/nodeDeprovision');
@@ -43,7 +44,8 @@ async function getMikrotikCreds() {
 //   ⚠️ NO toca LIST-NET-REMOTE-TOWERS (LAN compartidas entre nodos hermanos).
 async function cleanupWorkspaceOnRouter({ wsId, publicKeys, userIds, nodeRows }) {
   const routerCleanup = await removePeersFromRouter(publicKeys);   // peers WG del ws
-  const mangleCleanup = await removeUserMangles(userIds);          // mangles por-usuario
+  // mangles por-usuario — scoped: no tocar la de un user cuyo túnel vivo es de otro ws
+  const mangleCleanup = await removeUserMangles(userIds, { workspaceId: wsId });
   let nodesDeprovisioned = 0;
   const mtCreds = await getMikrotikCreds();
   if (mtCreds) {
@@ -185,8 +187,9 @@ router.patch('/moderators/:id', asyncHandler(async (req, res) => {
         [mod.workspace_id]
       );
       const userIds = memberIds.map(r => r.user_id);
-      // Borrar mangle activo en el router (corte inmediato del acceso)
-      mangleCleanup = await removeUserMangles(userIds);
+      // Borrar mangle activo en el router (corte inmediato del acceso) —
+      // scoped: un member cuyo túnel vivo es de OTRO workspace no se toca
+      mangleCleanup = await removeUserMangles(userIds, { workspaceId: mod.workspace_id });
       // Cerrar sesiones en BD para que keepalive deje de pedir
       await query(
         `UPDATE tunnel_user_sessions
@@ -224,13 +227,36 @@ router.delete('/moderators/:id', asyncHandler(async (req, res) => {
      SELECT public_key FROM member_wireguard WHERE workspace_id = ? AND public_key IS NOT NULL`,
     [wsId, wsId]
   );
-  const publicKeys = peerKeyRows.map(r => r.public_key).filter(Boolean);
 
   const wsUserRows = await query(
     'SELECT user_id FROM workspace_members WHERE workspace_id = ?',
     [wsId]
   );
   const userIds = wsUserRows.map(r => r.user_id);
+
+  // Multi-membresía: users de este ws que SOBREVIVEN (miembros de otro ws).
+  // Su identidad de red es GLOBAL (peer WG + mgmt IP) → NO se limpia del
+  // router ni de BD; sus filas se reasignan al otro workspace (FK obliga).
+  let survivorIds = [];
+  const survivorKeys = new Set();
+  if (userIds.length) {
+    const ph = userIds.map(() => '?').join(',');
+    const rows = await query(
+      `SELECT DISTINCT user_id FROM workspace_members
+        WHERE user_id IN (${ph}) AND workspace_id <> ? AND deleted_at IS NULL`,
+      [...userIds, wsId]
+    );
+    survivorIds = rows.map(r => r.user_id);
+    if (survivorIds.length) {
+      const ph2 = survivorIds.map(() => '?').join(',');
+      const keyRows = await query(
+        `SELECT public_key FROM member_wireguard WHERE user_id IN (${ph2}) AND public_key IS NOT NULL`,
+        survivorIds
+      );
+      keyRows.forEach(r => survivorKeys.add(r.public_key));
+    }
+  }
+  const publicKeys = peerKeyRows.map(r => r.public_key).filter(k => k && !survivorKeys.has(k));
 
   const nodeRows = await query(
     'SELECT ppp_user, nombre_vrf FROM nodes WHERE workspace_id = ? AND ppp_user IS NOT NULL',
@@ -244,6 +270,32 @@ router.delete('/moderators/:id', asyncHandler(async (req, res) => {
       [wsId]
     );
     const wsUserIds = memberRows.map(r => r.user_id);
+
+    // 1b) Reasignar la identidad de red GLOBAL de los users que sobreviven
+    //     (miembros de otro ws): sus filas de user_mgmt_ips/member_wireguard/
+    //     mgmt_peer_owners pasan a apuntar a su otro workspace, para que los
+    //     DELETE por workspace de abajo no las arrastren (y la FK no bloquee).
+    for (const uid of survivorIds) {
+      const other = (await tx.query(
+        `SELECT workspace_id FROM workspace_members
+          WHERE user_id = ? AND workspace_id <> ? AND deleted_at IS NULL
+          ORDER BY created_at ASC LIMIT 1`,
+        [uid, wsId]
+      ))[0];
+      if (!other) continue;
+      await tx.query('UPDATE user_mgmt_ips SET workspace_id = ? WHERE user_id = ? AND workspace_id = ?',
+        [other.workspace_id, uid, wsId]);
+      await tx.query('UPDATE member_wireguard SET workspace_id = ? WHERE user_id = ? AND workspace_id = ?',
+        [other.workspace_id, uid, wsId]);
+      // PK(public_key, workspace_id): IGNORE si ya existe la fila destino.
+      await tx.query(
+        `UPDATE IGNORE mgmt_peer_owners mpo
+           JOIN member_wireguard mw ON mw.public_key = mpo.public_key AND mw.user_id = ?
+            SET mpo.workspace_id = ?
+          WHERE mpo.workspace_id = ?`,
+        [uid, other.workspace_id, wsId]
+      );
+    }
 
     // 2) Auditoría / sesiones (FK NOT NULL a workspaces → borrar primero)
     await tx.query('DELETE FROM tunnel_session_logs WHERE workspace_id = ?', [wsId]);
@@ -308,30 +360,58 @@ router.delete('/moderators/:id', asyncHandler(async (req, res) => {
 }));
 
 // ── POST /api/admin/moderators — alta directa de un Moderador ──
+//  Identidad = email real XOR username (cuenta LOCAL sin correo: se le
+//  sintetiza `<username>@local.app`; el moderador asocia su correo después
+//  desde Perfil → Correo). El UNIQUE de users.email da la unicidad.
 const createSchema = CreateModeratorRequestSchema;
 
 router.post('/moderators', asyncHandler(async (req, res) => {
-  const { email, password, name, workspaceName } = createSchema.parse(req.body);
+  const { email: rawEmail, username, password, name, workspaceName } = createSchema.parse(req.body);
 
-  const existing = await query('SELECT id FROM users WHERE email = ? AND deleted_at IS NULL LIMIT 1', [email]);
-  if (existing.length) throw new AppError('Ese email ya está registrado', 409, 'EMAIL_TAKEN');
+  let email;
+  if (username) {
+    // Rama username (cuenta local sin correo real)
+    if (isReservedUsername(username)) {
+      throw new AppError('Ese usuario está reservado para la plataforma', 400, 'USERNAME_RESERVED');
+    }
+    email = syntheticEmail(username);
+    if (await userRepo.findByEmail(email)) {
+      throw new AppError('Ese usuario ya está registrado', 409, 'USERNAME_TAKEN');
+    }
+    // El login corto también resuelve por `name` (sessionBridge fallback):
+    // no dejar que el username nuevo se confunda con el name de otro user.
+    if (await userRepo.findByName(username)) {
+      throw new AppError('Ese usuario coincide con el nombre de otra cuenta', 409, 'NAME_CONFLICT');
+    }
+  } else {
+    // Rama email real: nadie registra el dominio sintético a mano.
+    if (isSyntheticEmail(rawEmail)) {
+      throw new AppError('Ese dominio de correo está reservado', 400, 'EMAIL_RESERVED_DOMAIN');
+    }
+    email = rawEmail;
+    const existing = await query('SELECT id FROM users WHERE email = ? AND deleted_at IS NULL LIMIT 1', [email]);
+    if (existing.length) throw new AppError('Ese email ya está registrado', 409, 'EMAIL_TAKEN');
+  }
 
+  // En cuentas locales `name` = username por defecto: mantiene el login corto
+  // vivo (findByName) incluso si después asocia un correo real.
+  const displayName = name || username || '';
   const userId = crypto.randomUUID();
   const now = Date.now();
   const wsId = await withTransaction(async (tx) => {
     await tx.query(
       `INSERT INTO users (id, email, password_hash, name, is_platform_admin, email_verified, created_at, updated_at)
        VALUES (?,?,?,?,0,1,?,?)`,
-      [userId, email, await bcrypt.hash(password, 10), name || '', now, now]
+      [userId, email, await bcrypt.hash(password, 10), displayName, now, now]
     );
     const { workspaceId } = await workspaceRepo.createForOwner(tx, {
-      ownerId: userId, name: workspaceName || `Espacio de ${name || email.split('@')[0]}`,
+      ownerId: userId, name: workspaceName || `Espacio de ${displayName || email.split('@')[0]}`,
     });
     return workspaceId;
   });
 
   return sendOk(res, {
-    moderator: { user_id: userId, email, name: name || '', workspace_id: wsId },
+    moderator: { user_id: userId, email, username: username || null, name: displayName, workspace_id: wsId },
     message: 'Moderador creado',
   }, 201);
 }));
@@ -344,6 +424,11 @@ const inviteModeratorSchema = InviteModeratorRequestSchema;
 
 router.post('/invite-moderator', asyncHandler(async (req, res) => {
   const { email, name, workspaceName } = inviteModeratorSchema.parse(req.body);
+
+  // El dominio sintético de cuentas locales no es invitable (no recibe correo).
+  if (isSyntheticEmail(email)) {
+    throw new AppError('Ese dominio de correo está reservado', 400, 'EMAIL_RESERVED_DOMAIN');
+  }
 
   // ¿Ya existe un usuario activo con ese email?
   const existing = await userRepo.findByEmail(email);

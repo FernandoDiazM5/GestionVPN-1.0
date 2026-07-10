@@ -155,7 +155,8 @@ CREATE TABLE IF NOT EXISTS member_wireguard (
   config_enc    TEXT,                    -- .conf cifrado (AES-256-GCM) — solo modo 'generate'
   created_at    BIGINT       NOT NULL,
   PRIMARY KEY (id),
-  UNIQUE KEY uq_member_wg (workspace_id, user_id),
+  UNIQUE KEY uq_member_wg (user_id),      -- 1 peer WG por persona GLOBAL (multi-workspace)
+  KEY idx_mwg_ws (workspace_id),          -- índice de la FK (donde se provisionó)
   CONSTRAINT fk_mwg_ws   FOREIGN KEY (workspace_id) REFERENCES workspaces(id),
   CONSTRAINT fk_mwg_user FOREIGN KEY (user_id)      REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

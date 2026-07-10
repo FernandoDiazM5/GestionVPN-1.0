@@ -16,6 +16,7 @@ const {
   ChangePasswordRequestSchema,
   ChangeEmailRequestSchema,
   ChangeEmailConfirmSchema,
+  SwitchWorkspaceRequestSchema,
 } = require('@gestionvpn/contracts');
 
 const { asyncHandler, AppError, sendOk } = require('../lib/apiResponse');
@@ -29,6 +30,11 @@ const { requireSession, invalidateUserCache } = require('../middleware/authJwt')
 const { query } = require('../db/mysql');
 const { verifyToken } = require('../auth.middleware');
 const { buildSessionForLegacyUser } = require('../lib/sessionBridge');
+const { isSyntheticEmail } = require('../lib/localAccount');
+const memberRepo = require('../db/repos/memberRepo');
+const tunnelService = require('../lib/tunnelService');
+const { getAppSetting, decryptPass } = require('../db.service');
+const log = require('../lib/logger').child({ scope: 'account' });
 
 const router = express.Router();
 
@@ -222,6 +228,75 @@ router.get('/me', requireSession, asyncHandler(async (req, res) => {
 }));
 
 // ════════════════════════════════════════════════════════════════════════════
+//  Multi-workspace: membresías + switch del workspace activo
+//  Un usuario puede ser OWNER de su workspace y MEMBER en otros (invitado).
+//  La sesión JWT lleva UN workspace activo; estos endpoints listan las
+//  membresías y re-emiten la cookie con el destino elegido.
+// ════════════════════════════════════════════════════════════════════════════
+
+// ── GET /workspaces — membresías del usuario (para el selector) ──
+router.get('/workspaces', requireSession, asyncHandler(async (req, res) => {
+  const memberships = await workspaceRepo.listMembershipsByUser(req.account.sub);
+  return sendOk(res, {
+    workspaces: memberships.map((m) => ({
+      workspace_id: m.workspace_id,
+      workspace_name: m.workspace_name,
+      role: m.role,
+      active: m.workspace_id === req.account.workspace_id,
+    })),
+  });
+}));
+
+// ── POST /switch-workspace — cambia el workspace activo de la sesión ──
+//  Valida la membresía SERVER-SIDE (el token viejo no da derechos sobre el
+//  destino) y desactiva el túnel activo del workspace saliente (1 túnel
+//  activo global por persona — la mangle del router es por-usuario).
+router.post('/switch-workspace', requireSession, asyncHandler(async (req, res) => {
+  const { workspaceId } = SwitchWorkspaceRequestSchema.parse(req.body);
+
+  const membership = await memberRepo.findMembership(workspaceId, req.account.sub);
+  if (!membership) throw new AppError('No eres miembro de ese workspace', 403, 'NOT_A_MEMBER');
+  const ws = await workspaceRepo.findById(workspaceId);
+  if (!ws) throw new AppError('Workspace no encontrado', 404, 'NOT_FOUND');
+
+  // Best-effort: cerrar el túnel del workspace saliente (mangle + sesión).
+  // Un router caído NO bloquea el switch (§4.17); la sesión BD que quede
+  // viva la cierra el próximo activate (cierre global) o el expirationJob.
+  if (workspaceId !== req.account.workspace_id) {
+    try {
+      const ip = await getAppSetting('MT_IP');
+      const user = await getAppSetting('MT_USER');
+      const passData = await getAppSetting('MT_PASS');
+      if (ip && user && passData) {
+        await tunnelService.deactivateTunnel({
+          account: req.account,
+          mikrotik: { ip, user, pass: decryptPass(passData) },
+          clientIp: req._clientIp || '-',
+        });
+      }
+    } catch (e) {
+      log.warn({ err: e?.message, from: req.account.workspace_id, to: workspaceId },
+        'switch-workspace: no se pudo desactivar el túnel saliente (best-effort)');
+    }
+  }
+
+  const user = await userRepo.findById(req.account.sub);
+  const token = signSession({
+    sub: req.account.sub, email: req.account.email,
+    workspace_id: workspaceId, role: membership.role,
+    platform_admin: !!req.account.platform_admin,
+  });
+  setSessionCookie(res, token);
+  return sendOk(res, {
+    user: {
+      id: req.account.sub, email: req.account.email, name: user?.name,
+      role: membership.role, workspace_id: workspaceId, workspace_name: ws.name,
+      platform_admin: !!req.account.platform_admin,
+    },
+  });
+}));
+
+// ════════════════════════════════════════════════════════════════════════════
 //  Ajustes del usuario logueado (Fase C)
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -257,6 +332,10 @@ router.patch('/email/request', requireSession, asyncHandler(async (req, res) => 
   const { newEmail } = changeEmailRequestSchema.parse(req.body);
   const lc = newEmail.toLowerCase();
 
+  // El dominio sintético de cuentas locales no es un correo real.
+  if (isSyntheticEmail(lc)) {
+    throw new AppError('Ese dominio de correo está reservado', 400, 'EMAIL_RESERVED_DOMAIN');
+  }
   if (lc === String(req.account.email).toLowerCase()) {
     throw new AppError('El correo nuevo es igual al actual', 400, 'SAME_EMAIL');
   }

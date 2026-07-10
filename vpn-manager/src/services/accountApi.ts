@@ -7,6 +7,7 @@ import type {
   NotificationPreferences,
   NotificationStatus,
   TelegramLinkStartResponse,
+  WorkspaceMembership,
 } from '@gestionvpn/contracts';
 
 export const accountApi = {
@@ -14,6 +15,16 @@ export const accountApi = {
 
   /** Re-emite la cookie de sesión multi-usuario tomando como base la sesión actual. */
   bridge: () => post<{ success: true; user: SessionUser }>('/api/account/bridge'),
+
+  // ── Multi-workspace ─────────────────────────────────────────
+  /** Todas las membresías del usuario (para el selector de workspace). */
+  myWorkspaces: () =>
+    get<{ success: true; workspaces: WorkspaceMembership[] }>('/api/account/workspaces'),
+
+  /** Cambia el workspace activo: re-emite la cookie con el destino.
+   *  Tras el OK conviene `window.location.reload()` (remonta los contexts). */
+  switchWorkspace: (workspaceId: string) =>
+    post<{ success: true; user: SessionUser }>('/api/account/switch-workspace', { workspaceId }),
 
   register: (email: string, password: string, name?: string) =>
     post<{ success: true; dev?: boolean }>('/api/account/register', { email, password, name }),

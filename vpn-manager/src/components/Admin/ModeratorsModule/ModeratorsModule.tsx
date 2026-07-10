@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import {
   UserCog, UserPlus, Loader2, RefreshCw, X, Briefcase, Mail, KeyRound,
-  Pencil, Trash2, Ban, Power, AlertTriangle, Link2, Copy, Check, Clock,
+  Pencil, Trash2, Ban, Power, AlertTriangle, Link2, Copy, Check, Clock, User,
 } from 'lucide-react';
 import { adminApi } from '../../../services/adminApi';
 import type { PendingInvitation } from '../../../services/adminApi';
 import { useWorkspaceSession } from '../../../context/WorkspaceSession';
 import { isPlatformAdmin } from '../../../utils/permissions';
+import { isLocalAccount, localUsername, displayEmail } from '../../../utils/identity';
 import type { Moderator } from '../../../types/account';
 
 /** Copia texto al portapapeles con fallback para navegadores sin clipboard API. */
@@ -127,10 +128,13 @@ export default function ModeratorsModule() {
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="font-semibold text-slate-800 dark:text-slate-100 truncate">{m.name || m.email.split('@')[0]}</p>
+                          <p className="font-semibold text-slate-800 dark:text-slate-100 truncate">{m.name || localUsername(m.email)}</p>
+                          {isLocalAccount(m.email) && <span className="badge badge-neutral text-2xs">sin correo</span>}
                           {m.disabled && <span className="badge badge-warning">Suspendido</span>}
                         </div>
-                        <p className="font-mono text-2xs text-slate-400 dark:text-slate-500 truncate">{m.email}</p>
+                        <p className="font-mono text-2xs text-slate-400 dark:text-slate-500 truncate">
+                          {displayEmail(m.email) ?? `usuario: ${localUsername(m.email)}`}
+                        </p>
                       </div>
                     </div>
                   </td>
@@ -278,30 +282,100 @@ function PendingInvitationsCard({ invites }: { invites: PendingInvitation[] }) {
   );
 }
 
-// ── Crear (Invitar) ───────────────────────────────────────────────────────
-//  Mismo UX que invitar un miembro: solo email, le llega correo con link, el
-//  invitado define su contraseña y genera su WG, y queda como OWNER de su ws.
+// ── Crear ───────────────────────────────────────────────────────────────────
+//  Dos modos:
+//  • Directo (usuario): alta inmediata con usuario + contraseña, SIN correo
+//    (cuenta local `<usuario>@local.app`; el moderador asocia su correo después
+//    desde Perfil → Correo). Muestra las credenciales UNA vez.
+//  • Por invitación (correo): flujo existente — email con link, el invitado
+//    define su contraseña y genera su WG.
+const USERNAME_RE = /^[a-z0-9][a-z0-9._-]*[a-z0-9]$/;
+
+/** Contraseña aleatoria segura (sin caracteres ambiguos). */
+function generatePassword(len = 14): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!#$%*+';
+  const buf = new Uint32Array(len);
+  crypto.getRandomValues(buf);
+  return Array.from(buf, (n) => alphabet[n % alphabet.length]).join('');
+}
+
 function CreateModeratorModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const [mode, setMode] = useState<'direct' | 'invite'>('direct');
   const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [workspaceName, setWorkspaceName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState<{ email: string; acceptUrl: string; emailSent: boolean } | null>(null);
+  const [created, setCreated] = useState<{ username: string; password: string } | null>(null);
   const [copied, setCopied] = useState(false);
 
+  const usernameOk = username.length >= 3 && username.length <= 32 && USERNAME_RE.test(username);
+  const canSubmit = mode === 'direct'
+    ? usernameOk && password.length >= 8
+    : !!email.trim();
+
   const submit = async () => {
+    if (!canSubmit) return;
     setBusy(true); setError(null);
     try {
-      const r = await adminApi.inviteModerator({
-        email: email.trim(),
-        name: name.trim() || undefined,
-        workspaceName: workspaceName.trim() || undefined,
-      });
-      setSent({ email: r.email, acceptUrl: r.acceptUrl, emailSent: r.emailSent });
+      if (mode === 'direct') {
+        await adminApi.createModerator({
+          username,
+          password,
+          name: name.trim() || undefined,
+          workspaceName: workspaceName.trim() || undefined,
+        });
+        setCreated({ username, password });
+      } else {
+        const r = await adminApi.inviteModerator({
+          email: email.trim(),
+          name: name.trim() || undefined,
+          workspaceName: workspaceName.trim() || undefined,
+        });
+        setSent({ email: r.email, acceptUrl: r.acceptUrl, emailSent: r.emailSent });
+      }
     } catch (e) { setError(e instanceof Error ? e.message : 'Error'); }
     finally { setBusy(false); }
   };
+
+  // Resultado del alta directa: credenciales UNA sola vez.
+  if (created) {
+    const credsText = `Usuario: ${created.username}\nContraseña: ${created.password}`;
+    const copy = async () => {
+      const ok = await copyToClipboard(credsText);
+      if (ok) { setCopied(true); setTimeout(() => setCopied(false), 2500); }
+      else window.prompt('Copia estas credenciales y compártelas con el moderador:', credsText);
+    };
+    return (
+      <ModalShell icon={<UserPlus className="w-4 h-4 text-white" />} title="Moderador creado" busy={false} onClose={() => { onCreated(); onClose(); }}>
+        <div className="space-y-3">
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-3">
+            <p className="text-xs text-amber-700 dark:text-amber-300 font-semibold">⚠ Guarda estas credenciales ahora — no se volverán a mostrar.</p>
+            <p className="text-2xs text-amber-700 dark:text-amber-400 mt-0.5">Compárteselas al moderador por un canal seguro. Podrá asociar su correo después desde su perfil.</p>
+          </div>
+          <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-3 bg-slate-50/60 dark:bg-slate-800/40 space-y-2">
+            <div className="flex items-center justify-between gap-3 text-xs">
+              <span className="text-slate-500 dark:text-slate-400">Usuario</span>
+              <span className="font-mono font-semibold text-slate-700 dark:text-slate-200">{created.username}</span>
+            </div>
+            <div className="flex items-center justify-between gap-3 text-xs">
+              <span className="text-slate-500 dark:text-slate-400">Contraseña</span>
+              <span className="font-mono font-semibold text-slate-700 dark:text-slate-200">{created.password}</span>
+            </div>
+          </div>
+          <button onClick={copy} className="btn-primary px-4 py-2.5 w-full flex items-center justify-center gap-2 text-sm">
+            {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}{copied ? 'Copiado' : 'Copiar credenciales'}
+          </button>
+        </div>
+        <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+          <button onClick={() => { onCreated(); onClose(); }} className="btn-ghost btn-md">Cerrar</button>
+        </div>
+      </ModalShell>
+    );
+  }
 
   if (sent) {
     const copy = async () => {
@@ -343,17 +417,66 @@ function CreateModeratorModal({ onClose, onCreated }: { onClose: () => void; onC
     );
   }
 
+  const segBase = 'flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5';
+  const segOn = 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-sm';
+  const segOff = 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200';
+
   return (
     <ModalShell icon={<UserPlus className="w-4 h-4 text-white" />} title="Nuevo Moderador" busy={busy} onClose={onClose}>
-      <p className="text-xs text-slate-500 dark:text-slate-400 -mt-1">
-        Le enviaremos un correo con el código de invitación. El moderador definirá su contraseña
-        y generará su configuración WireGuard al aceptar.
-      </p>
-      <div className="relative">
-        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
-        <input className={inputCls + ' pl-10'} type="email" placeholder="Correo del moderador" value={email} onChange={e => setEmail(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && email.trim() && submit()} />
+      {/* Selector de modo */}
+      <div className="flex gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-800">
+        <button type="button" onClick={() => { setMode('direct'); setError(null); }}
+          className={`${segBase} ${mode === 'direct' ? segOn : segOff}`}>
+          <User className="w-3.5 h-3.5" /> Directo (usuario)
+        </button>
+        <button type="button" onClick={() => { setMode('invite'); setError(null); }}
+          className={`${segBase} ${mode === 'invite' ? segOn : segOff}`}>
+          <Mail className="w-3.5 h-3.5" /> Por invitación (correo)
+        </button>
       </div>
+
+      {mode === 'direct' ? (
+        <>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Alta inmediata con usuario y contraseña, sin correo. El moderador podrá asociar
+            su correo después desde su perfil.
+          </p>
+          <div className="relative">
+            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
+            <input className={inputCls + ' pl-10 font-mono'} placeholder="Usuario (ej. soporte1)" value={username}
+              onChange={e => setUsername(e.target.value.toLowerCase().trim())} autoComplete="off" />
+          </div>
+          {username.length > 0 && !usernameOk && (
+            <p className="text-2xs text-amber-600 dark:text-amber-400 font-medium -mt-1.5">
+              3-32 caracteres: minúsculas, números y . _ - (sin empezar/terminar con símbolo).
+            </p>
+          )}
+          <div className="flex items-stretch gap-2">
+            <div className="relative flex-1">
+              <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
+              <input className={inputCls + ' pl-10 font-mono'} type="text" placeholder="Contraseña (mín. 8)" value={password}
+                onChange={e => setPassword(e.target.value)} autoComplete="new-password" />
+            </div>
+            <button type="button" onClick={() => setPassword(generatePassword())}
+              className="btn-outline px-3 flex items-center gap-1.5 text-xs shrink-0" title="Generar contraseña segura">
+              <RefreshCw className="w-3.5 h-3.5" /> Generar
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Le enviaremos un correo con el código de invitación. El moderador definirá su contraseña
+            y generará su configuración WireGuard al aceptar.
+          </p>
+          <div className="relative">
+            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
+            <input className={inputCls + ' pl-10'} type="email" placeholder="Correo del moderador" value={email} onChange={e => setEmail(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && email.trim() && submit()} />
+          </div>
+        </>
+      )}
+
       <input className={inputCls} placeholder="Nombre (opcional)" value={name} onChange={e => setName(e.target.value)} />
       <div className="relative">
         <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
@@ -362,8 +485,10 @@ function CreateModeratorModal({ onClose, onCreated }: { onClose: () => void; onC
       {error && <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">{error}</p>}
       <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
         <button onClick={onClose} className="btn-ghost btn-md">Cancelar</button>
-        <button onClick={submit} disabled={busy || !email.trim()} className="btn-primary px-5 py-2.5 flex items-center gap-2 text-sm disabled:opacity-40">
-          {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />} Enviar invitación
+        <button onClick={submit} disabled={busy || !canSubmit} className="btn-primary px-5 py-2.5 flex items-center gap-2 text-sm disabled:opacity-40">
+          {busy ? <Loader2 className="w-4 h-4 animate-spin" />
+            : mode === 'direct' ? <UserPlus className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
+          {mode === 'direct' ? 'Crear moderador' : 'Enviar invitación'}
         </button>
       </div>
     </ModalShell>
@@ -388,7 +513,9 @@ function EditModeratorModal({ mod, onClose, onSaved }: { mod: Moderator; onClose
 
   return (
     <ModalShell icon={<Pencil className="w-4 h-4 text-white" />} title="Editar moderador" busy={busy} onClose={onClose}>
-      <p className="font-mono text-2xs text-slate-400 dark:text-slate-500 -mt-1">{mod.email}</p>
+      <p className="font-mono text-2xs text-slate-400 dark:text-slate-500 -mt-1">
+        {displayEmail(mod.email) ?? `usuario: ${localUsername(mod.email)}`}
+      </p>
       <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">Nombre</label>
       <input className={inputCls} placeholder="Nombre del moderador" value={name} onChange={e => setName(e.target.value)} />
       <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">Workspace</label>
@@ -426,7 +553,7 @@ function ResetPasswordModal({ mod, onClose, onSaved }: { mod: Moderator; onClose
   return (
     <ModalShell icon={<KeyRound className="w-4 h-4 text-white" />} title="Resetear contraseña" busy={busy} onClose={onClose}>
       <p className="text-xs text-slate-500 dark:text-slate-400">
-        Nueva contraseña para <span className="font-semibold text-slate-700 dark:text-slate-200">{mod.name || mod.email}</span>.
+        Nueva contraseña para <span className="font-semibold text-slate-700 dark:text-slate-200">{mod.name || displayEmail(mod.email) || localUsername(mod.email)}</span>.
       </p>
       <div className="relative">
         <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
@@ -466,7 +593,7 @@ function DeleteModeratorModal({ mod, onClose, onDeleted }: { mod: Moderator; onC
           <AlertTriangle className="w-5 h-5 text-rose-500" />
         </div>
         <div className="text-sm text-slate-600 dark:text-slate-300">
-          Se dará de baja a <span className="font-semibold text-slate-800 dark:text-slate-100">{mod.name || mod.email}</span> y
+          Se dará de baja a <span className="font-semibold text-slate-800 dark:text-slate-100">{mod.name || displayEmail(mod.email) || localUsername(mod.email)}</span> y
           su workspace <span className="font-semibold">{mod.workspace_name}</span>
           {mod.miembros > 0 && <> (con {mod.miembros} miembro{mod.miembros !== 1 ? 's' : ''})</>}. Su acceso quedará bloqueado.
         </div>

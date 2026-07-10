@@ -6,8 +6,9 @@ import { useWorkspaceEvents } from '../../../hooks/useWorkspaceEvents';
 import { teamApi } from '../../../services/teamApi';
 import { auditApi } from '../../../services/auditApi';
 import { ROLE_LABEL } from '../../../types/account';
-import type { Member, Invitation, AuditLog, Role } from '../../../types/account';
+import type { Member, Invitation, AuditLog } from '../../../types/account';
 import { canInvite, isModerator } from '../../../utils/permissions';
+import { localUsername, displayEmail } from '../../../utils/identity';
 import MembersTable from './components/MembersTable';
 import InvitePanel from './components/InvitePanel';
 import AuditTimeline from './components/AuditTimeline';
@@ -71,10 +72,10 @@ export default function TeamModule() {
   // SSE: refresca el timeline cuando cualquier miembro ejecuta una acción
   useWorkspaceEvents(reloadLogs, !!session);
 
-  const handleInvite = async (email: string, role: Exclude<Role, 'OWNER'>, tunnelId?: string, name?: string) => {
-    const r = await teamApi.invite(email, role, tunnelId, name);
+  const handleInvite = async (data: { email?: string; username?: string; name?: string }) => {
+    const r = await teamApi.invite(data);
     await loadData();
-    return r.dev ? 'dev' : null;
+    return r.inApp ? 'inapp' : r.dev ? 'dev' : null;
   };
   const onInvitationAccepted = () => { refresh(); loadData(); };
   const handleRevoke = async (id: string) => { await teamApi.revokeInvitation(id); await loadData(); };
@@ -135,13 +136,13 @@ export default function TeamModule() {
           icon={<Crown className="w-4 h-4 text-amber-500" />}
           tag="Propietario"
           name={owner?.name || (loadingData ? '—' : 'Sin propietario')}
-          email={owner?.email}
+          email={displayEmail(owner?.email) ?? undefined}
         />
         <PersonRow
           icon={<UserIcon className="w-4 h-4 text-indigo-500" />}
           tag="Tú"
-          name={session.name || session.email.split('@')[0]}
-          email={session.email}
+          name={session.name || localUsername(session.email)}
+          email={displayEmail(session.email) ?? undefined}
           badge={
             <span className="badge badge-info inline-flex items-center gap-1">
               <ShieldCheck className="w-3 h-3" /> {ROLE_LABEL[session.role]}

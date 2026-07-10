@@ -35,12 +35,4 @@ async function listMembers(workspaceId) {
   return rows.map(r => ({ ...r, disabled: !!r.disabled_at }));
 }
 
-async function softRemove(workspaceId, userId) {
-  const r = await query(
-    "UPDATE workspace_members SET deleted_at = ? WHERE workspace_id = ? AND user_id = ? AND deleted_at IS NULL AND role <> 'OWNER'",
-    [Date.now(), workspaceId, userId]
-  );
-  return r.affectedRows > 0;
-}
-
-module.exports = { findMembership, add, listMembers, softRemove };
+module.exports = { findMembership, add, listMembers };

@@ -28,10 +28,11 @@ const assignmentRepo = require('../db/repos/assignmentRepo');
 const memberWgRepo = require('../db/repos/memberWgRepo');
 const mgmtIpRepo = require('../db/repos/mgmtIpRepo');
 const mgmtNet = require('../lib/mgmtNet');
-const { mgmtAllowedIpsFor, readTowerLans } = require('../lib/mgmtAllowedIps');
+const { mgmtAllowedIpsFor, mgmtAllowedIpsForUser, readTowerLans } = require('../lib/mgmtAllowedIps');
 const { generateKeyPair, buildClientConf } = require('../lib/wgkeys');
 const { lowestFreeOctet } = require('../lib/ipAlloc');
 const { encrypt, decrypt } = require('../lib/crypto');
+const { isSyntheticEmail, syntheticEmail } = require('../lib/localAccount');
 const { connectToMikrotik, safeWrite, writeIdempotent, getErrorMessage, isUnreachable } = require('../routeros.service');
 const { getAppSetting, decryptPass, getDb } = require('../db.service');
 const { removePeersFromRouter } = require('../lib/routerCleanup');
@@ -87,15 +88,18 @@ function sanitizeComment(s) {
 async function buildPeerComment(workspaceId, userId, role) {
   const db = await getDb();
   const row = await db.get(
-    `SELECT u.email, w.name AS ws_name
+    `SELECT u.email, u.name, w.name AS ws_name
        FROM users u
        JOIN workspaces w ON w.id = ?
       WHERE u.id = ? LIMIT 1`,
     [workspaceId, userId]
   );
-  const email = row?.email || `user:${userId.slice(0, 8)}`;
+  // Cuenta local (email sintético): el username (name) identifica mejor.
+  const who = (isSyntheticEmail(row?.email) && row?.name)
+    ? row.name
+    : (row?.email || `user:${userId.slice(0, 8)}`);
   const ws = row?.ws_name || `ws:${workspaceId.slice(0, 8)}`;
-  return sanitizeComment(`${ws} - ${email} - ${role || 'MEMBER'}`);
+  return sanitizeComment(`${ws} - ${who} - ${role || 'MEMBER'}`);
 }
 
 // Crea el peer WireGuard del miembro en el router usando SU clave pública
@@ -145,6 +149,16 @@ async function provisionMemberWgByPublicKey(mikrotik, { workspaceId, userId, pub
     const towerLans = await readTowerLans(api, safeWrite);
     await api.close();
     const endpoint = `${publicIp}:${listenPort}`;
+    // Peer GLOBAL por persona: si el user tenía OTRO peer (clave distinta,
+    // p.ej. re-provisión desde otro workspace), se limpia del router para no
+    // dejar huérfanos — el upsert de abajo pisa la fila única por user.
+    const prevRow = await memberWgRepo.getByUser(workspaceId, userId);
+    if (prevRow?.public_key && prevRow.public_key !== publicKey) {
+      try {
+        await removePeerByPublicKey(mikrotik, prevRow.public_key);
+        await (await getDb()).run('DELETE FROM mgmt_peer_owners WHERE public_key = ?', [prevRow.public_key]);
+      } catch (e) { log.warn({ err: e.message, userId }, 'peer global: no se pudo limpiar el peer anterior (no bloqueante)'); }
+    }
     await memberWgRepo.upsert({
       workspaceId, userId, peerName: peerComment, allowedIp: nextIp,
       publicKey, serverPublicKey: serverPub, endpoint, configEnc: null,
@@ -171,8 +185,9 @@ async function provisionMemberWgByPublicKey(mikrotik, { workspaceId, userId, pub
       // No bloqueamos la provisión; el operador puede limpiar con mapUserMgmtIp.js.
       log.warn({ err: e?.message, userId, mgmtIp: nextIp }, 'user_mgmt_ips upsert falló (no bloqueante)');
     }
-    // AllowedIPs split-tunnel = base RFC1918 + LAN de torre públicas (DB + address-list).
-    const allowedIps = await mgmtAllowedIpsFor(workspaceId, { addressList: towerLans });
+    // AllowedIPs split-tunnel = base RFC1918 + UNIÓN de LAN públicas de TODOS
+    // los workspaces del user (peer global multi-workspace) + address-list.
+    const allowedIps = await mgmtAllowedIpsForUser(userId, { addressList: towerLans });
     return { allowedIp: nextIp, serverPublicKey: serverPub, endpoint, allowedIps };
   } catch (e) {
     if (api) try { await api.close(); } catch (_) { /* noop */ }
@@ -210,11 +225,32 @@ const genOtp = () => String(crypto.randomInt(100000, 1000000));
 // ── POST /invite  (solo OWNER) — invita un MIEMBRO al workspace ──
 router.post('/invite', requireSession, requireRole('OWNER'),
   asyncHandler(async (req, res) => {
-    const { email, name, role, tunnelId } = inviteSchema.parse(req.body);
+    const { email: rawEmail, username, name, role, tunnelId } = inviteSchema.parse(req.body);
     const wsId = req.account.workspace_id;
 
+    // Destinatario: correo directo XOR username de un usuario EXISTENTE de la
+    // plataforma (multi-workspace: se le invita como MEMBER sin crear cuenta).
+    // El username se resuelve SERVER-SIDE a su email (sintético o real); la
+    // invitación cae en su bandeja in-app (GET /my-invitations lista por email).
+    let email = rawEmail;
+    let existingUser = null;
+    if (username) {
+      existingUser = await userRepo.findByEmail(syntheticEmail(username))
+        || await userRepo.findByName(username);
+      if (!existingUser) {
+        throw new AppError('No existe un usuario con ese nombre', 404, 'USER_NOT_FOUND');
+      }
+      email = existingUser.email;
+    } else {
+      existingUser = await userRepo.findByEmail(email);
+    }
+
+    // No puede invitarse a sí mismo (el OWNER ya es miembro, pero da un
+    // mensaje más claro que el 409 genérico).
+    if (existingUser && existingUser.id === req.account.sub) {
+      throw new AppError('No puedes invitarte a ti mismo', 400, 'SELF_INVITE');
+    }
     // ¿Ya es miembro?
-    const existingUser = await userRepo.findByEmail(email);
     if (existingUser && await memberRepo.findMembership(wsId, existingUser.id)) {
       throw new AppError('Ese usuario ya es miembro del workspace', 409, 'ALREADY_MEMBER');
     }
@@ -242,25 +278,33 @@ router.post('/invite', requireSession, requireRole('OWNER'),
     // El envío de correo NO debe bloquear/romper la creación de la invitación:
     // si SMTP está mal configurado o falla, devolvemos la invitación creada
     // pero con un warning para que el moderador sepa que el email no salió.
+    // Cuenta local (email sintético @local.app): NO se envía correo — la
+    // invitación aparece en su bandeja in-app y la acepta desde la app.
+    const inApp = isSyntheticEmail(email);
     let delivery = { dev: true, delivered: false };
     let mailError = null;
-    try {
-      delivery = await sendInvitation({
-        email,
-        code: otp,
-        inviterName: ctx.inviter_name || ctx.inviter_email || 'El administrador',
-        workspaceName: ctx.ws_name || 'tu workspace',
-        tunnelId: tunnelId || null,
-        role,
-      });
-    } catch (e) {
-      mailError = e.message || 'No se pudo enviar el correo';
-      log.warn({ err: mailError, email }, 'team/invite sendInvitation falló');
+    if (!inApp) {
+      try {
+        delivery = await sendInvitation({
+          email,
+          code: otp,
+          inviterName: ctx.inviter_name || ctx.inviter_email || 'El administrador',
+          workspaceName: ctx.ws_name || 'tu workspace',
+          tunnelId: tunnelId || null,
+          role,
+        });
+      } catch (e) {
+        mailError = e.message || 'No se pudo enviar el correo';
+        log.warn({ err: mailError, email }, 'team/invite sendInvitation falló');
+      }
     }
 
     return sendOk(res, {
-      message: 'Invitación enviada',
+      message: inApp
+        ? 'Invitación creada — el usuario la verá en su bandeja al iniciar sesión'
+        : 'Invitación enviada',
       role, tunnelId: tunnelId || null,
+      inApp: inApp || undefined,
       dev: delivery.dev || undefined,
       mailError: mailError || undefined,
     }, 201);
@@ -475,10 +519,13 @@ router.patch('/member/:userId', requireSession, requireRole('OWNER'),
       [disabled ? now : null, now, userId]
     );
 
-    // 2) Sync peer WG del miembro en el router (best-effort)
+    // 2) Sync peer WG del miembro en el router (best-effort).
+    //    El peer es GLOBAL por persona (fila keyed por user_id) — nota: como
+    //    users.disabled_at ya bloquea el LOGIN globalmente, deshabilitar el
+    //    peer global es consistente con la suspensión de la cuenta.
     const wgRows = await db.all(
-      'SELECT public_key FROM member_wireguard WHERE workspace_id = ? AND user_id = ? AND public_key IS NOT NULL',
-      [wsId, userId]
+      'SELECT public_key FROM member_wireguard WHERE user_id = ? AND public_key IS NOT NULL',
+      [userId]
     );
     const publicKeys = wgRows.map(r => r.public_key);
     const routerSync = await setPeersEnabled(publicKeys, !disabled);
@@ -486,7 +533,8 @@ router.patch('/member/:userId', requireSession, requireRole('OWNER'),
     // 3) Si deshabilitamos: borrar mangle activo del usuario + cerrar sesión + invalidar cache
     let mangleCleanup = null;
     if (disabled) {
-      // Borrar la regla mangle del usuario del router (corte inmediato de acceso)
+      // Borrar la regla mangle del usuario del router (corte inmediato de acceso).
+      // Sin scope de workspace: la suspensión es de la CUENTA (disabled_at global).
       mangleCleanup = await removeUserMangles([userId]);
       // Cerrar sesión activa en BD
       await db.run(
@@ -520,31 +568,44 @@ router.delete('/member/:userId', requireSession, requireRole('OWNER'),
     if (!target) throw new AppError('El usuario no es miembro', 404, 'NOT_MEMBER');
     if (target.role === 'OWNER') throw new AppError('No se puede remover al propietario', 403, 'OWNER_LOCKED');
 
-    // 1) Recolectar las public-keys WG del miembro para limpiar el router.
-    //    Antes filtrábamos mgmt_peer_owners por comment="member:<userId>";
-    //    ahora con comments legibles ese match ya no aplica. Usamos
-    //    member_wireguard (tiene user_id directo) como fuente única de verdad.
+    // Multi-membresía: el peer WG y la mgmt IP son GLOBALES por persona.
+    // Si el user sigue siendo miembro de OTRO workspace, su identidad de red
+    // (peer + IP + mapeo) SOBREVIVE — aquí solo se borra la membresía local.
     const db = await getDb();
+    const otherRows = await db.all(
+      'SELECT 1 FROM workspace_members WHERE user_id = ? AND workspace_id <> ? AND deleted_at IS NULL LIMIT 1',
+      [userId, wsId]
+    );
+    const hasOtherMemberships = otherRows.length > 0;
+
+    // 1) Public-keys WG del miembro (fila GLOBAL — keyed por user_id).
     const wgRows = await db.all(
-      'SELECT public_key FROM member_wireguard WHERE workspace_id = ? AND user_id = ?',
-      [wsId, userId]
+      'SELECT public_key FROM member_wireguard WHERE user_id = ?',
+      [userId]
     );
     const publicKeys = [...new Set(wgRows.map(r => r.public_key).filter(Boolean))];
 
-    // 2a) Eliminar peers del MikroTik (best-effort)
-    const routerCleanup = await removePeersFromRouter(publicKeys);
-    // 2b) Eliminar mangle activo del usuario (no dejar regla huérfana)
-    const mangleCleanup = await removeUserMangles([userId]);
+    // 2a) Eliminar peers del MikroTik SOLO si no le quedan otras membresías
+    const routerCleanup = hasOtherMemberships
+      ? { removed: 0, failed: 0, skipped: true }
+      : await removePeersFromRouter(publicKeys);
+    // 2b) Eliminar mangle activo del usuario — scoped: si su túnel vivo es de
+    //     otro workspace, se protege (removeUserMangles lo salta).
+    const mangleCleanup = await removeUserMangles([userId], { workspaceId: wsId });
 
     // 3) Hard-delete en BD dentro de transacción
     await withTransaction(async (tx) => {
-      if (publicKeys.length) {
-        const ph = publicKeys.map(() => '?').join(',');
-        await tx.query(`DELETE FROM mgmt_peer_owners WHERE public_key IN (${ph})`, publicKeys);
+      // Identidad de red global: solo se borra si esta era su ÚLTIMA membresía.
+      if (!hasOtherMemberships) {
+        if (publicKeys.length) {
+          const ph = publicKeys.map(() => '?').join(',');
+          await tx.query(`DELETE FROM mgmt_peer_owners WHERE public_key IN (${ph})`, publicKeys);
+        }
+        await tx.query('DELETE FROM member_wireguard WHERE user_id = ?', [userId]);
+        await tx.query('DELETE FROM user_mgmt_ips WHERE user_id = ?', [userId]);
       }
-      await tx.query('DELETE FROM member_wireguard WHERE workspace_id = ? AND user_id = ?', [wsId, userId]);
+      // Datos del workspace que abandona (siempre):
       await tx.query('DELETE FROM tunnel_assignments WHERE workspace_id = ? AND user_id = ?', [wsId, userId]);
-      await tx.query('DELETE FROM user_mgmt_ips WHERE workspace_id = ? AND user_id = ?', [wsId, userId]);
       await tx.query('DELETE FROM tunnel_user_sessions WHERE workspace_id = ? AND user_id = ?', [wsId, userId]);
       await tx.query('DELETE FROM tunnel_session_logs WHERE workspace_id = ? AND user_id = ?', [wsId, userId]);
       await tx.query('DELETE FROM workspace_members WHERE workspace_id = ? AND user_id = ?', [wsId, userId]);
@@ -659,7 +720,9 @@ router.post('/member/:id/wireguard', requireSession, requireRole('OWNER'),
       const towerLans = await readTowerLans(api, safeWrite);
       await api.close();
 
-      const allowedIps = await mgmtAllowedIpsFor(req.account.workspace_id, { addressList: towerLans });
+      // Peer GLOBAL por persona: el .conf une las LAN públicas de TODOS los
+      // workspaces del miembro (no solo el actual) — igual que provisionMemberWgByPublicKey.
+      const allowedIps = await mgmtAllowedIpsForUser(req.params.id, { addressList: towerLans });
       let conf = null;
       if (mode === 'generate') {
         conf = buildClientConf({
@@ -739,8 +802,15 @@ router.post('/me/wireguard', requireSession, asyncHandler(async (req, res) => {
 // ── GET /member/:id/wireguard — config del miembro (él o un moderador) ──
 router.get('/member/:id/wireguard', requireSession, asyncHandler(async (req, res) => {
   const targetId = req.params.id === 'me' ? req.account.sub : req.params.id;
-  if (targetId !== req.account.sub && !isModeratorRole(req.account.role)) {
-    throw new AppError('Permisos insuficientes', 403, 'FORBIDDEN');
+  if (targetId !== req.account.sub) {
+    if (!isModeratorRole(req.account.role)) {
+      throw new AppError('Permisos insuficientes', 403, 'FORBIDDEN');
+    }
+    // El peer es GLOBAL: la pertenencia se valida contra workspace_members
+    // (antes la daba implícita la fila ws-scoped) — anti cross-tenant.
+    if (!(await memberRepo.findMembership(req.account.workspace_id, targetId))) {
+      throw new AppError('El usuario no es miembro de tu workspace', 404, 'NOT_MEMBER');
+    }
   }
   const row = await memberWgRepo.getByUser(req.account.workspace_id, targetId);
   if (!row) throw new AppError('Sin acceso WireGuard configurado', 404, 'NO_WG');
@@ -749,7 +819,7 @@ router.get('/member/:id/wireguard', requireSession, asyncHandler(async (req, res
       allowedIp: row.allowed_ip, publicKey: row.public_key,
       serverPublicKey: row.server_public_key || null,
       endpoint: row.endpoint || null,
-      allowedIps: await mgmtAllowedIpsFor(req.account.workspace_id),
+      allowedIps: await mgmtAllowedIpsForUser(targetId),
       conf: row.config_enc ? decrypt(row.config_enc) : null,
     },
   });
@@ -761,14 +831,18 @@ router.get('/member/:id/wireguard', requireSession, asyncHandler(async (req, res
 router.get('/wireguard/by-key/:publicKey', requireSession, requireRole('OWNER'),
   asyncHandler(async (req, res) => {
     const row = await memberWgRepo.getByPublicKey(req.account.workspace_id, req.params.publicKey);
-    if (!row) throw new AppError('Peer no encontrado en este workspace', 404, 'NO_WG');
+    // El peer es GLOBAL: la restricción anti cross-tenant se valida contra la
+    // MEMBRESÍA del dueño del peer en el workspace del solicitante.
+    if (!row || !(await memberRepo.findMembership(req.account.workspace_id, row.user_id))) {
+      throw new AppError('Peer no encontrado en este workspace', 404, 'NO_WG');
+    }
     return sendOk(res, {
       wireguard: {
         allowedIp: row.allowed_ip,
         publicKey: row.public_key,
         serverPublicKey: row.server_public_key || null,
         endpoint: row.endpoint || null,
-        allowedIps: await mgmtAllowedIpsFor(req.account.workspace_id),
+        allowedIps: await mgmtAllowedIpsForUser(row.user_id),
         peerName: row.peer_name,
         conf: row.config_enc ? decrypt(row.config_enc) : null,
       },

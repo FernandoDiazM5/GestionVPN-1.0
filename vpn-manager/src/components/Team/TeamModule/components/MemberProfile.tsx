@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { localUsername, displayEmail } from '../../../../utils/identity';
 import QRCode from 'qrcode';
 import { UserCircle, Waypoints, Shield, Download, Copy, Check, Smartphone, KeyRound } from 'lucide-react';
 import Spinner from '../../../Common/Spinner';
@@ -80,7 +81,9 @@ export default function MemberProfile({ session }: Props) {
           <UserCircle className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
           <span>Mi perfil</span>
         </h2>
-        <p className="text-slate-400 dark:text-slate-500 text-sm mt-1 font-mono">{session.email}</p>
+        <p className="text-slate-400 dark:text-slate-500 text-sm mt-1 font-mono">
+          {displayEmail(session.email) ?? `usuario: ${localUsername(session.email)}`}
+        </p>
       </div>
 
       {loading ? (

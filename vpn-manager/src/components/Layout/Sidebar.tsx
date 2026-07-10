@@ -6,6 +6,7 @@ import {
 import { useVpn } from '../../context';
 import { useWorkspaceSession } from '../../context/WorkspaceSession';
 import { visibleModules, roleLabel, type ModuleId } from '../../utils/permissions';
+import WorkspaceSwitcher from './WorkspaceSwitcher';
 
 interface NavItem {
   id: ModuleId;
@@ -128,6 +129,9 @@ export default function Sidebar() {
           )}
         </div>
       </div>
+
+      {/* ── Workspace activo + invitaciones (multi-membresía) ── */}
+      <WorkspaceSwitcher mini={mini} onGoToTeam={() => handleNav('team')} />
 
       {/* ── Navegación por categorías ── */}
       <nav className="flex-1 overflow-y-auto py-3 space-y-4">

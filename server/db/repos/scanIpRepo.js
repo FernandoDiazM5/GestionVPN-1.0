@@ -29,15 +29,6 @@ async function getScanIpForWorkspace(workspaceId) {
   return rows[0] ? rows[0].scan_ip : null;
 }
 
-/** Registro completo (diagnósticos). */
-async function getByWorkspace(workspaceId) {
-  const rows = await query(
-    'SELECT * FROM workspace_scan_ip WHERE workspace_id = ? LIMIT 1',
-    [workspaceId]
-  );
-  return rows[0] || null;
-}
-
 /**
  * Crea/actualiza el mapeo workspace→scan-IP. Idempotente por workspace.
  * Lanza si la IP ya pertenece a OTRO workspace (uq_wsi_ip) → contención.
@@ -162,4 +153,4 @@ function poolSubnet() {
   return POOL_BASE ? `${POOL_BASE}0/24` : '';
 }
 
-module.exports = { getScanIpForWorkspace, getByWorkspace, upsert, allocate, allocateInTx, list, resolveForWorkspace, getSetting, poolSubnet, POOL_BASE, POOL_START, POOL_END };
+module.exports = { getScanIpForWorkspace, upsert, allocate, allocateInTx, list, resolveForWorkspace, getSetting, poolSubnet, POOL_BASE, POOL_START, POOL_END };

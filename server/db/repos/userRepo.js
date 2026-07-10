@@ -56,11 +56,4 @@ async function incOtpAttempts(id) {
   await query('UPDATE users SET otp_attempts = otp_attempts + 1 WHERE id = ?', [id]);
 }
 
-async function markVerified(id) {
-  await query(
-    'UPDATE users SET email_verified = 1, otp_hash = NULL, otp_expires_at = NULL, updated_at = ? WHERE id = ?',
-    [Date.now(), id]
-  );
-}
-
-module.exports = { findByEmail, findById, findByName, createPending, setOtp, incOtpAttempts, markVerified };
+module.exports = { findByEmail, findById, findByName, createPending, setOtp, incOtpAttempts };

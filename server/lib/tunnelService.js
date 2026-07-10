@@ -171,14 +171,24 @@ async function deactivateTunnel({ account, mikrotik, clientIp = '-' }) {
   try {
     const session = await sessionRepo.getActiveByUser(account.workspace_id, account.sub);
 
-    apiRead = await connectToMikrotik(ip, user, pass);
-    const ids = await provisioner.findUserMangleIds(apiRead, account.sub);
-    await apiRead.close().catch(() => {});
+    // Multi-membresía: la mangle del router es POR-USUARIO y única. Solo se
+    // toca si el túnel activo global del user es de ESTE workspace (o no hay
+    // ninguno → limpieza defensiva de mangles huérfanas). Si su túnel vivo
+    // pertenece a OTRO workspace, desactivar desde aquí NO debe matarlo.
+    const activeAnywhere = session || await sessionRepo.getActiveAnywhereByUser(account.sub);
+    const safeToClean = !activeAnywhere || activeAnywhere.workspace_id === account.workspace_id;
 
-    if (ids.length) {
-      apiWrite = await connectToMikrotik(ip, user, pass);
-      await provisioner.removeMangleIds(apiWrite, ids);
-      await apiWrite.close().catch(() => {});
+    let ids = [];
+    if (safeToClean) {
+      apiRead = await connectToMikrotik(ip, user, pass);
+      ids = await provisioner.findUserMangleIds(apiRead, account.sub);
+      await apiRead.close().catch(() => {});
+
+      if (ids.length) {
+        apiWrite = await connectToMikrotik(ip, user, pass);
+        await provisioner.removeMangleIds(apiWrite, ids);
+        await apiWrite.close().catch(() => {});
+      }
     }
 
     if (session) await sessionRepo.closeSession(session.id);

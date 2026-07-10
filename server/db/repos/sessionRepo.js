@@ -22,14 +22,15 @@ async function getActiveByUser(workspaceId, userId) {
   return rows[0] || null;
 }
 
-/** Sesión ACTIVE de un túnel concreto (para "en uso por otro" — admin). */
-async function getActiveByTunnel(workspaceId, tunnelId) {
+/** Sesión ACTIVE del usuario en CUALQUIER workspace (multi-membresía).
+ *  La mangle del router es POR-USUARIO → físicamente solo puede haber 1
+ *  túnel activo por persona; esta es la fuente de verdad de cuál es. */
+async function getActiveAnywhereByUser(userId) {
   const rows = await query(
-    `SELECT s.*, u.name AS user_name, u.email AS user_email
-       FROM tunnel_user_sessions s JOIN users u ON u.id = s.user_id
-      WHERE s.workspace_id = ? AND s.tunnel_id = ? AND s.status = 'ACTIVE'
-      ORDER BY s.activated_at DESC LIMIT 1`,
-    [workspaceId, tunnelId]
+    `SELECT * FROM tunnel_user_sessions
+      WHERE user_id = ? AND status = 'ACTIVE'
+      ORDER BY activated_at DESC LIMIT 1`,
+    [userId]
   );
   return rows[0] || null;
 }
@@ -63,12 +64,15 @@ async function createSession({ workspaceId, userId, tunnelId, vrfName, mgmtIp, m
   const now = Date.now();
   const expiresAt = now + TTL_MS;
   await withTransaction(async (tx) => {
-    // Cierra cualquier ACTIVE previa del usuario (defensa anti-duplicado)
+    // Cierra cualquier ACTIVE previa del usuario en TODOS sus workspaces
+    // (multi-membresía): la mangle del router es por-usuario → al activar
+    // aquí, cualquier sesión de otro workspace quedó físicamente muerta;
+    // cerrarla evita sesiones fantasma en el panel del otro workspace.
     await tx.query(
       `UPDATE tunnel_user_sessions
           SET status = 'CLOSED', deactivated_at = ?
-        WHERE workspace_id = ? AND user_id = ? AND status = 'ACTIVE'`,
-      [now, workspaceId, userId]
+        WHERE user_id = ? AND status = 'ACTIVE'`,
+      [now, userId]
     );
     await tx.query(
       `INSERT INTO tunnel_user_sessions
@@ -127,6 +131,6 @@ async function log({ workspaceId, sessionId, userId, tunnelId, action, mgmtIp, s
 
 module.exports = {
   TTL_MS,
-  getActiveByUser, getActiveByTunnel, listActiveForWorkspace, activeMapForWorkspace,
+  getActiveByUser, getActiveAnywhereByUser, listActiveForWorkspace, activeMapForWorkspace,
   createSession, closeSession, findExpired, touch, log,
 };

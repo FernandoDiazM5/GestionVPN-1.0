@@ -1,17 +1,25 @@
 import { z } from 'zod';
-import { EmailSchema, PasswordSchema } from './common';
+import { EmailSchema, PasswordSchema, UsernameSchema } from './common';
 
 // ────────────────────────────────────────────────────────────────────
 //  /api/admin  (sólo platform_admin)
 // ────────────────────────────────────────────────────────────────────
 
-/** POST /api/admin/moderators (creación directa, sin invitación) */
-export const CreateModeratorRequestSchema = z.object({
-  email: EmailSchema,
-  password: PasswordSchema,
-  name: z.string().max(120).optional(),
-  workspaceName: z.string().max(160).optional(),
-});
+/** POST /api/admin/moderators (creación directa, sin invitación).
+ *  Identidad = `email` (correo real) XOR `username` (cuenta local sin correo,
+ *  el backend le sintetiza `<username>@local.app`; el correo se asocia después
+ *  desde el perfil). Exactamente uno de los dos. */
+export const CreateModeratorRequestSchema = z
+  .object({
+    email: EmailSchema.optional(),
+    username: UsernameSchema.optional(),
+    password: PasswordSchema,
+    name: z.string().max(120).optional(),
+    workspaceName: z.string().max(160).optional(),
+  })
+  .refine((d) => !!d.email !== !!d.username, {
+    message: 'Indica correo O usuario (exactamente uno)',
+  });
 export type CreateModeratorRequest = z.infer<typeof CreateModeratorRequestSchema>;
 
 /** PATCH /api/admin/moderators/:id */

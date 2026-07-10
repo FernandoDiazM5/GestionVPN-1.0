@@ -11,9 +11,11 @@ export const teamApi = {
 
   listInvitations: () => get<{ success: true; invitations: Invitation[] }>('/api/team/invitations'),
 
-  invite: (email: string, role: Exclude<Role, 'OWNER'>, tunnelId?: string, name?: string) =>
-    post<{ success: true; role: Role; tunnelId: string | null; dev?: boolean }>(
-      '/api/team/invite', { email, role, tunnelId, name }
+  /** Invita a un miembro: `email` (correo) XOR `username` (usuario EXISTENTE
+   *  de la plataforma — la invitación cae en su bandeja in-app, sin correo). */
+  invite: (data: { email?: string; username?: string; tunnelId?: string; name?: string }) =>
+    post<{ success: true; role: Role; tunnelId: string | null; inApp?: boolean; dev?: boolean; mailError?: string }>(
+      '/api/team/invite', { role: 'MEMBER', ...data }
     ),
 
   accept: (email: string, otp: string, password?: string, publicKey?: string) =>

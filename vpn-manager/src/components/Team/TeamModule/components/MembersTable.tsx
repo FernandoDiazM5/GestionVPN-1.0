@@ -3,6 +3,7 @@ import { Crown, User, Trash2, Loader2, Shield, PowerOff, Power, Waypoints } from
 import type { Member, Role } from '../../../../types/account';
 import { ROLE_LABEL } from '../../../../types/account';
 import { canRemoveMembers, isOwner, isModerator } from '../../../../utils/permissions';
+import { localUsername, displayEmail } from '../../../../utils/identity';
 import MemberWireGuardModal from './MemberWireGuardModal';
 import AssignTunnelsModal from './AssignTunnelsModal';
 
@@ -85,10 +86,12 @@ export default function MembersTable({
                       </div>
                       <div className="min-w-0">
                         <p className="font-semibold text-slate-800 dark:text-slate-100 truncate">
-                          {m.name || m.email.split('@')[0]}
+                          {m.name || localUsername(m.email)}
                           {isSelf && <span className="ml-1.5 text-2xs font-medium text-slate-500 dark:text-slate-400">(tú)</span>}
                         </p>
-                        <p className="font-mono text-2xs text-slate-400 dark:text-slate-500 truncate">{m.email}</p>
+                        <p className="font-mono text-2xs text-slate-400 dark:text-slate-500 truncate">
+                          {displayEmail(m.email) ?? `usuario: ${localUsername(m.email)}`}
+                        </p>
                       </div>
                     </div>
                   </td>

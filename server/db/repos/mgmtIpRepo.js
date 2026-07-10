@@ -8,28 +8,30 @@ const { query } = require('../mysql');
 
 /**
  * Devuelve la IP de gestión del usuario (10.13.250.x mod/members · 10.14.250.x
- * admin), o null si no tiene.
+ * admin), o null si no tiene. Multi-workspace: la IP es GLOBAL por persona
+ * (UNIQUE user_id) — `workspaceId` se conserva en la firma por compatibilidad.
  * @returns {Promise<string|null>} mgmt_ip sin máscara, ej. "10.13.250.20"
  */
-async function getMgmtIpForUser(workspaceId, userId) {
+async function getMgmtIpForUser(_workspaceId, userId) {
   const rows = await query(
-    'SELECT mgmt_ip FROM user_mgmt_ips WHERE workspace_id = ? AND user_id = ? LIMIT 1',
-    [workspaceId, userId]
+    'SELECT mgmt_ip FROM user_mgmt_ips WHERE user_id = ? LIMIT 1',
+    [userId]
   );
   return rows[0] ? rows[0].mgmt_ip : null;
 }
 
 /** Registro completo (para diagnósticos). */
-async function getByUser(workspaceId, userId) {
+async function getByUser(_workspaceId, userId) {
   const rows = await query(
-    'SELECT * FROM user_mgmt_ips WHERE workspace_id = ? AND user_id = ? LIMIT 1',
-    [workspaceId, userId]
+    'SELECT * FROM user_mgmt_ips WHERE user_id = ? LIMIT 1',
+    [userId]
   );
   return rows[0] || null;
 }
 
 /**
- * Crea/actualiza el mapeo usuario→IP. Idempotente por (workspace,user).
+ * Crea/actualiza el mapeo usuario→IP. Idempotente por user (UNIQUE user_id;
+ * `workspace_id` queda informativo — dónde se provisionó por última vez).
  * Lanza si la IP ya pertenece a OTRO usuario (uq_umi_ip) → contención de colisión.
  */
 async function upsert({ workspaceId, userId, mgmtIp, publicKey, source }) {
@@ -40,6 +42,7 @@ async function upsert({ workspaceId, userId, mgmtIp, publicKey, source }) {
        (id, workspace_id, user_id, mgmt_ip, public_key, source, created_at, updated_at)
      VALUES (?,?,?,?,?,?,?,?)
      ON DUPLICATE KEY UPDATE
+       workspace_id = VALUES(workspace_id),
        mgmt_ip = VALUES(mgmt_ip),
        public_key = VALUES(public_key),
        source = VALUES(source),

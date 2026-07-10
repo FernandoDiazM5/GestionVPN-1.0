@@ -4,6 +4,7 @@ import { Shield, X, Loader2, Download, Copy, Check, Smartphone, RefreshCw, KeyRo
 import Spinner from '../../../Common/Spinner';
 import { teamApi } from '../../../../services/teamApi';
 import type { Member } from '../../../../types/account';
+import { localUsername } from '../../../../utils/identity';
 
 interface Props {
   member: Member;
@@ -58,7 +59,7 @@ export default function MemberWireGuardModal({ member, onClose }: Props) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `wg-${(member.name || member.email.split('@')[0]).replace(/[^a-z0-9]/gi, '-').toLowerCase()}.conf`;
+    a.download = `wg-${(member.name || localUsername(member.email)).replace(/[^a-z0-9]/gi, '-').toLowerCase()}.conf`;
     a.click();
     URL.revokeObjectURL(url);
   };

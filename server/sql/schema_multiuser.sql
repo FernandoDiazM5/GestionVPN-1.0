@@ -27,9 +27,10 @@ CREATE TABLE IF NOT EXISTS user_mgmt_ips (
   created_at    BIGINT       NOT NULL,
   updated_at    BIGINT       NOT NULL,
   PRIMARY KEY (id),
-  UNIQUE KEY uq_umi_user (workspace_id, user_id),       -- 1 IP por usuario
+  UNIQUE KEY uq_umi_user (user_id),                     -- 1 IP por usuario GLOBAL (multi-workspace)
   UNIQUE KEY uq_umi_ip (mgmt_ip),                       -- 1 usuario por IP (sin colisión)
   KEY idx_umi_user (user_id),
+  KEY idx_umi_ws (workspace_id),                        -- índice de la FK (donde se provisionó)
   CONSTRAINT fk_umi_ws   FOREIGN KEY (workspace_id) REFERENCES workspaces(id),
   CONSTRAINT fk_umi_user FOREIGN KEY (user_id)      REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

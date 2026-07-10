@@ -27,9 +27,4 @@ function publish(workspaceId, event, data) {
   }
 }
 
-/** Nº de clientes conectados (diagnóstico). */
-function clientCount(workspaceId) {
-  return rooms.get(workspaceId)?.size || 0;
-}
-
-module.exports = { subscribe, publish, clientCount };
+module.exports = { subscribe, publish };

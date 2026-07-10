@@ -12,6 +12,32 @@ export const WorkspaceRenameRequestSchema = z.object({
 export type WorkspaceRenameRequest = z.infer<typeof WorkspaceRenameRequestSchema>;
 
 // ────────────────────────────────────────────────────────────────────
+//  Multi-workspace: un usuario puede ser OWNER de su workspace y MEMBER
+//  en otros (invitado). La sesión lleva UN workspace activo; el selector
+//  lista las membresías y el switch re-emite la cookie con el destino.
+// ────────────────────────────────────────────────────────────────────
+
+/** Una membresía del usuario (GET /api/account/workspaces). */
+export interface WorkspaceMembership {
+  workspace_id: string;
+  workspace_name: string;
+  role: z.infer<typeof RoleSchema>;
+  /** true si es el workspace activo de la sesión actual. */
+  active?: boolean;
+}
+
+export interface MyWorkspacesResponse {
+  success: true;
+  workspaces: WorkspaceMembership[];
+}
+
+/** POST /api/account/switch-workspace */
+export const SwitchWorkspaceRequestSchema = z.object({
+  workspaceId: z.string().min(1).max(64),
+});
+export type SwitchWorkspaceRequest = z.infer<typeof SwitchWorkspaceRequestSchema>;
+
+// ────────────────────────────────────────────────────────────────────
 //  GET /api/workspace/export — payload JSON
 // ────────────────────────────────────────────────────────────────────
 

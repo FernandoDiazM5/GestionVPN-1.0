@@ -22,6 +22,7 @@ const notificationRepo = require('../db/repos/notificationRepo');
 const userRepo = require('../db/repos/userRepo');
 const mailer = require('./mailer');
 const telegram = require('./telegram');
+const { isSyntheticEmail } = require('./localAccount');
 
 const EVENT_LABEL = {
   TUNNEL_ACTIVATED: 'Túnel activado',
@@ -111,7 +112,8 @@ function buildMessage(event, payload = {}) {
 }
 
 async function dispatchEmail(user, msg) {
-  if (!user?.email) return { ok: false, reason: 'sin email' };
+  // Cuenta local (email sintético @local.app) = sin correo real asociado.
+  if (!user?.email || isSyntheticEmail(user.email)) return { ok: false, reason: 'sin email' };
   try {
     const out = await mailer.sendGeneric({
       to: user.email,

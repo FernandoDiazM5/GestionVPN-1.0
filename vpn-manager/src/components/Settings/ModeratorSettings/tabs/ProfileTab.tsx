@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Lock, Mail, Check, Loader2, AlertCircle, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { accountApi } from '../../../../services/accountApi';
 import { useWorkspaceSession } from '../../../../context/WorkspaceSession';
+import { isLocalAccount, localUsername } from '../../../../utils/identity';
 
 type Section = 'password' | 'email';
 
@@ -126,10 +127,13 @@ function ChangePassword() {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  Cambio de email (con OTP enviado al NUEVO correo)
+//  Cambio de email (con OTP enviado al NUEVO correo).
+//  Cuenta local (creada con usuario, sin correo real): mismo flujo,
+//  pero la UI lo presenta como "Asociar correo" por primera vez.
 // ─────────────────────────────────────────────────────────────
 function ChangeEmail() {
   const { session, refresh } = useWorkspaceSession();
+  const isLocal = isLocalAccount(session?.email);
   const [step, setStep] = useState<'request' | 'confirm'>('request');
   const [newEmail, setNewEmail] = useState('');
   const [otp, setOtp] = useState('');
@@ -165,9 +169,13 @@ function ChangeEmail() {
   return (
     <div className="space-y-4 max-w-md">
       <div>
-        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-1">Cambiar correo</h3>
+        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-1">
+          {isLocal ? 'Asociar correo' : 'Cambiar correo'}
+        </h3>
         <p className="text-xs text-slate-500 dark:text-slate-400">
-          Correo actual: <span className="font-mono">{session?.email}</span>
+          {isLocal
+            ? <>Sin correo asociado — tu cuenta es <span className="font-mono">{localUsername(session?.email)}</span>. Asocia uno para recibir notificaciones y poder recuperar tu contraseña.</>
+            : <>Correo actual: <span className="font-mono">{session?.email}</span></>}
         </p>
       </div>
 
@@ -194,7 +202,7 @@ function ChangeEmail() {
               className="input-field pl-10" />
           </div>
           <p className="text-2xs text-slate-500 dark:text-slate-400">
-            Te enviaremos un código de 6 dígitos al nuevo correo para confirmar el cambio.
+            Te enviaremos un código de 6 dígitos al {isLocal ? 'correo' : 'nuevo correo'} para confirmar{isLocal ? ' la asociación' : ' el cambio'}.
           </p>
           <button type="submit" disabled={busy || !newEmail.trim()}
             className="btn-primary px-5 py-2.5 flex items-center gap-2 text-sm disabled:opacity-50">

@@ -18,10 +18,10 @@ const workspaceRepo = require('../db/repos/workspaceRepo');
  * @param {string} username  username del login legacy
  */
 // Usuario que opera la plataforma (Administrador / Sistemas). Configurable.
-const PLATFORM_ADMIN_USERNAME = (process.env.PLATFORM_ADMIN_USERNAME || 'admin').toLowerCase();
+const { syntheticEmail, PLATFORM_ADMIN_USERNAME } = require('./localAccount');
 
 async function buildSessionForLegacyUser(username) {
-  const email = `${String(username).toLowerCase()}@local.app`;
+  const email = syntheticEmail(username);
   const isPlatformAdmin = String(username).toLowerCase() === PLATFORM_ADMIN_USERNAME;
   const { query } = require('../db/mysql');
   let user = await userRepo.findByEmail(email);
@@ -77,7 +77,7 @@ async function authenticateMysqlUser(login, password) {
   // o el `name` del usuario (lo que el Administrador ve como "usuario").
   const raw = String(login || '').trim().toLowerCase();
   if (!raw) return null;
-  const email = raw.includes('@') ? raw : `${raw}@local.app`;
+  const email = raw.includes('@') ? raw : syntheticEmail(raw);
   let user = await userRepo.findByEmail(email);
   if (!user && !raw.includes('@')) {
     // Fallback: login por nombre (ej. moderador "user123" con email real)

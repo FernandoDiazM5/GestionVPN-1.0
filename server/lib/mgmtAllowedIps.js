@@ -60,6 +60,43 @@ async function mgmtAllowedIpsFor(workspaceId, opts = {}) {
 }
 
 /**
+ * AllowedIPs split-tunnel para el peer GLOBAL de un usuario multi-workspace:
+ * base RFC1918 + UNIÓN de las LAN públicas de TODOS sus workspaces. El mismo
+ * .conf sirve en cualquiera de sus workspaces (el peer es único por persona).
+ * @param {string} userId
+ * @param {object} [opts]  { addressList } igual que mgmtAllowedIpsFor.
+ */
+async function mgmtAllowedIpsForUser(userId, opts = {}) {
+  const nets = new Set(
+    String(mgmtNet.mgmtAllowedIps || '10.0.0.0/8')
+      .split(',').map(s => s.trim()).filter(Boolean)
+  );
+  const add = (s) => { const c = String(s || '').trim(); if (isCidr(c) && !isPrivate(c)) nets.add(c); };
+
+  if (userId) {
+    try {
+      const rows = await query(
+        `SELECT n.segmento_lan, n.lan_subnets
+           FROM nodes n
+           JOIN workspace_members wm ON wm.workspace_id = n.workspace_id
+          WHERE wm.user_id = ? AND wm.deleted_at IS NULL`,
+        [userId]
+      );
+      for (const r of rows) {
+        add(r.segmento_lan);
+        try {
+          const arr = JSON.parse(r.lan_subnets || '[]');
+          if (Array.isArray(arr)) arr.forEach(add);
+        } catch { /* lan_subnets malformado: ignorar */ }
+      }
+    } catch { /* BD inaccesible: degradar a solo la base + addressList */ }
+  }
+
+  if (Array.isArray(opts.addressList)) opts.addressList.forEach(add);
+  return [...nets].join(', ');
+}
+
+/**
  * Lee los CIDR del address-list LIST-NET-REMOTE-TOWERS desde una conexión
  * RouterOS ya abierta. Best-effort: devuelve [] si falla.
  * @param {object} api   conexión node-routeros abierta
@@ -70,4 +107,4 @@ async function readTowerLans(api, safeWrite, listName = 'LIST-NET-REMOTE-TOWERS'
   return rows.filter(r => r.list === listName).map(r => r.address).filter(Boolean);
 }
 
-module.exports = { mgmtAllowedIpsFor, readTowerLans };
+module.exports = { mgmtAllowedIpsFor, mgmtAllowedIpsForUser, readTowerLans };

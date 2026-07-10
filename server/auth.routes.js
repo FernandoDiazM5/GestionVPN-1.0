@@ -6,6 +6,7 @@ const { hasUsers, getUserByUsername, createUser } = require('./db.service');
 const { JWT_SECRET } = require('./auth.middleware');
 const { setSessionCookie } = require('./lib/jwt');
 const { buildSessionForLegacyUser, authenticateMysqlUser } = require('./lib/sessionBridge');
+const { isSyntheticEmail } = require('./lib/localAccount');
 const userRepo = require('./db/repos/userRepo');
 const passwordResetRepo = require('./db/repos/passwordResetRepo');
 const { sendPasswordReset } = require('./lib/mailer');
@@ -191,7 +192,11 @@ router.post('/password-reset/request', rl.guard('OTP'), async (req, res) => {
 
     // Lookup silencioso del user. Independientemente del resultado,
     // devolvemos el mismo mensaje genérico (anti-enumeración).
-    const user = await userRepo.findByEmail(email).catch(() => null);
+    // Cuentas locales (@local.app) no tienen correo real → mismo genérico
+    // sin emitir token (el admin resetea desde el panel).
+    const user = isSyntheticEmail(email)
+      ? null
+      : await userRepo.findByEmail(email).catch(() => null);
 
     if (user) {
       // Anti-spam: máx 5 tokens emitidos por usuario en la última hora

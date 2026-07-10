@@ -18,10 +18,15 @@ export const adminApi = {
 
   listModerators: () => get<{ success: true; moderators: Moderator[] }>('/api/admin/moderators'),
 
-  createModerator: (data: { email: string; password: string; name?: string; workspaceName?: string }) =>
-    post<{ success: true; moderator: { user_id: string; email: string; workspace_id: string } }>(
-      '/api/admin/moderators', data
-    ),
+  /** Alta directa (sin invitación): correo real XOR usuario (cuenta local sin
+   *  correo, `<username>@local.app` sintético; el correo se asocia después). */
+  createModerator: (data: {
+    email?: string; username?: string; password: string; name?: string; workspaceName?: string;
+  }) =>
+    post<{
+      success: true; message: string;
+      moderator: { user_id: string; email: string; username: string | null; name: string; workspace_id: string };
+    }>('/api/admin/moderators', data),
 
   /** Invita a un nuevo moderador por email (mismo UX que invitar miembro): el
    *  invitado recibe correo con link, define su contraseña y genera su WG.

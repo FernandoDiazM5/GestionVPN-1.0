@@ -69,21 +69,22 @@ async function setPeersEnabled(publicKeys, enabled) {
   return { updated, notFound, failed, skipped: false };
 }
 
-/** Variante de un solo peer. */
-async function setPeerEnabled(publicKey, enabled) {
-  return setPeersEnabled([publicKey], enabled);
-}
-
 /**
- * Elimina TODAS las reglas mangle activas de los user_ids indicados (matcheando
+ * Elimina las reglas mangle activas de los user_ids indicados (matcheando
  * por el comment `ACCESO-USER-<userTag>` que crea el provisioner). Se usa al
  * deshabilitar/eliminar usuarios para cortar el acceso al instante sin esperar
  * el TTL natural de la sesión.
  *
+ * Multi-membresía: la mangle es POR-USUARIO y única (1 túnel activo global).
+ * Si se pasa `workspaceId` (el workspace que el user abandona / donde se le
+ * suspende), un user cuyo túnel activo global pertenece a OTRO workspace se
+ * SALTA — borrarle la mangle le mataría el acceso legítimo del otro workspace.
+ *
  * @param {string[]} userIds
- * @returns {Promise<{removed:number, failed:number, skipped:boolean}>}
+ * @param {{workspaceId?: string}} [opts]
+ * @returns {Promise<{removed:number, failed:number, skipped:boolean, protected?:number}>}
  */
-async function removeUserMangles(userIds) {
+async function removeUserMangles(userIds, opts = {}) {
   const ids = (userIds || []).filter(Boolean);
   if (!ids.length) return { removed: 0, failed: 0, skipped: true };
   const mt = await getMikrotikCreds();
@@ -92,13 +93,33 @@ async function removeUserMangles(userIds) {
     return { removed: 0, failed: 0, skipped: true };
   }
 
+  // Filtrado previo (BD): usuarios cuyo túnel vivo es de otro workspace.
+  let targets = ids;
+  let protectedCount = 0;
+  if (opts.workspaceId) {
+    const sessionRepo = require('../db/repos/sessionRepo');
+    const keep = [];
+    for (const userId of ids) {
+      const active = await sessionRepo.getActiveAnywhereByUser(userId).catch(() => null);
+      if (active && active.workspace_id !== opts.workspaceId) {
+        protectedCount++;
+        log.info({ userId, activeWs: active.workspace_id, leavingWs: opts.workspaceId },
+          'mangle protegida: el túnel activo del user es de otro workspace');
+        continue;
+      }
+      keep.push(userId);
+    }
+    targets = keep;
+    if (!targets.length) return { removed: 0, failed: 0, skipped: true, protected: protectedCount };
+  }
+
   let api;
   let removed = 0, failed = 0;
   try {
     api = await connectToMikrotik(mt.ip, mt.user, mt.pass);
     // Para cada user: encontrar sus .id de mangle y borrarlos. Si findUserMangleIds
     // falla, lo loggeamos y continuamos con el siguiente (best-effort).
-    for (const userId of ids) {
+    for (const userId of targets) {
       try {
         const mangleIds = await findUserMangleIds(api, userId);
         if (!mangleIds.length) continue;
@@ -113,10 +134,10 @@ async function removeUserMangles(userIds) {
   } catch (e) {
     if (api) try { await api.close(); } catch (_) { /* noop */ }
     log.warn({ err: e.message }, 'Router inalcanzable (mangle cleanup)');
-    return { removed, failed: ids.length - removed, skipped: true };
+    return { removed, failed: targets.length - removed, skipped: true, protected: protectedCount };
   }
 
-  return { removed, failed, skipped: false };
+  return { removed, failed, skipped: false, protected: protectedCount };
 }
 
-module.exports = { setPeerEnabled, setPeersEnabled, removeUserMangles };
+module.exports = { setPeersEnabled, removeUserMangles };

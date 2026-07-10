@@ -55,6 +55,19 @@ async function findMembershipByUser(userId) {
   return rows[0] || null;
 }
 
+/** TODAS las membresías vivas de un usuario (multi-workspace: OWNER de su
+ *  workspace + MEMBER en los que lo invitaron). Orden estable por antigüedad. */
+async function listMembershipsByUser(userId) {
+  return query(
+    `SELECT wm.workspace_id, wm.role, w.name AS workspace_name
+       FROM workspace_members wm
+       JOIN workspaces w ON w.id = wm.workspace_id
+      WHERE wm.user_id = ? AND wm.deleted_at IS NULL AND w.deleted_at IS NULL
+      ORDER BY wm.created_at ASC`,
+    [userId]
+  );
+}
+
 /** Workspace por id (no devuelve los borrados). */
 async function findById(workspaceId) {
   const rows = await query(
@@ -64,4 +77,4 @@ async function findById(workspaceId) {
   return rows[0] || null;
 }
 
-module.exports = { createForOwner, findMembershipByUser, findById };
+module.exports = { createForOwner, findMembershipByUser, listMembershipsByUser, findById };

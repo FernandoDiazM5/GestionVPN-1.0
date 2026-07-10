@@ -80,15 +80,6 @@ async function findScanMangleIds(api, workspaceId) {
 // El backend nuevo nunca los crea → si existen, son legacy y rompen el aislamiento.
 const LEGACY_GLOBAL_COMMENTS = ['ACCESO-ADMIN', 'ACCESO-DINAMICO'];
 
-/**
- * .id de las mangle GLOBALES legacy (single-user). Se eliminan automáticamente
- * para que el modelo por-usuario no conviva con la regla que marca toda la /24.
- * Lanza si el print falla.
- */
-async function findLegacyGlobalMangleIds(api) {
-  return filterLegacyGlobalMangleIds(await readMangles(api));
-}
-
 /** ¿Existe la mangle del usuario para ese VRF? (keepalive). Lanza si el print falla. */
 async function hasUserMangle(api, { userId, mgmtIp, vrfName }) {
   const comment = mangleComment(userId);
@@ -167,7 +158,7 @@ module.exports = {
   DST_LIST,
   LEGACY_GLOBAL_COMMENTS,
   userTag, mangleComment, scanMangleComment,
-  vrfExists, findUserMangleIds, findLegacyGlobalMangleIds, hasUserMangle,
+  vrfExists, findUserMangleIds, hasUserMangle,
   findScanMangleIds,
   readMangles, filterUserMangleIds, filterLegacyGlobalMangleIds,
   removeMangleIds, addUserMangle, addScanMangle,

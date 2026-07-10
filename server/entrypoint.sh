@@ -19,6 +19,7 @@ node db/migrateApNode.js        # FK aps.node_id
 node db/migrateScanIp.js        # tabla workspace_scan_ip (Opción C)
 node db/migrateDropCoModerator.js  # retiro del rol CO_MODERATOR (degrada→MEMBER + estrecha enum)
 node db/migrateMgmtIpSource.js     # ensancha enum source de user_mgmt_ips (+auto-provision/auto-heal) + backfill mapeos faltantes
+node db/migrateGlobalWg.js         # WG global por persona: UNIQUE(user_id) en user_mgmt_ips/member_wireguard (multi-workspace)
 
 # Siembra de usuarios demo (admin/admin + moderador fernando) SOLO si se pide.
 # En producción se deja apagada → BD sin usuarios → el panel muestra el

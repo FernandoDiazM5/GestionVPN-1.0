@@ -1,19 +1,26 @@
 import { z } from 'zod';
-import { EmailSchema, OtpSchema, PasswordSchema, PublicKeySchema, Role } from './common';
+import { EmailSchema, OtpSchema, PasswordSchema, PublicKeySchema, UsernameSchema, Role } from './common';
 
 // ────────────────────────────────────────────────────────────────────
 //  /api/team  (invitaciones, miembros, asignaciones, WireGuard)
 // ────────────────────────────────────────────────────────────────────
 
-/** POST /api/team/invite */
-export const InviteRequestSchema = z.object({
-  email: EmailSchema,
-  name: z.string().max(120).optional(),
-  // El workspace solo invita MIEMBROS (View). Su único moderador (OWNER) se
-  // crea por el flujo de "Crear Moderador" del Administrador, no por aquí.
-  role: z.enum(['MEMBER']).default('MEMBER'),
-  tunnelId: z.string().max(160).optional(),
-});
+/** POST /api/team/invite — destinatario = `email` (correo, exista o no la
+ *  cuenta) XOR `username` (usuario EXISTENTE de la plataforma; el backend lo
+ *  resuelve server-side y la invitación cae en su bandeja in-app). */
+export const InviteRequestSchema = z
+  .object({
+    email: EmailSchema.optional(),
+    username: UsernameSchema.optional(),
+    name: z.string().max(120).optional(),
+    // El workspace solo invita MIEMBROS (View). Su único moderador (OWNER) se
+    // crea por el flujo de "Crear Moderador" del Administrador, no por aquí.
+    role: z.enum(['MEMBER']).default('MEMBER'),
+    tunnelId: z.string().max(160).optional(),
+  })
+  .refine((d) => !!d.email !== !!d.username, {
+    message: 'Indica correo O usuario (exactamente uno)',
+  });
 export type InviteRequest = z.infer<typeof InviteRequestSchema>;
 
 /** POST /api/team/accept (público) */

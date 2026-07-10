@@ -16,6 +16,7 @@
     "migrate:scanip": "node db/migrateScanIp.js",
     "migrate:dropcomod": "node db/migrateDropCoModerator.js",
     "migrate:mgmtipsource": "node db/migrateMgmtIpSource.js",
+    "migrate:globalwg": "node db/migrateGlobalWg.js",
     "diagnose": "node db/diagnostics.js",
     "check:scanroute": "node db/checkScanRoute.js",
     "sync:wg0": "node db/syncWg0.js",
