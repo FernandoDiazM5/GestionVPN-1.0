@@ -18,6 +18,8 @@ import { z } from 'zod';
 // la regla src-nat del NAT. `connectIp` es opcional (modo avanzado): conectar
 // por una IP privada/gestión distinta de la pública.
 const HOST_RE = /^[a-zA-Z0-9.\-:]+$/; // IPv4/host/hostname permisivo — la conexión real valida
+// CIDR IPv4 (o IP suelta) para las redes de gestión adicionales de confianza.
+const CIDR_RE = /^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$/;
 
 // ── Requests ────────────────────────────────────────────────────────
 
@@ -39,6 +41,13 @@ export const CoreRouterBootstrapRequestSchema = CoreRouterCredsSchema.extend({
   // otro router configurado (MT_IP apuntaba a otra IP). Sin esto, el backend
   // devuelve 409 CORE_DEVICE_CHANGE para forzar la confirmación explícita.
   confirmSwitch: z.boolean().optional(),
+  // Redes de gestión ADICIONALES de confianza (además de los planos 10.x): p.ej.
+  // la LAN local desde la que el admin administra por Winbox (192.168.18.0/24).
+  // El backend las añade a LIST-MGMT-TRUSTED y a la allowlist de api/api-ssl, para
+  // que el blindado del bootstrap (§4.18: drop WAN + restricción de la API) NO deje
+  // sin acceso a esa red. Sin esto, un equipo blindado solo se administra por el
+  // túnel de gestión 10.x.
+  trustedNets: z.array(z.string().regex(CIDR_RE, 'Red inválida (CIDR IPv4, ej. 192.168.18.0/24)')).max(10).optional(),
 });
 export type CoreRouterBootstrapRequest = z.infer<typeof CoreRouterBootstrapRequestSchema>;
 

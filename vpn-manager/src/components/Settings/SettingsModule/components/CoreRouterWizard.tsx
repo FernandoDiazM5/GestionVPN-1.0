@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   ServerCog, Globe, Shield, Key, Plug, Loader2, CheckCircle2, XCircle,
-  AlertTriangle, RefreshCw, Zap, ChevronDown, Info,
+  AlertTriangle, RefreshCw, Zap, ChevronDown, Info, Network,
 } from 'lucide-react';
 import { apiFetch } from '../../../../utils/apiClient';
 import { API_BASE_URL } from '../../../../config';
@@ -18,7 +18,11 @@ const STATE_META: Record<CoreRouterState, { label: string; badge: string; hint: 
   ours:    { label: 'Ya configurado',          badge: 'badge-success', hint: 'Es un Servidor VPN nuestro y está conforme.' },
 };
 
-interface FormState { publicIp: string; user: string; pass: string; connectIp: string; }
+interface FormState { publicIp: string; user: string; pass: string; connectIp: string; trustedNets: string; }
+
+// "192.168.18.0/24, 10.0.5.0/24" → ['192.168.18.0/24','10.0.5.0/24'] (coma/espacio).
+const parseTrustedNets = (raw: string): string[] =>
+  raw.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
 
 const STEP_STYLE: Record<CoreBootstrapStep['status'], { box: string; dot: string; mark: string }> = {
   ok:    { box: 'bg-emerald-50 border-emerald-100 dark:bg-emerald-500/10 dark:border-emerald-500/30', dot: 'bg-emerald-500 text-white', mark: '✓' },
@@ -91,7 +95,7 @@ export function CoreRouterWizard() {
   // fuerza abierto al pulsar "Cambiar de equipo" — evita un setState-en-effect.
   const [formOverride, setFormOverride] = useState(false);
 
-  const [form, setForm] = useState<FormState>({ publicIp: '', user: 'admin', pass: '', connectIp: '' });
+  const [form, setForm] = useState<FormState>({ publicIp: '', user: 'admin', pass: '', connectIp: '', trustedNets: '' });
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const [busy, setBusy] = useState<null | 'validate' | 'bootstrap'>(null);
@@ -148,6 +152,7 @@ export function CoreRouterWizard() {
         body: JSON.stringify({
           publicIp: form.publicIp.trim(), user: form.user.trim() || 'admin', pass: form.pass,
           ...(form.connectIp.trim() ? { connectIp: form.connectIp.trim() } : {}),
+          ...(form.trustedNets.trim() ? { trustedNets: parseTrustedNets(form.trustedNets) } : {}),
           confirmSwitch,
         }),
       });
@@ -286,6 +291,20 @@ export function CoreRouterWizard() {
                       </div>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 font-medium">
                         Útil si el router ya está enlazado y prefieres conectar por el túnel de gestión.
+                      </p>
+
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 mt-4">
+                        Redes de gestión de confianza
+                      </label>
+                      <div className="relative">
+                        <Network className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
+                        <input type="text" value={form.trustedNets} onChange={(e) => setField('trustedNets', e.target.value)}
+                          className="input-field pl-10 h-11 font-mono" placeholder="ej. 192.168.18.0/24" autoComplete="off" />
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 font-medium">
+                        Redes desde las que administras el router además del túnel de gestión (ej. tu LAN local por Winbox).
+                        Se agregan a la allowlist del API y del firewall para que el blindado del router <strong>no te deje sin acceso</strong>.
+                        Separa varias con coma.
                       </p>
                     </div>
                   )}

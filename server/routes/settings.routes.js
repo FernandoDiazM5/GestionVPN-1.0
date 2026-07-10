@@ -141,7 +141,7 @@ router.post('/settings/core-router/validate', requireAdmin, asyncHandler(async (
 // POST /settings/core-router/bootstrap — aplica la config base idempotente y,
 // SOLO al terminar OK, persiste las credenciales del Core.
 router.post('/settings/core-router/bootstrap', requireAdmin, asyncHandler(async (req, res) => {
-  const { publicIp, user, pass, connectIp, confirmSwitch } = CoreRouterBootstrapRequestSchema.parse(req.body);
+  const { publicIp, user, pass, connectIp, confirmSwitch, trustedNets } = CoreRouterBootstrapRequestSchema.parse(req.body);
   const host = (connectIp && connectIp.trim()) || publicIp;
 
   // ¿Ya hay OTRO router configurado? → exigir confirmación explícita (§ "cambiar equipo").
@@ -167,8 +167,10 @@ router.post('/settings/core-router/bootstrap', requireAdmin, asyncHandler(async 
 
     // NO gestionamos la IP pública/WAN: eso lo provee la nube o lo habilita el
     // operador. Solo montamos el andamiaje VPN del Core.
+    // Redes de gestión extra de confianza (ej. la LAN local del admin) → entran a
+    // LIST-MGMT-TRUSTED y a la allowlist de la API para que el blindado no bloquee.
     await coreBootstrap.applyBaseline(api,
-      { sstpPort, backendOrigin, trustedPublics: [], lockdownSafe }, pushStep);
+      { sstpPort, backendOrigin, trustedPublics: trustedNets || [], lockdownSafe }, pushStep);
 
     const { state, summary } = await coreBootstrap.readRouterState(api);
     await api.close();

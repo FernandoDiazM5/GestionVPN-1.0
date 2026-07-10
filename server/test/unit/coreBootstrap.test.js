@@ -154,6 +154,24 @@ describe('coreBootstrap — applyBaseline idempotencia', () => {
 });
 
 describe('coreBootstrap — anti-bloqueo (§4.18)', () => {
+  it('trustedPublics (redes de gestión extra) → allowlist de API + LIST-MGMT-TRUSTED', async () => {
+    const { api, tables } = makeRouter();
+    const opts = {
+      sstpPort: 4443, backendOrigin: '179.6.29.241',
+      trustedPublics: ['192.168.18.0/24'], lockdownSafe: true,
+    };
+    await coreBootstrap.applyBaseline(api, opts, () => {});
+    // La red extra queda en la allowlist de api Y api-ssl.
+    const svc = tables.get('/ip/service') || [];
+    for (const name of ['api', 'api-ssl']) {
+      const row = svc.find(s => s.name === name);
+      expect(String(row?.address || '')).toContain('192.168.18.0/24');
+    }
+    // Y en LIST-MGMT-TRUSTED (para la regla de firewall de gestión).
+    const al = tables.get('/ip/firewall/address-list') || [];
+    expect(al.some(r => r.list === 'LIST-MGMT-TRUSTED' && r.address === '192.168.18.0/24')).toBe(true);
+  });
+
   it('omite "drop WAN" y la restricción de API si el origen no es seguro', async () => {
     const { api } = makeRouter();
     const opts = {
