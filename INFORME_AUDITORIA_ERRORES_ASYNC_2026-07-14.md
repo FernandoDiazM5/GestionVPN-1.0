@@ -1,7 +1,7 @@
 # Informe de auditoria: errores, estados asincronos y pagina 404
 
-Fecha: 2026-07-14  
-Rama: `vps_prod`  
+Fecha: 2026-07-14
+Rama: `vps_prod`
 Alcance: frontend React, clientes HTTP, integracion SMTP del backend y navegacion del SPA.
 
 ## 1. Resumen ejecutivo
@@ -134,4 +134,3 @@ Si se omite, el sistema usa `SMTP_USER`. Reiniciar/recrear el backend despues de
 - Los HTTP 4xx esperados no generan correo para evitar ruido y abuso. Siguen apareciendo en la UI mediante sus estados de error.
 - Las operaciones best-effort de cache/localStorage, parseo de eventos SSE y lectura de datos opcionales permanecen silenciosas por diseno; no representan una consulta visible ni deben bloquear al usuario.
 - La cobertura visual autenticada de todos los estados forzados por red aun puede ampliarse con fixtures E2E de 404/500 por modulo.
-

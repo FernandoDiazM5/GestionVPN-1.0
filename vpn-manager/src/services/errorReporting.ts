@@ -67,4 +67,3 @@ export function installGlobalErrorReporting(): void {
     reportFrontendError(event.reason, { source: 'unhandled-rejection' });
   });
 }
-
