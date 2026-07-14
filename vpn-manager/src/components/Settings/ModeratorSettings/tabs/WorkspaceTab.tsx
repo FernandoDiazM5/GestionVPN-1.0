@@ -17,7 +17,7 @@ export default function WorkspaceTab() {
     try {
       await workspaceApi.rename(name.trim());
       setOk(true); setName('');
-      refresh();
+      await refresh();
       setTimeout(() => setOk(false), 4000);
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'No se pudo actualizar');

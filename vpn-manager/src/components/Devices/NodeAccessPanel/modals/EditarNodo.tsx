@@ -12,6 +12,7 @@ import { ProvisionSteps } from '../components';
 import type { NodeInfo } from '../../../../types/api';
 import type { ProvisionResult } from '../types';
 import Dialog from '../../../Common/Dialog';
+import ModuleSkeleton from '../../../Common/ModuleSkeleton';
 
 interface EditarNodoProps {
   node: NodeInfo;
@@ -25,6 +26,8 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
   const [currentSubnets, setCurrentSubnets] = useState<string[]>([]);
   const [currentRemoteIP, setCurrentRemoteIP] = useState('');
   const [loadingDetails, setLoadingDetails] = useState(true);
+  const [detailsError, setDetailsError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
 
   const [newLabel, setNewLabel] = useState(node.nombre_nodo || '');
   const [newPppUser, setNewPppUser] = useState('');
@@ -37,6 +40,7 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
   const [copiedEditField, setCopiedEditField] = useState<string | null>(null);
   const [savingPassDb, setSavingPassDb] = useState(false);
   const [passDbSaved, setPassDbSaved] = useState(false);
+  const [passDbError, setPassDbError] = useState<string | null>(null);
 
   const copyEditField = (text: string, key: string) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -57,6 +61,7 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
   useEffect(() => {
     if (!credentials) return;
     setLoadingDetails(true);
+    setDetailsError(null);
     const pppUser = node.ppp_user;
     (async () => {
       const [detailsRes, credsRes] = await Promise.allSettled([
@@ -75,6 +80,12 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
       ]);
 
       const details = detailsRes.status === 'fulfilled' ? detailsRes.value : null;
+      if (!details?.success) {
+        const message = detailsRes.status === 'rejected' && detailsRes.reason instanceof Error
+          ? detailsRes.reason.message
+          : details?.message || 'No se pudieron cargar los datos actuales del nodo.';
+        setDetailsError(message);
+      }
       const mikrotikPass: string = (details?.success && details?.pppPassword) ? details.pppPassword : '';
       if (details?.success) {
         setCurrentSubnets(details.lanSubnets || []);
@@ -99,12 +110,14 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
           if (saveRes.success) {
             setLoadedPass(mikrotikPass);
           }
-        } catch { }
+        } catch (reason) {
+          setPassDbError(reason instanceof Error ? reason.message : 'No se pudo sincronizar la credencial local.');
+        }
       }
 
       setLoadingDetails(false);
     })();
-  }, [credentials, node.nombre_vrf, node.ppp_user]);
+  }, [credentials, loadAttempt, node.nombre_vrf, node.ppp_user]);
 
   useEffect(() => {
     if (!result) { setVisibleSteps(0); return; }
@@ -129,6 +142,7 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
   const handleSavePassToDb = async () => {
     if (!newPass.trim() || savingPassDb) return;
     setSavingPassDb(true);
+    setPassDbError(null);
     try {
       const r = await fetchWithTimeout(`${API_BASE_URL}/api/node/creds/save`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -140,8 +154,11 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
         setPassDbSaved(true);
         setTimeout(() => setPassDbSaved(false), 3000);
       }
-    } catch { }
-    setSavingPassDb(false);
+    } catch (reason) {
+      setPassDbError(reason instanceof Error ? reason.message : 'No se pudo guardar la credencial.');
+    } finally {
+      setSavingPassDb(false);
+    }
   };
 
   const handleSave = async () => {
@@ -224,9 +241,15 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
           {!saving && !result && (
             <>
               {loadingDetails && (
-                <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>Cargando datos actuales del router…</span>
+                <ModuleSkeleton rows={2} withHeader={false} label="Cargando datos actuales del router..." />
+              )}
+
+              {detailsError && !loadingDetails && (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300" role="alert">
+                  <span>{detailsError}</span>
+                  <button type="button" onClick={() => setLoadAttempt(value => value + 1)} className="btn-ghost min-h-11 px-3 inline-flex items-center gap-2">
+                    <RefreshCw className="h-4 w-4" /> Reintentar
+                  </button>
                 </div>
               )}
 
@@ -331,6 +354,7 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
                         )}
                       </div>
                     )}
+                    {passDbError && <p className="mt-1 text-2xs text-rose-600 dark:text-rose-400" role="alert">{passDbError}</p>}
                   </div>
                 )}
 

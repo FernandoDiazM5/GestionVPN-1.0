@@ -3,6 +3,7 @@ import { Mail, Loader2, Check, KeyRound, Router, Copy, ShieldCheck } from 'lucid
 import { teamApi } from '../../../../services/teamApi';
 import { ROLE_LABEL } from '../../../../types/account';
 import type { MyInvitation, WgServerConfig } from '../../../../types/account';
+import AsyncQueryState from '../../../Common/AsyncQueryState';
 
 /**
  * Bandeja in-app: muestra las invitaciones PENDING dirigidas al usuario logueado
@@ -16,12 +17,22 @@ export default function MyInvitationsInbox({ onAccepted }: { onAccepted: () => v
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ tunnel: string | null; wg: WgServerConfig | null } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    try { const r = await teamApi.myInvitations(); setInvs(r.invitations); }
-    catch { /* sin sesión / sin invitaciones */ }
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const r = await teamApi.myInvitations();
+      setInvs(r.invitations);
+    } catch (reason) {
+      setLoadError(reason instanceof Error ? reason.message : 'No se pudieron cargar las invitaciones.');
+    } finally {
+      setLoading(false);
+    }
   }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   const accept = async (inv: MyInvitation) => {
     setBusy(true); setError(null);
@@ -38,6 +49,19 @@ export default function MyInvitationsInbox({ onAccepted }: { onAccepted: () => v
 
   if (done) {
     return <AcceptedCard tunnel={done.tunnel} wg={done.wg} onClose={() => setDone(null)} />;
+  }
+  if (loading || loadError) {
+    return (
+      <AsyncQueryState
+        loading={loading}
+        error={loadError}
+        onRetry={() => { void load(); }}
+        loadingLabel="Cargando invitaciones..."
+        skeletonRows={1}
+      >
+        <div />
+      </AsyncQueryState>
+    );
   }
   if (invs.length === 0) return null;
 

@@ -14,10 +14,11 @@
 //  + tarjeta uptime + breakdown de errores routeros por tipo.
 // ============================================================
 import { useEffect, useRef, useState } from 'react';
-import { Activity, Gauge, Mail, Shield, Wifi, Loader2, RefreshCw, AlertCircle } from 'lucide-react';
+import { Activity, Gauge, Mail, Shield, Wifi, RefreshCw, AlertCircle } from 'lucide-react';
 import { dashboardApi } from '../../../services/dashboardApi';
 import type { DashboardMetricsResponse, DashboardSample } from '@gestionvpn/contracts';
 import Sparkline from '../../Common/Sparkline';
+import AsyncQueryState from '../../Common/AsyncQueryState';
 
 const POLL_MS = 10_000;
 
@@ -71,23 +72,19 @@ export default function MetricsPanel() {
     return () => { if (pollRef.current) window.clearInterval(pollRef.current); };
   }, []);
 
-  if (loading && !data) {
+  if (!data) {
     return (
-      <div className="card p-8 flex items-center justify-center">
-        <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />
-      </div>
+      <AsyncQueryState
+        loading={loading}
+        error={err}
+        onRetry={() => { setLoading(true); void refresh(); }}
+        loadingLabel="Cargando metricas..."
+        skeletonRows={2}
+      >
+        <div />
+      </AsyncQueryState>
     );
   }
-
-  if (err && !data) {
-    return (
-      <div className="card p-6 text-sm text-rose-600 flex items-start gap-2">
-        <AlertCircle className="w-4 h-4 mt-0.5" /> No se pudo cargar las métricas: {err}
-      </div>
-    );
-  }
-
-  if (!data) return null;
 
   const { current, history } = data;
   const reqsPerMin = deriveRate(history, 'httpRequests', 60_000);
@@ -107,6 +104,11 @@ export default function MetricsPanel() {
 
   return (
     <div className="space-y-3">
+      {err && (
+        <div className="card border-amber-200 p-3 text-sm text-amber-700 dark:border-amber-500/30 dark:text-amber-300" role="status">
+          <span className="flex items-start gap-2"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> No se pudieron actualizar las metricas: {err}</span>
+        </div>
+      )}
       <div className="flex items-center gap-2 text-xs text-slate-500">
         <span className="inline-flex items-center gap-1">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> En vivo · cada {POLL_MS / 1000}s

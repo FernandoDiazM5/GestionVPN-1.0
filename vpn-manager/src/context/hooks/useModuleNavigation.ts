@@ -42,24 +42,26 @@ export function modulePath(module: ActiveModule): string {
 export function useModuleNavigation() {
   const location = useLocation();
   const navigate = useNavigate();
+  const isNotFound = location.pathname !== '/' && !ROUTE_MODULES.has(location.pathname);
 
   const activeModule = useMemo<ActiveModule>(() => {
     return ROUTE_MODULES.get(location.pathname) ?? storedModule();
   }, [location.pathname]);
 
   useEffect(() => {
+    if (isNotFound) return;
     try { localStorage.setItem(LS_ACTIVE_MODULE, activeModule); } catch { /* storage opcional */ }
 
     const canonicalPath = modulePath(activeModule);
     if (location.pathname !== canonicalPath) {
       navigate({ pathname: canonicalPath, search: location.search }, { replace: true });
     }
-  }, [activeModule, location.pathname, location.search, navigate]);
+  }, [activeModule, isNotFound, location.pathname, location.search, navigate]);
 
   const setActiveModule = useCallback((module: ActiveModule) => {
     const next = module === 'users' ? 'team' : module;
     navigate(modulePath(next));
   }, [navigate]);
 
-  return { activeModule, setActiveModule };
+  return { activeModule, setActiveModule, isNotFound };
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { apiFetch } from '../../../../utils/apiClient';
 import { API_BASE_URL } from '../../../../config';
 import type { AppSettings } from '../types';
@@ -9,11 +9,9 @@ export function useLoadSettings() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
 
-  useEffect(() => {
-    loadSettings();
-  }, []);
-
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
+    setIsLoading(true);
+    setErrorMsg('');
     try {
       const response = await apiFetch(`${API_BASE_URL}/api/settings/get`);
       const data = await response.json();
@@ -35,7 +33,9 @@ export function useLoadSettings() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => { void loadSettings(); }, [loadSettings]);
 
   return {
     settings,

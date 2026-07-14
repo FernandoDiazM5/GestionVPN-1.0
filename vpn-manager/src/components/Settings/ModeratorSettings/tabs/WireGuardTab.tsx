@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Shield, Loader2, Download, Copy, Check, Smartphone, RefreshCw, KeyRound, AlertCircle } from 'lucide-react';
-import Spinner from '../../../Common/Spinner';
+import AsyncQueryState from '../../../Common/AsyncQueryState';
 import { teamApi } from '../../../../services/teamApi';
 import { useWorkspaceSession } from '../../../../context/WorkspaceSession';
+import type { ApiError } from '../../../../services/sessionClient';
 
 /**
  * "Mi WireGuard" — acceso VPN del propio usuario en sesión (moderador o member).
@@ -21,27 +22,37 @@ export default function WireGuardTab() {
   const [qr, setQr] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [qrError, setQrError] = useState<string | null>(null);
 
   // Carga la config existente (si la hay). 404 → todavía no tiene acceso.
-  useEffect(() => {
-    (async () => {
-      try {
-        const r = await teamApi.myWireguard();
-        setConf(r.wireguard.conf);
-        setAllowedIp(r.wireguard.allowedIp);
-      } catch { /* sin config aún */ }
-      finally { setLoading(false); }
-    })();
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const r = await teamApi.myWireguard();
+      setConf(r.wireguard.conf);
+      setAllowedIp(r.wireguard.allowedIp);
+    } catch (reason) {
+      if ((reason as Partial<ApiError>)?.status !== 404) {
+        setLoadError(reason instanceof Error ? reason.message : 'No se pudo cargar el acceso WireGuard.');
+      }
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => { void load(); }, [load]);
 
   // QR del .conf — WireGuard móvil lo escanea tal cual.
   useEffect(() => {
-    if (!conf) { setQr(null); return; }
+    if (!conf) { setQr(null); setQrError(null); return; }
     let active = true;
+    setQrError(null);
     import('qrcode')
       .then(({ default: QRCode }) => QRCode.toDataURL(conf, { margin: 1, width: 220 }))
       .then(dataUrl => { if (active) setQr(dataUrl); })
-      .catch(() => { if (active) setQr(null); });
+      .catch(() => { if (active) { setQr(null); setQrError('No se pudo generar el QR. Puedes descargar el archivo .conf.'); } });
     return () => { active = false; };
   }, [conf]);
 
@@ -55,7 +66,9 @@ export default function WireGuardTab() {
   };
 
   const copyConf = () => {
-    if (conf) navigator.clipboard.writeText(conf).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
+    if (conf) navigator.clipboard.writeText(conf)
+      .then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); })
+      .catch(() => setError('No se pudo copiar la configuracion.'));
   };
 
   const download = () => {
@@ -83,9 +96,14 @@ export default function WireGuardTab() {
       </div>
 
       <div className="p-6 space-y-4 max-w-md">
-        {loading ? (
-          <Spinner block className="text-violet-500" label="Cargando acceso WireGuard…" />
-        ) : conf ? (
+        <AsyncQueryState
+          loading={loading}
+          error={loadError}
+          onRetry={() => { void load(); }}
+          loadingLabel="Cargando acceso WireGuard..."
+          skeletonRows={2}
+        >
+        {conf ? (
           <>
             {allowedIp && (
               <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
@@ -101,6 +119,7 @@ export default function WireGuardTab() {
                 </p>
               </div>
             )}
+            {qrError && <p className="text-xs text-amber-600 dark:text-amber-400" role="status">{qrError}</p>}
             <pre className="text-2xs font-mono bg-slate-900 text-slate-200 rounded-xl p-3 overflow-x-auto max-h-32 leading-relaxed">{conf}</pre>
             <div className="flex items-center gap-2">
               <button onClick={download} className="btn-primary flex-1 px-4 py-2.5 flex items-center justify-center gap-2 text-sm">
@@ -128,6 +147,7 @@ export default function WireGuardTab() {
             </button>
           </div>
         )}
+        </AsyncQueryState>
         {error && (
           <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30">
             <AlertCircle className="w-4 h-4 text-rose-500 mt-0.5 shrink-0" />

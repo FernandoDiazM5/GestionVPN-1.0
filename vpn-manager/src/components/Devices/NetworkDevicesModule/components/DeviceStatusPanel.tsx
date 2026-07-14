@@ -21,6 +21,7 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<number | null>(dev.cachedStats ? Date.now() : null);
   const [showRaw, setShowRaw] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const devRef = useRef(dev);
   devRef.current = dev;
@@ -51,6 +52,7 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
     if (!d.sshUser || (!('hasSshPass' in d ? d.hasSshPass : false) && !d.sshPass) || isFetchingRef.current) return;
     isFetchingRef.current = true;
     setRefreshing(true);
+    setFetchError(null);
     try {
       const res = await fetchWithTimeout(`${API_BASE_URL}/api/device/antenna`, {
         method: 'POST',
@@ -62,10 +64,15 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
         setStats(data.stats);
         setLastUpdated(Date.now());
         onRefreshRef.current?.(data.stats);
+      } else {
+        throw new Error(data.message || 'No se pudieron obtener las estadisticas.');
       }
-    } catch { /* silencioso */ }
-    isFetchingRef.current = false;
-    setRefreshing(false);
+    } catch (reason) {
+      setFetchError(reason instanceof Error ? reason.message : 'No se pudieron obtener las estadisticas.');
+    } finally {
+      isFetchingRef.current = false;
+      setRefreshing(false);
+    }
   };
 
   // §43: ELIMINADO el polling automático cada 5s a la antena. Saturaba CPU
@@ -88,8 +95,10 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
 
   if (!s) {
     return (
-      <div className="px-5 py-5 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-4 dark:bg-slate-900/60 dark:border-slate-800">
-        <span className="text-xs text-slate-400 italic">Sin estadísticas SSH disponibles.</span>
+      <div className="px-5 py-5 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-4 dark:bg-slate-900/60 dark:border-slate-800">
+        <span className={`text-xs ${fetchError ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400 italic'}`} role={fetchError ? 'alert' : undefined}>
+          {fetchError || 'Sin estadísticas SSH disponibles.'}
+        </span>
         {dev.sshUser && (
           <button onClick={handleRefresh} disabled={refreshing}
             className="btn-info btn-sm flex items-center gap-1.5">
@@ -144,6 +153,12 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
           )}
         </div>
       </div>
+
+      {fetchError && (
+        <div className="border-b border-rose-200 bg-rose-50 px-4 py-2 text-xs text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300" role="alert">
+          {fetchError}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
         <div className="px-4 py-3">

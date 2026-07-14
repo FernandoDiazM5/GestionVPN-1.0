@@ -1,6 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import ModuleErrorBoundary from './ModuleErrorBoundary';
+import { reportFrontendError } from '../../services/errorReporting';
+
+vi.mock('../../services/errorReporting', () => ({ reportFrontendError: vi.fn() }));
 
 function BrokenView(): never {
   throw new Error('fallo de prueba');
@@ -18,5 +21,6 @@ describe('ModuleErrorBoundary', () => {
 
     expect(screen.getByRole('alert')).toHaveTextContent('No se pudo abrir este modulo');
     expect(screen.getByRole('button', { name: 'Reintentar' })).toBeInTheDocument();
+    expect(reportFrontendError).toHaveBeenCalledWith(expect.any(Error), expect.objectContaining({ source: 'render' }));
   });
 });

@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { UserCircle, Waypoints, Shield, Download, Copy, Check, Smartphone, KeyRound } from 'lucide-react';
-import Spinner from '../../../Common/Spinner';
+import AsyncQueryState from '../../../Common/AsyncQueryState';
 import { teamApi } from '../../../../services/teamApi';
 import { ADMIN_WG_NET } from '../../../../config';
 import type { Assignment, MemberWireguard, SessionUser } from '../../../../types/account';
+import type { ApiError } from '../../../../services/sessionClient';
 
 interface Props {
   session: SessionUser;
@@ -33,43 +34,59 @@ export default function MemberProfile({ session }: Props) {
   const [qr, setQr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [qrError, setQrError] = useState<string | null>(null);
 
   // .conf completo (modo servidor) o plantilla (modo clave-pública del miembro)
   const confText = wg?.conf ?? buildWgTemplate(wg);
   const isTemplate = !!confText && !wg?.conf;
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const a = await teamApi.listAssignments();
-        setAssignments(a.assignments);
-      } catch { /* */ }
-      try {
-        const w = await teamApi.myWireguard();
-        setWg(w.wireguard);
-      } catch { /* sin WG aún */ }
-      setLoading(false);
-    })();
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const errors: string[] = [];
+    try {
+      const a = await teamApi.listAssignments();
+      setAssignments(a.assignments);
+    } catch (reason) {
+      errors.push(reason instanceof Error ? reason.message : 'No se pudieron cargar los tuneles.');
+    }
+    try {
+      const w = await teamApi.myWireguard();
+      setWg(w.wireguard);
+    } catch (reason) {
+      if ((reason as Partial<ApiError>)?.status !== 404) {
+        errors.push(reason instanceof Error ? reason.message : 'No se pudo cargar WireGuard.');
+      }
+    }
+    setError(errors.length ? errors.join(' ') : null);
+    setLoading(false);
   }, []);
+
+  useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
     // QR solo del .conf completo; una plantilla con placeholder no es escaneable.
-    if (!wg?.conf) { setQr(null); return; }
+    if (!wg?.conf) { setQr(null); setQrError(null); return; }
     let cancelled = false;
     const conf = wg.conf;
     setQr(null);
+    setQrError(null);
 
     void import('qrcode')
       .then(({ default: QRCode }) => QRCode.toDataURL(conf, { margin: 1, width: 220 }))
       .then(dataUrl => { if (!cancelled) setQr(dataUrl); })
-      .catch(() => { if (!cancelled) setQr(null); });
+      .catch(() => { if (!cancelled) { setQr(null); setQrError('No se pudo generar el QR. Descarga el archivo .conf.'); } });
 
     return () => { cancelled = true; };
   }, [wg?.conf]);
 
   const copyConf = () => {
     if (!confText) return;
-    navigator.clipboard.writeText(confText).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
+    navigator.clipboard.writeText(confText)
+      .then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); })
+      .catch(() => setActionError('No se pudo copiar la configuracion.'));
   };
   const download = () => {
     if (!confText) return;
@@ -91,9 +108,13 @@ export default function MemberProfile({ session }: Props) {
         <p className="text-slate-500 dark:text-slate-500 text-sm mt-1 font-mono">{session.email}</p>
       </div>
 
-      {loading ? (
-        <Spinner block label="Cargando perfil…" />
-      ) : (
+      <AsyncQueryState
+        loading={loading}
+        error={error}
+        onRetry={() => { void load(); }}
+        loadingLabel="Cargando perfil..."
+        skeletonRows={3}
+      >
         <>
           {/* Mis túneles asignados */}
           <div className="card overflow-hidden border border-slate-200 dark:border-slate-800">
@@ -139,6 +160,7 @@ export default function MemberProfile({ session }: Props) {
                       </p>
                     </div>
                   )}
+                  {qrError && <p className="text-xs text-amber-600 dark:text-amber-400" role="status">{qrError}</p>}
 
                   {isTemplate && (
                     <div className="w-full space-y-2">
@@ -158,6 +180,7 @@ export default function MemberProfile({ session }: Props) {
                       {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
                     </button>
                   </div>
+                  {actionError && <p className="text-xs text-rose-600 dark:text-rose-400" role="alert">{actionError}</p>}
                 </div>
               ) : (
                 <p className="text-center text-sm text-slate-500 dark:text-slate-500 py-4">
@@ -167,7 +190,7 @@ export default function MemberProfile({ session }: Props) {
             </div>
           </div>
         </>
-      )}
+      </AsyncQueryState>
     </div>
   );
 }

@@ -7,6 +7,7 @@
 //  el contexto VPN limpie la sesión y redirija a login.
 // ============================================================
 import { API_BASE_URL } from '../config';
+import { reportFrontendError } from './errorReporting';
 
 export interface ApiError extends Error {
   status: number;
@@ -39,14 +40,24 @@ interface ApiResponseBody {
 }
 
 export async function apiJson<T = unknown>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
       ...(init?.headers || {}),
     },
-  });
+    });
+  } catch (error) {
+    reportFrontendError(error, { source: 'async', route: path });
+    throw error;
+  }
+
+  if (res.status >= 500) {
+    reportFrontendError(new Error(`HTTP ${res.status}`), { source: 'async', route: path });
+  }
 
   let body: ApiResponseBody | null = null;
   try {

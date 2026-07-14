@@ -1,5 +1,6 @@
 import { Component, Fragment, type ErrorInfo, type ReactNode } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { reportFrontendError } from '../../services/errorReporting';
 
 interface Props {
   children: ReactNode;
@@ -20,6 +21,7 @@ export default class ModuleErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('[ui] module render failed', error.name, info.componentStack);
+    reportFrontendError(error, { source: 'render', componentStack: info.componentStack ?? undefined });
   }
 
   componentDidUpdate(previous: Props) {

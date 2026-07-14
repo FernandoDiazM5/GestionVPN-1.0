@@ -15,6 +15,7 @@
 // ============================================================
 
 import type { TunnelErrorCode } from '@gestionvpn/contracts';
+import { reportFrontendError } from '../services/errorReporting';
 
 /**
  * Wrapper tipado de fetch que:
@@ -34,11 +35,17 @@ export const apiFetch = async (input: RequestInfo | URL, init?: RequestInit): Pr
     }
   }
 
-  const response = await fetch(input, {
+  let response: Response;
+  try {
+    response = await fetch(input, {
     ...init,
     credentials: 'include',   // envía cookie HttpOnly de sesión RBAC
     headers,
-  });
+    });
+  } catch (error) {
+    reportFrontendError(error, { source: 'async', route: typeof input === 'string' ? input : input.toString() });
+    throw error;
+  }
 
   // Interceptar sesión inválida/expirada.
   //  • 401 = sesión muerta SIEMPRE (token ausente/ilegible) → desloguear.
@@ -49,6 +56,9 @@ export const apiFetch = async (input: RequestInfo | URL, init?: RequestInit): Pr
   //    operador — p.ej. POST /node/history/add al activar su túnel asignado
   //    devuelve 403 de permisos, no de sesión.
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : '';
+  if (response.status >= 500) {
+    reportFrontendError(new Error(`HTTP ${response.status}`), { source: 'async', route: url });
+  }
   const isAuthRoute = url.includes('/api/auth/');
   if (!isAuthRoute && response.status === 401) {
     window.dispatchEvent(new Event('auth_expired'));

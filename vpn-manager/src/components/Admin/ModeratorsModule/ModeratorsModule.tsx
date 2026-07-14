@@ -42,15 +42,18 @@ export default function ModeratorsModule() {
   const load = useCallback(async () => {
     if (!canAdmin) { setLoading(false); return; }   // solo el Administrador consulta /api/admin
     setLoading(true);
+    setError(null);
     try {
       const [mods, invs] = await Promise.all([
         adminApi.listModerators(),
-        adminApi.listInvitations().catch(() => ({ invitations: [] as PendingInvitation[] })),
+        adminApi.listInvitations(),
       ]);
       setModerators(mods.moderators);
       setInvites(invs.invitations);
     }
-    catch { /* sesión/MySQL */ }
+    catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'No se pudieron cargar los moderadores.');
+    }
     finally { setLoading(false); }
   }, [canAdmin]);
   useEffect(() => { load(); }, [load]);

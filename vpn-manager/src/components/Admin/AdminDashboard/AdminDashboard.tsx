@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { LayoutDashboard, Users, UserCog, Briefcase, Activity, RefreshCw } from 'lucide-react';
-import Spinner from '../../Common/Spinner';
+import AsyncQueryState from '../../Common/AsyncQueryState';
 import { adminApi } from '../../../services/adminApi';
 import { useWorkspaceSession } from '../../../context/WorkspaceSession';
 import { isPlatformAdmin } from '../../../utils/permissions';
@@ -19,17 +19,19 @@ export default function AdminDashboard() {
   const [summary, setSummary] = useState<AdminSummary | null>(null);
   const [recent, setRecent] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { session } = useWorkspaceSession();
   const canAdmin = isPlatformAdmin(session);
 
   const load = useCallback(async () => {
     if (!canAdmin) { setLoading(false); return; }   // solo el Administrador consulta /api/admin
-    setLoading(true); setError(false);
+    setLoading(true); setError(null);
     try {
       const r = await adminApi.summary();
       setSummary(r.summary); setRecent(r.recent);
-    } catch { setError(true); }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'No se pudo cargar el resumen.');
+    }
     finally { setLoading(false); }
   }, [canAdmin]);
   useEffect(() => { load(); }, [load]);
@@ -56,11 +58,18 @@ export default function AdminDashboard() {
         </button>
       </div>
 
-      {loading && !summary ? (
-        <Spinner block label="Cargando resumen…" />
-      ) : error ? (
-        <div className="card p-8 text-center text-slate-500 dark:text-slate-500">No se pudo cargar el resumen (¿MySQL activo?).</div>
-      ) : (
+      {error && summary && (
+        <div className="card border-amber-200 p-3 text-sm text-amber-700 dark:border-amber-500/30 dark:text-amber-300" role="status">
+          No se pudo actualizar el resumen: {error}
+        </div>
+      )}
+      <AsyncQueryState
+        loading={loading && !summary}
+        error={!summary ? error : null}
+        onRetry={() => { void load(); }}
+        loadingLabel="Cargando resumen..."
+        skeletonRows={4}
+      >
         <>
           {/* Tarjetas de métricas */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -108,7 +117,7 @@ export default function AdminDashboard() {
             )}
           </div>
         </>
-      )}
+      </AsyncQueryState>
     </div>
   );
 }

@@ -23,6 +23,7 @@ const auditRoutes = require('./routes/audit.routes');
 const eventsRoutes = require('./routes/events.routes');
 const adminRoutes = require('./routes/admin.routes');
 const workspaceRoutes = require('./routes/workspace.routes');
+const errorReportsRoutes = require('./routes/errorReports.routes');
 const { errorMiddleware } = require('./lib/apiResponse');
 const coreRoutes = require('./routes/core');
 const nodeRoutes = require('./routes/nodes');
@@ -207,6 +208,7 @@ app.use('/api/audit', auditRoutes);        // Fase 3: auditoría de túneles
 app.use('/api/events', eventsRoutes);      // Fase 4: SSE tiempo real (por workspace)
 app.use('/api/admin', adminRoutes);        // Roles v2: Administrador de plataforma
 app.use('/api/workspace', workspaceRoutes); // Fase C: ajustes + import/export del workspace
+app.use('/api/error-reports', errorReportsRoutes); // errores del SPA -> correo del administrador
 
 // Omitir apiRoutes legado que ya fue borrado, registrar los modulares protegidos
 app.use('/api', verifyToken, coreRoutes);

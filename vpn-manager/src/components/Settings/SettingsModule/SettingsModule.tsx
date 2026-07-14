@@ -2,10 +2,10 @@ import {
   SettingsHeader,
   SettingsForm,
   SettingsMessages,
-  SettingsLoadingState,
   ScanModeToggle,
 } from './components';
 import { useLoadSettings, useSaveSettings } from './hooks';
+import AsyncQueryState from '../../Common/AsyncQueryState';
 
 export default function SettingsModule() {
   const loadState = useLoadSettings();
@@ -23,13 +23,17 @@ export default function SettingsModule() {
       <div className="card overflow-hidden">
         <SettingsHeader />
         <div className="p-6">
-          {loadState.isLoading ? (
-            <SettingsLoadingState />
-          ) : (
+          <AsyncQueryState
+            loading={loadState.isLoading}
+            error={loadState.errorMsg}
+            onRetry={() => { void loadState.loadSettings(); }}
+            loadingLabel="Cargando ajustes..."
+            skeletonRows={3}
+          >
             <>
               <SettingsMessages
                 successMsg={saveState.successMsg}
-                errorMsg={loadState.errorMsg || saveState.errorMsg}
+                errorMsg={saveState.errorMsg}
               />
               <SettingsForm
                 settings={loadState.settings}
@@ -38,7 +42,7 @@ export default function SettingsModule() {
                 isSaving={saveState.isSaving}
               />
             </>
-          )}
+          </AsyncQueryState>
         </div>
       </div>
 

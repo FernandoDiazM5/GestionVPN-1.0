@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Shield, X, Loader2, Download, Copy, Check, Smartphone, RefreshCw, KeyRound } from 'lucide-react';
-import Spinner from '../../../Common/Spinner';
+import AsyncQueryState from '../../../Common/AsyncQueryState';
 import { teamApi } from '../../../../services/teamApi';
 import type { Member } from '../../../../types/account';
 import Dialog from '../../../Common/Dialog';
+import type { ApiError } from '../../../../services/sessionClient';
 
 interface Props {
   member: Member;
@@ -18,29 +19,39 @@ export default function MemberWireGuardModal({ member, onClose }: Props) {
   const [qr, setQr] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [qrError, setQrError] = useState<string | null>(null);
 
   // Carga config existente (si la hay)
-  useEffect(() => {
-    (async () => {
-      try {
-        const r = await teamApi.getMemberWireguard(member.user_id);
-        setConf(r.wireguard.conf);
-        setAllowedIp(r.wireguard.allowedIp);
-      } catch { /* sin config aún */ }
-      finally { setLoading(false); }
-    })();
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const r = await teamApi.getMemberWireguard(member.user_id);
+      setConf(r.wireguard.conf);
+      setAllowedIp(r.wireguard.allowedIp);
+    } catch (reason) {
+      if ((reason as Partial<ApiError>)?.status !== 404) {
+        setLoadError(reason instanceof Error ? reason.message : 'No se pudo cargar el acceso WireGuard.');
+      }
+    } finally {
+      setLoading(false);
+    }
   }, [member.user_id]);
+
+  useEffect(() => { void load(); }, [load]);
 
   // Genera el QR cuando hay .conf
   useEffect(() => {
-    if (!conf) { setQr(null); return; }
+    if (!conf) { setQr(null); setQrError(null); return; }
     let cancelled = false;
     setQr(null);
+    setQrError(null);
 
     void import('qrcode')
       .then(({ default: QRCode }) => QRCode.toDataURL(conf, { margin: 1, width: 220 }))
       .then(dataUrl => { if (!cancelled) setQr(dataUrl); })
-      .catch(() => { if (!cancelled) setQr(null); });
+      .catch(() => { if (!cancelled) { setQr(null); setQrError('No se pudo generar el QR. Descarga el archivo .conf.'); } });
 
     return () => { cancelled = true; };
   }, [conf]);
@@ -56,7 +67,9 @@ export default function MemberWireGuardModal({ member, onClose }: Props) {
 
   const copyConf = () => {
     if (!conf) return;
-    navigator.clipboard.writeText(conf).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
+    navigator.clipboard.writeText(conf)
+      .then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); })
+      .catch(() => setError('No se pudo copiar la configuracion.'));
   };
 
   const download = () => {
@@ -91,9 +104,14 @@ export default function MemberWireGuardModal({ member, onClose }: Props) {
         </div>
 
         <div className="p-5 space-y-4">
-          {loading ? (
-            <Spinner block className="text-violet-500" label="Cargando acceso WireGuard…" />
-          ) : conf ? (
+          <AsyncQueryState
+            loading={loading}
+            error={loadError}
+            onRetry={() => { void load(); }}
+            loadingLabel="Cargando acceso WireGuard..."
+            skeletonRows={2}
+          >
+          {conf ? (
             <>
               {allowedIp && (
                 <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
@@ -110,6 +128,7 @@ export default function MemberWireGuardModal({ member, onClose }: Props) {
                   </p>
                 </div>
               )}
+              {qrError && <p className="text-xs text-amber-600 dark:text-amber-400" role="status">{qrError}</p>}
               {/* .conf */}
               <pre className="text-2xs font-mono bg-slate-900 text-slate-200 rounded-xl p-3 overflow-x-auto max-h-32 leading-relaxed">{conf}</pre>
               <div className="flex items-center gap-2">
@@ -136,6 +155,7 @@ export default function MemberWireGuardModal({ member, onClose }: Props) {
               </button>
             </div>
           )}
+          </AsyncQueryState>
           {error && <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">{error}</p>}
         </div>
     </Dialog>

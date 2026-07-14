@@ -23,6 +23,7 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
   const {
     session: restoredWorkspaceSession,
     loading: workspaceSessionLoading,
+    error: workspaceSessionError,
     refresh: refreshWorkspaceSession,
     clear: clearWorkspaceSession,
   } = useSession({ autoLoad: false });
@@ -118,6 +119,7 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
     handleLogout,
     workspaceSession: restoredWorkspaceSession,
     workspaceSessionLoading,
+    workspaceSessionError,
     refreshWorkspaceSession,
 
     // Nodos
@@ -133,6 +135,7 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
     // Navegación
     activeModule: navigation.activeModule,
     setActiveModule: navigation.setActiveModule,
+    isNotFound: navigation.isNotFound,
 
     // Tema
     darkMode: theme.darkMode,

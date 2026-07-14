@@ -10,20 +10,22 @@ import type { SessionUser } from '../types/account';
 interface WorkspaceSessionValue {
   session: SessionUser | null;
   loading: boolean;
+  error: string | null;
   refresh: () => Promise<SessionUser | null>;
 }
 
 const Ctx = createContext<WorkspaceSessionValue>({
-  session: null, loading: true, refresh: async () => null,
+  session: null, loading: true, error: null, refresh: async () => null,
 });
 
 export function WorkspaceSessionProvider({ children }: { children: ReactNode }) {
   const {
     workspaceSession: session,
     workspaceSessionLoading: loading,
+    workspaceSessionError: error,
     refreshWorkspaceSession: refresh,
   } = useVpn();
-  const value = { session, loading, refresh };
+  const value = { session, loading, error, refresh };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

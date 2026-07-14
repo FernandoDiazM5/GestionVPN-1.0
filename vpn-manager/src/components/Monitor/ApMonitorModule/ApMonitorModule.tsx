@@ -6,7 +6,7 @@ import {
   Search,
   AlertTriangle, RotateCw,
 } from 'lucide-react';
-import Spinner from '../../Common/Spinner';
+import AsyncQueryState from '../../Common/AsyncQueryState';
 import { fmtAgo } from './utils/formatters';
 import M5FullInfoModal from '../../Common/M5FullInfoModal';
 import ConfirmModal from '../../Common/ConfirmModal';
@@ -209,11 +209,19 @@ export default function ApMonitorModule() {
         {lastPolledAt > 0 && <span className="flex items-center gap-1"><RotateCw className="w-3 h-3" /> Última actualización {fmtAgo(lastPolledAt)}</span>}
       </div>
 
-      {logic.loading && (
-        <Spinner block className="text-slate-500 dark:text-slate-400" label="Cargando equipos…" />
+      {(logic.loading || logic.loadError) && (
+        <AsyncQueryState
+          loading={logic.loading}
+          error={logic.loadError}
+          onRetry={() => { void logic.loadDevices(); }}
+          loadingLabel="Cargando equipos..."
+          skeletonRows={4}
+        >
+          <div />
+        </AsyncQueryState>
       )}
 
-      {!logic.loading && logic.nodeGroups.length === 0 && (
+      {!logic.loading && !logic.loadError && logic.nodeGroups.length === 0 && (
         <div className="card border-dashed border-2 border-slate-200 dark:border-slate-700 py-16 flex flex-col items-center text-center gap-4">
           <div className="w-14 h-14 bg-indigo-50 dark:bg-indigo-500/10 rounded-2xl flex items-center justify-center">
             <Radio className="w-7 h-7 text-indigo-400" />
@@ -227,7 +235,7 @@ export default function ApMonitorModule() {
         </div>
       )}
 
-      {!logic.loading && logic.nodeFilter === 'active' && !tunnelActive && logic.filteredGroups.length === 0 && (
+      {!logic.loading && !logic.loadError && logic.nodeFilter === 'active' && !tunnelActive && logic.filteredGroups.length === 0 && (
         <div className="card p-8 text-center text-slate-500 dark:text-slate-400">
           <WifiOff className="w-8 h-8 mx-auto mb-3 text-amber-400" />
           <p className="font-semibold text-slate-600 dark:text-slate-300">Sin túnel VPN activo</p>
@@ -243,7 +251,7 @@ export default function ApMonitorModule() {
         </div>
       )}
 
-      {!logic.loading && logic.filteredGroups.map(group => (
+      {!logic.loading && !logic.loadError && logic.filteredGroups.map(group => (
         <ApGroupCard
           key={group.nodeId}
           group={group}

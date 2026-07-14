@@ -3,6 +3,7 @@ import { Waypoints, X, Loader2, Plus, Trash2, Search, AlertCircle } from 'lucide
 import { teamApi } from '../../../../services/teamApi';
 import type { Member, Assignment } from '../../../../types/account';
 import Dialog from '../../../Common/Dialog';
+import AsyncQueryState from '../../../Common/AsyncQueryState';
 
 interface Props {
   member: Member;
@@ -23,18 +24,22 @@ export default function AssignTunnelsModal({ member, onClose }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [partial, setPartial] = useState<{ ok: number; failed: number } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const [a, t] = await Promise.all([
         teamApi.listAssignments(),
-        teamApi.listWorkspaceTunnels().catch(() => ({ tunnels: [] as WorkspaceTunnel[] })),
+        teamApi.listWorkspaceTunnels(),
       ]);
       setAssignments(a.assignments.filter(x => x.user_id === member.user_id));
       setWorkspaceTunnels(t.tunnels);
-    } catch { /* */ }
+    } catch (reason) {
+      setLoadError(reason instanceof Error ? reason.message : 'No se pudieron cargar los tuneles.');
+    }
     finally { setLoading(false); }
   }, [member.user_id]);
   useEffect(() => { load(); }, [load]);
@@ -111,8 +116,11 @@ export default function AssignTunnelsModal({ member, onClose }: Props) {
   };
 
   const remove = async (id: string) => {
-    setBusy(true);
+    setBusy(true); setError(null);
     try { await teamApi.removeAssignment(id); await load(); }
+    catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'No se pudo quitar el tunel.');
+    }
     finally { setBusy(false); }
   };
 
@@ -151,6 +159,13 @@ export default function AssignTunnelsModal({ member, onClose }: Props) {
           </button>
         </div>
 
+        <AsyncQueryState
+          loading={loading}
+          error={loadError}
+          onRetry={() => { void load(); }}
+          loadingLabel="Cargando tuneles..."
+          skeletonRows={2}
+        >
         {/* Body */}
         <div className="p-5 space-y-4 overflow-y-auto">
           {/* ── Picker multi-selección ────────────────────────────── */}
@@ -334,6 +349,7 @@ export default function AssignTunnelsModal({ member, onClose }: Props) {
             )}
           </div>
         </div>
+        </AsyncQueryState>
     </Dialog>
   );
 }

@@ -12,6 +12,7 @@ export interface VpnContextType {
   handleLogout: () => Promise<void>;
   workspaceSession: SessionUser | null;
   workspaceSessionLoading: boolean;
+  workspaceSessionError: string | null;
   refreshWorkspaceSession: () => Promise<SessionUser | null>;
 
   // VPNs gestionados
@@ -29,6 +30,7 @@ export interface VpnContextType {
   // Navegación
   activeModule: ActiveModule;
   setActiveModule: (module: ActiveModule) => void;
+  isNotFound: boolean;
 
   // Tema
   darkMode: boolean;

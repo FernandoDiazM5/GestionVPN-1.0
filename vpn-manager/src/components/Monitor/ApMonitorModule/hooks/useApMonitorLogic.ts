@@ -9,6 +9,7 @@ import type { NodeGroup } from '../utils/types';
 export function useApMonitorLogic(nodes: NodeInfo[], activeNodeName: string | null) {
   const [devices, setDevices] = useState<SavedDevice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [apSearch, setApSearch] = useState('');
   const [nodeFilter, setNodeFilter] = useState<'active' | 'inactive' | 'all'>('active');
@@ -99,10 +100,13 @@ export function useApMonitorLogic(nodes: NodeInfo[], activeNodeName: string | nu
 
   const loadDevices = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const devs = await deviceDb.load();
       setDevices(devs);
-    } catch { /* silent */ }
+    } catch (reason) {
+      setLoadError(reason instanceof Error ? reason.message : 'No se pudieron cargar los equipos.');
+    }
     finally { setLoading(false); }
   }, []);
 
@@ -194,6 +198,7 @@ export function useApMonitorLogic(nodes: NodeInfo[], activeNodeName: string | nu
     devices,
     setDevices,
     loading,
+    loadError,
     toast,
     setToast,
     showToast,

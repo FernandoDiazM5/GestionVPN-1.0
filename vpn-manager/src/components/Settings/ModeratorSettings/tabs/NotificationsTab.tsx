@@ -5,10 +5,11 @@
 //  qué canal. Telegram requiere flujo de vinculación de 2 pasos con
 //  código de 6 chars (anti-spoofing).
 // ============================================================
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Bell, Mail, Send, Loader2, AlertCircle, Check, Pause, Play, Copy, X, Smartphone, ExternalLink } from 'lucide-react';
 import { accountApi } from '../../../../services/accountApi';
 import type { NotificationEvent, NotificationStatus } from '@gestionvpn/contracts';
+import AsyncQueryState from '../../../Common/AsyncQueryState';
 
 const EVENT_LABEL: Record<NotificationEvent, string> = {
   TUNNEL_ACTIVATED: 'Túnel activado',
@@ -44,19 +45,32 @@ export default function NotificationsTab({ memberMode = false }: NotificationsTa
   const [err, setErr] = useState<string | null>(null);
   const [linkCode, setLinkCode] = useState<{ code: string; expiresAt: number } | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     setBusy(true);
-    accountApi.getNotifications()
-      .then(s => setStatus(s))
-      .catch(e => setErr(e instanceof Error ? e.message : 'Error cargando preferencias'))
-      .finally(() => setBusy(false));
+    setErr(null);
+    try {
+      setStatus(await accountApi.getNotifications());
+    } catch (reason) {
+      setErr(reason instanceof Error ? reason.message : 'Error cargando preferencias');
+    } finally {
+      setBusy(false);
+    }
   }, []);
 
-  if (busy) {
-    return <div className="card p-6 flex items-center gap-2 text-slate-500"><Loader2 className="w-4 h-4 animate-spin" /> Cargando…</div>;
-  }
+  useEffect(() => { void load(); }, [load]);
+
   if (!status) {
-    return <div className="card p-6 text-rose-600">{err || 'No se pudo cargar.'}</div>;
+    return (
+      <AsyncQueryState
+        loading={busy}
+        error={err || (!busy ? 'No se pudieron cargar las preferencias.' : null)}
+        onRetry={() => { void load(); }}
+        loadingLabel="Cargando preferencias..."
+        skeletonRows={3}
+      >
+        <div />
+      </AsyncQueryState>
+    );
   }
 
   function update<K extends keyof NotificationStatus>(key: K, value: NotificationStatus[K]) {

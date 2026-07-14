@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { X, History } from 'lucide-react';
-import Spinner from '../../../Common/Spinner';
+import AsyncQueryState from '../../../Common/AsyncQueryState';
 import { apiFetch } from '../../../../utils/apiClient';
 import { API_BASE_URL } from '../../../../config';
 import type { NodeInfo } from '../../../../types/api';
@@ -9,14 +9,27 @@ import Dialog from '../../../Common/Dialog';
 export default function HistoryModal({ node, onClose }: { node: NodeInfo; onClose: () => void }) {
   const [history, setHistory] = useState<{ event: string; timestamp: number }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    apiFetch(`${API_BASE_URL}/api/node/history/get`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pppUser: node.ppp_user }),
-    }).then(r => r.json()).then(d => { if (d.success) setHistory(d.history || []); })
-      .catch(() => { }).finally(() => setLoading(false));
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await apiFetch(`${API_BASE_URL}/api/node/history/get`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pppUser: node.ppp_user }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message || 'No se pudo cargar el historial.');
+      setHistory(data.history || []);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'No se pudo cargar el historial.');
+    } finally {
+      setLoading(false);
+    }
   }, [node.ppp_user]);
+
+  useEffect(() => { void load(); }, [load]);
 
   const fmt = (ts: number) => new Date(ts).toLocaleString('es', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
 
@@ -41,11 +54,15 @@ export default function HistoryModal({ node, onClose }: { node: NodeInfo; onClos
           </button>
         </div>
         <div className="overflow-y-auto flex-1 p-4">
-          {loading && <Spinner block className="text-sky-500" label="Cargando historial…" />}
-          {!loading && history.length === 0 && (
-            <p className="text-center text-slate-500 dark:text-slate-400 text-sm py-10">Sin eventos registrados aún.</p>
-          )}
-          {!loading && history.length > 0 && (
+          <AsyncQueryState
+            loading={loading}
+            error={error}
+            empty={history.length === 0}
+            onRetry={() => { void load(); }}
+            loadingLabel="Cargando historial..."
+            emptyTitle="Sin eventos registrados aun"
+            skeletonRows={2}
+          >
             <div className="space-y-2">
               {history.map((h, i) => {
                 const cfg: Record<string, { dot: string; label: string; row: string; text: string }> = {
@@ -64,7 +81,7 @@ export default function HistoryModal({ node, onClose }: { node: NodeInfo; onClos
                 );
               })}
             </div>
-          )}
+          </AsyncQueryState>
         </div>
         <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-800 shrink-0">
           <button onClick={onClose} className="w-full py-2 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">

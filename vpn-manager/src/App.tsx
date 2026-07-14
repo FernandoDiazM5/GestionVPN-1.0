@@ -8,6 +8,8 @@ import { WorkspaceSessionProvider } from './context/WorkspaceSession';
 import ModuleSkeleton from './components/Common/ModuleSkeleton';
 import RouterMaintenanceOverlay from './components/Common/RouterMaintenanceOverlay';
 import ModuleErrorBoundary from './components/Common/ModuleErrorBoundary';
+import NotFoundPage from './components/Common/NotFoundPage';
+import AsyncQueryState from './components/Common/AsyncQueryState';
 
 // ── Code-splitting (FASE 10 del REFACTOR_PLAN) ─────────────────────
 //  Cada módulo se carga bajo demanda en su propio chunk. Esto baja el
@@ -42,6 +44,7 @@ function AppContent() {
 
     activeModule,
     setActiveModule,
+    isNotFound,
   } = useVpn();
 
   const [configAlert, setConfigAlert] = useState<string | null>(null);
@@ -83,6 +86,10 @@ function AppContent() {
         </div>
       </div>
     );
+  }
+
+  if (isNotFound && (!isAuthenticated || !credentials)) {
+    return <NotFoundPage />;
   }
 
   if (!isAuthenticated || !credentials) {
@@ -139,16 +146,30 @@ function AppContent() {
 }
 
 function ModuleRouter() {
-  const { activeModule, setActiveModule } = useVpn();
-  const { session, loading } = useWorkspaceSession();
+  const { activeModule, setActiveModule, isNotFound } = useVpn();
+  const { session, loading, error, refresh } = useWorkspaceSession();
   const allowed = visibleModules(session);
   const canOpen = allowed.includes(activeModule as ModuleId);
 
   useEffect(() => {
-    if (!loading && session && !canOpen) setActiveModule(allowed[0] ?? 'nodes');
-  }, [allowed, canOpen, loading, session, setActiveModule]);
+    if (!isNotFound && !loading && session && !canOpen) setActiveModule(allowed[0] ?? 'nodes');
+  }, [allowed, canOpen, isNotFound, loading, session, setActiveModule]);
 
-  if (loading || !session || !canOpen) return <ModuleSkeleton />;
+  if (isNotFound) return <NotFoundPage authenticated />;
+
+  if (loading) return <ModuleSkeleton />;
+  if (!session) {
+    return (
+      <AsyncQueryState
+        loading={false}
+        error={error || 'No se pudo recuperar la sesion del workspace.'}
+        onRetry={() => { void refresh(); }}
+      >
+        <div />
+      </AsyncQueryState>
+    );
+  }
+  if (!canOpen) return <ModuleSkeleton />;
 
   return (
     <ModuleErrorBoundary resetKey={activeModule}>
@@ -179,9 +200,11 @@ export default function App() {
   const basename = import.meta.env.BASE_URL.replace(/\/$/, '');
   return (
     <BrowserRouter basename={basename}>
-      <VpnProvider>
-        <AppContent />
-      </VpnProvider>
+      <ModuleErrorBoundary resetKey="application">
+        <VpnProvider>
+          <AppContent />
+        </VpnProvider>
+      </ModuleErrorBoundary>
     </BrowserRouter>
   );
 }
