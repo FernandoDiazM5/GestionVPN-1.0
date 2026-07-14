@@ -6,6 +6,11 @@
 
 ---
 
+> **Sesion 2026-07-14 - Auditoria y correccion de errores asincronos.** Rama `vps_prod`, commit funcional `1453274` publicado en `origin/vps_prod`; sin deploy. Gates: `check:all`/build OK, **341/341 backend + 106/106 frontend**, diseno 0 findings, Semgrep focalizado 0 findings (125 reglas/5 archivos), 404 movil 375x667 sin overflow y `diff --check` limpio.
+> - Se clasificaron 71 archivos de produccion con `await` (239 expresiones) en consultas, mutaciones, polling y degradaciones opcionales; se corrigieron fallos silenciosos y skeletons infinitos en sesion, Dashboard, Moderadores, Nodos, Monitor AP, Ajustes/Notificaciones y Equipo/WireGuard.
+> - Nuevo `AsyncQueryState`, Error Boundaries raiz/auth/modulo, captura global de errores y HTTP 5xx/red, pagina 404 real y servicio `POST /api/error-reports` con Zod, redaccion, dedupe, limite por IP y envio SMTP al administrador. Semgrep obligo a retirar el HTML dinamico del correo; queda texto plano.
+> - Informe completo: `INFORME_AUDITORIA_ERRORES_ASYNC_2026-07-14.md`. Pendiente: deploy y configurar/confirmar `ERROR_REPORT_EMAIL` en produccion con una prueba controlada. El scan Semgrep global fue detenido tras 14 min sin salida; el focalizado de la nueva superficie termino limpio.
+
 > **Sesion 2026-07-14 - Plan frontend FE-0 a FE-7 completado.** Rama `vps_prod`, base `63b7e89`; commit unico final creado, sin push ni deploy. Gates: `check:all` OK, build/analyze OK, **100/100 tests frontend**, coverage 15.84/10.81/12.58/17.12, **10/10 E2E** desktop 1280x720 + móvil 375x667 con fixtures OWNER/MEMBER y Axe, diseño 0 findings, Semgrep 0 findings (125 reglas/279 archivos) y `diff --check` limpio.
 > - Se corrigieron integridad del nodo activo y señales de cancelación, navegación URL/RBAC y Error Boundary; sesión única; errores parciales de Equipo; formularios, validaciones y feedback accesible; overlays con foco/Escape; tablas responsive, táctiles, ordenables y paginadas; tokens visuales, cachés con TTL y carga diferida de QR/exportadores.
 > - Se retiraron los 42 archivos TS/TSX inalcanzables confirmados, `cpeCache`, tres assets y cuatro dependencias directas sin uso. El grafo final desde `main.tsx` reporta 0 archivos de producción inalcanzables; `dbService`/`deviceDb` y `localforage` se conservan porque IndexedDB sí sigue activo.
