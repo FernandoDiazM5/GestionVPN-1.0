@@ -72,6 +72,8 @@ function CpeDetailModal({
   useEffect(() => {
     const timer = setTimeout(() => fetchDetail(), 0);
     return () => clearTimeout(timer);
+    // El modal se recrea al cambiar de CPE; cambios del formulario no deben reconsultar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleCredSubmit = async (evt: React.FormEvent) => {

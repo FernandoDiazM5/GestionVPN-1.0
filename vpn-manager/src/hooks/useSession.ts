@@ -1,8 +1,3 @@
-// ============================================================
-//  useSession (Fase 4) — sesión del sistema multi-usuario
-//  Consulta GET /api/account/me (cookie). Independiente del
-//  login legacy; si no hay sesión nueva, session = null.
-// ============================================================
 import { useState, useEffect, useCallback } from 'react';
 import { accountApi } from '../services/accountApi';
 import { purgeIfWorkspaceChanged } from '../utils/sessionReset';
@@ -18,8 +13,6 @@ export function useSession(): UseSessionResult {
   const [session, setSession] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Fija la sesión y, si el workspace cambió respecto al último en este
-  // navegador, purga los datos locales del moderador anterior (aislamiento).
   const applySession = (user: SessionUser | null) => {
     setSession(user);
     purgeIfWorkspaceChanged(user?.workspace_id);
@@ -28,25 +21,15 @@ export function useSession(): UseSessionResult {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      // Puente primero: re-emite la cookie RBAC tomando como base la sesión
-      // activa. Evita el 401 cosmético de probar /me sin cookie tras un reload.
-      const b = await accountApi.bridge();
-      applySession(b.user);
+      const response = await accountApi.me();
+      applySession(response.user);
     } catch {
-      // Fallback: quizá ya exista una cookie válida (login reciente).
-      try {
-        const r = await accountApi.me();
-        applySession(r.user);
-      } catch {
-        setSession(null);
-      }
+      setSession(null);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Carga al montar. Se difiere un tick para no disparar setState de forma
-  // síncrona dentro del effect (react-hooks/set-state-in-effect).
   useEffect(() => {
     const id = setTimeout(refresh, 0);
     return () => clearTimeout(id);

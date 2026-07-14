@@ -1,9 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { hasUsers, getUserByUsername, createUser } = require('./db.service');
-const { JWT_SECRET } = require('./auth.middleware');
 const { setSessionCookie } = require('./lib/jwt');
 const { buildSessionForLegacyUser, authenticateMysqlUser } = require('./lib/sessionBridge');
 const userRepo = require('./db/repos/userRepo');
@@ -21,15 +19,10 @@ const {
   PasswordResetConfirmSchema,
 } = require('@gestionvpn/contracts');
 
-// Establece (si es posible) la sesión RBAC por cookie a partir del login legacy.
-// No rompe el login si MySQL está caído: degrada a solo-Bearer.
+// Establece la sesión RBAC por cookie a partir del login legacy.
 async function attachRbacSession(res, username) {
-  try {
-    const { token } = await buildSessionForLegacyUser(username);
-    setSessionCookie(res, token);
-  } catch (e) {
-    log.warn({ err: e.message }, 'sesión RBAC no establecida (login continúa con Bearer)');
-  }
+  const { token } = await buildSessionForLegacyUser(username);
+  setSessionCookie(res, token);
 }
 
 // Schemas Zod centralizados en @gestionvpn/contracts (F5). Aliases locales
@@ -62,16 +55,10 @@ router.post('/setup', async (req, res) => {
         // Crear el primer usuario como rol "admin"
         await createUser(username, hash, 'admin');
 
-        // Generar JWT y loguear
-        // Setup: primer usuario, aún no tiene row.id — consultar después de crear
-        const newUser = await getUserByUsername(username);
-        const token = jwt.sign({ id: newUser.id, username, role: 'admin' }, JWT_SECRET, { expiresIn: '24h' });
-
         await attachRbacSession(res, username);
 
         return sendOk(res, {
             message: 'Administrador creado y logueado exitosamente',
-            token,
             user: username,
             role: 'admin',
         });
@@ -93,9 +80,14 @@ router.post('/login', async (req, res) => {
         try { row = await getUserByUsername(username); }
         catch (e) { dbError = e; }
         if (row && await bcrypt.compare(password, row.password_hash)) {
-            const token = jwt.sign({ id: row.id, username: row.username, role: row.role }, JWT_SECRET, { expiresIn: '24h' });
-            await attachRbacSession(res, row.username);
-            return sendOk(res, { message: 'Conectado exitosamente', token, user: row.username, role: row.role });
+            try {
+                await attachRbacSession(res, row.username);
+            } catch (e) {
+                dbError = e;
+            }
+            if (!dbError) {
+                return sendOk(res, { message: 'Conectado exitosamente', user: row.username, role: row.role });
+            }
         }
 
         // 2) Usuario multi-tenant (MySQL): Moderador / Miembro por email
@@ -107,7 +99,7 @@ router.post('/login', async (req, res) => {
                     const legacyRole = s.user.role === 'MEMBER' ? 'viewer' : 'admin';
                     return sendOk(res, {
                         message: 'Conectado exitosamente',
-                        token: s.token, user: s.user.email, role: legacyRole,
+                        user: s.user.email, role: legacyRole,
                     });
                 }
             } catch (e) { dbError = e; }
@@ -132,35 +124,10 @@ router.post('/login', async (req, res) => {
     }
 });
 
-// Obtener datos del JWT activo. M2: deriva de req.account (RBAC); solo cae a
-// req.user para tokens legacy puros (sin sesión RBAC). No lo usa el frontend.
+// Obtener datos de la sesión RBAC activa.
 router.get('/me', require('./auth.middleware').verifyToken, (req, res) => {
     const acc = req.account;
-    if (acc) {
-        return sendOk(res, { user: (acc.email || '').split('@')[0], role: acc.platform_admin ? 'admin' : acc.role });
-    }
-    return sendOk(res, { user: req.user?.username, role: req.user?.role });
-});
-
-// Refresh token — emite un nuevo JWT si el actual es válido
-router.post('/refresh', (req, res) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        metrics.authFailsTotal.inc({ reason: 'no_token' });
-        return sendError(res, 401, 'Token requerido', 'NO_TOKEN');
-    }
-    try {
-        const decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
-        const token = jwt.sign(
-            { id: decoded.id, username: decoded.username, role: decoded.role },
-            JWT_SECRET,
-            { expiresIn: '24h' }
-        );
-        return sendOk(res, { token, expiresIn: 86400 });
-    } catch {
-        metrics.authFailsTotal.inc({ reason: 'invalid_token' });
-        return sendError(res, 403, 'Token inválido o expirado', 'INVALID_TOKEN');
-    }
+    return sendOk(res, { user: (acc.email || '').split('@')[0], role: acc.platform_admin ? 'admin' : acc.role });
 });
 
 // ════════════════════════════════════════════════════════════════════════════

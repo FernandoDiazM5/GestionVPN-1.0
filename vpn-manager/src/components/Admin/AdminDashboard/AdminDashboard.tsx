@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { LayoutDashboard, Users, UserCog, Briefcase, Activity, RefreshCw } from 'lucide-react';
 import Spinner from '../../Common/Spinner';
 import { adminApi } from '../../../services/adminApi';
@@ -23,7 +23,7 @@ export default function AdminDashboard() {
   const { session } = useWorkspaceSession();
   const canAdmin = isPlatformAdmin(session);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!canAdmin) { setLoading(false); return; }   // solo el Administrador consulta /api/admin
     setLoading(true); setError(false);
     try {
@@ -31,8 +31,8 @@ export default function AdminDashboard() {
       setSummary(r.summary); setRecent(r.recent);
     } catch { setError(true); }
     finally { setLoading(false); }
-  };
-  useEffect(() => { load(); }, [canAdmin]);
+  }, [canAdmin]);
+  useEffect(() => { load(); }, [load]);
 
   const cards = summary ? [
     { label: 'Moderadores', value: summary.moderadores, icon: UserCog, color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-100 dark:bg-indigo-500/20' },

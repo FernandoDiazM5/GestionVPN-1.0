@@ -33,6 +33,7 @@ const redactPaths = [
   'password_hash', 'passwordHash',
   'otp', 'otp_hash', 'otpHash',
   'token', 'tokenHash', 'token_hash',
+  'acceptUrl', 'resetUrl',
   'secret', 'secret_key', 'secretKey',
   'privateKey', 'private_key',
   // — Credenciales cifradas en BD (no son legibles pero por defensa en profundidad) —
@@ -48,6 +49,7 @@ const redactPaths = [
   '*.password_hash', '*.passwordHash',
   '*.otp', '*.otp_hash', '*.otpHash',
   '*.token', '*.tokenHash', '*.token_hash',
+  '*.acceptUrl', '*.resetUrl',
   '*.secret', '*.secretKey',
   '*.privateKey', '*.private_key',
   '*.ppp_password_enc', '*.wg_cpe_private_enc', '*.ssh_pass_enc', '*.clave_ssh_enc',

@@ -15,9 +15,9 @@ import { apiJson } from './sessionClient';
 import { API_BASE_URL } from '../config';
 
 describe('sessionClient.apiJson', () => {
-  let authExpiredSpy: ReturnType<typeof vi.fn>;
+  let authExpiredSpy: EventListener;
   beforeEach(() => {
-    authExpiredSpy = vi.fn();
+    authExpiredSpy = vi.fn<(event: Event) => void>();
     window.addEventListener('auth_expired', authExpiredSpy);
     // El cliente tiene un cooldown de 3s entre disparos de auth_expired
     // (anti-spam). Usamos fake timers para resetear el cooldown entre

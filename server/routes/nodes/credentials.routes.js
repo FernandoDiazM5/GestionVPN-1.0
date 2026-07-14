@@ -33,6 +33,9 @@ router.post('/node/creds/save', requireOperator, asyncHandler(async (req, res) =
 router.post('/node/creds/get', requireOperator, asyncHandler(async (req, res) => {
   const { pppUser } = req.body;
   if (!pppUser) throw new AppError('pppUser requerido', 400, 'VALIDATION_ERROR');
+  if (!(await nodeBelongsToRequester(req, pppUser))) {
+    throw new AppError('Nodo no encontrado en tu workspace', 404, 'NOT_FOUND');
+  }
   const db = await getDb();
   const row = await db.get('SELECT ppp_password_enc FROM nodes WHERE ppp_user = ?', [pppUser]);
   if (!row || !row.ppp_password_enc) {
@@ -69,6 +72,9 @@ router.post('/node/ssh-creds/save', requireOperator, asyncHandler(async (req, re
 router.post('/node/ssh-creds/get', requireOperator, asyncHandler(async (req, res) => {
   const { pppUser } = req.body;
   if (!pppUser) throw new AppError('pppUser requerido', 400, 'VALIDATION_ERROR');
+  if (!(await nodeBelongsToRequester(req, pppUser))) {
+    throw new AppError('Nodo no encontrado en tu workspace', 404, 'NOT_FOUND');
+  }
   const db = await getDb();
   const nodeId = await getNodeId(pppUser);
   if (!nodeId) return sendOk(res, { creds: [] });

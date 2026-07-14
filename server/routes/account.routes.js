@@ -27,8 +27,6 @@ const userRepo = require('../db/repos/userRepo');
 const workspaceRepo = require('../db/repos/workspaceRepo');
 const { requireSession, invalidateUserCache } = require('../middleware/authJwt');
 const { query } = require('../db/mysql');
-const { verifyToken } = require('../auth.middleware');
-const { buildSessionForLegacyUser } = require('../lib/sessionBridge');
 
 const router = express.Router();
 
@@ -47,7 +45,7 @@ function genOtp() {
 }
 
 // ── POST /register ───────────────────────────────────────────
-router.post('/register', asyncHandler(async (req, res) => {
+router.post('/register', rl.guardOtpSend(), asyncHandler(async (req, res) => {
   const { email, password, name } = registerSchema.parse(req.body);
 
   const existing = await userRepo.findByEmail(email);
@@ -69,6 +67,7 @@ router.post('/register', asyncHandler(async (req, res) => {
     });
   }
 
+  await rl.recordAttempt(req._clientIp, 'OTP_SEND', email, true);
   const delivery = await sendOtp(email, otp, 'verificación de cuenta');
   return sendOk(res, {
     message: 'Código de verificación enviado',
@@ -121,8 +120,9 @@ router.post('/verify', rl.guard('OTP'), asyncHandler(async (req, res) => {
 }));
 
 // ── POST /resend ─────────────────────────────────────────────
-router.post('/resend', asyncHandler(async (req, res) => {
+router.post('/resend', rl.guardOtpSend(), asyncHandler(async (req, res) => {
   const { email } = ResendRequestSchema.parse(req.body);
+  await rl.recordAttempt(req._clientIp, 'OTP_SEND', email, true);
   const user = await userRepo.findByEmail(email);
   if (!user || user.email_verified) return sendOk(res, { message: 'Si la cuenta existe, se envió un código' });
   const otp = genOtp();
@@ -169,38 +169,6 @@ router.post('/logout', (req, res) => {
   clearSessionCookie(res);
   return sendOk(res, { message: 'Sesión cerrada' });
 });
-
-// ── POST /bridge ─────────────────────────────────────────────
-//  Puente desde la sesión legacy (Bearer): crea/recupera el usuario
-//  multi-tenant y su workspace, y emite la cookie de sesión. Evita
-//  el doble login: si ya estás autenticado en la app, "entras" solo.
-router.post('/bridge', verifyToken, asyncHandler(async (req, res) => {
-  // Ya hay sesión RBAC (cookie o Bearer RBAC) → reemítela tal cual.
-  if (req.account?.sub && req.account?.workspace_id) {
-    const u = await userRepo.findById(req.account.sub);
-    const ws = await workspaceRepo.findById(req.account.workspace_id);
-    const token = signSession({
-      sub: req.account.sub, email: req.account.email,
-      workspace_id: req.account.workspace_id, role: req.account.role,
-      platform_admin: !!req.account.platform_admin,
-    });
-    setSessionCookie(res, token);
-    return sendOk(res, {
-      user: {
-        id: req.account.sub, email: req.account.email, name: u?.name,
-        role: req.account.role, workspace_id: req.account.workspace_id,
-        workspace_name: ws?.name,
-        platform_admin: !!req.account.platform_admin,
-      },
-    });
-  }
-  // Si no, es un usuario legacy → construye la sesión desde su username.
-  const legacy = req.user;
-  if (!legacy?.username) throw new AppError('Sesión no válida', 401, 'NO_LEGACY');
-  const { token, user } = await buildSessionForLegacyUser(legacy.username);
-  setSessionCookie(res, token);
-  return sendOk(res, { user });
-}));
 
 // ── GET /me ──────────────────────────────────────────────────
 router.get('/me', requireSession, asyncHandler(async (req, res) => {

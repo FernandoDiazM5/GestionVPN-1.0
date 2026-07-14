@@ -16,8 +16,6 @@ const express = require('express');
 const router = express.Router();
 
 router.use(require('./connection.routes'));
-router.use(require('./ppp.routes'));
-router.use(require('./interface.routes'));
 router.use(require('./tunnel.routes'));
 router.use(require('./tunnel-repair.routes'));
 

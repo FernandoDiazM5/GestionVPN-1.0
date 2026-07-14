@@ -124,7 +124,7 @@ app.use(cors({
         callback(new Error('Not allowed by CORS'));
     },
     methods: ['GET','POST','PUT','PATCH','DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type'],
     credentials: true,
 }));
 app.use(express.json());
@@ -135,7 +135,7 @@ app.use(cookieParser());
 //    request via req.log (acceso desde rutas).
 //  • Niveles: 2xx/3xx → info · 4xx → warn · 5xx → error.
 //  • Silencia /api/health (mucho ruido del polling MySQL).
-//  • Headers Authorization/Cookie ya están redactados en lib/logger.js.
+//  • Headers sensibles ya están redactados en lib/logger.js.
 app.use(pinoHttp({
     logger,
     genReqId: (req) => req.headers['x-request-id'] || crypto.randomUUID(),

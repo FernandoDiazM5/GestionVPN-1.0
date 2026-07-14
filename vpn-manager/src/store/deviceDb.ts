@@ -2,7 +2,6 @@ import localforage from 'localforage';
 import { API_BASE_URL } from '../config';
 import type { SavedDevice, AntennaStats } from '../types/devices';
 import { apiFetch } from '../utils/apiClient';
-import { encryptText, decryptText } from '../utils/crypto';
 
 // ── Store separado de IndexedDB para diagnóstico completo de antenas ──────
 // NO viaja al servidor. Solo vive en el navegador.
@@ -12,69 +11,40 @@ const statsStore = localforage.createInstance({
   description: 'Cache de diagnóstico completo por antena (mca-status, meminfo, routes, etc.)',
 });
 
-// ── Credentials Cache (IndexedDB local) ──────────────────────────────────
-// Guarda credenciales SSH que funcionaron durante el escaneo, para el flujo de
-// guardado. La contraseña se cifra en reposo con AES-GCM (mismo esquema que el
-// JWT, src/utils/crypto). H14: antes se guardaba en texto plano.
+// ── Credentials Cache (memoria de la pestaña) ────────────────────────────
+// Las credenciales SSH validadas viven sólo en memoria durante esta pestaña.
 //
-// Aclaración: la contraseña SÍ se envía al backend al guardar el equipo (allí se
-// re-cifra en `aps.clave_ssh_enc`); este caché es solo una copia local cifrada.
-const credStore = localforage.createInstance({
+// Al guardar el equipo, la clave viaja al backend y se cifra en aps.clave_ssh_enc.
+const legacyCredStore = localforage.createInstance({
   name: 'MikroTikVPNManager',
   storeName: 'device_credentials_cache',
-  description: 'Cache de credenciales SSH validadas por dispositivo (pass cifrada)',
 });
+const legacyKeyStore = localforage.createInstance({
+  name: 'MikroTikVPNManager',
+  storeName: 'key_store',
+});
+type MemoryCred = { user: string; pass: string; port: number };
+const memoryCredentials = new Map<string, MemoryCred>();
 
-// Forma en reposo: { user, passEnc, port, enc: true }. Las entradas legacy
-// (texto plano `{ user, pass, port }`) se leen por compatibilidad.
-type StoredCred = { user: string; passEnc?: string; pass?: string; port?: number; enc?: boolean };
-
-async function decodeCred(v: StoredCred | null): Promise<{ user: string; pass: string; port: number } | null> {
-  if (!v) return null;
-  if (v.enc && v.passEnc) {
-    try { return { user: v.user, pass: await decryptText(v.passEnc), port: v.port ?? 22 }; }
-    catch { return null; }
-  }
-  if (typeof v.pass === 'string') return { user: v.user, pass: v.pass, port: v.port ?? 22 }; // legacy plano
-  return null;
-}
+// Purga best-effort de las credenciales cifradas y su llave de versiones previas.
+void Promise.allSettled([legacyCredStore.clear(), legacyKeyStore.clear()]);
 
 export const credCache = {
   async save(deviceId: string, user: string, pass: string, port?: number): Promise<void> {
-    try {
-      const passEnc = await encryptText(pass);
-      await credStore.setItem(deviceId, { user, passEnc, port: port ?? 22, enc: true } as StoredCred);
-    } catch (err) {
-      console.error('[CredCache] Error guardando credenciales:', err);
-    }
+    memoryCredentials.set(deviceId, { user, pass, port: port ?? 22 });
   },
 
   async get(deviceId: string): Promise<{ user: string; pass: string; port: number } | null> {
-    try {
-      return await decodeCred(await credStore.getItem<StoredCred>(deviceId));
-    } catch {
-      return null;
-    }
+    return memoryCredentials.get(deviceId) ?? null;
   },
 
   async remove(deviceId: string): Promise<void> {
-    try {
-      await credStore.removeItem(deviceId);
-    } catch { /* ignore */ }
+    memoryCredentials.delete(deviceId);
   },
 
-  async clear() { await credStore.clear(); },
+  async clear() { memoryCredentials.clear(); },
   async getAll(): Promise<Record<string, { user: string; pass: string; port: number }>> {
-    const raw: Record<string, StoredCred> = {};
-    try {
-      await credStore.iterate((value, key) => { raw[key] = value as StoredCred; });
-    } catch { /* ignore */ }
-    const result: Record<string, { user: string; pass: string; port: number }> = {};
-    for (const [key, v] of Object.entries(raw)) {
-      const decoded = await decodeCred(v);
-      if (decoded) result[key] = decoded;
-    }
-    return result;
+    return Object.fromEntries(memoryCredentials.entries());
   },
 };
 
@@ -130,7 +100,7 @@ function toSQLiteSkeleton(device: SavedDevice): Omit<SavedDevice, 'cachedStats'>
   return skeleton;
 }
 
-// Backfill: re-empuja al backend las claves SSH que están en credCache (navegador)
+// Backfill: re-empuja al backend las claves SSH que siguen en memoria
 // pero AUSENTES en la tabla aps (`hasSshPass=false`). Cubre APs guardados antes de
 // que saveSingle garantizara la propagación de la clave → Monitor AP (que lee del
 // backend) deja de mostrarlos "Sin SSH". Usa PUT PARCIAL (solo toca usuario_ssh/
@@ -162,7 +132,7 @@ export const deviceDb = {
       const res = await apiFetch(`${API_BASE_URL}/api/db/devices`);
       const data = await res.json();
       if (data.success && data.devices) {
-        // Enriquecer con stats y credenciales del IndexedDB local
+        // Enriquecer con stats persistidas y credenciales efímeras de esta sesión
         const [allStats, allCreds] = await Promise.all([
           statsCache.getAll(),
           credCache.getAll(),
@@ -172,7 +142,7 @@ export const deviceDb = {
           return {
             ...d,
             cachedStats: allStats[d.id]?.stats ?? undefined,
-            // Si hay credenciales en IndexedDB, usarlas (sobrescribe el hasSshPass del backend)
+            // Si hay credenciales en memoria, usarlas durante esta pestaña.
             sshUser: d.sshUser || cred?.user,
             sshPass: cred?.pass ?? undefined,
             sshPort: d.sshPort || cred?.port,
@@ -224,7 +194,7 @@ export const deviceDb = {
         }
       }
 
-      // 3. Guardar credenciales SSH en IndexedDB (siempre que existan)
+      // 3. Conservar temporalmente las credenciales SSH en memoria.
       if (toSave.sshUser && toSave.sshPass) {
         await credCache.save(toSave.id, toSave.sshUser, toSave.sshPass, toSave.sshPort);
       }

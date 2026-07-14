@@ -10,7 +10,7 @@ const { getDb } = require('../db.service');
 const { reqWorkspace } = require('../lib/tenantScope');
 const { sendOk, AppError, asyncHandler } = require('../lib/apiResponse');
 const { mikrotikAppError } = require('../lib/mikrotikError');
-const { requireMikrotik } = require('../lib/routeGuards');
+const { requireMikrotik, requireModerator } = require('../lib/routeGuards');
 const {
   PeerAddRequestSchema, PeerEditRequestSchema,
   PeerColorRequestSchema, PeerAliasRequestSchema,
@@ -119,7 +119,7 @@ router.post('/wireguard/peers', asyncHandler(async (req, res) => {
 // ─────────────────────────────────────────────────────────────
 //  POST /wireguard/peer/add
 // ─────────────────────────────────────────────────────────────
-router.post('/wireguard/peer/add', asyncHandler(async (req, res) => {
+router.post('/wireguard/peer/add', requireModerator, asyncHandler(async (req, res) => {
   const { ip, user, pass } = requireMikrotik(req);
   const { name, publicKey } = PeerAddRequestSchema.parse(req.body);
 
@@ -168,7 +168,7 @@ router.post('/wireguard/peer/add', asyncHandler(async (req, res) => {
 // ─────────────────────────────────────────────────────────────
 //  POST /wireguard/peer/edit — renombrar peer (sólo comment)
 // ─────────────────────────────────────────────────────────────
-router.post('/wireguard/peer/edit', asyncHandler(async (req, res) => {
+router.post('/wireguard/peer/edit', requireModerator, asyncHandler(async (req, res) => {
   const { ip, user, pass } = requireMikrotik(req);
   const { peerId, newName } = PeerEditRequestSchema.parse(req.body);
 

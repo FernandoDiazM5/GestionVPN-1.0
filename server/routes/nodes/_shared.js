@@ -6,7 +6,7 @@
 //                              active_by_other (visibilidad por rol).
 //   - filterNodesForRole:      aplica aislamiento multi-tenant.
 //   - nodeBelongsToRequester:  guarda anti-cross-workspace para mutaciones.
-//   - requireOperator:         middleware Bearer legacy (admin/operator).
+//   - requireOperator:         exige rol operativo en la sesión RBAC.
 // ============================================================
 
 const { getDb } = require('../../db.service');
@@ -57,7 +57,7 @@ async function annotateSessions(req, nodes) {
  */
 async function filterNodesForRole(req, nodes) {
   const acc = req.account;
-  if (!acc) return nodes;                 // token legacy sin RBAC
+  if (!acc) return [];                    // sin identidad RBAC: fail closed
   if (acc.platform_admin) return nodes;   // Administrador ve todo
 
   // Conjunto de identificadores (ppp_user / nombre_vrf) que pertenecen al workspace
@@ -99,7 +99,7 @@ async function filterNodesForRole(req, nodes) {
 
 /**
  * Verifica que el nodo pertenezca al workspace del solicitante.
- * Admin de plataforma y tokens legacy (sin RBAC) no tienen restricción.
+ * El Administrador de plataforma no tiene restricción de workspace.
  * Impide que un moderador mute/borre túneles de OTRO workspace.
  *
  * Identidad CONSISTENTE con filterNodesForRole: match por `ppp_user` O por
@@ -110,19 +110,42 @@ async function filterNodesForRole(req, nodes) {
  */
 async function nodeBelongsToRequester(req, pppUser, vrfName = null) {
   const acc = req.account;
-  if (!acc || acc.platform_admin) return true;
+  if (!acc) return false;
+  if (acc.platform_admin) return true;
   if (!pppUser && !vrfName) return false;
   try {
     const db = await getDb();
     // Pertenece si EXISTE algún nodo de MI workspace que matchee por ppp_user o vrf.
     const row = await db.get(
-      `SELECT 1 FROM nodes
-        WHERE workspace_id = ?
-          AND (ppp_user = ? OR (? IS NOT NULL AND nombre_vrf = ?))
+      `SELECT ppp_user, nombre_vrf, workspace_id FROM nodes
+        WHERE workspace_id = ? AND
+          (ppp_user = ? OR (? IS NOT NULL AND nombre_vrf = ?))
         LIMIT 1`,
       [acc.workspace_id, pppUser || null, vrfName, vrfName],
     );
     return !!row;
+  } catch (_) {
+    return false;
+  }
+}
+
+async function nodeVisibleToRequester(req, pppUser, vrfName = null) {
+  const acc = req.account;
+  if (!acc || (!pppUser && !vrfName)) return false;
+  if (acc.platform_admin) return true;
+  try {
+    const db = await getDb();
+    const node = await db.get(
+      `SELECT ppp_user, nombre_vrf, workspace_id FROM nodes
+        WHERE workspace_id = ? AND
+          (ppp_user = ? OR (? IS NOT NULL AND nombre_vrf = ?))
+        LIMIT 1`,
+      [acc.workspace_id, pppUser || null, vrfName, vrfName],
+    );
+    if (!node) return false;
+    if (acc.role !== 'MEMBER') return true;
+    const ids = new Set(await assignmentRepo.assignedTunnelIds(acc.workspace_id, acc.sub));
+    return ids.has(node.ppp_user) || ids.has(node.nombre_vrf);
   } catch (_) {
     return false;
   }
@@ -142,5 +165,6 @@ module.exports = {
   annotateSessions,
   filterNodesForRole,
   nodeBelongsToRequester,
+  nodeVisibleToRequester,
   requireOperator,
 };

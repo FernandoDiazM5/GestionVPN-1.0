@@ -1,10 +1,10 @@
 import React, { useEffect, useContext } from 'react';
 import { VpnContext } from './VpnContext';
 import { dbService } from '../store/db';
+import { accountApi } from '../services/accountApi';
 import {
   useAuth,
   useNodeManagement,
-  useScannerState,
   useModuleNavigation,
   useDarkMode,
   useTunnelSync,
@@ -18,40 +18,46 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
   // Orquestar todos los hooks
   const auth = useAuth();
   const nodes = useNodeManagement();
-  const scanner = useScannerState();
   const navigation = useModuleNavigation();
   const theme = useDarkMode();
+  const { handleLoginSuccess, setIsReady } = auth;
+  const {
+    setNodes, setActiveNodeVrf, setTunnelExpiry, deactivateAllNodes, tunnelExpiry,
+  } = nodes;
 
   // Inicializar BD
   useEffect(() => {
     const initApp = async () => {
       try {
-        const store = await dbService.getStore();
-        if (store.isAuthenticated && store.credentials && store.credentials.token) {
-          auth.setIsAuthenticated(true);
-          auth.setCredentials(store.credentials);
+        const [store, session] = await Promise.allSettled([
+          dbService.getStore(),
+          accountApi.me(),
+        ]);
+        const localState = store.status === 'fulfilled' ? store.value : {};
+        if (localState.nodes?.length) {
+          setNodes(localState.nodes);
         }
-        if (store.scannedSecrets?.length) {
-          scanner.setScannedSecrets(store.scannedSecrets);
-          scanner.setHasScanned(true);
-        }
-        if (store.nodes?.length) {
-          nodes.setNodes(store.nodes);
-        }
-        if (store.activeNodeVrf && store.tunnelExpiry) {
-          if (store.tunnelExpiry > Date.now()) {
-            nodes.setActiveNodeVrf(store.activeNodeVrf);
-            nodes.setTunnelExpiry(store.tunnelExpiry);
+        if (localState.activeNodeVrf && localState.tunnelExpiry) {
+          if (localState.tunnelExpiry > Date.now()) {
+            setActiveNodeVrf(localState.activeNodeVrf);
+            setTunnelExpiry(localState.tunnelExpiry);
           }
+        }
+        if (session.status === 'fulfilled') {
+          const user = session.value.user;
+          await handleLoginSuccess({
+            user: user.email,
+            role: user.role === 'MEMBER' ? 'viewer' : 'admin',
+          });
         }
       } catch (err) {
         console.error('Error cargando DB', err);
       } finally {
-        auth.setIsReady(true);
+        setIsReady(true);
       }
     };
     initApp();
-  }, []);
+  }, [handleLoginSuccess, setActiveNodeVrf, setIsReady, setNodes, setTunnelExpiry]);
 
   // Hooks de sincronización y mantenimiento
   useTunnelSync(
@@ -68,10 +74,6 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
   useAuthExpiry(auth.handleLogout);
 
   usePersistence(auth.isReady, auth.isLoggingOutRef.current, {
-    isAuthenticated: auth.isAuthenticated,
-    credentials: auth.credentials,
-    managedVpns: [],
-    scannedSecrets: scanner.scannedSecrets,
     activeNodeVrf: nodes.activeNodeVrf,
     tunnelExpiry: nodes.tunnelExpiry,
     nodes: nodes.nodes,
@@ -79,26 +81,20 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
 
   // Cuando isReady, desactivar si hace falta
   useEffect(() => {
-    if (auth.isReady && nodes.tunnelExpiry && nodes.tunnelExpiry <= Date.now()) {
-      nodes.deactivateAllNodes(auth.credentials);
+    if (auth.isReady && tunnelExpiry && tunnelExpiry <= Date.now()) {
+      deactivateAllNodes(auth.credentials);
     }
-  }, [auth.isReady]);
+  }, [auth.credentials, auth.isReady, deactivateAllNodes, tunnelExpiry]);
 
   // Logout completo
   const handleLogout = async () => {
-    auth.isLoggingOutRef.current = true;
     if (nodes.activeNodeVrf) {
       await nodes.deactivateAllNodes(auth.credentials);
     }
-    auth.setIsAuthenticated(false);
-    auth.setCredentials(undefined);
-    scanner.setScannedSecrets([]);
-    scanner.setHasScanned(false);
     nodes.setNodes([]);
     nodes.setActiveNodeVrf(null);
     nodes.setTunnelExpiry(null);
-    await dbService.clearStore();
-    auth.isLoggingOutRef.current = false;
+    await auth.handleLogout();
   };
 
   const value = {
@@ -108,16 +104,6 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
     isReady: auth.isReady,
     handleLoginSuccess: auth.handleLoginSuccess,
     handleLogout,
-
-    // VPNs (placeholder)
-    managedVpns: [] as any[],
-    setManagedVpns: (() => {}) as any,
-
-    // Scanner
-    scannedSecrets: scanner.scannedSecrets,
-    setScannedSecrets: scanner.setScannedSecrets,
-    hasScanned: scanner.hasScanned,
-    setHasScanned: scanner.setHasScanned,
 
     // Nodos
     nodes: nodes.nodes,

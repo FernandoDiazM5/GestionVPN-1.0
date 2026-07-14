@@ -54,6 +54,8 @@ export default function ScriptModal({ node, onClose }: { node: NodeInfo; onClose
       autoGenRun.current = true;
       handleGenerate();
     }
+    // La generación debe ejecutarse una sola vez; handleGenerate cambia al editar campos.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canGenerate, loadingPass]);
 
   const handleGenerate = async () => {

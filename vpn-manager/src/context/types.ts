@@ -1,4 +1,4 @@
-import type { VpnSecret, RouterCredentials } from '../store/db';
+import type { RouterCredentials } from '../store/db';
 import type { NodeInfo } from '../types/api';
 
 export interface VpnContextType {
@@ -10,15 +10,7 @@ export interface VpnContextType {
   handleLogout: () => Promise<void>;
 
   // VPNs gestionados
-  managedVpns: VpnSecret[];
-  setManagedVpns: React.Dispatch<React.SetStateAction<VpnSecret[]>>;
-
   // Estado del escáner (lifted para persistir entre cambios de tab)
-  scannedSecrets: VpnSecret[];
-  setScannedSecrets: React.Dispatch<React.SetStateAction<VpnSecret[]>>;
-  hasScanned: boolean;
-  setHasScanned: React.Dispatch<React.SetStateAction<boolean>>;
-
   // Nodos VRF
   nodes: NodeInfo[];
   setNodes: React.Dispatch<React.SetStateAction<NodeInfo[]>>;

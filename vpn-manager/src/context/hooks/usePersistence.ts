@@ -1,13 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { dbService, type VpnSecret, type RouterCredentials } from '../../store/db';
+import { dbService } from '../../store/db';
 import type { NodeInfo } from '../../types/api';
 import { DEBOUNCE_SAVE_MS } from '../constants';
 
 interface ContextState {
-  isAuthenticated: boolean;
-  credentials?: RouterCredentials;
-  managedVpns: VpnSecret[];
-  scannedSecrets: VpnSecret[];
   activeNodeVrf: string | null;
   tunnelExpiry: number | null;
   nodes: NodeInfo[];

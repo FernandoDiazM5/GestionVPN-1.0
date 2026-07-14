@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import type { NodeInfo } from '../../types/api';
+import type { RouterCredentials } from '../../store/db';
 import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
 import { API_BASE_URL } from '../../config';
 
@@ -12,7 +13,7 @@ export function useNodeManagement() {
   const keepaliveRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const activeNodeVrfRef = useRef<string | null>(null);
 
-  const deactivateAllNodes = useCallback(async (credentials: any) => {
+  const deactivateAllNodes = useCallback(async (credentials?: RouterCredentials) => {
     if (!credentials) return;
     try {
       await fetchWithTimeout(`${API_BASE_URL}/api/tunnel/deactivate`, {

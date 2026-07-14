@@ -4,7 +4,6 @@
 // ============================================================
 const express = require('express');
 const router = express.Router();
-const { connectToMikrotik, safeWrite, getErrorMessage } = require('../routeros.service');
 const { sshExec, parseFullOutput, ANTENNA_CMD, trySshCredentials } = require('../ubiquiti.service');
 const { getDb, encryptPass, decryptPass, getApGroupIntId } = require('../db.service');
 const log = require('../lib/logger').child({ scope: 'device' });
@@ -89,26 +88,6 @@ router.post('/device/antenna', asyncHandler(async (req, res) => {
                     : msg;
     log.debug({ deviceIP, friendly }, 'SSH');
     return res.json({ success: false, message: friendly });
-  }
-}));
-
-router.post('/device/wifi/get', asyncHandler(async (req, res) => {
-  const { routerIP, routerUser, routerPass } = req.body;
-  let api;
-  try {
-    api = await connectToMikrotik(routerIP, routerUser, routerPass || '');
-    // SECUENCIAL — RouterOS no soporta comandos paralelos en la misma conexión
-    const ifaces   = await safeWrite(api, ['/interface/wireless/print']).catch(() => []);
-    const profiles = await safeWrite(api, ['/interface/wireless/security-profiles/print']).catch(() => []);
-    await api.close();
-    return sendOk(res, {
-      interfaces: Array.isArray(ifaces) ? ifaces.map(i => ({ id: i['.id'], name: i.name, ssid: i.ssid, mode: i.mode, disabled: i.disabled === 'true' })) : [],
-      profiles: Array.isArray(profiles) ? profiles.map(p => ({ id: p['.id'], name: p.name, wpa2Key: p['wpa2-pre-shared-key'] })) : [],
-    });
-  } catch (error) {
-    if (api) try { await api.close(); } catch (_) { /* ignore */ }
-    if (error instanceof AppError) throw error;
-    throw new AppError(getErrorMessage(error, routerIP, routerUser), 500, 'MIKROTIK_ERROR');
   }
 }));
 

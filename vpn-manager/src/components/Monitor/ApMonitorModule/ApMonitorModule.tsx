@@ -32,6 +32,7 @@ export default function ApMonitorModule() {
 
   const logic = useApMonitorLogic(nodes, activeNodeName);
   const polling = usePolling(logic.devices, activeNodeName, logic.notifyTunnelInactive);
+  const { pingWatch, seedFromDb, ingestApPoll } = polling;
 
   const [expandedAps, setExpandedAps] = useState<Set<string>>(() => {
     try {
@@ -64,14 +65,14 @@ export default function ApMonitorModule() {
   //   (c) recibimos actualizaciones en vivo por SSE ('ap-poll').
   // El SSH a antenas vive en el backend (§43). El sync manual sigue disponible.
   useEffect(() => {
-    polling.pingWatch();
-    const t = setInterval(polling.pingWatch, 30_000);
+    pingWatch();
+    const t = setInterval(pingWatch, 30_000);
     return () => clearInterval(t);
-  }, [polling.pingWatch]);
+  }, [pingWatch]);
 
-  useEffect(() => { polling.seedFromDb(); }, [polling.seedFromDb]);
+  useEffect(() => { seedFromDb(); }, [seedFromDb]);
 
-  useApPollEvents(polling.ingestApPoll, true);
+  useApPollEvents(ingestApPoll, true);
 
   const toggleAp = (apId: string) => {
     setExpandedAps(prev => {

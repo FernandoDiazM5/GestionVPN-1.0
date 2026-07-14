@@ -16,7 +16,3 @@ export interface NodeProvisionData {
   cpePublicKey: string;
   serverPublicIP: string;
 }
-
-export interface ProvisionFormProps {
-  // Props si es necesario reutilizar el componente
-}

@@ -182,9 +182,10 @@ CREATE TABLE IF NOT EXISTS auth_attempts (
   id          CHAR(36)    NOT NULL,
   ip_address  VARCHAR(64) NOT NULL,
   email       VARCHAR(255) DEFAULT NULL,
-  kind        ENUM('LOGIN','OTP') NOT NULL,
+  kind        ENUM('LOGIN','OTP','OTP_SEND') NOT NULL,
   success     TINYINT(1)  NOT NULL DEFAULT 0,
   created_at  BIGINT      NOT NULL,
   PRIMARY KEY (id),
-  KEY idx_aa_ip (ip_address, created_at)
+  KEY idx_aa_ip (ip_address, created_at),
+  KEY idx_aa_email_kind (email, kind, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

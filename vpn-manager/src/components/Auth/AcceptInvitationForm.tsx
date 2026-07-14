@@ -160,7 +160,7 @@ export default function AcceptInvitationForm({
                   </div>
                 )}
                 <button
-                  onClick={() => onLoggedIn({ user: result.user.email, token: '', role: result.user.role === 'MEMBER' ? 'viewer' : 'admin' })}
+                  onClick={() => onLoggedIn({ user: result.user.email, role: result.user.role === 'MEMBER' ? 'viewer' : 'admin' })}
                   className="btn-primary btn-md w-full mt-2 flex items-center justify-center">
                   <ShieldCheck className="w-4 h-4" /> Entrar al panel
                 </button>

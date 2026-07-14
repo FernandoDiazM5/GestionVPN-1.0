@@ -681,14 +681,6 @@ router.post('/cpes/:mac/detail-direct', async (req, res) => {
                     // nombre_nodo / subred) antes que la lista genérica de todos los nodos.
                     const owner = await resolveNodeCreds(db, apRow);
                     if (owner && owner.user) credList.push(owner);
-                    // Resto de node_ssh_creds como último recurso (puede que el CPE
-                    // use credenciales de otro nodo en topologías mixtas).
-                    const nodeCredRows = await db.all(
-                        'SELECT ssh_user, ssh_pass_enc, ssh_port FROM node_ssh_creds ORDER BY priority'
-                    );
-                    for (const c of nodeCredRows) {
-                        credList.push({ user: c.ssh_user || '', pass: c.ssh_pass_enc ? decryptPass(c.ssh_pass_enc) : '', port: c.ssh_port || 22 });
-                    }
                 }
             } catch (e) {
                 log.warn({ err: e.message }, 'detail-direct: error buscando credenciales del AP/nodo');

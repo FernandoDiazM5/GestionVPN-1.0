@@ -12,6 +12,8 @@
 import '@testing-library/jest-dom/vitest';
 import { afterAll, afterEach, beforeAll, vi } from 'vitest';
 import { setupServer } from 'msw/node';
+import { http, HttpResponse } from 'msw';
+import { API_BASE_URL } from '../config';
 
 // ── Browser API shims ───────────────────────────────────────────────
 if (typeof window !== 'undefined') {
@@ -58,7 +60,11 @@ if (typeof window !== 'undefined') {
 //  Cada test puede agregar handlers via server.use(...).
 //  Cualquier request no-mockeada falla con "unhandled request" en consola
 //  para forzarte a ser explícito.
-export const server = setupServer();
+export const server = setupServer(
+  http.get(`${API_BASE_URL}/api/account/me`, () =>
+    HttpResponse.json({ success: false, message: 'No autenticado' }, { status: 401 })
+  ),
+);
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'warn' }));
 afterEach(() => server.resetHandlers());

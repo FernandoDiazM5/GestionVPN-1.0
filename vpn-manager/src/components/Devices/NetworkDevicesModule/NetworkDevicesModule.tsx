@@ -145,7 +145,6 @@ export default function NetworkDevicesModule() {
   // §40: si el usuario ya tenía persistida una subred MANUAL válida para alguna
   // de las opciones del nodo activo, la respetamos. Si no, autocompletamos con
   // la primera opción del nodo.
-  /* eslint-disable react-hooks/set-state-in-effect */
   const { setManualLan } = prefs;
   const persistedLanRef = useRef(prefs.manualLan);
   useEffect(() => {
@@ -169,7 +168,6 @@ export default function NetworkDevicesModule() {
       }
     }
   }, [activeNodeVrf, nodes, setManualLan]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   // §42-2: selección manual del usuario para bulk save. Declarado ANTES del
   // useEffect que limpia al cambiar de nodo. Se mantiene en memoria (no en

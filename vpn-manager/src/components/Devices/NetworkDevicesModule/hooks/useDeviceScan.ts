@@ -90,9 +90,8 @@ export function useDeviceScan(input: UseDeviceScanInput) {
   // Cancelar reader si el componente se desmonta a mitad de scan
   useEffect(() => () => { readerRef.current?.cancel(); }, []);
 
-  // H14 — Re-hidratar las contraseñas SSH desde credCache (IndexedDB cifrado)
-  // al cargar de sessionStorage, donde ya NO se persisten en claro. Necesita
-  // efecto async porque el descifrado del caché es asíncrono.
+  // Rehidrata las contraseñas desde memoria al remontar el módulo dentro de la
+  // misma pestaña. Un reload completo las elimina intencionalmente.
   useEffect(() => {
     if (!cached?.results?.length) return;
     let cancelled = false;
@@ -146,7 +145,6 @@ export function useDeviceScan(input: UseDeviceScanInput) {
   // Barra de progreso animada durante "discovering" (estimación basada en CIDR).
   // Effect → setInterval → setState es el patrón canónico de animaciones derivadas
   // de tiempo. Suprimimos la advertencia genérica del plugin.
-  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (scanState.phase !== 'discovering') {
       setDiscoveryProgress(0);
@@ -163,7 +161,6 @@ export function useDeviceScan(input: UseDeviceScanInput) {
     }, msPerIp);
     return () => clearInterval(timer);
   }, [scanState.phase, effectiveLan]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Persistir en sessionStorage cuando el scan termina con resultados.
   // Wrapeamos el payload con `v: SCAN_CACHE_VERSION` para que un upgrade
@@ -171,8 +168,7 @@ export function useDeviceScan(input: UseDeviceScanInput) {
   useEffect(() => {
     if (scanState.phase === 'done' && scanResults.length > 0) {
       // H14: NO persistir la contraseña SSH en sessionStorage (texto plano).
-      // La cred que funcionó ya está en credCache (IndexedDB, cifrada) y se
-      // re-hidrata al cargar. El sshUser no es secreto y se conserva.
+      // La credencial queda solo en memoria; sessionStorage conserva el usuario.
       const safeResults = scanResults.map(r => {
         if (!r.sshPass) return r;
         const copy = { ...r };

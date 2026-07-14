@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "analyze": "cross-env ANALYZE=1 npm run build",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings 0",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -38,7 +38,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.0",
-    "@vitest/coverage-v8": "^2.1.9",
+    "@vitest/coverage-v8": "^4.1.10",
     "autoprefixer": "^10.4.27",
     "cross-env": "^10.1.0",
     "eslint": "^9.39.4",
@@ -53,6 +53,6 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.56.1",
     "vite": "^8.0.0",
-    "vitest": "^2.1.9"
+    "vitest": "^4.1.10"
   }
 }

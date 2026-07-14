@@ -36,9 +36,10 @@ stubModule(__dirname, '../../lib/logger', {
   child: () => ({ warn: vi.fn(), info: vi.fn(), error: vi.fn(), debug: vi.fn() }),
 });
 
-stubModule(__dirname, '../../db/repos/assignmentRepo', {
+const assignmentRepoMocks = {
   assignedTunnelIds: vi.fn().mockResolvedValue([]),
-});
+};
+stubModule(__dirname, '../../db/repos/assignmentRepo', assignmentRepoMocks);
 stubModule(__dirname, '../../db/repos/sessionRepo', {
   activeMapForWorkspace: vi.fn().mockResolvedValue(new Map()),
   getActiveByUser: vi.fn().mockResolvedValue(null),
@@ -88,6 +89,58 @@ beforeEach(() => {
   db.get.mockResolvedValue(null);
   db.all.mockResolvedValue([]);
   db.run.mockResolvedValue(undefined);
+  assignmentRepoMocks.assignedTunnelIds.mockResolvedValue(['X']);
+});
+
+const SENSITIVE_MANAGER_ROUTES = [
+  { path: '/api/node/creds/get', body: { pppUser: 'X' } },
+  { path: '/api/node/ssh-creds/get', body: { pppUser: 'X' } },
+  { path: '/api/node/details', body: { pppUser: 'X', vrfName: 'VRF-ND2-X' } },
+  { path: '/api/node/script', body: { pppUser: 'X', serverPublicIP: 'vpn.example.test' } },
+];
+
+describe('Auditoría — datos sensibles de nodos requieren moderador y ownership', () => {
+  for (const route of SENSITIVE_MANAGER_ROUTES) {
+    it(`POST ${route.path} → 403 para MEMBER`, async () => {
+      const r = await request(app).post(route.path)
+        .set('x-test-identity', 'viewer')
+        .send(route.body);
+      expect(r.status).toBe(403);
+      expect(db.run).not.toHaveBeenCalled();
+    });
+
+    it(`POST ${route.path} → 404 para OWNER de otro workspace`, async () => {
+      db.get.mockResolvedValue(null);
+      const r = await request(app).post(route.path)
+        .set('x-test-identity', 'owner')
+        .send(route.body);
+      expect(r.status).toBe(404);
+    });
+  }
+});
+
+describe('Auditoría — historial de nodo exige asignación para MEMBER', () => {
+  it('MEMBER sin asignación → 404 y no lee historial', async () => {
+    db.get.mockResolvedValueOnce({ ppp_user: 'X', nombre_vrf: 'VRF-ND2-X', workspace_id: 'ws-1' });
+    assignmentRepoMocks.assignedTunnelIds.mockResolvedValue([]);
+    const r = await request(app).post('/api/node/history/get')
+      .set('x-test-identity', 'viewer')
+      .send({ pppUser: 'X' });
+    expect(r.status).toBe(404);
+    expect(db.all).not.toHaveBeenCalled();
+  });
+
+  it('MEMBER con asignación → puede leer su historial', async () => {
+    db.get
+      .mockResolvedValueOnce({ ppp_user: 'X', nombre_vrf: 'VRF-ND2-X', workspace_id: 'ws-1' })
+      .mockResolvedValueOnce(1);
+    assignmentRepoMocks.assignedTunnelIds.mockResolvedValue(['VRF-ND2-X']);
+    db.all.mockResolvedValue([]);
+    const r = await request(app).post('/api/node/history/get')
+      .set('x-test-identity', 'viewer')
+      .send({ pppUser: 'X' });
+    expect(r.status).toBe(200);
+  });
 });
 
 // Rutas de mutación que un viewer NUNCA debe poder ejecutar.
@@ -132,7 +185,7 @@ describe('H1 — /node/history/add: gate por workspace, no por rol', () => {
   });
 
   it('viewer con nodo de SU workspace → 200 y registra el evento', async () => {
-    db.get.mockResolvedValueOnce({ '1': 1 }); // nodeBelongsToRequester → true
+    db.get.mockResolvedValueOnce({ ppp_user: 'X', nombre_vrf: 'VRF-ND2-X', workspace_id: 'ws-1' });
     const r = await request(app).post('/api/node/history/add')
       .set('x-test-identity', 'viewer')
       .send({ pppUser: 'X', event: 'tunnel_activated' });

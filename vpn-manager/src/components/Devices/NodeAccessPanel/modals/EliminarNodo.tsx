@@ -47,7 +47,7 @@ export default function EliminarNodo({ node, onClose, onSuccess }: EliminarNodoP
       setDelStep(i);
     }, 1400);
     return () => clearInterval(id);
-  }, [deleting]);
+  }, [deleting, DEL_STEPS.length]);
 
   useEffect(() => {
     // Una respuesta de error (404/500) puede no traer `steps` (p.ej. AppError

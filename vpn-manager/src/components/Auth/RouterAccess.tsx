@@ -74,19 +74,24 @@ export default function RouterAccess() {
         `${API_BASE_URL}${endpoint}`,
         {
           method: 'POST',
+          credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, password }),
         },
         15_000,
       );
 
-      const data: any = await response.json();
+      const data = await response.json() as {
+        success?: boolean;
+        user?: string;
+        role?: string;
+        message?: string;
+      };
       if (response.ok && data.success) {
         setSyncStatus('success');
         setTimeout(() => handleLoginSuccess({
-            user: data.user,
-            token: data.token,
-            role: data.role
+            user: data.user ?? username,
+            role: data.role ?? 'viewer'
         }), 1000);
       } else {
         setErrorDetail(data.message ?? 'Acceso denegado.');

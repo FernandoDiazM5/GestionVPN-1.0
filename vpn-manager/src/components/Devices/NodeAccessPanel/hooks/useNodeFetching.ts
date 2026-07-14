@@ -147,7 +147,7 @@ export function useNodeFetching(props: UseNodeFetchingProps) {
         addToast('Sin respuesta del router — verifica que WireGuard esté activo', 'warn');
       }
     }
-  }, [fetchNodes, setNodes, addToast]);
+  }, [fetchNodes, setNodes, addToast, prevRunningRef]);
 
   // Iniciar polling cuando hay nodos cargados
   useEffect(() => {
@@ -157,7 +157,7 @@ export function useNodeFetching(props: UseNodeFetchingProps) {
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
-  }, [hasLoaded, credentials, silentPoll]);
+  }, [hasLoaded, credentials, silentPoll, pollingRef]);
 
   // Auto-sync silencioso al montar
   const autoSyncRanRef = useRef(false);

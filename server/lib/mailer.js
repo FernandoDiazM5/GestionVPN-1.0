@@ -50,7 +50,7 @@ async function sendOtp(email, code, purpose = 'verificación') {
   if (!tx) {
     // En modo DEV el OTP NO se considera secreto (no hay correo saliente);
     // se muestra al operador para facilitar pruebas locales.
-    log.info({ email, purpose, code }, 'OTP (modo DEV — sin SMTP configurado)');
+    log.info({ email, purpose }, 'OTP generado en modo DEV sin SMTP');
     metrics.mailSentTotal.inc({ kind: 'otp', status: 'dev' });
     return { delivered: false, dev: true };
   }
@@ -84,7 +84,7 @@ async function sendInvitation({ email, code, inviterName, workspaceName, tunnelI
   const tx = getTransporter();
   if (!tx) {
     log.info({
-      email, inviterName, workspaceName, roleLabel, tunnelId, code, acceptUrl,
+      email, inviterName, workspaceName, roleLabel, tunnelId,
     }, 'Invitación generada (modo DEV — sin SMTP)');
     metrics.mailSentTotal.inc({ kind: 'invitation', status: 'dev' });
     return { delivered: false, dev: true };
@@ -186,7 +186,7 @@ async function sendPasswordReset({ email, token, name }) {
   if (!tx) {
     // El token NO se expone como campo separado (redactado por logger). El
     // operador lo lee del query param `?reset=<token>` dentro de resetUrl.
-    log.info({ email, resetUrl, ttlMin: 15 }, 'Token de reset generado (modo DEV — sin SMTP)');
+    log.info({ email, ttlMin: 15 }, 'Token de reset generado en modo DEV sin SMTP');
     metrics.mailSentTotal.inc({ kind: 'password_reset', status: 'dev' });
     return { delivered: false, dev: true };
   }

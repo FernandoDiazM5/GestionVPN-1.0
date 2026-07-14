@@ -407,7 +407,7 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                 );
               })()}
 
-              <button onClick={() => { result.success ? onSuccess() : onClose(); }}
+              <button onClick={() => { if (result.success) onSuccess(); else onClose(); }}
                 className="btn-primary btn-md w-full">
                 {result.success ? 'Listo' : 'Cerrar'}
               </button>

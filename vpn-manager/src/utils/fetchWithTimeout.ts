@@ -2,7 +2,7 @@ import { apiFetch } from './apiClient';
 
 /**
  * Fetch con timeout automático para evitar que las peticiones queden colgadas.
- * Automáticamente inyecta el JWT token como apiFetch lo hace.
+ * Conserva la cookie HttpOnly de sesión mediante apiFetch.
  * @param url URL a fetchear
  * @param options Opciones de fetch (sin timeout)
  * @param timeoutMs Tiempo máximo en milisegundos (default 30000)

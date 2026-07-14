@@ -8,6 +8,9 @@ const { query } = require('../db/mysql');
 
 const MAX_FAILS = Number(process.env.RL_MAX_FAILS) || 5;
 const WINDOW_MS = Number(process.env.RL_WINDOW_MS) || 15 * 60 * 1000; // 15 min
+const OTP_SEND_MAX = Number(process.env.RL_OTP_SEND_MAX) || 5;
+const OTP_SEND_WINDOW_MS = Number(process.env.RL_OTP_SEND_WINDOW_MS) || 60 * 60 * 1000;
+const OTP_SEND_COOLDOWN_MS = Number(process.env.RL_OTP_SEND_COOLDOWN_MS) || 60 * 1000;
 
 /** Obtiene la IP real del request (respeta proxy si está configurado). */
 function clientIp(req) {
@@ -55,4 +58,46 @@ function guard(kind) {
   };
 }
 
-module.exports = { clientIp, recordAttempt, isBlocked, guard, MAX_FAILS, WINDOW_MS };
+async function otpSendStatus(ip, email) {
+  const rows = await query(
+    `SELECT COUNT(*) AS sends, MAX(created_at) AS last_send
+       FROM auth_attempts
+      WHERE kind = 'OTP_SEND' AND success = 1
+        AND (ip_address = ? OR email = ?) AND created_at >= ?`,
+    [ip, email || null, Date.now() - OTP_SEND_WINDOW_MS]
+  );
+  const sends = Number(rows[0]?.sends || 0);
+  const lastSend = Number(rows[0]?.last_send || 0);
+  return {
+    blocked: sends >= OTP_SEND_MAX || (lastSend > 0 && Date.now() - lastSend < OTP_SEND_COOLDOWN_MS),
+    retryAfterMs: sends >= OTP_SEND_MAX
+      ? OTP_SEND_WINDOW_MS
+      : Math.max(0, OTP_SEND_COOLDOWN_MS - (Date.now() - lastSend)),
+  };
+}
+
+function guardOtpSend() {
+  return async (req, res, next) => {
+    try {
+      const ip = clientIp(req);
+      const email = String(req.body?.email || '').trim().toLowerCase();
+      const status = await otpSendStatus(ip, email);
+      if (status.blocked) {
+        const retryAfter = Math.max(1, Math.ceil(status.retryAfterMs / 1000));
+        res.set('Retry-After', String(retryAfter));
+        return res.status(429).json({
+          success: false,
+          code: 'OTP_SEND_RATE_LIMITED',
+          message: 'Espera antes de solicitar otro código.',
+        });
+      }
+      req._clientIp = ip;
+      next();
+    } catch (e) { next(e); }
+  };
+}
+
+module.exports = {
+  clientIp, recordAttempt, isBlocked, guard, guardOtpSend, otpSendStatus,
+  MAX_FAILS, WINDOW_MS, OTP_SEND_MAX, OTP_SEND_WINDOW_MS, OTP_SEND_COOLDOWN_MS,
+};

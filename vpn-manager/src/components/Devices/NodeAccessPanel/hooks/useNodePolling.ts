@@ -7,7 +7,7 @@ interface Node {
   remoteAddress: string;
   connectionStatus?: string;
   tunnelType?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface UseNodePollingOptions {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   UserCog, UserPlus, Loader2, RefreshCw, X, Briefcase, Mail, KeyRound,
   Pencil, Trash2, Ban, Power, AlertTriangle, Link2, Copy, Check, Clock,
@@ -38,7 +38,7 @@ export default function ModeratorsModule() {
   const { session } = useWorkspaceSession();
   const canAdmin = isPlatformAdmin(session);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!canAdmin) { setLoading(false); return; }   // solo el Administrador consulta /api/admin
     setLoading(true);
     try {
@@ -51,8 +51,8 @@ export default function ModeratorsModule() {
     }
     catch { /* sesión/MySQL */ }
     finally { setLoading(false); }
-  };
-  useEffect(() => { load(); }, [canAdmin]);
+  }, [canAdmin]);
+  useEffect(() => { load(); }, [load]);
 
   const toggleSuspend = async (m: Moderator) => {
     setBusyId(m.user_id); setError(null);

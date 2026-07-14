@@ -227,23 +227,3 @@ export interface AntennaStats {
   _rawMeminfo?:  string;
   _rawBoard?:    string;
 }
-
-/** Interfaz wireless devuelta por /api/device/wifi/get */
-export interface WifiInterface {
-  id: string;
-  name: string;
-  ssid: string;
-  mode: string;
-  band?: string;
-  frequency?: string;
-  securityProfile: string;
-  disabled: boolean;
-}
-
-/** Perfil de seguridad wireless */
-export interface WifiSecurityProfile {
-  id: string;
-  name: string;
-  wpa2Key: string;
-  mode: string;
-}

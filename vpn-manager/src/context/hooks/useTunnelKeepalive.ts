@@ -2,10 +2,11 @@ import { useEffect, useRef } from 'react';
 import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
 import { API_BASE_URL } from '../../config';
 import { TUNNEL_KEEPALIVE_MS } from '../constants';
+import type { RouterCredentials } from '../../store/db';
 
 export function useTunnelKeepalive(
   tunnelExpiry: number | null,
-  credentials: any,
+  credentials: RouterCredentials | undefined,
   activeNodeVrf: string | null
 ) {
   const keepaliveRef = useRef<ReturnType<typeof setInterval> | null>(null);

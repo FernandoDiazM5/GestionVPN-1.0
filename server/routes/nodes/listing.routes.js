@@ -178,9 +178,12 @@ router.post('/nodes', asyncHandler(async (req, res) => {
   }
 }));
 
-router.post('/node/details', asyncHandler(async (req, res) => {
-  const { ip, user, pass } = requireMikrotik(req);
+router.post('/node/details', requireOperator, asyncHandler(async (req, res) => {
   const { vrfName, pppUser } = req.body;
+  if (!(await nodeBelongsToRequester(req, pppUser, vrfName))) {
+    throw new AppError('Nodo no encontrado en tu workspace', 404, 'NOT_FOUND');
+  }
+  const { ip, user, pass } = requireMikrotik(req);
   let api;
   try {
     api = await connectToMikrotik(ip, user, pass);
@@ -218,10 +221,13 @@ router.post('/node/details', asyncHandler(async (req, res) => {
   }
 }));
 
-router.post('/node/script', asyncHandler(async (req, res) => {
+router.post('/node/script', requireOperator, asyncHandler(async (req, res) => {
   const { pppUser, pppPassword, serverPublicIP } = req.body;
   if (!pppUser || !serverPublicIP) {
     throw new AppError('pppUser y serverPublicIP son requeridos', 400, 'VALIDATION_ERROR');
+  }
+  if (!(await nodeBelongsToRequester(req, pppUser))) {
+    throw new AppError('Nodo no encontrado en tu workspace', 404, 'NOT_FOUND');
   }
 
   const isWG = pppUser.startsWith('WG-ND') || pppUser.startsWith('VPN-WG-');

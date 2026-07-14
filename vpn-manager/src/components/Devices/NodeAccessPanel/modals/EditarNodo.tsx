@@ -113,7 +113,11 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
   }, [result]);
 
   const toggleRemove = (s: string) =>
-    setRemoveSet(prev => { const n = new Set(prev); n.has(s) ? n.delete(s) : n.add(s); return n; });
+    setRemoveSet(prev => {
+      const next = new Set(prev);
+      if (next.has(s)) next.delete(s); else next.add(s);
+      return next;
+    });
 
   const labelChanged = newLabel.trim() !== (node.nombre_nodo || '').trim();
   const pppUserChanged = newPppUser.trim() && newPppUser.trim() !== (node.ppp_user || '');

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Waypoints, X, Loader2, Plus, Trash2, Search, AlertCircle } from 'lucide-react';
 import { teamApi } from '../../../../services/teamApi';
 import type { Member, Assignment } from '../../../../types/account';
@@ -24,7 +24,7 @@ export default function AssignTunnelsModal({ member, onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [partial, setPartial] = useState<{ ok: number; failed: number } | null>(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const [a, t] = await Promise.all([
@@ -35,8 +35,8 @@ export default function AssignTunnelsModal({ member, onClose }: Props) {
       setWorkspaceTunnels(t.tunnels);
     } catch { /* */ }
     finally { setLoading(false); }
-  };
-  useEffect(() => { load(); }, [member.user_id]);
+  }, [member.user_id]);
+  useEffect(() => { load(); }, [load]);
 
   // ── Disponibles = workspace − ya asignados ──────────────────────
   const assignedIds = useMemo(() => new Set(assignments.map(a => a.tunnel_id)), [assignments]);

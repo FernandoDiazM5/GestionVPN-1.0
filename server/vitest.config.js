@@ -19,7 +19,8 @@ export default defineConfig({
     // Aislamiento: cada archivo en su fork (evita estado compartido entre tests
     // como cachés singleton de MySQL pool / RouterOS).
     isolate: true,
-    poolOptions: { forks: { singleFork: false } },
+    pool: 'forks',
+    singleFork: false,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json-summary', 'lcov'],

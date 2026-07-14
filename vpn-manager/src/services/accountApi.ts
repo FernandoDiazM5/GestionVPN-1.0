@@ -13,8 +13,6 @@ export const accountApi = {
   me: () => get<{ success: true; user: SessionUser }>('/api/account/me'),
 
   /** Re-emite la cookie de sesión multi-usuario tomando como base la sesión actual. */
-  bridge: () => post<{ success: true; user: SessionUser }>('/api/account/bridge'),
-
   register: (email: string, password: string, name?: string) =>
     post<{ success: true; dev?: boolean }>('/api/account/register', { email, password, name }),
 

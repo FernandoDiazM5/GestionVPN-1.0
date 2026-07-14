@@ -29,37 +29,21 @@ async function injectMikrotik(req) {
 // (sin RBAC), que el bridge legacy→RBAC necesita por username.
 
 const verifyToken = async (req, res, next) => {
-    // ── 1) Sesión RBAC por cookie (sistema unificado) ──
     const cookieTok = req.cookies && req.cookies['vpn_session'];
-    if (cookieTok) {
-        try {
-            const s = jwt.verify(cookieTok, JWT_SECRET);
-            if (s && s.sub && s.workspace_id) {
-                req.account = s; // { sub, email, workspace_id, role, platform_admin }
-                await injectMikrotik(req);
-                return next();
-            }
-        } catch (_) { /* cookie inválida/expirada → intenta Bearer */ }
+    if (!cookieTok) {
+        metrics.authFailsTotal.inc({ reason: 'no_token' });
+        return res.status(401).json({ success: false, message: 'Acceso denegado: sesión no iniciada.' });
     }
 
-    // ── 2) Fallback legacy: Bearer header o token por query (EventSource) ──
-    const authHeader = req.headers['authorization'];
-    const token = (authHeader && authHeader.split(' ')[1]) || req.query.token;
-    if (!token) {
-        metrics.authFailsTotal.inc({ reason: 'no_token' });
-        return res.status(401).json({ success: false, message: 'Acceso Denegado: Token no provisto.' });
-    }
     try {
-        const decoded = jwt.verify(token, JWT_SECRET);
-        if (decoded && decoded.sub && decoded.workspace_id) {
-            // Token RBAC usado como Bearer (moderador/miembro)
-            req.account = decoded;
-        } else {
-            req.user = decoded; // token LEGACY puro { id, username, role } → bridge legacy→RBAC
+        const session = jwt.verify(cookieTok, JWT_SECRET);
+        if (!session || !session.sub || !session.workspace_id) {
+            throw new Error('Sesión sin identidad RBAC');
         }
+        req.account = session;
         await injectMikrotik(req);
-        next();
-    } catch (err) {
+        return next();
+    } catch (_) {
         metrics.authFailsTotal.inc({ reason: 'expired_token' });
         return res.status(403).json({ success: false, message: 'Token de sesión expirado.', logout: true });
     }
