@@ -235,7 +235,7 @@ function KpiCard({ icon: Icon, label, value, sub, sparkline, color }: KpiCardPro
       </div>
       <div>
         <div className="text-2xl font-bold text-slate-800 dark:text-slate-100 leading-none font-mono">{value}</div>
-        <div className="text-2xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 mt-1.5">{label}</div>
+        <div className="text-2xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-500 mt-1.5">{label}</div>
         <div className="text-2xs text-slate-500 dark:text-slate-400 mt-0.5">{sub}</div>
       </div>
     </div>

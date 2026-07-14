@@ -57,7 +57,7 @@ function DeviceFiltersImpl({
               onClick={() => setSearchQuery('')}
               aria-label="Limpiar búsqueda"
               title="Limpiar búsqueda"
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 dark:text-slate-500 hover:text-slate-500 rounded transition-colors"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-500 dark:text-slate-500 hover:text-slate-500 rounded transition-colors"
             >
               <X className="w-3 h-3" />
             </button>
@@ -130,7 +130,7 @@ function DeviceFiltersImpl({
           {hasActiveFilter ? (
             <>
               <span className="font-bold text-indigo-600 dark:text-indigo-400">{filteredCount}</span>
-              <span className="text-slate-300 dark:text-slate-600 mx-1">/</span>
+              <span className="text-slate-500 dark:text-slate-600 mx-1">/</span>
               <span>{totalCount}</span>
               <span className="ml-1 text-slate-500 dark:text-slate-400">dispositivos</span>
             </>

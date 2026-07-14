@@ -6,6 +6,7 @@ import { API_BASE_URL } from '../../../../../config';
 import StatCard from '../StatCard';
 import { fmtDbm, fmtPct, fmtCpu, fmtMem, fmtFw } from '../../utils/formatters';
 import { sigColor, ccqColor } from '../../utils/colors';
+import Dialog from '../../../../Common/Dialog';
 
 const BASE = `${API_BASE_URL}/api/ap-monitor`;
 
@@ -61,9 +62,11 @@ function ApDetailModal({
     : [];
 
   return (
-    <div className="modal-overlay"
-      onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal-panel modal-panel-2xl max-h-[92vh]">
+    <Dialog
+      title={`Detalle completo del AP ${dev.cachedStats?.deviceName ?? dev.name ?? dev.ip}`}
+      onClose={onClose}
+      panelClassName="modal-panel modal-panel-2xl max-h-[92vh]"
+    >
         <div className="modal-header-decorated modal-header-slate py-3">
           <div>
             <p className="text-sm font-bold text-white">{dev.cachedStats?.deviceName ?? dev.name ?? dev.ip}</p>
@@ -177,8 +180,7 @@ function ApDetailModal({
             </button>
           </div>
         )}
-      </div>
-    </div>
+    </Dialog>
   );
 }
 

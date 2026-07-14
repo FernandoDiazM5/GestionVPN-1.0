@@ -40,8 +40,13 @@ export function useColumnPrefs({ visibleCols, colWidths, setColWidths }: UseColu
     }
   }, []);
 
-  const startResize = useCallback((key: string, startX: number) => {
+  const startResize = useCallback((key: string, startX: number, keyboardDelta?: number) => {
     const currentW = colWidths[key] ?? (parseInt(COLUMN_DEFS.find(c => c.key === key)?.width || '80') || 80);
+
+    if (keyboardDelta != null) {
+      setColWidths(prev => ({ ...prev, [key]: Math.max(50, currentW + keyboardDelta) }));
+      return;
+    }
 
     const onMove = (e: MouseEvent) => {
       const r = resizingRef.current;
@@ -81,19 +86,19 @@ export function useColumnPrefs({ visibleCols, colWidths, setColWidths }: UseColu
   // de selección (§42-2). En compactNameMode se omite la columna
   // 'minmax(100px,1fr)' = Nombre/Modelo para alinear filas.
   const gridTemplate = useMemo(() => [
-    '36px',       // checkbox selección (bulk save)
+    '44px',       // checkbox selección (bulk save)
     '40px',       // SSH status
     '54px',       // Rol + Freq
     '140px',      // IP / MAC
     ...(compactNameMode ? [] : ['minmax(100px,1fr)']),
     ...activeConfigCols.map(c => colWidths[c.key] != null ? `${colWidths[c.key]}px` : c.width),
-    '32px',       // Toggle expand
+    '44px',       // Toggle expand
     '180px',      // Acción
   ].join(' '), [activeConfigCols, colWidths, compactNameMode]);
 
   const minTableWidth = useMemo(() => {
-    const base = compactNameMode ? [36, 40, 54, 148] : [36, 40, 54, 148, 120];
-    return [...base, ...activeConfigCols.map(c => parseInt(c.width.match(/\d+/)?.[0] || '80') || 80), 32, 180]
+    const base = compactNameMode ? [44, 40, 54, 148] : [44, 40, 54, 148, 120];
+    return [...base, ...activeConfigCols.map(c => parseInt(c.width.match(/\d+/)?.[0] || '80') || 80), 44, 180]
       .reduce((a, b) => a + b, 0);
   }, [activeConfigCols, compactNameMode]);
 

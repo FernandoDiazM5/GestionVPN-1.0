@@ -11,11 +11,11 @@ interface DeviceHeaderProps {
 
 export default function DeviceHeader({ device, antennaStats, onRemove, isPreview }: DeviceHeaderProps) {
   const roleLabel = device.role === 'ap' ? 'AP' : device.role === 'sta' ? 'CPE' : '?';
-  const roleGrad = device.role === 'ap' ? 'from-indigo-500 to-indigo-600' : 'from-violet-500 to-violet-600';
+  const roleColor = device.role === 'ap' ? 'bg-indigo-600' : 'bg-cyan-700';
   const displayName = cleanDeviceName(device.deviceName) || device.name;
 
   return (
-    <div className={`bg-gradient-to-r ${roleGrad} px-4 py-3 flex items-center justify-between`}>
+    <div className={`${roleColor} px-4 py-3 flex items-center justify-between`}>
       <div className="flex items-center space-x-3 min-w-0">
         <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center shrink-0">
           {device.role === 'ap' ? <Radio className="w-4.5 h-4.5 text-white" /> : <Signal className="w-4.5 h-4.5 text-white" />}

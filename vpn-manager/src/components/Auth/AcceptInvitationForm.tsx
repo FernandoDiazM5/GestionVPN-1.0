@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { Mail, KeyRound, Lock, ArrowLeft, Loader2, Check, Copy, Router, ShieldCheck, Smartphone, AlertTriangle, RefreshCw } from 'lucide-react';
-import QRCode from 'qrcode';
 import { teamApi } from '../../services/teamApi';
 import type { RouterCredentials } from '../../store/db';
 import type { WgServerConfig, WgProvisionError } from '../../types/account';
@@ -24,6 +23,7 @@ export default function AcceptInvitationForm({
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [passwordRequired, setPasswordRequired] = useState(false);
   const [result, setResult] = useState<{ user: { email: string; role: string }; tunnel: string | null; wg: WgServerConfig | null; conf: string | null; wgError: WgProvisionError | null } | null>(null);
   const [copied, setCopied] = useState(false);
   const [qr, setQr] = useState<string | null>(null);
@@ -31,14 +31,26 @@ export default function AcceptInvitationForm({
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const normalizedEmail = email.trim();
+    const normalizedOtp = otp.trim();
+    if (!normalizedEmail || !/^\d{6}$/.test(normalizedOtp)) return;
+    if ((passwordRequired && !password) || (password && password.length < 8)) {
+      setError(passwordRequired && !password
+        ? 'Define una contraseña para crear tu cuenta.'
+        : 'La contraseña debe tener al menos 8 caracteres.');
+      return;
+    }
     setBusy(true); setError('');
     try {
       // No enviamos publicKey: el servidor genera el par completo y nos devuelve
       // el .conf con la PrivateKey real. El nombre del invitado lo eligió
       // quien envió la invitación; no se pide aquí.
-      const r = await teamApi.accept(email.trim(), otp.trim(), password || undefined);
+      const r = await teamApi.accept(normalizedEmail, normalizedOtp, password || undefined);
       setResult({ user: r.user, tunnel: r.tunnel, wg: r.wireguard, conf: r.conf ?? null, wgError: r.wgError ?? null });
     } catch (err) {
+      if (err && typeof err === 'object' && 'code' in err && err.code === 'PASSWORD_REQUIRED') {
+        setPasswordRequired(true);
+      }
       setError(err instanceof Error ? err.message : 'No se pudo aceptar la invitación');
     } finally { setBusy(false); }
   };
@@ -63,7 +75,15 @@ export default function AcceptInvitationForm({
   // completo como QR sin transformación adicional.
   useEffect(() => {
     if (!conf) { setQr(null); return; }
-    QRCode.toDataURL(conf, { margin: 1, width: 220 }).then(setQr).catch(() => setQr(null));
+    let cancelled = false;
+    setQr(null);
+
+    void import('qrcode')
+      .then(({ default: QRCode }) => QRCode.toDataURL(conf, { margin: 1, width: 220 }))
+      .then(dataUrl => { if (!cancelled) setQr(dataUrl); })
+      .catch(() => { if (!cancelled) setQr(null); });
+
+    return () => { cancelled = true; };
   }, [conf]);
 
   const downloadConf = () => {
@@ -79,7 +99,7 @@ export default function AcceptInvitationForm({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-sky-50 flex items-center justify-center p-4 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
+    <div className="relative min-h-[100svh] overflow-x-clip bg-slate-50 flex items-center justify-center p-4 dark:bg-slate-950">
       <div className="absolute top-0 left-0 w-96 h-96 bg-indigo-100 rounded-full -translate-x-1/2 -translate-y-1/2 opacity-60 blur-3xl pointer-events-none dark:bg-indigo-500/20 dark:opacity-30" />
       <div className="w-full max-w-md relative z-10">
         <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/80 border border-slate-200 overflow-hidden dark:bg-slate-900 dark:border-slate-800 dark:shadow-black/40">
@@ -95,7 +115,7 @@ export default function AcceptInvitationForm({
 
           <div className="px-8 py-8 -mt-4 relative">
             {result ? (
-              <div className="space-y-3">
+              <div role="status" aria-live="polite" className="space-y-3">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center dark:bg-emerald-500/15"><Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /></div>
                   <p className="text-sm font-bold text-slate-700">¡Listo, {result.user.email}!</p>
@@ -147,7 +167,7 @@ export default function AcceptInvitationForm({
                   <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-500/30 dark:bg-amber-500/10">
                     <div className="flex items-start gap-2">
                       <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                      <p className="text-2xs text-amber-700 dark:text-amber-300">
+                      <p role="alert" className="text-2xs text-amber-700 dark:text-amber-300">
                         {result.wgError?.message
                           || 'No se pudo crear tu acceso WireGuard ahora mismo. Tu cuenta quedó creada; reinténtalo.'}
                       </p>
@@ -167,29 +187,48 @@ export default function AcceptInvitationForm({
               </div>
             ) : (
               <form onSubmit={submit} className="space-y-4">
-                {error && <p className="text-sm text-rose-600 font-medium bg-rose-50 border border-rose-100 rounded-xl px-3 py-2 dark:bg-rose-500/10 dark:border-rose-500/30 dark:text-rose-400">{error}</p>}
-                <div className="relative">
-                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input type="email" required placeholder="Tu correo invitado" value={email} onChange={e => setEmail(e.target.value)} className="input-field pl-10" />
+                {error && <p id="invitation-error" role="alert" aria-live="assertive" className="text-sm text-rose-600 font-medium bg-rose-50 border border-rose-100 rounded-xl px-3 py-2 dark:bg-rose-500/10 dark:border-rose-500/30 dark:text-rose-400">{error}</p>}
+                <div>
+                  <label htmlFor="invitation-email" className="block text-xs font-semibold text-slate-500 mb-2">Correo invitado</label>
+                  <div className="relative">
+                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
+                    <input id="invitation-email" name="email" type="email" required autoComplete="email" maxLength={255}
+                      placeholder="tu@correo.com" value={email} onChange={e => setEmail(e.target.value)} className="input-field pl-10" />
+                  </div>
                 </div>
-                <div className="relative">
-                  <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
-                  <input required inputMode="numeric" maxLength={6} placeholder="Código de 6 dígitos" value={otp}
-                    onChange={e => setOtp(e.target.value.replace(/\D/g, ''))} className="input-field pl-10 font-mono tracking-widest" />
+                <div>
+                  <label htmlFor="invitation-otp" className="block text-xs font-semibold text-slate-500 mb-2">Código de invitación</label>
+                  <div className="relative">
+                    <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
+                    <input id="invitation-otp" name="otp" type="text" required inputMode="numeric" autoComplete="one-time-code"
+                      pattern="[0-9]{6}" minLength={6} maxLength={6} aria-describedby="invitation-otp-help"
+                      placeholder="Código de 6 dígitos" value={otp}
+                      onChange={e => setOtp(e.target.value.replace(/\D/g, ''))} className="input-field pl-10 font-mono tracking-widest" />
+                  </div>
+                  <p id="invitation-otp-help" className="mt-1 text-2xs text-slate-500 dark:text-slate-400">Ingresa los 6 dígitos recibidos.</p>
                 </div>
-                <div className="relative">
-                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
-                  <input type="password" placeholder="Crea tu contraseña (mín. 8)" value={password} onChange={e => setPassword(e.target.value)} className="input-field pl-10" />
+                <div>
+                  <label htmlFor="invitation-password" className="block text-xs font-semibold text-slate-500 mb-2">
+                    Contraseña {passwordRequired ? '(obligatoria)' : '(solo para una cuenta nueva)'}
+                  </label>
+                  <div className="relative">
+                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
+                    <input id="invitation-password" name="password" type="password" required={passwordRequired}
+                      minLength={8} maxLength={128} autoComplete="new-password"
+                      aria-describedby={`invitation-password-help${error ? ' invitation-error' : ''}`}
+                      placeholder="Mínimo 8 caracteres" value={password} onChange={e => setPassword(e.target.value)} className="input-field pl-10" />
+                  </div>
+                  <p id="invitation-password-help" className="mt-1 text-2xs text-slate-500 dark:text-slate-400">Si ya tienes cuenta, puedes dejarla vacía.</p>
                 </div>
                 <p className="text-2xs text-slate-500 dark:text-slate-400">Al aceptar, generaremos tu configuración WireGuard lista para usar.</p>
-                <button type="submit" disabled={busy || !email.trim() || otp.length !== 6}
+                <button type="submit" disabled={busy || !email.trim() || otp.length !== 6 || (password.length > 0 && password.length < 8) || (passwordRequired && !password)}
                   className="btn-primary btn-md w-full flex items-center justify-center">
                   {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Aceptar y unirme
                 </button>
               </form>
             )}
 
-            <button onClick={onBack} className="w-full mt-4 text-xs font-semibold text-slate-500 hover:text-indigo-600 flex items-center justify-center gap-1.5">
+            <button type="button" onClick={onBack} className="w-full mt-4 text-xs font-semibold text-slate-500 hover:text-indigo-600 flex items-center justify-center gap-1.5">
               <ArrowLeft className="w-3.5 h-3.5" /> Volver a iniciar sesión
             </button>
           </div>

@@ -22,7 +22,7 @@ export type {
   MemberWireguard,
 } from '@gestionvpn/contracts';
 
-export { ROLE_LABEL } from '@gestionvpn/contracts';
+export { ROLE_LABEL } from '@gestionvpn/contracts/constants';
 
 export type {
   Moderator,

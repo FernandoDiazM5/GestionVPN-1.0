@@ -4,6 +4,7 @@ import { useVpn } from '../../../../context';
 import { fetchWithTimeout } from '../../../../utils/fetchWithTimeout';
 import { API_BASE_URL, MGMT_NET } from '../../../../config';
 import type { WgPeer } from '../../../../types/api';
+import Dialog from '../../../Common/Dialog';
 
 interface NuevoAdminProps {
   peers: WgPeer[];
@@ -54,9 +55,13 @@ export default function NuevoAdmin({ peers, onClose, onSuccess }: NuevoAdminProp
   };
 
   return (
-    <div className="modal-overlay"
-      onClick={e => e.target === e.currentTarget && !saving && onClose()}>
-      <div className="modal-panel modal-panel-md">
+    <Dialog
+      title="Nuevo administrador"
+      onClose={onClose}
+      closeOnBackdrop={!saving}
+      closeOnEscape={!saving}
+      panelClassName="modal-panel modal-panel-md"
+    >
         <div className="modal-header-decorated modal-header-indigo">
           <div className="flex items-center gap-3">
             <div className="modal-header-icon">
@@ -123,7 +128,6 @@ export default function NuevoAdmin({ peers, onClose, onSuccess }: NuevoAdminProp
             </>
           )}
         </div>
-      </div>
-    </div>
+    </Dialog>
   );
 }

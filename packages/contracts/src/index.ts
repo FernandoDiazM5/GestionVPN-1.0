@@ -4,6 +4,7 @@
 // Cambiar un campo aquí rompe a ambos lados en tsc, evitando drift silencioso.
 
 export * from './common';
+export * from './constants';
 export * from './auth';
 export * from './account';
 export * from './team';

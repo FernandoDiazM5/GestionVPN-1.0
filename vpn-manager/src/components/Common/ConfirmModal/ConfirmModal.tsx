@@ -1,7 +1,6 @@
-import { createPortal } from 'react-dom';
 import type { ConfirmModalProps } from './types';
+import Dialog from '../Dialog';
 import CloseButton from './components/CloseButton';
-import ModalBackdrop from './components/ModalBackdrop';
 import ModalHeader from './components/ModalHeader';
 import ModalContent from './components/ModalContent';
 import ModalFooter from './components/ModalFooter';
@@ -17,16 +16,17 @@ export default function ConfirmModal({
 }: ConfirmModalProps) {
   if (!isOpen) return null;
 
-  return createPortal(
-    <div className={confirmModalStyles.container}>
-      <ModalBackdrop onClick={onCancel} />
-      <div className={confirmModalStyles.modal}>
-        <CloseButton onClick={onCancel} />
-        <ModalHeader title={title} />
-        <ModalContent message={message} />
-        <ModalFooter confirmLabel={confirmLabel} onCancel={onCancel} onConfirm={onConfirm} />
-      </div>
-    </div>,
-    document.body
+  return (
+    <Dialog
+      title={title}
+      onClose={onCancel}
+      overlayClassName={confirmModalStyles.container}
+      panelClassName={confirmModalStyles.modal}
+    >
+      <CloseButton onClick={onCancel} />
+      <ModalHeader title={title} />
+      <ModalContent message={message} />
+      <ModalFooter confirmLabel={confirmLabel} onCancel={onCancel} onConfirm={onConfirm} />
+    </Dialog>
   );
 }

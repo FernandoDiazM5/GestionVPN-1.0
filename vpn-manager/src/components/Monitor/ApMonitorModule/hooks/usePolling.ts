@@ -6,18 +6,134 @@ import { API_BASE_URL } from '../../../../config';
 import { deviceDb } from '../../../../store/deviceDb';
 
 const BASE = `${API_BASE_URL}/api/ap-monitor`;
+export const AP_POLL_CACHE_KEY = 'apMonitorPollResults_v2';
+export const AP_POLL_CACHE_TTL_MS = 5 * 60_000;
+export const AP_POLL_PERSIST_INTERVAL_MS = 1_500;
+const LEGACY_AP_POLL_CACHE_KEY = 'apMonitorPollResults';
+const MAX_CACHED_APS = 100;
+const MAX_CACHED_STATIONS_PER_AP = 250;
+
+interface PollCachePayload {
+  version: 2;
+  savedAt: number;
+  results: Record<string, PollResult>;
+}
+
+type PollCacheStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
+
+function compactStation(station: LiveCpe): LiveCpe {
+  const {
+    mac, signal, noisefloor, remote_signal, ccq, tx_rate, rx_rate,
+    airmax_quality, airmax_capacity, airmax_dcap, airmax_ucap,
+    airmax_cinr_rx, airmax_tx_usage, airmax_rx_usage,
+    throughputRxKbps, throughputTxKbps, uptimeStr, distance, lastip,
+    remote_hostname, cpe_name, hostname, cpe_product, modelo,
+    firmware_family, isKnown,
+  } = station;
+  return {
+    mac, signal, noisefloor, remote_signal, ccq, tx_rate, rx_rate,
+    airmax_quality, airmax_capacity, airmax_dcap, airmax_ucap,
+    airmax_cinr_rx, airmax_tx_usage, airmax_rx_usage,
+    throughputRxKbps, throughputTxKbps, uptimeStr, distance, lastip,
+    remote_hostname, cpe_name, hostname, cpe_product, modelo,
+    firmware_family, isKnown,
+  };
+}
+
+export function compactPollResults(results: Record<string, PollResult>): Record<string, PollResult> {
+  return Object.fromEntries(
+    Object.entries(results)
+      .sort(([, a], [, b]) => (b.polledAt ?? 0) - (a.polledAt ?? 0))
+      .slice(0, MAX_CACHED_APS)
+      .map(([apId, result]) => [apId, {
+        stations: result.stations.slice(0, MAX_CACHED_STATIONS_PER_AP).map(compactStation),
+        polledAt: result.polledAt,
+        loading: false,
+      }]),
+  );
+}
+
+export function readPollResultsCache(
+  storage: PollCacheStorage,
+  now = Date.now(),
+): Record<string, PollResult> {
+  try {
+    storage.removeItem(LEGACY_AP_POLL_CACHE_KEY);
+    const raw = storage.getItem(AP_POLL_CACHE_KEY);
+    if (!raw) return {};
+    const payload = JSON.parse(raw) as Partial<PollCachePayload>;
+    const age = now - Number(payload.savedAt);
+    if (payload.version !== 2 || !Number.isFinite(age) || age < 0 || age > AP_POLL_CACHE_TTL_MS
+      || !payload.results || typeof payload.results !== 'object' || Array.isArray(payload.results)) {
+      storage.removeItem(AP_POLL_CACHE_KEY);
+      return {};
+    }
+    return compactPollResults(payload.results);
+  } catch {
+    try { storage.removeItem(AP_POLL_CACHE_KEY); } catch { /* storage unavailable */ }
+    return {};
+  }
+}
+
+export function persistPollResultsCache(
+  storage: PollCacheStorage,
+  results: Record<string, PollResult>,
+  now = Date.now(),
+): boolean {
+  try {
+    const payload: PollCachePayload = {
+      version: 2,
+      savedAt: now,
+      results: compactPollResults(results),
+    };
+    storage.setItem(AP_POLL_CACHE_KEY, JSON.stringify(payload));
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export function usePolling(devices: SavedDevice[], _activeNodeName: string | null, onTunnelInactive?: (message: string) => void) {
   const [pollResults, setPollResults] = useState<Record<string, PollResult>>(() => {
     try {
-      const saved = sessionStorage.getItem('apMonitorPollResults');
-      if (saved) return JSON.parse(saved);
-    } catch(e) {}
+      return readPollResultsCache(sessionStorage);
+    } catch { /* storage unavailable */ }
     return {};
   });
+
+  const persistenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingPollResultsRef = useRef(pollResults);
+  const hasPendingPersistenceRef = useRef(false);
+  const persistenceDisabledRef = useRef(false);
+  const persistenceReadyRef = useRef(false);
+
   useEffect(() => {
-    sessionStorage.setItem('apMonitorPollResults', JSON.stringify(pollResults));
+    pendingPollResultsRef.current = pollResults;
+    if (!persistenceReadyRef.current) {
+      persistenceReadyRef.current = true;
+      return;
+    }
+    hasPendingPersistenceRef.current = true;
+    if (persistenceDisabledRef.current || persistenceTimerRef.current) return;
+    persistenceTimerRef.current = setTimeout(() => {
+      persistenceTimerRef.current = null;
+      hasPendingPersistenceRef.current = false;
+      try {
+        persistenceDisabledRef.current = !persistPollResultsCache(
+          sessionStorage,
+          pendingPollResultsRef.current,
+        );
+      } catch {
+        persistenceDisabledRef.current = true;
+      }
+    }, AP_POLL_PERSIST_INTERVAL_MS);
   }, [pollResults]);
+
+  useEffect(() => () => {
+    if (persistenceTimerRef.current) clearTimeout(persistenceTimerRef.current);
+    if (!hasPendingPersistenceRef.current || persistenceDisabledRef.current) return;
+    try { persistPollResultsCache(sessionStorage, pendingPollResultsRef.current); } catch { /* storage unavailable */ }
+  }, []);
 
   const pollResultsRef = useRef(pollResults);
   useEffect(() => { pollResultsRef.current = pollResults; }, [pollResults]);

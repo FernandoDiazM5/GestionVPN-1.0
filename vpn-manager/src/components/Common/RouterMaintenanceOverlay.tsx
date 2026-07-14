@@ -160,7 +160,7 @@ export default function RouterMaintenanceOverlay() {
           </div>
 
           {/* Pie: ayuda + código de error */}
-          <div className="mt-10 pt-6 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-400 dark:text-slate-500">
+          <div className="mt-10 pt-6 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-500">
             <p className="flex items-center justify-center gap-1.5">
               <Wifi className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
               Si el problema persiste tras activar la VPN, contacta a Soporte.

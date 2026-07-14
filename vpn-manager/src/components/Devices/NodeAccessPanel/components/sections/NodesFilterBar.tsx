@@ -148,7 +148,7 @@ function NodesFilterBarImpl({
           {hasActiveFilter ? (
             <>
               <span className="font-bold text-indigo-600 dark:text-indigo-400">{resultCount}</span>
-              <span className="text-slate-300 dark:text-slate-600 mx-1">/</span>
+              <span className="text-slate-500 dark:text-slate-600 mx-1">/</span>
               <span>{totalCount}</span>
               <span className="ml-1 text-slate-500 dark:text-slate-400">nodos</span>
             </>

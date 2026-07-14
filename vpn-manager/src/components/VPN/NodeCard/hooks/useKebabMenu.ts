@@ -24,11 +24,35 @@ export function useKebabMenu() {
       }
     };
     const scrollHandler = () => setShowKebab(false);
+    const keyHandler = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setShowKebab(false);
+        requestAnimationFrame(() => kebabRef.current?.querySelector<HTMLButtonElement>('button')?.focus());
+        return;
+      }
+
+      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+      const menu = dropdownRef.current;
+      if (!menu?.contains(document.activeElement)) return;
+      const items = [...menu.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled])')];
+      if (items.length === 0) return;
+      event.preventDefault();
+      const current = items.indexOf(document.activeElement as HTMLElement);
+      const delta = event.key === 'ArrowDown' ? 1 : -1;
+      items[(current + delta + items.length) % items.length]?.focus();
+    };
+    const focusFrame = requestAnimationFrame(() => {
+      dropdownRef.current?.querySelector<HTMLElement>('[role="menuitem"]:not([disabled])')?.focus();
+    });
 
     document.addEventListener('mousedown', handler);
+    document.addEventListener('keydown', keyHandler);
     window.addEventListener('scroll', scrollHandler, true);
     return () => {
+      cancelAnimationFrame(focusFrame);
       document.removeEventListener('mousedown', handler);
+      document.removeEventListener('keydown', keyHandler);
       window.removeEventListener('scroll', scrollHandler, true);
     };
   }, [showKebab]);

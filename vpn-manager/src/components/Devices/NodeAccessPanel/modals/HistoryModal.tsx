@@ -4,6 +4,7 @@ import Spinner from '../../../Common/Spinner';
 import { apiFetch } from '../../../../utils/apiClient';
 import { API_BASE_URL } from '../../../../config';
 import type { NodeInfo } from '../../../../types/api';
+import Dialog from '../../../Common/Dialog';
 
 export default function HistoryModal({ node, onClose }: { node: NodeInfo; onClose: () => void }) {
   const [history, setHistory] = useState<{ event: string; timestamp: number }[]>([]);
@@ -20,9 +21,11 @@ export default function HistoryModal({ node, onClose }: { node: NodeInfo; onClos
   const fmt = (ts: number) => new Date(ts).toLocaleString('es', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
 
   return (
-    <div className="modal-overlay"
-      onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal-panel modal-panel-md max-h-[80vh]">
+    <Dialog
+      title={`Historial de ${node.nombre_nodo}`}
+      onClose={onClose}
+      panelClassName="modal-panel modal-panel-md max-h-[80vh]"
+    >
         <div className="modal-header-decorated modal-header-sky">
           <div className="flex items-center gap-3">
             <div className="modal-header-icon">
@@ -68,7 +71,6 @@ export default function HistoryModal({ node, onClose }: { node: NodeInfo; onClos
             Cerrar
           </button>
         </div>
-      </div>
-    </div>
+    </Dialog>
   );
 }

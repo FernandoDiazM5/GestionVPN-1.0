@@ -367,7 +367,7 @@ export default function NetworkDevicesModule() {
             <Cpu className="w-5 h-5 text-indigo-500" />
             <span>Dispositivos de Red</span>
           </h2>
-          <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">Descubre y gestiona equipos Ubiquiti en las LANs remotas</p>
+          <p className="text-slate-500 dark:text-slate-500 text-sm mt-1">Descubre y gestiona equipos Ubiquiti en las LANs remotas</p>
         </div>
         <div className="text-sm text-slate-500 dark:text-slate-400">
           <span className="font-bold text-indigo-600 dark:text-indigo-400">{library.savedDevices.length}</span> guardados
@@ -375,13 +375,13 @@ export default function NetworkDevicesModule() {
       </div>
 
       {isTunnelActive ? (
-        <div className="card p-4 border-emerald-200 bg-gradient-to-r from-emerald-50 to-sky-50 dark:border-emerald-500/30 dark:from-emerald-500/10 dark:to-sky-500/10 flex items-center space-x-3">
+        <div className="card p-4 border-emerald-200 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/10 flex items-center space-x-3">
           <div className="w-9 h-9 bg-emerald-500 rounded-xl flex items-center justify-center shadow-md shadow-emerald-500/30 shrink-0">
             <ShieldCheck className="w-5 h-5 text-white" />
           </div>
           <div>
             <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Túnel activo: <span className="text-emerald-600 dark:text-emerald-400">{activeNodeName}</span></p>
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">El escaneo se realiza desde este equipo hacia la LAN remota</p>
+            <p className="text-xs text-slate-500 dark:text-slate-500 mt-0.5">El escaneo se realiza desde este equipo hacia la LAN remota</p>
           </div>
         </div>
       ) : (
@@ -446,7 +446,7 @@ export default function NetworkDevicesModule() {
                 <p className="text-slate-600 dark:text-slate-300 font-semibold">
                   {isTunnelActive ? 'Listo para escanear' : 'Sin túnel activo'}
                 </p>
-                <p className="text-2xs text-slate-400 dark:text-slate-500 max-w-xs mt-0.5">
+                <p className="text-2xs text-slate-500 dark:text-slate-500 max-w-xs mt-0.5">
                   {isTunnelActive
                     ? `Pulsa "Escanear dispositivos" para descubrir equipos Ubiquiti en ${effectiveLan || 'la subred'}.`
                     : 'Activa el acceso a un nodo en la pestaña "Nodos" para escanear la LAN remota.'}

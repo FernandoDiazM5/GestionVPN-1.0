@@ -159,15 +159,7 @@ const RULES = [
       const DARK_SURFACE_RE = /(?:bg-slate-(?:700|800|900|950)|bg-(?:indigo|rose|violet|emerald|sky|amber)-(?:500|600|700|800)|bg-gradient-to-|bg-black|modal-header-(?:decorated|indigo|rose|amber|emerald|sky|violet|slate)|text-white\b|text-white\/)/;
       if (DARK_SURFACE_RE.test(context)) return [];
 
-      // Refinamiento §53-b: si la MISMA línea tiene `dark:text-slate-{500-700}`
-      // o `dark:text-slate-{300-400}`, el desarrollador ya tomó una decisión
-      // consciente del par claro/oscuro (patrón `.data-muted` etc.). No marca.
-      // Esto NO es 100% defensible (slate-300 en claro sigue siendo bajo
-      // contraste técnicamente), pero respeta la intención del diseño en el
-      // patrón "valor vacío sutil" que es legítimo en tablas densas.
-      if (/\bdark:text-slate-(?:300|400|500|600|700)\b/.test(line)) return [];
-
-      // Refinamiento §53-c: si la clase está dentro de un `<Icon>` (lucide-react)
+      // Refinamiento §53-b: si la clase está dentro de un `<Icon>` (lucide-react)
       // como className, es para tinte del SVG, no texto leíble. Saltar.
       // Heurística: la línea contiene `<[A-Z]\w+ className="..."` + size class
       // (w-3 / w-4 / w-3.5 etc.) — patrón típico de íconos.

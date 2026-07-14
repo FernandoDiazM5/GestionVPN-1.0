@@ -4,12 +4,11 @@
 //  se "filtren" al siguiente que use el mismo navegador.
 // ============================================================
 import { credCache, statsCache } from '../store/deviceDb';
-import { cpeCache } from '../store/cpeCache';
 
 /** Borra escaneo, credenciales en memoria y cachés IndexedDB de CPEs/stats. */
 export async function clearUserScopedData(): Promise<void> {
   try { sessionStorage.clear(); } catch { /* ignore */ }
-  await Promise.allSettled([credCache.clear(), statsCache.clear(), cpeCache.clear()]);
+  await Promise.allSettled([credCache.clear(), statsCache.clear()]);
 }
 
 /**

@@ -9,6 +9,7 @@ import InterfacesSection from './components/InterfacesSection';
 import ServicesSection from './components/ServicesSection';
 import { detectFamily } from './utils/deviceFamily';
 import { modalContainerStyles } from './utils/styles';
+import Dialog from '../Dialog';
 
 export default function M5FullInfoModal({ dev, onClose }: M5FullInfoModalProps) {
   const { copiedIp, copyIp } = useCopiedIpState(dev.ip);
@@ -16,25 +17,25 @@ export default function M5FullInfoModal({ dev, onClose }: M5FullInfoModalProps) 
   const family = detectFamily(dev);
 
   return (
-    <div
-      className={modalContainerStyles.container}
-      onClick={e => e.target === e.currentTarget && onClose()}
+    <Dialog
+      title={`Información completa de ${dev.name || dev.ip}`}
+      onClose={onClose}
+      overlayClassName={modalContainerStyles.container}
+      panelClassName={modalContainerStyles.modal}
     >
-      <div className={modalContainerStyles.modal}>
-        <ModalHeader dev={dev} copiedIp={copiedIp} copyIp={copyIp} onClose={onClose} />
-        <ModalContent>
-          {!s ? (
-            <EmptyState />
-          ) : (
-            <>
-              <SystemSection s={s} family={family} />
-              <WirelessSection s={s} family={family} />
-              <InterfacesSection s={s} />
-              <ServicesSection s={s} />
-            </>
-          )}
-        </ModalContent>
-      </div>
-    </div>
+      <ModalHeader dev={dev} copiedIp={copiedIp} copyIp={copyIp} onClose={onClose} />
+      <ModalContent>
+        {!s ? (
+          <EmptyState />
+        ) : (
+          <>
+            <SystemSection s={s} family={family} />
+            <WirelessSection s={s} family={family} />
+            <InterfacesSection s={s} />
+            <ServicesSection s={s} />
+          </>
+        )}
+      </ModalContent>
+    </Dialog>
   );
 }

@@ -38,6 +38,38 @@ const COL_HEADER_META: Record<string, { label: string; sortKey?: SortKey }> = {
   uptime:    { label: 'Tiempo activo' },
 };
 
+interface SortableHeaderProps {
+  label: string;
+  columnKey: SortKey;
+  activeKey: SortKey;
+  direction: SortDir;
+  onSort: (key: SortKey) => void;
+}
+
+function SortableHeader({ label, columnKey, activeKey, direction, onSort }: SortableHeaderProps) {
+  const active = activeKey === columnKey;
+  const nextDirection = active && direction === 'asc' ? 'descendente' : 'ascendente';
+
+  return (
+    <th
+      className="p-0 text-left text-2xs font-bold uppercase tracking-wider text-slate-500 transition-colors hover:bg-slate-100 group dark:text-slate-400 dark:hover:bg-slate-800"
+      aria-sort={active ? (direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(columnKey)}
+        aria-label={`Ordenar por ${label} ${nextDirection}`}
+        className="flex min-h-11 w-full items-center px-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500"
+      >
+        {label}
+        {!active && <ArrowUpDown aria-hidden="true" className="ml-1 h-3 w-3 text-slate-500 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 dark:text-slate-500" />}
+        {active && direction === 'asc' && <ArrowUp aria-hidden="true" className="ml-1 h-3 w-3 text-indigo-500" />}
+        {active && direction === 'desc' && <ArrowDown aria-hidden="true" className="ml-1 h-3 w-3 text-indigo-500" />}
+      </button>
+    </th>
+  );
+}
+
 export default function NodesTable({
   nodes,
   nodeTags,
@@ -56,51 +88,46 @@ export default function NodesTable({
   visibleCols,
 }: NodesTableProps) {
 
-  const SortIcon = ({ columnKey }: { columnKey: SortKey }) => {
-    if (sortKey !== columnKey) return <ArrowUpDown className="w-3 h-3 text-slate-400 dark:text-slate-500 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />;
-    return sortDir === 'asc'
-      ? <ArrowUp className="w-3 h-3 text-indigo-500 ml-1" />
-      : <ArrowDown className="w-3 h-3 text-indigo-500 ml-1" />;
-  };
-
   // Filtramos a las claves válidas conocidas; preserva el orden del usuario.
   const orderedCols = visibleCols.filter(k => COL_HEADER_META[k]);
   // colspan para "Sin resultados": fixed cols (status + nombre + acciones) + opcionales visibles.
   const totalCols = 3 + orderedCols.length;
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-xs">
+    <div
+      className="max-w-full min-w-0 overflow-x-auto overscroll-x-contain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-400"
+      role="region"
+      aria-label="Nodos VPN. Desplaza horizontalmente para ver todas las columnas."
+      tabIndex={0}
+    >
+      <table className="w-full min-w-[760px] text-xs">
         <thead>
           <tr className="border-b border-slate-200 bg-slate-50 select-none dark:border-slate-800 dark:bg-slate-800/50">
             {/* Fija: Estado */}
-            <th className="px-4 py-3 w-10" aria-label="Estado" />
+            <th className="h-11 w-11 px-0 py-0" aria-label="Estado" />
 
             {/* Fija: Nodo (sortable) */}
-            <th
-              className="px-4 py-3 text-left font-bold text-slate-500 uppercase tracking-wider text-2xs cursor-pointer hover:bg-slate-100 group transition-colors dark:text-slate-400 dark:hover:bg-slate-800"
-              onClick={() => onSort('nombre_nodo')}
-            >
-              <div className="flex items-center">
-                Nodo <SortIcon columnKey="nombre_nodo" />
-              </div>
-            </th>
+            <SortableHeader label="Nodo" columnKey="nombre_nodo" activeKey={sortKey} direction={sortDir} onSort={onSort} />
 
             {/* Opcionales dinámicas */}
             {orderedCols.map(key => {
               const meta = COL_HEADER_META[key];
               const sortable = !!meta.sortKey;
               return (
-                <th
-                  key={key}
-                  className={`px-4 py-3 text-left font-bold text-slate-500 uppercase tracking-wider text-2xs dark:text-slate-400 ${sortable ? 'cursor-pointer hover:bg-slate-100 group transition-colors dark:hover:bg-slate-800' : ''}`}
-                  onClick={sortable ? () => onSort(meta.sortKey!) : undefined}
-                >
-                  <div className="flex items-center">
+                sortable ? (
+                  <SortableHeader
+                    key={key}
+                    label={meta.label}
+                    columnKey={meta.sortKey!}
+                    activeKey={sortKey}
+                    direction={sortDir}
+                    onSort={onSort}
+                  />
+                ) : (
+                  <th key={key} className="h-11 px-4 text-left text-2xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                     {meta.label}
-                    {sortable && <SortIcon columnKey={meta.sortKey!} />}
-                  </div>
-                </th>
+                  </th>
+                )
               );
             })}
 
@@ -134,7 +161,7 @@ export default function NodesTable({
             <tr>
               <td colSpan={totalCols} className="px-4 py-12 text-center">
                 <div className="flex flex-col items-center gap-2">
-                  <Search className="w-8 h-8 text-slate-400 dark:text-slate-500" />
+                  <Search className="w-8 h-8 text-slate-500 dark:text-slate-500" />
                   <p className="text-slate-500 dark:text-slate-400 font-semibold">Sin resultados</p>
                   <p className="text-slate-500 dark:text-slate-400 text-xs">
                     {searchQuery ? `No se encontraron nodos coincidentes con "${searchQuery}"` : 'No hay nodos para mostrar'}

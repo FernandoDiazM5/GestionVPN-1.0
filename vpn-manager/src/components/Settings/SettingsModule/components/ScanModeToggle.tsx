@@ -129,7 +129,7 @@ export function ScanModeToggle({ scanMode, localScanIp, onChange }: ScanModeTogg
           </span>
 
           <div className="flex items-center gap-3">
-            <span className={`text-xs font-semibold transition-colors ${!isLocal ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'}`}>
+            <span className={`text-xs font-semibold transition-colors ${!isLocal ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-500'}`}>
               VPS
             </span>
 
@@ -153,7 +153,7 @@ export function ScanModeToggle({ scanMode, localScanIp, onChange }: ScanModeTogg
               />
             </button>
 
-            <span className={`text-xs font-semibold transition-colors ${isLocal ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400 dark:text-slate-500'}`}>
+            <span className={`text-xs font-semibold transition-colors ${isLocal ? 'text-amber-600 dark:text-amber-400' : 'text-slate-500 dark:text-slate-500'}`}>
               Local
             </span>
 
@@ -223,7 +223,7 @@ export function ScanModeToggle({ scanMode, localScanIp, onChange }: ScanModeTogg
             {check && !check.ok && (
               <div
                 role="alert"
-                className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs leading-relaxed
+                className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs leading-relaxed dark:border-amber-500/30 dark:bg-amber-500/10
                   text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300"
               >
                 <div className="flex items-start gap-2">

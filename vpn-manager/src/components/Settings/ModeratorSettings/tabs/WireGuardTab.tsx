@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import QRCode from 'qrcode';
 import { Shield, Loader2, Download, Copy, Check, Smartphone, RefreshCw, KeyRound, AlertCircle } from 'lucide-react';
 import Spinner from '../../../Common/Spinner';
 import { teamApi } from '../../../../services/teamApi';
@@ -38,7 +37,12 @@ export default function WireGuardTab() {
   // QR del .conf — WireGuard móvil lo escanea tal cual.
   useEffect(() => {
     if (!conf) { setQr(null); return; }
-    QRCode.toDataURL(conf, { margin: 1, width: 220 }).then(setQr).catch(() => setQr(null));
+    let active = true;
+    import('qrcode')
+      .then(({ default: QRCode }) => QRCode.toDataURL(conf, { margin: 1, width: 220 }))
+      .then(dataUrl => { if (active) setQr(dataUrl); })
+      .catch(() => { if (active) setQr(null); });
+    return () => { active = false; };
   }, [conf]);
 
   const provision = async () => {

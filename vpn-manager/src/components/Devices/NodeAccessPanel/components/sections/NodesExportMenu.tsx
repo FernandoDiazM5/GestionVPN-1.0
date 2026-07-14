@@ -7,7 +7,7 @@
 
 import { useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Download, FileText, FileJson, FileSpreadsheet, FileType2, Loader2 } from 'lucide-react';
+import { AlertCircle, Download, FileText, FileJson, FileSpreadsheet, FileType2, Loader2 } from 'lucide-react';
 import { useKebabMenu } from '../../../../VPN/NodeCard/hooks/useKebabMenu';
 import type { NodeExportRow, NodesExportMetadata } from '../../utils/nodesExportShared';
 
@@ -29,9 +29,11 @@ const ITEMS: { key: Format; label: string; hint: string; Icon: typeof FileText; 
 export function NodesExportMenu({ rows, meta, disabled }: NodesExportMenuProps) {
   const { showKebab, setShowKebab, kebabCoords, kebabRef, dropdownRef, handleKebabClick } = useKebabMenu();
   const [busyFormat, setBusyFormat] = useState<Format | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const run = useCallback(async (fmt: Format) => {
     if (busyFormat) return;
+    setExportError(null);
     setBusyFormat(fmt);
     try {
       switch (fmt) {
@@ -59,7 +61,8 @@ export function NodesExportMenu({ rows, meta, disabled }: NodesExportMenuProps) 
       setShowKebab(false);
     } catch (err) {
       console.error(`[nodes-export] ${fmt} falló:`, err);
-      window.alert(`No se pudo generar el archivo ${fmt.toUpperCase()}. Revisa la consola para más detalle.`);
+      setExportError(`No se pudo generar el archivo ${fmt.toUpperCase()}. Inténtalo nuevamente.`);
+      setShowKebab(false);
     } finally {
       setBusyFormat(null);
     }
@@ -79,6 +82,13 @@ export function NodesExportMenu({ rows, meta, disabled }: NodesExportMenuProps) 
         <Download className="w-4 h-4" />
         <span>Exportar</span>
       </button>
+
+      {exportError && (
+        <p role="alert" className="mt-1 flex max-w-60 items-start gap-1 text-2xs text-rose-600 dark:text-rose-400">
+          <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
+          <span>{exportError}</span>
+        </p>
+      )}
 
       {showKebab && createPortal(
         <div
@@ -116,7 +126,7 @@ export function NodesExportMenu({ rows, meta, disabled }: NodesExportMenuProps) 
                     <span className="block text-xs font-bold text-slate-700 dark:text-slate-200">
                       {label}
                     </span>
-                    <span className="block text-2xs text-slate-400 dark:text-slate-500 leading-tight">
+                    <span className="block text-2xs text-slate-500 dark:text-slate-500 leading-tight">
                       {busy ? 'Generando…' : hint}
                     </span>
                   </span>

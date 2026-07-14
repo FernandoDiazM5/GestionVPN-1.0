@@ -49,7 +49,7 @@ export default function AdminDashboard() {
             <LayoutDashboard className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
             <span>Dashboard</span>
           </h2>
-          <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">Resumen general de la plataforma</p>
+          <p className="text-slate-500 dark:text-slate-500 text-sm mt-1">Resumen general de la plataforma</p>
         </div>
         <button onClick={load} disabled={loading} className="btn-outline px-4 py-2.5 flex items-center gap-2 text-sm disabled:opacity-50">
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Actualizar
@@ -59,7 +59,7 @@ export default function AdminDashboard() {
       {loading && !summary ? (
         <Spinner block label="Cargando resumen…" />
       ) : error ? (
-        <div className="card p-8 text-center text-slate-400 dark:text-slate-500">No se pudo cargar el resumen (¿MySQL activo?).</div>
+        <div className="card p-8 text-center text-slate-500 dark:text-slate-500">No se pudo cargar el resumen (¿MySQL activo?).</div>
       ) : (
         <>
           {/* Tarjetas de métricas */}
@@ -71,7 +71,7 @@ export default function AdminDashboard() {
                 </div>
                 <div>
                   <div className="text-2xl font-bold text-slate-800 dark:text-slate-100 leading-none">{value}</div>
-                  <div className="text-2xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 mt-1.5">{label}</div>
+                  <div className="text-2xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-500 mt-1.5">{label}</div>
                 </div>
               </div>
             ))}
@@ -86,7 +86,7 @@ export default function AdminDashboard() {
               <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">Actividad reciente (toda la plataforma)</h3>
             </div>
             {recent.length === 0 ? (
-              <div className="py-12 text-center text-slate-400 dark:text-slate-500 text-sm">Sin actividad registrada</div>
+              <div className="py-12 text-center text-slate-500 dark:text-slate-500 text-sm">Sin actividad registrada</div>
             ) : (
               <ul className="divide-y divide-slate-100 dark:divide-slate-800">
                 {recent.map((log, i) => (
@@ -100,7 +100,7 @@ export default function AdminDashboard() {
                         <span className="text-slate-500 dark:text-slate-400">{log.action}</span>{' '}
                         {log.tunnel_id && <span className="font-mono text-slate-600 dark:text-slate-300">{log.tunnel_id}</span>}
                       </p>
-                      <p className="text-2xs text-slate-400 dark:text-slate-500 mt-0.5">{timeAgo(log.created_at)}</p>
+                      <p className="text-2xs text-slate-500 dark:text-slate-500 mt-0.5">{timeAgo(log.created_at)}</p>
                     </div>
                   </li>
                 ))}

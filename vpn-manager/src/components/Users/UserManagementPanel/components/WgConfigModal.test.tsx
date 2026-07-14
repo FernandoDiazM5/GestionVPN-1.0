@@ -42,8 +42,8 @@ describe('<WgConfigModal />', () => {
 
     renderWithProviders(<WgConfigModal peer={peer} onClose={() => {}} />);
 
-    // Aparece header con el nombre del peer
-    expect(await screen.findByText(/Configuración WireGuard/i)).toBeInTheDocument();
+    // El diálogo queda identificado por su título accesible.
+    expect(await screen.findByRole('dialog', { name: /Configuración WireGuard/i })).toBeInTheDocument();
 
     // El .conf real se muestra (esperamos hasta que el fetch resuelva)
     await waitFor(() => {

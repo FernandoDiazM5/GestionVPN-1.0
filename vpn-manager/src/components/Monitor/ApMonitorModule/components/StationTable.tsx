@@ -147,7 +147,7 @@ function StationTable({ poll, onCpeDetail, dev }: {
           </button>
           <ColSelector hidden={hiddenCols} onChange={handleColChange} />
           {poll.polledAt > 0 && (
-            <span className="text-3xs text-slate-400 dark:text-slate-500 font-mono">
+            <span className="text-3xs text-slate-500 dark:text-slate-500 font-mono">
               {new Date(poll.polledAt).toLocaleTimeString()}
             </span>
           )}

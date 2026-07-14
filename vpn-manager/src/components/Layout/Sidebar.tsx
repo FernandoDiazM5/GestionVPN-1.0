@@ -6,6 +6,7 @@ import {
 import { useVpn } from '../../context';
 import { useWorkspaceSession } from '../../context/WorkspaceSession';
 import { visibleModules, roleLabel, type ModuleId } from '../../utils/permissions';
+import Drawer from '../Common/Drawer';
 
 interface NavItem {
   id: ModuleId;
@@ -98,7 +99,7 @@ export default function Sidebar() {
               <h1 className="text-sm font-bold text-slate-800 dark:text-slate-100 leading-none truncate">
                 MikroTik<span className="text-indigo-600 dark:text-indigo-400">VPN</span>
               </h1>
-              <p className="text-2xs text-slate-400 dark:text-slate-500 font-medium mt-0.5">Remote Manager</p>
+              <p className="text-2xs text-slate-500 dark:text-slate-500 font-medium mt-0.5">Remote Manager</p>
             </div>
           )}
         </div>
@@ -137,7 +138,7 @@ export default function Sidebar() {
           return (
             <div key={group.category}>
               {!mini && (
-                <p className="px-5 mb-1.5 text-2xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                <p className="px-5 mb-1.5 text-2xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-500">
                   {group.category}
                 </p>
               )}
@@ -203,7 +204,7 @@ export default function Sidebar() {
           {!mini && (
             <div className="min-w-0 flex-1">
               <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate leading-none">@{credentials?.user}</p>
-              <p className="text-2xs text-slate-400 dark:text-slate-500 mt-0.5">{roleLabel(session) || credentials?.role}</p>
+              <p className="text-2xs text-slate-500 dark:text-slate-500 mt-0.5">{roleLabel(session) || credentials?.role}</p>
             </div>
           )}
         </div>
@@ -263,19 +264,20 @@ export default function Sidebar() {
 
       {/* ── Drawer móvil (siempre expandido) ── */}
       {mobileOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex">
-          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm anim-fade-in" onClick={() => setMobileOpen(false)} />
-          <aside className="relative w-64 h-full anim-drawer-left">
-            <button
-              onClick={() => setMobileOpen(false)}
-              className="absolute top-4 right-3 z-10 p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-              aria-label="Cerrar menú"
-            >
-              <X className="w-4 h-4" />
-            </button>
-            {renderBody(false)}
-          </aside>
-        </div>
+        <Drawer
+          title="Navegación principal"
+          onClose={() => setMobileOpen(false)}
+          overlayClassName="lg:hidden fixed inset-0 z-50 flex bg-slate-900/50 backdrop-blur-sm anim-fade-in"
+        >
+          <button
+            onClick={() => setMobileOpen(false)}
+            className="absolute top-4 right-3 z-10 p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+            aria-label="Cerrar menú"
+          >
+            <X className="w-4 h-4" />
+          </button>
+          {renderBody(false)}
+        </Drawer>
       )}
     </>
   );

@@ -41,6 +41,8 @@ export default function TeamModule() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [loadingData, setLoadingData] = useState(false);
+  const [dataError, setDataError] = useState<string | null>(null);
+  const [logsError, setLogsError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('members');
 
   const moderator = isModerator(session?.role);
@@ -48,15 +50,40 @@ export default function TeamModule() {
   const loadData = useCallback(async () => {
     if (!session) return;
     setLoadingData(true);
+    setDataError(null);
+    setLogsError(null);
     try {
-      const [m, l] = await Promise.all([teamApi.listMembers(), auditApi.listLogs(200)]);
-      setMembers(m.members);
-      setLogs(l.logs);
-      if (isModerator(session.role)) {
-        const inv = await teamApi.listInvitations();
-        setInvitations(inv.invitations);
+      const [membersResult, logsResult, invitationsResult] = await Promise.allSettled([
+        teamApi.listMembers(),
+        auditApi.listLogs(200),
+        isModerator(session.role) ? teamApi.listInvitations() : Promise.resolve(null),
+      ]);
+      const failures: string[] = [];
+
+      if (membersResult.status === 'fulfilled') {
+        setMembers(membersResult.value.members);
+      } else {
+        failures.push('los miembros');
       }
-    } catch { /* la sesión expirará vía useSession */ }
+
+      if (logsResult.status === 'fulfilled') {
+        setLogs(logsResult.value.logs);
+      } else {
+        setLogsError('No se pudo actualizar la actividad reciente.');
+      }
+
+      if (invitationsResult.status === 'fulfilled') {
+        if (invitationsResult.value) setInvitations(invitationsResult.value.invitations);
+      } else {
+        failures.push('las invitaciones');
+      }
+
+      if (failures.length > 0) {
+        setDataError(`No se pudieron cargar ${failures.join(' ni ')} del workspace.`);
+      }
+    } catch {
+      setDataError('No se pudieron cargar los datos del workspace.');
+    }
     finally { setLoadingData(false); }
   }, [session]);
 
@@ -65,7 +92,13 @@ export default function TeamModule() {
   // Recarga ligera solo del timeline (para eventos en vivo)
   const reloadLogs = useCallback(async () => {
     if (!session) return;
-    try { const l = await auditApi.listLogs(200); setLogs(l.logs); } catch { /* noop */ }
+    try {
+      const l = await auditApi.listLogs(200);
+      setLogs(l.logs);
+      setLogsError(null);
+    } catch {
+      setLogsError('No se pudo actualizar la actividad reciente.');
+    }
   }, [session]);
 
   // SSE: refresca el timeline cuando cualquier miembro ejecuta una acción
@@ -104,7 +137,7 @@ export default function TeamModule() {
           <WifiOff className="w-7 h-7 text-amber-500" />
         </div>
         <p className="text-slate-600 dark:text-slate-300 font-semibold">Workspace no disponible</p>
-        <p className="text-slate-400 dark:text-slate-500 text-sm max-w-sm">
+        <p className="text-slate-500 dark:text-slate-400 text-sm max-w-sm">
           No se pudo conectar al servicio multi-usuario. Verifica que la base de datos (MySQL/XAMPP) esté activa.
         </p>
         <button onClick={refresh} className="btn-outline px-4 py-2 flex items-center gap-2 text-sm">
@@ -125,7 +158,7 @@ export default function TeamModule() {
             <Briefcase className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
             <span className="truncate">{workspaceName}</span>
           </h2>
-          <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">Workspace</p>
+          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Workspace</p>
         </div>
       </div>
 
@@ -171,8 +204,10 @@ export default function TeamModule() {
 
       {header}
 
+      {dataError && <InlineError message={dataError} onRetry={loadData} />}
+
       {/* Tabs */}
-      <div className="card p-1 flex gap-1">
+      <div className="card p-1 grid grid-cols-2 gap-1" role="tablist" aria-label="Vistas del workspace">
         <TabButton
           active={tab === 'members'}
           onClick={() => setTab('members')}
@@ -190,7 +225,7 @@ export default function TeamModule() {
       </div>
 
       {loadingData && tab === 'members' && (
-        <div className="flex items-center gap-2 text-xs text-slate-400 dark:text-slate-500">
+        <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400" role="status">
           <Loader2 className="w-3.5 h-3.5 animate-spin" /> Cargando datos del workspace…
         </div>
       )}
@@ -218,8 +253,10 @@ export default function TeamModule() {
 
           <AuditTimeline logs={logs} live />
 
+          {logsError && <InlineError message={logsError} onRetry={reloadLogs} compact />}
+
           {!moderator && (
-            <p className="text-xs text-slate-400 dark:text-slate-500 text-center">
+            <p className="text-xs text-slate-500 dark:text-slate-400 text-center">
               Tienes una vista de solo lectura. Contacta a un moderador para gestionar el equipo.
             </p>
           )}
@@ -259,9 +296,9 @@ function PersonRow({ icon, tag, name, email, badge }: PersonRowProps) {
         {icon}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-2xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">{tag}</p>
+        <p className="text-2xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{tag}</p>
         <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate">{name}</p>
-        {email && <p className="text-xs font-mono text-slate-400 dark:text-slate-500 truncate">{email}</p>}
+        {email && <p className="text-xs font-mono text-slate-500 dark:text-slate-400 truncate">{email}</p>}
       </div>
       {badge}
     </div>
@@ -280,20 +317,43 @@ function TabButton({ active, onClick, icon, label, desc }: TabButtonProps) {
   return (
     <button
       onClick={onClick}
-      aria-pressed={active}
-      className={`flex-1 px-4 py-3 rounded-xl flex items-center gap-3 transition-all text-left
+      role="tab"
+      aria-selected={active}
+      className={`min-w-0 min-h-11 px-2 sm:px-4 py-2.5 sm:py-3 rounded-xl flex items-center gap-2 sm:gap-3 transition-colors text-left
         ${active
           ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20'
           : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
     >
-      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0
+      <div className={`hidden min-[360px]:flex w-8 h-8 rounded-lg items-center justify-center shrink-0
         ${active ? 'bg-white/15' : 'bg-slate-100 dark:bg-slate-700/60'}`}>
         {icon}
       </div>
       <div className="min-w-0">
         <p className="text-sm font-semibold leading-tight">{label}</p>
-        <p className={`text-2xs truncate ${active ? 'text-indigo-100' : 'text-slate-400 dark:text-slate-500'}`}>{desc}</p>
+        <p className={`hidden sm:block text-2xs truncate ${active ? 'text-indigo-100' : 'text-slate-500 dark:text-slate-400'}`}>{desc}</p>
       </div>
     </button>
+  );
+}
+
+function InlineError({
+  message,
+  onRetry,
+  compact = false,
+}: {
+  message: string;
+  onRetry: () => void | Promise<void>;
+  compact?: boolean;
+}) {
+  return (
+    <div
+      role="alert"
+      className={`flex flex-wrap items-center justify-between gap-3 border border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300 ${compact ? 'rounded-lg px-3 py-2 text-xs' : 'rounded-xl px-4 py-3 text-sm'}`}
+    >
+      <span>{message}</span>
+      <button type="button" onClick={onRetry} className="btn-ghost min-h-11 px-3 inline-flex items-center gap-2">
+        <RefreshCw className="w-4 h-4" /> Reintentar
+      </button>
+    </div>
   );
 }

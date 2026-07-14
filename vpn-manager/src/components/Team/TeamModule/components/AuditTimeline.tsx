@@ -128,8 +128,8 @@ export default function AuditTimeline({ logs, live }: AuditTimelineProps) {
 
       {logs.length === 0 ? (
         <div className="py-12 flex flex-col items-center text-center gap-2">
-          <Activity className="w-8 h-8 text-slate-300 dark:text-slate-600" />
-          <p className="text-slate-400 dark:text-slate-500 text-sm">Sin actividad registrada aún</p>
+          <Activity className="w-8 h-8 text-slate-500 dark:text-slate-600" />
+          <p className="text-slate-500 dark:text-slate-500 text-sm">Sin actividad registrada aún</p>
         </div>
       ) : (
         <>
@@ -148,7 +148,7 @@ export default function AuditTimeline({ logs, live }: AuditTimelineProps) {
                     <span className="text-slate-500 dark:text-slate-400">{label.toLowerCase()}</span>{' '}
                     {log.tunnel_id && <span className="font-mono text-slate-600 dark:text-slate-300">{log.tunnel_id}</span>}
                   </p>
-                  <p className="text-2xs text-slate-400 dark:text-slate-500 mt-0.5">
+                  <p className="text-2xs text-slate-500 dark:text-slate-500 mt-0.5">
                     {timeAgo(log.created_at)}
                     {log.ip_address && <span className="font-mono ml-2">· {log.ip_address}</span>}
                   </p>

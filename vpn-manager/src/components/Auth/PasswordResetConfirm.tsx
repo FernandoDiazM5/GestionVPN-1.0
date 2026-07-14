@@ -28,7 +28,7 @@ export default function PasswordResetConfirm({
 
   const mismatch = confirm.length > 0 && password !== confirm;
   const tooShort = password.length > 0 && password.length < 8;
-  const canSubmit = password.length >= 8 && !mismatch;
+  const canSubmit = password.length >= 8 && confirm.length > 0 && password === confirm;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,7 +45,7 @@ export default function PasswordResetConfirm({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-sky-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 flex items-center justify-center p-4">
+    <div className="relative min-h-[100svh] overflow-x-clip bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
       <div className="absolute top-0 left-0 w-96 h-96 bg-indigo-100 dark:bg-indigo-900/20 rounded-full -translate-x-1/2 -translate-y-1/2 opacity-60 blur-3xl pointer-events-none" />
       <div className="w-full max-w-md relative z-10">
         <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xl shadow-slate-200/80 dark:shadow-black/40 border border-slate-200 dark:border-slate-800 overflow-hidden">
@@ -64,7 +64,7 @@ export default function PasswordResetConfirm({
           {/* Body */}
           <div className="px-8 py-8 -mt-4 relative">
             {done ? (
-              <div className="space-y-4 text-center">
+              <div role="status" aria-live="polite" className="space-y-4 text-center">
                 <div className="w-16 h-16 mx-auto rounded-2xl bg-emerald-100 dark:bg-emerald-500/15 flex items-center justify-center">
                   <Check className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
                 </div>
@@ -72,7 +72,7 @@ export default function PasswordResetConfirm({
                 <p className="text-sm text-slate-500 dark:text-slate-400">
                   Ya puedes iniciar sesión con tu nueva clave.
                 </p>
-                <p className="text-2xs text-slate-400 dark:text-slate-500">Redirigiendo al login…</p>
+                <p className="text-2xs text-slate-500 dark:text-slate-500">Redirigiendo al login…</p>
               </div>
             ) : (
               <form onSubmit={submit} className="space-y-4">
@@ -81,35 +81,45 @@ export default function PasswordResetConfirm({
                 </p>
 
                 {error && (
-                  <div className="flex items-start gap-2 bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 rounded-xl px-3 py-2">
+                  <div id="password-reset-confirm-error" role="alert" aria-live="assertive" className="flex items-start gap-2 bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 rounded-xl px-3 py-2">
                     <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
                     <p className="text-xs text-rose-700 dark:text-rose-300">{error}</p>
                   </div>
                 )}
 
-                <div className="relative">
-                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
-                  <input type={showPwd ? 'text' : 'password'} required
-                    placeholder="Nueva contraseña (mín. 8)"
-                    value={password} onChange={e => setPassword(e.target.value)}
-                    autoFocus
-                    className="input-field pl-10 pr-10" />
-                  <button type="button" onClick={() => setShowPwd(s => !s)}
-                    aria-label={showPwd ? 'Ocultar' : 'Ver'}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-                    {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
+                <div>
+                  <label htmlFor="new-password" className="block text-xs font-semibold text-slate-500 mb-2">Nueva contraseña</label>
+                  <div className="relative">
+                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
+                    <input id="new-password" name="new-password" type={showPwd ? 'text' : 'password'} required
+                      minLength={8} maxLength={128} autoComplete="new-password"
+                      aria-invalid={tooShort || undefined}
+                      aria-describedby={`${tooShort ? 'new-password-help ' : ''}${error ? 'password-reset-confirm-error' : ''}`.trim() || undefined}
+                      placeholder="Nueva contraseña (mín. 8)"
+                      value={password} onChange={e => setPassword(e.target.value)}
+                      autoFocus className="input-field pl-10 pr-10" />
+                    <button type="button" onClick={() => setShowPwd(s => !s)}
+                      aria-label={showPwd ? 'Ocultar contraseñas' : 'Ver contraseñas'} aria-controls="new-password confirm-password"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                      {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
-                {tooShort && <p className="text-2xs text-amber-600 dark:text-amber-400">Mínimo 8 caracteres</p>}
+                {tooShort && <p id="new-password-help" aria-live="polite" className="text-2xs text-amber-600 dark:text-amber-400">Mínimo 8 caracteres</p>}
 
-                <div className="relative">
-                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
-                  <input type={showPwd ? 'text' : 'password'} required
-                    placeholder="Confirma la contraseña"
-                    value={confirm} onChange={e => setConfirm(e.target.value)}
-                    className="input-field pl-10" />
+                <div>
+                  <label htmlFor="confirm-password" className="block text-xs font-semibold text-slate-500 mb-2">Confirmar contraseña</label>
+                  <div className="relative">
+                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
+                    <input id="confirm-password" name="confirm-password" type={showPwd ? 'text' : 'password'} required
+                      minLength={8} maxLength={128} autoComplete="new-password"
+                      aria-invalid={mismatch || undefined} aria-describedby={mismatch ? 'confirm-password-help' : undefined}
+                      placeholder="Confirma la contraseña"
+                      value={confirm} onChange={e => setConfirm(e.target.value)}
+                      className="input-field pl-10" />
+                  </div>
                 </div>
-                {mismatch && <p className="text-2xs text-rose-600 dark:text-rose-400">Las contraseñas no coinciden</p>}
+                {mismatch && <p id="confirm-password-help" aria-live="polite" className="text-2xs text-rose-600 dark:text-rose-400">Las contraseñas no coinciden</p>}
 
                 <button type="submit" disabled={busy || !canSubmit}
                   className="btn-primary btn-md w-full flex items-center justify-center">
@@ -119,7 +129,7 @@ export default function PasswordResetConfirm({
             )}
 
             {!done && (
-              <button onClick={onBack} className="w-full mt-4 text-xs font-semibold text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center justify-center gap-1.5">
+              <button type="button" onClick={onBack} className="w-full mt-4 text-xs font-semibold text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center justify-center gap-1.5">
                 <ArrowLeft className="w-3.5 h-3.5" /> Cancelar
               </button>
             )}

@@ -1,4 +1,5 @@
 import { WifiOff, X } from 'lucide-react';
+import Dialog from '../../../../Common/Dialog';
 
 // Aviso cuando una operación de Monitor AP (sync, detalle de CPE/AP) se rechaza
 // con 409 TUNNEL_NOT_ACTIVE: el túnel del nodo no está activo, así que no hay
@@ -9,8 +10,11 @@ export function TunnelInactiveModal({ message, onClose, onGoActivate }: {
   onGoActivate: () => void;
 }) {
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-panel modal-panel-sm" onClick={e => e.stopPropagation()}>
+    <Dialog
+      title="Túnel del nodo inactivo"
+      onClose={onClose}
+      panelClassName="modal-panel modal-panel-sm"
+    >
         <div className="modal-header">
           <h3 className="flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
             <WifiOff className="w-4 h-4 text-amber-500" /> Túnel del nodo inactivo
@@ -22,7 +26,7 @@ export function TunnelInactiveModal({ message, onClose, onGoActivate }: {
 
         <div className="modal-body">
           <p className="text-sm text-slate-600 dark:text-slate-300">{message}</p>
-          <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">
+          <p className="text-xs text-slate-500 dark:text-slate-500 mt-2">
             El monitoreo de los equipos requiere el túnel del nodo activo (la ruta hacia su LAN).
           </p>
         </div>
@@ -31,8 +35,7 @@ export function TunnelInactiveModal({ message, onClose, onGoActivate }: {
           <button onClick={onClose} className="btn-outline btn-sm">Cerrar</button>
           <button onClick={onGoActivate} className="btn-primary btn-sm">Ir a activar el túnel</button>
         </div>
-      </div>
-    </div>
+    </Dialog>
   );
 }
 

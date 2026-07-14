@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import QRCode from 'qrcode';
 import { UserCircle, Waypoints, Shield, Download, Copy, Check, Smartphone, KeyRound } from 'lucide-react';
 import Spinner from '../../../Common/Spinner';
 import { teamApi } from '../../../../services/teamApi';
@@ -56,8 +55,17 @@ export default function MemberProfile({ session }: Props) {
   useEffect(() => {
     // QR solo del .conf completo; una plantilla con placeholder no es escaneable.
     if (!wg?.conf) { setQr(null); return; }
-    QRCode.toDataURL(wg.conf, { margin: 1, width: 220 }).then(setQr).catch(() => setQr(null));
-  }, [wg]);
+    let cancelled = false;
+    const conf = wg.conf;
+    setQr(null);
+
+    void import('qrcode')
+      .then(({ default: QRCode }) => QRCode.toDataURL(conf, { margin: 1, width: 220 }))
+      .then(dataUrl => { if (!cancelled) setQr(dataUrl); })
+      .catch(() => { if (!cancelled) setQr(null); });
+
+    return () => { cancelled = true; };
+  }, [wg?.conf]);
 
   const copyConf = () => {
     if (!confText) return;
@@ -80,7 +88,7 @@ export default function MemberProfile({ session }: Props) {
           <UserCircle className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
           <span>Mi perfil</span>
         </h2>
-        <p className="text-slate-400 dark:text-slate-500 text-sm mt-1 font-mono">{session.email}</p>
+        <p className="text-slate-500 dark:text-slate-500 text-sm mt-1 font-mono">{session.email}</p>
       </div>
 
       {loading ? (
@@ -99,7 +107,7 @@ export default function MemberProfile({ session }: Props) {
                   <Waypoints className="w-6 h-6 text-slate-300 dark:text-slate-600" />
                 </div>
                 <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Sin túneles asignados</p>
-                <p className="text-2xs text-slate-400 dark:text-slate-500 max-w-xs">Tu moderador aún no te asignó túneles. Cuando lo haga, aparecerán aquí con su acceso.</p>
+                <p className="text-2xs text-slate-500 dark:text-slate-500 max-w-xs">Tu moderador aún no te asignó túneles. Cuando lo haga, aparecerán aquí con su acceso.</p>
               </div>
             ) : (
               <ul className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -126,7 +134,7 @@ export default function MemberProfile({ session }: Props) {
                     <div className="flex flex-col items-center gap-2">
                       {/* QR siempre blanco — la cámara debe leerlo igual en dark. */}
                       <img src={qr} alt="QR WireGuard" className="rounded-lg bg-white dark:bg-white p-1" width={200} height={200} />
-                      <p className="flex items-center gap-1.5 text-2xs text-slate-400 dark:text-slate-500">
+                      <p className="flex items-center gap-1.5 text-2xs text-slate-500 dark:text-slate-500">
                         <Smartphone className="w-3 h-3" /> Escanea desde la app WireGuard del móvil
                       </p>
                     </div>
@@ -152,7 +160,7 @@ export default function MemberProfile({ session }: Props) {
                   </div>
                 </div>
               ) : (
-                <p className="text-center text-sm text-slate-400 dark:text-slate-500 py-4">
+                <p className="text-center text-sm text-slate-500 dark:text-slate-500 py-4">
                   Aún no tienes acceso WireGuard. Pídele a tu moderador que lo genere o acepta una invitación con tu clave pública.
                 </p>
               )}

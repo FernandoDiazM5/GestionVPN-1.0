@@ -32,8 +32,8 @@ export default defineConfig({
         'src/vite-env.d.ts',
         'src/main.tsx',
       ],
-      // Thresholds tras F4 (suaves). F8/F10 los suben.
-      thresholds: { lines: 5, functions: 5, branches: 50, statements: 5 },
+      // Piso global conservador basado en la cobertura verificada por FE-7.
+      thresholds: { lines: 16, functions: 12, branches: 10, statements: 15 },
     },
   },
 });

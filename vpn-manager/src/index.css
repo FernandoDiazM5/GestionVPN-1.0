@@ -82,6 +82,10 @@
 }
 
 @layer utilities {
+  .table-row-auto {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 48px;
+  }
   /* Escala de texto — respeta limites de DESIGN_SYSTEM.md.
      `text-2xs` (11px) reservado para micro-badges de estado.
      `text-3xs` (9px) — RESERVADO EXCLUSIVAMENTE para etiquetas
@@ -259,12 +263,10 @@
      .modal-body:    padding y scroll vertical si excede.
 
      Patrón de uso:
-       <div className="modal-overlay" onClick={onClose}>
-         <div className="modal-panel" onClick={e => e.stopPropagation()}>
-           <div className="modal-header">…</div>
-           <div className="modal-body">…</div>
-         </div>
-       </div>
+       <Dialog title="Título" onClose={onClose} panelClassName="modal-panel">
+         <div className="modal-header">…</div>
+         <div className="modal-body">…</div>
+       </Dialog>
   */
   .modal-overlay {
     @apply fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm

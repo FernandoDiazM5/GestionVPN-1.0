@@ -33,12 +33,12 @@ export default function ModalHeader({ dev, copiedIp, copyIp, onClose }: ModalHea
             {familyBadge}
           </div>
           <div className={headerStyles.subtitle}>
-            <p className="text-2xs text-slate-400 dark:text-slate-500 font-mono">{dev.ip}</p>
+            <p className="text-2xs text-slate-500 dark:text-slate-500 font-mono">{dev.ip}</p>
             <button onClick={copyIp} aria-label="Copiar IP" className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-white/10 transition-colors">
               {copiedIp ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
             </button>
             <span className="text-2xs text-slate-400">·</span>
-            <p className="text-2xs text-slate-400 dark:text-slate-500 font-mono truncate max-w-[200px]">{s?.deviceModel ?? dev.model ?? '—'}</p>
+            <p className="text-2xs text-slate-500 dark:text-slate-500 font-mono truncate max-w-[200px]">{s?.deviceModel ?? dev.model ?? '—'}</p>
           </div>
         </div>
       </div>

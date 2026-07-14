@@ -90,7 +90,7 @@ export default function UserManagementPanel({ embedded = false }: UserManagement
               <Users className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
               <span>Gestión de Usuarios</span>
             </h2>
-            <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">
+            <p className="text-slate-500 dark:text-slate-500 text-sm mt-1">
               Administra el acceso de los administradores a la red y monitorea su actividad
             </p>
           </div>

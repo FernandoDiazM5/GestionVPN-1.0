@@ -49,7 +49,7 @@ export default function ModeratorSettingsModule() {
           </div>
           <div>
             <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">Ajustes</h2>
-            <p className="text-slate-400 dark:text-slate-500 text-sm">
+            <p className="text-slate-500 dark:text-slate-500 text-sm">
               {isMember
                 ? 'Gestiona tu perfil y vincula Telegram para activar túneles desde el bot'
                 : 'Gestiona tu perfil, el workspace y los respaldos'}
@@ -78,7 +78,7 @@ export default function ModeratorSettingsModule() {
                 <Icon className="w-4 h-4 shrink-0" />
                 <div className="min-w-0">
                   <div className="text-sm font-semibold truncate">{t.label}</div>
-                  <div className={`text-2xs truncate ${active ? 'text-indigo-100' : 'text-slate-400 dark:text-slate-500'}`}>
+                  <div className={`text-2xs truncate ${active ? 'text-indigo-100' : 'text-slate-500 dark:text-slate-500'}`}>
                     {t.description}
                   </div>
                 </div>

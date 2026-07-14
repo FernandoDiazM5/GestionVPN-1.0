@@ -88,7 +88,7 @@ export default function MembersTable({
                           {m.name || m.email.split('@')[0]}
                           {isSelf && <span className="ml-1.5 text-2xs font-medium text-slate-500 dark:text-slate-400">(tú)</span>}
                         </p>
-                        <p className="font-mono text-2xs text-slate-400 dark:text-slate-500 truncate">{m.email}</p>
+                        <p className="font-mono text-2xs text-slate-500 dark:text-slate-500 truncate">{m.email}</p>
                       </div>
                     </div>
                   </td>
@@ -165,7 +165,7 @@ export default function MembersTable({
                       )}
 
                       {(ownerRow || isSelf) && !busy && (
-                        <span className="text-2xs text-slate-300 dark:text-slate-600">{isOwner(m.role) ? 'Propietario' : '—'}</span>
+                        <span className="text-2xs text-slate-500 dark:text-slate-600">{isOwner(m.role) ? 'Propietario' : '—'}</span>
                       )}
                     </div>
                   </td>

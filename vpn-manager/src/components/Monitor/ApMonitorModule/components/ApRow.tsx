@@ -92,7 +92,7 @@ const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCol
           <div className="text-right pr-2">
             {txPower != null
               ? <span className="text-xs font-mono font-bold text-indigo-600">{txPower} dBm</span>
-              : <span className="text-slate-400 dark:text-slate-500 text-xs">—</span>}
+              : <span className="text-slate-500 dark:text-slate-500 text-xs">—</span>}
           </div>
         )}
 
@@ -122,7 +122,7 @@ const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCol
               {isHistorical && <span className="text-3xs opacity-60">*</span>}
             </span>
           ) : (
-            <span className="text-slate-400 dark:text-slate-500 text-xs">—</span>
+            <span className="text-slate-500 dark:text-slate-500 text-xs">—</span>
           )}
         </div>
 

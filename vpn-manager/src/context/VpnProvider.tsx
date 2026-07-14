@@ -1,7 +1,7 @@
-import React, { useEffect, useContext } from 'react';
+import React, { useCallback, useEffect, useContext } from 'react';
 import { VpnContext } from './VpnContext';
 import { dbService } from '../store/db';
-import { accountApi } from '../services/accountApi';
+import { useSession } from '../hooks/useSession';
 import {
   useAuth,
   useNodeManagement,
@@ -20,7 +20,13 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
   const nodes = useNodeManagement();
   const navigation = useModuleNavigation();
   const theme = useDarkMode();
-  const { handleLoginSuccess, setIsReady } = auth;
+  const {
+    session: restoredWorkspaceSession,
+    loading: workspaceSessionLoading,
+    refresh: refreshWorkspaceSession,
+    clear: clearWorkspaceSession,
+  } = useSession({ autoLoad: false });
+  const { handleLoginSuccess: authenticate, setIsReady } = auth;
   const {
     setNodes, setActiveNodeVrf, setTunnelExpiry, deactivateAllNodes, tunnelExpiry,
   } = nodes;
@@ -31,7 +37,7 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
       try {
         const [store, session] = await Promise.allSettled([
           dbService.getStore(),
-          accountApi.me(),
+          refreshWorkspaceSession(),
         ]);
         const localState = store.status === 'fulfilled' ? store.value : {};
         if (localState.nodes?.length) {
@@ -43,9 +49,9 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
             setTunnelExpiry(localState.tunnelExpiry);
           }
         }
-        if (session.status === 'fulfilled') {
-          const user = session.value.user;
-          await handleLoginSuccess({
+        if (session.status === 'fulfilled' && session.value) {
+          const user = session.value;
+          await authenticate({
             user: user.email,
             role: user.role === 'MEMBER' ? 'viewer' : 'admin',
           });
@@ -57,7 +63,7 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
       }
     };
     initApp();
-  }, [handleLoginSuccess, setActiveNodeVrf, setIsReady, setNodes, setTunnelExpiry]);
+  }, [authenticate, refreshWorkspaceSession, setActiveNodeVrf, setIsReady, setNodes, setTunnelExpiry]);
 
   // Hooks de sincronización y mantenimiento
   useTunnelSync(
@@ -86,6 +92,11 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
     }
   }, [auth.credentials, auth.isReady, deactivateAllNodes, tunnelExpiry]);
 
+  const handleLoginSuccess = useCallback(async (creds: Parameters<typeof authenticate>[0]) => {
+    await authenticate(creds);
+    await refreshWorkspaceSession();
+  }, [authenticate, refreshWorkspaceSession]);
+
   // Logout completo
   const handleLogout = async () => {
     if (nodes.activeNodeVrf) {
@@ -94,6 +105,7 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
     nodes.setNodes([]);
     nodes.setActiveNodeVrf(null);
     nodes.setTunnelExpiry(null);
+    clearWorkspaceSession();
     await auth.handleLogout();
   };
 
@@ -102,8 +114,11 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
     isAuthenticated: auth.isAuthenticated,
     credentials: auth.credentials,
     isReady: auth.isReady,
-    handleLoginSuccess: auth.handleLoginSuccess,
+    handleLoginSuccess,
     handleLogout,
+    workspaceSession: restoredWorkspaceSession,
+    workspaceSessionLoading,
+    refreshWorkspaceSession,
 
     // Nodos
     nodes: nodes.nodes,

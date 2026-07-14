@@ -11,6 +11,7 @@ import { generateSecurePassword, getSubnetConflicts } from '../utils';
 import { ProvisionSteps } from '../components';
 import type { NodeInfo } from '../../../../types/api';
 import type { ProvisionResult } from '../types';
+import Dialog from '../../../Common/Dialog';
 
 interface EditarNodoProps {
   node: NodeInfo;
@@ -175,9 +176,13 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
   };
 
   return (
-    <div className="modal-overlay"
-      onClick={e => e.target === e.currentTarget && !saving && !result && onClose()}>
-      <div className="modal-panel modal-panel-xl">
+    <Dialog
+      title={`Editar nodo ${node.nombre_nodo}`}
+      onClose={onClose}
+      closeOnBackdrop={!saving && !result}
+      closeOnEscape={!saving && !result}
+      panelClassName="modal-panel modal-panel-xl"
+    >
 
         <div className="modal-header-decorated modal-header-indigo">
           <div className="flex items-center gap-3">
@@ -430,7 +435,6 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
             </button>
           </div>
         )}
-      </div>
-    </div>
+    </Dialog>
   );
 }

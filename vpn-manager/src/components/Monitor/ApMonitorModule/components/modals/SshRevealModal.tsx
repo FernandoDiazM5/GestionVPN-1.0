@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { KeyRound, Eye, EyeOff, Copy, X } from 'lucide-react';
+import Dialog from '../../../../Common/Dialog';
 
 // Muestra la credencial SSH guardada del AP (la que autenticó la antena),
 // pedida bajo clic explícito a /api/ap-monitor/reveal-ssh. La contraseña arranca
@@ -12,8 +13,11 @@ export function SshRevealModal({ data, onClose }: {
   const copy = (text: string) => { navigator.clipboard?.writeText(text).catch(() => { /* noop */ }); };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-panel modal-panel-sm" onClick={e => e.stopPropagation()}>
+    <Dialog
+      title="Clave SSH del AP"
+      onClose={onClose}
+      panelClassName="modal-panel modal-panel-sm"
+    >
         <div className="modal-header">
           <div className="min-w-0">
             <h3 className="flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
@@ -55,8 +59,7 @@ export function SshRevealModal({ data, onClose }: {
         <div className="modal-footer">
           <button onClick={onClose} className="btn-outline btn-sm">Cerrar</button>
         </div>
-      </div>
-    </div>
+    </Dialog>
   );
 }
 

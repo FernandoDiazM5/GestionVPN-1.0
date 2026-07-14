@@ -1,13 +1,18 @@
 import type { RouterCredentials } from '../store/db';
 import type { NodeInfo } from '../types/api';
+import type { SessionUser } from '../types/account';
+import type { ActiveModule } from './hooks/useModuleNavigation';
 
 export interface VpnContextType {
   // Auth
   isAuthenticated: boolean;
   credentials: RouterCredentials | undefined;
   isReady: boolean;
-  handleLoginSuccess: (creds: RouterCredentials) => void;
+  handleLoginSuccess: (creds: RouterCredentials) => Promise<void>;
   handleLogout: () => Promise<void>;
+  workspaceSession: SessionUser | null;
+  workspaceSessionLoading: boolean;
+  refreshWorkspaceSession: () => Promise<SessionUser | null>;
 
   // VPNs gestionados
   // Estado del escáner (lifted para persistir entre cambios de tab)
@@ -22,8 +27,8 @@ export interface VpnContextType {
   removeNodeFromState: (pppUser: string) => void;
 
   // Navegación
-  activeModule: 'dashboard' | 'moderators' | 'nodes' | 'users' | 'team' | 'devices' | 'monitor' | 'settings';
-  setActiveModule: React.Dispatch<React.SetStateAction<'dashboard' | 'moderators' | 'nodes' | 'users' | 'team' | 'devices' | 'monitor' | 'settings'>>;
+  activeModule: ActiveModule;
+  setActiveModule: (module: ActiveModule) => void;
 
   // Tema
   darkMode: boolean;

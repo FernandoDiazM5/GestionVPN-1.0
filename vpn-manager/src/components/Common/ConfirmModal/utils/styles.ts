@@ -4,8 +4,6 @@
 // backdrop, dark mode, focus ring y active:scale de las clases del sistema.
 export const confirmModalStyles = {
   container: 'modal-overlay',
-  // Click-catcher transparente: el fondo/blur lo pinta .modal-overlay.
-  backdrop: 'absolute inset-0',
   modal: 'modal-panel modal-panel-sm relative p-6',
   closeButton: 'absolute top-4 right-4 btn-ghost btn-icon',
   headerContainer: 'flex items-center space-x-3 mb-4',

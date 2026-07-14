@@ -14,7 +14,6 @@ ConfirmModal/
 ├── constants.ts              # Constants (labels)
 ├── components/
 │   ├── CloseButton.tsx       # Close button (X)
-│   ├── ModalBackdrop.tsx     # Backdrop with blur effect
 │   ├── ModalHeader.tsx       # Header with icon and title
 │   ├── ModalContent.tsx      # Message text
 │   └── ModalFooter.tsx       # Cancel and Confirm buttons
@@ -70,7 +69,7 @@ interface ConfirmModalProps {
 
 - **Dark Mode**: Full Tailwind dark mode support with `dark:` utilities
 - **Animations**: Smooth fade-in and zoom-in animations
-- **Keyboard Friendly**: Close button and clickable backdrop
+- **Keyboard Friendly**: Focus trap, Escape, focus restoration and clickable backdrop
 - **Responsive**: Works on all screen sizes with padding and max-width constraints
 - **Accessible**: Semantic button roles, clear visual hierarchy
 
@@ -78,11 +77,6 @@ interface ConfirmModalProps {
 
 ### CloseButton
 - Simple X button to close the modal
-- Props: `onClick`
-
-### ModalBackdrop
-- Dark semi-transparent backdrop with blur effect
-- Clickable to cancel (dismissible)
 - Props: `onClick`
 
 ### ModalHeader
@@ -102,7 +96,6 @@ interface ConfirmModalProps {
 All styles are defined in `utils/styles.ts` using Tailwind CSS classes. Key style objects:
 
 - `container`: Outer wrapper with fixed positioning
-- `backdrop`: Dark overlay with blur
 - `modal`: Main modal box with shadows and animations
 - `headerContainer`: Flex layout for title and icon
 - `footer`: Grid layout for buttons

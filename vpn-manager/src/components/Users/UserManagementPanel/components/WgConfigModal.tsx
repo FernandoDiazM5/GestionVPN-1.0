@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { X, Copy, Download, Loader2, AlertCircle, ShieldCheck } from 'lucide-react';
 import { teamApi } from '../../../../services/teamApi';
 import type { WgPeer } from '../../../../types/api';
+import Dialog from '../../../Common/Dialog';
 
 /**
  * Modal que muestra la configuración WireGuard COMPLETA de un peer
@@ -52,9 +53,11 @@ export default function WgConfigModal({ peer, onClose }: { peer: WgPeer; onClose
   };
 
   return (
-    <div className="modal-overlay"
-      onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal-panel modal-panel-xl">
+    <Dialog
+      title="Configuración WireGuard"
+      onClose={onClose}
+      panelClassName="modal-panel modal-panel-xl"
+    >
         {/* Header — usa gradient indigo-600→800 intencional para destacar
             del modal-header-indigo (color sólido) que tienen otros modales.
             Mantiene .modal-header-decorated para layout y .modal-header-close. */}
@@ -117,7 +120,6 @@ export default function WgConfigModal({ peer, onClose }: { peer: WgPeer; onClose
             <Copy className="w-3.5 h-3.5" /> {copied ? '¡Copiado!' : 'Copiar configuración'}
           </button>
         </div>
-      </div>
-    </div>
+    </Dialog>
   );
 }

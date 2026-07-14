@@ -39,15 +39,15 @@ function ScanControlsImpl({
             <Radio className="w-4 h-4 text-emerald-500 shrink-0" />
             <div className="min-w-0">
               <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{activeNode.nombre_nodo}</p>
-              <p className="text-2xs font-mono text-slate-400 dark:text-slate-500 truncate">{activeNode.nombre_vrf}</p>
+              <p className="text-2xs font-mono text-slate-500 dark:text-slate-500 truncate">{activeNode.nombre_vrf}</p>
             </div>
           </div>
 
           <div>
-            <label className="text-2xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-1.5">
+            <label className="text-2xs font-bold text-slate-500 dark:text-slate-500 uppercase tracking-wider block mb-1.5">
               Subred LAN a escanear
               {availableSubnets.length > 1 && (
-                <span className="ml-1.5 normal-case font-normal text-slate-400 dark:text-slate-500">({availableSubnets.length} disponibles)</span>
+                <span className="ml-1.5 normal-case font-normal text-slate-500 dark:text-slate-500">({availableSubnets.length} disponibles)</span>
               )}
             </label>
             {availableSubnets.length > 1 ? (
@@ -75,7 +75,7 @@ function ScanControlsImpl({
         </div>
       ) : (
         <div>
-          <label className="text-2xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-1.5">
+          <label className="text-2xs font-bold text-slate-500 dark:text-slate-500 uppercase tracking-wider block mb-1.5">
             Subred LAN (CIDR) — manual
           </label>
           <input
@@ -84,7 +84,7 @@ function ScanControlsImpl({
             placeholder="ej: 10.5.5.0/24"
             className="input-field w-full text-sm font-mono"
           />
-          <p className="text-2xs text-slate-400 dark:text-slate-500 mt-1">Activa un túnel en la pestaña Nodos para autocompletar la subred.</p>
+          <p className="text-2xs text-slate-500 dark:text-slate-500 mt-1">Activa un túnel en la pestaña Nodos para autocompletar la subred.</p>
         </div>
       )}
 

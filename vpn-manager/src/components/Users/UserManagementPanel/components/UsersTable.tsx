@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Search, X, ArrowUpDown, ArrowUp, ArrowDown, Copy, Check, Pencil, Loader2,
-  Users, SlidersHorizontal, Mail, Key, Tag, Plus,
+  Users, SlidersHorizontal, Mail, Key, Tag, Plus, ChevronLeft, ChevronRight, AlertCircle,
 } from 'lucide-react';
 import type { WgPeer } from '../../../../types/api';
 import { formatLastHandshake } from '../utils';
@@ -33,6 +33,7 @@ const COLUMNS: ColumnDef[] = [
 ];
 
 const LS_VISIBLE_COLS = 'vpn_users_visible_cols';
+const PAGE_SIZE = 50;
 
 function loadVisibleCols(): Set<ColId> {
   // Default: todo lo no-defaultHidden.
@@ -54,6 +55,38 @@ function loadVisibleCols(): Set<ColId> {
 type SortKey = 'active' | 'name' | 'alias' | 'email' | 'allowedAddress' | 'lastHandshakeSecs';
 type SortDir = 'asc' | 'desc';
 type StatusFilter = 'all' | 'active' | 'inactive';
+
+interface SortableHeaderProps {
+  label: string;
+  columnKey: SortKey;
+  activeKey: SortKey;
+  direction: SortDir;
+  onSort: (key: SortKey) => void;
+}
+
+function SortableHeader({ label, columnKey, activeKey, direction, onSort }: SortableHeaderProps) {
+  const active = activeKey === columnKey;
+  const nextDirection = active && direction === 'asc' ? 'descendente' : 'ascendente';
+
+  return (
+    <th
+      className="th-cell !p-0 group transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
+      aria-sort={active ? (direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(columnKey)}
+        aria-label={`Ordenar por ${label} ${nextDirection}`}
+        className="flex min-h-11 w-full items-center px-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500"
+      >
+        {label}
+        {!active && <ArrowUpDown aria-hidden="true" className="ml-1 h-3 w-3 text-slate-500 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 dark:text-slate-500" />}
+        {active && direction === 'asc' && <ArrowUp aria-hidden="true" className="ml-1 h-3 w-3 text-indigo-500" />}
+        {active && direction === 'desc' && <ArrowDown aria-hidden="true" className="ml-1 h-3 w-3 text-indigo-500" />}
+      </button>
+    </th>
+  );
+}
 
 interface UsersTableProps {
   peers: WgPeer[];
@@ -98,6 +131,7 @@ export default function UsersTable({
   const [status, setStatus] = useState<StatusFilter>('all');
   const [sortKey, setSortKey] = useState<SortKey>('active');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [page, setPage] = useState(1);
 
   // ── Columnas visibles (persistido) ────────────────────────────
   const [visibleCols, setVisibleCols] = useState<Set<ColId>>(loadVisibleCols);
@@ -117,11 +151,23 @@ export default function UsersTable({
         setShowColPicker(false);
       }
     };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      setShowColPicker(false);
+      colPickerRef.current?.querySelector<HTMLButtonElement>('[aria-expanded]')?.focus();
+    };
+    const focusFrame = requestAnimationFrame(() => {
+      colPickerRef.current?.querySelector<HTMLInputElement>('input[type="checkbox"]:not([disabled])')?.focus();
+    });
     document.addEventListener('mousedown', onClick);
     document.addEventListener('touchstart', onClick, { passive: true });
+    document.addEventListener('keydown', onKeyDown);
     return () => {
+      cancelAnimationFrame(focusFrame);
       document.removeEventListener('mousedown', onClick);
       document.removeEventListener('touchstart', onClick);
+      document.removeEventListener('keydown', onKeyDown);
     };
   }, [showColPicker]);
 
@@ -169,14 +215,18 @@ export default function UsersTable({
     });
   }, [peers, search, status, sortKey, sortDir]);
 
+  useEffect(() => { setPage(1); }, [search, status, sortKey, sortDir, peers.length]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedPeers = useMemo(
+    () => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [currentPage, filtered],
+  );
+
   const activeCount = peers.filter(p => p.active).length;
 
   // ── Helpers ───────────────────────────────────────────────────
-  const SortIcon = ({ k }: { k: SortKey }) => {
-    if (sortKey !== k) return <ArrowUpDown className="w-3 h-3 text-slate-400 dark:text-slate-500 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />;
-    return sortDir === 'asc' ? <ArrowUp className="w-3 h-3 text-indigo-500 ml-1" /> : <ArrowDown className="w-3 h-3 text-indigo-500 ml-1" />;
-  };
-
   const statusChips: { key: StatusFilter; label: string }[] = [
     { key: 'all',      label: 'Todos' },
     { key: 'active',   label: 'Activos' },
@@ -189,9 +239,9 @@ export default function UsersTable({
   const totalCols = visibleCount + 2;
 
   return (
-    <div className="card overflow-hidden border border-slate-200">
+    <div className="card max-w-full min-w-0 overflow-hidden border border-slate-200">
       {/* Toolbar: búsqueda + filtros + selector de columnas */}
-      <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50/50 to-white dark:border-slate-800 dark:from-slate-800/30 dark:to-slate-900 flex flex-col sm:flex-row sm:items-center gap-3">
+      <div className="flex flex-col gap-3 border-b border-slate-100 bg-gradient-to-r from-slate-50/50 to-white px-4 py-4 sm:flex-row sm:items-center sm:px-6 dark:border-slate-800 dark:from-slate-800/30 dark:to-slate-900">
         <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
@@ -204,16 +254,16 @@ export default function UsersTable({
                        placeholder:text-slate-400 text-slate-700 transition-all"
           />
           {search && (
-            <button onClick={() => setSearch('')} title="Limpiar búsqueda" aria-label="Limpiar búsqueda"
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 hover:text-slate-600 transition-colors p-1">
+            <button type="button" onClick={() => setSearch('')} title="Limpiar búsqueda" aria-label="Limpiar búsqueda"
+              className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center text-slate-500 transition-colors hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 dark:text-slate-400">
               <X className="w-4 h-4" />
             </button>
           )}
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex w-full max-w-full shrink-0 items-center gap-1.5 overflow-x-auto overscroll-x-contain pb-1 sm:w-auto sm:pb-0">
           {statusChips.map(c => (
-            <button key={c.key} onClick={() => setStatus(c.key)}
-              className={`px-3 py-2 rounded-lg text-xs font-bold border transition-all
+            <button type="button" key={c.key} onClick={() => setStatus(c.key)} aria-pressed={status === c.key}
+              className={`min-h-11 shrink-0 px-3 py-2 rounded-lg text-xs font-bold border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500
                 ${status === c.key
                   ? 'bg-indigo-50 border-indigo-300 text-indigo-700 dark:bg-indigo-500/15 dark:border-indigo-500/40 dark:text-indigo-300'
                   : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-200 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400 dark:hover:border-indigo-500/40'}`}>
@@ -224,11 +274,13 @@ export default function UsersTable({
           {/* Selector de columnas */}
           <div className="relative" ref={colPickerRef}>
             <button
+              type="button"
               onClick={() => setShowColPicker(v => !v)}
               title="Columnas visibles"
               aria-label="Columnas visibles"
+              aria-haspopup="true"
               aria-expanded={showColPicker}
-              className={`px-3 py-2 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5
+              className={`min-h-11 shrink-0 px-3 py-2 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500
                 ${showColPicker
                   ? 'bg-indigo-50 border-indigo-300 text-indigo-700 dark:bg-indigo-500/15 dark:border-indigo-500/40 dark:text-indigo-300'
                   : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-200 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400 dark:hover:border-indigo-500/40'}`}>
@@ -236,7 +288,7 @@ export default function UsersTable({
               <span>Columnas</span>
             </button>
             {showColPicker && (
-              <div className="absolute right-0 top-full mt-2 w-56 z-30 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg shadow-slate-900/10 dark:shadow-black/40 overflow-hidden">
+              <div role="group" aria-label="Mostrar columnas" className="absolute right-0 top-full mt-2 w-56 max-w-[calc(100vw-2rem)] z-30 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg shadow-slate-900/10 dark:shadow-black/40 overflow-hidden">
                 <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 text-2xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                   Mostrar columnas
                 </div>
@@ -246,9 +298,9 @@ export default function UsersTable({
                     const disabled = !!c.required;
                     return (
                       <li key={c.id}>
-                        <label className={`flex items-center gap-2.5 px-3 py-2 text-xs cursor-pointer transition-colors
+                        <label className={`flex min-h-11 items-center gap-2.5 px-3 py-2 text-xs cursor-pointer transition-colors
                           ${disabled
-                            ? 'text-slate-400 dark:text-slate-500 cursor-not-allowed'
+                            ? 'text-slate-500 dark:text-slate-500 cursor-not-allowed'
                             : 'text-slate-600 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-slate-700/50'}`}>
                           <input
                             type="checkbox"
@@ -258,7 +310,7 @@ export default function UsersTable({
                             className="accent-indigo-600"
                           />
                           <span className="flex-1 font-semibold">{c.label}</span>
-                          {disabled && <span className="text-2xs uppercase tracking-wider text-slate-400 dark:text-slate-500">fija</span>}
+                          {disabled && <span className="text-2xs uppercase tracking-wider text-slate-500 dark:text-slate-500">fija</span>}
                         </label>
                       </li>
                     );
@@ -271,35 +323,30 @@ export default function UsersTable({
       </div>
 
       {/* Tabla */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs">
+      <div
+        className="max-w-full overflow-x-auto overscroll-x-contain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-400"
+        role="region"
+        aria-label="Usuarios WireGuard. Desplaza horizontalmente para ver todas las columnas."
+        tabIndex={0}
+      >
+        <table className="w-full min-w-[900px] text-xs">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50 select-none dark:border-slate-800 dark:bg-slate-800/50">
               <th className="th-cell w-10" aria-label="Color" />
               {isVisible('status') && (
-                <th className="th-cell cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 group transition-colors" onClick={() => handleSort('active')}>
-                  <div className="flex items-center">Estado <SortIcon k="active" /></div>
-                </th>
+                <SortableHeader label="Estado" columnKey="active" activeKey={sortKey} direction={sortDir} onSort={handleSort} />
               )}
               {isVisible('name') && (
-                <th className="th-cell cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 group transition-colors" onClick={() => handleSort('name')}>
-                  <div className="flex items-center">Usuario <SortIcon k="name" /></div>
-                </th>
+                <SortableHeader label="Usuario" columnKey="name" activeKey={sortKey} direction={sortDir} onSort={handleSort} />
               )}
               {isVisible('alias') && (
-                <th className="th-cell cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 group transition-colors" onClick={() => handleSort('alias')}>
-                  <div className="flex items-center">Alias <SortIcon k="alias" /></div>
-                </th>
+                <SortableHeader label="Alias" columnKey="alias" activeKey={sortKey} direction={sortDir} onSort={handleSort} />
               )}
               {isVisible('email') && (
-                <th className="th-cell cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 group transition-colors" onClick={() => handleSort('email')}>
-                  <div className="flex items-center">Email <SortIcon k="email" /></div>
-                </th>
+                <SortableHeader label="Email" columnKey="email" activeKey={sortKey} direction={sortDir} onSort={handleSort} />
               )}
               {isVisible('address') && (
-                <th className="th-cell cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 group transition-colors" onClick={() => handleSort('allowedAddress')}>
-                  <div className="flex items-center">IP <SortIcon k="allowedAddress" /></div>
-                </th>
+                <SortableHeader label="IP" columnKey="allowedAddress" activeKey={sortKey} direction={sortDir} onSort={handleSort} />
               )}
               {isVisible('protocol') && (
                 <th className="th-cell">Protocolo</th>
@@ -308,9 +355,7 @@ export default function UsersTable({
                 <th className="th-cell">Clave pública</th>
               )}
               {isVisible('lastSeen') && (
-                <th className="th-cell cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 group transition-colors" onClick={() => handleSort('lastHandshakeSecs')}>
-                  <div className="flex items-center">Último acceso <SortIcon k="lastHandshakeSecs" /></div>
-                </th>
+                <SortableHeader label="Último acceso" columnKey="lastHandshakeSecs" activeKey={sortKey} direction={sortDir} onSort={handleSort} />
               )}
               <th className="th-cell text-right">Acciones</th>
             </tr>
@@ -325,10 +370,10 @@ export default function UsersTable({
                 <td className="px-4 py-3"><div className="skeleton h-7 w-20 ml-auto" /></td>
               </tr>
             ))}
-            {filtered.map(peer => {
+            {pagedPeers.map(peer => {
               const color = peerColors[peer.allowedAddress];
               return (
-                <tr key={peer.id} className="hover:bg-indigo-50/30 dark:hover:bg-indigo-500/10 transition-colors group">
+                <tr key={peer.id} className="table-row-auto hover:bg-indigo-50/30 dark:hover:bg-indigo-500/10 transition-colors group">
                   {/* Color */}
                   <td className="px-4 py-3 w-10">
                     <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: color || (peer.active ? '#10b981' : '#cbd5e1') }} />
@@ -382,13 +427,13 @@ export default function UsersTable({
                     <td className="px-4 py-3 min-w-[160px]">
                       {peer.email ? (
                         <CopyableCell
-                          icon={<Mail className="w-3 h-3 text-slate-400 dark:text-slate-500" />}
+                          icon={<Mail className="w-3 h-3 text-slate-500 dark:text-slate-500" />}
                           text={peer.email}
                           title={`Copiar ${peer.email}`}
                           mono={false}
                         />
                       ) : (
-                        <span className="text-slate-300 dark:text-slate-600">—</span>
+                        <span className="text-slate-500 dark:text-slate-600">—</span>
                       )}
                     </td>
                   )}
@@ -410,13 +455,13 @@ export default function UsersTable({
                     <td className="px-4 py-3 max-w-[180px]">
                       {peer.publicKey ? (
                         <CopyableCell
-                          icon={<Key className="w-3 h-3 text-slate-400 dark:text-slate-500" />}
+                          icon={<Key className="w-3 h-3 text-slate-500 dark:text-slate-500" />}
                           text={peer.publicKey}
                           displayText={truncatePubKey(peer.publicKey)}
                           title={`Copiar ${peer.publicKey}`}
                         />
                       ) : (
-                        <span className="text-slate-300 dark:text-slate-600">—</span>
+                        <span className="text-slate-500 dark:text-slate-600">—</span>
                       )}
                     </td>
                   )}
@@ -424,7 +469,7 @@ export default function UsersTable({
                   {/* Último acceso */}
                   {isVisible('lastSeen') && (
                     <td className="px-4 py-3">
-                      <span className={`text-xs font-medium ${peer.lastHandshakeSecs == null ? 'text-slate-400 dark:text-slate-500' : peer.active ? 'text-slate-600' : 'text-slate-500 dark:text-slate-400'}`}>
+                      <span className={`text-xs font-medium ${peer.lastHandshakeSecs == null ? 'text-slate-500 dark:text-slate-500' : peer.active ? 'text-slate-600' : 'text-slate-500 dark:text-slate-400'}`}>
                         {formatLastHandshake(peer.lastHandshakeSecs)}
                       </span>
                     </td>
@@ -433,9 +478,9 @@ export default function UsersTable({
                   {/* Acciones */}
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end">
-                      <button onClick={() => onCopyConfig(peer)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors
-                          ${copiedPeerId === peer.id ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400' : 'bg-slate-50 text-slate-600 group-hover:bg-indigo-600 group-hover:text-white border border-slate-200 group-hover:border-indigo-600 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 dark:group-hover:bg-indigo-500 dark:group-hover:border-indigo-500'}`}>
+                      <button type="button" onClick={() => onCopyConfig(peer)}
+                        className={`flex min-h-11 items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500
+                          ${copiedPeerId === peer.id ? 'btn-success' : 'btn-outline group-hover:bg-indigo-600 group-hover:text-white group-hover:border-indigo-600 dark:group-hover:bg-indigo-500 dark:group-hover:border-indigo-500'}`}>
                         {copiedPeerId === peer.id ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                         <span>{copiedPeerId === peer.id ? '¡Copiado!' : 'Config WG'}</span>
                       </button>
@@ -448,7 +493,7 @@ export default function UsersTable({
               <tr>
                 <td colSpan={totalCols} className="px-4 py-12 text-center">
                   <div className="flex flex-col items-center gap-2">
-                    <Users className="w-8 h-8 text-slate-400 dark:text-slate-500" />
+                    <Users className="w-8 h-8 text-slate-500 dark:text-slate-500" />
                     <p className="text-slate-500 dark:text-slate-400 font-semibold">Sin usuarios</p>
                     <p className="text-slate-500 dark:text-slate-400 text-xs">
                       {search || status !== 'all' ? 'Ningún usuario coincide con los filtros' : 'No hay administradores configurados'}
@@ -469,10 +514,27 @@ export default function UsersTable({
             {' · '}<span className="text-emerald-600 font-semibold">{activeCount} activo{activeCount !== 1 ? 's' : ''}</span>
             {' · '}<span className="text-slate-500 dark:text-slate-400 font-semibold">{peers.length - activeCount} inactivo{peers.length - activeCount !== 1 ? 's' : ''}</span>
           </div>
-          <div className="text-2xs text-slate-400 dark:text-slate-500">
+          <div className="text-2xs text-slate-500 dark:text-slate-500">
             {visibleCount} de {COLUMNS.length} columnas visibles
           </div>
         </div>
+      )}
+
+      {filtered.length > PAGE_SIZE && (
+        <nav className="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-2 text-xs text-slate-600 dark:border-slate-800 dark:text-slate-300" aria-label="Paginacion de usuarios VPN">
+          <span>
+            {((currentPage - 1) * PAGE_SIZE) + 1}-{Math.min(currentPage * PAGE_SIZE, filtered.length)} de {filtered.length}
+          </span>
+          <div className="flex items-center gap-1">
+            <button type="button" className="btn-ghost flex h-11 w-11 items-center justify-center" aria-label="Pagina anterior" disabled={currentPage === 1} onClick={() => setPage(value => Math.max(1, value - 1))}>
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span className="min-w-16 text-center font-mono">{currentPage} / {totalPages}</span>
+            <button type="button" className="btn-ghost flex h-11 w-11 items-center justify-center" aria-label="Pagina siguiente" disabled={currentPage === totalPages} onClick={() => setPage(value => Math.min(totalPages, value + 1))}>
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </nav>
       )}
     </div>
   );
@@ -493,21 +555,31 @@ interface CopyableCellProps {
 
 function CopyableCell({ text, displayText, title, icon, mono = true }: CopyableCellProps) {
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
 
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(text);
+      setCopyFailed(false);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch { /* clipboard bloqueado (http no-localhost) — sin feedback */ }
+    } catch {
+      setCopyFailed(true);
+      setTimeout(() => setCopyFailed(false), 2500);
+    }
   };
+
+  const accessibleLabel = copyFailed
+    ? 'No se pudo copiar. Inténtalo nuevamente'
+    : (title || `Copiar ${text}`);
 
   return (
     <button
       type="button"
       onClick={handleCopy}
-      title={title || `Copiar ${text}`}
-      className={`inline-flex items-center gap-1.5 group/cell rounded-md px-1 -mx-1 py-0.5 transition-colors
+      title={accessibleLabel}
+      aria-label={accessibleLabel}
+      className={`inline-flex min-h-11 items-center gap-1.5 group/cell rounded-md px-2 -mx-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500
         hover:bg-indigo-50 dark:hover:bg-indigo-500/10
         ${mono ? 'data-cell' : 'text-xs text-slate-600 dark:text-slate-300'}`}
     >
@@ -515,8 +587,11 @@ function CopyableCell({ text, displayText, title, icon, mono = true }: CopyableC
       <span className="truncate max-w-[220px]">{displayText || text}</span>
       {copied
         ? <Check className="w-3 h-3 text-emerald-500 shrink-0" />
-        : <Copy className="w-3 h-3 text-slate-400 dark:text-slate-500 opacity-0 group-hover/cell:opacity-100 transition-opacity shrink-0" />
+        : copyFailed
+          ? <AlertCircle className="w-3 h-3 text-rose-500 shrink-0" />
+        : <Copy className="w-3 h-3 text-slate-500 dark:text-slate-500 opacity-0 group-hover/cell:opacity-100 transition-opacity shrink-0" />
       }
+      {copyFailed && <span role="status" className="sr-only">No se pudo copiar. Inténtalo nuevamente.</span>}
     </button>
   );
 }
@@ -558,18 +633,20 @@ function AliasCell({ peer, editing, draft, saving, onStart, onCancel, onChange, 
           className="flex-1 px-2 py-1 text-xs border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300 max-w-[160px] dark:bg-slate-800 dark:border-indigo-500/50 dark:text-slate-100"
         />
         <button
+          type="button"
           onClick={onCommit}
           disabled={saving}
           aria-label="Guardar alias"
-          className="p-1 rounded text-emerald-600 hover:bg-emerald-50 disabled:opacity-50 dark:hover:bg-emerald-500/10"
+          className="flex h-11 w-11 items-center justify-center rounded text-emerald-600 hover:bg-emerald-50 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:hover:bg-emerald-500/10"
         >
           {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
         </button>
         <button
+          type="button"
           onClick={onCancel}
           disabled={saving}
           aria-label="Cancelar"
-          className="p-1 rounded text-slate-400 hover:bg-slate-100 disabled:opacity-50 dark:hover:bg-slate-800"
+          className="flex h-11 w-11 items-center justify-center rounded text-slate-400 hover:bg-slate-100 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:hover:bg-slate-800"
         >
           <X className="w-3 h-3" />
         </button>
@@ -585,9 +662,10 @@ function AliasCell({ peer, editing, draft, saving, onStart, onCancel, onChange, 
           {peer.alias}
         </span>
         <button
+          type="button"
           onClick={onStart}
           aria-label="Editar alias"
-          className="opacity-0 group-hover/alias:opacity-100 p-0.5 rounded text-slate-500 dark:text-slate-400 hover:text-indigo-600 transition-opacity"
+          className="flex h-11 w-11 items-center justify-center rounded text-slate-500 opacity-0 transition-opacity hover:text-indigo-600 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 group-hover/alias:opacity-100 dark:text-slate-400"
         >
           <Pencil className="w-2.5 h-2.5" />
         </button>
@@ -598,8 +676,9 @@ function AliasCell({ peer, editing, draft, saving, onStart, onCancel, onChange, 
   // Sin alias — botón sutil para agregarlo
   return (
     <button
+      type="button"
       onClick={onStart}
-      className="inline-flex items-center gap-1 text-2xs text-slate-400 hover:text-indigo-600 dark:text-slate-500 dark:hover:text-indigo-400 transition-colors"
+      className="inline-flex min-h-11 items-center gap-1 rounded px-2 text-2xs text-slate-500 transition-colors hover:text-indigo-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-slate-400 dark:hover:text-indigo-400"
     >
       <Plus className="w-3 h-3" />
       <span>Agregar alias</span>

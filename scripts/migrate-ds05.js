@@ -2,17 +2,14 @@
 // ============================================================
 //  migrate-ds05.js — Fase 4 helper §53
 //
-//  Migra `text-slate-{300,400}` SIN dark variant en la misma línea
-//  a la versión con par claro/oscuro:
-//    text-slate-300 → text-slate-400 dark:text-slate-500
-//    text-slate-400 → text-slate-500 dark:text-slate-400
+//  Migra `text-slate-{300,400}` usado como clase base a slate-500,
+//  el mínimo de contraste para texto normal sobre fondo claro.
 //
 //  PRESERVA:
 //    - dark:text-slate-{300,400} (ya intencional)
 //    - hover:text-slate-{...} / focus:text-slate-{...}
 //    - placeholder:text-slate-{...} / placeholder:font-...
-//    - Líneas que ya tienen `dark:text-slate-{500,600,700}` o
-//      `dark:text-slate-{300,400}` en algún lugar (decisión consciente).
+//    - Clases que ya están bajo la variante `dark:`.
 //    - text-slate-{300,400} sobre superficie oscura permanente
 //      (heurística: contexto con bg-slate-{700-950}, bg-{tone}-{500-800},
 //      modal-header-{tone}, text-white).
@@ -55,26 +52,22 @@ for (const file of files) {
   for (let i = 0; i < lines.length; i++) {
     let line = lines[i];
 
-    // Saltar línea si ya tiene `dark:text-slate-` en cualquier lugar
-    // (significa decisión consciente del par claro/oscuro).
-    if (/\bdark:text-slate-/.test(line)) continue;
-
     // Saltar si la línea o las 3 previas indican superficie oscura.
     const prev3 = lines.slice(Math.max(0, i - 3), i).join('\n');
     if (DARK_SURFACE_RE.test(prev3 + '\n' + line)) continue;
 
-    // Sustituir text-slate-400 → text-slate-500 dark:text-slate-400
-    // Sustituir text-slate-300 → text-slate-400 dark:text-slate-500
+    // Sustituir texto base slate-300/400 por slate-500. Si la línea todavía
+    // no declara modo oscuro, añadir el par dark:text-slate-400.
     // PERO: el `text-slate-{300,400}` debe estar como clase base (no después
     //   de `hover:`, `focus:`, `active:`, `disabled:`, `group-hover:`,
     //   `placeholder:`, etc.)
     // Regex: la clase debe estar precedida por whitespace o `"` o "`" o "{".
-    const VARIANT_PREFIX = '(?:hover|focus|active|disabled|group-hover|group-focus|placeholder|focus-visible|peer|first|last|odd|even|sm|md|lg|xl|2xl):';
+    const VARIANT_PREFIX = '(?:dark|hover|focus|active|disabled|group-hover|group-focus|placeholder|focus-visible|peer|first|last|odd|even|sm|md|lg|xl|2xl):';
     const NO_VARIANT_PREFIX = new RegExp(`(?<![:\\w-])(?<!${VARIANT_PREFIX})text-slate-(300|400)\\b`, 'g');
 
     const newLine = line.replace(NO_VARIANT_PREFIX, (m, shade) => {
       changed++;
-      if (shade === '300') return 'text-slate-400 dark:text-slate-500';
+      if (/\bdark:text-slate-/.test(line)) return 'text-slate-500';
       return 'text-slate-500 dark:text-slate-400';
     });
 

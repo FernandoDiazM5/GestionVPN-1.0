@@ -48,7 +48,7 @@ export default function WorkspaceTab() {
         )}
 
         <div>
-          <label className="block text-2xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
+          <label className="block text-2xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-500 mb-1">
             Nuevo nombre
           </label>
           <div className="relative">

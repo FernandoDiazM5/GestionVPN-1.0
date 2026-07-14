@@ -6,6 +6,7 @@ import { API_BASE_URL } from '../../../../../config';
 import { fmtDbm, fmtPct, fmtMbps, fmtFw } from '../../utils/formatters';
 import { sigColor, ccqColor } from '../../utils/colors';
 import Sparkline from '../Sparkline';
+import Dialog from '../../../../Common/Dialog';
 
 const BASE = `${API_BASE_URL}/api/ap-monitor`;
 
@@ -114,9 +115,11 @@ function CpeDetailModal({
   ].filter(r => r.v) as typeof rows : [];
 
   return (
-    <div className="modal-overlay"
-      onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal-panel modal-panel-lg">
+    <Dialog
+      title={`Detalle CPE ${mac}`}
+      onClose={onClose}
+      panelClassName="modal-panel modal-panel-lg"
+    >
         <div className="modal-header-decorated modal-header-slate py-3">
           <div>
             <p className="text-xs font-bold text-white font-mono">{mac}</p>
@@ -138,7 +141,7 @@ function CpeDetailModal({
                 <div className={sigColor(last)}>
                   <Sparkline values={signalHist} width={520} height={40} className="w-full" />
                 </div>
-                <div className="flex justify-between text-3xs text-slate-400 dark:text-slate-500 mt-1 font-mono">
+                <div className="flex justify-between text-3xs text-slate-500 dark:text-slate-500 mt-1 font-mono">
                   <span>min {fmtDbm(Math.min(...valid))}</span>
                   <span>max {fmtDbm(Math.max(...valid))}</span>
                 </div>
@@ -208,8 +211,7 @@ function CpeDetailModal({
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </Dialog>
   );
 }
 

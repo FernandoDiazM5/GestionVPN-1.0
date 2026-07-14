@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X, Tag, Plus } from 'lucide-react';
 import type { NodeInfo } from '../../../../types/api';
+import Dialog from '../../../Common/Dialog';
 
 export default function TagModal({ node, currentTags, onSave, onClose }: {
   node: NodeInfo;
@@ -20,9 +21,11 @@ export default function TagModal({ node, currentTags, onSave, onClose }: {
   };
 
   return (
-    <div className="modal-overlay"
-      onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal-panel modal-panel-sm">
+    <Dialog
+      title={`Etiquetas de ${node.nombre_nodo}`}
+      onClose={onClose}
+      panelClassName="modal-panel modal-panel-sm"
+    >
         <div className="modal-header-decorated modal-header-amber">
           <div className="flex items-center gap-3">
             <div className="modal-header-icon">
@@ -67,7 +70,6 @@ export default function TagModal({ node, currentTags, onSave, onClose }: {
             </button>
           </div>
         </div>
-      </div>
-    </div>
+    </Dialog>
   );
 }

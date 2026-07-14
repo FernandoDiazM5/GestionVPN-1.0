@@ -23,7 +23,7 @@ interface DeviceTableProps {
   compactNameMode: boolean;
   sortConfig: { key: string; dir: 'asc' | 'desc' } | null;
   toggleSort: (key: string) => void;
-  startResize: (key: string, startX: number) => void;
+  startResize: (key: string, startX: number, keyboardDelta?: number) => void;
   sshStatus: Record<string, SshAuthStatus>;
   expandedRows: Set<string>;
   toggleExpand: (ip: string) => void;
@@ -103,18 +103,25 @@ function DeviceTableImpl(props: DeviceTableProps) {
   );
 
   return (
-    <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-x-auto">
-      <div style={containerStyle}>
+    <div
+      className="max-w-full min-w-0 overflow-x-auto overscroll-x-contain rounded-xl border border-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-400 dark:border-slate-700"
+      role="region"
+      aria-label="Dispositivos escaneados. Desplaza horizontalmente para ver todas las columnas."
+      tabIndex={0}
+    >
+      <div role="table" aria-rowcount={sortedRows.length + 1} style={containerStyle}>
 
         {/* Header sticky */}
         <div
+          role="row"
           className="bg-slate-100 border-b border-slate-200 text-xs font-bold text-slate-600 uppercase tracking-wider rounded-tl-xl rounded-tr-xl dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300"
           style={{ display: 'grid', gridTemplateColumns: 'var(--cols-tpl)' }}
         >
           {/* §42-2: checkbox de selección masiva — afecta solo a candidatos
               (SSH OK + no guardados). Tri-state. */}
-          <div className="px-1 py-3 flex items-center justify-center">
+          <div role="columnheader" className="flex min-h-11 items-center justify-center">
             <button
+              type="button"
               onClick={handleHeaderCheckboxClick}
               disabled={visibleCandidateCount === 0}
               title={
@@ -131,67 +138,97 @@ function DeviceTableImpl(props: DeviceTableProps) {
                   : 'false'
               }
               role="checkbox"
-              className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors
-                ${visibleCandidateCount === 0
-                  ? 'border-slate-300 bg-slate-50 cursor-not-allowed dark:border-slate-700 dark:bg-slate-800'
-                  : headerCheckState === 'full'
-                    ? 'border-emerald-500 bg-emerald-500 hover:bg-emerald-600 hover:border-emerald-600'
-                    : headerCheckState === 'partial'
-                      ? 'border-emerald-500 bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-500/30'
-                      : 'border-slate-400 hover:border-emerald-500 dark:border-slate-500'}`}
+              className="group/check flex h-11 w-11 items-center justify-center rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 disabled:cursor-not-allowed"
             >
-              {headerCheckState === 'full' && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
-              {headerCheckState === 'partial' && <Minus className="w-3 h-3 text-emerald-700" strokeWidth={3} />}
+              <span className={`flex h-4 w-4 items-center justify-center rounded border-2 transition-colors
+                ${visibleCandidateCount === 0
+                  ? 'border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-800'
+                  : headerCheckState === 'full'
+                    ? 'border-emerald-500 bg-emerald-500 group-hover/check:bg-emerald-600'
+                    : headerCheckState === 'partial'
+                      ? 'border-emerald-500 bg-emerald-100 dark:bg-emerald-500/30'
+                      : 'border-slate-400 dark:border-slate-500'}`}>
+                {headerCheckState === 'full' && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                {headerCheckState === 'partial' && <Minus className="w-3 h-3 text-emerald-700" strokeWidth={3} />}
+              </span>
             </button>
           </div>
-          <div className="px-3 py-3 text-center">SSH</div>
-          <div className="px-3 py-3">Rol</div>
+          <div role="columnheader" className="px-3 py-3 text-center">SSH</div>
+          <div role="columnheader" className="px-3 py-3">Rol</div>
           <div
-            className="px-3 py-3 cursor-pointer select-none flex items-center gap-1 hover:text-slate-700"
-            onClick={() => toggleSort('ip')}
+            role="columnheader"
+            aria-sort={sortConfig?.key === 'ip' ? (sortConfig.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+            className="min-w-0"
           >
-            IP / MAC
-            {sortConfig?.key === 'ip' && <span className="text-indigo-600">{sortConfig.dir === 'asc' ? '↑' : '↓'}</span>}
+            <button
+              type="button"
+              onClick={() => toggleSort('ip')}
+              aria-label={`Ordenar por IP / MAC ${sortConfig?.key === 'ip' && sortConfig.dir === 'asc' ? 'descendente' : 'ascendente'}`}
+              className="flex min-h-11 w-full items-center gap-1 px-3 text-left hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 dark:hover:text-slate-100"
+            >
+              IP / MAC
+              {sortConfig?.key === 'ip' && <span aria-hidden="true" className="text-indigo-600">{sortConfig.dir === 'asc' ? '↑' : '↓'}</span>}
+            </button>
           </div>
           {!compactNameMode && (
             <div
-              className="px-3 py-3 cursor-pointer select-none flex items-center gap-1 hover:text-slate-700"
-              onClick={() => toggleSort('name')}
+              role="columnheader"
+              aria-sort={sortConfig?.key === 'name' ? (sortConfig.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+              className="min-w-0"
             >
-              Nombre / Modelo
-              {sortConfig?.key === 'name' && <span className="text-indigo-600">{sortConfig.dir === 'asc' ? '↑' : '↓'}</span>}
+              <button
+                type="button"
+                onClick={() => toggleSort('name')}
+                aria-label={`Ordenar por Nombre / Modelo ${sortConfig?.key === 'name' && sortConfig.dir === 'asc' ? 'descendente' : 'ascendente'}`}
+                className="flex min-h-11 w-full items-center gap-1 px-3 text-left hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 dark:hover:text-slate-100"
+              >
+                Nombre / Modelo
+                {sortConfig?.key === 'name' && <span aria-hidden="true" className="text-indigo-600">{sortConfig.dir === 'asc' ? '↑' : '↓'}</span>}
+              </button>
             </div>
           )}
           {activeConfigCols.map(col => (
             <div
               key={col.key}
+              role="columnheader"
+              aria-sort={sortConfig?.key === col.key ? (sortConfig.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
               title={col.label}
-              className="px-3 py-3 min-w-0 overflow-hidden select-none flex items-center gap-1 hover:text-slate-700 relative group"
+              className="relative flex min-w-0 items-center overflow-hidden hover:text-slate-700 dark:hover:text-slate-100"
             >
-              <span
-                className="cursor-pointer flex items-center gap-1 flex-1 min-w-0 truncate"
+              <button
+                type="button"
+                className="flex min-h-11 min-w-0 flex-1 items-center gap-1 truncate px-3 pr-11 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500"
                 onClick={() => toggleSort(col.key)}
+                aria-label={`Ordenar por ${col.label} ${sortConfig?.key === col.key && sortConfig.dir === 'asc' ? 'descendente' : 'ascendente'}`}
               >
-                {col.label}
-                {sortConfig?.key === col.key && <span className="text-indigo-600">{sortConfig.dir === 'asc' ? '↑' : '↓'}</span>}
-              </span>
-              <span
-                title="Arrastra para redimensionar"
-                className="cursor-col-resize opacity-0 group-hover:opacity-60 hover:!opacity-100 text-slate-500 dark:text-slate-400 shrink-0 select-none"
+                <span className="truncate">{col.label}</span>
+                {sortConfig?.key === col.key && <span aria-hidden="true" className="text-indigo-600">{sortConfig.dir === 'asc' ? '↑' : '↓'}</span>}
+              </button>
+              <button
+                type="button"
+                title="Redimensionar columna. Usa Flecha izquierda o Flecha derecha."
+                aria-label={`Redimensionar columna ${col.label}`}
+                aria-keyshortcuts="ArrowLeft ArrowRight"
+                className="absolute right-0 top-0 flex h-11 w-11 cursor-col-resize items-center justify-center text-slate-500 opacity-60 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 dark:text-slate-400"
                 onMouseDown={e => {
                   e.preventDefault();
                   startResize(col.key, e.clientX);
                 }}
+                onKeyDown={e => {
+                  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+                  e.preventDefault();
+                  startResize(col.key, 0, e.key === 'ArrowLeft' ? -10 : 10);
+                }}
               >
                 <GripVertical className="w-3 h-3" />
-              </span>
+              </button>
             </div>
           ))}
-          <div className="px-3 py-3" />
+          <div role="columnheader" className="px-3 py-3" />
           {/* Acción sticky-right (U1.A): siempre visible aunque la tabla scrolle
               horizontalmente. Shadow sutil hacia la izquierda marca que está
               flotando sobre las columnas previas cuando hay overflow. */}
-          <div className="px-3 py-3 text-right sticky right-0 z-10 bg-slate-100 dark:bg-slate-800 shadow-[-2px_0_6px_-3px_rgba(0,0,0,0.06)]">
+          <div role="columnheader" className="px-3 py-3 text-right sticky right-0 z-10 bg-slate-100 dark:bg-slate-800 shadow-[-2px_0_6px_-3px_rgba(0,0,0,0.06)]">
             Acción
           </div>
         </div>

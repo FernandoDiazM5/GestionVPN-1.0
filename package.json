@@ -31,6 +31,7 @@
     "audit:semgrep:json": "node scripts/semgrep.js --json"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
     "@playwright/test": "^1.60.0",
     "husky": "^9.1.7",
     "lint-staged": "^15.2.10",

@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import QRCode from 'qrcode';
 import { Shield, X, Loader2, Download, Copy, Check, Smartphone, RefreshCw, KeyRound } from 'lucide-react';
 import Spinner from '../../../Common/Spinner';
 import { teamApi } from '../../../../services/teamApi';
 import type { Member } from '../../../../types/account';
+import Dialog from '../../../Common/Dialog';
 
 interface Props {
   member: Member;
@@ -34,7 +34,15 @@ export default function MemberWireGuardModal({ member, onClose }: Props) {
   // Genera el QR cuando hay .conf
   useEffect(() => {
     if (!conf) { setQr(null); return; }
-    QRCode.toDataURL(conf, { margin: 1, width: 220 }).then(setQr).catch(() => setQr(null));
+    let cancelled = false;
+    setQr(null);
+
+    void import('qrcode')
+      .then(({ default: QRCode }) => QRCode.toDataURL(conf, { margin: 1, width: 220 }))
+      .then(dataUrl => { if (!cancelled) setQr(dataUrl); })
+      .catch(() => { if (!cancelled) setQr(null); });
+
+    return () => { cancelled = true; };
   }, [conf]);
 
   const provision = async () => {
@@ -64,9 +72,13 @@ export default function MemberWireGuardModal({ member, onClose }: Props) {
   };
 
   return (
-    <div className="modal-overlay"
-      onClick={e => e.target === e.currentTarget && !busy && onClose()}>
-      <div className="modal-panel modal-panel-md">
+    <Dialog
+      title={`Acceso WireGuard de ${member.name || member.email}`}
+      onClose={onClose}
+      closeOnBackdrop={!busy}
+      closeOnEscape={!busy}
+      panelClassName="modal-panel modal-panel-md"
+    >
         <div className="modal-header-decorated modal-header-violet">
           <div className="flex items-center gap-3 min-w-0">
             <div className="modal-header-icon"><Shield className="w-4 h-4 text-white" /></div>
@@ -126,7 +138,6 @@ export default function MemberWireGuardModal({ member, onClose }: Props) {
           )}
           {error && <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">{error}</p>}
         </div>
-      </div>
-    </div>
+    </Dialog>
   );
 }

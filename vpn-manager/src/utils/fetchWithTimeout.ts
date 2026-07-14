@@ -13,18 +13,52 @@ export async function fetchWithTimeout(
   options?: RequestInit,
   timeoutMs: number = 30000
 ): Promise<Response> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  const timeoutController = new AbortController();
+  const composedSignal = composeAbortSignals(options?.signal, timeoutController.signal);
+  const timeoutId = setTimeout(() => {
+    timeoutController.abort(new DOMException('Request timed out', 'TimeoutError'));
+  }, timeoutMs);
 
   try {
-    const response = await apiFetch(url, {
+    return await apiFetch(url, {
       ...options,
-      signal: controller.signal,
+      signal: composedSignal.signal,
     });
+  } finally {
     clearTimeout(timeoutId);
-    return response;
-  } catch (error) {
-    clearTimeout(timeoutId);
-    throw error;
+    composedSignal.cleanup();
   }
+}
+
+function composeAbortSignals(
+  callerSignal: AbortSignal | null | undefined,
+  timeoutSignal: AbortSignal
+): { signal: AbortSignal; cleanup: () => void } {
+  if (!callerSignal) {
+    return { signal: timeoutSignal, cleanup: () => undefined };
+  }
+
+  const controller = new AbortController();
+  const abortFromCaller = () => controller.abort(callerSignal.reason);
+  const abortFromTimeout = () => controller.abort(timeoutSignal.reason);
+
+  if (callerSignal.aborted) {
+    abortFromCaller();
+  } else {
+    callerSignal.addEventListener('abort', abortFromCaller, { once: true });
+  }
+
+  if (timeoutSignal.aborted) {
+    abortFromTimeout();
+  } else {
+    timeoutSignal.addEventListener('abort', abortFromTimeout, { once: true });
+  }
+
+  return {
+    signal: controller.signal,
+    cleanup: () => {
+      callerSignal.removeEventListener('abort', abortFromCaller);
+      timeoutSignal.removeEventListener('abort', abortFromTimeout);
+    },
+  };
 }

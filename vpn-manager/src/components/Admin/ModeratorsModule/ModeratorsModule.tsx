@@ -3,6 +3,7 @@ import {
   UserCog, UserPlus, Loader2, RefreshCw, X, Briefcase, Mail, KeyRound,
   Pencil, Trash2, Ban, Power, AlertTriangle, Link2, Copy, Check, Clock,
 } from 'lucide-react';
+import Dialog from '../../Common/Dialog';
 import { adminApi } from '../../../services/adminApi';
 import type { PendingInvitation } from '../../../services/adminApi';
 import { useWorkspaceSession } from '../../../context/WorkspaceSession';
@@ -69,7 +70,7 @@ export default function ModeratorsModule() {
             <UserCog className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
             <span>Moderadores</span>
           </h2>
-          <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">Da de alta y gestiona los clientes que usan la plataforma</p>
+          <p className="text-slate-500 dark:text-slate-500 text-sm mt-1">Da de alta y gestiona los clientes que usan la plataforma</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setShowCreate(true)} className="btn-primary px-4 py-2.5 flex items-center gap-2 text-sm">
@@ -130,7 +131,7 @@ export default function ModeratorsModule() {
                           <p className="font-semibold text-slate-800 dark:text-slate-100 truncate">{m.name || m.email.split('@')[0]}</p>
                           {m.disabled && <span className="badge badge-warning">Suspendido</span>}
                         </div>
-                        <p className="font-mono text-2xs text-slate-400 dark:text-slate-500 truncate">{m.email}</p>
+                        <p className="font-mono text-2xs text-slate-500 dark:text-slate-500 truncate">{m.email}</p>
                       </div>
                     </div>
                   </td>
@@ -169,7 +170,7 @@ export default function ModeratorsModule() {
                     </div>
                     <div>
                       <p className="text-slate-600 dark:text-slate-300 font-semibold">Aún no hay moderadores</p>
-                      <p className="text-slate-400 dark:text-slate-500 text-xs mt-0.5">Da de alta al primer cliente para que use la plataforma.</p>
+                      <p className="text-slate-500 dark:text-slate-500 text-xs mt-0.5">Da de alta al primer cliente para que use la plataforma.</p>
                     </div>
                     <button onClick={() => setShowCreate(true)} className="btn-primary px-4 py-2 flex items-center gap-2 text-sm mt-1">
                       <UserPlus className="w-4 h-4" /> Nuevo Moderador
@@ -201,9 +202,13 @@ function ModalShell({ icon, title, danger, busy, onClose, children }: {
   onClose: () => void; children: React.ReactNode;
 }) {
   return (
-    <div className="modal-overlay"
-      onClick={e => e.target === e.currentTarget && !busy && onClose()}>
-      <div className="modal-panel modal-panel-md">
+    <Dialog
+      title={title}
+      onClose={onClose}
+      closeOnBackdrop={!busy}
+      closeOnEscape={!busy}
+      panelClassName="modal-panel modal-panel-md"
+    >
         <div className={`modal-header-decorated ${danger ? 'modal-header-rose' : 'modal-header-indigo'}`}>
           <div className="flex items-center gap-3">
             <div className="modal-header-icon">{icon}</div>
@@ -212,8 +217,7 @@ function ModalShell({ icon, title, danger, busy, onClose, children }: {
           {!busy && <button onClick={onClose} className="modal-header-close"><X className="w-4 h-4" /></button>}
         </div>
         <div className="p-5 space-y-3">{children}</div>
-      </div>
-    </div>
+    </Dialog>
   );
 }
 
@@ -245,7 +249,7 @@ function PendingInvitationsCard({ invites }: { invites: PendingInvitation[] }) {
         <Clock className="w-4 h-4 text-amber-500" />
         <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">Invitaciones pendientes</h3>
         <span className="badge badge-warning text-2xs ml-1">{invites.length}</span>
-        <p className="text-2xs text-slate-400 dark:text-slate-500 ml-auto hidden sm:block">
+        <p className="text-2xs text-slate-500 dark:text-slate-500 ml-auto hidden sm:block">
           ¿No llegó el correo? Copia el enlace y compártelo manualmente.
         </p>
       </div>
@@ -331,7 +335,7 @@ function CreateModeratorModal({ onClose, onCreated }: { onClose: () => void; onC
                 {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}{copied ? 'Copiado' : 'Copiar'}
               </button>
             </div>
-            <p className="text-2xs text-slate-400 dark:text-slate-500 mt-1">
+            <p className="text-2xs text-slate-500 dark:text-slate-500 mt-1">
               Al abrirlo, el moderador define su contraseña y genera su acceso WireGuard. Queda como OWNER de su workspace.
             </p>
           </div>

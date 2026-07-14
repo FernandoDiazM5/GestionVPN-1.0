@@ -121,7 +121,7 @@ export function DeviceStatusPanel({ dev, stationNamesByMac, onRefresh }: DeviceS
             const ageSec = Math.floor((Date.now() - lastUpdated) / 1000);
             const stale = ageSec > 300;  // >5min = pedir refresh
             return (
-              <span className={`flex items-center gap-1 text-2xs ${stale ? 'text-amber-300' : 'text-slate-400 dark:text-slate-500'}`}>
+              <span className={`flex items-center gap-1 text-2xs ${stale ? 'text-amber-300' : 'text-slate-500 dark:text-slate-500'}`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${refreshing ? 'bg-sky-400 motion-safe:animate-pulse' : stale ? 'bg-amber-400' : 'bg-slate-400'}`} />
                 {refreshing ? 'Actualizando…' : `Datos del scan · ${fmtAge(lastUpdated)}`}
               </span>

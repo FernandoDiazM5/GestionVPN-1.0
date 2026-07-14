@@ -1,7 +1,6 @@
 import { Bell, X } from 'lucide-react';
 import { useVpn, TUNNEL_TIMEOUT_MS } from '../../../context';
 import { deviceDb } from '../../../store/deviceDb';
-import { cpeCache } from '../../../store/cpeCache';
 import { useWorkspaceSession } from '../../../context/WorkspaceSession';
 import { isPlatformAdmin } from '../../../utils/permissions';
 // MEMBER → solo "Acceder" en la fila + sin "Nuevo Nodo" / "Exportar" / kebab.
@@ -248,7 +247,6 @@ export default function NodeAccessPanel() {
             if (deletedDeviceIds.length > 0) {
               deviceDb.removeByIds(deletedDeviceIds).catch(() => { });
             }
-            cpeCache.clear().catch(() => { });
           }}
         />
       )}

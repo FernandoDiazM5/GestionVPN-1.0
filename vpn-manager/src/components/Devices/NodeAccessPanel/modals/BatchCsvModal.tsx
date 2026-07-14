@@ -4,6 +4,7 @@ import { useVpn } from '../../../../context';
 import { apiFetch } from '../../../../utils/apiClient';
 import { API_BASE_URL } from '../../../../config';
 import type { NodeInfo } from '../../../../types/api';
+import Dialog from '../../../Common/Dialog';
 
 interface BatchCsvModalProps {
   onClose: () => void;
@@ -92,9 +93,13 @@ export default function BatchCsvModal({ onClose, onSuccess, nodes }: BatchCsvMod
   };
 
   return (
-    <div className="modal-overlay"
-      onClick={e => e.target === e.currentTarget && !processing && onClose()}>
-      <div className="modal-panel modal-panel-2xl">
+    <Dialog
+      title="Importar nodos desde CSV"
+      onClose={onClose}
+      closeOnBackdrop={!processing}
+      closeOnEscape={!processing}
+      panelClassName="modal-panel modal-panel-2xl"
+    >
         <div className="modal-header-decorated modal-header-violet">
           <div className="flex items-center gap-3">
             <div className="modal-header-icon">
@@ -226,7 +231,6 @@ export default function BatchCsvModal({ onClose, onSuccess, nodes }: BatchCsvMod
             </button>
           )}
         </div>
-      </div>
-    </div>
+    </Dialog>
   );
 }

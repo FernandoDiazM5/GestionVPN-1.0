@@ -3,6 +3,7 @@ import { X, Cpu, Wifi, Radio, AlertCircle, Check } from 'lucide-react';
 import type { AddDeviceModalProps } from '../types';
 import type { SavedDevice } from '../../../../types/devices';
 import { ipInCidr } from '../constants';
+import Dialog from '../../../Common/Dialog';
 
 export function AddDeviceModal({ device, node, existing, onSave, onClose }: AddDeviceModalProps) {
   const [sshUser, setSshUser] = useState(existing?.sshUser ?? device.sshUser ?? 'ubnt');
@@ -39,9 +40,11 @@ export function AddDeviceModal({ device, node, existing, onSave, onClose }: AddD
   const isEdit = !!existing;
 
   return (
-    <div className="modal-overlay"
-      onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal-panel modal-panel-sm p-6 space-y-5 overflow-y-auto">
+    <Dialog
+      title={isEdit ? 'Editar dispositivo' : 'Guardar dispositivo'}
+      onClose={onClose}
+      panelClassName="modal-panel modal-panel-sm p-6 space-y-5 overflow-y-auto"
+    >
         <div className="flex items-center justify-between">
           <div>
             <h3 className="font-bold text-slate-800 dark:text-slate-100">{isEdit ? 'Editar dispositivo' : 'Guardar dispositivo'}</h3>
@@ -91,7 +94,7 @@ export function AddDeviceModal({ device, node, existing, onSave, onClose }: AddD
           </p>
           <div>
             <label className="text-2xs sm:text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">
-              Puerto WebUI <span className="normal-case font-normal text-slate-400 dark:text-slate-500">(acceso en {device.ip}:puerto)</span>
+              Puerto WebUI <span className="normal-case font-normal text-slate-500 dark:text-slate-500">(acceso en {device.ip}:puerto)</span>
             </label>
             <input type="number" value={routerPort} onChange={e => setRouterPort(+e.target.value)} className="input-field w-full text-xs" />
           </div>
@@ -134,7 +137,6 @@ export function AddDeviceModal({ device, node, existing, onSave, onClose }: AddD
             <span>{isEdit ? 'Actualizar' : 'Guardar'}</span>
           </button>
         </div>
-      </div>
-    </div>
+    </Dialog>
   );
 }

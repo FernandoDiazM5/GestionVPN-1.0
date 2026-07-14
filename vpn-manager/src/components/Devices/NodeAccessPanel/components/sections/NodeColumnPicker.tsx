@@ -77,12 +77,12 @@ export function NodeColumnPicker({ visibleCols, onChange }: NodeColumnPickerProp
                       <div className="flex flex-col shrink-0">
                         <button onClick={() => moveUp(idx)} disabled={idx === 0}
                           aria-label={`Subir columna ${col.label}`}
-                          className="p-0.5 text-slate-400 dark:text-slate-500 hover:text-indigo-600 disabled:opacity-20 transition-colors">
+                          className="p-0.5 text-slate-500 dark:text-slate-500 hover:text-indigo-600 disabled:opacity-20 transition-colors">
                           <ChevronUp className="w-3 h-3" />
                         </button>
                         <button onClick={() => moveDown(idx)} disabled={idx === visibleCols.length - 1}
                           aria-label={`Bajar columna ${col.label}`}
-                          className="p-0.5 text-slate-400 dark:text-slate-500 hover:text-indigo-600 disabled:opacity-20 transition-colors">
+                          className="p-0.5 text-slate-500 dark:text-slate-500 hover:text-indigo-600 disabled:opacity-20 transition-colors">
                           <ChevronDown className="w-3 h-3" />
                         </button>
                       </div>
@@ -102,7 +102,7 @@ export function NodeColumnPicker({ visibleCols, onChange }: NodeColumnPickerProp
           {hiddenCols.length > 0 && (
             <>
               <div className="border-t border-slate-100 dark:border-slate-700 my-1" />
-              <p className="text-3xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 mt-2">Ocultas</p>
+              <p className="text-3xs font-bold text-slate-500 dark:text-slate-500 uppercase tracking-wider mb-1.5 mt-2">Ocultas</p>
               <div className="space-y-0.5">
                 {hiddenCols.map(col => (
                   <button key={col.key} onClick={() => addCol(col.key)}

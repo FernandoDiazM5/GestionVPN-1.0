@@ -5,6 +5,7 @@ import { apiFetch } from '../../../../utils/apiClient';
 import { fetchWithTimeout } from '../../../../utils/fetchWithTimeout';
 import { API_BASE_URL } from '../../../../config';
 import type { NodeInfo } from '../../../../types/api';
+import Dialog from '../../../Common/Dialog';
 
 export default function ScriptModal({ node, onClose }: { node: NodeInfo; onClose: () => void }) {
   const { credentials } = useVpn();
@@ -91,9 +92,11 @@ export default function ScriptModal({ node, onClose }: { node: NodeInfo; onClose
   };
 
   return (
-    <div className="modal-overlay"
-      onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal-panel modal-panel-xl">
+    <Dialog
+      title={`Script de configuración de ${node.nombre_nodo}`}
+      onClose={onClose}
+      panelClassName="modal-panel modal-panel-xl"
+    >
         <div className="modal-header-decorated modal-header-emerald">
           <div className="flex items-center gap-3">
             <div className="modal-header-icon">
@@ -226,7 +229,6 @@ export default function ScriptModal({ node, onClose }: { node: NodeInfo; onClose
             <span>{loading ? 'Generando...' : script ? 'Regenerar' : 'Generar Script'}</span>
           </button>
         </div>
-      </div>
-    </div>
+    </Dialog>
   );
 }

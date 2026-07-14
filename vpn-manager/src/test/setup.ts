@@ -50,6 +50,14 @@ if (typeof window !== 'undefined') {
     };
   }
 
+  if (!('EventSource' in globalThis)) {
+    (globalThis as unknown as { EventSource: unknown }).EventSource = class {
+      onmessage: ((event: MessageEvent) => void) | null = null;
+      onerror: (() => void) | null = null;
+      close() {}
+    };
+  }
+
   // scrollTo: jsdom no implementa
   if (!window.scrollTo) {
     window.scrollTo = vi.fn() as unknown as typeof window.scrollTo;

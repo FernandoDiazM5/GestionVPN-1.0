@@ -6,7 +6,7 @@
 import { test, expect } from '@playwright/test';
 
 test('app carga y muestra pantalla de acceso', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('./');
   // El título de la app aparece en cualquier vista pública
   await expect(page).toHaveTitle(/MikroTik|VPN|GestionVPN/i, { timeout: 15_000 });
   // Y el body NO está vacío

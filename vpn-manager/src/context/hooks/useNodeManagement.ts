@@ -1,17 +1,22 @@
-import { useState, useCallback, useRef } from 'react';
+import { useCallback, useReducer } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import type { NodeInfo } from '../../types/api';
 import type { RouterCredentials } from '../../store/db';
 import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
 import { API_BASE_URL } from '../../config';
 
 export function useNodeManagement() {
-  const [nodes, setNodes] = useState<NodeInfo[]>([]);
-  const [activeNodeVrf, setActiveNodeVrf] = useState<string | null>(null);
-  const [tunnelExpiry, setTunnelExpiry] = useState<number | null>(null);
+  const [state, dispatch] = useReducer(nodeManagementReducer, initialState);
 
-  const timeoutRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const keepaliveRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const activeNodeVrfRef = useRef<string | null>(null);
+  const setNodes = useCallback<Dispatch<SetStateAction<NodeInfo[]>>>((value) => {
+    dispatch({ type: 'setNodes', value });
+  }, []);
+  const setActiveNodeVrf = useCallback<Dispatch<SetStateAction<string | null>>>((value) => {
+    dispatch({ type: 'setActiveNodeVrf', value });
+  }, []);
+  const setTunnelExpiry = useCallback<Dispatch<SetStateAction<number | null>>>((value) => {
+    dispatch({ type: 'setTunnelExpiry', value });
+  }, []);
 
   const deactivateAllNodes = useCallback(async (credentials?: RouterCredentials) => {
     if (!credentials) return;
@@ -24,43 +29,80 @@ export function useNodeManagement() {
     } catch (err) {
       console.error('Error desactivando tunnels:', err);
     }
-    setActiveNodeVrf(null);
-    setTunnelExpiry(null);
-    if (timeoutRef.current) {
-      clearInterval(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-    if (keepaliveRef.current) {
-      clearInterval(keepaliveRef.current);
-      keepaliveRef.current = null;
-    }
+    dispatch({ type: 'clearTunnel' });
   }, []);
 
   const removeNodeFromState = useCallback((pppUser: string) => {
-    setNodes(prev => {
-      const removed = prev.find(n => n.ppp_user === pppUser);
-      if (!removed) return prev;
-      if (activeNodeVrfRef.current === removed.nombre_vrf) {
-        setActiveNodeVrf(null);
-        setTunnelExpiry(null);
-        if (timeoutRef.current) { clearInterval(timeoutRef.current); timeoutRef.current = null; }
-        if (keepaliveRef.current) { clearInterval(keepaliveRef.current); keepaliveRef.current = null; }
-      }
-      return prev.filter(n => n.ppp_user !== pppUser);
-    });
+    dispatch({ type: 'removeNode', pppUser });
   }, []);
 
   return {
-    nodes,
+    nodes: state.nodes,
     setNodes,
-    activeNodeVrf,
+    activeNodeVrf: state.activeNodeVrf,
     setActiveNodeVrf,
-    tunnelExpiry,
+    tunnelExpiry: state.tunnelExpiry,
     setTunnelExpiry,
     deactivateAllNodes,
     removeNodeFromState,
-    timeoutRef,
-    keepaliveRef,
-    activeNodeVrfRef,
   };
+}
+
+interface NodeManagementState {
+  nodes: NodeInfo[];
+  activeNodeVrf: string | null;
+  tunnelExpiry: number | null;
+}
+
+type NodeManagementAction =
+  | { type: 'setNodes'; value: SetStateAction<NodeInfo[]> }
+  | { type: 'setActiveNodeVrf'; value: SetStateAction<string | null> }
+  | { type: 'setTunnelExpiry'; value: SetStateAction<number | null> }
+  | { type: 'clearTunnel' }
+  | { type: 'removeNode'; pppUser: string };
+
+const initialState: NodeManagementState = {
+  nodes: [],
+  activeNodeVrf: null,
+  tunnelExpiry: null,
+};
+
+function resolveStateUpdate<T>(value: SetStateAction<T>, current: T): T {
+  return typeof value === 'function'
+    ? (value as (previous: T) => T)(current)
+    : value;
+}
+
+function nodeManagementReducer(
+  state: NodeManagementState,
+  action: NodeManagementAction
+): NodeManagementState {
+  switch (action.type) {
+    case 'setNodes':
+      return { ...state, nodes: resolveStateUpdate(action.value, state.nodes) };
+    case 'setActiveNodeVrf':
+      return {
+        ...state,
+        activeNodeVrf: resolveStateUpdate(action.value, state.activeNodeVrf),
+      };
+    case 'setTunnelExpiry':
+      return {
+        ...state,
+        tunnelExpiry: resolveStateUpdate(action.value, state.tunnelExpiry),
+      };
+    case 'clearTunnel':
+      return { ...state, activeNodeVrf: null, tunnelExpiry: null };
+    case 'removeNode': {
+      const removedNode = state.nodes.find((node) => node.ppp_user === action.pppUser);
+      if (!removedNode) return state;
+
+      const removedActiveNode = state.activeNodeVrf === removedNode.nombre_vrf;
+      return {
+        ...state,
+        nodes: state.nodes.filter((node) => node.ppp_user !== action.pppUser),
+        activeNodeVrf: removedActiveNode ? null : state.activeNodeVrf,
+        tunnelExpiry: removedActiveNode ? null : state.tunnelExpiry,
+      };
+    }
+  }
 }

@@ -169,7 +169,7 @@ function ImportCard({ disabled }: { disabled?: boolean }) {
                        text-center group disabled:opacity-50 disabled:cursor-not-allowed">
             <FileJson className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-2 group-hover:text-indigo-400" />
             <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Elegir archivo .json</p>
-            <p className="text-2xs text-slate-400 dark:text-slate-500 mt-1">o arrastra y suelta aquí</p>
+            <p className="text-2xs text-slate-500 dark:text-slate-500 mt-1">o arrastra y suelta aquí</p>
           </button>
         </div>
       )}

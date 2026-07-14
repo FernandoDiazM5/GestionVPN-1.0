@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Waypoints, X, Loader2, Plus, Trash2, Search, AlertCircle } from 'lucide-react';
 import { teamApi } from '../../../../services/teamApi';
 import type { Member, Assignment } from '../../../../types/account';
+import Dialog from '../../../Common/Dialog';
 
 interface Props {
   member: Member;
@@ -127,9 +128,13 @@ export default function AssignTunnelsModal({ member, onClose }: Props) {
   const selectedCount = selected.size;
 
   return (
-    <div className="modal-overlay"
-      onClick={e => e.target === e.currentTarget && !busy && onClose()}>
-      <div className="modal-panel modal-panel-lg">
+    <Dialog
+      title={`Túneles asignados a ${member.name || member.email}`}
+      onClose={onClose}
+      closeOnBackdrop={!busy}
+      closeOnEscape={!busy}
+      panelClassName="modal-panel modal-panel-lg"
+    >
         {/* Header */}
         <div className="modal-header-decorated modal-header-indigo">
           <div className="flex items-center gap-3 min-w-0">
@@ -165,7 +170,7 @@ export default function AssignTunnelsModal({ member, onClose }: Props) {
                   </button>
                   {selectedCount > 0 && !visibleAllSelected && (
                     <>
-                      <span className="text-slate-400 dark:text-slate-500">·</span>
+                      <span className="text-slate-500 dark:text-slate-500">·</span>
                       <button
                         onClick={clearSelection}
                         disabled={busy}
@@ -208,11 +213,11 @@ export default function AssignTunnelsModal({ member, onClose }: Props) {
                   <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
                 </div>
               ) : availableTunnels.length === 0 ? (
-                <p className="text-center text-xs text-slate-400 dark:text-slate-500 py-6 px-3">
+                <p className="text-center text-xs text-slate-500 dark:text-slate-500 py-6 px-3">
                   No hay túneles disponibles para asignar.
                 </p>
               ) : visibleTunnels.length === 0 ? (
-                <p className="text-center text-xs text-slate-400 dark:text-slate-500 py-6 px-3">
+                <p className="text-center text-xs text-slate-500 dark:text-slate-500 py-6 px-3">
                   Ningún túnel coincide con "{search}".
                 </p>
               ) : (
@@ -240,7 +245,7 @@ export default function AssignTunnelsModal({ member, onClose }: Props) {
                               {id}
                             </p>
                             {t.nombre_nodo && (
-                              <p className="text-2xs text-slate-400 dark:text-slate-500 truncate">{t.nombre_nodo}</p>
+                              <p className="text-2xs text-slate-500 dark:text-slate-500 truncate">{t.nombre_nodo}</p>
                             )}
                           </div>
                         </label>
@@ -303,7 +308,7 @@ export default function AssignTunnelsModal({ member, onClose }: Props) {
                 <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />
               </div>
             ) : assignments.length === 0 ? (
-              <p className="text-center text-sm text-slate-400 dark:text-slate-500 py-6">
+              <p className="text-center text-sm text-slate-500 dark:text-slate-500 py-6">
                 Sin túneles asignados todavía. Elige uno o varios arriba y dale "Asignar".
               </p>
             ) : (
@@ -329,7 +334,6 @@ export default function AssignTunnelsModal({ member, onClose }: Props) {
             )}
           </div>
         </div>
-      </div>
-    </div>
+    </Dialog>
   );
 }

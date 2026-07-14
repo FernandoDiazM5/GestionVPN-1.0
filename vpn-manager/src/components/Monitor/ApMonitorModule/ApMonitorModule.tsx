@@ -220,7 +220,7 @@ export default function ApMonitorModule() {
           </div>
           <div>
             <p className="text-slate-600 dark:text-slate-300 font-semibold">Sin APs guardados</p>
-            <p className="text-slate-400 dark:text-slate-500 text-sm mt-1 max-w-sm">
+            <p className="text-slate-500 dark:text-slate-500 text-sm mt-1 max-w-sm">
               Ve a la pestaña <strong>Escanear</strong>, agrega dispositivos con rol "AP" y vuelve aquí para monitorearlos.
             </p>
           </div>

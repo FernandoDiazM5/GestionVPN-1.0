@@ -11,6 +11,7 @@
 import { useState } from 'react';
 import { X, Wifi, Network, Loader2, Play, AlertCircle, Check } from 'lucide-react';
 import { diagnosticsApi } from '../../../../services/diagnosticsApi';
+import Dialog from '../../../Common/Dialog';
 import type {
   DiagnosticsPingResponse,
   DiagnosticsTraceResponse,
@@ -59,14 +60,11 @@ export default function DiagnosticsModal({ initialTarget, nodeName, onClose }: D
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div
-        className="modal-panel modal-panel-2xl"
-        onClick={e => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="diag-title"
-      >
+    <Dialog
+      title="Diagnóstico de red"
+      onClose={onClose}
+      panelClassName="modal-panel modal-panel-2xl"
+    >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-2">
@@ -128,8 +126,7 @@ export default function DiagnosticsModal({ initialTarget, nodeName, onClose }: D
           {tab === 'ping' && pingResult && <PingResults data={pingResult} />}
           {tab === 'trace' && traceResult && <TraceResults data={traceResult} />}
         </div>
-      </div>
-    </div>
+    </Dialog>
   );
 }
 

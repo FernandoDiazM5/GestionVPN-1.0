@@ -36,7 +36,7 @@ export default function ControlBar({
           <Waypoints className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
           <span>Acceso a Nodos VRF</span>
         </h2>
-        <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">
+        <p className="text-slate-500 dark:text-slate-500 text-sm mt-1">
           Abre acceso a APs y CPEs remotos mediante enrutamiento VRF
         </p>
         {/* IP global del servidor SSTP — solo visible para Administrador de plataforma */}
@@ -72,7 +72,7 @@ export default function ControlBar({
               <span className={`text-2xs font-mono font-semibold ${globalServerIP ? 'text-slate-700 dark:text-slate-200' : 'text-slate-500 dark:text-slate-400 italic'}`}>
                 {globalServerIP || 'Sin configurar'}
               </span>
-              <Pencil className="w-2.5 h-2.5 text-slate-400 dark:text-slate-500 group-hover:text-indigo-500 transition-colors" />
+              <Pencil className="w-2.5 h-2.5 text-slate-500 dark:text-slate-500 group-hover:text-indigo-500 transition-colors" />
             </button>
           )}
         </div>

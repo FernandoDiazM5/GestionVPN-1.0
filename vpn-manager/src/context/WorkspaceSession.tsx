@@ -4,21 +4,26 @@
 //  (Sidebar, módulos), evitando puentes duplicados.
 // ============================================================
 import { createContext, useContext, type ReactNode } from 'react';
-import { useSession } from '../hooks/useSession';
+import { useVpn } from './VpnProvider';
 import type { SessionUser } from '../types/account';
 
 interface WorkspaceSessionValue {
   session: SessionUser | null;
   loading: boolean;
-  refresh: () => Promise<void>;
+  refresh: () => Promise<SessionUser | null>;
 }
 
 const Ctx = createContext<WorkspaceSessionValue>({
-  session: null, loading: true, refresh: async () => {},
+  session: null, loading: true, refresh: async () => null,
 });
 
 export function WorkspaceSessionProvider({ children }: { children: ReactNode }) {
-  const value = useSession();
+  const {
+    workspaceSession: session,
+    workspaceSessionLoading: loading,
+    refreshWorkspaceSession: refresh,
+  } = useVpn();
+  const value = { session, loading, refresh };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

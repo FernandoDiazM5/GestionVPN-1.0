@@ -1,11 +1,13 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { Server, AlertTriangle } from 'lucide-react';
+import { BrowserRouter } from 'react-router-dom';
 import { VpnProvider, useVpn } from './context';
 
 import Sidebar from './components/Layout/Sidebar';
 import { WorkspaceSessionProvider } from './context/WorkspaceSession';
 import ModuleSkeleton from './components/Common/ModuleSkeleton';
 import RouterMaintenanceOverlay from './components/Common/RouterMaintenanceOverlay';
+import ModuleErrorBoundary from './components/Common/ModuleErrorBoundary';
 
 // ── Code-splitting (FASE 10 del REFACTOR_PLAN) ─────────────────────
 //  Cada módulo se carga bajo demanda en su propio chunk. Esto baja el
@@ -29,7 +31,7 @@ const SettingsModule            = lazy(() => import('./components/Settings/Setti
 const ModeratorSettingsModule   = lazy(() => import('./components/Settings/ModeratorSettings/ModeratorSettingsModule'));
 
 import { useWorkspaceSession } from './context/WorkspaceSession';
-import { isPlatformAdmin } from './utils/permissions';
+import { isPlatformAdmin, visibleModules, type ModuleId } from './utils/permissions';
 import { useDeepLinks, PENDING_ACTIVATE_KEY, PENDING_DEACTIVATE_KEY } from './context/hooks/useDeepLinks';
 
 function AppContent() {
@@ -72,7 +74,7 @@ function AppContent() {
 
   if (!isReady) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-sky-50">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
         <div className="flex flex-col items-center space-y-4">
           <div className="p-4 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-500/30 animate-pulse">
             <Server className="w-8 h-8 text-white" />
@@ -89,19 +91,21 @@ function AppContent() {
     // PasswordResetConfirm). El ModuleSkeleton de la app autenticada
     // se vería raro aquí: este flujo es público y debe sentirse instantáneo.
     return (
-      <Suspense
-        fallback={
-          <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-sky-50">
-            <div className="flex flex-col items-center space-y-4">
-              <div className="p-4 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-500/30 animate-pulse">
-                <Server className="w-8 h-8 text-white" />
+      <ModuleErrorBoundary resetKey="auth">
+        <Suspense
+          fallback={
+            <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
+              <div className="flex flex-col items-center space-y-4">
+                <div className="p-4 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-500/30 animate-pulse">
+                  <Server className="w-8 h-8 text-white" />
+                </div>
               </div>
             </div>
-          </div>
-        }
-      >
-        <RouterAccess />
-      </Suspense>
+          }
+        >
+          <RouterAccess />
+        </Suspense>
+      </ModuleErrorBoundary>
     );
   }
 
@@ -126,22 +130,38 @@ function AppContent() {
           </div>
         )}
 
-        {/* Suspense único — se reusa al cambiar de módulo. La key fuerza un nuevo
-            boundary cuando cambia activeModule para que el skeleton aparezca
-            limpio aunque el chunk anterior ya estuviera resuelto. */}
-        <Suspense key={activeModule} fallback={<ModuleSkeleton />}>
-          {activeModule === 'dashboard'   && <AdminDashboard />}
-          {activeModule === 'moderators'  && <ModeratorsModule />}
-          {activeModule === 'nodes'       && <NodeAccessPanel />}
-          {activeModule === 'team'        && <TeamModule />}
-          {activeModule === 'devices'     && <NetworkDevicesModule />}
-          {activeModule === 'monitor'     && <ApMonitorModule />}
-          {activeModule === 'settings'    && <SettingsModuleRouter />}
-        </Suspense>
+        <ModuleRouter />
       </main>
 
     </div>
     </WorkspaceSessionProvider>
+  );
+}
+
+function ModuleRouter() {
+  const { activeModule, setActiveModule } = useVpn();
+  const { session, loading } = useWorkspaceSession();
+  const allowed = visibleModules(session);
+  const canOpen = allowed.includes(activeModule as ModuleId);
+
+  useEffect(() => {
+    if (!loading && session && !canOpen) setActiveModule(allowed[0] ?? 'nodes');
+  }, [allowed, canOpen, loading, session, setActiveModule]);
+
+  if (loading || !session || !canOpen) return <ModuleSkeleton />;
+
+  return (
+    <ModuleErrorBoundary resetKey={activeModule}>
+      <Suspense fallback={<ModuleSkeleton />}>
+        {activeModule === 'dashboard'   && <AdminDashboard />}
+        {activeModule === 'moderators'  && <ModeratorsModule />}
+        {activeModule === 'nodes'       && <NodeAccessPanel />}
+        {activeModule === 'team'        && <TeamModule />}
+        {activeModule === 'devices'     && <NetworkDevicesModule />}
+        {activeModule === 'monitor'     && <ApMonitorModule />}
+        {activeModule === 'settings'    && <SettingsModuleRouter />}
+      </Suspense>
+    </ModuleErrorBoundary>
   );
 }
 
@@ -156,9 +176,12 @@ function SettingsModuleRouter() {
 }
 
 export default function App() {
+  const basename = import.meta.env.BASE_URL.replace(/\/$/, '');
   return (
-    <VpnProvider>
-      <AppContent />
-    </VpnProvider>
+    <BrowserRouter basename={basename}>
+      <VpnProvider>
+        <AppContent />
+      </VpnProvider>
+    </BrowserRouter>
   );
 }

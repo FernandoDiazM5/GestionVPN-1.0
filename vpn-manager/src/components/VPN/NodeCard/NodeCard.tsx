@@ -195,7 +195,7 @@ export default function NodeCard({
                 disabled={!canActivate}
                 onClick={handleActivate}
                 title={accessBlockReason ?? undefined}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all
+                className={`flex min-h-11 items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500
                   ${canActivate
                     ? 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white group-hover:shadow-sm active:scale-[0.97] dark:bg-indigo-500/15 dark:text-indigo-300 dark:group-hover:bg-indigo-500 dark:group-hover:text-white'
                     : 'bg-slate-50 text-slate-300 cursor-not-allowed dark:bg-slate-800 dark:text-slate-600'}`}
@@ -212,7 +212,7 @@ export default function NodeCard({
               <button
                 disabled={isPending}
                 onClick={handleDeactivate}
-                className="btn-danger flex items-center gap-1.5 px-3 py-1.5 text-xs disabled:opacity-50"
+                className="btn-danger flex min-h-11 items-center gap-1.5 px-3 py-1.5 text-xs disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
               >
                 {isDeactivating
                   ? <Loader2 className="w-3.5 h-3.5 animate-spin" />

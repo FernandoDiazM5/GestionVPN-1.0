@@ -224,7 +224,7 @@ export default function NodesListSection({
             <Radio className="w-7 h-7 text-indigo-400" />
           </div>
           <p className="text-slate-500 dark:text-slate-300 font-medium">Sin nodos SSTP</p>
-          <p className="text-slate-400 dark:text-slate-500 text-sm">El router no tiene túneles SSTP configurados</p>
+          <p className="text-slate-500 dark:text-slate-500 text-sm">El router no tiene túneles SSTP configurados</p>
         </div>
       )}
 
@@ -235,7 +235,7 @@ export default function NodesListSection({
             <Search className="w-7 h-7 text-indigo-400" />
           </div>
           <p className="text-slate-500 dark:text-slate-300 font-medium">Sin datos aún</p>
-          <p className="text-slate-400 dark:text-slate-500 text-sm">Haz clic en "Actualizar" para obtener los túneles VRF del router</p>
+          <p className="text-slate-500 dark:text-slate-500 text-sm">Haz clic en "Actualizar" para obtener los túneles VRF del router</p>
         </div>
       )}
     </>

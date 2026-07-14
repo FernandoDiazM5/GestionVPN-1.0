@@ -6,6 +6,7 @@ import { API_BASE_URL } from '../../../../config';
 import { ProvisionSteps } from '../components';
 import type { NodeInfo } from '../../../../types/api';
 import type { ProvisionResult } from '../types';
+import Dialog from '../../../Common/Dialog';
 
 interface EliminarNodoProps {
   node: NodeInfo;
@@ -82,9 +83,13 @@ export default function EliminarNodo({ node, onClose, onSuccess }: EliminarNodoP
   };
 
   return (
-    <div className="modal-overlay"
-      onClick={e => e.target === e.currentTarget && !deleting && !result && onClose()}>
-      <div className="modal-panel modal-panel-xl">
+    <Dialog
+      title={`Eliminar nodo ${node.nombre_nodo}`}
+      onClose={onClose}
+      closeOnBackdrop={!deleting && !result}
+      closeOnEscape={!deleting && !result}
+      panelClassName="modal-panel modal-panel-xl"
+    >
 
         <div className="modal-header-decorated modal-header-rose">
           <div className="flex items-center gap-3">
@@ -187,7 +192,6 @@ export default function EliminarNodo({ node, onClose, onSuccess }: EliminarNodoP
             </button>
           </div>
         )}
-      </div>
-    </div>
+    </Dialog>
   );
 }

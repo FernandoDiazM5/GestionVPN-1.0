@@ -137,9 +137,3 @@ export interface MemberWireguard {
   allowedIps?: string;
   conf: string | null;
 }
-
-/** Etiqueta legible por rol — la mantenemos aquí para que ambos lados la importen. */
-export const ROLE_LABEL: Record<Role, string> = {
-  OWNER: 'Propietario',
-  MEMBER: 'Miembro',
-};

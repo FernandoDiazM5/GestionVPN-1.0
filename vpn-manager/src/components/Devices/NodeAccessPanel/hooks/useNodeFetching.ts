@@ -19,6 +19,43 @@ interface UseNodeFetchingProps {
   addToast: (text: string, type: 'warn' | 'info') => void;
 }
 
+export const NODE_CACHE_KEY = 'vpn_nodes_cache_v1';
+export const NODE_CACHE_TTL_MS = 5 * 60_000;
+type NodeCacheStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
+
+export function persistNodesCache(
+  storage: NodeCacheStorage,
+  nodes: NodeInfo[],
+  now = Date.now(),
+): boolean {
+  try {
+    storage.setItem(NODE_CACHE_KEY, JSON.stringify({ at: now, nodes }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function readNodesCache(
+  storage: NodeCacheStorage,
+  now = Date.now(),
+): NodeInfo[] | null {
+  try {
+    const raw = storage.getItem(NODE_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { at?: unknown; nodes?: unknown };
+    const age = now - Number(parsed.at);
+    if (!Number.isFinite(age) || age < 0 || age > NODE_CACHE_TTL_MS || !Array.isArray(parsed.nodes)) {
+      storage.removeItem(NODE_CACHE_KEY);
+      return null;
+    }
+    return parsed.nodes as NodeInfo[];
+  } catch {
+    try { storage.removeItem(NODE_CACHE_KEY); } catch { /* storage unavailable */ }
+    return null;
+  }
+}
+
 export function useNodeFetching(props: UseNodeFetchingProps) {
   const {
     credentials,
@@ -47,24 +84,8 @@ export function useNodeFetching(props: UseNodeFetchingProps) {
     return Array.isArray(data) ? data as NodeInfo[] : null;
   }, [credentials]);
 
-  // Cache persistente en sessionStorage para sobrevivir cambios de pestaña.
-  // TTL: solo invalida al hacer F5 o cerrar la pestaña. Mientras esté viva la
-  // sesión, los datos se mantienen y solo se refrescan vía botón "Actualizar".
-  const CACHE_KEY = 'vpn_nodes_cache_v1';
-
-  const persistCache = (list: NodeInfo[]) => {
-    try { sessionStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), nodes: list })); } catch { /* ignore */ }
-  };
-
-  const readCache = (): NodeInfo[] | null => {
-    try {
-      const raw = sessionStorage.getItem(CACHE_KEY);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed?.nodes) ? parsed.nodes as NodeInfo[] : null;
-    } catch { return null; }
-  };
-
+  // La caché solo acelera el primer render; el TTL limita cuánto tiempo puede
+  // mostrarse antes de exigir una carga fresca desde el backend.
   const handleLoadNodes = async () => {
     if (!credentials) return;
     setIsLoading(true);
@@ -78,7 +99,7 @@ export function useNodeFetching(props: UseNodeFetchingProps) {
       });
       setNodes(nodeList);
       setHasLoaded(true);
-      persistCache(nodeList);
+      persistNodesCache(sessionStorage, nodeList);
     } catch (err: unknown) {
       setErrorMsg(`Error: ${err instanceof Error ? err.message : 'Error desconocido'}`);
     } finally {
@@ -95,7 +116,7 @@ export function useNodeFetching(props: UseNodeFetchingProps) {
     if (bootstrapDoneRef.current) return;
     if (!credentials || !isReady) return;
     bootstrapDoneRef.current = true;
-    const cached = readCache();
+    const cached = readNodesCache(sessionStorage);
     if (cached && cached.length) {
       cached.forEach(n => { prevRunningRef.current[n.ppp_user] = n.running; });
       setNodes(cached);
@@ -124,7 +145,7 @@ export function useNodeFetching(props: UseNodeFetchingProps) {
         prevRunningRef.current[n.ppp_user] = n.running;
       });
       setNodes(nodeList);
-      persistCache(nodeList);
+      persistNodesCache(sessionStorage, nodeList);
       disconnected.forEach(n => {
         addToast(`${n.nombre_nodo} se desconectó del VPN`, 'warn');
         apiFetch(`${API_BASE_URL}/api/node/history/add`, {
@@ -168,8 +189,10 @@ export function useNodeFetching(props: UseNodeFetchingProps) {
       try {
         const live = await fetchNodes();
         if (!live) return;
+        live.forEach(n => { prevRunningRef.current[n.ppp_user] = n.running; });
         setNodes(live);
         setHasLoaded(true);
+        persistNodesCache(sessionStorage, live);
       } catch {
         // Silencioso — si el backend no responde, conservar caché
       }

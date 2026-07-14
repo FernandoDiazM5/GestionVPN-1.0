@@ -9,6 +9,7 @@ import { API_BASE_URL } from '../../../../config';
 import { generateSecurePassword, getSubnetConflicts } from '../utils';
 import { ProvisionSteps } from '../components';
 import type { ProvisionResult } from '../types';
+import Dialog from '../../../Common/Dialog';
 
 interface NuevoNodoProps {
   onClose: () => void;
@@ -209,9 +210,13 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
   };
 
   return (
-    <div className="modal-overlay"
-      onClick={e => e.target === e.currentTarget && !provisioning && !result && onClose()}>
-      <div className="modal-panel modal-panel-2xl">
+    <Dialog
+      title="Crear nuevo nodo"
+      onClose={onClose}
+      closeOnBackdrop={!provisioning && !result}
+      closeOnEscape={!provisioning && !result}
+      panelClassName="modal-panel modal-panel-2xl"
+    >
 
         {/* NuevoNodo usa indigo-700 intencional (más sólido que el indigo-600
             estándar de modal-header-indigo) para diferenciarlo visualmente
@@ -658,7 +663,6 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
             </button>
           </div>
         )}
-      </div>
-    </div>
+    </Dialog>
   );
 }

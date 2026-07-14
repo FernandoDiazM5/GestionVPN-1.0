@@ -59,7 +59,7 @@ function CpeRow({ cpe, idx, onDetail, hiddenCols, gridCols }: {
         <div className="px-2 py-2 min-w-0">
           {displayName
             ? <p className="truncate font-semibold text-slate-800 dark:text-slate-100 text-2xs">{displayName}</p>
-            : <p className="text-slate-400 dark:text-slate-500 italic text-3xs">Sin nombre</p>}
+            : <p className="text-slate-500 dark:text-slate-500 italic text-3xs">Sin nombre</p>}
         </div>
       )}
 

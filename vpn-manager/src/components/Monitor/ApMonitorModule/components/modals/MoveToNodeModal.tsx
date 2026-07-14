@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X, ArrowRightLeft } from 'lucide-react';
 import type { SavedDevice } from '../../../../../types/devices';
 import type { NodeInfo } from '../../../../../types/api';
+import Dialog from '../../../../Common/Dialog';
 
 function MoveToNodeModal({ device, nodes, knownNames, onConfirm, onClose }: {
   device: SavedDevice;
@@ -20,9 +21,11 @@ function MoveToNodeModal({ device, nodes, knownNames, onConfirm, onClose }: {
   ];
 
   return (
-    <div className="modal-overlay"
-      onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal-panel modal-panel-sm p-5 space-y-4">
+    <Dialog
+      title="Mover AP a nodo"
+      onClose={onClose}
+      panelClassName="modal-panel modal-panel-sm p-5 space-y-4"
+    >
         <div className="flex items-center justify-between">
           <div>
             <h3 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
@@ -46,7 +49,7 @@ function MoveToNodeModal({ device, nodes, knownNames, onConfirm, onClose }: {
             <button key={opt.id} onClick={() => setSelected(opt)}
               className={`w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium border transition-all
                 ${selected?.id === opt.id
-                  ? 'bg-indigo-600 text-white border-indigo-600 dark:bg-indigo-500 dark:border-indigo-500'
+                  ? 'btn-primary border-indigo-600 dark:border-indigo-500'
                   : opt.name === device.nodeName
                     ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-default dark:bg-slate-800 dark:text-slate-500 dark:border-slate-700'
                     : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-indigo-50 hover:border-indigo-300 dark:bg-slate-800/60 dark:text-slate-200 dark:border-slate-700 dark:hover:bg-indigo-500/10 dark:hover:border-indigo-500/40'}`}
@@ -69,8 +72,7 @@ function MoveToNodeModal({ device, nodes, knownNames, onConfirm, onClose }: {
             Mover
           </button>
         </div>
-      </div>
-    </div>
+    </Dialog>
   );
 }
 

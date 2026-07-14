@@ -108,7 +108,7 @@ export default function RouterAccess() {
 
   if (needsSetup === null) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-sky-50">
+        <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
            <Spinner size="lg" label="Verificando sesión…" />
         </div>
       );
@@ -137,7 +137,7 @@ export default function RouterAccess() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-sky-50 flex items-center justify-center p-4 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
+    <div className="relative min-h-[100svh] overflow-x-clip bg-slate-50 flex items-center justify-center p-4 dark:bg-slate-950">
 
       <div className="absolute top-0 left-0 w-96 h-96 bg-indigo-100 rounded-full -translate-x-1/2 -translate-y-1/2 opacity-60 blur-3xl pointer-events-none dark:bg-indigo-500/20 dark:opacity-30" />
       <div className="absolute bottom-0 right-0 w-96 h-96 bg-sky-100 rounded-full translate-x-1/2 translate-y-1/2 opacity-60 blur-3xl pointer-events-none dark:bg-sky-500/20 dark:opacity-30" />
@@ -168,7 +168,7 @@ export default function RouterAccess() {
             {syncStatus !== 'idle' && (
               <div className="mb-6">
                 {syncStatus === 'loading' && (
-                  <div className="flex items-center space-x-3 px-4 py-3 bg-indigo-50 rounded-xl border border-indigo-100 dark:bg-indigo-500/10 dark:border-indigo-500/30">
+                  <div role="status" aria-live="polite" className="flex items-center space-x-3 px-4 py-3 bg-indigo-50 rounded-xl border border-indigo-100 dark:bg-indigo-500/10 dark:border-indigo-500/30">
                     <Loader2 className="w-4 h-4 text-indigo-500 animate-spin shrink-0" />
                     <div>
                       <p className="text-sm font-semibold text-indigo-700 dark:text-indigo-300">Autenticando...</p>
@@ -176,14 +176,14 @@ export default function RouterAccess() {
                   </div>
                 )}
                 {syncStatus === 'success' && (
-                  <div className="flex items-center space-x-3 px-4 py-3 bg-emerald-50 rounded-xl border border-emerald-100 dark:bg-emerald-500/10 dark:border-emerald-500/30">
+                  <div role="status" aria-live="polite" className="flex items-center space-x-3 px-4 py-3 bg-emerald-50 rounded-xl border border-emerald-100 dark:bg-emerald-500/10 dark:border-emerald-500/30">
                     <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
                     <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">¡Conexión exitosa! Entrando...</p>
                   </div>
                 )}
                 {syncStatus === 'error' && (
                   <div className="space-y-3">
-                    <div className="flex items-start space-x-3 px-4 py-3 bg-rose-50 rounded-xl border border-rose-100 dark:bg-rose-500/10 dark:border-rose-500/30">
+                    <div role="alert" aria-live="assertive" className="flex items-start space-x-3 px-4 py-3 bg-rose-50 rounded-xl border border-rose-100 dark:bg-rose-500/10 dark:border-rose-500/30">
                       <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-rose-700 dark:text-rose-300">Error de conexión</p>
@@ -197,14 +197,18 @@ export default function RouterAccess() {
 
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+                <label htmlFor="login-username" className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
                   {needsSetup ? 'Usuario Administrador' : 'Usuario o correo'}
                 </label>
                 <div className="relative">
                   <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
                   <input
+                    id="login-username"
+                    name="username"
                     type="text"
                     required
+                    autoComplete="username"
+                    maxLength={255}
                     placeholder={needsSetup ? "admin" : "admin o correo@ejemplo.com"}
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
@@ -214,14 +218,19 @@ export default function RouterAccess() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+                <label htmlFor="login-password" className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
                   Contraseña
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
                   <input
+                    id="login-password"
+                    name="password"
                     type="password"
                     required
+                    minLength={8}
+                    maxLength={128}
+                    autoComplete={needsSetup ? 'new-password' : 'current-password'}
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
