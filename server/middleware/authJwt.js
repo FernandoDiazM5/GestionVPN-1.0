@@ -5,30 +5,12 @@
 // ============================================================
 const { COOKIE_NAME, verifySession, clearSessionCookie } = require('../lib/jwt');
 const { sendError } = require('../lib/apiResponse');
-const { query } = require('../db/mysql');
+const { getAccountStatus, invalidateAccountStatus } = require('../lib/accountStatus');
 const log = require('../lib/logger').child({ scope: 'auth' });
-
-// Cache LRU minimalista — evita golpear MySQL en CADA request. TTL corto: si
-// el usuario es eliminado, el deslogueo tarda como máximo este intervalo.
-const USER_CACHE_TTL_MS = 15 * 1000;
-const userCache = new Map(); // user_id → { ok: boolean, expires: number }
-
-async function userStillExists(userId) {
-  const cached = userCache.get(userId);
-  const now = Date.now();
-  if (cached && cached.expires > now) return cached.ok;
-  const rows = await query(
-    'SELECT 1 FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1',
-    [userId]
-  );
-  const ok = rows.length > 0;
-  userCache.set(userId, { ok, expires: now + USER_CACHE_TTL_MS });
-  return ok;
-}
 
 /** Invalida el cache de un user (llamar al borrarlo). */
 function invalidateUserCache(userId) {
-  if (userId) userCache.delete(userId);
+  invalidateAccountStatus(userId);
 }
 
 /** Exige sesión válida. Setea req.account = { sub, email, workspace_id, role }. */
@@ -48,9 +30,12 @@ async function requireSession(req, res, next) {
     return next();
   }
   try {
-    if (!(await userStillExists(account.sub))) {
+    const status = await getAccountStatus(account.sub);
+    if (status !== 'active') {
       try { clearSessionCookie(res); } catch (_) { /* noop */ }
-      return sendError(res, 401, 'Tu cuenta fue eliminada', 'USER_DELETED');
+      return status === 'suspended'
+        ? sendError(res, 401, 'Tu cuenta fue suspendida por el Administrador', 'ACCOUNT_SUSPENDED')
+        : sendError(res, 401, 'Tu cuenta fue eliminada', 'USER_DELETED');
     }
   } catch (e) {
     // Si MySQL falla acá, mejor dejar pasar (degradar) que tirar 500 a todas

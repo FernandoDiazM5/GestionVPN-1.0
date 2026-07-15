@@ -24,11 +24,19 @@ export function useSaveSettings() {
     setErrorMsg('');
 
     try {
-      await saveSetting('MT_IP', settings.MT_IP || '');
-      await saveSetting('MT_USER', settings.MT_USER || '');
-      await saveSetting('MT_PASS', settings.MT_PASS || '');
-      await saveSetting('server_public_ip', settings.server_public_ip || '');
-      await saveSetting('sstp_port', settings.sstp_port || '');
+      await Promise.all([
+        saveSetting('MT_IP', settings.MT_IP || ''),
+        saveSetting('MT_USER', settings.MT_USER || ''),
+        saveSetting('MT_PASS', settings.MT_PASS || ''),
+        saveSetting('server_public_ip', settings.server_public_ip || ''),
+        saveSetting('sstp_port', settings.sstp_port || ''),
+        saveSetting('core_wan_interface', settings.core_wan_interface || ''),
+        saveSetting('core_vps_public_key', settings.core_vps_public_key || ''),
+        saveSetting('core_backup_enabled', String(settings.core_backup_enabled ?? false)),
+        saveSetting('core_backup_time', settings.core_backup_time || '02:00'),
+        saveSetting('core_backup_timezone', settings.core_backup_timezone || 'America/Lima'),
+        saveSetting('core_backup_password', settings.core_backup_password || ''),
+      ]);
       setSuccessMsg(SETTINGS_MESSAGES.SAVE_SUCCESS);
     } catch (e: unknown) {
       setErrorMsg(e instanceof Error ? e.message : SETTINGS_MESSAGES.SAVE_ERROR);

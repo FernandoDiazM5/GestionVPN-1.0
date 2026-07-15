@@ -74,25 +74,38 @@ function buildAcceptUrl(email, otp) {
 const router = express.Router();
 router.use(requireSession, requirePlatformAdmin);
 
-// ── GET /api/admin/summary — métricas globales para el Dashboard ──
-router.get('/summary', asyncHandler(async (_req, res) => {
-  const roles = (await query(
+async function loadAdminSummary(runQuery = query, now = Date.now()) {
+  const roles = (await runQuery(
     `SELECT
-       SUM(role='OWNER') AS moderadores,
-       SUM(role='MEMBER') AS miembros,
+       SUM(wm.role='OWNER' AND u.is_platform_admin=0) AS moderadores,
+       SUM(wm.role='MEMBER' AND u.is_platform_admin=0) AS miembros,
        COUNT(*) AS total
-     FROM workspace_members WHERE deleted_at IS NULL`
+     FROM workspace_members wm
+     JOIN users u ON u.id = wm.user_id
+     JOIN workspaces w ON w.id = wm.workspace_id
+     WHERE wm.deleted_at IS NULL AND u.deleted_at IS NULL AND w.deleted_at IS NULL`
   ))[0] || {};
-  const ws = (await query('SELECT COUNT(*) AS total FROM workspaces WHERE deleted_at IS NULL'))[0] || {};
-  const usr = (await query('SELECT COUNT(*) AS total FROM users WHERE deleted_at IS NULL'))[0] || {};
-  const acts = (await query('SELECT COUNT(*) AS total FROM tunnel_logs WHERE created_at >= ?', [Date.now() - 86400000]))[0] || {};
-  const recent = await query(
+  const ws = (await runQuery(
+    `SELECT COUNT(*) AS total
+       FROM workspaces w
+       JOIN users owner ON owner.id = w.owner_id
+      WHERE w.deleted_at IS NULL AND owner.deleted_at IS NULL
+        AND owner.is_platform_admin = 0`
+  ))[0] || {};
+  const usr = (await runQuery(
+    'SELECT COUNT(*) AS total FROM users WHERE deleted_at IS NULL AND is_platform_admin = 0'
+  ))[0] || {};
+  const acts = (await runQuery(
+    'SELECT COUNT(*) AS total FROM tunnel_logs WHERE created_at >= ?',
+    [now - 86400000]
+  ))[0] || {};
+  const recent = await runQuery(
     `SELECT tl.action, tl.tunnel_id, tl.created_at, u.email AS user_email
        FROM tunnel_logs tl LEFT JOIN users u ON u.id = tl.user_id
       ORDER BY tl.created_at DESC LIMIT 10`
   );
 
-  return sendOk(res, {
+  return {
     summary: {
       workspaces: Number(ws.total || 0),
       usuarios: Number(usr.total || 0),
@@ -101,7 +114,12 @@ router.get('/summary', asyncHandler(async (_req, res) => {
       acciones_24h: Number(acts.total || 0),
     },
     recent,
-  });
+  };
+}
+
+// ── GET /api/admin/summary — métricas globales para el Dashboard ──
+router.get('/summary', asyncHandler(async (_req, res) => {
+  return sendOk(res, await loadAdminSummary());
 }));
 
 // ── GET /api/admin/moderators — lista de moderadores (OWNERs) ──
@@ -438,4 +456,9 @@ router.post('/invitations/:id/link', asyncHandler(async (req, res) => {
   return sendOk(res, { email: inv.email, acceptUrl: buildAcceptUrl(inv.email, otp), code: otp });
 }));
 
+// Estado, aprovisionamiento desde cero y respaldo dual del MikroTik Core.
+// Hereda requireSession + requirePlatformAdmin del router padre.
+router.use('/core-server', require('./coreServer.routes'));
+
 module.exports = router;
+module.exports.loadAdminSummary = loadAdminSummary;

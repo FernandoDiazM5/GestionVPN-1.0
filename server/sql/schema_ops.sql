@@ -233,6 +233,29 @@ CREATE TABLE IF NOT EXISTS app_settings (
     updated_at BIGINT NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ── 12b. Ejecuciones del respaldo dual del core ─────────────
+-- Sólo metadatos: los archivos .backup/.rsc NUNCA se persisten en MySQL.
+CREATE TABLE IF NOT EXISTS core_backup_runs (
+    id                CHAR(36) NOT NULL PRIMARY KEY,
+    dedupe_key        VARCHAR(190) NOT NULL,
+    trigger_type      ENUM('scheduled','manual') NOT NULL,
+    local_date        CHAR(10) NOT NULL,
+    status            ENUM('RUNNING','SENT','FAILED') NOT NULL,
+    identity_name     VARCHAR(190) DEFAULT NULL,
+    backup_size_bytes BIGINT DEFAULT NULL,
+    backup_sha256     CHAR(64) DEFAULT NULL,
+    rsc_size_bytes    BIGINT DEFAULT NULL,
+    rsc_sha256        CHAR(64) DEFAULT NULL,
+    recipient_masked  VARCHAR(255) DEFAULT NULL,
+    failure_code      VARCHAR(80) DEFAULT NULL,
+    started_at        BIGINT NOT NULL,
+    sent_at           BIGINT DEFAULT NULL,
+    finished_at       BIGINT DEFAULT NULL,
+    UNIQUE KEY uq_core_backup_dedupe (dedupe_key),
+    KEY idx_core_backup_started (started_at),
+    KEY idx_core_backup_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ── 13. Colores de peers WireGuard ─────────────────────────
 CREATE TABLE IF NOT EXISTS peer_colors (
     peer_address VARCHAR(190) NOT NULL PRIMARY KEY,

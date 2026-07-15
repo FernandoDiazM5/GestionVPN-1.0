@@ -62,6 +62,15 @@ describe('sessionClient.apiJson', () => {
     expect(authExpiredSpy).toHaveBeenCalledTimes(1);
   });
 
+  it('401 ACCOUNT_SUSPENDED → dispara auth_expired', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(
+      JSON.stringify({ success: false, code: 'ACCOUNT_SUSPENDED', message: 'Cuenta suspendida' }),
+      { status: 401, headers: { 'Content-Type': 'application/json' } },
+    ));
+    await expect(apiJson('/api/account/session-status')).rejects.toMatchObject({ code: 'ACCOUNT_SUSPENDED' });
+    expect(authExpiredSpy).toHaveBeenCalledTimes(1);
+  });
+
   it('401 NO_SESSION → dispara auth_expired', async () => {
     server.use(http.get(`${API_BASE_URL}/api/test/y`, () =>
       HttpResponse.json({ success: false, code: 'NO_SESSION' }, { status: 401 })));

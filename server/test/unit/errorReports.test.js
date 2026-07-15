@@ -13,13 +13,14 @@ const baseReport = {
   occurredAt: 1_700_000_000_000,
 };
 
-function appWith(sendGeneric) {
+function appWith(sendGeneric, options = {}) {
   const app = express();
   app.use(express.json());
   app.use('/api/error-reports', createErrorReportsRouter({
     sendGeneric,
     errorReportEmail: 'admin@example.com',
     logger: { info: vi.fn(), warn: vi.fn() },
+    ...options,
   }));
   return app;
 }
@@ -56,6 +57,15 @@ describe('errorReports.routes', () => {
     await request(app).post('/api/error-reports').send(baseReport);
     await request(app).post('/api/error-reports').send(baseReport);
     expect(sendGeneric).toHaveBeenCalledTimes(1);
+  });
+
+  it('resuelve el destinatario dinamicamente para cada reporte nuevo', async () => {
+    const sendGeneric = vi.fn().mockResolvedValue({ delivered: true });
+    const resolveErrorReportEmail = vi.fn().mockResolvedValue('dinamico@example.com');
+    const app = appWith(sendGeneric, { errorReportEmail: undefined, resolveErrorReportEmail });
+    await request(app).post('/api/error-reports').send({ ...baseReport, message: 'Error dinamico' });
+    expect(resolveErrorReportEmail).toHaveBeenCalledTimes(1);
+    expect(sendGeneric).toHaveBeenCalledWith(expect.objectContaining({ to: 'dinamico@example.com' }));
   });
 
   it('redacta JWT y claves privadas', () => {

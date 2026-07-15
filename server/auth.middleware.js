@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const { getAppSetting, decryptPass } = require('./db.service');
 const metrics = require('./lib/metrics');
+const { getAccountStatus } = require('./lib/accountStatus');
 
 const SECRET_FILE = `${process.env.DATA_DIR || __dirname}/.jwt_secret`;
 let JWT_SECRET;
@@ -39,6 +40,23 @@ const verifyToken = async (req, res, next) => {
         const session = jwt.verify(cookieTok, JWT_SECRET);
         if (!session || !session.sub || !session.workspace_id) {
             throw new Error('Sesión sin identidad RBAC');
+        }
+        if (!session.platform_admin) {
+            const status = await getAccountStatus(session.sub);
+            if (status !== 'active') {
+                res.clearCookie('vpn_session', {
+                    httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/',
+                });
+                metrics.authFailsTotal.inc({ reason: status });
+                return res.status(401).json({
+                    success: false,
+                    code: status === 'suspended' ? 'ACCOUNT_SUSPENDED' : 'USER_DELETED',
+                    message: status === 'suspended'
+                        ? 'Tu cuenta fue suspendida por el Administrador'
+                        : 'Tu cuenta fue eliminada',
+                    logout: true,
+                });
+            }
         }
         req.account = session;
         await injectMikrotik(req);

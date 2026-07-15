@@ -1,11 +1,12 @@
-// En desarrollo: vacío → http://localhost:3001
-// En Docker con nginx proxy: VITE_API_URL="" → URLs relativas, nginx redirige /api → backend
-// En Docker acceso externo: VITE_API_URL="http://IP_SERVIDOR:3001"
-export const API_BASE_URL = (import.meta.env.VITE_API_URL ?? '') !== ''
-  ? import.meta.env.VITE_API_URL
-  : (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1')
-    ? ''              // En producción (Docker nginx proxy): URLs relativas
-    : 'http://localhost:3001';  // En desarrollo local
+// Por defecto la API es same-origin: Vite redirige /api al backend en desarrollo
+// y Nginx hace lo mismo en produccion. Esto evita mezclar 127.0.0.1 con localhost,
+// porque las cookies SameSite y los SSE deben usar el mismo sitio del frontend.
+// VITE_API_URL solo se usa cuando el backend vive realmente en otro origen.
+export function resolveApiBaseUrl(configuredUrl?: string): string {
+  return String(configuredUrl ?? '').trim().replace(/\/+$/, '');
+}
+
+export const API_BASE_URL = resolveApiBaseUrl(import.meta.env.VITE_API_URL);
 
 // ── Plano de gestión (espejo de server/lib/mgmtNet.js) ──────────────────────
 //  Solo para validación de subred y visualización en la UI. El backend es la

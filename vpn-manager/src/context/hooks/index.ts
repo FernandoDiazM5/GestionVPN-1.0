@@ -6,4 +6,5 @@ export { useTunnelSync } from './useTunnelSync';
 export { useTunnelTimeout } from './useTunnelTimeout';
 export { useTunnelKeepalive } from './useTunnelKeepalive';
 export { useAuthExpiry } from './useAuthExpiry';
+export { useSessionExpiry } from './useSessionExpiry';
 export { usePersistence } from './usePersistence';

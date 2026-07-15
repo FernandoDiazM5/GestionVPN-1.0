@@ -144,6 +144,10 @@ router.post('/login', rl.guard('LOGIN'), asyncHandler(async (req, res) => {
   if (!user.email_verified) {
     throw new AppError('Verifica tu correo antes de iniciar sesión', 403, 'EMAIL_NOT_VERIFIED');
   }
+  if (user.disabled_at) {
+    await rl.recordAttempt(ip, 'LOGIN', email, false);
+    throw new AppError('Tu cuenta fue suspendida por el Administrador', 403, 'ACCOUNT_SUSPENDED');
+  }
   const ok = await bcrypt.compare(password, user.password_hash);
   if (!ok) {
     await rl.recordAttempt(ip, 'LOGIN', email, false);
@@ -170,8 +174,28 @@ router.post('/logout', (req, res) => {
   return sendOk(res, { message: 'Sesión cerrada' });
 });
 
+router.get('/session-status', requireSession, (req, res) => sendOk(res, {
+  expiresAt: Number(req.account.exp) * 1000,
+}));
+
+router.post('/session-renew', requireSession, (req, res) => {
+  const { iat: _iat, exp: _exp, ...identity } = req.account;
+  const token = signSession(identity);
+  const renewed = require('../lib/jwt').verifySession(token);
+  setSessionCookie(res, token);
+  return sendOk(res, { expiresAt: Number(renewed.exp) * 1000 });
+});
+
+// Ausencia de cookie durante el arranque del login no es un error. Si existe
+// cookie, requireSession conserva todas las validaciones (expirada/suspendida).
+function optionalSession(req, res, next) {
+  if (!req.cookies?.vpn_session) return next();
+  return requireSession(req, res, next);
+}
+
 // ── GET /me ──────────────────────────────────────────────────
-router.get('/me', requireSession, asyncHandler(async (req, res) => {
+router.get('/me', optionalSession, asyncHandler(async (req, res) => {
+  if (!req.account) return sendOk(res, { user: null });
   const user = await userRepo.findById(req.account.sub);
   if (!user) throw new AppError('Usuario no encontrado', 404, 'NOT_FOUND');
   // workspace_name viaja en el header del módulo Workspace unificado;

@@ -10,7 +10,7 @@ import type {
 } from '@gestionvpn/contracts';
 
 export const accountApi = {
-  me: () => get<{ success: true; user: SessionUser }>('/api/account/me'),
+  me: () => get<{ success: true; user: SessionUser | null }>('/api/account/me'),
 
   /** Re-emite la cookie de sesión multi-usuario tomando como base la sesión actual. */
   register: (email: string, password: string, name?: string) =>
@@ -25,6 +25,10 @@ export const accountApi = {
     post<{ success: true; user: SessionUser }>('/api/account/login', { email, password }),
 
   logout: () => post('/api/account/logout'),
+
+  sessionStatus: () => get<{ success: true; expiresAt: number }>('/api/account/session-status'),
+
+  renewSession: () => post<{ success: true; expiresAt: number }>('/api/account/session-renew'),
 
   // ── Ajustes del usuario logueado (Fase C) ───────────────────
   /** Cambiar contraseña: requiere la actual. */

@@ -1,7 +1,7 @@
 export const SETTINGS_MESSAGES = {
   LOAD_ERROR: 'Error al cargar la configuración.',
   NETWORK_ERROR: 'Error de red al cargar configuración.',
-  SAVE_SUCCESS: 'Configuración guardada exitosamente. El Core ahora está provisionado en el servidor.',
+  SAVE_SUCCESS: 'Configuración guardada exitosamente.',
   SAVE_ERROR: 'Error desconocido',
 };
 

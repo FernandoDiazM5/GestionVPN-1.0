@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const express = require('express');
 const { z } = require('zod');
 const mailer = require('../lib/mailer');
+const { getAppSetting } = require('../db.service');
 const logger = require('../lib/logger').child({ scope: 'frontend-error-reports' });
 
 const REPORT_WINDOW_MS = 10 * 60_000;
@@ -37,7 +38,11 @@ function createErrorReportsRouter(options = {}) {
   const router = express.Router();
   const sendGeneric = options.sendGeneric || mailer.sendGeneric;
   const log = options.logger || logger;
-  const errorReportEmail = options.errorReportEmail ?? process.env.ERROR_REPORT_EMAIL ?? process.env.SMTP_USER;
+  const resolveErrorReportEmail = options.resolveErrorReportEmail || (async () => {
+    if (options.errorReportEmail !== undefined) return options.errorReportEmail;
+    const saved = String(await getAppSetting('error_report_email').catch(() => '') || '').trim();
+    return saved || process.env.ERROR_REPORT_EMAIL || process.env.SMTP_USER;
+  });
   const rateByIp = new Map();
   const recentFingerprints = new Map();
 
@@ -79,6 +84,7 @@ function createErrorReportsRouter(options = {}) {
     }
     recentFingerprints.set(fingerprint, now);
 
+    const errorReportEmail = await resolveErrorReportEmail();
     if (!errorReportEmail) {
       log.warn({ fingerprint }, 'Reporte aceptado sin ERROR_REPORT_EMAIL configurado');
       return res.status(202).json({ success: true, accepted: true });

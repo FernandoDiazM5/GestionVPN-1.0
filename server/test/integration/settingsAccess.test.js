@@ -7,10 +7,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const { stubModule } = require('../helpers/moduleMock');
 
 const db = { get: vi.fn(), all: vi.fn(), run: vi.fn() };
+const getAppSetting = vi.fn();
+const sendGeneric = vi.fn();
 stubModule(__dirname, '../../db.service', {
   getDb: vi.fn().mockResolvedValue(db),
   encryptPass: vi.fn((v) => `enc:${v}`),
+  getAppSetting,
 });
+stubModule(__dirname, '../../lib/mailer', { sendGeneric });
 stubModule(__dirname, '../../lib/logger', {
   child: () => ({ warn: vi.fn(), info: vi.fn(), error: vi.fn(), debug: vi.fn() }),
 });
@@ -43,6 +47,8 @@ beforeEach(() => {
   db.get.mockResolvedValue(null);
   db.all.mockResolvedValue([]);
   db.run.mockResolvedValue(undefined);
+  getAppSetting.mockResolvedValue('');
+  sendGeneric.mockResolvedValue({ delivered: true });
 });
 
 describe('A2 — escritura de settings solo para platform_admin', () => {
@@ -73,10 +79,56 @@ describe('A2 — escritura de settings solo para platform_admin', () => {
     db.all.mockResolvedValue([
       { key: 'server_public_ip', value: '1.2.3.4' },
       { key: 'MT_PASS', value: 'secret' },
+      { key: 'error_report_email', value: 'errores@example.com' },
     ]);
     const r = await request(app).get('/api/settings/get').set('x-test-identity', 'owner');
     expect(r.status).toBe(200);
     expect(r.body.settings.server_public_ip).toBe('1.2.3.4');
     expect(r.body.settings.MT_PASS).toBeUndefined(); // claves core ocultas a no-admin
+    expect(r.body.settings.error_report_email).toBeUndefined();
+  });
+
+  it('valida y normaliza el correo de reportes', async () => {
+    const valid = await request(app).post('/api/settings/save')
+      .set('x-test-identity', 'platformAdmin')
+      .send({ key: 'error_report_email', value: ' ALERTAS@Example.COM ' });
+    expect(valid.status).toBe(200);
+    expect(db.run).toHaveBeenCalledWith(expect.any(String), [
+      'error_report_email', 'alertas@example.com', expect.any(Number),
+    ]);
+
+    db.run.mockClear();
+    const invalid = await request(app).post('/api/settings/save')
+      .set('x-test-identity', 'platformAdmin')
+      .send({ key: 'error_report_email', value: 'correo-invalido' });
+    expect(invalid.status).toBe(422);
+    expect(db.run).not.toHaveBeenCalled();
+  });
+
+  it('cifra la contraseña de respaldo y nunca persiste la máscara', async () => {
+    const saved = await request(app).post('/api/settings/save')
+      .set('x-test-identity', 'platformAdmin')
+      .send({ key: 'core_backup_password', value: 'una-clave-segura-2026' });
+    expect(saved.status).toBe(200);
+    expect(db.run).toHaveBeenCalledWith(expect.any(String), [
+      'core_backup_password', 'enc:una-clave-segura-2026', expect.any(Number),
+    ]);
+
+    db.run.mockClear();
+    const masked = await request(app).post('/api/settings/save')
+      .set('x-test-identity', 'platformAdmin')
+      .send({ key: 'core_backup_password', value: '********' });
+    expect(masked.status).toBe(200);
+    expect(db.run).not.toHaveBeenCalled();
+  });
+
+  it('envia una prueba solo al destinatario configurado', async () => {
+    getAppSetting.mockResolvedValue('alertas@example.com');
+    const r = await request(app).post('/api/settings/test-error-email')
+      .set('x-test-identity', 'platformAdmin');
+    expect(r.status).toBe(200);
+    expect(sendGeneric).toHaveBeenCalledWith(expect.objectContaining({
+      to: 'alertas@example.com', kind: 'error_report_test',
+    }));
   });
 });

@@ -40,12 +40,13 @@ export function useTunnelSync(
   // SSE: suscripción en tiempo real a cambios de túnel
   useEffect(() => {
     if (!isReady || !isAuthenticated) return;
+    let disposed = false;
 
     // Sync inicial desde el backend
     fetchWithTimeout(`${API_BASE_URL}/api/tunnel/status`, {}, 5_000)
       .then(r => r.ok ? r.json() : null)
       .then(data => {
-        if (data?.success) {
+        if (!disposed && data?.success) {
           setActiveNodeVrf(data.activeNodeVrf ?? null);
           setTunnelExpiry(data.tunnelExpiry ?? null);
         }
@@ -64,7 +65,12 @@ export function useTunnelSync(
     };
     es.onerror = () => { /* reconexión automática */ };
 
-    return () => es.close();
+    return () => {
+      disposed = true;
+      es.onmessage = null;
+      es.onerror = null;
+      es.close();
+    };
   }, [isReady, isAuthenticated, setActiveNodeVrf, setTunnelExpiry]);
 
   return { tunnelChannelRef };

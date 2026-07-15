@@ -25,7 +25,7 @@ let pool = null;
  *   • connectTimeout — cuánto esperamos abrir el socket TCP al servidor MySQL.
  *     Si XAMPP/MariaDB está iniciándose o la red se cuelga, sin este límite el
  *     primer request quedaría colgado hasta el TCP-RST del kernel (~75s en Linux).
- *   • keepAliveInitialDelayMs — 5s evita el warning de mysql2 cuando el OS no
+ *   • keepAliveInitialDelay — 5s evita el warning de mysql2 cuando el OS no
  *     soporta delay 0 (visto en Windows). 5s es invisible para el caso normal
  *     y permite reciclar conexiones zombi en pocos segundos.
  *   • maxIdle — el pool puede tener N conexiones idle. Con connectionLimit=10
@@ -49,7 +49,7 @@ function getPool() {
       timezone: 'Z',
       connectTimeout: Number(process.env.MYSQL_CONNECT_TIMEOUT_MS || 10000),
       enableKeepAlive: true,
-      keepAliveInitialDelayMs: Number(process.env.MYSQL_KEEPALIVE_DELAY_MS || 5000),
+      keepAliveInitialDelay: Number(process.env.MYSQL_KEEPALIVE_DELAY_MS || 5000),
       idleTimeout: Number(process.env.MYSQL_IDLE_TIMEOUT_MS || 60000),
       maxIdle: Number(process.env.MYSQL_MAX_IDLE || 5),
     });

@@ -1,0 +1,21 @@
+const { deriveWanInterface, summarizeInventory } = require('../../lib/coreServerService');
+
+describe('coreServerService inventory', () => {
+  it('detecta la WAN desde immediate-gw y usa DHCP como respaldo', () => {
+    expect(deriveWanInterface([{ active: 'true', 'immediate-gw': '10.0.0.1%ether1' }], [])).toBe('ether1');
+    expect(deriveWanInterface([], [{ disabled: 'false', interface: 'sfp1' }])).toBe('sfp1');
+  });
+
+  it('marca saludable sólo al core con ruta e interfaces de gestión', () => {
+    const summary = summarizeInventory({
+      identity: { name: 'CORE' }, resource: { version: '7.20' },
+      routes: [{ active: 'true', disabled: 'false' }], interfaces: [],
+      wireguard: [{ name: 'VPN-WG-VPS' }, { name: 'VPN-WG-CLIENTES' }, { name: 'VPN-WG-ADMIN' }],
+      peers: [], sstpServer: { disabled: 'false', port: '443' }, sstpInterfaces: [],
+      pppSecrets: [], vrfs: [], filters: [], wanInterface: 'ether1',
+    });
+    expect(summary.status).toBe('HEALTHY');
+    expect(summary.vpnReady).toBe(true);
+    expect(summary.operationalObjects).toBe(0);
+  });
+});

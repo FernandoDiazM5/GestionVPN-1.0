@@ -16,6 +16,15 @@ export interface AppSettings {
   scan_mode?: ScanMode;
   /** IP WG de gestión de ESTA máquina — origen del escaneo en modo 'local'. */
   local_scan_ip?: string;
+  /** Destinatario de errores inesperados del frontend. Las credenciales SMTP
+   *  permanecen exclusivamente en el backend. */
+  error_report_email?: string;
+  core_wan_interface?: string;
+  core_vps_public_key?: string;
+  core_backup_enabled?: boolean;
+  core_backup_time?: string;
+  core_backup_timezone?: string;
+  core_backup_password?: string;
 }
 
 export interface SettingsState {

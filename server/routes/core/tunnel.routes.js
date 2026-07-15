@@ -112,14 +112,32 @@ router.post('/tunnel/keepalive', asyncHandler(async (req, res) => {
 router.get('/tunnel/events', (req, res) => {
   const userId = req.account?.sub;
   if (!userId) return res.status(401).end();
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.flushHeaders();
+  res.set({
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no',
+  });
+  if (typeof res.flushHeaders === 'function') res.flushHeaders();
+
   addSseClient(userId, res);
+  res.write(`retry: 3000\nevent: ready\ndata: ${JSON.stringify({ ts: Date.now() })}\n\n`);
   // Heartbeat cada 25s para evitar que proxies cierren la conexión idle
-  const heartbeat = setInterval(() => { try { res.write(': ping\n\n'); } catch (_) { /* noop */ } }, 25_000);
-  req.on('close', () => { clearInterval(heartbeat); removeSseClient(userId, res); });
+  const heartbeat = setInterval(() => {
+    try { res.write(': ping\n\n'); } catch (_) { /* noop */ }
+  }, 25_000);
+  let cleanedUp = false;
+  const cleanup = () => {
+    if (cleanedUp) return;
+    cleanedUp = true;
+    clearInterval(heartbeat);
+    removeSseClient(userId, res);
+  };
+
+  req.once('aborted', cleanup);
+  req.once('close', cleanup);
+  res.once('close', cleanup);
+  res.once('error', cleanup);
 });
 
 // Estado de túnel DEL USUARIO autenticado (no global).

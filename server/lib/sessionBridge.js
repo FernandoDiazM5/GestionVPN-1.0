@@ -26,6 +26,16 @@ async function buildSessionForLegacyUser(username) {
   const { query } = require('../db/mysql');
   let user = await userRepo.findByEmail(email);
 
+  // El administrador puede cambiar su email de recuperacion desde Ajustes.
+  // El login legacy debe reutilizar esa misma cuenta por su flag estable, no
+  // recrear <username>@local.app y producir otro platform_admin/workspace.
+  if (!user && isPlatformAdmin) {
+    const platformAdmins = await query(
+      'SELECT * FROM users WHERE is_platform_admin = 1 AND deleted_at IS NULL ORDER BY created_at ASC LIMIT 1'
+    );
+    user = platformAdmins[0] || null;
+  }
+
   if (!user) {
     const id = crypto.randomUUID();
     const now = Date.now();

@@ -299,7 +299,7 @@ async function verifySmtp() {
  * En dev (sin SMTP) imprime resumen y marca dev=true sin throwear — el caller
  * (lib/notifier.js) registra el resultado en notification_log.
  */
-async function sendGeneric({ to, subject, html, text, kind = 'notification' }) {
+async function sendGeneric({ to, subject, html, text, kind = 'notification', attachments }) {
   if (!to || !subject) return { delivered: false, error: 'to y subject requeridos' };
   const tx = getTransporter();
   if (!tx) {
@@ -309,7 +309,7 @@ async function sendGeneric({ to, subject, html, text, kind = 'notification' }) {
   try {
     await sendAndCount(tx, kind, {
       from: process.env.SMTP_FROM || FROM_DEFAULT,
-      to, subject, html, text: text || subject,
+      to, subject, html, text: text || subject, attachments,
     });
     return { delivered: true };
   } catch (err) {

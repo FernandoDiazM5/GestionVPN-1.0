@@ -76,6 +76,7 @@ const expirationJob = require('./lib/expirationJob');
 const monitoringJob = require('./lib/monitoringJob');
 const apPollJob = require('./lib/apPollJob');
 const telegramBot = require('./lib/telegramBot');
+const coreBackupJob = require('./lib/coreBackupJob');
 
 // ── Helmet — headers de seguridad HTTP (FASE 2 del REFACTOR_PLAN) ──
 //  Backend API-only: NO sirve HTML, NO sirve estáticos. La CSP es
@@ -229,6 +230,7 @@ function gracefulShutdown(signal) {
         logger.info({ signal }, 'Shutdown — drenando bot y jobs');
         try { telegramBot.stop(); } catch (_) {}
         try { expirationJob.stop(); } catch (_) {}
+        try { coreBackupJob.stop(); } catch (_) {}
         setTimeout(() => process.exit(0), 500);
     };
 }
@@ -251,6 +253,7 @@ function startServer(attempt = 1) {
         dashboardMetrics.start();
         monitoringJob.start();
         apPollJob.start();
+        coreBackupJob.start();
         // §4.27 — re-siembra la intención del wg0 con TODAS las LAN de nodos vivos
         // (recupera las que el hook event-driven pudo perder). Best-effort, no-op
         // fuera del VPS. Así cada deploy/restart re-sincroniza el wg0 sin tocarlo.

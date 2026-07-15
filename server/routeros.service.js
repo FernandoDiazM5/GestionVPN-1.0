@@ -339,4 +339,4 @@ const parseHandshakeSecs = (str) => {
     return total || Infinity;
 };
 
-module.exports = { connectToMikrotik, safeWrite, getErrorMessage, isUnreachable, cleanTunnelRules, writeIdempotent, parseHandshakeSecs, getLastSafeWriteOkAt };
+module.exports = { connectToMikrotik, safeWrite, getErrorMessage, isUnreachable, classifyError, cleanTunnelRules, writeIdempotent, parseHandshakeSecs, getLastSafeWriteOkAt };

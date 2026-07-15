@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useContext } from 'react';
+import React, { useCallback, useEffect, useContext, useRef } from 'react';
 import { VpnContext } from './VpnContext';
 import { dbService } from '../store/db';
 import { useSession } from '../hooks/useSession';
@@ -11,14 +11,16 @@ import {
   useTunnelTimeout,
   useTunnelKeepalive,
   useAuthExpiry,
+  useSessionExpiry,
   usePersistence,
 } from './hooks';
+import SessionExpiryDialog from '../components/Auth/SessionExpiryDialog';
 
 export function VpnProvider({ children }: { children: React.ReactNode }) {
   // Orquestar todos los hooks
   const auth = useAuth();
   const nodes = useNodeManagement();
-  const navigation = useModuleNavigation();
+  const navigation = useModuleNavigation(auth.isAuthenticated);
   const theme = useDarkMode();
   const {
     session: restoredWorkspaceSession,
@@ -31,9 +33,12 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
   const {
     setNodes, setActiveNodeVrf, setTunnelExpiry, deactivateAllNodes, tunnelExpiry,
   } = nodes;
+  const initializationStarted = useRef(false);
 
   // Inicializar BD
   useEffect(() => {
+    if (initializationStarted.current) return;
+    initializationStarted.current = true;
     const initApp = async () => {
       try {
         const [store, session] = await Promise.allSettled([
@@ -79,6 +84,7 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
   useTunnelTimeout(nodes.tunnelExpiry, () => nodes.deactivateAllNodes(auth.credentials));
   useTunnelKeepalive(nodes.tunnelExpiry, auth.credentials, nodes.activeNodeVrf);
   useAuthExpiry(auth.handleLogout);
+  const sessionExpiry = useSessionExpiry(auth.isAuthenticated, auth.handleLogout);
 
   usePersistence(auth.isReady, auth.isLoggingOutRef.current, {
     activeNodeVrf: nodes.activeNodeVrf,
@@ -145,6 +151,10 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
   return (
     <VpnContext.Provider value={value}>
       {children}
+      <SessionExpiryDialog
+        secondsLeft={sessionExpiry.secondsLeft}
+        onContinue={sessionExpiry.continueSession}
+      />
     </VpnContext.Provider>
   );
 }

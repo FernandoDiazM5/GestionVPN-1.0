@@ -13,6 +13,10 @@ stubModule(__dirname, '../../lib/metrics', {
   authFailsTotal: { inc: vi.fn() },
 });
 
+stubModule(__dirname, '../../lib/accountStatus', {
+  getAccountStatus: vi.fn().mockResolvedValue('active'),
+});
+
 const { verifyToken, JWT_SECRET } = require('../../auth.middleware');
 
 function createApp() {

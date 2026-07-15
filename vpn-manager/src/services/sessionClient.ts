@@ -20,7 +20,7 @@ const AUTH_PUBLIC_PATHS = [
   '/api/auth/login', '/api/auth/status', '/api/team/accept',
   '/api/auth/password-reset/request', '/api/auth/password-reset/confirm',
 ];
-const SESSION_INVALID_CODES = new Set(['USER_DELETED', 'SESSION_EXPIRED', 'NO_SESSION']);
+const SESSION_INVALID_CODES = new Set(['USER_DELETED', 'ACCOUNT_SUSPENDED', 'SESSION_EXPIRED', 'NO_SESSION']);
 
 let dispatchedExpired = false;
 function dispatchAuthExpired() {

@@ -1,15 +1,17 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { useModuleNavigation } from './useModuleNavigation';
 
-function Probe() {
-  const { activeModule, setActiveModule, isNotFound } = useModuleNavigation();
+function Probe({ authenticated = true }: { authenticated?: boolean }) {
+  const { activeModule, setActiveModule, isNotFound } = useModuleNavigation(authenticated);
+  const location = useLocation();
   return (
     <div>
       <output>{activeModule}</output>
       <output aria-label="not-found">{String(isNotFound)}</output>
+      <output aria-label="pathname">{location.pathname}</output>
       <button onClick={() => setActiveModule('team')}>Equipo</button>
     </div>
   );
@@ -35,5 +37,18 @@ describe('useModuleNavigation', () => {
   it('conserva una ruta desconocida para que la aplicacion muestre 404', () => {
     render(<MemoryRouter initialEntries={['/ruta-inexistente']}><Probe /></MemoryRouter>);
     expect(screen.getByLabelText('not-found')).toHaveTextContent('true');
+  });
+
+  it('mantiene el login en raiz aunque localStorage recuerde team', () => {
+    localStorage.setItem('vpn_active_module', 'team');
+    render(<MemoryRouter initialEntries={['/']}><Probe authenticated={false} /></MemoryRouter>);
+    expect(screen.getByText('team')).toBeInTheDocument();
+    expect(screen.getByLabelText('pathname')).toHaveTextContent('/');
+    expect(screen.getByLabelText('not-found')).toHaveTextContent('false');
+  });
+
+  it('saca una ruta privada hacia el login cuando no hay sesion', async () => {
+    render(<MemoryRouter initialEntries={['/team']}><Probe authenticated={false} /></MemoryRouter>);
+    expect(await screen.findByLabelText('pathname')).toHaveTextContent('/');
   });
 });
