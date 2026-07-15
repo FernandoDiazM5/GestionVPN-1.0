@@ -6,6 +6,86 @@
 
 ---
 
+> **Sesion 2026-07-15 - publicación de sesiones, Ajustes y servidor VPN.** Rama `vps_prod`; commit de producto `2e8d07b` publicado en `origin/vps_prod`, sin deploy. Skill: `github:yeet` (alcance limitado por solicitud a commit+push, sin PR) y `handoff-keeper`.
+> - Publicados 54 archivos: revocación/expiración de sesiones, navegación/login/SSE, métricas y Ajustes administrativos, reportes técnicos, servidor VPN greenfield, health, respaldo dual, frontend y pruebas.
+> - Verificaciones previas: 356 tests backend, 119 frontend, build Vite, `check:all`, TypeScript, ESLint, auditoría de diseño sin hallazgos, `diff --check` y pre-commit OK.
+> - El escaneo de secretos sólo detectó la cadena falsa `BEGIN PRIVATE KEY` de una prueba de redacción; no se versionaron llaves ni credenciales reales.
+> - Pendiente: desplegar `vps_prod` y validar los flujos en producción; aprovisionamiento y SFTP/respaldo deben probarse primero contra un MikroTik de laboratorio. Los perfiles multi-Core del tercer escenario siguen pendientes.
+
+> **Sesion 2026-07-15 - tercer escenario: alternar Core existente sin aprovisionar.** Rama `vps_prod` (base `ef11875`; sólo documentación en esta sesión, sin cambios de producto ni deploy). Skill: `handoff-keeper`.
+> - Requisito nuevo: poder guardar un servidor principal y uno de pruebas, seleccionar temporalmente el segundo sin ejecutar aprovisionamiento y volver al principal sin reescribir credenciales ni cambiar sus peers, VRF, PPP secrets o firewall.
+> - Riesgo identificado: hoy existe un único `MT_IP/MT_USER/MT_PASS`; sustituirlo cambia el destino global de operaciones y respaldos, mientras los datos operativos de MySQL no están aislados por servidor. Un selector simple no basta para pruebas seguras.
+> - Diseño pendiente: perfiles cifrados con `core_server_id`, perfil activo visible, prueba de conexión, respaldo/jobs por perfil y modos `Sólo observación` (default, read-only) y `Operativo` explícito.
+> - Aclaración durable: `Preparar desde cero` sólo aplica a un MikroTik limpio. La WAN sirve para identificar la salida de Internet en firewall y se autodetecta desde la ruta default; la clave pública WG del VPS permite crear su peer de gestión y nunca implica compartir la clave privada.
+
+> **Sesion 2026-07-14 - servidor VPN greenfield, health y respaldo dual implementados.** Rama `vps_prod` (base `ef11875`, cambios sin commit ni deploy). Skills: `network-engineer`, `vercel-react-best-practices`, `browser:control-in-app-browser`, `handoff-keeper`.
+> - Backend: agregados `coreServerService`, `coreBackupService`, `coreBackupJob`, rutas platform-admin `/api/admin/core-server/*` y metadata `core_backup_runs`. El aprovisionamiento sólo agrega objetos `GVPN:` de gestión, detecta WAN/ruta default y se bloquea si encuentra nodos/PPP/VRF operativos.
+> - Respaldo: par atómico `.backup` AES-SHA256 + `.rsc`, mismo nombre base con fecha/identidad; adjuntos en un solo correo al admin verificado. SFTP temporal restringido al VPS, restauración del servicio SSH, límites/validación/hash y borrado remoto/local en `finally`; cero archivos o secretos en MySQL.
+> - Frontend: quinta sección `Servidor VPN` con estado, cambio de equipo, configuración diaria, ejecución manual, última metadata, vista previa, bloqueadores y confirmación escrita para preparar desde cero.
+> - Verificación: 49 archivos/356 tests backend y 34 archivos/119 tests frontend; build Vite, TypeScript, ESLint y `check:all` OK. La comprobación visual llegó al login local y no se usaron credenciales del usuario; los flujos nuevos quedaron cubiertos por pruebas de componente.
+> - Pendiente antes de producción: ejecutar health, aprovisionamiento y respaldo/correo contra un MikroTik RouterOS 7.x de laboratorio limpio; confirmar compatibilidad SFTP y comandos `/system backup save`/`/export` del modelo/versión objetivo.
+
+> **Sesion 2026-07-14 - respaldo diario definido como par backup+rsc.** Rama `vps_prod` (solo documentacion; sin cambios de producto o infraestructura). Skills: `network-engineer`, `process-discovery-interviewer`, `handoff-keeper`.
+> - Decision final: el mismo correo diario al platform admin lleva dos adjuntos obligatorios con igual nombre base: `.backup` AES-SHA256 para restauracion completa y `.rsc` sin `show-sensitive=yes` para lectura/auditoria.
+> - Nombre base: `servervpn_YYYY-MM-DD_HH-mm-ss_<identity-saneada>`. La contraseña del `.backup` la define el admin, queda cifrada server-side y no viaja en el correo.
+> - El par es atomico: si uno falla no se envia parcial; ambos temporales se borran de RouterOS/VPS en `finally`. MySQL conserva sólo metadata/hashes individuales, nunca contenidos.
+
+> **Sesion 2026-07-14 - respaldo diario cambiado a export RouterOS legible.** Rama `vps_prod` (solo documentacion; sin cambios de producto o infraestructura). Skills: `network-engineer`, `process-discovery-interviewer`, `handoff-keeper`.
+> - Por decision del usuario se reemplaza el `.backup` binario por un único `.rsc` plano generado con `/export file=...`, sin `show-sensitive=yes`, para poder revisar el codigo.
+> - Nombre canonico: `servervpn_YYYY-MM-DD_HH-mm-ss_<system-identity-saneada>.rsc`; ejemplo `servervpn_2026-07-14_02-00-00_GW-VPN-CORE-ISP.rsc`. MIME `text/plain; charset=utf-8`.
+> - Se mantienen correo exclusivo al platform admin, cero contenido en MySQL y borrado en RouterOS/VPS aun si SMTP falla. Limitacion aceptada: el export visible no incluye ciertos secretos/certificados y no equivale a restauracion binaria completa.
+
+> **Sesion 2026-07-14 - health del core existente y backup diario efimero.** Rama `vps_prod` (solo documentacion; sin cambios de producto o infraestructura). Skills: `network-engineer`, `process-discovery-interviewer`, `handoff-keeper`.
+> - Alcance corregido: no existe migracion en ninguna fase. Un nuevo MikroTik siempre empieza vacio; un servidor existente se observa sin copiar ni alterar sus torres, usuarios o peers.
+> - Agregado health read-only del existente: API, Internet, alcance VPS, WG, SSTP, firewall, rutas, reloj, ultimo/próximo backup y estados HEALTHY/DEGRADED/UNREACHABLE/INVALID_CREDENTIALS.
+> - Agregado backup diario: `.backup` RouterOS AES-SHA256 al correo verificado del platform admin, ejecucion manual, lock/catch-up, limite inicial 15 MiB y hash. Cero contenido en MySQL; temporal efimero 0600 y borrado en RouterOS/VPS en `finally`; si falla no se conserva para retry. Sólo metadata de auditoria.
+
+> **Sesion 2026-07-14 - alcance greenfield del aprovisionamiento confirmado.** Rama `vps_prod` (solo documentacion; sin cambios de producto o infraestructura). Skills: `network-engineer`, `process-discovery-interviewer`, `handoff-keeper`.
+> - El MVP queda definido de extremo a extremo: parte de un MikroTik limpio con RouterOS 7.x, salida a Internet y credenciales; instala toda la base VPN de GestionVPN, sincroniza el VPS, valida persistencia y comprueba que se pueda crear el primer acceso y el primer nodo WG/SSTP.
+> - El aprovisionador no reconfigura una WAN funcional ni controla el router del proveedor; detecta/valida y entrega checklist de NAT o security groups.
+> - `Cambiar servidor` queda fuera del MVP: reemplazo blue-green pasa a P2 y migracion de torres existentes a P3. Preguntas abiertas reducidas de 8 a 6 decisiones operativas.
+
+> **Sesion 2026-07-14 - plan de aprovisionamiento y cambio del core MikroTik.** Rama `vps_prod` (base `ef11875`, solo documentacion nueva). Estado: `git diff --check` limpio; no se modifico codigo ni infraestructura. Skills: `network-engineer`, `process-discovery-interviewer`, `handoff-keeper`.
+> - Auditado `C:\Users\i201720174\Downloads\vpn_habil.rsc` (252 lineas) con material sensible redactado: el export mezcla base reusable con WAN/LAN, peers, nodos, VRF, rutas y secrets especificos, por lo que no debe clonarse completo.
+> - Creado `PLAN_APROVISIONAMIENTO_CORE_MIKROTIK_2026-07-14.md`: opcion `Servidor VPN`, asistente, WAN estatica/DHCP/NAT/cloud, bootstrap, desired-state/diff, ownership `GVPN:*`, jobs persistentes, health/drift, modelo DB/API, helper root del VPS y activacion blue-green con rollback.
+> - Recomendacion: entregar primero inventario read-only + health + dry-run. Pendiente responder 8 decisiones de alcance antes de programar.
+
+> **Sesion 2026-07-14 - Ajustes del Administrador reorganizados como menu.** Rama `vps_prod` (base `ef11875`, cambios sin commit). Estado: 348 backend + 116 frontend; `check:all`, build y diseno 0 violaciones.
+> - `SettingsModule` adopta el patron responsive del Moderador: menu lateral en desktop/apilado en movil y un solo panel visible.
+> - Secciones: `Router Core` (RouterOS/IP publica/SSTP), `Escaneo` (VPS/local), `Reportes tecnicos` (destino/prueba) y `Cuenta` (correo/contrasena). No se alteraron endpoints ni persistencia.
+> - Agregada `SettingsModule.test.tsx` para comprobar exclusividad del contenido y navegacion por las cuatro opciones. Pendiente commit/push/deploy con el bloque local acumulado.
+
+> **Sesion 2026-07-14 - login deja de reinyectar `/team` y arranque sin 401.** Rama `vps_prod` (base `ef11875`, cambios sin commit). Estado: 348 backend + 115 frontend; `check:all`, build y diseno 0 violaciones.
+> - `useModuleNavigation(authenticated)` conserva `/` para login y expulsa rutas privadas cuando no hay sesion; normaliza la raiz con barra final `/GestionVPN-1.0/` para que la recarga directa funcione bajo el base URL de Vite.
+> - `/api/account/me` responde `200 user:null` si no existe cookie (arranque anonimo normal), pero sigue usando `requireSession` si hay cookie para detectar expiracion/suspension. Guard de inicializacion evita la llamada doble de React StrictMode.
+> - Validacion real con la skill Browser: abrir `/GestionVPN-1.0/team` termino en `/GestionVPN-1.0/`; recarga mantuvo el login; consola sin errores ni warnings. Pendiente commit/push/deploy junto al bloque local acumulado.
+
+> **Sesion 2026-07-14 - suspension revoca sesion y vencimiento renovable.** Rama `vps_prod` (base `ef11875`, cambios sin commit). Estado: 348 backend + 113 frontend; `check:all`, build, diseno 0 violaciones y `diff --check` limpio.
+> - Centralizado `accountStatus`: las rutas RBAC y legacy rechazan `disabled_at`, limpian la cookie y emiten `ACCOUNT_SUSPENDED`; el login tambien queda bloqueado. El panel ya invalidaba el cache al suspender y el frontend consulta estado cada 10 s, por lo que sale aun sin nuevas acciones.
+> - Agregados `/api/account/session-status` y `/session-renew`; dialogo accesible y no descartable durante los ultimos 30 s del JWT absoluto (8 h por defecto), con contador y `Continuar trabajando`. Sin confirmacion se ejecuta logout.
+> - Archivos principales: `server/lib/accountStatus.js`, ambos middleware de auth, `routes/account.routes.js`, `useSessionExpiry.ts`, `SessionExpiryDialog.tsx` y pruebas asociadas. Pendiente: commit/push/deploy y prueba funcional con dos navegadores.
+
+> **Sesion 2026-07-14 - Causa raiz de resets SSE repetidos: 127.0.0.1 vs localhost.** Seguimiento de la entrada siguiente; rama `vps_prod`, cambios sin commit/push/deploy. Frontend **112/112**, TypeScript, ESLint y build OK; backend previo **346/346**.
+> - El backend no reiniciaba: mismo PID y uptime creciente. Pruebas directas mantuvieron `/api/tunnel/events` y `/api/events/stream` abiertos 32 s, ambos con heartbeat, hasta aborto intencional. La repeticion estaba en el navegador: la app se servia desde `127.0.0.1:5174` y `config.ts` forzaba `http://localhost:3001`; los logs mostraban sesion invalida por cookies SameSite entre hostnames distintos.
+> - `API_BASE_URL` queda relativo por defecto. Vite ya proxya `/api` a `localhost:3001` y Nginx hace lo mismo en produccion; `VITE_API_URL` solo aplica si se configura un backend externo real. Pruebas nuevas cubren default relativo y normalizacion del origen explicito.
+> - Validacion real: login desde `127.0.0.1:5174` exitoso, navegacion Dashboard -> Moderadores -> Ajustes -> Dashboard y 32 s adicionales sin ningun error/warning nuevo. Ademas ambos SSE permanecieron estables 27 s, con heartbeat, pasando por `127.0.0.1:5174/api` y el proxy de Vite. El primer reset aislado si coincidio con `nodemon`, pero no explicaba la repeticion sostenida; esta entrada supersede ese diagnostico parcial.
+
+> **Sesion 2026-07-14 - Diagnostico y robustez del SSE de tunel.** Rama `vps_prod`, base `ef11875`; cambios sin commit/push/deploy. Gates: **346/346 backend + 110/110 frontend**, `check:all`, build, diseno 0 violaciones, `diff --check` y prueba manual SSE autenticada `200`/ready.
+> - El `ERR_CONNECTION_RESET 200 (OK)` local coincidio con el reinicio automatico del backend por `nodemon` al editar archivos. La navegacion no desmonta `VpnProvider`, los setters son estables y una regresion nueva verifica que cambiar el estado/modulo conserva un solo `EventSource`.
+> - `/api/tunnel/events` agrega `X-Accel-Buffering: no`, `retry: 3000`, evento inicial `ready`, heartbeat existente y cleanup idempotente para close/abort/error. `useTunnelSync` anula handlers al cerrar e ignora el `/tunnel/status` tardio despues de logout/unmount.
+> - Un restart/redeploy real todavia puede generar una linea de red en DevTools porque corta el socket persistente; no implica perdida de sesion. EventSource reconecta automaticamente en aproximadamente 3 s. Pendiente: incluir estos cambios en el mismo commit/push de fixes admin y validar un restart controlado tras deploy.
+
+> **Sesion 2026-07-14 - Correos de recuperacion y reportes en Ajustes admin.** Rama `vps_prod`, base `ef11875`; cambios sin commit/push/deploy. Gates: **346/346 backend + 108/108 frontend**, `check:all`, build y diseno 0 violaciones.
+> - El platform admin ve `Cuenta y recuperacion`, reutilizando el flujo existente de cambio de email con OTP al nuevo buzon y contrasena actual. `sessionBridge` busca por `is_platform_admin` si el email canonico cambio, evitando duplicar usuario/workspace en un login legacy posterior.
+> - Nuevo `Reportes tecnicos`: guarda `app_settings.error_report_email`, valida/normaliza email y envia una prueba. Los reportes resuelven ese destinatario por evento; fallback `ERROR_REPORT_EMAIL` -> `SMTP_USER`. Moderadores no pueden leer ni escribir el valor.
+> - SMTP sigue en env y nunca llega al frontend. Pruebas nuevas para autorizacion/validacion/envio, destino dinamico, puente legacy y componente UI. Pendiente: commit/push, configurar un email real en Ajustes y pulsar `Enviar prueba` tras deploy.
+
+> **Sesion 2026-07-14 - Metricas admin coherentes y limpieza RBAC local.** Rama `vps_prod`, base `ef11875`; cambios sin commit/push/deploy. Backend **342/342**, `check:backend` y API autenticada OK.
+> - El Dashboard contaba el workspace bootstrap del platform admin como moderador/workspace, mientras `/api/admin/moderators` lo excluia. `loadAdminSummary` unifica el universo y excluye `is_platform_admin=1`; nueva regresion `adminSummary.test.js`.
+> - Auditoria local encontro 2 usuarios vivos sin ninguna membresia ni dependencias. Se respaldo la base completa (33 tablas) fuera del repo y se borraron ambos en una transaccion; el platform admin, su workspace interno y su membresia OWNER permanecen integros.
+> - Se corrigio `keepAliveInitialDelayMs` a la opcion real `keepAliveInitialDelay`; MySQL2 ignoraba el nombre anterior y advertia que lo rechazara en una version futura.
+> - Resultado API: workspaces/usuarios/moderadores/miembros/acciones = 0/0/0/0/0. Pendiente: commit/push de este fix a `vps_prod` antes del despliegue.
+
 > **Sesion 2026-07-14 - Auditoria y correccion de errores asincronos.** Rama `vps_prod`, commit funcional `1453274` publicado en `origin/vps_prod`; sin deploy. Gates: `check:all`/build OK, **341/341 backend + 106/106 frontend**, diseno 0 findings, Semgrep focalizado 0 findings (125 reglas/5 archivos), 404 movil 375x667 sin overflow y `diff --check` limpio.
 > - Se clasificaron 71 archivos de produccion con `await` (239 expresiones) en consultas, mutaciones, polling y degradaciones opcionales; se corrigieron fallos silenciosos y skeletons infinitos en sesion, Dashboard, Moderadores, Nodos, Monitor AP, Ajustes/Notificaciones y Equipo/WireGuard.
 > - Nuevo `AsyncQueryState`, Error Boundaries raiz/auth/modulo, captura global de errores y HTTP 5xx/red, pagina 404 real y servicio `POST /api/error-reports` con Zod, redaccion, dedupe, limite por IP y envio SMTP al administrador. Semgrep obligo a retirar el HTML dinamico del correo; queda texto plano.
