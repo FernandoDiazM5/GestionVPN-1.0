@@ -6,6 +6,18 @@
 
 ---
 
+> **Sesion 2026-07-16 - despliegue de plataforma verificado en VPS.** Rama `vps_prod`; producción actualizada con el paquete `2e8d07b` contenido en `d9d1603`. Skill: `handoff-keeper`.
+> - `vpn-db` y `vpn-backend` quedaron healthy; `vpn-frontend` quedó arriba en 80/443. Todas las migraciones del entrypoint terminaron sin fallos y conservaron datos.
+> - `/api/health`: success/status `ok`, MySQL `ok` (1 ms), RouterOS `ok` y SMTP `ok` (478 ms). Nginx respondió HTTP/2 200 para `/GestionVPN-1.0/`.
+> - Única anomalía: Telegram `getUpdates HTTP 409` repetido porque el mismo token sigue activo en otra instancia local. No bloquea API/UI; apagar el bot local con `TELEGRAM_BOT_ENABLED=false` y reiniciar ese backend local.
+> - La mejora UX de la cabecera Monitor AP no entró en este despliegue; luego fue publicada como `7f28782` y requiere reconstruir el frontend en el VPS.
+
+> **Sesion 2026-07-16 - mejora UX de la cabecera Monitor AP.** Rama `vps_prod`; commit de producto `7f28782` publicado en `origin/vps_prod`, sin redeploy del frontend. Skills: `ui-design-system`, `vercel-react-best-practices`, `handoff-keeper`.
+> - La cabecera monolítica se extrajo a `ApMonitorModule/components/MonitorHeader.tsx` y se organizó en identidad/estado SSE, barra de métricas y controles, y leyenda integrada. Se corrigieron jerarquía, responsive, idioma, contraste, foco, `aria-pressed` y objetivos táctiles de 44 px.
+> - `useApPollEvents` ahora expone `connecting`/`connected`/`reconnecting` según eventos reales de EventSource; la UI muestra el estado sin inferirlo desde los datos de AP.
+> - Agregadas pruebas de `MonitorHeader` y `useApPollEvents`. Verificación: 122/122 frontend, TypeScript, ESLint, build Vite, `audit:design` sin violaciones y `git diff --check` limpio.
+> - Pendiente: reconstruir el frontend en el VPS y realizar revisión visual final en navegador autenticado, modo claro/oscuro y 375 px.
+
 > **Sesion 2026-07-15 - publicación de sesiones, Ajustes y servidor VPN.** Rama `vps_prod`; commit de producto `2e8d07b` publicado en `origin/vps_prod`, sin deploy. Skill: `github:yeet` (alcance limitado por solicitud a commit+push, sin PR) y `handoff-keeper`.
 > - Publicados 54 archivos: revocación/expiración de sesiones, navegación/login/SSE, métricas y Ajustes administrativos, reportes técnicos, servidor VPN greenfield, health, respaldo dual, frontend y pruebas.
 > - Verificaciones previas: 356 tests backend, 119 frontend, build Vite, `check:all`, TypeScript, ESLint, auditoría de diseño sin hallazgos, `diff --check` y pre-commit OK.
