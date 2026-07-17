@@ -96,7 +96,7 @@ No se implementarán:
 | Caché | Resultado persistido por hash con TTL; no usar caché remota como requisito |
 | Cuota | Reserva atómica diaria en MySQL + cooldown en memoria + consumo real acumulado |
 | Historial | Snapshots pseudonimizados y métricas normalizadas; sin credenciales ni identificadores directos |
-| Retención | Configurable; propuesta inicial: análisis 30 días, métricas 90 días |
+| Retención | Máximo 7 días para diagnósticos y snapshots AirOS |
 | Observabilidad | Logs redactados + métricas Prometheus de uso, error, latencia y tokens |
 
 ### 4.1 Selección inicial del modelo
@@ -481,8 +481,8 @@ GEMINI_DAILY_TOKEN_BUDGET=150000
 GEMINI_WORKSPACE_DAILY_REQUEST_BUDGET=10
 GEMINI_USER_COOLDOWN_SECONDS=60
 GEMINI_CACHE_TTL_HOURS=24
-GEMINI_ANALYSIS_RETENTION_DAYS=30
-GEMINI_SNAPSHOT_RETENTION_DAYS=90
+GEMINI_ANALYSIS_RETENTION_DAYS=7
+GEMINI_SNAPSHOT_RETENTION_DAYS=7
 AI_PSEUDONYM_KEY=
 ```
 

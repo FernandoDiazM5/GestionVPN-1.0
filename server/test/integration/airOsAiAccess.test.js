@@ -51,6 +51,7 @@ beforeEach(() => {
   aiConsentRepo.get.mockResolvedValue(true);
   aiConsentRepo.set.mockResolvedValue(undefined);
   aiUsageRepo.get.mockResolvedValue({ request_count: 0, total_tokens: 0 });
+  aiAnalysisRepo.listForUser.mockResolvedValue([]);
   analysisService.analyze.mockResolvedValue({
     uuid: 'run-1', cached: false, model: 'gemini-test', createdAt: 1,
     usage: { inputTokens: 10, outputTokens: 10, totalTokens: 20 },
@@ -99,6 +100,23 @@ describe('control de acceso Gemini AirOS', () => {
     expect(JSON.stringify(dto)).not.toContain(device.name);
     expect(JSON.stringify(dto)).not.toContain(device.essid);
     expect(dto.metrics.signal).toBe(-63);
+  });
+
+  it('lista el historial individual usando sólo la huella seudonimizada', async () => {
+    const response = await request(app).post('/api/ai/air-os/analyses/device-history')
+      .set('x-test-identity', 'owner')
+      .send({
+        device: { ip: device.ip, mac: device.mac, name: device.name, model: device.model },
+        limit: 30,
+      });
+
+    expect(response.status).toBe(200);
+    const params = aiAnalysisRepo.listForUser.mock.calls[0][0];
+    expect(params.type).toBe('DEVICE');
+    expect(params.deviceFingerprint).toMatch(/^[a-f0-9]{64}$/);
+    expect(JSON.stringify(params)).not.toContain(device.ip);
+    expect(JSON.stringify(params)).not.toContain(device.mac);
+    expect(response.body.retentionDays).toBe(7);
   });
 
   it('rechaza campos no permitidos como contraseñas SSH', async () => {

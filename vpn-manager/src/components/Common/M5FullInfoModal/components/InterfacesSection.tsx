@@ -28,7 +28,7 @@ export default function InterfacesSection({ s }: InterfacesSectionProps) {
         </>
       )}
       {s.ifaceTraffic && Object.keys(s.ifaceTraffic).length > 0 && (
-        <div className="col-span-2 mt-2">
+        <div className="col-span-full mt-2">
           <p className={`${rawDataStyles.label} text-violet-600`}>{RAW_DATA_LABELS.TRAFFIC}</p>
           <div className="grid grid-cols-1 gap-1">
             {Object.entries(s.ifaceTraffic).map(([iface, tr]) => (
@@ -42,7 +42,7 @@ export default function InterfacesSection({ s }: InterfacesSectionProps) {
         </div>
       )}
       {s._rawRoutes && (
-        <div className="col-span-2 mt-2">
+        <div className="col-span-full mt-2">
           <p className={`${rawDataStyles.label} text-violet-600`}>{RAW_DATA_LABELS.ROUTE}</p>
           <pre className={`${rawDataStyles.pre} border-violet-100 max-h-24`}>{s._rawRoutes}</pre>
         </div>

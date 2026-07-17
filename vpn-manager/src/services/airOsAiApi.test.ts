@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { toAirOsAiDevice } from './airOsAiApi';
+import { toAirOsAiDevice, toAirOsAiIdentity } from './airOsAiApi';
 import type { ScannedDevice } from '../types/devices';
 
 describe('toAirOsAiDevice', () => {
@@ -31,5 +31,12 @@ describe('toAirOsAiDevice', () => {
     expect(JSON.stringify(output.cachedStats)).not.toContain('secreto');
     expect(JSON.stringify(output.cachedStats)).not.toContain('10.1.1.99');
     expect(output.role).toBe('sta');
+
+    expect(toAirOsAiIdentity(device)).toEqual({
+      ip: '10.1.1.37',
+      mac: 'F4:92:BF:EC:B6:57',
+      name: 'Cliente privado',
+      model: 'LiteBeam M5',
+    });
   });
 });

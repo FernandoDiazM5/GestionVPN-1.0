@@ -1,6 +1,7 @@
 import type {
   AirOsAiAnalysisResult,
   AirOsAiDevice,
+  AirOsAiDeviceIdentity,
   AirOsAiDeviceAnalysisRequest,
   AirOsAiNetworkAnalysisRequest,
   AirOsAiStatus,
@@ -47,6 +48,17 @@ export function toAirOsAiDevice(device: ScannedDevice | SavedDevice): AirOsAiDev
   };
 }
 
+/** Envía sólo la identidad necesaria para que el backend derive la huella HMAC. */
+export function toAirOsAiIdentity(device: ScannedDevice | SavedDevice): AirOsAiDeviceIdentity {
+  const source = device.cachedStats;
+  return {
+    ip: device.ip,
+    mac: source?.wlanMac || device.mac || '',
+    name: source?.deviceName || device.name || '',
+    model: source?.deviceModel || device.model || '',
+  };
+}
+
 export const airOsAiApi = {
   status: () => get<{ success: true; status: AirOsAiStatus }>('/api/ai/air-os/status'),
   consent: (policyVersion: string, accepted: boolean) =>
@@ -56,7 +68,12 @@ export const airOsAiApi = {
   analyzeNetwork: (request: AirOsAiNetworkAnalysisRequest) =>
     post<{ success: true; result: AirOsAiAnalysisResult }>('/api/ai/air-os/network-analysis', request),
   listAnalyses: () =>
-    get<{ success: true; analyses: AirOsAiHistoryItem[] }>('/api/ai/air-os/analyses?limit=30'),
+    get<{ success: true; analyses: AirOsAiHistoryItem[]; retentionDays: number }>('/api/ai/air-os/analyses?limit=30'),
+  listDeviceAnalyses: (device: ScannedDevice | SavedDevice) =>
+    post<{ success: true; analyses: AirOsAiHistoryItem[]; retentionDays: number }>(
+      '/api/ai/air-os/analyses/device-history',
+      { device: toAirOsAiIdentity(device), limit: 30 },
+    ),
   getAnalysis: (uuid: string) =>
     get<{ success: true; analysis: AirOsAiHistoryDetail }>(`/api/ai/air-os/analyses/${encodeURIComponent(uuid)}`),
   deleteAnalysis: (uuid: string) =>

@@ -3,6 +3,7 @@ const {
   AIR_OS_AI_POLICY_VERSION,
   AirOsAiConsentRequestSchema,
   AirOsAiDeviceAnalysisRequestSchema,
+  AirOsAiDeviceHistoryRequestSchema,
   AirOsAiNetworkAnalysisRequestSchema,
 } = require('@gestionvpn/contracts');
 const { asyncHandler, AppError, sendOk } = require('../lib/apiResponse');
@@ -13,7 +14,8 @@ const aiConsentRepo = require('../db/repos/aiConsentRepo');
 const aiUsageRepo = require('../db/repos/aiUsageRepo');
 const aiAnalysisRepo = require('../db/repos/aiAnalysisRepo');
 const analysisService = require('../lib/ai/airOsAnalysisService');
-const { buildDeviceDto, buildNetworkDto, snapshotHash } = require('../lib/ai/airOsDto');
+const { buildDeviceDto, buildNetworkDto, deviceFingerprint, snapshotHash } = require('../lib/ai/airOsDto');
+const { analysisRetentionDays, historyCutoff } = require('../lib/ai/aiRetention');
 const { PROMPT_VERSION } = require('../lib/ai/airOsPrompt');
 
 const router = express.Router();
@@ -91,7 +93,7 @@ router.post('/device-analysis', requireAiAccess, requireAiConsent, asyncHandler(
     dto,
     hash,
     promptVersion: PROMPT_VERSION,
-    scope: { snapshotAt: input.snapshotAt, deviceAlias: dto.alias },
+    scope: { snapshotAt: input.snapshotAt, deviceAlias: dto.alias, deviceId: dto.id },
   });
   return sendOk(res, { result }, result.cached ? 200 : 201);
 }));
@@ -131,14 +133,33 @@ router.get('/analyses', requireAiAccess, requireAiConsent, asyncHandler(async (r
   const type = req.query.type ? String(req.query.type).toUpperCase() : undefined;
   if (type && !['DEVICE', 'NETWORK'].includes(type)) throw new AppError('Tipo de análisis inválido', 422, 'VALIDATION_ERROR');
   const analyses = await aiAnalysisRepo.listForUser({
-    workspaceId: req.account.workspace_id, userId: req.account.sub, type, limit: req.query.limit,
+    workspaceId: req.account.workspace_id, userId: req.account.sub, type,
+    limit: req.query.limit, createdAfter: historyCutoff(),
   });
-  return sendOk(res, { analyses });
+  return sendOk(res, { analyses, retentionDays: analysisRetentionDays() });
+}));
+
+router.post('/analyses/device-history', requireAiAccess, requireAiConsent, asyncHandler(async (req, res) => {
+  const input = AirOsAiDeviceHistoryRequestSchema.parse(req.body);
+  const fingerprint = deviceFingerprint({
+    workspaceId: req.account.workspace_id,
+    device: input.device,
+  });
+  const analyses = await aiAnalysisRepo.listForUser({
+    workspaceId: req.account.workspace_id,
+    userId: req.account.sub,
+    type: 'DEVICE',
+    deviceFingerprint: fingerprint,
+    createdAfter: historyCutoff(),
+    limit: input.limit,
+  });
+  return sendOk(res, { analyses, retentionDays: analysisRetentionDays() });
 }));
 
 router.get('/analyses/:uuid', requireAiAccess, requireAiConsent, asyncHandler(async (req, res) => {
   const analysis = await aiAnalysisRepo.getForUser({
-    workspaceId: req.account.workspace_id, userId: req.account.sub, uuid: req.params.uuid,
+    workspaceId: req.account.workspace_id, userId: req.account.sub,
+    uuid: req.params.uuid, createdAfter: historyCutoff(),
   });
   if (!analysis) throw new AppError('Análisis no encontrado', 404, 'NOT_FOUND');
   return sendOk(res, { analysis });

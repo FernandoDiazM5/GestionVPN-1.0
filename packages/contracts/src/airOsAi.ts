@@ -58,6 +58,21 @@ export const AirOsAiDeviceSchema = z.object({
 }).strict();
 export type AirOsAiDevice = z.infer<typeof AirOsAiDeviceSchema>;
 
+/** Identidad mínima usada sólo para localizar el historial seudonimizado. */
+export const AirOsAiDeviceIdentitySchema = z.object({
+  ip: z.string().min(1).max(64),
+  mac: z.string().max(32).optional().default(''),
+  name: z.string().max(160).optional().default(''),
+  model: z.string().max(120).optional().default(''),
+}).strict();
+export type AirOsAiDeviceIdentity = z.infer<typeof AirOsAiDeviceIdentitySchema>;
+
+export const AirOsAiDeviceHistoryRequestSchema = z.object({
+  device: AirOsAiDeviceIdentitySchema,
+  limit: z.number().int().min(1).max(30).optional().default(30),
+}).strict();
+export type AirOsAiDeviceHistoryRequest = z.infer<typeof AirOsAiDeviceHistoryRequestSchema>;
+
 export const AirOsAiDeviceAnalysisRequestSchema = z.object({
   snapshotAt: z.number().int().positive(),
   device: AirOsAiDeviceSchema,

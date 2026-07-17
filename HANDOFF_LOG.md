@@ -6,6 +6,13 @@
 
 ---
 
+> **Sesion 2026-07-17 - mejora del diagnóstico AirOS e historial por antena.** Rama `vps_prod` (base publicada `4ee4fa9`; publicación directa solicitada para estos cambios). Skills: `ui-design-system`, `vercel-react-best-practices`, `handoff-keeper`.
+> - El informe AirOS conserva todos sus campos y ahora los presenta en tarjetas legibles, resumen operativo y pestañas `Datos`/`Historial de resultados`; valores largos ya no se truncan y los bloques raw conservan acceso por scroll.
+> - La acción de la tabla usa `BrainCircuit` y comunica “diagnóstico inteligente”. El diálogo de Gemini y el historial global usan header fijo + body `min-h-0/overflow-y-auto`, corrigiendo el contenido inaccesible sin barra.
+> - Nuevo historial individual: el frontend envía identidad mínima al backend, éste deriva la huella HMAC y consulta sólo análisis de esa antena mediante `scope_json`/snapshots. La identidad cruda no se guarda ni llega a Gemini.
+> - Retención efectiva máxima de 7 días para análisis y snapshots, incluso con valores env antiguos de 30/90; el listado oculta vencidos y el job purga registros existentes, fallidos o pendientes aunque la feature esté apagada.
+> - Gates: **384 backend + 124 frontend**, `check:all`, build Vite, auditor de diseño 0 violaciones y `git diff --check`; agregadas pruebas de retención, filtro por huella, endpoint de historial y pestañas del modal. Pendiente: rebuild VPS y QA visual autenticada.
+
 > **Sesion 2026-07-17 - inicio de implementación Gemini AirOS.** Rama `vps_prod` (cambios sin commit ni deploy). Skills: `database-schema-design`, `vercel-react-best-practices`, `handoff-keeper`.
 > - Implementados contratos, cinco tablas/migración, repositorios, reglas locales, DTO allowlist con HMAC, prompt y cliente oficial Gemini con JSON estructurado + validación Zod, caché, cooldown, presupuestos global/workspace y telemetría de tokens.
 > - Agregados endpoints de estado, consentimiento, análisis individual/red visible e historial; sólo `OWNER` habilitado puede usarlos. MEMBER y platform admin reciben 403. El Administrador controla el entitlement por moderador desde un switch server-first y cada cambio intenta registrar auditoría con actor/estado previo/nuevo.

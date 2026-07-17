@@ -67,17 +67,17 @@ export function AirOsAiHistoryDialog({ open, onClose }: Props) {
   };
 
   return (
-    <Dialog title="Historial de análisis AirOS" onClose={onClose} panelClassName="modal-panel w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-      <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-700">
+    <Dialog title="Historial de análisis AirOS" onClose={onClose} panelClassName="modal-panel modal-panel-3xl h-[min(90vh,780px)] max-h-[90vh]">
+      <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-700">
         <div className="flex items-center gap-3">
           {detail && <button onClick={() => setDetail(null)} aria-label="Volver al historial" className="btn-ghost btn-icon min-h-11 min-w-11"><ArrowLeft className="h-4 w-4" /></button>}
           <Sparkles className="h-5 w-5 text-violet-600 dark:text-violet-300" />
-          <div><p className="font-bold text-slate-800 dark:text-slate-100">{detail ? 'Detalle guardado' : 'Historial Gemini AirOS'}</p><p className="text-xs text-slate-500">Resultados consultivos del moderador actual</p></div>
+          <div><p className="font-bold text-slate-800 dark:text-slate-100">{detail ? 'Detalle guardado' : 'Historial Gemini AirOS'}</p><p className="text-xs text-slate-500">Resultados consultivos · retención máxima de 7 días</p></div>
         </div>
         <button onClick={onClose} aria-label="Cerrar historial" className="btn-ghost btn-icon min-h-11 min-w-11"><X className="h-4 w-4" /></button>
       </div>
 
-      <div className="p-5">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 [scrollbar-gutter:stable]">
         {error && detail && <p role="alert" className="mb-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">{error}</p>}
         {detail ? (
           <div className="space-y-4">

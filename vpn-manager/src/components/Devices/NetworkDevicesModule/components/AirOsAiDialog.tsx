@@ -16,9 +16,9 @@ export function AirOsAiDialog({ controller }: { controller: AirOsAiController })
       onClose={close}
       closeOnBackdrop={!busy}
       closeOnEscape={!busy}
-      panelClassName="modal-panel w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+      panelClassName="modal-panel modal-panel-2xl h-[min(90vh,780px)] max-h-[90vh]"
     >
-      <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-700">
+      <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-700">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">
             <Sparkles className="h-5 w-5" />
@@ -33,7 +33,7 @@ export function AirOsAiDialog({ controller }: { controller: AirOsAiController })
         </button>
       </div>
 
-      <div className="space-y-4 p-5">
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-5 [scrollbar-gutter:stable]">
         {!analysis ? (
           <>
             <div className="rounded-xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-950 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-100">

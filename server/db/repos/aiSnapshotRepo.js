@@ -20,8 +20,14 @@ async function insertMany({ workspaceId, analysisRunId, devices, capturedAt, ret
   }
 }
 
-async function purgeExpired(now = Date.now(), runQuery = query) {
-  const result = await runQuery('DELETE FROM ai_air_os_snapshots WHERE expires_at < ?', [now]);
+async function purgeExpired(now = Date.now(), retentionDays, runQuery = query) {
+  const cutoff = retentionDays ? now - retentionDays * 86400000 : null;
+  const result = cutoff
+    ? await runQuery(
+      'DELETE FROM ai_air_os_snapshots WHERE expires_at < ? OR captured_at < ?',
+      [now, cutoff]
+    )
+    : await runQuery('DELETE FROM ai_air_os_snapshots WHERE expires_at < ?', [now]);
   return Number(result.affectedRows || 0);
 }
 

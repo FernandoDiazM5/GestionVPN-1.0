@@ -26,6 +26,7 @@ const notifier = require('./notifier');
 const scanMangleSync = require('./scanMangleSync');
 const sse = require('./sse');
 const { getAppSetting, decryptPass } = require('../db.service');
+const { analysisRetentionDays, snapshotRetentionDays } = require('./ai/aiRetention');
 
 // Retención de la "Actividad reciente": guarda como MÁXIMO los últimos N días
 // (default 7) → purga rodante que va quitando el día más viejo. Se ejecuta como
@@ -49,15 +50,15 @@ async function purgeOldAudit() {
 }
 
 async function purgeOldAiData() {
-  if (process.env.GEMINI_AI_ENABLED !== 'true') return;
   if (Date.now() - _lastAiPurge < PURGE_THROTTLE_MS) return;
   _lastAiPurge = Date.now();
-  const analysisDays = Math.max(1, Number(process.env.GEMINI_ANALYSIS_RETENTION_DAYS || 30));
+  const analysisDays = analysisRetentionDays();
+  const snapshotDays = snapshotRetentionDays();
   try {
     const analyses = await aiAnalysisRepo.purgeOlderThan(Date.now() - analysisDays * 86400000);
-    const snapshots = await aiSnapshotRepo.purgeExpired();
+    const snapshots = await aiSnapshotRepo.purgeExpired(Date.now(), snapshotDays);
     if (analyses || snapshots) {
-      log.info({ analyses, snapshots, analysisDays }, 'Gemini AirOS: purga de retención');
+      log.info({ analyses, snapshots, analysisDays, snapshotDays }, 'Gemini AirOS: purga de retención');
     }
   } catch (err) {
     log.warn({ err: err.message }, 'Gemini AirOS: purga de retención falló (best-effort)');

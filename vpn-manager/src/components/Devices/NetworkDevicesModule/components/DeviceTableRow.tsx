@@ -9,7 +9,7 @@
 import { memo, Fragment } from 'react';
 import {
   CheckCircle2, X, Loader2, ChevronDown, ChevronRight,
-  Activity, RefreshCw, PlusCircle, Save, Check,
+  BrainCircuit, RefreshCw, PlusCircle, Save, Check,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { ScannedDevice, SavedDevice, AntennaStats } from '../../../../types/devices';
@@ -380,10 +380,10 @@ function DeviceRowActions({
   if (hasStats) {
     actions.push({
       key: 'info',
-      Icon: Activity,
+      Icon: BrainCircuit,
       onClick: () => onOpenM5Detail(dev),
-      title: 'Ver informe airOS — estado completo del dispositivo (mca-status)',
-      ariaLabel: 'Ver informe airOS',
+      title: 'Abrir diagnóstico inteligente AirOS — datos completos e historial IA',
+      ariaLabel: 'Abrir diagnóstico inteligente AirOS',
       scheme: 'violet-outline',
     });
   }

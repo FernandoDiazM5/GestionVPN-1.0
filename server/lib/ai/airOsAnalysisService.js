@@ -5,6 +5,7 @@ const aiUsageRepo = require('../../db/repos/aiUsageRepo');
 const aiAnalysisRepo = require('../../db/repos/aiAnalysisRepo');
 const aiSnapshotRepo = require('../../db/repos/aiSnapshotRepo');
 const metrics = require('../metrics');
+const { snapshotRetentionDays } = require('./aiRetention');
 const inFlight = new Map();
 
 function positiveNumber(value, fallback) {
@@ -19,7 +20,7 @@ function config() {
     globalDailyTokens: positiveNumber(process.env.GEMINI_DAILY_TOKEN_BUDGET, 150000),
     deviceCacheTtlMs: positiveNumber(process.env.GEMINI_DEVICE_CACHE_TTL_MS, 5 * 60 * 1000),
     networkCacheTtlMs: positiveNumber(process.env.GEMINI_NETWORK_CACHE_TTL_MS, 10 * 60 * 1000),
-    snapshotRetentionDays: positiveNumber(process.env.GEMINI_SNAPSHOT_RETENTION_DAYS, 90),
+    snapshotRetentionDays: snapshotRetentionDays(),
   };
 }
 

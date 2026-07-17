@@ -15,7 +15,7 @@ export default function SystemSection({ s, family }: SystemSectionProps) {
     <M5Section
       title={SECTION_TITLES.SYSTEM}
       icon={<Cpu className="w-3.5 h-3.5" />}
-      colorClass="bg-sky-50 border-sky-200 text-sky-700 dark:bg-sky-500/10 dark:border-sky-500/30 dark:text-sky-400"
+      colorClass="border-sky-200 bg-sky-50/70 text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-300"
     >
       <M5Row label="hostname" value={s.deviceName} />
       <M5Row label="devmodel" value={s.deviceModel} />
