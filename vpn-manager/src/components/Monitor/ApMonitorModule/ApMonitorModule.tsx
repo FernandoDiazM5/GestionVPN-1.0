@@ -1,13 +1,10 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import {
-  Radio, RefreshCw, Loader2, X,
-  CheckCircle2, Activity, Clock,
-  Users, ZapOff, WifiOff,
-  Search,
-  AlertTriangle, RotateCw,
+  Radio,
+  CheckCircle2, WifiOff,
+  AlertTriangle,
 } from 'lucide-react';
 import AsyncQueryState from '../../Common/AsyncQueryState';
-import { fmtAgo } from './utils/formatters';
 import M5FullInfoModal from '../../Common/M5FullInfoModal';
 import ConfirmModal from '../../Common/ConfirmModal';
 import { useVpn } from '../../../context';
@@ -19,6 +16,7 @@ import CpeDetailModal from './components/modals/CpeDetailModal';
 import ApDetailModal from './components/modals/ApDetailModal';
 import SshRevealModal from './components/modals/SshRevealModal';
 import TunnelInactiveModal from './components/modals/TunnelInactiveModal';
+import MonitorHeader from './components/MonitorHeader';
 
 import { useApMonitorLogic } from './hooks/useApMonitorLogic';
 import { usePolling } from './hooks/usePolling';
@@ -72,7 +70,7 @@ export default function ApMonitorModule() {
 
   useEffect(() => { seedFromDb(); }, [seedFromDb]);
 
-  useApPollEvents(ingestApPoll, true);
+  const apPollConnectionStatus = useApPollEvents(ingestApPoll, true);
 
   const toggleAp = (apId: string) => {
     setExpandedAps(prev => {
@@ -129,85 +127,21 @@ export default function ApMonitorModule() {
         </div>
       )}
 
-      <div className="card p-6 flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-            <Activity className="w-5 h-5 text-indigo-500" />
-            <span>Monitor de APs</span>
-          </h2>
-          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-            Monitoreo en tiempo real — APs de la pestaña Equipos, agrupados por nodo
-          </p>
-        </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="text-right text-sm text-slate-500 dark:text-slate-400">
-            <span className="font-bold text-indigo-600 dark:text-indigo-400">{logic.filteredGroups.length}</span> nodos ·{' '}
-            <span className="font-bold text-indigo-600 dark:text-indigo-400">{totalAps}</span> APs ·{' '}
-            <span className="font-bold text-cyan-600 dark:text-cyan-400">{totalCpes}</span> CPEs live
-          </div>
-          <div className="flex items-center rounded-xl border border-slate-200 overflow-hidden text-xs shrink-0 dark:border-slate-700">
-            <button
-              onClick={() => logic.setNodeFilter('active')}
-              title="Nodos activos"
-              className={`flex items-center gap-1 px-2 py-1.5 font-bold transition-colors
-                ${logic.nodeFilter === 'active'
-                  ? 'bg-emerald-500 text-white'
-                  : 'bg-white text-slate-500 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'}`}>
-              <CheckCircle2 className="w-3 h-3" />
-              <span className="text-xs">Activos</span>
-            </button>
-            <button
-              onClick={() => logic.setNodeFilter('inactive')}
-              title="Nodos inactivos"
-              className={`flex items-center gap-1 px-2 py-1.5 font-bold border-x border-slate-200 transition-colors
-                ${logic.nodeFilter === 'inactive'
-                  ? 'bg-amber-500 text-white'
-                  : 'bg-white text-slate-500 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'}`}>
-              <ZapOff className="w-3 h-3" />
-              <span className="text-xs">Inactivos</span>
-            </button>
-            <button
-              onClick={() => logic.setNodeFilter('all')}
-              title="Todos los nodos"
-              className={`flex items-center gap-1 px-2 py-1.5 font-bold transition-colors
-                ${logic.nodeFilter === 'all'
-                  ? 'bg-indigo-500 text-white'
-                  : 'bg-white text-slate-500 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'}`}>
-              <Users className="w-3 h-3" />
-              <span className="text-xs">Todos</span>
-            </button>
-          </div>
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-            <input
-              value={logic.apSearch} onChange={e => logic.setApSearch(e.target.value)}
-              placeholder="Buscar AP…" aria-label="Buscar AP por nombre, IP, modelo o SSID"
-              className="pl-8 pr-8 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 w-44 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100 dark:placeholder-slate-500"
-            />
-            {logic.apSearch && <button onClick={() => logic.setApSearch('')} aria-label="Limpiar búsqueda" title="Limpiar búsqueda" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"><X className="w-3.5 h-3.5" /></button>}
-          </div>
-          <button onClick={syncAllVisible} disabled={syncableAps.length === 0}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-            title="Sincronizar ahora los CPEs de todos los APs visibles (manual)">
-            <RotateCw className="w-3.5 h-3.5" />
-            <span>Sincronizar todo</span>
-          </button>
-          <button onClick={() => { logic.loadDevices(); polling.seedFromDb(); }} disabled={logic.loading}
-            className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors disabled:opacity-50 dark:text-slate-500 dark:hover:text-indigo-400 dark:hover:bg-indigo-500/10"
-            title="Recargar lista de equipos">
-            {logic.loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-          </button>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-3 px-1 text-2xs text-slate-500 dark:text-slate-400">
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Online</span>
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400" /> Parcial / Errores</span>
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-sky-400" /> Conectando…</span>
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-300" /> Sin datos</span>
-        <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> En vivo (backend)</span>
-        {lastPolledAt > 0 && <span className="flex items-center gap-1"><RotateCw className="w-3 h-3" /> Última actualización {fmtAgo(lastPolledAt)}</span>}
-      </div>
+      <MonitorHeader
+        nodeCount={logic.filteredGroups.length}
+        apCount={totalAps}
+        cpeCount={totalCpes}
+        nodeFilter={logic.nodeFilter}
+        search={logic.apSearch}
+        connectionStatus={apPollConnectionStatus}
+        lastPolledAt={lastPolledAt}
+        canSync={syncableAps.length > 0}
+        reloading={logic.loading}
+        onFilterChange={logic.setNodeFilter}
+        onSearchChange={logic.setApSearch}
+        onSync={syncAllVisible}
+        onReload={() => { void logic.loadDevices(); polling.seedFromDb(); }}
+      />
 
       {(logic.loading || logic.loadError) && (
         <AsyncQueryState

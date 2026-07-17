@@ -3,7 +3,7 @@
 //  emitido por el apPollJob del backend y lo entrega al consumidor.
 //  Reusa el stream existente /api/events/stream (room por workspace).
 // ============================================================
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { API_BASE_URL } from '../../../../config';
 import type { LiveCpe } from '../../../../types/apMonitor';
 
@@ -14,20 +14,32 @@ interface ApPollEvent {
   error?: string;
 }
 
+export type ApPollConnectionStatus = 'connecting' | 'connected' | 'reconnecting';
+
 export function useApPollEvents(onEvent: (e: ApPollEvent) => void, enabled: boolean) {
   const cbRef = useRef(onEvent);
+  const [connectionStatus, setConnectionStatus] = useState<ApPollConnectionStatus>('connecting');
   useEffect(() => { cbRef.current = onEvent; });
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) return undefined;
+    setConnectionStatus('connecting');
     const es = new EventSource(`${API_BASE_URL}/api/events/stream`, { withCredentials: true });
     const handler = (e: MessageEvent) => {
       try { cbRef.current(JSON.parse(e.data)); } catch { /* ignora payloads no-JSON */ }
     };
+    const handleOpen = () => setConnectionStatus('connected');
+    const handleError = () => setConnectionStatus('reconnecting');
     es.addEventListener('ap-poll', handler as EventListener);
+    es.addEventListener('open', handleOpen);
+    es.addEventListener('error', handleError);
     return () => {
       es.removeEventListener('ap-poll', handler as EventListener);
+      es.removeEventListener('open', handleOpen);
+      es.removeEventListener('error', handleError);
       es.close();
     };
   }, [enabled]);
+
+  return connectionStatus;
 }
