@@ -97,6 +97,44 @@ const mailSentTotal = new client.Counter({
     registers: [register],
 });
 
+// ── Gemini AirOS ───────────────────────────────────────────────────────────
+// Sin labels de usuario/workspace/dispositivo: evita PII y cardinalidad alta.
+const aiRequestsTotal = new client.Counter({
+    name: 'gestionvpn_ai_requests_total',
+    help: 'Solicitudes de análisis AirOS por tipo, resultado y modelo.',
+    labelNames: ['type', 'status', 'model'],
+    registers: [register],
+});
+
+const aiLatencySeconds = new client.Histogram({
+    name: 'gestionvpn_ai_latency_seconds',
+    help: 'Latencia de llamadas reales a Gemini para análisis AirOS.',
+    labelNames: ['type', 'model'],
+    buckets: [0.1, 0.25, 0.5, 1, 2.5, 5, 10, 20, 30],
+    registers: [register],
+});
+
+const aiTokensTotal = new client.Counter({
+    name: 'gestionvpn_ai_tokens_total',
+    help: 'Tokens reportados por Gemini para análisis AirOS.',
+    labelNames: ['direction', 'type', 'model'],
+    registers: [register],
+});
+
+const aiCacheHitsTotal = new client.Counter({
+    name: 'gestionvpn_ai_cache_hits_total',
+    help: 'Análisis AirOS reutilizados desde caché sin consumir Gemini.',
+    labelNames: ['type'],
+    registers: [register],
+});
+
+const aiRejectionsTotal = new client.Counter({
+    name: 'gestionvpn_ai_rejections_total',
+    help: 'Solicitudes o respuestas de IA rechazadas por controles internos.',
+    labelNames: ['reason'],
+    registers: [register],
+});
+
 module.exports = {
     register,
     httpRequestsTotal,
@@ -105,4 +143,9 @@ module.exports = {
     routerosErrorsTotal,
     routerosWritesTotal,
     mailSentTotal,
+    aiRequestsTotal,
+    aiLatencySeconds,
+    aiTokensTotal,
+    aiCacheHitsTotal,
+    aiRejectionsTotal,
 };

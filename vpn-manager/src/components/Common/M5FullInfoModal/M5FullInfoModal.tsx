@@ -11,7 +11,7 @@ import { detectFamily } from './utils/deviceFamily';
 import { modalContainerStyles } from './utils/styles';
 import Dialog from '../Dialog';
 
-export default function M5FullInfoModal({ dev, onClose }: M5FullInfoModalProps) {
+export default function M5FullInfoModal({ dev, onClose, onAnalyzeWithAi }: M5FullInfoModalProps) {
   const { copiedIp, copyIp } = useCopiedIpState(dev.ip);
   const s = dev.cachedStats;
   const family = detectFamily(dev);
@@ -23,7 +23,7 @@ export default function M5FullInfoModal({ dev, onClose }: M5FullInfoModalProps) 
       overlayClassName={modalContainerStyles.container}
       panelClassName={modalContainerStyles.modal}
     >
-      <ModalHeader dev={dev} copiedIp={copiedIp} copyIp={copyIp} onClose={onClose} />
+      <ModalHeader dev={dev} copiedIp={copiedIp} copyIp={copyIp} onClose={onClose} onAnalyzeWithAi={onAnalyzeWithAi} />
       <ModalContent>
         {!s ? (
           <EmptyState />

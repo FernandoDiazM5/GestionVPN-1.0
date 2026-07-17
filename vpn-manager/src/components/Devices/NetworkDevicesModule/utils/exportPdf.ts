@@ -14,9 +14,9 @@
 
 import type { DeviceRow } from '../hooks/useDeviceList';
 import {
-  PDF_COLUMNS,
   buildFileName,
   downloadBlob,
+  getPdfColumns,
   type ExportMetadata,
 } from './exportShared';
 
@@ -25,7 +25,11 @@ const INDIGO_100: [number, number, number] = [224, 231, 255];
 const SLATE_500: [number, number, number] = [100, 116, 139];
 const SLATE_700: [number, number, number] = [51, 65, 85];
 
-export async function exportScanToPdf(rows: DeviceRow[], meta: ExportMetadata): Promise<void> {
+export async function exportScanToPdf(
+  rows: DeviceRow[],
+  meta: ExportMetadata,
+  visibleColumnKeys: string[],
+): Promise<void> {
   // Dynamic imports — ambos chunks lazy.
   const [{ default: jsPDF }, autoTableModule] = await Promise.all([
     import('jspdf'),
@@ -89,9 +93,10 @@ export async function exportScanToPdf(rows: DeviceRow[], meta: ExportMetadata): 
   });
 
   // ── Tabla ──────────────────────────────────────────────────────
-  const head = [PDF_COLUMNS.map(c => c.header)];
+  const pdfColumns = getPdfColumns(visibleColumnKeys);
+  const head = [pdfColumns.map(c => c.header)];
   const body = rows.map(r =>
-    PDF_COLUMNS.map(c => {
+    pdfColumns.map(c => {
       const v = c.get(r);
       return v == null ? '' : String(v);
     }),

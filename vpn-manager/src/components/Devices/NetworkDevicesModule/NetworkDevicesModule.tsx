@@ -18,7 +18,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
-  CheckCircle2, Cpu, ShieldCheck, ShieldOff, RefreshCw, Radio, Save, Loader2, RotateCcw,
+  CheckCircle2, Cpu, ShieldCheck, ShieldOff, RefreshCw, Radio, Save, Loader2, RotateCcw, Sparkles, History,
 } from 'lucide-react';
 
 import { useVpn } from '../../../context';
@@ -46,9 +46,15 @@ import { useColumnPrefs } from './hooks/useColumnPrefs';
 import { useDeviceLibrary } from './hooks/useDeviceLibrary';
 import { useScanPreferences } from './hooks/useScanPreferences';
 import { API_BASE_URL } from '../../../config';
+import { useWorkspaceSession } from '../../../context/WorkspaceSession';
+import { useAirOsAi } from './hooks/useAirOsAi';
+import { AirOsAiDialog } from './components/AirOsAiDialog';
+import { AirOsAiHistoryDialog } from './components/AirOsAiHistoryDialog';
 
 export default function NetworkDevicesModule() {
   const { credentials, activeNodeVrf, nodes, setNodes } = useVpn();
+  const { session } = useWorkspaceSession();
+  const airOsAi = useAirOsAi(session?.role === 'OWNER' && !session.platform_admin);
 
   // ── Preferencias persistentes (§40) ───────────────────────────────
   // Almacén ÚNICO: columnas + anchos + sort + filtros + búsqueda + subred.
@@ -61,6 +67,7 @@ export default function NetworkDevicesModule() {
   const [m5DetailDevice, setM5DetailDevice] = useState<ScannedDevice | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showAiHistory, setShowAiHistory] = useState(false);
   const [nodeSshCreds, setNodeSshCreds] = useState<ScanCred[]>([]);
 
   // ── Derivados básicos del estado externo ──────────────────────────
@@ -245,10 +252,10 @@ export default function NetworkDevicesModule() {
     nodeName: effectiveNode?.nombre_nodo ?? null,
     subnet: effectiveLan || null,
     scannedAt: new Date(),
-    totalCount: list.scanRows.length,
-    withStatsCount: list.scanRows.filter(r => r.dev.cachedStats).length,
-    savedCount: list.scanRows.filter(r => r.isSaved).length,
-  }), [effectiveNode, effectiveLan, list.scanRows]);
+    totalCount: list.sortedRows.length,
+    withStatsCount: list.sortedRows.filter(r => r.dev.cachedStats).length,
+    savedCount: list.sortedRows.filter(r => r.isSaved).length,
+  }), [effectiveNode, effectiveLan, list.sortedRows]);
 
   // Candidatos visibles para bulk save: filas que tienen SSH OK y aún no
   // están guardadas. Antes (§38) el botón guardaba a TODOS automáticamente;
@@ -497,9 +504,39 @@ export default function NetworkDevicesModule() {
                     <span>Guardar {bulkSaveSelection.length}</span>
                   </button>
                 )}
+                {airOsAi.available && list.sortedRows.some(row => !!row.dev.cachedStats) && (
+                  <button
+                    onClick={() => airOsAi.requestNetwork(
+                      list.sortedRows.map(row => row.dev),
+                      {
+                        subnet: effectiveLan || undefined,
+                        roleFilter: prefs.filterRole || undefined,
+                        ssidFilter: prefs.filterSSID || undefined,
+                        searchApplied: !!prefs.searchQuery.trim(),
+                        visibleCount: list.sortedRows.length,
+                      },
+                    )}
+                    title="Analizar con Gemini únicamente los equipos visibles que tienen datos AirOS"
+                    className="btn-secondary btn-sm flex min-h-11 items-center gap-1.5 border-violet-200 text-violet-700 hover:bg-violet-50 dark:border-violet-500/30 dark:text-violet-300 dark:hover:bg-violet-500/10"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    <span>Analizar red visible</span>
+                  </button>
+                )}
+                {airOsAi.available && (
+                  <button
+                    onClick={() => setShowAiHistory(true)}
+                    title="Ver análisis AirOS guardados"
+                    aria-label="Abrir historial de análisis AirOS"
+                    className="btn-outline btn-icon min-h-11 min-w-11 text-violet-700 dark:text-violet-300"
+                  >
+                    <History className="h-4 w-4" />
+                  </button>
+                )}
                 <ExportMenu
                   rows={list.sortedRows}
                   meta={exportMeta}
+                  visibleColumnKeys={prefs.visibleCols}
                   disabled={list.sortedRows.length === 0}
                 />
                 <ColumnPicker visibleCols={prefs.visibleCols} onChange={prefs.setVisibleCols} />
@@ -566,8 +603,15 @@ export default function NetworkDevicesModule() {
       )}
 
       {m5DetailDevice && (
-        <M5FullInfoModal dev={m5DetailDevice} onClose={() => setM5DetailDevice(null)} />
+        <M5FullInfoModal
+          dev={m5DetailDevice}
+          onClose={() => setM5DetailDevice(null)}
+          onAnalyzeWithAi={airOsAi.available ? () => airOsAi.requestDevice(m5DetailDevice) : undefined}
+        />
       )}
+
+      <AirOsAiDialog controller={airOsAi} />
+      <AirOsAiHistoryDialog open={showAiHistory && airOsAi.available} onClose={() => setShowAiHistory(false)} />
 
       <ConfirmModal
         isOpen={showResetConfirm}

@@ -1,4 +1,4 @@
-import { Activity, Check, Copy, X } from 'lucide-react';
+import { Activity, Check, Copy, Sparkles, X } from 'lucide-react';
 import type { ScannedDevice, SavedDevice } from '../../../../types/devices';
 import { detectFamily } from '../utils/deviceFamily';
 import { headerStyles } from '../utils/styles';
@@ -8,9 +8,10 @@ interface ModalHeaderProps {
   copiedIp: boolean;
   copyIp: () => void;
   onClose: () => void;
+  onAnalyzeWithAi?: () => void;
 }
 
-export default function ModalHeader({ dev, copiedIp, copyIp, onClose }: ModalHeaderProps) {
+export default function ModalHeader({ dev, copiedIp, copyIp, onClose, onAnalyzeWithAi }: ModalHeaderProps) {
   const s = dev.cachedStats;
   const family = detectFamily(dev);
 
@@ -42,9 +43,20 @@ export default function ModalHeader({ dev, copiedIp, copyIp, onClose }: ModalHea
           </div>
         </div>
       </div>
-      <button onClick={onClose} className={headerStyles.closeButton}>
-        <X className="w-4 h-4" />
-      </button>
+      <div className="flex items-center gap-2">
+        {onAnalyzeWithAi && s && (
+          <button
+            onClick={onAnalyzeWithAi}
+            className="flex min-h-11 items-center gap-2 rounded-lg border border-violet-400/40 bg-violet-500/20 px-3 text-xs font-bold text-violet-100 hover:bg-violet-500/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300"
+          >
+            <Sparkles className="h-4 w-4" />
+            Analizar con Gemini
+          </button>
+        )}
+        <button onClick={onClose} aria-label="Cerrar informe AirOS" className={headerStyles.closeButton}>
+          <X className="w-4 h-4" />
+        </button>
+      </div>
     </div>
   );
 }

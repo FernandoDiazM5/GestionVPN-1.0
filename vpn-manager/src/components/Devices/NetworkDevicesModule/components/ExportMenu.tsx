@@ -25,6 +25,7 @@ type Format = 'csv' | 'json' | 'xlsx' | 'pdf';
 interface ExportMenuProps {
   rows: DeviceRow[];
   meta: ExportMetadata;
+  visibleColumnKeys: string[];
   disabled?: boolean;
 }
 
@@ -35,7 +36,7 @@ const ITEMS: { key: Format; label: string; hint: string; Icon: typeof FileText; 
   { key: 'pdf',  label: 'PDF informe', hint: 'Informe imprimible (A4)',         Icon: FileType2,       colorClass: 'text-rose-600' },
 ];
 
-export function ExportMenu({ rows, meta, disabled }: ExportMenuProps) {
+export function ExportMenu({ rows, meta, visibleColumnKeys, disabled }: ExportMenuProps) {
   const { showKebab, setShowKebab, kebabCoords, kebabRef, dropdownRef, handleKebabClick } = useKebabMenu();
   const [busyFormat, setBusyFormat] = useState<Format | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -63,7 +64,7 @@ export function ExportMenu({ rows, meta, disabled }: ExportMenuProps) {
         }
         case 'pdf': {
           const { exportScanToPdf } = await import('../utils/exportPdf');
-          await exportScanToPdf(rows, meta);
+          await exportScanToPdf(rows, meta, visibleColumnKeys);
           break;
         }
       }
@@ -75,7 +76,7 @@ export function ExportMenu({ rows, meta, disabled }: ExportMenuProps) {
     } finally {
       setBusyFormat(null);
     }
-  }, [rows, meta, busyFormat, setShowKebab]);
+  }, [rows, meta, visibleColumnKeys, busyFormat, setShowKebab]);
 
   return (
     <div ref={kebabRef} className="relative">

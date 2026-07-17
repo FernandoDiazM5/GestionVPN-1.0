@@ -3,6 +3,7 @@
 // ============================================================
 import { get, post, patch, del } from './sessionClient';
 import type { AdminSummary, Moderator, AuditLog } from '../types/account';
+import type { ModeratorAiAccess } from '@gestionvpn/contracts';
 
 export interface PendingInvitation {
   id: string;
@@ -47,6 +48,11 @@ export const adminApi = {
     id: string,
     data: { name?: string; workspaceName?: string; password?: string; disabled?: boolean }
   ) => patch<{ success: true; message: string }>(`/api/admin/moderators/${id}`, data),
+
+  setModeratorAiAccess: (id: string, enabled: boolean) =>
+    patch<{ success: true; message: string; access: ModeratorAiAccess }>(
+      `/api/admin/moderators/${id}/ai-access`, { enabled }
+    ),
 
   deleteModerator: (id: string) =>
     del<{ success: true; message: string }>(`/api/admin/moderators/${id}`),

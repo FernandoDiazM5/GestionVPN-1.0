@@ -3,6 +3,7 @@ import type { ScannedDevice, SavedDevice, AntennaStats } from '../../../types/de
 export interface M5FullInfoModalProps {
   dev: ScannedDevice | SavedDevice;
   onClose: () => void;
+  onAnalyzeWithAi?: () => void;
 }
 
 export interface ModalSectionProps {

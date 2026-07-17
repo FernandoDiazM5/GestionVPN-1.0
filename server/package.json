@@ -17,6 +17,7 @@
     "migrate:dropcomod": "node db/migrateDropCoModerator.js",
     "migrate:mgmtipsource": "node db/migrateMgmtIpSource.js",
     "migrate:otp-send": "node db/migrateOtpSendRate.js",
+    "migrate:air-os-ai": "node db/migrateAirOsAi.js",
     "diagnose": "node db/diagnostics.js",
     "check:scanroute": "node db/checkScanRoute.js",
     "sync:wg0": "node db/syncWg0.js",
@@ -32,6 +33,7 @@
   },
   "dependencies": {
     "@gestionvpn/contracts": "*",
+    "@google/genai": "^2.12.0",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",

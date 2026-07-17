@@ -11,6 +11,7 @@ const {
   CreateModeratorRequestSchema,
   ModeratorPatchRequestSchema,
   InviteModeratorRequestSchema,
+  AirOsAiAccessPatchSchema,
 } = require('@gestionvpn/contracts');
 
 const { asyncHandler, AppError, sendOk } = require('../lib/apiResponse');
@@ -19,6 +20,8 @@ const { requireSession, requirePlatformAdmin, invalidateUserCache } = require('.
 const workspaceRepo = require('../db/repos/workspaceRepo');
 const invitationRepo = require('../db/repos/invitationRepo');
 const userRepo = require('../db/repos/userRepo');
+const aiAccessRepo = require('../db/repos/aiAccessRepo');
+const auditRepo = require('../db/repos/auditRepo');
 const { sendInvitation } = require('../lib/mailer');
 const { removePeersFromRouter } = require('../lib/routerCleanup');
 const { setPeersEnabled, removeUserMangles } = require('../lib/routerPeerState');
@@ -127,17 +130,30 @@ router.get('/moderators', asyncHandler(async (_req, res) => {
   const moderators = await query(
     `SELECT u.id AS user_id, u.email, u.name, u.created_at, u.disabled_at,
             w.id AS workspace_id, w.name AS workspace_name,
+            COALESCE(aia.enabled, 0) AS ai_enabled,
+            aia.enabled_at AS ai_enabled_at, aia.disabled_at AS ai_disabled_at,
+            aia.updated_at AS ai_updated_at,
             (SELECT COUNT(*) FROM workspace_members m2
               WHERE m2.workspace_id = w.id AND m2.deleted_at IS NULL AND m2.role <> 'OWNER') AS miembros
        FROM workspace_members wm
        JOIN users u ON u.id = wm.user_id
        JOIN workspaces w ON w.id = wm.workspace_id
+       LEFT JOIN ai_moderator_access aia ON aia.user_id = u.id
       WHERE wm.role = 'OWNER' AND wm.deleted_at IS NULL AND w.deleted_at IS NULL
         AND u.deleted_at IS NULL AND u.is_platform_admin = 0
       ORDER BY u.created_at DESC`
   );
   return sendOk(res, {
-    moderators: moderators.map(m => ({ ...m, disabled: !!m.disabled_at })),
+    moderators: moderators.map(m => ({
+      ...m,
+      disabled: !!m.disabled_at,
+      ai_access: {
+        enabled: !!m.ai_enabled,
+        enabled_at: m.ai_enabled_at == null ? null : Number(m.ai_enabled_at),
+        disabled_at: m.ai_disabled_at == null ? null : Number(m.ai_disabled_at),
+        updated_at: m.ai_updated_at == null ? null : Number(m.ai_updated_at),
+      },
+    })),
   });
 }));
 
@@ -155,6 +171,36 @@ async function findModeratorOr404(userId) {
   if (!rows.length) throw new AppError('Moderador no encontrado', 404, 'NOT_FOUND');
   return rows[0];
 }
+
+// ── PATCH /api/admin/moderators/:id/ai-access — entitlement individual ──
+router.patch('/moderators/:id/ai-access', asyncHandler(async (req, res) => {
+  const moderator = await findModeratorOr404(req.params.id);
+  const { enabled } = AirOsAiAccessPatchSchema.parse(req.body);
+  const previous = await aiAccessRepo.getForUser(req.params.id);
+  const access = await aiAccessRepo.setForModerator({
+    userId: req.params.id,
+    enabled,
+    changedByAdmin: req.account.sub,
+  });
+  if (!access) throw new AppError('Moderador activo no encontrado', 404, 'NOT_FOUND');
+  try {
+    await auditRepo.log({
+      workspaceId: moderator.workspace_id,
+      tunnelId: req.params.id,
+      userId: req.account.sub,
+      action: enabled ? 'AI_ACCESS_ENABLE' : 'AI_ACCESS_DISABLE',
+      ip: req.ip,
+      detail: JSON.stringify({ moderatorId: req.params.id, previous: previous.enabled, enabled }),
+    });
+  } catch (error) {
+    log.warn({ moderatorId: req.params.id, err: error.message }, 'no se pudo auditar el acceso Gemini AirOS');
+  }
+  log.info({ moderatorId: req.params.id, enabled, actor: req.account.sub }, 'acceso Gemini AirOS actualizado');
+  return sendOk(res, {
+    access,
+    message: enabled ? 'Gemini habilitado para el moderador' : 'Gemini deshabilitado para el moderador',
+  });
+}));
 
 // ── PATCH /api/admin/moderators/:id — editar nombre / workspace / clave / estado ──
 const patchSchema = ModeratorPatchRequestSchema;

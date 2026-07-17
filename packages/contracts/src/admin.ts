@@ -47,6 +47,7 @@ export interface Moderator {
   workspace_name: string;
   miembros: number;
   disabled?: boolean;
+  ai_access?: import('./airOsAi').ModeratorAiAccess;
 }
 
 /** Métricas del dashboard del Administrador. */

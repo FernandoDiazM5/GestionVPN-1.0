@@ -72,10 +72,49 @@ export const EXPORT_COLUMNS: ExportColumn[] = [
   { header: 'Guardado',          jsonKey: 'saved',       get: r => r.isSaved ? 'Sí' : 'No' },
 ];
 
-/** Subconjunto reducido para el PDF — pensado para una hoja A4 legible. */
-export const PDF_COLUMNS: ExportColumn[] = EXPORT_COLUMNS.filter(c => [
-  'ip', 'role', 'name', 'ssid', 'signalDbm', 'ccqPct', 'txRateMbps', 'rxRateMbps', 'cpuPct', 'ramPct', 'uptime',
-].includes(c.jsonKey));
+/** Columnas de identidad que la tabla siempre muestra y el PDF conserva. */
+const PDF_IDENTITY_COLUMNS: ExportColumn[] = [
+  EXPORT_COLUMNS.find(c => c.jsonKey === 'ip')!,
+  EXPORT_COLUMNS.find(c => c.jsonKey === 'mac')!,
+  EXPORT_COLUMNS.find(c => c.jsonKey === 'role')!,
+  EXPORT_COLUMNS.find(c => c.jsonKey === 'name')!,
+  EXPORT_COLUMNS.find(c => c.jsonKey === 'model')!,
+];
+
+/** Equivalencia entre el selector de columnas de la tabla y el PDF. */
+const PDF_TABLE_COLUMNS: Record<string, ExportColumn> = {
+  essid: { header: 'SSID / AP', jsonKey: 'ssidAp', get: r => [r.dev.cachedStats?.essid ?? r.dev.essid, r.dev.parentAp].filter((value, index, values) => value && values.indexOf(value) === index).join(' / ') || null },
+  signal: { header: 'Señal (dBm)', jsonKey: 'signalDbm', get: r => r.dev.cachedStats?.signal ?? null },
+  ccq: { header: 'CCQ (%)', jsonKey: 'ccqPct', get: r => r.dev.cachedStats?.ccq ?? null },
+  txRate: { header: 'TX rate (Mbps)', jsonKey: 'txRateMbps', get: r => r.dev.cachedStats?.txRate ?? null },
+  rxRate: { header: 'RX rate (Mbps)', jsonKey: 'rxRateMbps', get: r => r.dev.cachedStats?.rxRate ?? null },
+  noise: { header: 'Piso ruido (dBm)', jsonKey: 'noiseFloorDbm', get: r => r.dev.cachedStats?.noiseFloor ?? null },
+  cpu: { header: 'CPU (%)', jsonKey: 'cpuPct', get: r => r.dev.cachedStats?.cpuLoad ?? null },
+  mem: { header: 'RAM (%)', jsonKey: 'ramPct', get: r => r.dev.cachedStats?.memoryPercent ?? null },
+  amq: { header: 'Calidad AM (%)', jsonKey: 'airmaxQualityPct', get: r => r.dev.cachedStats?.airmaxQuality ?? null },
+  amc: { header: 'Capacidad AM (%)', jsonKey: 'airmaxCapacityPct', get: r => r.dev.cachedStats?.airmaxCapacity ?? null },
+  uptime: { header: 'Tiempo activo', jsonKey: 'uptime', get: r => r.dev.cachedStats?.uptimeStr ?? null },
+  txPower: { header: 'Potencia TX (dBm)', jsonKey: 'txPowerDbm', get: r => r.dev.cachedStats?.txPower ?? null },
+  chanbw: { header: 'Ancho canal (MHz)', jsonKey: 'channelWidthMhz', get: r => r.dev.cachedStats?.channelWidth ?? null },
+  rssi: { header: 'RSSI bruto (dBm)', jsonKey: 'rssiDbm', get: r => r.dev.cachedStats?.rssi ?? r.dev.cachedStats?.signal ?? null },
+  distance: { header: 'Distancia (m)', jsonKey: 'distanceM', get: r => r.dev.cachedStats?.distance ?? null },
+  frequency: { header: 'Frecuencia (MHz)', jsonKey: 'frequencyMhz', get: r => r.dev.cachedStats?.frequency ?? r.dev.frequency ?? null },
+  hostname: { header: 'Nombre dispositivo', jsonKey: 'hostname', get: r => r.dev.cachedStats?.deviceName ?? r.dev.name ?? null },
+  firmware: { header: 'Versión FW', jsonKey: 'firmware', get: r => r.dev.cachedStats?.firmwareVersion ?? r.dev.firmware ?? null },
+  chains: { header: 'Cadenas TX/RX', jsonKey: 'chains', get: r => r.dev.cachedStats?.chains ?? null },
+  security: { header: 'Seguridad', jsonKey: 'security', get: r => r.dev.cachedStats?.security ?? null },
+  txretries: { header: 'Reintentos TX', jsonKey: 'txRetries', get: r => r.dev.cachedStats?.txRetries ?? null },
+  opmode: { header: 'Modo WiFi HT', jsonKey: 'opmode', get: r => r.dev.cachedStats?.opmode ?? null },
+  country: { header: 'País/Región', jsonKey: 'country', get: r => r.dev.cachedStats?.countryCode ?? null },
+  routerLink: { header: 'Acceso Router', jsonKey: 'routerLink', get: r => `http://${r.dev.ip}:${r.dev.routerPort ?? 8075}` },
+};
+
+export function getPdfColumns(visibleColumnKeys: string[]): ExportColumn[] {
+  return [
+    ...PDF_IDENTITY_COLUMNS,
+    ...visibleColumnKeys.map(key => PDF_TABLE_COLUMNS[key]).filter(Boolean),
+  ];
+}
 
 export interface ExportMetadata {
   /** Nombre del nodo activo (o undefined si scan en subred manual). */

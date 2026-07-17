@@ -32,6 +32,7 @@ const wireguardRoutes = require('./routes/wireguard.routes');
 const settingsRoutes = require('./routes/settings.routes');
 const diagnosticsRoutes = require('./routes/diagnostics.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
+const aiRoutes = require('./routes/ai.routes');
 const dashboardMetrics = require('./lib/dashboardMetrics');
 const apRoutes  = require('./ap.routes');
 const { initDb } = require('./db.service');
@@ -219,6 +220,7 @@ app.use('/api', verifyToken, wireguardRoutes);
 app.use('/api', verifyToken, settingsRoutes);
 app.use('/api', verifyToken, diagnosticsRoutes);
 app.use('/api', verifyToken, dashboardRoutes);
+app.use('/api/ai/air-os', verifyToken, aiRoutes);
 app.use('/api/ap-monitor', verifyToken, apRoutes);
 
 // ── Middleware de error central (estandariza respuestas) ─────────────────────

@@ -20,6 +20,8 @@
 const log = require('./logger').child({ scope: 'expiration-job' });
 const sessionRepo = require('../db/repos/sessionRepo');
 const auditRepo = require('../db/repos/auditRepo');
+const aiAnalysisRepo = require('../db/repos/aiAnalysisRepo');
+const aiSnapshotRepo = require('../db/repos/aiSnapshotRepo');
 const notifier = require('./notifier');
 const scanMangleSync = require('./scanMangleSync');
 const sse = require('./sse');
@@ -32,6 +34,7 @@ const { getAppSetting, decryptPass } = require('../db.service');
 const RETENTION_DAYS = Math.max(1, Number(process.env.AUDIT_RETENTION_DAYS || 7));
 const PURGE_THROTTLE_MS = Number(process.env.AUDIT_PURGE_THROTTLE_MS || 60 * 60 * 1000); // 1h
 let _lastPurge = 0;
+let _lastAiPurge = 0;
 
 async function purgeOldAudit() {
   if (Date.now() - _lastPurge < PURGE_THROTTLE_MS) return;
@@ -42,6 +45,22 @@ async function purgeOldAudit() {
     if (removed) log.info({ removed, retentionDays: RETENTION_DAYS }, 'auditoría: purga de retención');
   } catch (err) {
     log.warn({ err: err.message }, 'auditoría: purga de retención falló (best-effort)');
+  }
+}
+
+async function purgeOldAiData() {
+  if (process.env.GEMINI_AI_ENABLED !== 'true') return;
+  if (Date.now() - _lastAiPurge < PURGE_THROTTLE_MS) return;
+  _lastAiPurge = Date.now();
+  const analysisDays = Math.max(1, Number(process.env.GEMINI_ANALYSIS_RETENTION_DAYS || 30));
+  try {
+    const analyses = await aiAnalysisRepo.purgeOlderThan(Date.now() - analysisDays * 86400000);
+    const snapshots = await aiSnapshotRepo.purgeExpired();
+    if (analyses || snapshots) {
+      log.info({ analyses, snapshots, analysisDays }, 'Gemini AirOS: purga de retención');
+    }
+  } catch (err) {
+    log.warn({ err: err.message }, 'Gemini AirOS: purga de retención falló (best-effort)');
   }
 }
 
@@ -65,6 +84,7 @@ async function runOnce() {
     // Retención de auditoría (throttle interno 1×/hora). Antes del early-return de
     // abajo para que corra aunque no haya sesiones expiradas este tick.
     await purgeOldAudit();
+    await purgeOldAiData();
 
     const expired = await sessionRepo.findExpired();
     if (!expired.length) return;

@@ -6,6 +6,42 @@
 
 ---
 
+> **Sesion 2026-07-17 - inicio de implementación Gemini AirOS.** Rama `vps_prod` (cambios sin commit ni deploy). Skills: `database-schema-design`, `vercel-react-best-practices`, `handoff-keeper`.
+> - Implementados contratos, cinco tablas/migración, repositorios, reglas locales, DTO allowlist con HMAC, prompt y cliente oficial Gemini con JSON estructurado + validación Zod, caché, cooldown, presupuestos global/workspace y telemetría de tokens.
+> - Agregados endpoints de estado, consentimiento, análisis individual/red visible e historial; sólo `OWNER` habilitado puede usarlos. MEMBER y platform admin reciben 403. El Administrador controla el entitlement por moderador desde un switch server-first y cada cambio intenta registrar auditoría con actor/estado previo/nuevo.
+> - Escanear incorpora análisis del equipo desde el informe AirOS y de exactamente la red visible después de filtros/orden, usando sólo filas con stats. El diálogo confirma envío, muestra cuota y recalca que Gemini no modifica equipos ni decide; no existe botón Aplicar ni Function Calling.
+> - Privacidad verificada por pruebas: el frontend no copia secretos/raw/stations a la solicitud; el backend elimina IP, MAC, nombre y SSID antes de Gemini. Feature apagada por defecto y variables documentadas en `.env.example`/`.env.production.example`.
+> - Fase 4 inicial: historial accesible desde Escanear, detalle, eliminación manual del análisis+snapshot y purga automática (análisis 30 días, snapshots métricos 90 días). Las tendencias quedan deliberadamente pendientes hasta acumular dataset suficiente.
+> - Hardening adicional: límite de payload; salida rechazada si contiene comandos, URLs o evidencia ajena al snapshot; prompt resistente a instrucciones embebidas; métricas Prometheus sin labels PII; confirmación administrativa y aviso del tratamiento del free tier.
+> - Gates: **380 backend + 123 frontend**, contratos, `check:all`, lint, build Vite, auditor de diseño sin violaciones y `diff --check`. Documentación oficial vigente confirmó el modelo estable y cuotas variables por proyecto. La migración idempotente se aplicó localmente y existen las cinco tablas `ai_*`; no hubo llamada real porque la feature sigue apagada y no hay API key/HMAC local. Falta configurar secretos, piloto y despliegue gradual.
+
+> **Sesion 2026-07-17 - Gemini habilitable por moderador.** Rama `vps_prod` (base `fd6f8b8`; sólo documentación, sin implementación ni deploy). Skills: `documentation-writer`, `handoff-keeper`.
+> - Nueva regla: sólo moderadores `OWNER` pueden consumir análisis y únicamente si el Administrador habilitó su entitlement individual. MEMBER y platform admin no consumen los endpoints AI.
+> - El permiso nace apagado, se gestiona por moderador desde Administración, se audita y se comprueba antes de caché/cuota/Gemini. Deshabilitar bloquea inmediatamente sin borrar historial.
+> - Actualizados documento de aplicaciones y plan: quinta tabla `ai_moderator_access`, endpoints administrativos, toggle UI, códigos de error, pruebas y commit adicional (25 total). Consentimiento y entitlement siguen siendo independientes.
+
+> **Sesion 2026-07-16 - plan ejecutable Gemini sobre AirOS.** Rama `vps_prod` (base `fd6f8b8`; sólo documentación, sin implementación ni deploy). Skills: `documentation-writer`, `handoff-keeper`.
+> - Creado `PLAN_IMPLEMENTACION_GEMINI_AIR_OS_2026-07-16.md` con arquitectura adaptada al Express CommonJS/React/contratos Zod/MySQL actuales, endpoints, esquemas, seguridad, cuota gratuita y despliegue gradual.
+> - Descompuesto en 24 commits verdes para fases 0, 1, 2 y 4; fase 3 conversacional ausente. Feature flag apagado por defecto y sin Function Calling ni imports de escritura RouterOS/AirOS.
+> - El plan usa DTO allowlist, pseudonimización HMAC, hechos/risk score locales, Structured Outputs, caché por hash, reserva diaria atómica y `usageMetadata`; no hace una llamada `countTokens` por solicitud.
+> - Verificada documentación oficial vigente: modelos estables/configurables, Structured Outputs, free tier variable por proyecto, cuotas consultables en AI Studio y deprecaciones.
+
+> **Sesion 2026-07-16 - alcance y cuota gratuita para Gemini.** Rama `vps_prod` (base `fd6f8b8`; sólo documentación, sin implementación ni deploy). Skill: `handoff-keeper`.
+> - Decidido usar el nivel gratuito de la API de Gemini: el diseño debe minimizar y controlar tokens/solicitudes mediante DTO compacto, cálculos locales, selección de anomalías, caché por snapshot y límites de salida.
+> - Alcance aprobado: implementar fases 0 (preparación), 1 (análisis individual), 2 (red visible) y 4 (historial). La fase 3 de asistente consultivo conversacional queda explícitamente excluida.
+> - Actualizados el documento de aplicaciones y el contexto durable; se mantiene la regla de IA sin permisos de modificación ni decisión operativa.
+
+> **Sesion 2026-07-16 - aplicaciones consultivas de Gemini para datos AirOS.** Rama `vps_prod` (base `fd6f8b8`; sólo documentación, sin implementación ni deploy). Skills: `documentation-writer`, `handoff-keeper`.
+> - Creado `APLICACIONES_GEMINI_DATOS_AIR_OS_2026-07-16.md`: inventario de datos disponibles, casos individuales y de red, arquitectura, contratos JSON, privacidad, evaluación, prioridades y fases.
+> - Regla durable del usuario: la IA no puede modificar configuraciones ni tomar decisiones. Gemini sólo analiza y recomienda; el propietario decide y ejecuta manualmente.
+> - Las capacidades y consideraciones de Structured Outputs, Function Calling de sólo lectura, caching, Batch API, precios y límites se contrastaron con documentación oficial vigente de Gemini.
+
+> **Sesion 2026-07-16 - PDF de Escanear refleja filtros y columnas visibles.** Rama `vps_prod` (base `fd6f8b8`; cambios sin commit ni deploy). Skill: `handoff-keeper`.
+> - Corregido el desacople del PDF: antes recibía filas filtradas, pero sus KPI se calculaban con el escaneo completo y sus 11 columnas eran fijas.
+> - Ahora `ExportMenu` entrega las columnas activas, el PDF conserva las columnas básicas de identidad y agrega sólo las métricas seleccionadas; los KPI usan exactamente las filas filtradas y ordenadas que se exportan.
+> - Archivos de producto: `NetworkDevicesModule.tsx`, `components/ExportMenu.tsx`, `utils/exportPdf.ts` y `utils/exportShared.ts`. CSV, JSON y Excel quedaron sin cambios.
+> - Verificación: 122/122 frontend, TypeScript, ESLint focalizado, build Vite y `git diff --check`.
+
 > **Sesion 2026-07-16 - despliegue de plataforma verificado en VPS.** Rama `vps_prod`; producción actualizada con el paquete `2e8d07b` contenido en `d9d1603`. Skill: `handoff-keeper`.
 > - `vpn-db` y `vpn-backend` quedaron healthy; `vpn-frontend` quedó arriba en 80/443. Todas las migraciones del entrypoint terminaron sin fallos y conservaron datos.
 > - `/api/health`: success/status `ok`, MySQL `ok` (1 ms), RouterOS `ok` y SMTP `ok` (478 ms). Nginx respondió HTTP/2 200 para `/GestionVPN-1.0/`.

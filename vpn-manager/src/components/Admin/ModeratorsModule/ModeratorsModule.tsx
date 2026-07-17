@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   UserCog, UserPlus, Loader2, RefreshCw, X, Briefcase, Mail, KeyRound,
   Pencil, Trash2, Ban, Power, AlertTriangle, Link2, Copy, Check, Clock,
+  Sparkles,
 } from 'lucide-react';
 import Dialog from '../../Common/Dialog';
 import { adminApi } from '../../../services/adminApi';
@@ -35,6 +36,7 @@ export default function ModeratorsModule() {
   const [resetting, setResetting] = useState<Moderator | null>(null);
   const [deleting, setDeleting] = useState<Moderator | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [aiBusyId, setAiBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { session } = useWorkspaceSession();
   const canAdmin = isPlatformAdmin(session);
@@ -63,6 +65,26 @@ export default function ModeratorsModule() {
     try { await adminApi.updateModerator(m.user_id, { disabled: !m.disabled }); await load(); }
     catch (e) { setError(e instanceof Error ? e.message : 'Error al actualizar'); }
     finally { setBusyId(null); }
+  };
+
+  const toggleAiAccess = async (m: Moderator) => {
+    if (m.disabled || aiBusyId) return;
+    const enabled = !m.ai_access?.enabled;
+    if (enabled && !window.confirm(
+      `¿Habilitar Gemini AirOS para ${m.name || m.email}? Podrá consumir la cuota gratuita compartida después de aceptar el consentimiento.`
+    )) return;
+    setAiBusyId(m.user_id);
+    setError(null);
+    try {
+      const result = await adminApi.setModeratorAiAccess(m.user_id, enabled);
+      setModerators(current => current.map(item =>
+        item.user_id === m.user_id ? { ...item, ai_access: result.access } : item
+      ));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'No se pudo actualizar el acceso a Gemini');
+    } finally {
+      setAiBusyId(null);
+    }
   };
 
   return (
@@ -100,6 +122,7 @@ export default function ModeratorsModule() {
                 <th className="th-cell dark:text-slate-400">Moderador</th>
                 <th className="th-cell dark:text-slate-400">Workspace</th>
                 <th className="th-cell dark:text-slate-400">Miembros</th>
+                <th className="th-cell dark:text-slate-400">Gemini AirOS</th>
                 <th className="th-cell dark:text-slate-400">Alta</th>
                 <th className="th-cell dark:text-slate-400 text-right">Acciones</th>
               </tr>
@@ -118,6 +141,7 @@ export default function ModeratorsModule() {
                   </td>
                   <td className="px-4 py-3"><div className="skeleton h-3 w-24" /></td>
                   <td className="px-4 py-3"><div className="skeleton h-5 w-8 rounded-full" /></td>
+                  <td className="px-4 py-3"><div className="skeleton h-6 w-20 rounded-full" /></td>
                   <td className="px-4 py-3"><div className="skeleton h-3 w-20" /></td>
                   <td className="px-4 py-3"><div className="skeleton h-7 w-28 ml-auto" /></td>
                 </tr>
@@ -140,6 +164,27 @@ export default function ModeratorsModule() {
                   </td>
                   <td className="px-4 py-3"><span className="text-slate-600 dark:text-slate-300">{m.workspace_name}</span></td>
                   <td className="px-4 py-3"><span className="badge badge-info">{m.miembros}</span></td>
+                  <td className="px-4 py-3">
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={!!m.ai_access?.enabled}
+                      aria-label={`${m.ai_access?.enabled ? 'Deshabilitar' : 'Habilitar'} Gemini AirOS para ${m.name || m.email}`}
+                      title={m.disabled ? 'Activa primero la cuenta del moderador' : 'Controla el acceso individual a los análisis AirOS con Gemini'}
+                      disabled={m.disabled || aiBusyId !== null}
+                      onClick={() => toggleAiAccess(m)}
+                      className={`inline-flex min-h-11 items-center gap-2 rounded-lg px-2.5 text-2xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50 ${
+                        m.ai_access?.enabled
+                          ? 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300'
+                          : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                      }`}
+                    >
+                      {aiBusyId === m.user_id
+                        ? <Loader2 className="h-4 w-4 motion-safe:animate-spin" />
+                        : <Sparkles className="h-4 w-4" />}
+                      <span>{m.ai_access?.enabled ? 'Habilitado' : 'Deshabilitado'}</span>
+                    </button>
+                  </td>
                   <td className="px-4 py-3"><span className="text-slate-500 dark:text-slate-400">{new Date(m.created_at).toLocaleDateString('es')}</span></td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1">
@@ -166,7 +211,7 @@ export default function ModeratorsModule() {
                 </tr>
               ))}
               {!loading && moderators.length === 0 && (
-                <tr><td colSpan={5} className="px-4 py-14 text-center">
+                <tr><td colSpan={6} className="px-4 py-14 text-center">
                   <div className="flex flex-col items-center gap-3">
                     <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center">
                       <UserCog className="w-7 h-7 text-indigo-400 dark:text-indigo-400/70" />
