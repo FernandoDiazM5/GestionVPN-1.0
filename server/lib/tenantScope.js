@@ -72,32 +72,53 @@ async function cpeForeign(db, req, mac) {
  * ambos lados de la comparación es deliberado: sin él, subredes con el bit alto
  * activo (p.ej. 192.168.x) quedan con signo y la comparación falla.
  */
-async function ipInOwnedSubnet(db, req, ip) {
-  const ws = reqWorkspace(req);
-  if (ws === null) return true;   // admin sin restricción
-  if (!ip || !/^(\d{1,3}\.){3}\d{1,3}$/.test(ip)) return false;
+function isIpv4(ip) {
+  if (typeof ip !== 'string' || !/^(\d{1,3}\.){3}\d{1,3}$/.test(ip)) return false;
+  return ip.split('.').every((octet) => Number(octet) >= 0 && Number(octet) <= 255);
+}
 
-  const rows = await db.all('SELECT segmento_lan, lan_subnets FROM nodes WHERE workspace_id = ?', [ws]);
-  const cidrs = [];
-  for (const r of rows) {
-    if (r.segmento_lan) cidrs.push(String(r.segmento_lan).trim());
-    try { (JSON.parse(r.lan_subnets || '[]') || []).forEach(s => cidrs.push(String(s).trim())); } catch (_) { /* noop */ }
-  }
-
-  const toNum = (a) => a.split('.').reduce((acc, o) => ((acc << 8) | parseInt(o, 10)) >>> 0, 0) >>> 0;
+function ipInCidrs(ip, cidrs) {
+  if (!isIpv4(ip)) return false;
+  const toNum = (address) => address.split('.').reduce((acc, octet) => (
+    ((acc << 8) | Number(octet)) >>> 0
+  ), 0) >>> 0;
   const ipN = toNum(ip);
   for (const cidr of cidrs) {
     const [net, prefStr] = cidr.split('/');
-    if (!net || !/^(\d{1,3}\.){3}\d{1,3}$/.test(net)) continue;
-    const pref = parseInt(prefStr, 10);
-    if (!(pref >= 0 && pref <= 32)) continue;
+    if (!isIpv4(net)) continue;
+    const pref = Number(prefStr);
+    if (!Number.isInteger(pref) || pref < 0 || pref > 32) continue;
     const mask = pref === 0 ? 0 : (~0 << (32 - pref)) >>> 0;
     if (((ipN & mask) >>> 0) === ((toNum(net) & mask) >>> 0)) return true;
   }
   return false;
 }
 
+async function ownedCidrs(db, workspaceId) {
+  const rows = await db.all('SELECT segmento_lan, lan_subnets FROM nodes WHERE workspace_id = ?', [workspaceId]);
+  const cidrs = [];
+  for (const row of rows) {
+    if (row.segmento_lan) cidrs.push(String(row.segmento_lan).trim());
+    try {
+      (JSON.parse(row.lan_subnets || '[]') || []).forEach((subnet) => cidrs.push(String(subnet).trim()));
+    } catch (_) { /* configuración heredada corrupta: se ignora, nunca amplía acceso */ }
+  }
+  return cidrs;
+}
+
+async function ipsInOwnedSubnets(db, req, ips) {
+  const ws = reqWorkspace(req);
+  if (ws === null) return true;   // admin sin restricción
+  if (!Array.isArray(ips) || ips.length === 0 || ips.some((ip) => !isIpv4(ip))) return false;
+  const cidrs = await ownedCidrs(db, ws);
+  return ips.every((ip) => ipInCidrs(ip, cidrs));
+}
+
+async function ipInOwnedSubnet(db, req, ip) {
+  return ipsInOwnedSubnets(db, req, [ip]);
+}
+
 module.exports = {
   reqWorkspace, ownedGroupIntIds, ownedApIntIds, ownsGroupUuid, ownsApUuid, cpeForeign,
-  ipInOwnedSubnet,
+  ipInOwnedSubnet, ipsInOwnedSubnets,
 };

@@ -29,15 +29,16 @@ describe('security route inventory', () => {
     expect(accountLogin.risks).not.toContain('PUBLIC_RATE_LIMIT_MISSING');
   });
 
-  it('recognizes global authentication and body-schema debt in AP routes', () => {
-    const apDebt = inventory.find((route) => (
-      route.file === 'ap.routes.js' && route.usesBody && !route.validatesBody
+  it('recognizes global authentication and middleware schemas in AP/device routes', () => {
+    const inputRoutes = inventory.filter((route) => (
+      ['ap.routes.js', 'routes/device.routes.js'].includes(route.file) && route.usesBody
     ));
 
-    expect(apDebt).toBeDefined();
-    expect(apDebt.authenticated).toBe(true);
-    expect(apDebt.risks).toContain('BODY_SCHEMA_MISSING');
-    expect(Array.isArray(apDebt.sinks)).toBe(true);
+    expect(inputRoutes.length).toBeGreaterThan(5);
+    expect(inputRoutes.every((route) => route.authenticated)).toBe(true);
+    expect(inputRoutes.every((route) => route.validatesBody)).toBe(true);
+    expect(inputRoutes.every((route) => !route.risks.includes('BODY_SCHEMA_MISSING'))).toBe(true);
+    expect(inputRoutes.every((route) => Array.isArray(route.sinks))).toBe(true);
   });
 
   it('renders a deterministic Markdown report', () => {

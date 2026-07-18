@@ -4,12 +4,40 @@ const router  = express.Router();
 const { getDb, encryptPass, decryptPass, getApIntId, getCpeIntId, getApGroupIntId, getNodeByPppUser } = require('./db.service');
 const { pollAp, getDetail, getFullDetail, clearApCache }  = require('./ap.service');
 
-const { reqWorkspace, ownedGroupIntIds, ownedApIntIds, ownsGroupUuid, ownsApUuid, cpeForeign } = require('./lib/tenantScope');
+const {
+  reqWorkspace,
+  ownedGroupIntIds,
+  ownedApIntIds,
+  ownsGroupUuid,
+  ownsApUuid,
+  cpeForeign,
+  ipInOwnedSubnet,
+  ipsInOwnedSubnets,
+} = require('./lib/tenantScope');
 const { ipInCidr, resolveOwnerNodeId, resolveNodeCreds: resolveNodeCredsShared } = require('./lib/apNode');
 const apWatch = require('./lib/apWatch');
 const scanIpRepo = require('./db/repos/scanIpRepo');
 const sessionRepo = require('./db/repos/sessionRepo');
 const log = require('./lib/logger').child({ scope: 'ap-routes' });
+const { validate } = require('./middleware/validate');
+const {
+  ApCreateRequestSchema,
+  ApDetailRequestSchema,
+  ApEmptyBodySchema,
+  ApEntityParamsSchema,
+  ApGroupParamsSchema,
+  ApGroupRequestSchema,
+  ApIdRequestSchema,
+  ApPollDirectRequestSchema,
+  ApPollRequestSchema,
+  ApUpdateRequestSchema,
+  CpeCredentialsRequestSchema,
+  CpeDetailDirectRequestSchema,
+  CpeDetailRequestSchema,
+  CpeEnrichBatchRequestSchema,
+  CpeMacParamsSchema,
+  SignalHistoryQuerySchema,
+} = require('@gestionvpn/contracts');
 
 const genUuid = () => crypto.randomBytes(8).toString('hex');
 const isValidMac = (mac) => /^([0-9a-f]{2}:?){5}([0-9a-f]{2})$/i.test(mac);
@@ -72,7 +100,7 @@ router.get('/nodos', async (req, res) => {
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
-router.post('/nodos', async (req, res) => {
+router.post('/nodos', validate({ body: ApGroupRequestSchema }), async (req, res) => {
     try {
         const { nombre, descripcion, ubicacion } = req.body;
         if (!nombre) return res.status(400).json({ success: false, message: 'Nombre requerido' });
@@ -85,7 +113,7 @@ router.post('/nodos', async (req, res) => {
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
-router.put('/nodos/:id', async (req, res) => {
+router.put('/nodos/:id', validate({ params: ApEntityParamsSchema, body: ApGroupRequestSchema }), async (req, res) => {
     try {
         const { nombre, descripcion, ubicacion } = req.body;
         if (!nombre) return res.status(400).json({ success: false, message: 'Nombre requerido' });
@@ -97,7 +125,7 @@ router.put('/nodos/:id', async (req, res) => {
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
-router.delete('/nodos/:id', async (req, res) => {
+router.delete('/nodos/:id', validate({ params: ApEntityParamsSchema }), async (req, res) => {
     try {
         const db = await getDb();
         if (!(await ownsGroupUuid(db, req, req.params.id))) return res.status(404).json({ success: false, message: 'Grupo no encontrado' });
@@ -121,7 +149,7 @@ router.delete('/nodos/:id', async (req, res) => {
 });
 
 // ── APs ───────────────────────────────────────────────────────────────────
-router.get('/nodos/:nodeId/aps', async (req, res) => {
+router.get('/nodos/:nodeId/aps', validate({ params: ApGroupParamsSchema }), async (req, res) => {
     try {
         const db = await getDb();
         if (!(await ownsGroupUuid(db, req, req.params.nodeId))) return res.json({ success: true, aps: [] });
@@ -134,11 +162,14 @@ router.get('/nodos/:nodeId/aps', async (req, res) => {
 });
 
 // Register AP — tries SSH immediately to pull static config
-router.post('/aps', async (req, res) => {
+router.post('/aps', validate({ body: ApCreateRequestSchema }), async (req, res) => {
     try {
         const { nodo_id, ip, usuario_ssh, clave_ssh_plain, puerto_ssh } = req.body;
         if (!nodo_id || !ip) return res.status(400).json({ success: false, message: 'nodo_id e ip requeridos' });
         const db   = await getDb();
+        if (!(await ipInOwnedSubnet(db, req, ip))) {
+            return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'La IP no pertenece a ninguna de tus subredes' });
+        }
         const uuid = genUuid();
         const port = parseInt(puerto_ssh) || 22;
         const enc  = clave_ssh_plain ? encryptPass(clave_ssh_plain) : '';
@@ -184,10 +215,13 @@ router.post('/aps', async (req, res) => {
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
-router.put('/aps/:id', async (req, res) => {
+router.put('/aps/:id', validate({ params: ApEntityParamsSchema, body: ApUpdateRequestSchema }), async (req, res) => {
     try {
         const { ip, usuario_ssh, clave_ssh_plain, puerto_ssh, activo } = req.body;
         const db = await getDb();
+        if (ip && !(await ipInOwnedSubnet(db, req, ip))) {
+            return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'La IP no pertenece a ninguna de tus subredes' });
+        }
         if (!(await ownsApUuid(db, req, req.params.id))) return res.status(404).json({ success: false, message: 'AP no encontrado' });
         const ap = await db.get('SELECT * FROM aps WHERE uuid=?', req.params.id);
         if (!ap) return res.status(404).json({ success: false, message: 'AP no encontrado' });
@@ -199,7 +233,7 @@ router.put('/aps/:id', async (req, res) => {
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
-router.delete('/aps/:id', async (req, res) => {
+router.delete('/aps/:id', validate({ params: ApEntityParamsSchema }), async (req, res) => {
     try {
         const db = await getDb();
         if (!(await ownsApUuid(db, req, req.params.id))) return res.status(404).json({ success: false, message: 'AP no encontrado' });
@@ -215,12 +249,15 @@ router.delete('/aps/:id', async (req, res) => {
 });
 
 // ── Refresh AP static data (re-SSH) ──────────────────────────────────────
-router.post('/aps/:id/refresh', async (req, res) => {
+router.post('/aps/:id/refresh', validate({ params: ApEntityParamsSchema, body: ApEmptyBodySchema }), async (req, res) => {
     try {
         const db = await getDb();
         if (!(await ownsApUuid(db, req, req.params.id))) return res.status(404).json({ success: false, message: 'AP no encontrado' });
         const ap = await db.get('SELECT * FROM aps WHERE uuid=?', req.params.id);
         if (!ap) return res.status(404).json({ success: false, message: 'AP no encontrado' });
+        if (!(await ipInOwnedSubnet(db, req, ap.ip))) {
+            return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'La IP guardada no pertenece a ninguna de tus subredes' });
+        }
         const pass = decryptPass(ap.clave_ssh_enc);
         const s = await getDetail(ap.ip, ap.puerto_ssh, ap.usuario_ssh, pass);
         await db.run(
@@ -237,12 +274,15 @@ router.post('/aps/:id/refresh', async (req, res) => {
 });
 
 // ── Poll AP → wstalist (real-time) ────────────────────────────────────────
-router.post('/aps/:id/poll', async (req, res) => {
+router.post('/aps/:id/poll', validate({ params: ApEntityParamsSchema, body: ApPollRequestSchema }), async (req, res) => {
     try {
         const db = await getDb();
         if (!(await ownsApUuid(db, req, req.params.id))) return res.status(404).json({ success: false, message: 'AP no encontrado' });
         const ap = await db.get('SELECT * FROM aps WHERE uuid=?', req.params.id);
         if (!ap) return res.status(404).json({ success: false, message: 'AP no encontrado' });
+        if (!(await ipInOwnedSubnet(db, req, ap.ip))) {
+            return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'La IP guardada no pertenece a ninguna de tus subredes' });
+        }
         const pass = decryptPass(ap.clave_ssh_enc);
 
         const stations = await pollAp(ap.uuid, ap.ip, ap.puerto_ssh, ap.usuario_ssh, pass, ap.firmware || '');
@@ -338,12 +378,15 @@ router.post('/aps/:id/poll', async (req, res) => {
 });
 
 // ── CPE detail — SSH on demand ────────────────────────────────────────────
-router.post('/cpes/:mac/detail', async (req, res) => {
+router.post('/cpes/:mac/detail', validate({ params: CpeMacParamsSchema, body: CpeDetailRequestSchema }), async (req, res) => {
     try {
         const { ap_id, cpe_ip } = req.body;
         if (!ap_id || !cpe_ip) return res.status(400).json({ success: false, message: 'ap_id y cpe_ip requeridos' });
 
         const db = await getDb();
+        if (!(await ipInOwnedSubnet(db, req, cpe_ip))) {
+            return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'La IP no pertenece a ninguna de tus subredes' });
+        }
         // ap_id from frontend is a uuid
         if (!(await ownsApUuid(db, req, ap_id))) return res.status(404).json({ success: false, message: 'AP no encontrado' });
         const ap = await db.get('SELECT * FROM aps WHERE uuid=?', ap_id);
@@ -396,7 +439,7 @@ router.get('/cpes', async (req, res) => {
 });
 
 // ── Signal history ────────────────────────────────────────────────────────
-router.get('/historial/:mac', async (req, res) => {
+router.get('/historial/:mac', validate({ params: CpeMacParamsSchema, query: SignalHistoryQuerySchema }), async (req, res) => {
     try {
         const db    = await getDb();
         const limit = parseInt(req.query.limit) || 100;
@@ -412,7 +455,7 @@ router.get('/historial/:mac', async (req, res) => {
 });
 
 // ── Poll AP directly — usa credenciales del nodo (node_ssh_creds) ────────
-router.post('/poll-direct', async (req, res) => {
+router.post('/poll-direct', validate({ body: ApPollDirectRequestSchema }), async (req, res) => {
     try {
         const { apId, saveHistory } = req.body;
         if (!apId) return res.status(400).json({ success: false, message: 'apId requerido' });
@@ -431,6 +474,9 @@ router.post('/poll-direct', async (req, res) => {
               WHERE a.uuid = ?`, [apId]
         );
         if (!apRow || !apRow.ip) return res.status(404).json({ success: false, message: 'AP no encontrado' });
+        if (!(await ipInOwnedSubnet(db, req, apRow.ip))) {
+            return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'La IP guardada no pertenece a ninguna de tus subredes' });
+        }
 
         // Resolve AP integer id from uuid
         const apIntId = await getApIntId(apId);
@@ -533,7 +579,7 @@ router.post('/poll-direct', async (req, res) => {
 // (AES-GCM) en aps.clave_ssh_enc; se descifra SERVER-SIDE y se devuelve SOLO
 // bajo la sesión autenticada del dueño (ownsApUuid). No se expone en listados:
 // solo bajo clic explícito de "revelar".
-router.post('/reveal-ssh', async (req, res) => {
+router.post('/reveal-ssh', validate({ body: ApIdRequestSchema }), async (req, res) => {
     try {
         const { apId } = req.body;
         if (!apId) return res.status(400).json({ success: false, message: 'apId requerido' });
@@ -551,7 +597,7 @@ router.post('/reveal-ssh', async (req, res) => {
 });
 
 // ── Full AP detail direct — all 12 SSH sections (ANTENNA_CMD) ────────────
-router.post('/ap-detail-direct', async (req, res) => {
+router.post('/ap-detail-direct', validate({ body: ApDetailRequestSchema }), async (req, res) => {
     try {
         const { id } = req.body;
         if (!id) return res.status(400).json({ success: false, message: 'id requerido' });
@@ -564,6 +610,9 @@ router.post('/ap-detail-direct', async (req, res) => {
                FROM aps a LEFT JOIN nodes n ON n.id = a.node_id WHERE a.uuid = ?`, [id]
         );
         if (!row || !row.ip || !row.usuario_ssh) return res.status(404).json({ success: false, message: 'AP sin datos o sin credenciales SSH' });
+        if (!(await ipInOwnedSubnet(db, req, row.ip))) {
+            return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'La IP guardada no pertenece a ninguna de tus subredes' });
+        }
 
         const bind = await resolveTunnelBinding(req, row.nombre_vrf);
         if (!bind.ok) return res.status(409).json({ success: false, code: bind.code, vrf: bind.vrf, message: bind.message });
@@ -575,7 +624,7 @@ router.post('/ap-detail-direct', async (req, res) => {
 });
 
 // ── Batch CPE enrich — SSH to multiple CPEs to get hostname/model ─────────
-router.post('/cpes/enrich-batch', async (req, res) => {
+router.post('/cpes/enrich-batch', validate({ body: CpeEnrichBatchRequestSchema }), async (req, res) => {
     try {
         const { cpes, apId, port } = req.body;
         // cpes: [{ mac, ip }]
@@ -585,6 +634,9 @@ router.post('/cpes/enrich-batch', async (req, res) => {
 
         // C1: aislamiento — el AP debe pertenecer al workspace del solicitante.
         if (!(await ownsApUuid(db, req, apId))) return res.status(404).json({ success: false, message: 'AP no encontrado' });
+        if (!(await ipsInOwnedSubnets(db, req, cpes.map((cpe) => cpe.ip)))) {
+            return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'Una o más IPs no pertenecen a tus subredes' });
+        }
 
         // C4: credenciales SSH resueltas SIEMPRE server-side desde tabla aps (cifradas), nunca del body.
         const apRow = await db.get(
@@ -631,13 +683,16 @@ router.post('/cpes/enrich-batch', async (req, res) => {
 });
 
 // ── CPE detail direct — resuelve credenciales en orden: CPE propio > AP > nodo > ubnt default ──
-router.post('/cpes/:mac/detail-direct', async (req, res) => {
+router.post('/cpes/:mac/detail-direct', validate({ params: CpeMacParamsSchema, body: CpeDetailDirectRequestSchema }), async (req, res) => {
     try {
         const { cpe_ip, port, user, pass, apId } = req.body;
         if (!cpe_ip) return res.status(400).json({ success: false, message: 'cpe_ip requerido' });
 
         const db = await getDb();
         const mac = req.params.mac.toUpperCase();
+        if (!(await ipInOwnedSubnet(db, req, cpe_ip))) {
+            return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'La IP no pertenece a ninguna de tus subredes' });
+        }
         // Aislamiento: no permitir leer un CPE que pertenece a otro workspace,
         // ni usar como fallback un AP ajeno.
         if (await cpeForeign(db, req, mac)) return res.status(404).json({ success: false, message: 'CPE no encontrado' });
@@ -755,7 +810,7 @@ router.post('/cpes/:mac/detail-direct', async (req, res) => {
 });
 
 // ── Guardar/actualizar credenciales SSH de un CPE especifico ─────────────
-router.put('/cpes/:mac/credentials', async (req, res) => {
+router.put('/cpes/:mac/credentials', validate({ params: CpeMacParamsSchema, body: CpeCredentialsRequestSchema }), async (req, res) => {
     try {
         const mac = req.params.mac.toUpperCase();
         const { user, pass, port } = req.body;
@@ -779,7 +834,7 @@ router.put('/cpes/:mac/credentials', async (req, res) => {
 // ── Poll masivo — pollea todos los APs activos del AP Monitor ────────────
 // Actualiza last_stats en cpes para cada CPE visible.
 // Usado por el boton "Actualizar" de la topologia.
-router.post('/poll-all-monitor', async (req, res) => {
+router.post('/poll-all-monitor', validate({ body: ApEmptyBodySchema }), async (req, res) => {
     try {
         const db  = await getDb();
         const apIds = await ownedApIntIds(db, req);     // null = admin (todos)
@@ -933,7 +988,7 @@ router.get('/topology-cpes', async (req, res) => {
 // Mientras el frontend tenga la vista abierta manda este latido (~30s). El
 // apPollJob solo pollea workspaces con latido reciente (§43: SSH solo si
 // alguien está mirando).
-router.post('/watch', (req, res) => {
+router.post('/watch', validate({ body: ApEmptyBodySchema }), (req, res) => {
     const ws = reqWorkspace(req);                    // null = platform_admin
     if (ws && ws !== '__none__') apWatch.touch(ws);
     res.json({ success: true, intervalMs: Number(process.env.AP_POLL_INTERVAL_MS || 60_000) });

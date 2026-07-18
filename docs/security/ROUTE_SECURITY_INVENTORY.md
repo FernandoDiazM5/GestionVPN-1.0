@@ -9,22 +9,22 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 - Rutas detectadas: 142
 - Rutas de mutación (POST/PUT/PATCH): 94
 - Rutas que consumen `req.body`: 73
-- Rutas con validación directa de `req.body`: 39/73
+- Rutas con esquema de `req.body` detectable: 55/73
 - Endpoints públicos de identidad sin rate limiting detectable: 2
 
 ## Alertas detectadas
 
-- `BODY_SCHEMA_MISSING`: 34
-- `PARAM_SCHEMA_MISSING`: 27
+- `BODY_SCHEMA_MISSING`: 18
+- `PARAM_SCHEMA_MISSING`: 14
 - `PUBLIC_MUTATION_REVIEW`: 2
 - `PUBLIC_RATE_LIMIT_MISSING`: 2
-- `QUERY_SCHEMA_MISSING`: 3
+- `QUERY_SCHEMA_MISSING`: 2
 
 ## Criterios
 
 - **Autenticación:** middleware en la propia ruta o montaje global protegido declarado en el servidor.
 - **Rate limiting:** guardas `rl.guard`, `rl.guardOtpSend` o un limiter explícito.
-- **Schema body:** llamada directa `schema.parse(req.body)` o `schema.safeParse(req.body)`.
+- **Schema body:** middleware `validate({ body })` o parseo Zod directo detectable.
 - **Sinks:** uso estático detectable de SQL, procesos, filesystem, correo o administración de red.
 - Las alertas `*_SCHEMA_MISSING` también pueden señalar validaciones indirectas; deben revisarse antes de corregir.
 - `PUBLIC_MUTATION_REVIEW` exige confirmar que la exposición anónima sea intencional y segura.
@@ -33,29 +33,29 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 
 | Archivo | Línea | Método | Ruta | Auth | Rol | Rate limit | Schema body | Sinks | Alertas |
 |---|---:|---|---|---|---|---|---|---|---|
-| `ap.routes.js` | 56 | GET | `/nodos` | sí | — | no | n/a | sql | — |
-| `ap.routes.js` | 75 | POST | `/nodos` | sí | — | no | **no** | sql | `BODY_SCHEMA_MISSING` |
-| `ap.routes.js` | 88 | PUT | `/nodos/:id` | sí | — | no | **no** | sql | `BODY_SCHEMA_MISSING`, `PARAM_SCHEMA_MISSING` |
-| `ap.routes.js` | 100 | DELETE | `/nodos/:id` | sí | — | no | n/a | sql | `PARAM_SCHEMA_MISSING` |
-| `ap.routes.js` | 124 | GET | `/nodos/:nodeId/aps` | sí | — | no | n/a | sql, network-admin | `PARAM_SCHEMA_MISSING` |
-| `ap.routes.js` | 137 | POST | `/aps` | sí | — | no | **no** | sql, network-admin | `BODY_SCHEMA_MISSING` |
-| `ap.routes.js` | 187 | PUT | `/aps/:id` | sí | — | no | **no** | sql | `BODY_SCHEMA_MISSING`, `PARAM_SCHEMA_MISSING` |
-| `ap.routes.js` | 202 | DELETE | `/aps/:id` | sí | — | no | n/a | sql, network-admin | `PARAM_SCHEMA_MISSING` |
-| `ap.routes.js` | 218 | POST | `/aps/:id/refresh` | sí | — | no | n/a | sql | `PARAM_SCHEMA_MISSING` |
-| `ap.routes.js` | 240 | POST | `/aps/:id/poll` | sí | — | no | **no** | sql, network-admin | `BODY_SCHEMA_MISSING`, `PARAM_SCHEMA_MISSING` |
-| `ap.routes.js` | 341 | POST | `/cpes/:mac/detail` | sí | — | no | **no** | sql | `BODY_SCHEMA_MISSING`, `PARAM_SCHEMA_MISSING` |
-| `ap.routes.js` | 381 | GET | `/cpes` | sí | — | no | n/a | sql | — |
-| `ap.routes.js` | 399 | GET | `/historial/:mac` | sí | — | no | n/a | sql | `PARAM_SCHEMA_MISSING`, `QUERY_SCHEMA_MISSING` |
-| `ap.routes.js` | 415 | POST | `/poll-direct` | sí | — | no | **no** | sql, network-admin | `BODY_SCHEMA_MISSING` |
-| `ap.routes.js` | 536 | POST | `/reveal-ssh` | sí | — | no | **no** | sql, network-admin | `BODY_SCHEMA_MISSING` |
-| `ap.routes.js` | 554 | POST | `/ap-detail-direct` | sí | — | no | **no** | sql, network-admin | `BODY_SCHEMA_MISSING` |
-| `ap.routes.js` | 578 | POST | `/cpes/enrich-batch` | sí | — | no | **no** | sql, network-admin | `BODY_SCHEMA_MISSING` |
-| `ap.routes.js` | 634 | POST | `/cpes/:mac/detail-direct` | sí | — | no | **no** | sql, network-admin | `BODY_SCHEMA_MISSING`, `PARAM_SCHEMA_MISSING` |
-| `ap.routes.js` | 758 | PUT | `/cpes/:mac/credentials` | sí | — | no | **no** | sql | `BODY_SCHEMA_MISSING`, `PARAM_SCHEMA_MISSING` |
-| `ap.routes.js` | 782 | POST | `/poll-all-monitor` | sí | — | no | n/a | sql | — |
-| `ap.routes.js` | 839 | GET | `/topology-cpes` | sí | — | no | n/a | sql, network-admin | — |
-| `ap.routes.js` | 936 | POST | `/watch` | sí | — | no | n/a | — | — |
-| `ap.routes.js` | 945 | GET | `/stations` | sí | — | no | n/a | sql | — |
+| `ap.routes.js` | 84 | GET | `/nodos` | sí | — | no | n/a | sql | — |
+| `ap.routes.js` | 103 | POST | `/nodos` | sí | — | no | sí | sql | — |
+| `ap.routes.js` | 116 | PUT | `/nodos/:id` | sí | — | no | sí | sql | — |
+| `ap.routes.js` | 128 | DELETE | `/nodos/:id` | sí | — | no | n/a | sql | — |
+| `ap.routes.js` | 152 | GET | `/nodos/:nodeId/aps` | sí | — | no | n/a | sql, network-admin | — |
+| `ap.routes.js` | 165 | POST | `/aps` | sí | — | no | sí | sql, network-admin | — |
+| `ap.routes.js` | 218 | PUT | `/aps/:id` | sí | — | no | sí | sql | — |
+| `ap.routes.js` | 236 | DELETE | `/aps/:id` | sí | — | no | n/a | sql, network-admin | — |
+| `ap.routes.js` | 252 | POST | `/aps/:id/refresh` | sí | — | no | n/a | sql | — |
+| `ap.routes.js` | 277 | POST | `/aps/:id/poll` | sí | — | no | sí | sql, network-admin | — |
+| `ap.routes.js` | 381 | POST | `/cpes/:mac/detail` | sí | — | no | sí | sql | — |
+| `ap.routes.js` | 424 | GET | `/cpes` | sí | — | no | n/a | sql | — |
+| `ap.routes.js` | 442 | GET | `/historial/:mac` | sí | — | no | n/a | sql | — |
+| `ap.routes.js` | 458 | POST | `/poll-direct` | sí | — | no | sí | sql, network-admin | — |
+| `ap.routes.js` | 582 | POST | `/reveal-ssh` | sí | — | no | sí | sql, network-admin | — |
+| `ap.routes.js` | 600 | POST | `/ap-detail-direct` | sí | — | no | sí | sql, network-admin | — |
+| `ap.routes.js` | 627 | POST | `/cpes/enrich-batch` | sí | — | no | sí | sql, network-admin | — |
+| `ap.routes.js` | 686 | POST | `/cpes/:mac/detail-direct` | sí | — | no | sí | sql, network-admin | — |
+| `ap.routes.js` | 813 | PUT | `/cpes/:mac/credentials` | sí | — | no | sí | sql | — |
+| `ap.routes.js` | 837 | POST | `/poll-all-monitor` | sí | — | no | n/a | sql | — |
+| `ap.routes.js` | 894 | GET | `/topology-cpes` | sí | — | no | n/a | sql, network-admin | — |
+| `ap.routes.js` | 991 | POST | `/watch` | sí | — | no | n/a | — | — |
+| `ap.routes.js` | 1000 | GET | `/stations` | sí | — | no | n/a | sql | — |
 | `auth.routes.js` | 34 | GET | `/status` | no | — | no | n/a | — | — |
 | `auth.routes.js` | 44 | POST | `/setup` | no | — | no | sí | — | `PUBLIC_RATE_LIMIT_MISSING` |
 | `auth.routes.js` | 72 | POST | `/login` | no | — | no | sí | — | `PUBLIC_RATE_LIMIT_MISSING` |
@@ -114,13 +114,13 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `routes/coreServer.routes.js` | 47 | POST | `/provision` | sí | platform-admin | no | sí | — | — |
 | `routes/coreServer.routes.js` | 57 | POST | `/backup-now` | sí | platform-admin | no | n/a | — | — |
 | `routes/dashboard.routes.js` | 16 | GET | `/dashboard/metrics` | sí | — | no | n/a | — | — |
-| `routes/device.routes.js` | 16 | POST | `/device/auto-login` | sí | — | no | **no** | network-admin | `BODY_SCHEMA_MISSING` |
-| `routes/device.routes.js` | 38 | POST | `/device/antenna` | sí | — | no | **no** | sql, network-admin | `BODY_SCHEMA_MISSING` |
-| `routes/device.routes.js` | 96 | GET | `/db/devices` | sí | — | no | n/a | sql | — |
-| `routes/device.routes.js` | 144 | POST | `/db/devices` | sí | — | no | **no** | sql | `BODY_SCHEMA_MISSING` |
-| `routes/device.routes.js` | 244 | PUT | `/db/devices/:id` | sí | — | no | **no** | sql | `BODY_SCHEMA_MISSING`, `PARAM_SCHEMA_MISSING` |
-| `routes/device.routes.js` | 307 | DELETE | `/db/devices/:id` | sí | — | no | n/a | sql | `PARAM_SCHEMA_MISSING` |
-| `routes/device.routes.js` | 316 | POST | `/db/cleanup-orphan-devices` | sí | — | no | n/a | sql | — |
+| `routes/device.routes.js` | 25 | POST | `/device/auto-login` | sí | — | no | sí | network-admin | — |
+| `routes/device.routes.js` | 47 | POST | `/device/antenna` | sí | — | no | sí | sql, network-admin | — |
+| `routes/device.routes.js` | 108 | GET | `/db/devices` | sí | — | no | n/a | sql | — |
+| `routes/device.routes.js` | 156 | POST | `/db/devices` | sí | — | no | sí | sql | — |
+| `routes/device.routes.js` | 260 | PUT | `/db/devices/:id` | sí | — | no | sí | sql | — |
+| `routes/device.routes.js` | 327 | DELETE | `/db/devices/:id` | sí | — | no | n/a | sql | — |
+| `routes/device.routes.js` | 336 | POST | `/db/cleanup-orphan-devices` | sí | — | no | n/a | sql | — |
 | `routes/diagnostics.routes.js` | 76 | POST | `/diagnostics/ping` | sí | — | sí | sí | network-admin | — |
 | `routes/diagnostics.routes.js` | 127 | POST | `/diagnostics/traceroute` | sí | — | sí | sí | network-admin | — |
 | `routes/errorReports.routes.js` | 49 | POST | `/` | no | — | no | sí | — | `PUBLIC_MUTATION_REVIEW` |

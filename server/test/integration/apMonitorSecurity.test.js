@@ -43,6 +43,8 @@ const tenantMocks = stubModule(__dirname, '../../lib/tenantScope', {
   ownsGroupUuid: vi.fn().mockResolvedValue(true),
   ownsApUuid: vi.fn().mockResolvedValue(true),  // por defecto: dueño
   cpeForeign: vi.fn().mockResolvedValue(false),
+  ipInOwnedSubnet: vi.fn().mockResolvedValue(true),
+  ipsInOwnedSubnets: vi.fn().mockResolvedValue(true),
 });
 
 stubModule(__dirname, '../../lib/logger', {
@@ -56,10 +58,12 @@ const express = require('express');
 const request = require('supertest');
 const apWatch = require('../../lib/apWatch');
 const apRoutes = require('../../ap.routes');
+const { errorMiddleware } = require('../../lib/apiResponse');
 
 const app = express();
 app.use(express.json());
 app.use('/api/ap-monitor', apRoutes);
+app.use(errorMiddleware);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -69,6 +73,8 @@ beforeEach(() => {
   apServiceMocks.pollAp.mockResolvedValue([]);
   apServiceMocks.getDetail.mockResolvedValue({ deviceName: 'CPE-X', deviceModel: 'LBE-5AC' });
   tenantMocks.ownsApUuid.mockResolvedValue(true);
+  tenantMocks.ipInOwnedSubnet.mockResolvedValue(true);
+  tenantMocks.ipsInOwnedSubnets.mockResolvedValue(true);
   dbServiceMocks.getApIntId.mockResolvedValue(7);
 });
 
@@ -88,21 +94,42 @@ describe('POST /poll-direct — aislamiento + anti-SSRF (C2/C4)', () => {
     expect(apServiceMocks.pollAp).not.toHaveBeenCalled();
   });
 
-  it('usa la IP de la DB, NO la del body (anti-SSRF)', async () => {
+  it('rechaza IP/puerto/credenciales inyectadas en un endpoint que sólo acepta apId', async () => {
+    const r = await request(app).post('/api/ap-monitor/poll-direct')
+      .send({ apId: 'ap1', ip: '1.2.3.4', port: 9999, user: 'evil', pass: 'evil' });
+    expect(r.status).toBe(400);
+    expect(r.body.code).toBe('VALIDATION_ERROR');
+    expect(r.body.fields).toEqual(expect.arrayContaining([
+      'body.ip', 'body.pass', 'body.port', 'body.user',
+    ]));
+    expect(apServiceMocks.pollAp).not.toHaveBeenCalled();
+  });
+
+  it('usa la IP y credenciales de la DB con un payload permitido', async () => {
     db.get.mockResolvedValue({
       ip: '10.0.0.5', usuario_ssh: 'ubnt', clave_ssh_enc: 'secret',
       puerto_ssh: 22, ap_group_id: 1, firmware: 'XW.v6',
     });
     const r = await request(app).post('/api/ap-monitor/poll-direct')
-      .send({ apId: 'ap1', ip: '1.2.3.4', port: 9999, user: 'evil', pass: 'evil' });
+      .send({ apId: 'ap1' });
     expect(r.status).toBe(200);
     expect(apServiceMocks.pollAp).toHaveBeenCalledTimes(1);
     const [, ipArg, portArg, userArg, passArg] = apServiceMocks.pollAp.mock.calls[0];
-    expect(ipArg).toBe('10.0.0.5');     // ← IP de la DB
-    expect(ipArg).not.toBe('1.2.3.4');  // ← ignora la del body
+    expect(ipArg).toBe('10.0.0.5');
     expect(portArg).toBe(22);
-    expect(userArg).toBe('ubnt');       // ← credenciales de la DB
-    expect(passArg).toBe('secret');     // ← ignora user/pass del body
+    expect(userArg).toBe('ubnt');
+    expect(passArg).toBe('secret');
+  });
+
+  it('IP guardada fuera de las subredes propias → 403 y no ejecuta SSH', async () => {
+    db.get.mockResolvedValue({
+      ip: '169.254.169.254', usuario_ssh: 'ubnt', clave_ssh_enc: 'secret',
+      puerto_ssh: 22, ap_group_id: 1, firmware: 'XW.v6',
+    });
+    tenantMocks.ipInOwnedSubnet.mockResolvedValue(false);
+    const r = await request(app).post('/api/ap-monitor/poll-direct').send({ apId: 'ap1' });
+    expect(r.status).toBe(403);
+    expect(apServiceMocks.pollAp).not.toHaveBeenCalled();
   });
 });
 
@@ -117,8 +144,17 @@ describe('POST /cpes/enrich-batch — aislamiento (C1/C4)', () => {
   it('AP de otro workspace → 404 y NO ejecuta SSH ni resuelve credenciales', async () => {
     tenantMocks.ownsApUuid.mockResolvedValue(false);
     const r = await request(app).post('/api/ap-monitor/cpes/enrich-batch')
-      .send({ apId: 'ajeno', cpes: [{ mac: 'AA:BB:CC:DD:EE:FF', ip: '10.0.0.9' }], user: 'evil', pass: 'evil' });
+      .send({ apId: 'ajeno', cpes: [{ mac: 'AA:BB:CC:DD:EE:FF', ip: '10.0.0.9' }] });
     expect(r.status).toBe(404);
+    expect(apServiceMocks.getDetail).not.toHaveBeenCalled();
+  });
+
+  it('rechaza credenciales SSH desconocidas antes de consultar la DB', async () => {
+    const r = await request(app).post('/api/ap-monitor/cpes/enrich-batch')
+      .send({ apId: 'ap1', cpes: [{ mac: 'AA:BB:CC:DD:EE:FF', ip: '10.0.0.9' }], user: 'evil', pass: 'evil' });
+    expect(r.status).toBe(400);
+    expect(r.body.fields).toEqual(expect.arrayContaining(['body.pass', 'body.user']));
+    expect(db.get).not.toHaveBeenCalled();
     expect(apServiceMocks.getDetail).not.toHaveBeenCalled();
   });
 
@@ -133,7 +169,7 @@ describe('POST /cpes/enrich-batch — aislamiento (C1/C4)', () => {
   it('AP propio con credenciales en DB → SSH con las credenciales de la DB', async () => {
     db.get.mockResolvedValue({ usuario_ssh: 'ubnt', clave_ssh_enc: 'secret', puerto_ssh: 22 });
     const r = await request(app).post('/api/ap-monitor/cpes/enrich-batch')
-      .send({ apId: 'ap1', cpes: [{ mac: 'AA:BB:CC:DD:EE:FF', ip: '10.0.0.9' }], user: 'evil', pass: 'evil' });
+      .send({ apId: 'ap1', cpes: [{ mac: 'AA:BB:CC:DD:EE:FF', ip: '10.0.0.9' }] });
     expect(r.status).toBe(200);
     expect(apServiceMocks.getDetail).toHaveBeenCalledTimes(1);
     const [ipArg, portArg, userArg, passArg] = apServiceMocks.getDetail.mock.calls[0];
@@ -141,6 +177,14 @@ describe('POST /cpes/enrich-batch — aislamiento (C1/C4)', () => {
     expect(portArg).toBe(22);
     expect(userArg).toBe('ubnt');     // ← de la DB
     expect(passArg).toBe('secret');   // ← ignora user/pass del body
+  });
+
+  it('una IP del lote fuera de las subredes propias → rechaza todo antes de SSH', async () => {
+    tenantMocks.ipsInOwnedSubnets.mockResolvedValue(false);
+    const r = await request(app).post('/api/ap-monitor/cpes/enrich-batch')
+      .send({ apId: 'ap1', cpes: [{ mac: 'AA:BB:CC:DD:EE:FF', ip: '169.254.169.254' }] });
+    expect(r.status).toBe(403);
+    expect(apServiceMocks.getDetail).not.toHaveBeenCalled();
   });
 });
 

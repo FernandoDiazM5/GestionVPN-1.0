@@ -169,3 +169,28 @@ describe('cpeForeign', () => {
     }, 'AA:BB')).toBe(false);
   });
 });
+
+describe('ipInOwnedSubnet / ipsInOwnedSubnets', () => {
+  const req = { account: { role: 'OWNER', workspace_id: 'ws-1' } };
+
+  it('acepta sólo IPs dentro de las subredes propias con una consulta por lote', async () => {
+    const db = makeDb({ all: [{
+      segmento_lan: '10.0.50.0/24',
+      lan_subnets: JSON.stringify(['192.168.20.0/24']),
+    }] });
+
+    expect(await scope.ipsInOwnedSubnets(db, req, ['10.0.50.7', '192.168.20.99'])).toBe(true);
+    expect(db.all).toHaveBeenCalledTimes(1);
+  });
+
+  it('rechaza si una IP del lote queda fuera', async () => {
+    const db = makeDb({ all: [{ segmento_lan: '10.0.50.0/24', lan_subnets: '[]' }] });
+    expect(await scope.ipsInOwnedSubnets(db, req, ['10.0.50.7', '169.254.169.254'])).toBe(false);
+  });
+
+  it('rechaza octetos inválidos antes de consultar la DB', async () => {
+    const db = makeDb();
+    expect(await scope.ipInOwnedSubnet(db, req, '999.0.0.1')).toBe(false);
+    expect(db.all).not.toHaveBeenCalled();
+  });
+});

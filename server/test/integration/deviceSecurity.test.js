@@ -122,6 +122,37 @@ describe('POST /device/antenna — escaneo (sin deviceId)', () => {
 });
 
 describe('POST /device/auto-login — anti-SSRF', () => {
+  it('IPv4 malformada → 400 antes de consultar subredes o SSH', async () => {
+    const r = await request(app).post('/api/device/auto-login')
+      .send({ ip: '999.0.0.1', sshCredentials: [{ user: 'ubnt', pass: 'x' }] });
+    expect(r.status).toBe(400);
+    expect(r.body.code).toBe('VALIDATION_ERROR');
+    expect(trySshCredentials).not.toHaveBeenCalled();
+  });
+
+  it('más de 20 credenciales → 400 antes de intentar autenticación', async () => {
+    const r = await request(app).post('/api/device/auto-login')
+      .send({
+        ip: '10.0.50.7',
+        sshCredentials: Array.from({ length: 21 }, () => ({ user: 'ubnt', pass: 'x' })),
+      });
+    expect(r.status).toBe(400);
+    expect(trySshCredentials).not.toHaveBeenCalled();
+  });
+
+  it('campo desconocido → 400 sin reflejar el secreto', async () => {
+    const r = await request(app).post('/api/device/auto-login')
+      .send({
+        ip: '10.0.50.7',
+        sshCredentials: [{ user: 'ubnt', pass: 'x' }],
+        password: 'no-reflejar-este-valor',
+      });
+    expect(r.status).toBe(400);
+    expect(r.body.fields).toContain('body.password');
+    expect(JSON.stringify(r.body)).not.toContain('no-reflejar-este-valor');
+    expect(trySshCredentials).not.toHaveBeenCalled();
+  });
+
   it('IP fuera de subred propia → 403 y NO prueba credenciales', async () => {
     const r = await request(app).post('/api/device/auto-login')
       .send({ ip: '8.8.8.8', sshCredentials: [{ user: 'ubnt', pass: 'x' }] });
@@ -134,5 +165,15 @@ describe('POST /device/auto-login — anti-SSRF', () => {
       .send({ ip: '10.0.50.7', sshCredentials: [{ user: 'ubnt', pass: 'x' }] });
     expect(r.status).toBe(200);
     expect(trySshCredentials).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('POST /db/devices — anti-SSRF persistente', () => {
+  it('no permite guardar un equipo con IP fuera de las subredes propias', async () => {
+    const r = await request(app).post('/api/db/devices')
+      .send({ id: 'AABBCCDDEEFF', ip: '169.254.169.254' });
+    expect(r.status).toBe(403);
+    expect(r.body.code).toBe('FORBIDDEN');
+    expect(db.run).not.toHaveBeenCalled();
   });
 });

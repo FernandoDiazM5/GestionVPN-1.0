@@ -102,9 +102,12 @@ function collectInventory() {
       const usesBody = /\breq\.body\b/.test(segment);
       const usesParams = /\breq\.params\b/.test(segment);
       const usesQuery = /\breq\.query\b/.test(segment);
-      const validatesBody = /\b(?:safeParse|parse)\s*\(\s*req\.body\b/.test(segment);
-      const validatesParams = /\b(?:safeParse|parse)\s*\(\s*req\.params\b/.test(segment);
-      const validatesQuery = /\b(?:safeParse|parse)\s*\(\s*req\.query\b/.test(segment);
+      const validatesBody = /\b(?:safeParse|parse)\s*\(\s*req\.body\b/.test(segment)
+        || /\bvalidate\s*\(\s*\{[^}]*\bbody\s*:/s.test(segment);
+      const validatesParams = /\b(?:safeParse|parse)\s*\(\s*req\.params\b/.test(segment)
+        || /\bvalidate\s*\(\s*\{[^}]*\bparams\s*:/s.test(segment);
+      const validatesQuery = /\b(?:safeParse|parse)\s*\(\s*req\.query\b/.test(segment)
+        || /\bvalidate\s*\(\s*\{[^}]*\bquery\s*:/s.test(segment);
       const routeAuthentication = /\b(?:requireSession|verifyToken|requirePlatformAdmin)\b|\brequireRole\s*\(/.test(segment);
       const authenticated = hasGlobalAuthentication(relativeFile) || fileAuthentication || routeAuthentication;
       const rateLimited = /\brl\.(?:guard|guardOtpSend)\s*\(|\brateLimit(?:er)?\b|\bloginLimiter\b/.test(segment);
@@ -188,7 +191,7 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 - Rutas detectadas: ${routes.length}
 - Rutas de mutación (POST/PUT/PATCH): ${mutationCount}
 - Rutas que consumen \`req.body\`: ${bodyRoutes.length}
-- Rutas con validación directa de \`req.body\`: ${validatedBodyRoutes.length}/${bodyRoutes.length}
+- Rutas con esquema de \`req.body\` detectable: ${validatedBodyRoutes.length}/${bodyRoutes.length}
 - Endpoints públicos de identidad sin rate limiting detectable: ${unguardedIdentityRoutes.length}
 
 ## Alertas detectadas
@@ -199,7 +202,7 @@ ${riskSummary}
 
 - **Autenticación:** middleware en la propia ruta o montaje global protegido declarado en el servidor.
 - **Rate limiting:** guardas \`rl.guard\`, \`rl.guardOtpSend\` o un limiter explícito.
-- **Schema body:** llamada directa \`schema.parse(req.body)\` o \`schema.safeParse(req.body)\`.
+- **Schema body:** middleware \`validate({ body })\` o parseo Zod directo detectable.
 - **Sinks:** uso estático detectable de SQL, procesos, filesystem, correo o administración de red.
 - Las alertas \`*_SCHEMA_MISSING\` también pueden señalar validaciones indirectas; deben revisarse antes de corregir.
 - \`PUBLIC_MUTATION_REVIEW\` exige confirmar que la exposición anónima sea intencional y segura.

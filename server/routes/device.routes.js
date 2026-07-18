@@ -11,9 +11,18 @@ const { reqWorkspace, ownedGroupIntIds, ownsApUuid, ownsGroupUuid, ipInOwnedSubn
 const { resolveOwnerNodeId } = require('../lib/apNode');
 const { sendOk, AppError, asyncHandler } = require('../lib/apiResponse');
 const scanIpRepo = require('../db/repos/scanIpRepo');
+const { validate } = require('../middleware/validate');
+const {
+  DeviceAntennaRequestSchema,
+  DeviceAutoLoginRequestSchema,
+  DeviceEmptyBodySchema,
+  DeviceIdParamsSchema,
+  DevicePatchRequestSchema,
+  DevicePersistRequestSchema,
+} = require('@gestionvpn/contracts');
 
 // /device/auto-login: 200 OK siempre — el flag `authenticated` señala el resultado.
-router.post('/device/auto-login', asyncHandler(async (req, res) => {
+router.post('/device/auto-login', validate({ body: DeviceAutoLoginRequestSchema }), asyncHandler(async (req, res) => {
   const { ip, sshCredentials } = req.body;
   // H14 — Anti-SSRF: solo se puede sondear SSH contra IPs de subredes propias.
   const db = await getDb();
@@ -35,7 +44,7 @@ router.post('/device/auto-login', asyncHandler(async (req, res) => {
 
 // /device/antenna: errores de red/auth son ESPERADOS (200 OK con flag); solo
 // errores inesperados del servidor caen al middleware central.
-router.post('/device/antenna', asyncHandler(async (req, res) => {
+router.post('/device/antenna', validate({ body: DeviceAntennaRequestSchema }), asyncHandler(async (req, res) => {
   const { deviceIP, deviceUser, devicePass, devicePort, deviceId } = req.body;
   try {
     const db = await getDb();
@@ -51,6 +60,9 @@ router.post('/device/antenna', asyncHandler(async (req, res) => {
       if (!(await ownsApUuid(db, req, deviceId))) throw new AppError('AP no encontrado', 404, 'NOT_FOUND');
       const row = await db.get('SELECT ip, usuario_ssh, clave_ssh_enc, puerto_ssh FROM aps WHERE uuid = ?', [deviceId]);
       if (!row) throw new AppError('AP no encontrado', 404, 'NOT_FOUND');
+      if (!(await ipInOwnedSubnet(db, req, row.ip))) {
+        throw new AppError('La IP guardada no pertenece a ninguna de tus subredes', 403, 'FORBIDDEN');
+      }
       targetIP = row.ip;
       targetUser = row.usuario_ssh || deviceUser;
       targetPass = row.clave_ssh_enc ? decryptPass(row.clave_ssh_enc) : (devicePass || '');
@@ -141,10 +153,14 @@ router.get('/db/devices', asyncHandler(async (req, res) => {
     return sendOk(res, { devices });
 }));
 
-router.post('/db/devices', asyncHandler(async (req, res) => {
+router.post('/db/devices', validate({ body: DevicePersistRequestSchema }), asyncHandler(async (req, res) => {
     const db = await getDb();
     const d = req.body;
     const now = Date.now();
+
+    if (!(await ipInOwnedSubnet(db, req, d.ip))) {
+        throw new AppError('La IP no pertenece a ninguna de tus subredes', 403, 'FORBIDDEN');
+    }
 
     // Aislamiento: no sobrescribir un AP existente de otro workspace
     if (d.id) {
@@ -241,7 +257,7 @@ router.post('/db/devices', asyncHandler(async (req, res) => {
     return sendOk(res, { id: d.id });
 }));
 
-router.put('/db/devices/:id', asyncHandler(async (req, res) => {
+router.put('/db/devices/:id', validate({ params: DeviceIdParamsSchema, body: DevicePatchRequestSchema }), asyncHandler(async (req, res) => {
     const db = await getDb();
     const uuid = req.params.id; // frontend sends UUID as :id
     if (!(await ownsApUuid(db, req, uuid))) throw new AppError('AP no encontrado', 404, 'NOT_FOUND');
@@ -250,6 +266,10 @@ router.put('/db/devices/:id', asyncHandler(async (req, res) => {
 
         const d = req.body;
         const now = Date.now();
+
+        if (d.ip !== undefined && !(await ipInOwnedSubnet(db, req, d.ip))) {
+            throw new AppError('La IP no pertenece a ninguna de tus subredes', 403, 'FORBIDDEN');
+        }
 
         let cpesCount = 0;
         if (d.cachedStats && d.cachedStats.stations) {
@@ -304,7 +324,7 @@ router.put('/db/devices/:id', asyncHandler(async (req, res) => {
     return sendOk(res);
 }));
 
-router.delete('/db/devices/:id', asyncHandler(async (req, res) => {
+router.delete('/db/devices/:id', validate({ params: DeviceIdParamsSchema }), asyncHandler(async (req, res) => {
     const db = await getDb();
     const uuid = req.params.id; // frontend sends UUID
     if (!(await ownsApUuid(db, req, uuid))) throw new AppError('AP no encontrado', 404, 'NOT_FOUND');
@@ -313,7 +333,7 @@ router.delete('/db/devices/:id', asyncHandler(async (req, res) => {
 }));
 
 // Limpieza basada en la relación Nodos <-> APs (schema v2)
-router.post('/db/cleanup-orphan-devices', asyncHandler(async (req, res) => {
+router.post('/db/cleanup-orphan-devices', validate({ body: DeviceEmptyBodySchema }), asyncHandler(async (req, res) => {
     // Mantenimiento global: solo el Administrador de plataforma puede ejecutarlo.
     if (reqWorkspace(req) !== null) {
         return sendOk(res, { devicesDeleted: 0, cpesDeleted: 0, orphanIds: [], message: 'Operación reservada al administrador' });
