@@ -57,6 +57,10 @@ describe('preselección local de receptores AirOS', () => {
       sta({ signal: -60, noiseFloor: -92, ccq: 82, txRate: 100, rxRate: 100, channelWidth: 40 }),
     ]);
     expect(result.rows[0].mandatory).toBe(true);
+    const acceptable = assessAirOsNetwork([
+      sta({ signal: -60, noiseFloor: -92, ccq: 82, txRate: 135, rxRate: 121, channelWidth: 40 }),
+    ]);
+    expect(acceptable.rows[0].mandatory).toBe(false);
   });
 
   it('no compara contra toda la red cuando falta el AP', () => {

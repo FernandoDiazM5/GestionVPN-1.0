@@ -225,7 +225,8 @@ export function assessAirOsNetwork(
     const txRate = finite(metrics.txRate);
     const rxRate = finite(metrics.rxRate);
     const expectedRate = finite(metrics.channelWidth) != null && Number(metrics.channelWidth) >= 40 ? 150 : 72;
-    const mandatory = signal != null && signal <= -56 && (txRate != null && txRate < expectedRate || rxRate != null && rxRate < expectedRate);
+    const minimumAcceptableRate = expectedRate * 0.8;
+    const mandatory = signal != null && signal <= -56 && (txRate != null && txRate < minimumAcceptableRate || rxRate != null && rxRate < minimumAcceptableRate);
     if (txRate != null) score += absoluteRateBand(txRate, 'TX', reasons);
     if (rxRate != null) score += absoluteRateBand(rxRate, 'RX', reasons);
 

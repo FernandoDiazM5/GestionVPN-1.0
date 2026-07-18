@@ -13,6 +13,7 @@ function buildPrompt(kind, dto) {
     'En análisis NETWORK sólo recibes receptores STA preseleccionados por reglas locales.',
     'No repitas en prosa todos los datos ni los equipos saludables del resumen.',
     `Devuelve como máximo ${maxFindings} hallazgos, en español claro.`,
+    'RF reference: 20 MHz is usually near 72 Mbps and 40 MHz near 150 Mbps per direction. Treat at least 80% of that reference as acceptable when no other symptoms exist; do not call 135/121 Mbps at 40 MHz degraded by itself.',
     'Prioriza los hallazgos; usa frases breves y evita repetir la misma evidencia.',
     `Tipo de análisis: ${kind}.`,
     `Datos: ${JSON.stringify(dto)}`,
