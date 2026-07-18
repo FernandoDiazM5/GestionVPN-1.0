@@ -6,6 +6,13 @@
 
 ---
 
+> **Sesión 2026-07-18 - Fase 2 de rate limiting persistente y atómico.** Rama `vps_prod`; commit local `62680b4`. Skill: `handoff-keeper`.
+> - Creada `auth_rate_buckets` con migración/entrypoint, contador transaccional `SELECT ... FOR UPDATE`, índice de purga y estado compartido por varias instancias. IP, identidad y par IP+identidad se almacenan únicamente como HMAC-SHA256 con `AUTH_RATE_HMAC_KEY`; producción falla al arrancar si el secreto no tiene 32+ bytes.
+> - Aplicado antes de bcrypt a setup, ambos logins, registro, OTP verify/send, resend, aceptación pública de invitación y recuperación de contraseña. Respuestas 429 genéricas con `Retry-After`, cooldown OTP de 60 s, limpieza de identidad tras éxito, métricas sólo `kind/result` y job de retención sin PII.
+> - Cerrados spoof/race: `clientIp()` usa `req.ip`; Nginx reemplaza el header por `$remote_addr`, aplica un límite grueso sólo a identidad y el setup se serializa con lock global MySQL mantenido hasta después del commit.
+> - Verificación: 70 suites / 454 pruebas backend, caso de 50 reservas concurrentes (5 permitidas/45 bloqueadas), `check:all`, inventario con 0 endpoints públicos de identidad sin límite, reglas Semgrep 2/2 y escaneo focalizado de 6 archivos con 0 hallazgos. El scan general mantiene 19 hallazgos históricos conocidos, ninguno nuevo.
+> - Pendiente antes de deploy: crear `AUTH_RATE_HMAC_KEY`, verificar UFW/puerto 3001 y `nginx -t` dentro de la imagen. Siguiente implementación: Fase 3 bcrypt→Argon2id.
+
 > **Sesión 2026-07-18 - cierre de Fase 1: params/query y reglas Semgrep locales.** Rama `vps_prod`; commits locales `feb350b` y `d81237d`. Skills: `handoff-keeper`, `semgrep`.
 > - Añadidos schemas de UUID, alias `me`, clave pública WireGuard y queries acotadas para las 14 rutas params y 2 rutas query pendientes en admin/team/AI/auditoría. El inventario queda sin alertas `BODY/PARAM/QUERY_SCHEMA_MISSING`.
 > - Creadas test-first dos reglas bloqueantes: SQL por concatenación/interpolación y entrada HTTP cruda directa a shell/SSH/RouterOS. `test:semgrep-rules` ejecuta ambos fixtures con Docker y `audit:semgrep` carga automáticamente las reglas locales.
