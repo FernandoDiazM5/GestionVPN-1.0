@@ -4,6 +4,7 @@
 // Cambiar un campo aquí rompe a ambos lados en tsc, evitando drift silencioso.
 
 export * from './common';
+export * from './network';
 export * from './constants';
 export * from './auth';
 export * from './account';
@@ -19,6 +20,7 @@ export * from './wireguard';
 export * from './tunnel';
 export * from './nodes';
 export * from './device';
+export * from './apMonitor';
 export * from './settings';
 export * from './airOsAi';
 export * from './airOsAiScoring';
