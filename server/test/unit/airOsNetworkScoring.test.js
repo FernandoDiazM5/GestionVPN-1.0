@@ -48,6 +48,7 @@ describe('preselección local de receptores AirOS', () => {
       sta({ signal: -60, noiseFloor: -92, ccq: 82, txRate: 19, rxRate: 39 }),
     ]);
     expect(result.rows[0]).toMatchObject({ candidate: true });
+    expect(result.rows[0].mandatory).toBe(true);
     expect(result.rows[0].reasons.map(reason => reason.code)).toEqual(expect.arrayContaining(['TX_RATE_BAD', 'RX_RATE_BAD']));
   });
 });

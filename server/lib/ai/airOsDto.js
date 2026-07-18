@@ -112,6 +112,7 @@ function buildNetworkDto({ workspaceId, devices, snapshotAt, selectedDeviceIndex
       family: String(device.model || '').toLowerCase().includes('ac') ? 'AC' : 'M5',
       score: row.score,
       level: row.level,
+      mandatory: row.mandatory,
       metrics: pickNetworkMetrics(device.cachedStats, row.derived),
       flags: row.reasons.map(reason => reason.code),
     };
@@ -156,6 +157,7 @@ function buildNetworkDto({ workspaceId, devices, snapshotAt, selectedDeviceIndex
         alias: row.alias,
         score: row.score,
         level: row.level,
+        mandatory: row.mandatory,
         derived: row.derived,
         reasons: row.reasons,
       })),

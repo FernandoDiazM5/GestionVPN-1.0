@@ -6,6 +6,11 @@
 
 ---
 
+> **Sesión 2026-07-17 - prioridad obligatoria para desalineación RF.** Rama `vps_prod` (base `ecc16f2`; cambios locales pendientes de publicación directa). Skills: `vercel-react-best-practices`, `handoff-keeper`.
+> - Regla solicitada: `signal <= -56 dBm` con TX o RX `<72 Mbps` entra con prioridad obligatoria, aunque haya más de 10 candidatos; el orden prioriza estos equipos antes del score general.
+> - El ejemplo `-60 dBm / 19 Mbps / 39 Mbps` queda marcado y se enviará automáticamente en la preselección, con posibilidad de retiro manual.
+> - La UI muestra `Prioridad obligatoria`; el backend y el frontend comparten la misma regla. Pruebas focalizadas: 9 backend, 3 frontend, contratos y TypeScript correctos.
+
 > **Sesión 2026-07-17 - ajuste del scoring tras validar velocidades TX/RX.** Rama `vps_prod` (base `785d2c0`; cambios locales pendientes de publicación directa). Skills: `vercel-react-best-practices`, `handoff-keeper`.
 > - El caso `-60 dBm / CCQ 82% / TX 19 Mbps / RX 39 Mbps` ahora se clasifica como candidato con score 60 (`bad`) por velocidades negociadas bajas, aunque señal y CCQ sean aceptables.
 > - Se añadieron bandas absolutas para TX/RX cuando no hay suficientes pares para una mediana, reconocimiento de modos AirOS `Station`, `Client` y `Subscriber`, y una sección de todos los STA evaluados que no se envían.

@@ -142,6 +142,7 @@ export interface AirOsAiNetworkSelection {
     alias: string;
     score: number;
     level: import('./airOsAiScoring').AirOsRiskLevel;
+    mandatory: boolean;
     derived: import('./airOsAiScoring').AirOsNetworkScoreRow['derived'];
     reasons: import('./airOsAiScoring').AirOsRiskReason[];
   }>;

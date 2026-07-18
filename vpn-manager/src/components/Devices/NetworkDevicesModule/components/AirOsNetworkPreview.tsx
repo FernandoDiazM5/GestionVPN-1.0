@@ -75,6 +75,7 @@ export function AirOsNetworkPreview({ devices, preview, selectedIndexes, onToggl
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="break-words text-sm font-bold text-slate-800 dark:text-slate-100">{stats?.deviceName || device?.name || row.alias}</p>
                         <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${LEVEL_CLASSES[row.level]}`}>{RISK_LABELS[row.level]}</span>
+                        {row.mandatory && <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-800 dark:bg-rose-500/15 dark:text-rose-200">Prioridad obligatoria</span>}
                         <span className="rounded-full bg-slate-900 px-2 py-0.5 text-xs font-bold text-white dark:bg-slate-100 dark:text-slate-900">{row.score}/100</span>
                       </div>
                       <p className="mt-1 text-xs text-slate-500">{device?.ip} · <RadioTower className="inline h-3.5 w-3.5" /> {device?.parentAp || stats?.essid || device?.essid || 'AP no identificado'}</p>

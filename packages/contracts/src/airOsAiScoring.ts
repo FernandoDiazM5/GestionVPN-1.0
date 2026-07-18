@@ -35,6 +35,7 @@ export interface AirOsNetworkScoreRow {
   score: number;
   level: AirOsRiskLevel;
   candidate: boolean;
+  mandatory: boolean;
   derived: {
     snrDb: number | null;
     txRateRatioPct: number | null;
@@ -196,6 +197,7 @@ export function assessAirOsNetwork(
       return {
         index, alias: input.role === 'ap' ? 'AP' : 'UNKNOWN', role: input.role,
         score: 0, level: 'healthy', candidate: false,
+        mandatory: false,
         derived: { snrDb: null, txRateRatioPct: null, rxRateRatioPct: null }, reasons: [],
       };
     }
@@ -220,6 +222,7 @@ export function assessAirOsNetwork(
     if (capacity != null) score += airmaxBand(capacity, 'capacity', reasons);
     const txRate = finite(metrics.txRate);
     const rxRate = finite(metrics.rxRate);
+    const mandatory = signal != null && signal <= -56 && (txRate != null && txRate < 72 || rxRate != null && rxRate < 72);
     if (txRate != null) score += absoluteRateBand(txRate, 'TX', reasons);
     if (rxRate != null) score += absoluteRateBand(rxRate, 'RX', reasons);
 
@@ -256,12 +259,13 @@ export function assessAirOsNetwork(
       score,
       level: levelForScore(score),
       candidate: score >= 40,
+      mandatory,
       derived: { snrDb: snr, txRateRatioPct: txRelative.ratio, rxRateRatioPct: rxRelative.ratio },
       reasons: reasons.sort((a, b) => b.points - a.points),
     };
   });
 
-  const candidates = rows.filter(row => row.candidate).sort((a, b) => b.score - a.score || a.index - b.index);
+  const candidates = rows.filter(row => row.candidate).sort((a, b) => Number(b.mandatory) - Number(a.mandatory) || b.score - a.score || a.index - b.index);
   const selectedIndexes = candidates.slice(0, Math.max(0, maxSelected)).map(row => row.index);
   const staRows = rows.filter(row => row.role === 'sta');
   const count = (level: AirOsRiskLevel) => staRows.filter(row => row.level === level).length;
