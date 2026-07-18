@@ -210,16 +210,19 @@ El middleware:
 
 #### Implementación
 
-- crear tabla `auth_rate_buckets` con `bucket_hash`, `kind`, `count`, `window_started_at`, `blocked_until` y `updated_at`;
-- nunca guardar el password; evitar email crudo en la nueva tabla mediante `HMAC-SHA256(AUTH_RATE_HMAC_KEY, email_normalizado)`;
-- implementar incremento/bloqueo atómico con `INSERT ... ON DUPLICATE KEY UPDATE` o transacción con bloqueo de fila;
-- derivar IP mediante `req.ip`, con `app.set('trust proxy', 1)` sólo en producción y Nginx como único salto;
+- [x] Crear tabla `auth_rate_buckets` con `bucket_hash`, `kind`, `count`, `window_started_at`, `blocked_until` y `updated_at`.
+- [x] Nunca guardar el password; evitar email crudo en la nueva tabla mediante `HMAC-SHA256(AUTH_RATE_HMAC_KEY, email_normalizado)`.
+- [x] Implementar incremento/bloqueo atómico con transacción y `SELECT ... FOR UPDATE`.
+- [x] Derivar IP mediante `req.ip`, con `app.set('trust proxy', 1)` sólo en producción y Nginx como único salto; Nginx sobrescribe `X-Forwarded-For`.
 - impedir acceso público directo al puerto 3001 mediante Docker/UFW;
-- aplicar el guard a ambos logins, setup, registro, OTP, resend y reset;
-- rate limit antes de bcrypt/Argon2;
-- emitir `429`, código genérico y `Retry-After` sin confirmar cuenta;
-- limpiar buckets vencidos con job e índice por `updated_at`;
-- añadir métricas por `kind/result`, nunca por IP/email.
+- [x] Aplicar el guard a ambos logins, setup, registro, OTP, resend, aceptación de invitaciones y reset.
+- [x] Ejecutar rate limit antes de bcrypt/Argon2.
+- [x] Emitir `429`, código genérico y `Retry-After` sin confirmar cuenta.
+- [x] Limpiar buckets vencidos con job e índice por `updated_at`.
+- [x] Añadir métricas por `kind/result`, nunca por IP/email.
+- [x] Serializar el setup inicial con un lock global MySQL mantenido hasta después del commit.
+
+Pendiente de despliegue: generar `AUTH_RATE_HMAC_KEY` estable de 32+ bytes, comprobar UFW/puerto 3001 y validar la configuración Nginx dentro de la imagen de producción.
 
 #### Política inicial
 

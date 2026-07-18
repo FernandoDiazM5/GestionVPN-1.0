@@ -45,7 +45,7 @@ function genOtp() {
 }
 
 // ── POST /register ───────────────────────────────────────────
-router.post('/register', rl.guardOtpSend(), asyncHandler(async (req, res) => {
+router.post('/register', rl.guardPolicy('REGISTER'), asyncHandler(async (req, res) => {
   const { email, password, name } = registerSchema.parse(req.body);
 
   const existing = await userRepo.findByEmail(email);
@@ -67,7 +67,6 @@ router.post('/register', rl.guardOtpSend(), asyncHandler(async (req, res) => {
     });
   }
 
-  await rl.recordAttempt(req._clientIp, 'OTP_SEND', email, true);
   const delivery = await sendOtp(email, otp, 'verificación de cuenta');
   return sendOk(res, {
     message: 'Código de verificación enviado',
@@ -77,13 +76,10 @@ router.post('/register', rl.guardOtpSend(), asyncHandler(async (req, res) => {
 }));
 
 // ── POST /verify ─────────────────────────────────────────────
-router.post('/verify', rl.guard('OTP'), asyncHandler(async (req, res) => {
+router.post('/verify', rl.guardPolicy('OTP_VERIFY'), asyncHandler(async (req, res) => {
   const { email, otp } = verifySchema.parse(req.body);
-  const ip = req._clientIp;
-
   const user = await userRepo.findByEmail(email);
   if (!user || user.email_verified) {
-    await rl.recordAttempt(ip, 'OTP', email, false);
     throw new AppError('Solicitud inválida', 400, 'INVALID');
   }
   if (!user.otp_hash || !user.otp_expires_at || Date.now() > Number(user.otp_expires_at)) {
@@ -96,7 +92,6 @@ router.post('/verify', rl.guard('OTP'), asyncHandler(async (req, res) => {
   const okOtp = await bcrypt.compare(otp, user.otp_hash);
   if (!okOtp) {
     await userRepo.incOtpAttempts(user.id);
-    await rl.recordAttempt(ip, 'OTP', email, false);
     throw new AppError('Código incorrecto', 401, 'OTP_INVALID');
   }
 
@@ -112,7 +107,7 @@ router.post('/verify', rl.guard('OTP'), asyncHandler(async (req, res) => {
     });
   });
 
-  await rl.recordAttempt(ip, 'OTP', email, true);
+  await rl.clearSuccessfulIdentity(req);
 
   const token = signSession({ sub: user.id, email: user.email, workspace_id: workspaceId, role: 'OWNER' });
   setSessionCookie(res, token);
@@ -120,9 +115,8 @@ router.post('/verify', rl.guard('OTP'), asyncHandler(async (req, res) => {
 }));
 
 // ── POST /resend ─────────────────────────────────────────────
-router.post('/resend', rl.guardOtpSend(), asyncHandler(async (req, res) => {
+router.post('/resend', rl.guardPolicy('OTP_SEND'), asyncHandler(async (req, res) => {
   const { email } = ResendRequestSchema.parse(req.body);
-  await rl.recordAttempt(req._clientIp, 'OTP_SEND', email, true);
   const user = await userRepo.findByEmail(email);
   if (!user || user.email_verified) return sendOk(res, { message: 'Si la cuenta existe, se envió un código' });
   const otp = genOtp();
@@ -132,32 +126,27 @@ router.post('/resend', rl.guardOtpSend(), asyncHandler(async (req, res) => {
 }));
 
 // ── POST /login ──────────────────────────────────────────────
-router.post('/login', rl.guard('LOGIN'), asyncHandler(async (req, res) => {
+router.post('/login', rl.guardPolicy('LOGIN'), asyncHandler(async (req, res) => {
   const { email, password } = loginSchema.parse(req.body);
-  const ip = req._clientIp;
-
   const user = await userRepo.findByEmail(email);
   if (!user) {
-    await rl.recordAttempt(ip, 'LOGIN', email, false);
     throw new AppError('Credenciales inválidas', 401, 'BAD_CREDENTIALS');
   }
   if (!user.email_verified) {
     throw new AppError('Verifica tu correo antes de iniciar sesión', 403, 'EMAIL_NOT_VERIFIED');
   }
   if (user.disabled_at) {
-    await rl.recordAttempt(ip, 'LOGIN', email, false);
     throw new AppError('Tu cuenta fue suspendida por el Administrador', 403, 'ACCOUNT_SUSPENDED');
   }
   const ok = await bcrypt.compare(password, user.password_hash);
   if (!ok) {
-    await rl.recordAttempt(ip, 'LOGIN', email, false);
     throw new AppError('Credenciales inválidas', 401, 'BAD_CREDENTIALS');
   }
 
   const membership = await workspaceRepo.findMembershipByUser(user.id);
   if (!membership) throw new AppError('El usuario no pertenece a ningún workspace', 403, 'NO_WORKSPACE');
 
-  await rl.recordAttempt(ip, 'LOGIN', email, true);
+  await rl.clearSuccessfulIdentity(req);
 
   const token = signSession({
     sub: user.id, email: user.email, workspace_id: membership.workspace_id, role: membership.role,

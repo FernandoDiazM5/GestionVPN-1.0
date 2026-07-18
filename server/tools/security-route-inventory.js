@@ -110,7 +110,7 @@ function collectInventory() {
         || /\bvalidate\s*\(\s*\{[^}]*\bquery\s*:/s.test(segment);
       const routeAuthentication = /\b(?:requireSession|verifyToken|requirePlatformAdmin)\b|\brequireRole\s*\(/.test(segment);
       const authenticated = hasGlobalAuthentication(relativeFile) || fileAuthentication || routeAuthentication;
-      const rateLimited = /\brl\.(?:guard|guardOtpSend)\s*\(|\brateLimit(?:er)?\b|\bloginLimiter\b/.test(segment);
+      const rateLimited = /\brl\.(?:guard|guardOtpSend|guardPolicy)\s*\(|\brateLimit(?:er)?\b|\bloginLimiter\b/.test(segment);
       const identityEndpoint = IDENTITY_ENDPOINTS.test(routeMatch.routePath);
       const sinks = detectSinks(segment);
       const risks = [];
@@ -201,7 +201,7 @@ ${riskSummary}
 ## Criterios
 
 - **Autenticación:** middleware en la propia ruta o montaje global protegido declarado en el servidor.
-- **Rate limiting:** guardas \`rl.guard\`, \`rl.guardOtpSend\` o un limiter explícito.
+- **Rate limiting:** guardas \`rl.guard\`, \`rl.guardOtpSend\`, \`rl.guardPolicy\` o un limiter explícito.
 - **Schema body:** middleware \`validate({ body })\` o parseo Zod directo detectable.
 - **Sinks:** uso estático detectable de SQL, procesos, filesystem, correo o administración de red.
 - Las alertas \`*_SCHEMA_MISSING\` también pueden señalar validaciones indirectas; deben revisarse antes de corregir.

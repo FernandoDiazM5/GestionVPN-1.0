@@ -189,3 +189,15 @@ CREATE TABLE IF NOT EXISTS auth_attempts (
   KEY idx_aa_ip (ip_address, created_at),
   KEY idx_aa_email_kind (email, kind, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ── 8b. Buckets atómicos de autenticación (sin identidades en claro) ──
+CREATE TABLE IF NOT EXISTS auth_rate_buckets (
+  bucket_hash       CHAR(64)    NOT NULL,
+  kind              VARCHAR(32) NOT NULL,
+  count             INT UNSIGNED NOT NULL DEFAULT 0,
+  window_started_at BIGINT      NOT NULL,
+  blocked_until     BIGINT      NOT NULL DEFAULT 0,
+  updated_at        BIGINT      NOT NULL,
+  PRIMARY KEY (bucket_hash, kind),
+  KEY idx_arb_updated (updated_at)
+) ENGINE=InnoDB DEFAULT CHARSET=ascii COLLATE=ascii_bin;

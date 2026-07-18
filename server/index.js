@@ -42,9 +42,10 @@ const app  = express();
 const PORT = process.env.PORT || 3001;
 
 // Detrás de nginx en producción: confiar en 1 nivel de proxy para que req.ip y
-// el rate-limit de login usen la IP real del cliente (X-Forwarded-For), no la
-// del contenedor nginx. (Auditoría despliegue VPS, hallazgo 4.)
+// Express derive req.ip de forma segura. El backend :3001 debe permanecer
+// cerrado al acceso público; ver docker-compose.prod.yml y DESPLIEGUE_VPS.md.
 if (process.env.NODE_ENV === 'production') app.set('trust proxy', 1);
+require('./lib/rateLimit').assertRateLimitConfig();
 
 // ── Guard global: errores asincrónicos de node-routeros ──────────────────────
 const SAFE_CODES = new Set([
@@ -235,6 +236,7 @@ function gracefulShutdown(signal) {
         try { telegramBot.stop(); } catch (_) {}
         try { expirationJob.stop(); } catch (_) {}
         try { coreBackupJob.stop(); } catch (_) {}
+        try { require('./lib/rateLimit').stopBucketCleanup(); } catch (_) {}
         setTimeout(() => process.exit(0), 500);
     };
 }
@@ -252,6 +254,7 @@ function startServer(attempt = 1) {
         logger.info({ port: PORT, attempt }, 'Servidor backend MikroTik API Proxy escuchando');
         // Inicia monitoreo de salud de MySQL cada 10 segundos
         startMonitor(10000);
+        require('./lib/rateLimit').startBucketCleanup();
         expirationJob.start();
         telegramBot.start();
         dashboardMetrics.start();

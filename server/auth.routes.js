@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
-const { hasUsers, getUserByUsername, createUser } = require('./db.service');
+const { hasUsers, getUserByUsername, createInitialUser } = require('./db.service');
 const { setSessionCookie } = require('./lib/jwt');
 const { buildSessionForLegacyUser, authenticateMysqlUser } = require('./lib/sessionBridge');
 const userRepo = require('./db/repos/userRepo');
@@ -41,7 +41,7 @@ router.get('/status', async (req, res) => {
 });
 
 // Endpoint de Setup inicial (sólo funciona si no hay usuarios)
-router.post('/setup', async (req, res) => {
+router.post('/setup', rl.guardPolicy('SETUP', { identityField: 'username' }), async (req, res) => {
     try {
         const configured = await hasUsers();
         if (configured) {
@@ -52,8 +52,11 @@ router.post('/setup', async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const hash = await bcrypt.hash(password, salt);
 
-        // Crear el primer usuario como rol "admin"
-        await createUser(username, hash, 'admin');
+        // Crear un único primer usuario incluso con varias instancias/request concurrentes.
+        const created = await createInitialUser(username, hash, 'admin');
+        if (!created) {
+            return sendError(res, 403, 'La aplicación ya fue inicializada. Inicie sesión.', 'ALREADY_SETUP');
+        }
 
         await attachRbacSession(res, username);
 
@@ -69,7 +72,7 @@ router.post('/setup', async (req, res) => {
     }
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', rl.guardPolicy('LOGIN', { identityField: 'username' }), async (req, res) => {
     try {
         const { username, password } = loginSchema.parse(req.body);
 
@@ -86,6 +89,7 @@ router.post('/login', async (req, res) => {
                 dbError = e;
             }
             if (!dbError) {
+                await rl.clearSuccessfulIdentity(req);
                 return sendOk(res, { message: 'Conectado exitosamente', user: row.username, role: row.role });
             }
         }
@@ -95,6 +99,7 @@ router.post('/login', async (req, res) => {
             try {
                 const s = await authenticateMysqlUser(username, password);
                 if (s) {
+                    await rl.clearSuccessfulIdentity(req);
                     setSessionCookie(res, s.token);
                     const legacyRole = s.user.role === 'MEMBER' ? 'viewer' : 'admin';
                     return sendOk(res, {
@@ -151,7 +156,7 @@ const GENERIC_OK = {
   message: 'Si el correo está registrado, te enviamos un enlace para restablecer tu contraseña.',
 };
 
-router.post('/password-reset/request', rl.guard('OTP'), async (req, res) => {
+router.post('/password-reset/request', rl.guardPolicy('RESET_REQUEST'), async (req, res) => {
   const ip = req._clientIp;
   try {
     const { email } = requestResetSchema.parse(req.body);
@@ -163,15 +168,12 @@ router.post('/password-reset/request', rl.guard('OTP'), async (req, res) => {
     if (user) {
       // Anti-spam: máx 5 tokens emitidos por usuario en la última hora
       const recent = await passwordResetRepo.countRecent(user.id, 60 * 60 * 1000);
-      if (recent >= MAX_PENDING_TOKENS_PER_HOUR) {
-        await rl.recordAttempt(ip, 'OTP', email, false);
-      } else {
+      if (recent < MAX_PENDING_TOKENS_PER_HOUR) {
         const { token, hash } = await passwordResetRepo.generateToken();
         await passwordResetRepo.create({ userId: user.id, tokenHash: hash, ipAddress: ip });
         // Envío de correo en background (no bloquea el response)
         sendPasswordReset({ email: user.email, token, name: user.name })
           .catch(e => log.warn({ err: e.message }, 'password-reset: mail falló'));
-        await rl.recordAttempt(ip, 'OTP', email, true);
       }
     }
     return res.json(GENERIC_OK);
@@ -183,14 +185,12 @@ router.post('/password-reset/request', rl.guard('OTP'), async (req, res) => {
   }
 });
 
-router.post('/password-reset/confirm', rl.guard('OTP'), async (req, res) => {
-  const ip = req._clientIp;
+router.post('/password-reset/confirm', rl.guardPolicy('RESET_CONFIRM'), async (req, res) => {
   try {
     const { token, newPassword } = confirmResetSchema.parse(req.body);
 
     const found = await passwordResetRepo.findValid(token);
     if (!found) {
-      await rl.recordAttempt(ip, 'OTP', null, false);
       metrics.authFailsTotal.inc({ reason: 'reset_token_invalid' });
       return sendError(res, 401, 'El enlace es inválido o ya fue usado. Solicita uno nuevo.', 'INVALID_TOKEN');
     }
@@ -206,7 +206,6 @@ router.post('/password-reset/confirm', rl.guard('OTP'), async (req, res) => {
     // Por seguridad: invalidar sesiones activas del user (cache de auth)
     invalidateUserCache(found.userId);
 
-    await rl.recordAttempt(ip, 'OTP', null, true);
     return sendOk(res, { message: 'Contraseña actualizada. Ya puedes iniciar sesión con tu nueva clave.' });
   } catch (err) {
     if ((err.issues || err.errors)) return res.status(400).json({ success: false, message: 'Datos inválidos', code: 'VALIDATION_ERROR', errors: (err.issues || err.errors) });

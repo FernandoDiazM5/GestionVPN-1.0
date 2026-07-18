@@ -20,6 +20,7 @@ node db/migrateScanIp.js        # tabla workspace_scan_ip (Opción C)
 node db/migrateDropCoModerator.js  # retiro del rol CO_MODERATOR (degrada→MEMBER + estrecha enum)
 node db/migrateMgmtIpSource.js     # ensancha enum source de user_mgmt_ips (+auto-provision/auto-heal) + backfill mapeos faltantes
 node db/migrateOtpSendRate.js      # enum/índice para rate limit persistente de envíos OTP
+node db/migrateAuthRateBuckets.js  # buckets atómicos por IP/identidad para autenticación
 node db/migrateAirOsAi.js           # acceso, cuota, análisis e historial AirOS con Gemini
 
 # Siembra de usuarios demo (admin/admin + moderador fernando) SOLO si se pide.

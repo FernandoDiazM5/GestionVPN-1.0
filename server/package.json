@@ -17,6 +17,7 @@
     "migrate:dropcomod": "node db/migrateDropCoModerator.js",
     "migrate:mgmtipsource": "node db/migrateMgmtIpSource.js",
     "migrate:otp-send": "node db/migrateOtpSendRate.js",
+    "migrate:auth-rate-buckets": "node db/migrateAuthRateBuckets.js",
     "migrate:air-os-ai": "node db/migrateAirOsAi.js",
     "diagnose": "node db/diagnostics.js",
     "check:scanroute": "node db/checkScanRoute.js",

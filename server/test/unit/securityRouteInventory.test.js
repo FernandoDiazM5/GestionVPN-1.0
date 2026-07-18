@@ -12,13 +12,13 @@ describe('security route inventory', () => {
     expect(inventory.some((route) => route.file === 'routes/account.routes.js' && route.path === '/login')).toBe(true);
   });
 
-  it('flags the legacy login when it lacks rate limiting', () => {
+  it('recognizes the protected legacy login limiter', () => {
     const legacyLogin = inventory.find((route) => route.file === 'auth.routes.js' && route.path === '/login');
 
     expect(legacyLogin.authenticated).toBe(false);
     expect(legacyLogin.validatesBody).toBe(true);
-    expect(legacyLogin.rateLimited).toBe(false);
-    expect(legacyLogin.risks).toContain('PUBLIC_RATE_LIMIT_MISSING');
+    expect(legacyLogin.rateLimited).toBe(true);
+    expect(legacyLogin.risks).not.toContain('PUBLIC_RATE_LIMIT_MISSING');
   });
 
   it('recognizes the protected account login limiter', () => {
@@ -47,6 +47,6 @@ describe('security route inventory', () => {
 
     expect(second).toBe(first);
     expect(first).toContain('# Inventario de seguridad de rutas API');
-    expect(first).toContain('`PUBLIC_RATE_LIMIT_MISSING`');
+    expect(first).toContain('Endpoints públicos de identidad sin rate limiting detectable: 0');
   });
 });

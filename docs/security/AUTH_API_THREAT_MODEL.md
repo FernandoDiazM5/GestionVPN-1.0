@@ -110,8 +110,8 @@ Reglas del límite:
 | T02 | SQL injection | Dato externo entra en SQL concatenado | placeholders + regla Semgrep | Predominante, no gate específico |
 | T03 | XSS reflejado/almacenado | Nombre/tag malicioso llega a HTML | React text, encoding contextual, prohibir HTML crudo | Buena base |
 | T04 | Command injection | IP/nombre llega a shell/SSH/RouterOS | schemas y allowlists por argumento | Parcial |
-| T05 | Fuerza bruta | Muchas claves para una cuenta | buckets atómicos por identidad e IP | Parcial |
-| T06 | Credential stuffing | Pares filtrados distribuidos | límite por identidad, alertas y MFA opcional | Pendiente |
+| T05 | Fuerza bruta | Muchas claves para una cuenta | buckets atómicos por identidad e IP | Implementado en código; calibrar en staging |
+| T06 | Credential stuffing | Pares filtrados distribuidos | límite por identidad, alertas y MFA opcional | Límite por identidad implementado; MFA pendiente |
 | T07 | Enumeración | Distintos mensajes/status/tiempos | respuesta y trabajo equivalentes | Incompleto |
 | T08 | Robo de BD | Crack offline de hashes | Argon2id + migración bcrypt | bcrypt coste 10 |
 | T09 | Truncamiento bcrypt | Password >72 bytes comparte prefijo | Argon2id; reset controlado de legado largo | Pendiente |
@@ -119,29 +119,26 @@ Reglas del límite:
 | T11 | CSRF | Sitio hostil dispara mutación con cookie | Origin + token CSRF | Pendiente |
 | T12 | IDOR/tenant escape | ID válido de otro workspace | scope obligatorio en cada repo/servicio | Invariante existente; vigilar |
 | T13 | Escalada de rol | MEMBER invoca ruta OWNER | RBAC server-side y tests negativos | Implementado en rutas principales |
-| T14 | Spoof de IP | Cliente controla X-Forwarded-For | `req.ip`, proxy exacto, puerto interno | Pendiente |
-| T15 | Carrera del limitador | Requests paralelos pasan el umbral | contador/transacción atómica | Pendiente |
+| T14 | Spoof de IP | Cliente controla X-Forwarded-For | `req.ip`, proxy exacto, puerto interno | Código/proxy implementados; firewall por verificar en VPS |
+| T15 | Carrera del limitador | Requests paralelos pasan el umbral | contador/transacción atómica | Implementado y probado con 50 reservas concurrentes |
 | T16 | Fail-open de estado | MySQL cae y suspendido sigue entrando | middleware único fail-closed | Brecha detectada |
 | T17 | Clave JWT comprometida | Una clave firma todas las sesiones | keyring, `kid`, rotación y revocación | Pendiente |
-| T18 | DoS por hash | Ataque fuerza Argon2/bcrypt masivo | edge limit antes del hash y benchmark | Parcial |
+| T18 | DoS por hash | Ataque fuerza Argon2/bcrypt masivo | edge limit antes del hash y benchmark | Nginx + guard previo implementados; benchmark pendiente |
 | T19 | Fuga por logs | Password/cookie aparece en errores | redacción central y tests | Buena base |
 | T20 | BaaS mal integrado | Token válido obtiene permisos obsoletos | verificación server-side + RBAC MySQL | No adoptado |
 | T21 | Dependencia indisponible | proveedor identidad/BD falla | fail-closed para seguridad + respuesta 503 | Inconsistente |
-| T22 | Setup expuesto | carrera crea bootstrap débil | límite, transacción y secreto fuerte | Parcial |
+| T22 | Setup expuesto | carrera crea bootstrap débil | límite, transacción y secreto fuerte | Límite y lock MySQL implementados; política de password pendiente |
 
 ## Riesgos prioritarios
 
 ### P0 — cerrar antes de ampliar autenticación
 
-- login heredado sin rate limit;
 - sesión que permite continuar si falla la comprobación de estado;
-- confianza directa en `X-Forwarded-For`;
 - rutas de red/dispositivos con lectura cruda de `req.body`;
 - enumeración explícita de cuenta.
 
 ### P1 — siguiente hito
 
-- rate buckets atómicos por IP e identidad;
 - migración bcrypt→Argon2id;
 - defensa CSRF y revocación inmediata;
 - reglas estáticas específicas de queries y command sinks.

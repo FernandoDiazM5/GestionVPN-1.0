@@ -272,19 +272,17 @@ router.post('/invite', requireSession, requireRole('OWNER'),
   }));
 
 // ── POST /accept  (público, rate-limited) ────────────────────
-router.post('/accept', rl.guard('OTP'), asyncHandler(async (req, res) => {
+router.post('/accept', rl.guardPolicy('OTP_VERIFY'), asyncHandler(async (req, res) => {
   const { email, otp, password, publicKey } = acceptSchema.parse(req.body);
-  const ip = req._clientIp;
 
   const inv = await invitationRepo.findPendingByEmail(email);
-  if (!inv) { await rl.recordAttempt(ip, 'OTP', email, false); throw new AppError('Invitación no encontrada', 404, 'NO_INVITE'); }
+  if (!inv) throw new AppError('Invitación no encontrada', 404, 'NO_INVITE');
   if (Date.now() > Number(inv.expires_at)) throw new AppError('La invitación expiró', 410, 'INVITE_EXPIRED');
   if (inv.attempts >= INVITE_MAX_ATTEMPTS) throw new AppError('Demasiados intentos', 429, 'INVITE_LOCKED');
 
   const okOtp = await bcrypt.compare(otp, inv.otp_hash);
   if (!okOtp) {
     await invitationRepo.incAttempts(inv.id);
-    await rl.recordAttempt(ip, 'OTP', email, false);
     throw new AppError('Código incorrecto', 401, 'OTP_INVALID');
   }
 
@@ -325,7 +323,7 @@ router.post('/accept', rl.guard('OTP'), asyncHandler(async (req, res) => {
     await invitationRepo.markAccepted(tx, inv.id);
   });
 
-  await rl.recordAttempt(ip, 'OTP', email, true);
+  await rl.clearSuccessfulIdentity(req);
 
   // Provisión WireGuard: si el invitado no envía su clave pública, el servidor
   // genera el par y devuelve el .conf completo (PrivateKey real) listo para usar.

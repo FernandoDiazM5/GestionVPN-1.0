@@ -97,6 +97,13 @@ const mailSentTotal = new client.Counter({
     registers: [register],
 });
 
+const authRateLimitTotal = new client.Counter({
+    name: 'auth_rate_limit_total',
+    help: 'Evaluaciones de buckets de autenticación por tipo y resultado.',
+    labelNames: ['kind', 'result'],
+    registers: [register],
+});
+
 // ── Gemini AirOS ───────────────────────────────────────────────────────────
 // Sin labels de usuario/workspace/dispositivo: evita PII y cardinalidad alta.
 const aiRequestsTotal = new client.Counter({
@@ -140,6 +147,7 @@ module.exports = {
     httpRequestsTotal,
     httpRequestDurationSeconds,
     authFailsTotal,
+    authRateLimitTotal,
     routerosErrorsTotal,
     routerosWritesTotal,
     mailSentTotal,

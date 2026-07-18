@@ -41,6 +41,7 @@ stubModule(__dirname, '../../db.service', {
   hasUsers: vi.fn().mockResolvedValue(true),
   getUserByUsername: vi.fn().mockResolvedValue(null),
   createUser: vi.fn(),
+  createInitialUser: vi.fn(),
   encryptPass: (s) => s,
   decryptPass: (s) => s,
   getAppSetting: vi.fn(),
@@ -73,6 +74,8 @@ stubModule(__dirname, '../../lib/rateLimit', {
   recordAttempt: vi.fn(),
   isBlocked: vi.fn().mockResolvedValue(false),
   guard: () => (req, res, next) => { req._clientIp = '127.0.0.1'; next(); },
+  guardPolicy: () => (req, res, next) => { req._clientIp = '127.0.0.1'; next(); },
+  clearSuccessfulIdentity: vi.fn(),
   MAX_FAILS: 5,
   WINDOW_MS: 900_000,
 });

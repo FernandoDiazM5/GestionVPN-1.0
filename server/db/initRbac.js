@@ -60,7 +60,7 @@ async function main() {
     // (Antes dropeaba siempre → borraba users/workspaces/invitations en cada deploy.)
     if (process.env.RBAC_RESET === 'true') {
       await conn.query('SET FOREIGN_KEY_CHECKS = 0;');
-      for (const tbl of ['auth_attempts', 'tunnel_logs', 'workspace_routers',
+      for (const tbl of ['auth_rate_buckets', 'auth_attempts', 'tunnel_logs', 'workspace_routers',
                          'invitations', 'workspace_members', 'workspaces', 'users']) {
         try { await conn.query(`DROP TABLE IF EXISTS \`${tbl}\`;`); }
         catch (e) { console.warn(`[init:rbac] aviso al dropear ${tbl}: ${e.message}`); }

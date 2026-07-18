@@ -427,6 +427,49 @@ async function createUser(username, password_hash, role = 'viewer') {
     );
 }
 
+/**
+ * Crea el único usuario bootstrap bajo un lock global de MySQL.
+ * El lock se libera después del COMMIT para que otra instancia siempre vea el
+ * usuario ya confirmado antes de reevaluar el estado inicial.
+ */
+async function createInitialUser(username, password_hash, role = 'admin') {
+    const conn = await getPool().getConnection();
+    let lockAcquired = false;
+    let transactionOpen = false;
+    try {
+        const [lockRows] = await conn.query("SELECT GET_LOCK('gestionvpn:initial-setup', 5) AS acquired");
+        lockAcquired = Number(lockRows[0]?.acquired) === 1;
+        if (!lockAcquired) throw new Error('No se pudo adquirir el lock del setup inicial');
+
+        await conn.beginTransaction();
+        transactionOpen = true;
+        const [rows] = await conn.query('SELECT COUNT(*) AS count FROM vpn_users');
+        if (Number(rows[0]?.count || 0) > 0) {
+            await conn.rollback();
+            transactionOpen = false;
+            return false;
+        }
+
+        await conn.execute(
+            'INSERT INTO vpn_users (username, password_hash, role, created_at) VALUES (?, ?, ?, ?)',
+            [username, password_hash, role, Date.now()]
+        );
+        await conn.commit();
+        transactionOpen = false;
+        return true;
+    } catch (error) {
+        if (transactionOpen) {
+            try { await conn.rollback(); } catch (_) { /* noop */ }
+        }
+        throw error;
+    } finally {
+        if (lockAcquired) {
+            try { await conn.query("SELECT RELEASE_LOCK('gestionvpn:initial-setup')"); } catch (_) { /* noop */ }
+        }
+        conn.release();
+    }
+}
+
 // ══════════════════════════════════════════════════════════════════════════
 // APP SETTINGS  (`key` es palabra reservada en MySQL → backticks)
 // ══════════════════════════════════════════════════════════════════════════
@@ -565,7 +608,7 @@ module.exports = {
     initDb, getDb,
     encryptPass, decryptPass, encryptDevice, decryptDevice,
     saveNode, getNodes, getNodeByPppUser, getNodeId, deleteNode,
-    hasUsers, getUserByUsername, createUser,
+    hasUsers, getUserByUsername, createUser, createInitialUser,
     setAppSetting, getAppSetting,
     getTorres, saveTorre, deleteTorre,
     getApByUuid, getApIntId,
