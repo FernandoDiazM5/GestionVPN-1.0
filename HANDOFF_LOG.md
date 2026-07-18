@@ -6,6 +6,10 @@
 
 ---
 
+> **Sesión 2026-07-17 - señal -55 a -60 reclasificada como observación.** Rama `vps_prod` (base `dd19fd8`; cambios locales pendientes de publicación directa). Skill: `handoff-keeper`.
+> - `SIGNAL_ACCEPTABLE` fue reemplazado por `SIGNAL_OBSERVATION`; el rango empieza en `-55 dBm` y se muestra como `Señal en observación`.
+> - La prioridad obligatoria combinada con tasa baja también comienza en `-55 dBm`.
+
 > **Sesión 2026-07-17 - Gemini obligado a analizar todos los parámetros del STA.** Rama `vps_prod` (base `8e6f6fd`; cambios locales pendientes de publicación directa). Skills: `network-engineer`, `handoff-keeper`.
 > - El DTO NETWORK pasó de `metrics` anidado y `score` a campos planos exactos con `riskScore`, `riskLevel` y `flags`, preservando privacidad.
 > - El prompt v4 exige cubrir todos los flags de cada equipo, incluyendo señal/CCQ en observación, con un hallazgo por STA y hasta 10 hallazgos.

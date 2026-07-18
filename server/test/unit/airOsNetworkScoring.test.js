@@ -22,6 +22,15 @@ describe('preselección local de receptores AirOS', () => {
     expect(result.selectedIndexes).toEqual([]);
   });
 
+  it('clasifica desde -55 hasta -60 dBm como señal en observación', () => {
+    for (const signal of [-55, -56, -60]) {
+      const row = assessAirOsNetwork([sta({ signal, noiseFloor: -92, ccq: 98 })]).rows[0];
+      expect(row.reasons).toEqual(expect.arrayContaining([
+        expect.objectContaining({ code: 'SIGNAL_OBSERVATION', level: 'observation' }),
+      ]));
+    }
+  });
+
   it('excluye AP y roles desconocidos', () => {
     const result = assessAirOsNetwork([
       { role: 'ap', groupKey: null, metrics: { signal: -90, ccq: 1 } },

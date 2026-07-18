@@ -93,7 +93,7 @@ function signalBand(value: number, reasons: AirOsRiskReason[]) {
   if (value <= -75) return addReason(reasons, 'SIGNAL_CRITICAL', 'Señal crítica', value, 'dBm', 35, 'critical');
   if (value <= -68) return addReason(reasons, 'SIGNAL_BAD', 'Señal mala', value, 'dBm', 25, 'bad');
   if (value <= -61) return addReason(reasons, 'SIGNAL_DEFICIENT', 'Señal deficiente', value, 'dBm', 15, 'deficient');
-  if (value <= -56) return addReason(reasons, 'SIGNAL_ACCEPTABLE', 'Señal aceptable', value, 'dBm', 5, 'observation');
+  if (value <= -55) return addReason(reasons, 'SIGNAL_OBSERVATION', 'Señal en observación', value, 'dBm', 5, 'observation');
   return 0;
 }
 
@@ -189,7 +189,7 @@ export function assessAirOsNetwork(
     const rxRate = finite(metrics.rxRate);
     const expectedRate = finite(metrics.channelWidth) != null && Number(metrics.channelWidth) >= 40 ? 150 : 72;
     const minimumAcceptableRate = expectedRate * 0.8;
-    const mandatory = signal != null && signal <= -56 && (txRate != null && txRate < minimumAcceptableRate || rxRate != null && rxRate < minimumAcceptableRate);
+    const mandatory = signal != null && signal <= -55 && (txRate != null && txRate < minimumAcceptableRate || rxRate != null && rxRate < minimumAcceptableRate);
     if (txRate != null) score += absoluteRateBand(txRate, 'TX', reasons);
     if (rxRate != null) score += absoluteRateBand(rxRate, 'RX', reasons);
 
