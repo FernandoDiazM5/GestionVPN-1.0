@@ -79,6 +79,17 @@ Tokens semánticos en `tailwind.config.js` (`brand`, `success`, …) y variables
 - Barrel exports (`index.ts`) por carpeta.
 - Rutas relativas: cuidado con la profundidad desde `components/sections/` (5 niveles a `src/`).
 
+## Seguridad frontend ↔ backend
+
+- La validación en React mejora UX; **no es un control de seguridad**. Toda entrada se revalida en Express con Zod.
+- No ocultar un botón como sustituto de RBAC. El backend decide identidad, workspace, rol y pertenencia del recurso.
+- La sesión web viaja sólo en cookie HttpOnly. No guardar JWT en localStorage/sessionStorage ni enviarlo en query.
+- No usar `dangerouslySetInnerHTML`; cualquier excepción requiere sanitización, prueba XSS y revisión explícita.
+- No mostrar mensajes que confirmen si un email/cuenta existe. Respetar el contrato genérico del backend.
+- No enviar password, OTP, token, cookie, clave privada ni credenciales de red a logs, telemetría o reportes de error.
+- CORS no bloquea cURL/Postman y nunca debe describirse como autenticación.
+- Referencia normativa del servidor: [`../server/SECURITY.md`](../server/SECURITY.md).
+
 ## Convenciones post-refactor (fases 0-12)
 
 ### Contratos API (F5) — `@gestionvpn/contracts`

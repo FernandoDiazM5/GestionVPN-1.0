@@ -6,6 +6,18 @@
 
 ---
 
+> **Sesión 2026-07-18 - inicio de implementación del hardening API.** Rama `vps_prod` (base `767c7ae`; Fase 0 local). Skills: `documentation-writer`, `semgrep`, `handoff-keeper`.
+> - Creados threat model, invariantes backend/frontend, benchmark bcrypt reproducible e inventario generado de controles por ruta y sinks; el inventario detecta 142 rutas, 94 mutadoras, 34 bodies sin esquema directo y dos endpoints legacy de identidad sin rate limit.
+> - El inventario queda bloqueado contra desactualización mediante `check:security-routes` dentro de `check:all` y 5 pruebas unitarias. También se retiraron credenciales locales antiguas que estaban documentadas en el handoff.
+> - Verificación: 61 suites / 402 pruebas backend, `check:all`, benchmark bcrypt local y Semgrep 1.166.0 sobre 484 archivos con 0 findings.
+> - Pendiente: benchmark en VPS, revisión humana del threat model y Fase 1 (`middleware/validate.js` + schemas de AP/device/core/nodes).
+
+> **Sesión 2026-07-18 - plan de hardening de autenticación y API.** Rama `vps_prod` (base `767c7ae`; sólo documentación, cambios locales sin commit). Skills: `documentation-writer`, `semgrep`, `handoff-keeper`.
+> - Auditado el estado actual de validación server-side, rate limiting, bcrypt, respuestas de identidad, cookies/sesiones y opción Firebase/Identity Platform. Semgrep focalizado terminó sin findings; la inspección manual identificó brechas de cobertura y diseño no reducibles a patrones.
+> - Creado `PLAN_HARDENING_SEGURIDAD_AUTENTICACION_API_2026-07-18.md`: 7 fases, 31 commits pequeños, arquitectura objetivo, pruebas de ataques/concurrencia, métricas, CI, despliegue, rollback y matriz de trazabilidad para los cinco requisitos solicitados. Incluye consolidación de sesión fail-closed y rotación JWT tras detectar comportamiento desigual entre los dos middlewares actuales.
+> - Decisión propuesta: hardening inmediato e independiente del proveedor; migración bcrypt→Argon2id; rate buckets atómicos por IP+identidad HMAC; respuestas y coste equivalentes; CSRF/revocación; Firebase sólo tras spike+ADR, conservando autorización/workspace en MySQL.
+> - Verificación documental: fuentes oficiales OWASP/Firebase/Google Cloud contrastadas y `git diff --check` correcto. Pendiente: aprobación del plan y ejecución por fases.
+
 > **Sesión 2026-07-18 - tarjetas móviles para la tabla de Escanear.** Rama `vps_prod` (base `b26c189`; acumulada con correcciones responsive y publicada directamente en `origin/vps_prod`). Skills: `vercel-react-best-practices`, `github:yeet`, `handoff-keeper`.
 > - En viewport `<640 px`, `DeviceTable` deja de montar la cuadrícula horizontal de escritorio y muestra una lista de tarjetas sin overflow: nombre, IP, modelo, MAC, rol, frecuencia, estado SSH y estado guardado.
 > - Las columnas configuradas se conservan como métricas en una cuadrícula de dos columnas; también permanecen selección individual/masiva, guardar, diagnóstico AirOS, sincronizar y detalle expandible. Desde `sm` sigue activa la tabla completa configurable y redimensionable.
@@ -413,7 +425,7 @@
 >   2. **§4.3/ruta muerta:** `POST /tunnel/mangle-access` (legacy single-user) seguía registrada e inyectaba mangles GLOBALES `ACCESO-ADMIN` con `src=<toda la /24>` (rompe aislamiento por-usuario). Sin consumidor frontend (solo un tipo huérfano). Borrado handler (118 líneas) + comentario + imports `writeIdempotent`/`getErrorMessage` + tipo `MangleAccessResponse`.
 >   3. **CRLF/loader:** `db.service.splitStatements` usaba `split('\n')`; con checkout CRLF el `\r` rompía el strip de comentarios (`.` no cruza `\r`, `$` no matchea antes), dejando pasar el `;` de comentarios inline (`schema_ops.sql:133/256`) y truncando `CREATE TABLE aps`/`mgmt_peer_owners` en BD fresca. Fix: `split(/\r?\n/)`. NO afectaba prod (repo guarda `.sql` como LF). diagnose ahora 0 avisos.
 >   4. **§4.10/footgun:** `buildClientConf` (`wgkeys.js`) caía a `AllowedIPs=0.0.0.0/0` si faltaba `allowedIps` (el bug del corte 2026-06-20). Ahora **lanza**. Test actualizado (+1 → 271).
->   5. **Seed:** `seedRoles.js` con password hardcodeada `48523451` → overridable por `SEED_ADMIN_PASSWORD`/`SEED_MOD_PASSWORD` + aviso al usar default.
+>   5. **Seed:** `seedRoles.js` tenía una password hardcodeada (valor retirado del handoff) → overridable por `SEED_ADMIN_PASSWORD`/`SEED_MOD_PASSWORD` + aviso al usar default.
 > - **Tooling semgrep** (commit `64adc7b`): no hay Python/binario Windows → wrapper `scripts/semgrep.js` corre `semgrep/semgrep` (imagen fijada) vía Docker. Scripts `audit:semgrep` / `audit:semgrep:json`, rulesets alineados a CLAUDE.md F12. Baseline 606 archivos · 0 findings.
 > - **Pendiente:** ver §7. Verificación de lógica fue dirigida (no se lanzó `/code-review high`/`ultra` automatizado).
 
@@ -517,7 +529,7 @@
 >   - 🔴 **Splitter SQL rompía esquemas en MariaDB 11** (`c43e53f` + `9427798`): el parser de `initRbac`/`initMultiuser`/`db.service` quitaba solo las líneas que EMPIEZAN con `--` y luego `split(';')`. Un **comentario inline con `;`** (`schema_rbac.sql` "login bloqueado; NULL"; `schema_ops.sql` "Fase 2-B; resuelto") truncaba el `CREATE TABLE` → `ER_PARSE_ERROR "near ''"` y, en schema_ops, `aps` no se creaba → `signal_history` FK **errno 150** + `migrate:apnode "Table aps doesn't exist"` → **crash-loop del backend**. Fix: el splitter elimina TODO comentario `--` (línea e inline) antes de partir por `;`.
 >   - 🔴 **Orden de migraciones** (`294be9a`): `migrate:apnode` corría antes de que `initDb`/`schema_ops` (que crea `aps`) se aplicara → se ajustó para aplicar schema_ops antes.
 >   - 🟡 **Audit fixes** (en `9f785c1`): `app.set('trust proxy', 1)` en prod + timeout de `scanLock` proporcional al nº de hosts del escaneo.
->   - **Siembra demo opcional** (`cf73a77`): el entrypoint ya NO siembra `admin/admin` + `fernando` por defecto; solo con `SEED_DEMO_USERS=true`. En prod la BD queda vacía → aparece el **Setup Inicial** y el operador crea el admin con su clave.
+>   - **Siembra demo opcional** (`cf73a77`): el entrypoint ya NO siembra credenciales demo por defecto; solo con `SEED_DEMO_USERS=true`. En prod la BD queda vacía → aparece el **Setup Inicial** y el operador crea el admin con su clave.
 >   - **Ruta de retorno `.30` por VRF** (`cec810e`): `provision.routes` inyecta `dst-address=$SCAN_RETURN_SUBNET → VPN-WG-MGMT` en cada VRF (aditivo, gobernado por env). Para los VRF YA existentes se añadió a mano con un `:foreach` (ver abajo).
 >   - **Invitaciones pendientes + enlace manual** (`f19576b`): como **DO bloquea el SMTP saliente**, el correo de invitación NO llega. Ahora `invite-moderator` no falla si el email falla (la invitación se crea igual) y devuelve `acceptUrl`; nuevo `GET /api/admin/invitations` (lista pendientes) + `POST /api/admin/invitations/:id/link` (regenera OTP → enlace fresco, porque el OTP solo se guarda hasheado). El frontend (`ModeratorsModule`) muestra el enlace al crear + tarjeta "Invitaciones pendientes" con copiar-enlace. **El admin comparte el enlace a mano** hasta que el email funcione.
 > - **🛠️ GOTCHAS OPERATIVOS DEL VPS (críticos para el próximo despliegue):**
@@ -530,7 +542,7 @@
 > - **Red Opción C: se usó `192.168.30.0/24` (no `.21.200-.230`).** Decisión: `.21` = usuarios, `.30` = scan-IPs del VPS. En `wg0` el pool `.30.2–.40` (`PostUp`/`PostDown`); peer del VPS en MikroTik `allowed-address=192.168.21.60/32,192.168.30.0/24`; `Route-SCAN` (`dst=192.168.30.0/24 gw=VPN-WG-MGMT`) en los **14 VRF** (ND1…ND15). Env: `SCAN_IP_POOL_BASE=192.168.30.`, `_START=2`, `_END=40`, `SCAN_RETURN_SUBNET=192.168.30.0/24`. `AllowedIPs` del VPS ya cubría todo (`192.168.0.0/16`+`10.0.0.0/8`).
 > - **Estado del VPS:** 3 contenedores `Up` (db/backend healthy, frontend); health `mysql: ok` (degraded solo por SMTP); cert autofirmado; `ufw` 2375/2376 cerrados, 8080 aún abierto (cerrable). **Pendiente:** `npm run scan:assign <workspaceId>` por moderador, relay SMTP, validar escaneo/Monitor AP contra antenas reales con túnel arriba. Detalle completo en [`DESPLIEGUE_VPS.md`](./DESPLIEGUE_VPS.md).
 > - 🔴🔴 **PÉRDIDA DE DATOS EN CADA DEPLOY — corregido (`ae868b9`):** `db/initRbac.js` hacía `DROP TABLE` de `users/workspaces/workspace_members/invitations/tunnel_logs/...` en **cada arranque** (el comentario decía "seguro en Fase 1 sin datos"), y el entrypoint lo corre en cada redespliegue → **borraba admin, moderadores e invitaciones en cada `up`**. Ahora el DROP solo corre con **`RBAC_RESET=true`** (reset intencional); por defecto es **idempotente** (`CREATE TABLE IF NOT EXISTS`) y **preserva los datos**. El log debe decir "Modo idempotente (sin DROP)". ⚠️ Esto explicaba el síntoma de "se borra todo al desplegar" y el estado `vpn_users` con `admin` pero `users` (RBAC) vacía (initRbac dropeaba `users` pero no la tabla legacy `vpn_users`).
-> - **Recuperación del admin:** como `users` quedó vacía por los DROP previos, se resetea la clave del `admin` en `vpn_users` (`UPDATE vpn_users SET password_hash=bcrypt('48523451Fs')`) y al loguear (path legacy) `attachRbacSession` recrea el admin RBAC — que **ya persiste** tras el fix. Admin de producción: **`admin` / `48523451Fs`**.
+> - **Recuperación del admin:** como `users` quedó vacía por los DROP previos, se reseteó la clave en `vpn_users` y al loguear (path legacy) `attachRbacSession` recreó el admin RBAC — que **ya persiste** tras el fix. El valor de la credencial fue retirado del handoff y debe considerarse rotado.
 > - **Fix `.conf.txt` (`fc28924`):** la descarga del `.conf` de WireGuard usaba Blob `text/plain` → el navegador añadía `.txt`. Cambiado a `application/octet-stream` en los 3 flujos (`AcceptInvitationForm`, `MemberWireGuardModal`, `WgConfigModal`) → baja como `*.conf`.
 > - **Login 401 / Setup vs Login:** `/auth/status` decide Setup (BD sin usuarios) vs Login; tras un reset, forzar recarga del navegador (`Ctrl+Shift+R`) porque el bundle del frontend cambia de hash y el cacheado llama al flujo viejo.
 > - **Tip actual `main`=`dev`=`ae868b9`.**
@@ -661,7 +673,7 @@
 | Cripto | AES-256-GCM (`.db_secret`) para credenciales; JWT HS (`.jwt_secret`) para sesión |
 | Puertos | Backend **:3001** · Frontend **:5173** (base `/GestionVPN-1.0/`) · Router MikroTik **192.168.21.1** (intermitente) |
 
-**Credenciales de prueba:** `admin/admin` (platform_admin) · `fernando/48523451` (Moderador OWNER — **dueño de los 13 túneles actuales**) · `fernandodiazm.5@gmail.com` (frank, FIWIS — clave reseteada a `frank12345` en pruebas).
+**Credenciales de prueba:** valores retirados del handoff; las identidades y claves de prueba se administran fuera del repositorio.
 
 **Auth unificada:** cookie HttpOnly `vpn_session` (RBAC, 8h) leída por `verifyToken` (acepta cookie o Bearer). Login por **email, `usuario@local.app` o nombre** (`sessionBridge.authenticateMysqlUser`).
 
@@ -2746,7 +2758,7 @@ El workaround histórico era `node db/mapUserMgmtIp.js <email> <ip>` (script CLI
 
 **Fix de raíz** ([server/routes/team.routes.js](server/routes/team.routes.js)): ambas funciones que provisionan peer ahora llaman a `mgmtIpRepo.upsert({ workspaceId, userId, mgmtIp: nextIp, publicKey, source: 'auto-provision' })` justo después de poblar `member_wireguard` y `mgmt_peer_owners`. Idempotente por `UNIQUE(workspace,user)`. Si la IP ya está reclamada por otro (`uq_umi_ip`), se loguea `warn` y **no bloquea** la provisión — el operador puede limpiar manualmente sin perder el peer recién creado.
 
-**Para MEMBERs ya provisionados antes de este fix:** un toque del script `mapUserMgmtIp.js` los pone al día. En esta sesión lo apliqué a `fernandodiazm.5@gmail.com → 192.168.21.64`.
+**Para MEMBERs ya provisionados antes de este fix:** un toque del script `mapUserMgmtIp.js` los pone al día. En esta sesión se validó con un usuario de prueba; sus datos fueron retirados del handoff.
 
 ### Métricas pre/post §32
 
@@ -2882,7 +2894,7 @@ Todos usan `requireSession` sin verificar rol. El MEMBER ya podía cambiar contr
 
 ### Pendiente / mejoras futuras
 
-- **Verificación manual con sesión real de MEMBER.** Logear con `fernandodiazm.5@gmail.com / frank12345` (FIWIS) o cualquier MEMBER asignado a un workspace; confirmar visualmente que (a) la tabla de nodos solo tiene "Acceder", (b) "Ajustes" aparece en el sidebar entre "Equipo" y nada más, (c) Notificaciones solo muestra Telegram. Cuando el moderador entra como OWNER no debe notar diferencia.
+- **Verificación manual con sesión real de MEMBER.** Usar cualquier MEMBER de prueba asignado a un workspace, con credenciales administradas fuera del repositorio; confirmar visualmente que (a) la tabla de nodos solo tiene "Acceder", (b) "Ajustes" aparece en el sidebar entre "Equipo" y nada más, (c) Notificaciones solo muestra Telegram. Cuando el moderador entra como OWNER no debe notar diferencia.
 - **`MyInvitationsInbox` / `AcceptInvitationForm`.** Esos flujos son del MEMBER recién invitado; revisar si tienen botones de mutación equivalentes que también deban ocultarse (no estaban en `CAMBIOS_.docx`, pero el patrón aplica).
 - **Tests E2E del MEMBER.** Hoy hay 37 unitarios frontend; ninguno valida específicamente que el MEMBER no vea el kebab. Podría añadirse un test que monte `NodesTable` con `canManage={false}` y verifique `queryByRole('button', { name: /más acciones/i })` → null.
 - **CO_MODERATOR.** El derivado `session?.role !== 'MEMBER'` deja a CO_MOD igual que OWNER. Si en el futuro CO_MOD tiene un subset de mutaciones (ej. sin eliminar nodos), agregar otra prop por acción (`canDeleteNode` separado de `canEditNode`).
@@ -5212,7 +5224,7 @@ Si en una sesión futura aparece una regresión (alguien añade `text-red-500` o
 2b. (Fase 2-B, opcional) `cd server && npm run migrate:apnode` — backfill completo de `aps.node_id` **por subred**. La columna y el backfill por `nombre_nodo` ya los aplica `initDb()` en cada boot (auto-heal); este script añade la resolución por CIDR para los APs que no matchean por nombre.
 3. `cd server && npm run dev` (reintenta si MySQL aún no levanta). Debe imprimir `[ROUTEROS] Parche !empty aplicado...`.
 4. `cd vpn-manager && npm run dev` → `http://localhost:5173/GestionVPN-1.0/`.
-5. Login `admin/admin` o `fernando@local.app / 48523451`.
+5. Usar credenciales locales administradas fuera del repositorio y del handoff.
 6. Si una sesión vieja da 401: F12 → Application → *Clear site data* y re-login.
 7. ⚠️ Si el puerto 3001 aparece "ocupado" por un node zombie: matar el PID (`Get-NetTCPConnection -LocalPort 3001` → `Stop-Process`) y relanzar `npm run dev`. El backend nuevo debe cargar `routeros.service.js` con el parche.
 
