@@ -34,21 +34,25 @@ const report: AirOsNetworkReportData = {
 };
 
 describe('informe de campo AirOS', () => {
-  it('crea un único título con todos los problemas y una guía por parámetro', () => {
+  it('crea un único título y separa revisiones remotas de campo', () => {
     const [deviceReport] = buildAirOsDeviceFieldReports(report);
     expect(deviceReport.title).toBe('Tasas TX/RX deficientes, señal en observación y CCQ aceptable');
     expect(deviceReport.problems.map(problem => problem.parameter)).toEqual(['Tasa TX', 'Tasa RX', 'Señal', 'CCQ']);
-    expect(deviceReport.problems.every(problem => problem.diagnosis && problem.fieldChecks.length >= 2)).toBe(true);
+    expect(deviceReport.remoteChecks).toContain('Realizar un escaneo de espectro para revisar frecuencia, ruido y ocupación del canal');
+    expect(deviceReport.remoteChecks).toContain('Validar los reintentos TX y monitorear la estabilidad del CCQ');
+    expect(deviceReport.fieldChecks).toContain('Verificar la alineación física fina, polarización y cadenas en ambos extremos');
+    expect(deviceReport.fieldChecks).toContain('Confirmar la línea de vista y el despeje de la zona de Fresnel');
     expect(deviceReport.title).not.toContain('STA-01');
   });
 
-  it('formatea WhatsApp por equipo, parámetro, diagnóstico y acción de campo', () => {
+  it('formatea WhatsApp con resumen, métricas y planes de acción separados', () => {
     const text = formatAirOsNetworkWhatsApp(report);
-    expect(text).toContain('*1. WILDER HERBER*');
-    expect(text).toContain('⚠️ *Problemas:* Tasas TX/RX deficientes, señal en observación y CCQ aceptable');
-    expect(text).toContain('*🔎 Señal: Observación (-60 dBm)*');
-    expect(text).toContain('🩺 *Diagnóstico:*');
-    expect(text).toContain('🔧 *Acciones de campo:*');
+    expect(text).toContain('*1. ANÁLISIS POR CLIENTE*');
+    expect(text).toContain('*WILDER HERBER*');
+    expect(text).toContain('*📋 RESUMEN DEL ESTADO*');
+    expect(text).toContain('*📊 MÉTRICAS CLAVE*');
+    expect(text).toContain('*🖥️ PLAN DE ACCIÓN: REVISIONES REMOTAS*');
+    expect(text).toContain('*🛠️ PLAN DE ACCIÓN: REVISIONES EN CAMPO*');
     expect(text).not.toContain('STA-01 · STA-01');
   });
 });

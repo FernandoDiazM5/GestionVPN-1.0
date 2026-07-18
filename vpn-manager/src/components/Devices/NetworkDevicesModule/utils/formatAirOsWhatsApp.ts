@@ -1,6 +1,10 @@
 import type { AirOsNetworkReportData } from './airOsAiReport';
 import { buildAirOsDeviceFieldReports } from './airOsFieldReport';
 
+function whatsappList(items: string[]) {
+  return items.map(item => `• ${item}`);
+}
+
 export function formatAirOsNetworkWhatsApp(report: AirOsNetworkReportData): string {
   const deviceReports = buildAirOsDeviceFieldReports(report);
   const lines = [
@@ -12,24 +16,32 @@ export function formatAirOsNetworkWhatsApp(report: AirOsNetworkReportData): stri
 
   deviceReports.forEach((deviceReport, index) => {
     const { device } = deviceReport;
-    lines.push(`*${index + 1}. ${device.name}*`);
-    lines.push(`📍 IP: ${device.ip}`);
-    lines.push(`📡 AP: ${device.apName}`);
-    lines.push(`⚠️ *Problemas:* ${deviceReport.title}`);
-    lines.push(`📶 Señal/SNR/CCQ: ${device.signal ?? 'N/D'} dBm · ${device.snr ?? 'N/D'} dB · ${device.ccq ?? 'N/D'}%`);
-    lines.push(`🚀 TX/RX: ${device.txRate ?? 'N/D'} / ${device.rxRate ?? 'N/D'} Mbps`);
+    lines.push(`*${index + 1}. ANÁLISIS POR CLIENTE*`);
+    lines.push(`*${device.name}*`);
+    lines.push(`📍 *IP:* ${device.ip}`);
+    lines.push(`📡 *AP asociado:* ${device.apName}`);
     lines.push('');
-
-    deviceReport.problems.forEach(problem => {
-      lines.push(`*🔎 ${problem.parameter}: ${problem.status} (${problem.value})*`);
-      lines.push(`🩺 *Diagnóstico:* ${problem.diagnosis}`);
-      lines.push(`🔧 *Acciones de campo:* ${problem.fieldChecks.join('; ')}`);
+    lines.push('*📋 RESUMEN DEL ESTADO*');
+    lines.push(deviceReport.aiInterpretation);
+    lines.push(`⚠️ *Problemas observados:* ${deviceReport.title}`);
+    lines.push('');
+    lines.push('*📊 MÉTRICAS CLAVE*');
+    lines.push(`TX: *${device.txRate ?? 'N/D'} Mbps* | RX: *${device.rxRate ?? 'N/D'} Mbps*`);
+    lines.push(`Señal: *${device.signal ?? 'N/D'} dBm* | SNR: *${device.snr ?? 'N/D'} dB* | CCQ: *${device.ccq ?? 'N/D'}%*`);
+    lines.push('');
+    lines.push('*🔎 PROBLEMA PRINCIPAL*');
+    lines.push(deviceReport.problems.map(problem => `${problem.parameter} (${problem.status}, ${problem.value}): ${problem.diagnosis}`).join(' '));
+    if (deviceReport.possibleCauses.length > 0) {
       lines.push('');
-    });
-
-    lines.push(`🤖 *Diagnóstico general:* ${deviceReport.aiInterpretation}`);
-    if (deviceReport.possibleCauses.length > 0) lines.push(`🧩 *Posibles causas:* ${deviceReport.possibleCauses.join('; ')}`);
-    if (deviceReport.additionalChecks.length > 0) lines.push(`✅ *Comprobaciones adicionales:* ${deviceReport.additionalChecks.join('; ')}`);
+      lines.push('*🧩 POSIBLES CAUSAS*');
+      lines.push(...whatsappList(deviceReport.possibleCauses));
+    }
+    lines.push('');
+    lines.push('*🖥️ PLAN DE ACCIÓN: REVISIONES REMOTAS*');
+    lines.push(...whatsappList(deviceReport.remoteChecks.length ? deviceReport.remoteChecks : ['Sin comprobaciones remotas adicionales.']));
+    lines.push('');
+    lines.push('*🛠️ PLAN DE ACCIÓN: REVISIONES EN CAMPO*');
+    lines.push(...whatsappList(deviceReport.fieldChecks.length ? deviceReport.fieldChecks : ['Sin comprobaciones de campo adicionales.']));
     lines.push('', '────────────────────', '');
   });
 

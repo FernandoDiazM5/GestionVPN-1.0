@@ -6,6 +6,12 @@
 
 ---
 
+> **Sesión 2026-07-18 - rediseño estructurado del PDF y WhatsApp AirOS.** Rama `vps_prod` (base `26056da`; publicado directamente en `origin/vps_prod`). Skills: `network-engineer`, `pdf`, `handoff-keeper`.
+> - Reemplazado el bloque continuo del PDF por portada/resumen de red más una ficha profesional por cliente: estado, identidad, métricas clave, problema, causas y dos planes de acción en columnas.
+> - Las comprobaciones se clasifican y consolidan en remotas (espectro, canal, MCS, airMAX, reintentos) y campo (alineación, Fresnel, potencia, cadenas, cables/conectores/PoE); WhatsApp replica la estructura.
+> - QA visual con WILDER `19/39 Mbps`, `-60 dBm`, SNR `32`, CCQ `82`: 2 páginas A4 horizontales, sin cortes, superposición ni duplicación de acciones. Temporales QA eliminados.
+> - Verificación: 131/131 frontend, `check:all`, build Vite y auditor de diseño 0 violaciones.
+
 > **Sesión 2026-07-17 - informe AirOS por equipo y parámetro para campo.** Rama `vps_prod` (base `07c6e5d`; publicado directamente en `origin/vps_prod`). Skills: `network-engineer`, `vercel-react-best-practices`, `pdf`, `handoff-keeper`.
 > - Corregida la duplicación `STA-01 · STA-01`; el backend fusiona múltiples hallazgos del mismo alias y el frontend usa un título compuesto derivado de todos los flags locales.
 > - Creado `airOsFieldReport.ts`: por cada parámetro entrega valor, clasificación, diagnóstico y comprobaciones específicas para señal, TX/RX, CCQ, SNR, ruido, airMAX, reintentos, latencia y LAN.

@@ -17,6 +17,8 @@ export interface AirOsDeviceFieldReport {
   aiInterpretation: string;
   possibleCauses: string[];
   additionalChecks: string[];
+  remoteChecks: string[];
+  fieldChecks: string[];
 }
 
 const unique = (values: string[], limit = Number.POSITIVE_INFINITY) =>
@@ -121,26 +123,62 @@ function mergeFindings(findings: AirOsAiAnalysis['findings'], alias: string) {
   };
 }
 
+const FIELD_CHECK_PATTERN = /alineaci|antena|polariz|cadena|fresnel|l[ií]nea de vista|potencia|cable|conector|poe|puerto/i;
+
+function canonicalAction(check: string, field: boolean) {
+  if (field) {
+    if (/cable|conector|poe|puerto/i.test(check)) return 'Inspeccionar físicamente la integridad de cables, conectores y PoE';
+    if (/fresnel|l[ií]nea de vista/i.test(check)) return 'Confirmar la línea de vista y el despeje de la zona de Fresnel';
+    if (/potencia/i.test(check)) return 'Verificar los niveles de potencia emitidos en ambos extremos';
+    if (/alineaci|antena|polariz|cadena/i.test(check)) return 'Verificar la alineación física fina, polarización y cadenas en ambos extremos';
+    return check;
+  }
+  if (/espectro|frecuencia|ruido|interferencia|ocupaci/i.test(check)) return 'Realizar un escaneo de espectro para revisar frecuencia, ruido y ocupación del canal';
+  if (/mcs|airmax|ancho de canal|configuraci/i.test(check)) return 'Comprobar el ancho de canal, la configuración MCS y la negociación airMAX';
+  if (/reintento|ccq/i.test(check)) return 'Validar los reintentos TX y monitorear la estabilidad del CCQ';
+  if (/airtime|carga|sincroniz/i.test(check)) return 'Revisar airtime, carga y sincronización del AP';
+  if (/latencia|tr[aá]fico/i.test(check)) return 'Medir latencia y estabilidad con y sin tráfico controlado';
+  return check;
+}
+
+function splitActionPlan(problems: AirOsFieldProblem[], additionalChecks: string[]) {
+  const remoteChecks: string[] = [];
+  const fieldChecks: string[] = [];
+  const checks = unique([...problems.flatMap(problem => problem.fieldChecks), ...additionalChecks]);
+  for (const check of checks) {
+    const field = FIELD_CHECK_PATTERN.test(check);
+    if (field) fieldChecks.push(canonicalAction(check, true));
+    else remoteChecks.push(canonicalAction(check, false));
+  }
+  return {
+    remoteChecks: unique(remoteChecks, 7),
+    fieldChecks: unique(fieldChecks, 7),
+  };
+}
+
 export function buildAirOsDeviceFieldReports(report: AirOsNetworkReportData): AirOsDeviceFieldReport[] {
   return report.devices.map(device => {
     const ai = mergeFindings(report.analysis.findings, device.alias);
+    const problems = device.reasons.map(reason => {
+      const advice = guidance(reason, device);
+      return {
+        code: reason.code,
+        parameter: parameterFor(reason.code),
+        status: RISK_LABELS[reason.level],
+        value: `${reason.value} ${reason.unit}`,
+        diagnosis: advice.diagnosis,
+        fieldChecks: advice.checks,
+      };
+    });
+    const actionPlan = splitActionPlan(problems, ai.checks);
     return {
       device,
       title: titleForReasons(device.reasons),
-      problems: device.reasons.map(reason => {
-        const advice = guidance(reason, device);
-        return {
-          code: reason.code,
-          parameter: parameterFor(reason.code),
-          status: RISK_LABELS[reason.level],
-          value: `${reason.value} ${reason.unit}`,
-          diagnosis: advice.diagnosis,
-          fieldChecks: advice.checks,
-        };
-      }),
+      problems,
       aiInterpretation: ai.interpretation || 'Gemini no agregó una interpretación adicional para este equipo.',
       possibleCauses: ai.causes,
       additionalChecks: ai.checks,
+      ...actionPlan,
     };
   });
 }
