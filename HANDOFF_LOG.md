@@ -6,6 +6,13 @@
 
 ---
 
+> **Sesión 2026-07-18 - cobertura completa de body en core tunnel y nodes.** Rama `vps_prod` (base `4639e36`; commits locales `b4cffa4`, `91097d3`, `7cfc2c8`). Skills: `handoff-keeper`, `semgrep`.
+> - Endurecidos los contratos de tunnel/nodes con IPv4/CIDR semánticos, allowlists para IDs RouterOS, límites de arrays/texto/secretos, claves WireGuard y objetos estrictos; se añadieron pruebas contra campos heredados, caracteres de control y payloads de comando.
+> - Migradas las 18 rutas restantes de core tunnel/repair y nodes a `validate({ body })`. El inventario pasa de 34 bodies sin schema al inicio de Fase 1 a **73/73 rutas consumidoras cubiertas**; quedan 14 params y 2 query para el siguiente lote.
+> - El frontend dejó de enviar credenciales MikroTik `ip/user/pass` en listar, crear, editar, eliminar y keepalive. Esos secretos ya se resuelven exclusivamente desde la sesión/configuración server-side y los schemas rechazan el canal heredado.
+> - Verificación: 63 suites / 427 pruebas backend, contratos CJS+ESM, `check:all`, inventario actualizado y Semgrep focalizado sobre 12 archivos (125 reglas, 0 hallazgos). El barrido inicial por directorios se canceló al quedar bloqueado y se repitió correctamente sobre los archivos modificados.
+> - Pendiente: límites JSON/Content-Type, schemas params/query y reglas Semgrep locales; después Fase 2 de rate limiting para identidad. Los commits de hardening siguen sin push/deploy.
+
 > **Sesión 2026-07-18 - validación server-side de AP y device.** Rama `vps_prod` (base `1becbde`; commits locales `1877580`, `77fe0a8`, `245ef0a`). Skills: `handoff-keeper`, `semgrep`.
 > - Implementado `middleware/validate.js`: parseo/normalización Zod de body/params/query, rechazo 400 uniforme y logging de ruta/campos/request ID sin valores sensibles.
 > - Añadidos contratos estrictos de IPv4, MAC, puertos, IDs, texto, secretos y payloads AP/device. Migradas todas las entradas de `ap.routes.js` y `routes/device.routes.js`; la deuda del inventario bajó de 34→18 body, 27→14 params y 3→2 query.

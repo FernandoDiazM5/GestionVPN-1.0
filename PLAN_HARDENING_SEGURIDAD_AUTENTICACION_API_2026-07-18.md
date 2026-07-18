@@ -189,9 +189,10 @@ El middleware:
 - [x] Schemas estrictos y migración completa de `ap.routes.js` y `routes/device.routes.js`.
 - [x] Rechazo de campos desconocidos en endpoints SSH y límites de 20 credenciales / 100 CPEs por lote.
 - [x] Defensa SSRF al guardar direcciones y justo antes de conexiones SSH, con validación por lote contra subredes del workspace.
-- [x] Inventario actualizado: deuda de body reducida de 34 a 18; params de 27 a 14; query de 3 a 2.
-- [x] Baseline tras el lote: 63 suites / 423 pruebas backend y `check:all` correctos.
-- [ ] Migrar core tunnel/repair y los módulos de nodes.
+- [x] Inventario actualizado: las 73/73 rutas que consumen body tienen schema detectable; la deuda de params queda en 14 y query en 2.
+- [x] Schemas estrictos y migración completa de core tunnel/repair y todos los módulos de nodes.
+- [x] El frontend dejó de enviar `ip/user/pass` de MikroTik en los flujos de listar, crear, editar y eliminar nodos; el servidor rechaza esas claves heredadas.
+- [x] Baseline tras el segundo lote: 63 suites / 427 pruebas backend, `check:all` y Semgrep focalizado (12 archivos, 125 reglas, 0 hallazgos).
 - [ ] Aplicar límites explícitos de payload/JSON estricto y Content-Type.
 - [ ] Crear y probar las reglas Semgrep locales para SQL y ejecución de comandos.
 
