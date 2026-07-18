@@ -63,4 +63,15 @@ async function markVerified(id) {
   );
 }
 
-module.exports = { findByEmail, findById, findByName, createPending, setOtp, incOtpAttempts, markVerified };
+async function updatePasswordHashIfCurrent(id, passwordHash, currentHash) {
+  const result = await query(
+    'UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ? AND password_hash = ?',
+    [passwordHash, Date.now(), id, currentHash]
+  );
+  return Number(result.affectedRows || 0) === 1;
+}
+
+module.exports = {
+  findByEmail, findById, findByName, createPending, setOtp, incOtpAttempts, markVerified,
+  updatePasswordHashIfCurrent,
+};

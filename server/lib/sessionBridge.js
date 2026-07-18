@@ -6,8 +6,8 @@
 //  para que un único login establezca la sesión RBAC en toda la app.
 // ============================================================
 const crypto = require('crypto');
-const bcrypt = require('bcryptjs');
 const { withTransaction } = require('../db/mysql');
+const { hashPassword, verifyAndUpgrade } = require('./passwordHasher');
 const { signSession } = require('./jwt');
 const userRepo = require('../db/repos/userRepo');
 const workspaceRepo = require('../db/repos/workspaceRepo');
@@ -43,7 +43,7 @@ async function buildSessionForLegacyUser(username) {
       await tx.query(
         `INSERT INTO users (id, email, password_hash, name, is_platform_admin, email_verified, created_at, updated_at)
          VALUES (?,?,?,?,?,1,?,?)`,
-        [id, email, await bcrypt.hash(crypto.randomUUID(), 10), username, isPlatformAdmin ? 1 : 0, now, now]
+        [id, email, await hashPassword(crypto.randomUUID()), username, isPlatformAdmin ? 1 : 0, now, now]
       );
       await workspaceRepo.createForOwner(tx, { ownerId: id, name: `Espacio de ${username}` });
     });
@@ -95,8 +95,10 @@ async function authenticateMysqlUser(login, password) {
   }
   if (!user || !user.password_hash) return null;
   if (user.disabled_at) return null;   // moderador suspendido → login bloqueado
-  const ok = await bcrypt.compare(password, user.password_hash);
-  if (!ok) return null;
+  const verification = await verifyAndUpgrade(password, user.password_hash, (nextHash, currentHash) => (
+    userRepo.updatePasswordHashIfCurrent(user.id, nextHash, currentHash)
+  ));
+  if (!verification.valid) return null;
 
   let membership = await workspaceRepo.findMembershipByUser(user.id);
   if (!membership) {

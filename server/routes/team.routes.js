@@ -5,6 +5,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
+const { hashPassword } = require('../lib/passwordHasher');
 const { z } = require('zod');
 const {
   InviteRequestSchema,
@@ -300,7 +301,7 @@ router.post('/accept', rl.guardPolicy('OTP_VERIFY'), asyncHandler(async (req, re
       await tx.query(
         `INSERT INTO users (id, email, password_hash, name, email_verified, created_at, updated_at)
          VALUES (?,?,?,?,1,?,?)`,
-        [id, email, await bcrypt.hash(password, 10), inv.name || '', now, now]
+        [id, email, await hashPassword(password), inv.name || '', now, now]
       );
       user = { id, email };
     }

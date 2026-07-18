@@ -6,6 +6,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
+const { hashPassword, verifyPassword, verifyAndUpgrade } = require('../lib/passwordHasher');
 const { z } = require('zod');
 const {
   EmailSchema,
@@ -53,7 +54,7 @@ router.post('/register', rl.guardPolicy('REGISTER'), asyncHandler(async (req, re
     throw new AppError('Ese email ya está registrado', 409, 'EMAIL_TAKEN');
   }
 
-  const passwordHash = await bcrypt.hash(password, 10);
+  const passwordHash = await hashPassword(password);
   const otp = genOtp();
   const otpHash = await bcrypt.hash(otp, 8);
   const otpExpiresAt = Date.now() + OTP_TTL_MS;
@@ -138,8 +139,10 @@ router.post('/login', rl.guardPolicy('LOGIN'), asyncHandler(async (req, res) => 
   if (user.disabled_at) {
     throw new AppError('Tu cuenta fue suspendida por el Administrador', 403, 'ACCOUNT_SUSPENDED');
   }
-  const ok = await bcrypt.compare(password, user.password_hash);
-  if (!ok) {
+  const verification = await verifyAndUpgrade(password, user.password_hash, (nextHash, currentHash) => (
+    userRepo.updatePasswordHashIfCurrent(user.id, nextHash, currentHash)
+  ));
+  if (!verification.valid) {
     throw new AppError('Credenciales inválidas', 401, 'BAD_CREDENTIALS');
   }
 
@@ -214,14 +217,14 @@ router.patch('/password', requireSession, asyncHandler(async (req, res) => {
   const user = await userRepo.findById(req.account.sub);
   if (!user) throw new AppError('Usuario no encontrado', 404, 'NOT_FOUND');
 
-  const ok = await bcrypt.compare(currentPassword, user.password_hash);
+  const ok = await verifyPassword(currentPassword, user.password_hash);
   if (!ok) throw new AppError('La contraseña actual es incorrecta', 401, 'BAD_CURRENT');
 
   if (currentPassword === newPassword) {
     throw new AppError('La nueva contraseña debe ser distinta de la actual', 400, 'SAME_PASSWORD');
   }
 
-  const newHash = await bcrypt.hash(newPassword, 10);
+  const newHash = await hashPassword(newPassword);
   await query('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?',
     [newHash, Date.now(), user.id]);
   // Invalidar cache de auth: cualquier otra sesión existente del usuario
@@ -276,7 +279,7 @@ router.post('/email/confirm', requireSession, asyncHandler(async (req, res) => {
   const user = await userRepo.findById(req.account.sub);
   if (!user) throw new AppError('Usuario no encontrado', 404, 'NOT_FOUND');
 
-  const passOk = await bcrypt.compare(currentPassword, user.password_hash);
+  const passOk = await verifyPassword(currentPassword, user.password_hash);
   if (!passOk) throw new AppError('La contraseña actual es incorrecta', 401, 'BAD_CURRENT');
 
   if (!user.otp_hash || !user.otp_expires_at || Date.now() > Number(user.otp_expires_at)) {

@@ -1,6 +1,6 @@
 // ============================================================
 //  Seed de roles (Roles v2) — consolidación de usuarios (todo en MySQL)
-//  - vpn_users : solo 'admin' (bootstrap legacy, clave 'admin'); elimina resto.
+//  - vpn_users : solo 'admin' (bootstrap legacy); elimina resto.
 //  - users(RBAC): admin@local.app (Administrador/platform_admin)
 //            fernando@local.app (Moderador, clave 48523451) — dueño de
 //            su workspace; al ser OWNER ve TODOS los túneles del router.
@@ -9,15 +9,15 @@
 // ============================================================
 try { require('dotenv').config(); } catch (_) { /* opcional */ }
 
-const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
+const { hashPassword } = require('../lib/passwordHasher');
 const { query, withTransaction, closePool } = require('./mysql');
 const userRepo = require('./repos/userRepo');
 const workspaceRepo = require('./repos/workspaceRepo');
 const { getDb, initDb } = require('../db.service');
 
 async function ensureMysqlUser({ email, name, password, platformAdmin }) {
-  const hash = await bcrypt.hash(password, 10);
+  const hash = await hashPassword(password);
   let user = await userRepo.findByEmail(email);
   if (!user) {
     const id = crypto.randomUUID();
@@ -47,10 +47,16 @@ async function ensureMysqlUser({ email, name, password, platformAdmin }) {
 }
 
 async function main() {
-  // 1) vpn_users (MySQL) — bootstrap legacy: solo 'admin' con clave 'admin'
+  const adminPass = process.env.SEED_ADMIN_PASSWORD;
+  const modPass = process.env.SEED_MOD_PASSWORD;
+  if (!adminPass || !modPass) {
+    throw new Error('SEED_ADMIN_PASSWORD y SEED_MOD_PASSWORD son obligatorios para ejecutar el seed');
+  }
+
+  // 1) vpn_users (MySQL) — bootstrap legacy con secreto explícito
   await initDb();
   const db = await getDb();
-  const adminHash = await bcrypt.hash('admin', 10);
+  const adminHash = await hashPassword(adminPass);
   const existing = await db.get('SELECT id FROM vpn_users WHERE username = ?', 'admin');
   if (existing) {
     await db.run('UPDATE vpn_users SET password_hash = ?, role = ? WHERE username = ?', adminHash, 'admin', 'admin');
@@ -59,15 +65,10 @@ async function main() {
       'admin', adminHash, 'admin', Date.now());
   }
   const del = await db.run("DELETE FROM vpn_users WHERE username <> 'admin'");
-  console.log(`[seed] vpn_users: admin asegurado (admin/admin); ${del.changes || 0} usuario(s) legacy eliminados.`);
+  console.log(`[seed] vpn_users: admin asegurado; ${del.changes || 0} usuario(s) legacy eliminados.`);
 
   // 2) MySQL — Administrador + Moderador fernando.
-  // Contraseñas overridables por env (prod/CI NO deben usar el default de dev).
-  const adminPass = process.env.SEED_ADMIN_PASSWORD || 'admin';
-  const modPass = process.env.SEED_MOD_PASSWORD || '48523451';
-  if (!process.env.SEED_ADMIN_PASSWORD || !process.env.SEED_MOD_PASSWORD) {
-    console.warn('[seed] ⚠ Usando contraseña(s) DEFAULT de dev. Define SEED_ADMIN_PASSWORD / SEED_MOD_PASSWORD en prod.');
-  }
+  // Contraseñas siempre explícitas por env; no existen defaults conocidos.
   await ensureMysqlUser({ email: 'admin@local.app', name: 'admin', password: adminPass, platformAdmin: true });
   await ensureMysqlUser({ email: 'fernando@local.app', name: 'fernando', password: modPass, platformAdmin: false });
 

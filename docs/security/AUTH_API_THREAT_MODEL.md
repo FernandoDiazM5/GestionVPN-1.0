@@ -113,8 +113,8 @@ Reglas del límite:
 | T05 | Fuerza bruta | Muchas claves para una cuenta | buckets atómicos por identidad e IP | Implementado en código; calibrar en staging |
 | T06 | Credential stuffing | Pares filtrados distribuidos | límite por identidad, alertas y MFA opcional | Límite por identidad implementado; MFA pendiente |
 | T07 | Enumeración | Distintos mensajes/status/tiempos | respuesta y trabajo equivalentes | Incompleto |
-| T08 | Robo de BD | Crack offline de hashes | Argon2id + migración bcrypt | bcrypt coste 10 |
-| T09 | Truncamiento bcrypt | Password >72 bytes comparte prefijo | Argon2id; reset controlado de legado largo | Pendiente |
+| T08 | Robo de BD | Crack offline de hashes | Argon2id + migración bcrypt | Nuevas escrituras Argon2id; legado se actualiza al login |
+| T09 | Truncamiento bcrypt | Password >72 bytes comparte prefijo | Argon2id; reset controlado de legado largo | Verificador legado rechaza entradas >72 bytes |
 | T10 | Session fixation/theft | Cookie robada sigue válida | rotación, `jti`/versión y revocación | Parcial |
 | T11 | CSRF | Sitio hostil dispara mutación con cookie | Origin + token CSRF | Pendiente |
 | T12 | IDOR/tenant escape | ID válido de otro workspace | scope obligatorio en cada repo/servicio | Invariante existente; vigilar |

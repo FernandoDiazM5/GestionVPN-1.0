@@ -24,7 +24,7 @@ export interface LoginResponse {
 /** POST /api/auth/setup (sólo si no hay usuarios) */
 export const SetupRequestSchema = z.object({
   username: z.string().min(1),
-  password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
+  password: PasswordSchema,
 });
 export type SetupRequest = z.infer<typeof SetupRequestSchema>;
 

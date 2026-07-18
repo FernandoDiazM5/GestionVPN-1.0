@@ -427,6 +427,15 @@ async function createUser(username, password_hash, role = 'viewer') {
     );
 }
 
+async function updateLegacyPasswordHashIfCurrent(username, passwordHash, currentHash) {
+    const d = await getDb();
+    const result = await d.run(
+        'UPDATE vpn_users SET password_hash = ? WHERE username = ? AND password_hash = ?',
+        [passwordHash, username, currentHash]
+    );
+    return Number(result.changes || 0) === 1;
+}
+
 /**
  * Crea el único usuario bootstrap bajo un lock global de MySQL.
  * El lock se libera después del COMMIT para que otra instancia siempre vea el
@@ -608,7 +617,7 @@ module.exports = {
     initDb, getDb,
     encryptPass, decryptPass, encryptDevice, decryptDevice,
     saveNode, getNodes, getNodeByPppUser, getNodeId, deleteNode,
-    hasUsers, getUserByUsername, createUser, createInitialUser,
+    hasUsers, getUserByUsername, createUser, createInitialUser, updateLegacyPasswordHashIfCurrent,
     setAppSetting, getAppSetting,
     getTorres, saveTorre, deleteTorre,
     getApByUuid, getApIntId,

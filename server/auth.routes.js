@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const bcrypt = require('bcryptjs');
-const { hasUsers, getUserByUsername, createInitialUser } = require('./db.service');
+const { hasUsers, getUserByUsername, createInitialUser, updateLegacyPasswordHashIfCurrent } = require('./db.service');
+const { hashPassword, verifyAndUpgrade } = require('./lib/passwordHasher');
 const { setSessionCookie } = require('./lib/jwt');
 const { buildSessionForLegacyUser, authenticateMysqlUser } = require('./lib/sessionBridge');
 const userRepo = require('./db/repos/userRepo');
@@ -49,8 +49,7 @@ router.post('/setup', rl.guardPolicy('SETUP', { identityField: 'username' }), as
         }
 
         const { username, password } = setupSchema.parse(req.body);
-        const salt = await bcrypt.genSalt(10);
-        const hash = await bcrypt.hash(password, salt);
+        const hash = await hashPassword(password);
 
         // Crear un único primer usuario incluso con varias instancias/request concurrentes.
         const created = await createInitialUser(username, hash, 'admin');
@@ -82,7 +81,12 @@ router.post('/login', rl.guardPolicy('LOGIN', { identityField: 'username' }), as
         let row = null;
         try { row = await getUserByUsername(username); }
         catch (e) { dbError = e; }
-        if (row && await bcrypt.compare(password, row.password_hash)) {
+        const legacyVerification = row
+            ? await verifyAndUpgrade(password, row.password_hash, (nextHash, currentHash) => (
+                updateLegacyPasswordHashIfCurrent(row.username, nextHash, currentHash)
+            ))
+            : { valid: false };
+        if (row && legacyVerification.valid) {
             try {
                 await attachRbacSession(res, row.username);
             } catch (e) {
@@ -196,7 +200,7 @@ router.post('/password-reset/confirm', rl.guardPolicy('RESET_CONFIRM'), async (r
     }
 
     // Actualizar contraseña + marcar token como usado + invalidar el resto
-    const hash = await bcrypt.hash(newPassword, 10);
+    const hash = await hashPassword(newPassword);
     const now = Date.now();
     const { query } = require('./db/mysql');
     await query('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?', [hash, now, found.userId]);

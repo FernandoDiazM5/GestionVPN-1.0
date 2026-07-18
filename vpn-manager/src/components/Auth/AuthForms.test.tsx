@@ -76,7 +76,7 @@ describe('formularios de acceso', () => {
     expect(username).toHaveAttribute('autocomplete', 'username');
     expect(password).toHaveAttribute('name', 'password');
     expect(password).toHaveAttribute('autocomplete', 'current-password');
-    expect(password).toHaveAttribute('minlength', '8');
+    expect(password).toHaveAttribute('minlength', '12');
 
     await user.type(username, 'moderador@example.com');
     await user.type(password, 'password-seguro');
@@ -124,13 +124,13 @@ describe('formularios de acceso', () => {
     const password = screen.getByLabelText(/Contraseña/);
     expect(password).toBeRequired();
 
-    await user.type(password, '1234567');
+    await user.type(password, '12345678901');
     expect(screen.getByRole('button', { name: 'Aceptar y unirme' })).toBeDisabled();
-    await user.type(password, '8');
+    await user.type(password, '2');
     await user.click(screen.getByRole('button', { name: 'Aceptar y unirme' }));
 
     await waitFor(() => expect(mocks.acceptInvitation).toHaveBeenCalledTimes(2));
-    expect(mocks.acceptInvitation).toHaveBeenLastCalledWith('persona@example.com', '123456', '12345678');
+    expect(mocks.acceptInvitation).toHaveBeenLastCalledWith('persona@example.com', '123456', '123456789012');
   });
 
   it('usa un email validado y anuncia el resultado de recuperación', async () => {

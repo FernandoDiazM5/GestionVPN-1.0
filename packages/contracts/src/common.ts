@@ -12,7 +12,7 @@ export type Role = z.infer<typeof RoleSchema>;
 export const EmailSchema = z.string().email('Email inválido').max(255);
 export const PasswordSchema = z
   .string()
-  .min(8, 'La contraseña debe tener al menos 8 caracteres')
+  .min(12, 'La contraseña debe tener al menos 12 caracteres')
   .max(128);
 export const OtpSchema = z.string().regex(/^\d{6}$/, 'OTP de 6 dígitos');
 export const PublicKeySchema = z.string().max(120);

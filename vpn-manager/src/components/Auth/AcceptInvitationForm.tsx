@@ -34,10 +34,10 @@ export default function AcceptInvitationForm({
     const normalizedEmail = email.trim();
     const normalizedOtp = otp.trim();
     if (!normalizedEmail || !/^\d{6}$/.test(normalizedOtp)) return;
-    if ((passwordRequired && !password) || (password && password.length < 8)) {
+    if ((passwordRequired && !password) || (password && password.length < 12)) {
       setError(passwordRequired && !password
         ? 'Define una contraseña para crear tu cuenta.'
-        : 'La contraseña debe tener al menos 8 caracteres.');
+        : 'La contraseña debe tener al menos 12 caracteres.');
       return;
     }
     setBusy(true); setError('');
@@ -214,14 +214,14 @@ export default function AcceptInvitationForm({
                   <div className="relative">
                     <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
                     <input id="invitation-password" name="password" type="password" required={passwordRequired}
-                      minLength={8} maxLength={128} autoComplete="new-password"
+                      minLength={12} maxLength={128} autoComplete="new-password"
                       aria-describedby={`invitation-password-help${error ? ' invitation-error' : ''}`}
-                      placeholder="Mínimo 8 caracteres" value={password} onChange={e => setPassword(e.target.value)} className="input-field pl-10" />
+                      placeholder="Mínimo 12 caracteres" value={password} onChange={e => setPassword(e.target.value)} className="input-field pl-10" />
                   </div>
                   <p id="invitation-password-help" className="mt-1 text-2xs text-slate-500 dark:text-slate-400">Si ya tienes cuenta, puedes dejarla vacía.</p>
                 </div>
                 <p className="text-2xs text-slate-500 dark:text-slate-400">Al aceptar, generaremos tu configuración WireGuard lista para usar.</p>
-                <button type="submit" disabled={busy || !email.trim() || otp.length !== 6 || (password.length > 0 && password.length < 8) || (passwordRequired && !password)}
+                <button type="submit" disabled={busy || !email.trim() || otp.length !== 6 || (password.length > 0 && password.length < 12) || (passwordRequired && !password)}
                   className="btn-primary btn-md w-full flex items-center justify-center">
                   {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Aceptar y unirme
                 </button>

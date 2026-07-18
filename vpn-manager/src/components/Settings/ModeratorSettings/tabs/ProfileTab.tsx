@@ -49,7 +49,7 @@ function ChangePassword() {
   const [err, setErr] = useState<string | null>(null);
 
   const mismatch = confirm.length > 0 && next !== confirm;
-  const tooShort = next.length > 0 && next.length < 8;
+  const tooShort = next.length > 0 && next.length < 12;
   const canSubmit = current.length > 0 && next.length >= 8 && !mismatch;
 
   const submit = async (e: React.FormEvent) => {
@@ -105,7 +105,7 @@ function ChangePassword() {
           placeholder="Nueva contraseña (mín. 8)"
           className="input-field pl-10" />
       </div>
-      {tooShort && <p className="text-2xs text-amber-600 dark:text-amber-400 -mt-2">Mínimo 8 caracteres</p>}
+      {tooShort && <p className="text-2xs text-amber-600 dark:text-amber-400 -mt-2">Mínimo 12 caracteres</p>}
 
       <div className="relative">
         <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />

@@ -27,7 +27,7 @@ export default function PasswordResetConfirm({
   const [done, setDone] = useState(false);
 
   const mismatch = confirm.length > 0 && password !== confirm;
-  const tooShort = password.length > 0 && password.length < 8;
+  const tooShort = password.length > 0 && password.length < 12;
   const canSubmit = password.length >= 8 && confirm.length > 0 && password === confirm;
 
   const submit = async (e: React.FormEvent) => {
@@ -77,7 +77,7 @@ export default function PasswordResetConfirm({
             ) : (
               <form onSubmit={submit} className="space-y-4">
                 <p className="text-sm text-slate-600 dark:text-slate-300">
-                  Elige una nueva contraseña para tu cuenta. Debe tener al menos <strong>8 caracteres</strong>.
+                  Elige una nueva contraseña para tu cuenta. Debe tener al menos <strong>12 caracteres</strong>.
                 </p>
 
                 {error && (
@@ -92,7 +92,7 @@ export default function PasswordResetConfirm({
                   <div className="relative">
                     <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
                     <input id="new-password" name="new-password" type={showPwd ? 'text' : 'password'} required
-                      minLength={8} maxLength={128} autoComplete="new-password"
+                      minLength={12} maxLength={128} autoComplete="new-password"
                       aria-invalid={tooShort || undefined}
                       aria-describedby={`${tooShort ? 'new-password-help ' : ''}${error ? 'password-reset-confirm-error' : ''}`.trim() || undefined}
                       placeholder="Nueva contraseña (mín. 8)"
@@ -105,14 +105,14 @@ export default function PasswordResetConfirm({
                     </button>
                   </div>
                 </div>
-                {tooShort && <p id="new-password-help" aria-live="polite" className="text-2xs text-amber-600 dark:text-amber-400">Mínimo 8 caracteres</p>}
+                {tooShort && <p id="new-password-help" aria-live="polite" className="text-2xs text-amber-600 dark:text-amber-400">Mínimo 12 caracteres</p>}
 
                 <div>
                   <label htmlFor="confirm-password" className="block text-xs font-semibold text-slate-500 mb-2">Confirmar contraseña</label>
                   <div className="relative">
                     <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
                     <input id="confirm-password" name="confirm-password" type={showPwd ? 'text' : 'password'} required
-                      minLength={8} maxLength={128} autoComplete="new-password"
+                      minLength={12} maxLength={128} autoComplete="new-password"
                       aria-invalid={mismatch || undefined} aria-describedby={mismatch ? 'confirm-password-help' : undefined}
                       placeholder="Confirma la contraseña"
                       value={confirm} onChange={e => setConfirm(e.target.value)}

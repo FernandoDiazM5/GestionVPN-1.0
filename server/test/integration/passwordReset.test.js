@@ -42,6 +42,7 @@ stubModule(__dirname, '../../db.service', {
   getUserByUsername: vi.fn().mockResolvedValue(null),
   createUser: vi.fn(),
   createInitialUser: vi.fn(),
+  updateLegacyPasswordHashIfCurrent: vi.fn(),
   encryptPass: (s) => s,
   decryptPass: (s) => s,
   getAppSetting: vi.fn(),
@@ -176,7 +177,7 @@ describe('POST /api/auth/password-reset/confirm — single-use', () => {
   it('token INVÁLIDO (no encontrado) → 401 INVALID_TOKEN sin tocar BD', async () => {
     prMocks.findValid.mockResolvedValue(null);
     const r = await request(app).post('/api/auth/password-reset/confirm')
-      .send({ token: 'b'.repeat(64), newPassword: 'OtraPass123' });
+      .send({ token: 'b'.repeat(64), newPassword: 'OtraPass123!' });
     expect(r.status).toBe(401);
     expect(r.body.code).toBe('INVALID_TOKEN');
     // No UPDATE password ni markUsed
@@ -184,7 +185,7 @@ describe('POST /api/auth/password-reset/confirm — single-use', () => {
     expect(authJwtMocks.invalidateUserCache).not.toHaveBeenCalled();
   });
 
-  it('newPassword < 8 chars → 400 (zod)', async () => {
+  it('newPassword < 12 chars → 400 (zod)', async () => {
     const r = await request(app).post('/api/auth/password-reset/confirm')
       .send({ token: 'c'.repeat(64), newPassword: '123' });
     expect(r.status).toBe(400);

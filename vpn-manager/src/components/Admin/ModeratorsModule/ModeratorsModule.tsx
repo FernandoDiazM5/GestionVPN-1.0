@@ -491,7 +491,7 @@ function ResetPasswordModal({ mod, onClose, onSaved }: { mod: Moderator; onClose
         : (
           <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
             <button onClick={onClose} className="btn-ghost btn-md">Cancelar</button>
-            <button onClick={submit} disabled={busy || password.length < 8} className="btn-primary px-5 py-2.5 flex items-center gap-2 text-sm disabled:opacity-40">
+            <button onClick={submit} disabled={busy || password.length < 12} className="btn-primary px-5 py-2.5 flex items-center gap-2 text-sm disabled:opacity-40">
               {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />} Actualizar
             </button>
           </div>

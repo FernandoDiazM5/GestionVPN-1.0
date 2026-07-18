@@ -54,34 +54,34 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `ap.routes.js` | 1000 | GET | `/stations` | sí | — | no | n/a | sql | — |
 | `auth.routes.js` | 34 | GET | `/status` | no | — | no | n/a | — | — |
 | `auth.routes.js` | 44 | POST | `/setup` | no | — | sí | sí | — | — |
-| `auth.routes.js` | 75 | POST | `/login` | no | — | sí | sí | — | — |
-| `auth.routes.js` | 133 | GET | `/me` | sí | — | no | n/a | — | — |
-| `auth.routes.js` | 159 | POST | `/password-reset/request` | no | — | sí | sí | — | — |
-| `auth.routes.js` | 188 | POST | `/password-reset/confirm` | no | — | sí | sí | — | — |
-| `routes/account.routes.js` | 48 | POST | `/register` | no | — | sí | sí | — | — |
-| `routes/account.routes.js` | 79 | POST | `/verify` | no | — | sí | sí | — | — |
-| `routes/account.routes.js` | 118 | POST | `/resend` | no | — | sí | sí | — | — |
-| `routes/account.routes.js` | 129 | POST | `/login` | no | — | sí | sí | — | — |
-| `routes/account.routes.js` | 161 | POST | `/logout` | no | — | no | n/a | — | — |
-| `routes/account.routes.js` | 166 | GET | `/session-status` | sí | — | no | n/a | — | — |
-| `routes/account.routes.js` | 170 | POST | `/session-renew` | sí | — | no | n/a | — | — |
-| `routes/account.routes.js` | 186 | GET | `/me` | no | — | no | n/a | — | — |
-| `routes/account.routes.js` | 212 | PATCH | `/password` | sí | — | no | sí | — | — |
-| `routes/account.routes.js` | 237 | PATCH | `/email/request` | sí | — | no | sí | — | — |
-| `routes/account.routes.js` | 272 | POST | `/email/confirm` | sí | — | no | sí | — | — |
-| `routes/account.routes.js` | 326 | GET | `/notifications` | sí | — | no | n/a | — | — |
-| `routes/account.routes.js` | 341 | PATCH | `/notifications` | sí | — | no | sí | — | — |
-| `routes/account.routes.js` | 359 | POST | `/telegram/link/start` | sí | — | no | n/a | — | — |
-| `routes/account.routes.js` | 369 | POST | `/telegram/unlink` | sí | — | no | n/a | — | — |
-| `routes/admin.routes.js` | 126 | GET | `/summary` | sí | platform-admin | no | n/a | — | — |
-| `routes/admin.routes.js` | 131 | GET | `/moderators` | sí | platform-admin | no | n/a | — | — |
-| `routes/admin.routes.js` | 178 | PATCH | `/moderators/:id/ai-access` | sí | platform-admin | no | sí | — | — |
-| `routes/admin.routes.js` | 210 | PATCH | `/moderators/:id` | sí | platform-admin | no | sí | — | — |
-| `routes/admin.routes.js` | 278 | DELETE | `/moderators/:id` | sí | platform-admin | no | n/a | network-admin | — |
-| `routes/admin.routes.js` | 379 | POST | `/moderators` | sí | platform-admin | no | sí | — | — |
-| `routes/admin.routes.js` | 411 | POST | `/invite-moderator` | sí | platform-admin | no | sí | — | — |
-| `routes/admin.routes.js` | 478 | GET | `/invitations` | sí | platform-admin | no | n/a | — | — |
-| `routes/admin.routes.js` | 493 | POST | `/invitations/:id/link` | sí | platform-admin | no | n/a | network-admin | — |
+| `auth.routes.js` | 74 | POST | `/login` | no | — | sí | sí | — | — |
+| `auth.routes.js` | 137 | GET | `/me` | sí | — | no | n/a | — | — |
+| `auth.routes.js` | 163 | POST | `/password-reset/request` | no | — | sí | sí | — | — |
+| `auth.routes.js` | 192 | POST | `/password-reset/confirm` | no | — | sí | sí | — | — |
+| `routes/account.routes.js` | 49 | POST | `/register` | no | — | sí | sí | — | — |
+| `routes/account.routes.js` | 80 | POST | `/verify` | no | — | sí | sí | — | — |
+| `routes/account.routes.js` | 119 | POST | `/resend` | no | — | sí | sí | — | — |
+| `routes/account.routes.js` | 130 | POST | `/login` | no | — | sí | sí | — | — |
+| `routes/account.routes.js` | 164 | POST | `/logout` | no | — | no | n/a | — | — |
+| `routes/account.routes.js` | 169 | GET | `/session-status` | sí | — | no | n/a | — | — |
+| `routes/account.routes.js` | 173 | POST | `/session-renew` | sí | — | no | n/a | — | — |
+| `routes/account.routes.js` | 189 | GET | `/me` | no | — | no | n/a | — | — |
+| `routes/account.routes.js` | 215 | PATCH | `/password` | sí | — | no | sí | — | — |
+| `routes/account.routes.js` | 240 | PATCH | `/email/request` | sí | — | no | sí | — | — |
+| `routes/account.routes.js` | 275 | POST | `/email/confirm` | sí | — | no | sí | — | — |
+| `routes/account.routes.js` | 329 | GET | `/notifications` | sí | — | no | n/a | — | — |
+| `routes/account.routes.js` | 344 | PATCH | `/notifications` | sí | — | no | sí | — | — |
+| `routes/account.routes.js` | 362 | POST | `/telegram/link/start` | sí | — | no | n/a | — | — |
+| `routes/account.routes.js` | 372 | POST | `/telegram/unlink` | sí | — | no | n/a | — | — |
+| `routes/admin.routes.js` | 127 | GET | `/summary` | sí | platform-admin | no | n/a | — | — |
+| `routes/admin.routes.js` | 132 | GET | `/moderators` | sí | platform-admin | no | n/a | — | — |
+| `routes/admin.routes.js` | 179 | PATCH | `/moderators/:id/ai-access` | sí | platform-admin | no | sí | — | — |
+| `routes/admin.routes.js` | 211 | PATCH | `/moderators/:id` | sí | platform-admin | no | sí | — | — |
+| `routes/admin.routes.js` | 279 | DELETE | `/moderators/:id` | sí | platform-admin | no | n/a | network-admin | — |
+| `routes/admin.routes.js` | 380 | POST | `/moderators` | sí | platform-admin | no | sí | — | — |
+| `routes/admin.routes.js` | 412 | POST | `/invite-moderator` | sí | platform-admin | no | sí | — | — |
+| `routes/admin.routes.js` | 479 | GET | `/invitations` | sí | platform-admin | no | n/a | — | — |
+| `routes/admin.routes.js` | 494 | POST | `/invitations/:id/link` | sí | platform-admin | no | n/a | network-admin | — |
 | `routes/ai.routes.js` | 56 | GET | `/status` | sí | — | no | n/a | — | — |
 | `routes/ai.routes.js` | 80 | POST | `/consent` | sí | — | no | sí | — | — |
 | `routes/ai.routes.js` | 86 | POST | `/device-analysis` | sí | — | no | sí | — | — |
@@ -145,23 +145,23 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `routes/settings.routes.js` | 62 | GET | `/settings/scan-local-check` | sí | — | no | n/a | sql | — |
 | `routes/settings.routes.js` | 73 | POST | `/settings/save` | sí | — | no | sí | sql, network-admin | — |
 | `routes/settings.routes.js` | 125 | POST | `/settings/test-error-email` | sí | — | no | n/a | — | — |
-| `routes/team.routes.js` | 216 | POST | `/invite` | sí | OWNER | no | sí | — | — |
-| `routes/team.routes.js` | 275 | POST | `/accept` | no | — | sí | sí | network-admin | `PUBLIC_MUTATION_REVIEW` |
-| `routes/team.routes.js` | 380 | GET | `/my-invitations` | sí | — | no | n/a | — | — |
-| `routes/team.routes.js` | 388 | POST | `/invitations/:id/accept` | sí | — | no | sí | network-admin | — |
-| `routes/team.routes.js` | 438 | GET | `/members` | sí | — | no | n/a | — | — |
-| `routes/team.routes.js` | 444 | GET | `/invitations` | sí | OWNER | no | n/a | network-admin | — |
-| `routes/team.routes.js` | 459 | PATCH | `/member/:userId` | sí | OWNER | no | sí | sql | — |
-| `routes/team.routes.js` | 518 | DELETE | `/member/:userId` | sí | OWNER | no | n/a | sql, network-admin | — |
-| `routes/team.routes.js` | 575 | POST | `/invitation/:id/revoke` | sí | OWNER | no | n/a | network-admin | — |
-| `routes/team.routes.js` | 586 | GET | `/workspace-tunnels` | sí | OWNER | no | n/a | — | — |
-| `routes/team.routes.js` | 602 | GET | `/assignments` | sí | — | no | n/a | — | — |
-| `routes/team.routes.js` | 611 | POST | `/assignments` | sí | OWNER | no | sí | — | — |
-| `routes/team.routes.js` | 623 | DELETE | `/assignments/:id` | sí | OWNER | no | n/a | network-admin | — |
-| `routes/team.routes.js` | 635 | POST | `/member/:id/wireguard` | sí | OWNER | no | sí | sql, network-admin | — |
-| `routes/team.routes.js` | 719 | POST | `/me/wireguard` | sí | — | no | n/a | network-admin | — |
-| `routes/team.routes.js` | 748 | GET | `/member/:id/wireguard` | sí | — | no | n/a | network-admin | — |
-| `routes/team.routes.js` | 769 | GET | `/wireguard/by-key/:publicKey` | sí | OWNER | no | n/a | network-admin | — |
+| `routes/team.routes.js` | 217 | POST | `/invite` | sí | OWNER | no | sí | — | — |
+| `routes/team.routes.js` | 276 | POST | `/accept` | no | — | sí | sí | network-admin | `PUBLIC_MUTATION_REVIEW` |
+| `routes/team.routes.js` | 381 | GET | `/my-invitations` | sí | — | no | n/a | — | — |
+| `routes/team.routes.js` | 389 | POST | `/invitations/:id/accept` | sí | — | no | sí | network-admin | — |
+| `routes/team.routes.js` | 439 | GET | `/members` | sí | — | no | n/a | — | — |
+| `routes/team.routes.js` | 445 | GET | `/invitations` | sí | OWNER | no | n/a | network-admin | — |
+| `routes/team.routes.js` | 460 | PATCH | `/member/:userId` | sí | OWNER | no | sí | sql | — |
+| `routes/team.routes.js` | 519 | DELETE | `/member/:userId` | sí | OWNER | no | n/a | sql, network-admin | — |
+| `routes/team.routes.js` | 576 | POST | `/invitation/:id/revoke` | sí | OWNER | no | n/a | network-admin | — |
+| `routes/team.routes.js` | 587 | GET | `/workspace-tunnels` | sí | OWNER | no | n/a | — | — |
+| `routes/team.routes.js` | 603 | GET | `/assignments` | sí | — | no | n/a | — | — |
+| `routes/team.routes.js` | 612 | POST | `/assignments` | sí | OWNER | no | sí | — | — |
+| `routes/team.routes.js` | 624 | DELETE | `/assignments/:id` | sí | OWNER | no | n/a | network-admin | — |
+| `routes/team.routes.js` | 636 | POST | `/member/:id/wireguard` | sí | OWNER | no | sí | sql, network-admin | — |
+| `routes/team.routes.js` | 720 | POST | `/me/wireguard` | sí | — | no | n/a | network-admin | — |
+| `routes/team.routes.js` | 749 | GET | `/member/:id/wireguard` | sí | — | no | n/a | network-admin | — |
+| `routes/team.routes.js` | 770 | GET | `/wireguard/by-key/:publicKey` | sí | OWNER | no | n/a | network-admin | — |
 | `routes/wireguard.routes.js` | 25 | POST | `/wireguard/peers` | sí | — | no | n/a | sql, network-admin | — |
 | `routes/wireguard.routes.js` | 122 | POST | `/wireguard/peer/add` | sí | — | no | sí | sql, network-admin | — |
 | `routes/wireguard.routes.js` | 171 | POST | `/wireguard/peer/edit` | sí | — | no | sí | sql, network-admin | — |

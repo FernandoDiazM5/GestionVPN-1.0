@@ -251,12 +251,12 @@ Los valores se calibran con métricas de staging; no se cambian silenciosamente 
 
 #### Abstracción
 
-Crear `server/lib/passwordHasher.js` con:
+Estado local 2026-07-18:
 
-- `hashPassword(password)`;
-- `verifyPassword(password, encodedHash)`;
-- `needsRehash(encodedHash)`;
-- `verifyAndUpgrade(userId, password, encodedHash)`.
+- [x] `hashPassword(password)`;
+- [x] `verifyPassword(password, encodedHash)`;
+- [x] `needsRehash(encodedHash)`;
+- [x] `verifyAndUpgrade(password, encodedHash, updateIfCurrent)` con actualización condicionada al hash anterior.
 
 Ninguna ruta o seed invoca bcrypt/Argon2 directamente para contraseñas humanas. Los hashes de tokens/OTP se tratan por separado porque su amenaza y entropía son distintas.
 
@@ -274,19 +274,19 @@ Los parámetros definitivos salen del benchmark del VPS. Se configuran con env v
 
 #### Migración sin corte
 
-1. Agregar `argon2` y validar compatibilidad con la imagen Docker de producción.
-2. Todo password nuevo/reset/cambio se guarda como Argon2id.
-3. Login detecta prefijo `$2...` y verifica con bcrypt.
-4. Tras un login bcrypt correcto, rehashea con Argon2id dentro de una actualización condicionada al hash anterior.
-5. Si un password bcrypt de entrada supera 72 bytes UTF-8, exigir reset seguro en vez de aceptar ambigüedad por truncamiento.
+1. [x] Agregar `argon2` y validar hash/verify dentro de la imagen Alpine de producción.
+2. [x] Todo password nuevo/reset/cambio se guarda como Argon2id.
+3. [x] Login detecta prefijo `$2...` y verifica con bcrypt.
+4. [x] Tras un login bcrypt correcto, rehashea con Argon2id dentro de una actualización condicionada al hash anterior.
+5. [x] Si un password bcrypt de entrada supera 72 bytes UTF-8, rechazarlo en vez de aceptar ambigüedad por truncamiento.
 6. Mantener el verificador bcrypt durante una ventana de migración; nunca volver a escribir bcrypt.
 7. Métrica `password_hash_algorithm` agregada por algoritmo, sin user ID.
 8. Cuando bcrypt llegue a cero o venza el plazo, retirar la dependencia de rutas y dejar sólo una herramienta offline de recuperación si se aprueba.
 
 #### Seeds y setup
 
-- retirar credenciales débiles por defecto como `admin/admin` de entornos productivos;
-- setup genera/acepta una contraseña conforme a la política moderna;
+- [x] Retirar credenciales débiles por defecto como `admin/admin` de los seeds.
+- [x] Setup acepta una contraseña conforme a la política moderna de 12–128 caracteres.
 - fallar el arranque productivo si conserva credenciales bootstrap conocidas;
 - documentar rotación y recuperación sin incluir valores secretos.
 

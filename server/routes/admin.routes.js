@@ -6,6 +6,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
+const { hashPassword } = require('../lib/passwordHasher');
 const { z } = require('zod');
 const {
   CreateModeratorRequestSchema,
@@ -221,7 +222,7 @@ router.patch('/moderators/:id', validate({ params: IdParamsSchema }), asyncHandl
     await query('UPDATE workspaces SET name = ?, updated_at = ? WHERE id = ?', [workspaceName, now, mod.workspace_id]);
   }
   if (password !== undefined) {
-    await query('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?', [await bcrypt.hash(password, 10), now, mod.id]);
+    await query('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?', [await hashPassword(password), now, mod.id]);
   }
   if (disabled !== undefined) {
     // 1) Persistir el estado en BD (todos los users del workspace cuando suspendemos,
@@ -388,7 +389,7 @@ router.post('/moderators', asyncHandler(async (req, res) => {
     await tx.query(
       `INSERT INTO users (id, email, password_hash, name, is_platform_admin, email_verified, created_at, updated_at)
        VALUES (?,?,?,?,0,1,?,?)`,
-      [userId, email, await bcrypt.hash(password, 10), name || '', now, now]
+      [userId, email, await hashPassword(password), name || '', now, now]
     );
     const { workspaceId } = await workspaceRepo.createForOwner(tx, {
       ownerId: userId, name: workspaceName || `Espacio de ${name || email.split('@')[0]}`,
