@@ -27,6 +27,9 @@
     "migrate:assignments": "node db/normalizeTunnelAssignments.js",
     "seed:roles": "node db/seedRoles.js",
     "analyze:queries": "node tools/analyze-queries.js",
+    "security:routes": "node tools/security-route-inventory.js --write",
+    "security:routes:check": "node tools/security-route-inventory.js --check",
+    "security:hash-benchmark": "node tools/benchmark-password-hash.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
