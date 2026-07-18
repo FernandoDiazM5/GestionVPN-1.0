@@ -194,7 +194,8 @@ El middleware:
 - [x] El frontend dejó de enviar `ip/user/pass` de MikroTik en los flujos de listar, crear, editar y eliminar nodos; el servidor rechaza esas claves heredadas.
 - [x] Baseline tras el segundo lote: 63 suites / 427 pruebas backend, `check:all` y Semgrep focalizado (12 archivos, 125 reglas, 0 hallazgos).
 - [x] Aplicar límite global de 100 KiB, JSON estructurado estricto y rechazo 415 de mutaciones con body y `Content-Type` incorrecto.
-- [ ] Crear y probar las reglas Semgrep locales para SQL y ejecución de comandos.
+- [x] Crear y probar reglas Semgrep locales bloqueantes para SQL dinámico y entrada HTTP directa hacia shell/SSH/RouterOS; las excepciones `IN (?,...)` están documentadas y conservan valores parametrizados.
+- [x] Fase 1 cerrada: inventario sin alertas `BODY/PARAM/QUERY_SCHEMA_MISSING`, 64 suites / 433 pruebas backend y `check:all` correctos.
 
 ### Fase 2 — Rate limiting resistente a fuerza bruta
 

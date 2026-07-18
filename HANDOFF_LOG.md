@@ -6,6 +6,13 @@
 
 ---
 
+> **Sesión 2026-07-18 - cierre de Fase 1: params/query y reglas Semgrep locales.** Rama `vps_prod`; commits locales `feb350b` y `d81237d`. Skills: `handoff-keeper`, `semgrep`.
+> - Añadidos schemas de UUID, alias `me`, clave pública WireGuard y queries acotadas para las 14 rutas params y 2 rutas query pendientes en admin/team/AI/auditoría. El inventario queda sin alertas `BODY/PARAM/QUERY_SCHEMA_MISSING`.
+> - Creadas test-first dos reglas bloqueantes: SQL por concatenación/interpolación y entrada HTTP cruda directa a shell/SSH/RouterOS. `test:semgrep-rules` ejecuta ambos fixtures con Docker y `audit:semgrep` carga automáticamente las reglas locales.
+> - La regla SQL detectó tres cláusulas `IN` dinámicas existentes; se verificó que sólo expanden placeholders `?`, con valores ligados aparte, y se documentaron como excepciones `nosemgrep` puntuales.
+> - Verificación: 64 suites / 433 pruebas backend, contratos CJS+ESM, `check:all`, inventario actualizado, reglas 2/2 y Semgrep focalizado sin hallazgos.
+> - Pendiente inmediato: Fase 2, rate limiting persistente/atómico por IP e identidad HMAC; el inventario aún señala `/api/auth/setup` y `/api/auth/login`.
+
 > **Sesión 2026-07-18 - límite y tipo estricto de JSON.** Rama `vps_prod`; commit local `590419b`. Skills: `handoff-keeper`, `semgrep`.
 > - Añadido un guard global previo al parser: las mutaciones POST/PUT/PATCH con body requieren `application/json`; las peticiones realmente vacías siguen permitidas.
 > - `express.json` queda en modo estricto con límite global de 100 KiB. El middleware central traduce JSON malformado/escalares a 400, exceso de tamaño a 413 y media type incorrecto a 415, con códigos estables.
