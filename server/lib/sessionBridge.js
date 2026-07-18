@@ -11,6 +11,9 @@ const { hashPassword, verifyAndUpgrade } = require('./passwordHasher');
 const { signSession } = require('./jwt');
 const userRepo = require('../db/repos/userRepo');
 const workspaceRepo = require('../db/repos/workspaceRepo');
+const metrics = require('./metrics');
+
+const DUMMY_USER_ID = '00000000-0000-0000-0000-000000000000';
 
 /**
  * Garantiza usuario + workspace en MySQL para un usuario legacy y
@@ -88,24 +91,27 @@ async function authenticateMysqlUser(login, password) {
   const raw = String(login || '').trim().toLowerCase();
   if (!raw) return null;
   const email = raw.includes('@') ? raw : `${raw}@local.app`;
-  let user = await userRepo.findByEmail(email);
-  if (!user && !raw.includes('@')) {
-    // Fallback: login por nombre (ej. moderador "user123" con email real)
-    user = await userRepo.findByName(raw);
-  }
-  if (!user || !user.password_hash) return null;
-  if (user.disabled_at) return null;   // moderador suspendido → login bloqueado
-  const verification = await verifyAndUpgrade(password, user.password_hash, (nextHash, currentHash) => (
-    userRepo.updatePasswordHashIfCurrent(user.id, nextHash, currentHash)
-  ));
-  if (!verification.valid) return null;
+  const userByEmail = await userRepo.findByEmail(email);
+  // Para usernames cortos hacemos siempre ambas consultas. Así encontrar
+  // <username>@local.app no crea un atajo temporal frente al fallback name.
+  const userByName = raw.includes('@') ? null : await userRepo.findByName(raw);
+  const user = userByEmail || userByName;
+  const verification = await verifyAndUpgrade(
+    password,
+    user?.password_hash,
+    user ? (nextHash, currentHash) => userRepo.updatePasswordHashIfCurrent(user.id, nextHash, currentHash) : undefined
+  );
+  const membership = await workspaceRepo.findMembershipByUser(user?.id || DUMMY_USER_ID);
 
-  let membership = await workspaceRepo.findMembershipByUser(user.id);
-  if (!membership) {
-    await withTransaction(async (tx) => {
-      await workspaceRepo.createForOwner(tx, { ownerId: user.id, name: `Espacio de ${user.name || email}` });
-    });
-    membership = await workspaceRepo.findMembershipByUser(user.id);
+  let failureReason = null;
+  if (!user) failureReason = 'not_found';
+  else if (!verification.valid) failureReason = 'bad_password';
+  else if (!user.email_verified) failureReason = 'unverified';
+  else if (user.disabled_at) failureReason = 'disabled';
+  else if (!membership) failureReason = 'no_membership';
+  if (failureReason) {
+    metrics.authFailsTotal.inc({ reason: failureReason });
+    return null;
   }
 
   const platform_admin = Number(user.is_platform_admin) === 1;

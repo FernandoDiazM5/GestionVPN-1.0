@@ -115,8 +115,12 @@ describe('POST /api/auth/password-reset/request — anti-enumeración', () => {
     expect(r.status).toBe(200);
     expect(r.body.success).toBe(true);
     expect(r.body.message).toMatch(GENERIC_MSG);
-    // No se genera token para inexistentes
-    expect(prMocks.generateToken).not.toHaveBeenCalled();
+    // Sí se paga el mismo hash de token; no se persiste ni se envía.
+    expect(prMocks.countRecent).toHaveBeenCalledWith(
+      '00000000-0000-0000-0000-000000000000', expect.any(Number),
+    );
+    expect(prMocks.generateToken).toHaveBeenCalledTimes(1);
+    expect(prMocks.create).not.toHaveBeenCalled();
     expect(mailerMocks.sendPasswordReset).not.toHaveBeenCalled();
   });
 
@@ -150,9 +154,23 @@ describe('POST /api/auth/password-reset/request — anti-enumeración', () => {
       .send({ email: 'flooded@test.com' });
     expect(r.status).toBe(200);
     expect(r.body.message).toMatch(GENERIC_MSG);
-    // No nuevo token ni mail (anti-spam)
-    expect(prMocks.generateToken).not.toHaveBeenCalled();
+    // Se conserva el trabajo criptográfico aunque el límite silencioso aplique.
+    expect(prMocks.generateToken).toHaveBeenCalledTimes(1);
+    expect(prMocks.create).not.toHaveBeenCalled();
     expect(mailerMocks.sendPasswordReset).not.toHaveBeenCalled();
+  });
+
+  it('correo existente e inexistente devuelven exactamente el mismo contrato HTTP', async () => {
+    userRepoMocks.findByEmail.mockResolvedValueOnce(null);
+    const missing = await request(app).post('/api/auth/password-reset/request')
+      .send({ email: 'missing@test.com' });
+
+    userRepoMocks.findByEmail.mockResolvedValueOnce({ id: 'u3', email: 'real2@test.com', name: 'Real' });
+    const existing = await request(app).post('/api/auth/password-reset/request')
+      .send({ email: 'real2@test.com' });
+
+    expect({ status: existing.status, body: existing.body })
+      .toEqual({ status: missing.status, body: missing.body });
   });
 });
 

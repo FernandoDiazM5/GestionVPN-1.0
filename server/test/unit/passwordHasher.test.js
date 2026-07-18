@@ -37,7 +37,7 @@ describe('passwordHasher', () => {
     const updateIfCurrent = vi.fn().mockResolvedValue(true);
 
     await expect(verifyAndUpgrade(PASSWORD, legacyHash, updateIfCurrent))
-      .resolves.toEqual({ valid: true, upgraded: true });
+      .resolves.toEqual({ valid: true, upgraded: true, dummy: false });
     const [newHash, previousHash] = updateIfCurrent.mock.calls[0];
     expect(newHash).toMatch(/^\$argon2id\$/);
     expect(previousHash).toBe(legacyHash);
@@ -47,7 +47,14 @@ describe('passwordHasher', () => {
     const legacyHash = await bcrypt.hash(PASSWORD, 10);
     const updateIfCurrent = vi.fn();
     await expect(verifyAndUpgrade('wrong password', legacyHash, updateIfCurrent))
-      .resolves.toEqual({ valid: false, upgraded: false });
+      .resolves.toEqual({ valid: false, upgraded: false, dummy: false });
+    expect(updateIfCurrent).not.toHaveBeenCalled();
+  });
+
+  it('pays a dummy Argon2id verification when no stored hash exists', async () => {
+    const updateIfCurrent = vi.fn();
+    await expect(verifyAndUpgrade(PASSWORD, null, updateIfCurrent))
+      .resolves.toEqual({ valid: false, upgraded: false, dummy: true });
     expect(updateIfCurrent).not.toHaveBeenCalled();
   });
 

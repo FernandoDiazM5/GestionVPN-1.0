@@ -280,7 +280,7 @@ Los parámetros definitivos salen del benchmark del VPS. Se configuran con env v
 4. [x] Tras un login bcrypt correcto, rehashea con Argon2id dentro de una actualización condicionada al hash anterior.
 5. [x] Si un password bcrypt de entrada supera 72 bytes UTF-8, rechazarlo en vez de aceptar ambigüedad por truncamiento.
 6. Mantener el verificador bcrypt durante una ventana de migración; nunca volver a escribir bcrypt.
-7. Métrica `password_hash_algorithm` agregada por algoritmo, sin user ID.
+7. [x] Métrica `password_hash_verifications_total` agregada por algoritmo y resultado, sin user ID ni email.
 8. Cuando bcrypt llegue a cero o venza el plazo, retirar la dependencia de rutas y dejar sólo una herramienta offline de recuperación si se aprueba.
 
 #### Seeds y setup
@@ -300,6 +300,17 @@ Los parámetros definitivos salen del benchmark del VPS. Se configuran con env v
 - hash/token/contraseña nunca aparecen en logs ni respuestas.
 
 ### Fase 4 — Anti-enumeración y equivalencia temporal
+
+#### Estado de implementación — 2026-07-18
+
+- [x] Ambos logins devuelven exactamente `401 BAD_CREDENTIALS` y `Correo o contraseña incorrectos` para todos los rechazos de identidad.
+- [x] El login multi-tenant verifica un hash Argon2id ficticio cuando no encuentra usuario y consulta membresía con un UUID reservado para conservar la forma del trabajo.
+- [x] Un username corto ejecuta siempre lookup por email local y por nombre; el login legacy no cae en una segunda verificación multi-tenant después de fallar su hash.
+- [x] Registro y reenvío ejecutan el mismo trabajo criptográfico para cuentas nuevas, existentes, verificadas o pendientes; responden con contratos genéricos sin OTP de desarrollo.
+- [x] Recuperación ejecuta siempre consulta de frecuencia y generación/hash del token; sólo persiste y envía para una cuenta elegible, fuera de la latencia de la respuesta HTTP.
+- [x] Las causas reales se conservan únicamente en métricas agregadas; errores de correo en flujos públicos registran código técnico sin email ni mensaje potencialmente identificable.
+- [x] Matriz automatizada de usuario inexistente, password incorrecto, no verificado, suspendido y sin workspace, además de registro, reenvío y reset opacos.
+- [ ] Pendiente operativo: comparar distribuciones de latencia en staging/VPS con carga controlada y documentar la tolerancia antes del despliegue.
 
 #### Contrato externo
 

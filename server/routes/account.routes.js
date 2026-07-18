@@ -6,7 +6,8 @@
 const express = require('express');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
-const { hashPassword, verifyPassword, verifyAndUpgrade } = require('../lib/passwordHasher');
+const { hashPassword, verifyPassword } = require('../lib/passwordHasher');
+const { authenticateMysqlUser } = require('../lib/sessionBridge');
 const { z } = require('zod');
 const {
   EmailSchema,
@@ -28,11 +29,15 @@ const userRepo = require('../db/repos/userRepo');
 const workspaceRepo = require('../db/repos/workspaceRepo');
 const { requireSession, invalidateUserCache } = require('../middleware/authJwt');
 const { query } = require('../db/mysql');
+const log = require('../lib/logger').child({ scope: 'account' });
 
 const router = express.Router();
 
 const OTP_TTL_MS = 10 * 60 * 1000;   // 10 min
 const OTP_MAX_ATTEMPTS = 5;
+const GENERIC_REGISTER_MESSAGE = 'Si el registro puede procesarse, recibirás un código de verificación.';
+const GENERIC_RESEND_MESSAGE = 'Si la cuenta requiere verificación, se enviará un código.';
+const GENERIC_BAD_CREDENTIALS = 'Correo o contraseña incorrectos';
 
 // Schemas centralizados en @gestionvpn/contracts (F5).
 // Aliases locales sin duplicar definiciones — mismo comportamiento Zod.
@@ -50,30 +55,26 @@ router.post('/register', rl.guardPolicy('REGISTER'), asyncHandler(async (req, re
   const { email, password, name } = registerSchema.parse(req.body);
 
   const existing = await userRepo.findByEmail(email);
-  if (existing && existing.email_verified) {
-    throw new AppError('Ese email ya está registrado', 409, 'EMAIL_TAKEN');
-  }
-
+  // El mismo trabajo criptográfico se ejecuta aunque el correo ya exista.
   const passwordHash = await hashPassword(password);
   const otp = genOtp();
   const otpHash = await bcrypt.hash(otp, 8);
   const otpExpiresAt = Date.now() + OTP_TTL_MS;
 
-  if (existing && !existing.email_verified) {
-    // Re-registro de un email no verificado → refresca credenciales + OTP
-    await userRepo.setOtp(existing.id, otpHash, otpExpiresAt);
-  } else {
-    await userRepo.createPending({
-      id: crypto.randomUUID(), email, passwordHash, name, otpHash, otpExpiresAt,
-    });
+  if (!existing) {
+    // La escritura y el correo no alteran la latencia HTTP según existencia.
+    // El correo sólo sale después de persistir correctamente el usuario.
+    void userRepo.createPending({
+        id: crypto.randomUUID(), email, passwordHash, name, otpHash, otpExpiresAt,
+      })
+      .then(() => sendOtp(email, otp, 'verificación de cuenta'))
+      .catch(error => {
+        if (error?.code !== 'ER_DUP_ENTRY') {
+          log.error({ code: error?.code || 'UNKNOWN' }, 'register: emisión falló');
+        }
+      });
   }
-
-  const delivery = await sendOtp(email, otp, 'verificación de cuenta');
-  return sendOk(res, {
-    message: 'Código de verificación enviado',
-    // En dev (sin SMTP) devolvemos una pista para facilitar la prueba
-    dev: delivery.dev || undefined,
-  }, 201);
+  return sendOk(res, { message: GENERIC_REGISTER_MESSAGE }, 202);
 }));
 
 // ── POST /verify ─────────────────────────────────────────────
@@ -119,44 +120,26 @@ router.post('/verify', rl.guardPolicy('OTP_VERIFY'), asyncHandler(async (req, re
 router.post('/resend', rl.guardPolicy('OTP_SEND'), asyncHandler(async (req, res) => {
   const { email } = ResendRequestSchema.parse(req.body);
   const user = await userRepo.findByEmail(email);
-  if (!user || user.email_verified) return sendOk(res, { message: 'Si la cuenta existe, se envió un código' });
   const otp = genOtp();
-  await userRepo.setOtp(user.id, await bcrypt.hash(otp, 8), Date.now() + OTP_TTL_MS);
-  const delivery = await sendOtp(email, otp, 'verificación de cuenta');
-  return sendOk(res, { message: 'Código reenviado', dev: delivery.dev || undefined });
+  const otpHash = await bcrypt.hash(otp, 8);
+  if (user && !user.email_verified) {
+    void userRepo.setOtp(user.id, otpHash, Date.now() + OTP_TTL_MS)
+      .then(() => sendOtp(email, otp, 'verificación de cuenta'))
+      .catch(error => log.warn({ code: error?.code || 'UNKNOWN' }, 'resend: emisión falló'));
+  }
+  return sendOk(res, { message: GENERIC_RESEND_MESSAGE });
 }));
 
 // ── POST /login ──────────────────────────────────────────────
 router.post('/login', rl.guardPolicy('LOGIN'), asyncHandler(async (req, res) => {
   const { email, password } = loginSchema.parse(req.body);
-  const user = await userRepo.findByEmail(email);
-  if (!user) {
-    throw new AppError('Credenciales inválidas', 401, 'BAD_CREDENTIALS');
-  }
-  if (!user.email_verified) {
-    throw new AppError('Verifica tu correo antes de iniciar sesión', 403, 'EMAIL_NOT_VERIFIED');
-  }
-  if (user.disabled_at) {
-    throw new AppError('Tu cuenta fue suspendida por el Administrador', 403, 'ACCOUNT_SUSPENDED');
-  }
-  const verification = await verifyAndUpgrade(password, user.password_hash, (nextHash, currentHash) => (
-    userRepo.updatePasswordHashIfCurrent(user.id, nextHash, currentHash)
-  ));
-  if (!verification.valid) {
-    throw new AppError('Credenciales inválidas', 401, 'BAD_CREDENTIALS');
-  }
-
-  const membership = await workspaceRepo.findMembershipByUser(user.id);
-  if (!membership) throw new AppError('El usuario no pertenece a ningún workspace', 403, 'NO_WORKSPACE');
+  const session = await authenticateMysqlUser(email, password);
+  if (!session) throw new AppError(GENERIC_BAD_CREDENTIALS, 401, 'BAD_CREDENTIALS');
 
   await rl.clearSuccessfulIdentity(req);
-
-  const token = signSession({
-    sub: user.id, email: user.email, workspace_id: membership.workspace_id, role: membership.role,
-  });
-  setSessionCookie(res, token);
+  setSessionCookie(res, session.token);
   return sendOk(res, {
-    user: { id: user.id, email: user.email, name: user.name, role: membership.role, workspace_id: membership.workspace_id },
+    user: session.user,
   });
 }));
 

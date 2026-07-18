@@ -97,6 +97,13 @@ const mailSentTotal = new client.Counter({
     registers: [register],
 });
 
+const passwordHashVerificationsTotal = new client.Counter({
+    name: 'password_hash_verifications_total',
+    help: 'Verificaciones de passwords humanos por algoritmo y resultado, sin identidad.',
+    labelNames: ['algorithm', 'result'],
+    registers: [register],
+});
+
 const authRateLimitTotal = new client.Counter({
     name: 'auth_rate_limit_total',
     help: 'Evaluaciones de buckets de autenticación por tipo y resultado.',
@@ -147,6 +154,7 @@ module.exports = {
     httpRequestsTotal,
     httpRequestDurationSeconds,
     authFailsTotal,
+    passwordHashVerificationsTotal,
     authRateLimitTotal,
     routerosErrorsTotal,
     routerosWritesTotal,

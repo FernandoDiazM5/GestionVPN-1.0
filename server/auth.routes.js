@@ -29,6 +29,7 @@ async function attachRbacSession(res, username) {
 // para mantener legibilidad sin tocar el resto del handler.
 const loginSchema = LoginRequestSchema;
 const setupSchema = SetupRequestSchema;
+const GENERIC_BAD_CREDENTIALS = 'Correo o contraseña incorrectos';
 
 // Endpoint para estado inicial (saber si hay que mostrar pantalla de Setup o Login)
 router.get('/status', async (req, res) => {
@@ -81,12 +82,17 @@ router.post('/login', rl.guardPolicy('LOGIN', { identityField: 'username' }), as
         let row = null;
         try { row = await getUserByUsername(username); }
         catch (e) { dbError = e; }
-        const legacyVerification = row
-            ? await verifyAndUpgrade(password, row.password_hash, (nextHash, currentHash) => (
-                updateLegacyPasswordHashIfCurrent(row.username, nextHash, currentHash)
-            ))
-            : { valid: false };
-        if (row && legacyVerification.valid) {
+        if (row) {
+          const legacyVerification = await verifyAndUpgrade(
+            password,
+            row.password_hash,
+            (nextHash, currentHash) => updateLegacyPasswordHashIfCurrent(row.username, nextHash, currentHash)
+          );
+          if (!legacyVerification.valid) {
+            metrics.authFailsTotal.inc({ reason: 'bad_password' });
+            return sendError(res, 401, GENERIC_BAD_CREDENTIALS, 'BAD_CREDENTIALS');
+          }
+
             try {
                 await attachRbacSession(res, row.username);
             } catch (e) {
@@ -99,7 +105,7 @@ router.post('/login', rl.guardPolicy('LOGIN', { identityField: 'username' }), as
         }
 
         // 2) Usuario multi-tenant (MySQL): Moderador / Miembro por email
-        if (!dbError) {
+        if (!dbError && !row) {
             try {
                 const s = await authenticateMysqlUser(username, password);
                 if (s) {
@@ -125,8 +131,8 @@ router.post('/login', rl.guardPolicy('LOGIN', { identityField: 'username' }), as
             );
         }
 
-        metrics.authFailsTotal.inc({ reason: 'bad_credentials' });
-        return sendError(res, 401, 'Usuario o contraseña incorrectos', 'BAD_CREDENTIALS');
+        // authenticateMysqlUser ya registra la razón interna sin exponerla.
+        return sendError(res, 401, GENERIC_BAD_CREDENTIALS, 'BAD_CREDENTIALS');
     } catch (zodError) {
         metrics.authFailsTotal.inc({ reason: 'validation' });
         return res.status(400).json({ success: false, message: 'Datos de entrada inválidos', code: 'VALIDATION_ERROR', errors: zodError.issues || zodError.errors });
@@ -169,16 +175,17 @@ router.post('/password-reset/request', rl.guardPolicy('RESET_REQUEST'), async (r
     // devolvemos el mismo mensaje genérico (anti-enumeración).
     const user = await userRepo.findByEmail(email).catch(() => null);
 
-    if (user) {
-      // Anti-spam: máx 5 tokens emitidos por usuario en la última hora
-      const recent = await passwordResetRepo.countRecent(user.id, 60 * 60 * 1000);
-      if (recent < MAX_PENDING_TOKENS_PER_HOUR) {
-        const { token, hash } = await passwordResetRepo.generateToken();
-        await passwordResetRepo.create({ userId: user.id, tokenHash: hash, ipAddress: ip });
-        // Envío de correo en background (no bloquea el response)
-        sendPasswordReset({ email: user.email, token, name: user.name })
-          .catch(e => log.warn({ err: e.message }, 'password-reset: mail falló'));
-      }
+    const recent = await passwordResetRepo.countRecent(
+      user?.id || '00000000-0000-0000-0000-000000000000',
+      60 * 60 * 1000
+    );
+    const { token, hash } = await passwordResetRepo.generateToken();
+    if (user && recent < MAX_PENDING_TOKENS_PER_HOUR) {
+      // Persistencia + correo en background: la latencia HTTP no revela si
+      // hubo una cuenta real. La cadena conserva el orden token -> correo.
+      void passwordResetRepo.create({ userId: user.id, tokenHash: hash, ipAddress: ip })
+        .then(() => sendPasswordReset({ email: user.email, token, name: user.name }))
+        .catch(e => log.warn({ code: e?.code || 'UNKNOWN' }, 'password-reset: emisión falló'));
     }
     return res.json(GENERIC_OK);
   } catch (err) {
