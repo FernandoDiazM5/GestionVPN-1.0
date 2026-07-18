@@ -68,7 +68,6 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
         fetchWithTimeout(`${API_BASE_URL}/api/node/details`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            ip: credentials.ip, user: credentials.user, pass: credentials.pass,
             vrfName: node.nombre_vrf || '', pppUser,
           }),
         }, 15_000).then(r => r.json()),
@@ -168,7 +167,6 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
       const r = await fetchWithTimeout(`${API_BASE_URL}/api/node/edit`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ip: credentials.ip, user: credentials.user, pass: credentials.pass,
           pppUser: node.ppp_user, vrfName: node.nombre_vrf || '',
           newComment: labelChanged ? newLabel.trim() : undefined,
           newPppUser: pppUserChanged ? newPppUser.trim() : undefined,

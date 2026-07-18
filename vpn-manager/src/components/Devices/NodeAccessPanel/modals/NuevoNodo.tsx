@@ -79,7 +79,7 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
     try {
       const r = await fetchWithTimeout(`${API_BASE_URL}/api/node/next`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ip: credentials.ip, user: credentials.user, pass: credentials.pass }),
+        body: JSON.stringify({}),
       }, 15_000);
       const d = await r.json();
       if (d.success) { setNextNode(d.nextNode); setNextRemote(d.nextRemote); }
@@ -175,7 +175,6 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
       const r = await fetchWithTimeout(`${API_BASE_URL}/api/node/provision`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ip: credentials.ip, user: credentials.user, pass: credentials.pass,
           nodeNumber: nextNode, nodeName: nameClean,
           // SSTP: solo se envían si el operador los sobreescribió en avanzadas;
           // si van vacíos, el backend genera usuario + contraseña dinámicamente.

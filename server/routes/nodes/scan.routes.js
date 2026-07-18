@@ -28,6 +28,8 @@ const scanLock = require('../../lib/scanLock');
 const wgDetect = require('../../lib/wgDetect');
 const { resolveScanTargetVrf } = require('../../lib/scanTarget');
 const log = require('../../lib/logger').child({ scope: 'scan' });
+const { validate } = require('../../middleware/validate');
+const { NodeScanRequestSchema } = require('@gestionvpn/contracts');
 
 // El SSE se mantiene ABIERTO tras 'complete' mientras el cliente corre la fase de
 // auth SSH, para que la scan-mangle siga viva (las antenas solo-SSH necesitan esa
@@ -46,7 +48,7 @@ const SCAN_LOCK_WAIT_MS = parseInt(process.env.SCAN_LOCK_WAIT_MS || '8000', 10);
 // siempre gana. En memoria (por proceso) — suficiente: el lock también lo es.
 const inflightScans = new Map(); // workspaceId -> () => void
 
-router.post('/node/scan-stream', async (req, res) => {
+router.post('/node/scan-stream', validate({ body: NodeScanRequestSchema }), async (req, res) => {
   const { nodeLan } = req.body;
   if (!nodeLan || !CIDR_REGEX.test(nodeLan) || parseInt(nodeLan.split('/')[1], 10) < 16) {
     return res.status(400).json({ success: false, message: 'CIDR inválido o muy grande' });

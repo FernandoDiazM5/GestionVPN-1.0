@@ -9,12 +9,11 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 - Rutas detectadas: 142
 - Rutas de mutación (POST/PUT/PATCH): 94
 - Rutas que consumen `req.body`: 73
-- Rutas con esquema de `req.body` detectable: 55/73
+- Rutas con esquema de `req.body` detectable: 73/73
 - Endpoints públicos de identidad sin rate limiting detectable: 2
 
 ## Alertas detectadas
 
-- `BODY_SCHEMA_MISSING`: 18
 - `PARAM_SCHEMA_MISSING`: 14
 - `PUBLIC_MUTATION_REVIEW`: 2
 - `PUBLIC_RATE_LIMIT_MISSING`: 2
@@ -100,14 +99,14 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `routes/core/connection.routes.js` | 19 | POST | `/connect` | sí | — | no | n/a | — | — |
 | `routes/core/connection.routes.js` | 40 | GET | `/router/check` | sí | — | no | n/a | network-admin | — |
 | `routes/core/connection.routes.js` | 54 | POST | `/diagnose` | sí | — | no | n/a | — | — |
-| `routes/core/tunnel-repair.routes.js` | 24 | POST | `/tunnel/repair` | sí | — | no | **no** | sql, network-admin | `BODY_SCHEMA_MISSING` |
-| `routes/core/tunnel.routes.js` | 37 | POST | `/tunnel/activate` | sí | — | no | **no** | network-admin | `BODY_SCHEMA_MISSING` |
-| `routes/core/tunnel.routes.js` | 60 | POST | `/tunnel/deactivate` | sí | — | no | n/a | network-admin | — |
-| `routes/core/tunnel.routes.js` | 72 | POST | `/tunnel/keepalive` | sí | — | no | n/a | — | — |
-| `routes/core/tunnel.routes.js` | 112 | GET | `/tunnel/events` | sí | — | no | n/a | — | — |
-| `routes/core/tunnel.routes.js` | 144 | GET | `/tunnel/status` | sí | — | no | n/a | network-admin | — |
-| `routes/core/tunnel.routes.js` | 190 | GET | `/tunnel/my-mgmt-ip` | sí | — | no | n/a | — | — |
-| `routes/core/tunnel.routes.js` | 211 | POST | `/tunnel/register-my-ip` | sí | — | no | **no** | sql, network-admin | `BODY_SCHEMA_MISSING` |
+| `routes/core/tunnel-repair.routes.js` | 26 | POST | `/tunnel/repair` | sí | — | no | sí | sql, network-admin | — |
+| `routes/core/tunnel.routes.js` | 43 | POST | `/tunnel/activate` | sí | — | no | sí | network-admin | — |
+| `routes/core/tunnel.routes.js` | 66 | POST | `/tunnel/deactivate` | sí | — | no | n/a | network-admin | — |
+| `routes/core/tunnel.routes.js` | 78 | POST | `/tunnel/keepalive` | sí | — | no | n/a | — | — |
+| `routes/core/tunnel.routes.js` | 118 | GET | `/tunnel/events` | sí | — | no | n/a | — | — |
+| `routes/core/tunnel.routes.js` | 150 | GET | `/tunnel/status` | sí | — | no | n/a | network-admin | — |
+| `routes/core/tunnel.routes.js` | 196 | GET | `/tunnel/my-mgmt-ip` | sí | — | no | n/a | — | — |
+| `routes/core/tunnel.routes.js` | 217 | POST | `/tunnel/register-my-ip` | sí | — | no | sí | sql, network-admin | — |
 | `routes/coreServer.routes.js` | 23 | GET | `/status` | sí | platform-admin | no | n/a | — | — |
 | `routes/coreServer.routes.js` | 37 | POST | `/health` | sí | platform-admin | no | n/a | — | — |
 | `routes/coreServer.routes.js` | 39 | GET | `/provision-preview` | sí | platform-admin | no | n/a | — | — |
@@ -127,24 +126,24 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `routes/events.routes.js` | 13 | GET | `/stream` | sí | — | no | n/a | — | — |
 | `routes/health.routes.js` | 64 | GET | `/` | no | — | no | n/a | network-admin | — |
 | `routes/health.routes.js` | 82 | GET | `/db` | no | — | no | n/a | — | — |
-| `routes/nodes/credentials.routes.js` | 19 | POST | `/node/creds/save` | sí | — | no | **no** | sql | `BODY_SCHEMA_MISSING` |
-| `routes/nodes/credentials.routes.js` | 33 | POST | `/node/creds/get` | sí | — | no | **no** | sql | `BODY_SCHEMA_MISSING` |
-| `routes/nodes/credentials.routes.js` | 48 | POST | `/node/ssh-creds/save` | sí | — | no | **no** | sql, network-admin | `BODY_SCHEMA_MISSING` |
-| `routes/nodes/credentials.routes.js` | 72 | POST | `/node/ssh-creds/get` | sí | — | no | **no** | sql, network-admin | `BODY_SCHEMA_MISSING` |
-| `routes/nodes/editing.routes.js` | 23 | POST | `/node/edit` | sí | — | no | **no** | sql, network-admin | `BODY_SCHEMA_MISSING` |
-| `routes/nodes/editing.routes.js` | 195 | POST | `/node/label/save` | sí | — | no | **no** | sql | `BODY_SCHEMA_MISSING` |
-| `routes/nodes/history.routes.js` | 19 | POST | `/node/history/add` | sí | — | no | **no** | sql | `BODY_SCHEMA_MISSING` |
-| `routes/nodes/history.routes.js` | 33 | POST | `/node/history/get` | sí | — | no | **no** | sql | `BODY_SCHEMA_MISSING` |
-| `routes/nodes/listing.routes.js` | 40 | POST | `/nodes` | sí | — | no | n/a | sql, network-admin | — |
-| `routes/nodes/listing.routes.js` | 181 | POST | `/node/details` | sí | — | no | **no** | sql, network-admin | `BODY_SCHEMA_MISSING` |
-| `routes/nodes/listing.routes.js` | 224 | POST | `/node/script` | sí | — | no | **no** | sql, network-admin | `BODY_SCHEMA_MISSING` |
-| `routes/nodes/listing.routes.js` | 296 | POST | `/node/wg/set-peer` | sí | — | no | **no** | sql, network-admin | `BODY_SCHEMA_MISSING` |
-| `routes/nodes/provision.routes.js` | 233 | POST | `/node/next` | sí | — | no | n/a | — | — |
-| `routes/nodes/provision.routes.js` | 248 | POST | `/node/provision` | sí | — | no | **no** | sql, network-admin | `BODY_SCHEMA_MISSING` |
-| `routes/nodes/provision.routes.js` | 608 | POST | `/node/deprovision` | sí | — | no | **no** | — | `BODY_SCHEMA_MISSING` |
-| `routes/nodes/scan.routes.js` | 49 | POST | `/node/scan-stream` | sí | — | no | **no** | network-admin | `BODY_SCHEMA_MISSING` |
-| `routes/nodes/tags.routes.js` | 14 | GET | `/node/tags` | sí | — | no | n/a | sql | — |
-| `routes/nodes/tags.routes.js` | 39 | POST | `/node/tag/save` | sí | — | no | **no** | sql | `BODY_SCHEMA_MISSING` |
+| `routes/nodes/credentials.routes.js` | 25 | POST | `/node/creds/save` | sí | — | no | sí | sql | — |
+| `routes/nodes/credentials.routes.js` | 39 | POST | `/node/creds/get` | sí | — | no | sí | sql | — |
+| `routes/nodes/credentials.routes.js` | 54 | POST | `/node/ssh-creds/save` | sí | — | no | sí | sql, network-admin | — |
+| `routes/nodes/credentials.routes.js` | 78 | POST | `/node/ssh-creds/get` | sí | — | no | sí | sql, network-admin | — |
+| `routes/nodes/editing.routes.js` | 25 | POST | `/node/edit` | sí | — | no | sí | sql, network-admin | — |
+| `routes/nodes/editing.routes.js` | 197 | POST | `/node/label/save` | sí | — | no | sí | sql | — |
+| `routes/nodes/history.routes.js` | 21 | POST | `/node/history/add` | sí | — | no | sí | sql | — |
+| `routes/nodes/history.routes.js` | 35 | POST | `/node/history/get` | sí | — | no | sí | sql | — |
+| `routes/nodes/listing.routes.js` | 47 | POST | `/nodes` | sí | — | no | n/a | sql, network-admin | — |
+| `routes/nodes/listing.routes.js` | 188 | POST | `/node/details` | sí | — | no | sí | sql, network-admin | — |
+| `routes/nodes/listing.routes.js` | 231 | POST | `/node/script` | sí | — | no | sí | sql, network-admin | — |
+| `routes/nodes/listing.routes.js` | 303 | POST | `/node/wg/set-peer` | sí | — | no | sí | sql, network-admin | — |
+| `routes/nodes/provision.routes.js` | 239 | POST | `/node/next` | sí | — | no | n/a | — | — |
+| `routes/nodes/provision.routes.js` | 254 | POST | `/node/provision` | sí | — | no | sí | sql, network-admin | — |
+| `routes/nodes/provision.routes.js` | 614 | POST | `/node/deprovision` | sí | — | no | sí | — | — |
+| `routes/nodes/scan.routes.js` | 51 | POST | `/node/scan-stream` | sí | — | no | sí | network-admin | — |
+| `routes/nodes/tags.routes.js` | 16 | GET | `/node/tags` | sí | — | no | n/a | sql | — |
+| `routes/nodes/tags.routes.js` | 41 | POST | `/node/tag/save` | sí | — | no | sí | sql | — |
 | `routes/settings.routes.js` | 31 | GET | `/settings/get` | sí | — | no | n/a | sql | — |
 | `routes/settings.routes.js` | 62 | GET | `/settings/scan-local-check` | sí | — | no | n/a | sql | — |
 | `routes/settings.routes.js` | 73 | POST | `/settings/save` | sí | — | no | sí | sql, network-admin | — |

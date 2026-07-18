@@ -10,6 +10,8 @@ const router = express.Router();
 
 const { getDb, getNodeId } = require('../../db.service');
 const { nodeBelongsToRequester, requireOperator } = require('./_shared');
+const { validate } = require('../../middleware/validate');
+const { NodeTagsSaveRequestSchema } = require('@gestionvpn/contracts');
 
 router.get('/node/tags', async (req, res) => {
   try {
@@ -36,7 +38,7 @@ router.get('/node/tags', async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
-router.post('/node/tag/save', requireOperator, async (req, res) => {
+router.post('/node/tag/save', requireOperator, validate({ body: NodeTagsSaveRequestSchema }), async (req, res) => {
   const { pppUser, tags } = req.body;
   if (!pppUser) return res.status(400).json({ success: false, message: 'pppUser requerido' });
   if (!(await nodeBelongsToRequester(req, pppUser))) return res.status(404).json({ success: false, message: 'Nodo no encontrado en tu workspace' });

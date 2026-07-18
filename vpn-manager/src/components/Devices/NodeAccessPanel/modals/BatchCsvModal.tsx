@@ -62,14 +62,13 @@ export default function BatchCsvModal({ onClose, onSuccess, nodes }: BatchCsvMod
       try {
         const nextRes = await apiFetch(`${API_BASE_URL}/api/node/next`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ip: credentials.ip, user: credentials.user, pass: credentials.pass }),
+          body: JSON.stringify({}),
         }).then(r => r.json());
         if (!nextRes.success) throw new Error(nextRes.message || 'Error obteniendo número de nodo');
         const nameClean = row.nombre.toUpperCase().replace(/[^A-Z0-9]/g, '');
         const provRes = await apiFetch(`${API_BASE_URL}/api/node/provision`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            ip: credentials.ip, user: credentials.user, pass: credentials.pass,
             nodeNumber: nextRes.nextNode, nodeName: nameClean,
             pppUser: row.usuario, pppPassword: row.pass,
             lanSubnets: row.subnets, remoteAddress: nextRes.nextRemote,

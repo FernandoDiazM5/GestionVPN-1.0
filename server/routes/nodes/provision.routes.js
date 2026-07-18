@@ -19,6 +19,12 @@ const { nodeBelongsToRequester, requireOperator } = require('./_shared');
 const { sendOk, AppError, asyncHandler } = require('../../lib/apiResponse');
 const { mikrotikAppError } = require('../../lib/mikrotikError');
 const { requireMikrotik } = require('../../lib/routeGuards');
+const { validate } = require('../../middleware/validate');
+const {
+  NodeDeprovisionRequestSchema,
+  NodeEmptyBodySchema,
+  NodeProvisionRequestSchema,
+} = require('@gestionvpn/contracts');
 const mgmtNet = require('../../lib/mgmtNet');
 const sse = require('../../lib/sse');
 const { entriesToAdd } = require('../../lib/addressList');
@@ -230,7 +236,7 @@ async function rollbackProvision(creds, { isWG, ifaceName, vrfName, pppUser, all
   }
 }
 
-router.post('/node/next', requireOperator, asyncHandler(async (req, res) => {
+router.post('/node/next', requireOperator, validate({ body: NodeEmptyBodySchema }), asyncHandler(async (req, res) => {
   const { ip, user, pass } = requireMikrotik(req);
   let api;
   try {
@@ -245,7 +251,7 @@ router.post('/node/next', requireOperator, asyncHandler(async (req, res) => {
   }
 }));
 
-router.post('/node/provision', requireOperator, asyncHandler(async (req, res) => {
+router.post('/node/provision', requireOperator, validate({ body: NodeProvisionRequestSchema }), asyncHandler(async (req, res) => {
   const { ip, user, pass } = requireMikrotik(req);
   const { nodeNumber, nodeName, pppUser, pppPassword, lanSubnet, lanSubnets, remoteAddress, protocol, cpePublicKey, wgListenPort, provisionId } = req.body;
   const isWG = protocol === 'wireguard';
@@ -605,7 +611,7 @@ router.post('/node/provision', requireOperator, asyncHandler(async (req, res) =>
   }
 }));
 
-router.post('/node/deprovision', requireOperator, asyncHandler(async (req, res) => {
+router.post('/node/deprovision', requireOperator, validate({ body: NodeDeprovisionRequestSchema }), asyncHandler(async (req, res) => {
   const { ip, user, pass } = requireMikrotik(req);
   const { vrfName, pppUser, protocol } = req.body;
   if (!pppUser) throw new AppError('pppUser es requerido', 400, 'VALIDATION_ERROR');

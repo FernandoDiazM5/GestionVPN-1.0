@@ -10,13 +10,15 @@ const router = express.Router();
 
 const { getDb, getNodeId } = require('../../db.service');
 const { nodeVisibleToRequester } = require('./_shared');
+const { validate } = require('../../middleware/validate');
+const { NodeHistoryAddRequestSchema, NodeLookupRequestSchema } = require('@gestionvpn/contracts');
 
 // NOTA: sin requireOperator a propósito. Registrar un evento de bitácora
 // (append-only) al activar un túnel es una acción legítima de un MEMBER sobre
 // un nodo ASIGNADO de su workspace; el gate real es nodeVisibleToRequester
 // (aislamiento multi-tenant). Con requireOperator, el MEMBER recibía 403 de
 // permisos que el frontend confundía con sesión expirada → logout en cadena.
-router.post('/node/history/add', async (req, res) => {
+router.post('/node/history/add', validate({ body: NodeHistoryAddRequestSchema }), async (req, res) => {
   const { pppUser, event } = req.body;
   if (!pppUser || !event) return res.status(400).json({ success: false, message: 'pppUser y event requeridos' });
   if (!(await nodeVisibleToRequester(req, pppUser))) return res.status(404).json({ success: false, message: 'Nodo no encontrado en tu workspace' });
@@ -30,7 +32,7 @@ router.post('/node/history/add', async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
-router.post('/node/history/get', async (req, res) => {
+router.post('/node/history/get', validate({ body: NodeLookupRequestSchema }), async (req, res) => {
   const { pppUser } = req.body;
   if (!pppUser) return res.status(400).json({ success: false, message: 'pppUser requerido' });
   if (!(await nodeVisibleToRequester(req, pppUser))) return res.status(404).json({ success: false, message: 'Nodo no encontrado en tu workspace' });

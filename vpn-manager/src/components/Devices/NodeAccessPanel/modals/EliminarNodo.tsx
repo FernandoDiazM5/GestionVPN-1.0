@@ -24,10 +24,6 @@ export default function EliminarNodo({ node, onClose, onSuccess }: EliminarNodoP
   const [delStep, setDelStep] = useState(0);
 
   const ifaceName = node.nombre_vrf?.replace(/^VRF-/, 'VPN-SSTP-') ?? '';
-  const lanSubnets = node.lan_subnets && node.lan_subnets.length > 0
-    ? node.lan_subnets
-    : node.segmento_lan ? node.segmento_lan.split(',').map(s => s.trim()) : [];
-
   const DEL_STEPS = [
     'Reglas Mangle (VRF)',
     'Sesión activa PPP / WG Peers',
@@ -69,8 +65,7 @@ export default function EliminarNodo({ node, onClose, onSuccess }: EliminarNodoP
       const r = await fetchWithTimeout(`${API_BASE_URL}/api/node/deprovision`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ip: credentials.ip, user: credentials.user, pass: credentials.pass,
-          vrfName: node.nombre_vrf, pppUser: node.ppp_user, lanSubnets, protocol: node.service,
+          vrfName: node.nombre_vrf, pppUser: node.ppp_user, protocol: node.service,
         }),
       }, 60_000);
       const d = await r.json();

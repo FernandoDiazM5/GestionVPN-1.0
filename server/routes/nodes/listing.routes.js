@@ -20,6 +20,13 @@ const { annotateSessions, filterNodesForRole, nodeBelongsToRequester, requireOpe
 const { sendOk, AppError, asyncHandler } = require('../../lib/apiResponse');
 const { mikrotikAppError } = require('../../lib/mikrotikError');
 const { requireMikrotik } = require('../../lib/routeGuards');
+const { validate } = require('../../middleware/validate');
+const {
+  NodeDetailsRequestSchema,
+  NodeEmptyBodySchema,
+  NodeScriptRequestSchema,
+  NodeSetPeerRequestSchema,
+} = require('@gestionvpn/contracts');
 const mgmtNet = require('../../lib/mgmtNet');
 const { buildCpeWgScript, buildCpeSstpScript } = require('../../lib/cpeScript');
 const scanIpRepo = require('../../db/repos/scanIpRepo');
@@ -37,7 +44,7 @@ const MGMT_NETS = new Set(mgmtNet.allNets);
 // NOTA: el endpoint /nodes históricamente responde con un ARRAY plano (no shape
 // { success, ... }). El frontend lo consume así. Mantengo el shape legacy para
 // no romper la UI. F5.C considera migrarlo a sendOk(res, { nodes: [...] }).
-router.post('/nodes', asyncHandler(async (req, res) => {
+router.post('/nodes', validate({ body: NodeEmptyBodySchema }), asyncHandler(async (req, res) => {
   const { ip, user, pass } = requireMikrotik(req);
   let api;
   try {
@@ -178,7 +185,7 @@ router.post('/nodes', asyncHandler(async (req, res) => {
   }
 }));
 
-router.post('/node/details', requireOperator, asyncHandler(async (req, res) => {
+router.post('/node/details', requireOperator, validate({ body: NodeDetailsRequestSchema }), asyncHandler(async (req, res) => {
   const { vrfName, pppUser } = req.body;
   if (!(await nodeBelongsToRequester(req, pppUser, vrfName))) {
     throw new AppError('Nodo no encontrado en tu workspace', 404, 'NOT_FOUND');
@@ -221,7 +228,7 @@ router.post('/node/details', requireOperator, asyncHandler(async (req, res) => {
   }
 }));
 
-router.post('/node/script', requireOperator, asyncHandler(async (req, res) => {
+router.post('/node/script', requireOperator, validate({ body: NodeScriptRequestSchema }), asyncHandler(async (req, res) => {
   const { pppUser, pppPassword, serverPublicIP } = req.body;
   if (!pppUser || !serverPublicIP) {
     throw new AppError('pppUser y serverPublicIP son requeridos', 400, 'VALIDATION_ERROR');
@@ -293,7 +300,7 @@ router.post('/node/script', requireOperator, asyncHandler(async (req, res) => {
 //   - cpePublicKey presente → modo manual (el operador pega la pública del CPE).
 //   - cpePublicKey ausente   → modo auto: el servidor GENERA el par, registra la
 //     pública en el peer del Core y devuelve el script con la privada embebida.
-router.post('/node/wg/set-peer', requireOperator, asyncHandler(async (req, res) => {
+router.post('/node/wg/set-peer', requireOperator, validate({ body: NodeSetPeerRequestSchema }), asyncHandler(async (req, res) => {
   const { ip, user, pass } = requireMikrotik(req);
   const { pppUser, cpePublicKey } = req.body;
   if (!pppUser) {

@@ -15,8 +15,14 @@ const router = express.Router();
 const { getDb, encryptPass, decryptPass, getNodeId } = require('../../db.service');
 const { nodeBelongsToRequester, requireOperator } = require('./_shared');
 const { sendOk, AppError, asyncHandler } = require('../../lib/apiResponse');
+const { validate } = require('../../middleware/validate');
+const {
+  NodeCredsSaveRequestSchema,
+  NodeLookupRequestSchema,
+  NodeSshCredsSaveRequestSchema,
+} = require('@gestionvpn/contracts');
 
-router.post('/node/creds/save', requireOperator, asyncHandler(async (req, res) => {
+router.post('/node/creds/save', requireOperator, validate({ body: NodeCredsSaveRequestSchema }), asyncHandler(async (req, res) => {
   const { pppUser, pppPassword } = req.body;
   if (!pppUser || !pppPassword) {
     throw new AppError('pppUser y pppPassword requeridos', 400, 'VALIDATION_ERROR');
@@ -30,7 +36,7 @@ router.post('/node/creds/save', requireOperator, asyncHandler(async (req, res) =
   return sendOk(res);
 }));
 
-router.post('/node/creds/get', requireOperator, asyncHandler(async (req, res) => {
+router.post('/node/creds/get', requireOperator, validate({ body: NodeLookupRequestSchema }), asyncHandler(async (req, res) => {
   const { pppUser } = req.body;
   if (!pppUser) throw new AppError('pppUser requerido', 400, 'VALIDATION_ERROR');
   if (!(await nodeBelongsToRequester(req, pppUser))) {
@@ -45,7 +51,7 @@ router.post('/node/creds/get', requireOperator, asyncHandler(async (req, res) =>
   return sendOk(res, { hasCredentials: true, pppPassword: decryptPass(row.ppp_password_enc) });
 }));
 
-router.post('/node/ssh-creds/save', requireOperator, asyncHandler(async (req, res) => {
+router.post('/node/ssh-creds/save', requireOperator, validate({ body: NodeSshCredsSaveRequestSchema }), asyncHandler(async (req, res) => {
   const { pppUser, creds } = req.body;
   if (!pppUser || !Array.isArray(creds)) {
     throw new AppError('pppUser y creds[] requeridos', 400, 'VALIDATION_ERROR');
@@ -69,7 +75,7 @@ router.post('/node/ssh-creds/save', requireOperator, asyncHandler(async (req, re
   return sendOk(res);
 }));
 
-router.post('/node/ssh-creds/get', requireOperator, asyncHandler(async (req, res) => {
+router.post('/node/ssh-creds/get', requireOperator, validate({ body: NodeLookupRequestSchema }), asyncHandler(async (req, res) => {
   const { pppUser } = req.body;
   if (!pppUser) throw new AppError('pppUser requerido', 400, 'VALIDATION_ERROR');
   if (!(await nodeBelongsToRequester(req, pppUser))) {

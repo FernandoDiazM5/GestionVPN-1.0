@@ -19,8 +19,10 @@ const { getDb, saveNode, deleteNode } = require('../../db.service');
 const { nodeBelongsToRequester, requireOperator } = require('./_shared');
 const { sendOk, AppError, asyncHandler } = require('../../lib/apiResponse');
 const { requireMikrotik } = require('../../lib/routeGuards');
+const { validate } = require('../../middleware/validate');
+const { NodeEditRequestSchema, NodeLabelRequestSchema } = require('@gestionvpn/contracts');
 
-router.post('/node/edit', requireOperator, asyncHandler(async (req, res) => {
+router.post('/node/edit', requireOperator, validate({ body: NodeEditRequestSchema }), asyncHandler(async (req, res) => {
   const { ip, user, pass } = requireMikrotik(req);
   const { pppUser, newPppUser, newPassword, newRemoteAddress, newComment, vrfName, addSubnets, removeSubnets } = req.body;
   if (!pppUser) throw new AppError('pppUser requerido', 400, 'VALIDATION_ERROR');
@@ -192,7 +194,7 @@ router.post('/node/edit', requireOperator, asyncHandler(async (req, res) => {
   }
 }));
 
-router.post('/node/label/save', requireOperator, asyncHandler(async (req, res) => {
+router.post('/node/label/save', requireOperator, validate({ body: NodeLabelRequestSchema }), asyncHandler(async (req, res) => {
   const { pppUser, label } = req.body;
   if (!pppUser) throw new AppError('pppUser requerido', 400, 'VALIDATION_ERROR');
   if (!(await nodeBelongsToRequester(req, pppUser))) {

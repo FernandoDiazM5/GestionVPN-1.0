@@ -77,7 +77,7 @@ export function useNodeFetching(props: UseNodeFetchingProps) {
     const res = await fetchWithTimeout(`${API_BASE_URL}/api/nodes`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ip: credentials.ip, user: credentials.user, pass: credentials.pass }),
+      body: JSON.stringify({}),
     }, 20_000);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
