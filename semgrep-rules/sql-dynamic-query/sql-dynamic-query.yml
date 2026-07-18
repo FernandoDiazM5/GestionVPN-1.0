@@ -1,0 +1,19 @@
+rules:
+  - id: gestionvpn-sql-dynamic-query
+    languages: [javascript, typescript]
+    message: >-
+      SQL dinámico por concatenación/interpolación. Usa placeholders para valores
+      y allowlists constantes para identificadores que no admiten parámetros.
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: CWE-89
+    pattern-either:
+      - pattern: $DB.query($A + $B, ...)
+      - pattern: $DB.execute($A + $B, ...)
+      - pattern: query($A + $B, ...)
+      - pattern: execute($A + $B, ...)
+      - pattern: $DB.query(`...${$X}...`, ...)
+      - pattern: $DB.execute(`...${$X}...`, ...)
+      - pattern: query(`...${$X}...`, ...)
+      - pattern: execute(`...${$X}...`, ...)

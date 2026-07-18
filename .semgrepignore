@@ -12,3 +12,4 @@ vpn-manager/dist/
 e2e/
 .claude/
 packages/contracts/dist/
+semgrep-rules/

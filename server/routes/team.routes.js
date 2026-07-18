@@ -547,7 +547,7 @@ router.delete('/member/:userId', requireSession, requireRole('OWNER'),
     await withTransaction(async (tx) => {
       if (publicKeys.length) {
         const ph = publicKeys.map(() => '?').join(',');
-        await tx.query(`DELETE FROM mgmt_peer_owners WHERE public_key IN (${ph})`, publicKeys);
+        await tx.query(`DELETE FROM mgmt_peer_owners WHERE public_key IN (${ph})`, publicKeys); // nosemgrep: gestionvpn-sql-dynamic-query -- sólo expande placeholders '?'; valores ligados aparte.
       }
       await tx.query('DELETE FROM member_wireguard WHERE workspace_id = ? AND user_id = ?', [wsId, userId]);
       await tx.query('DELETE FROM tunnel_assignments WHERE workspace_id = ? AND user_id = ?', [wsId, userId]);

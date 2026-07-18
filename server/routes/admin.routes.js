@@ -347,7 +347,7 @@ router.delete('/moderators/:id', validate({ params: IdParamsSchema }), asyncHand
     //    Esto cubre al OWNER y libera su email para reutilización.
     if (wsUserIds.length) {
       const placeholders = wsUserIds.map(() => '?').join(',');
-      const stillBelong = await tx.query(
+      const stillBelong = await tx.query( // nosemgrep: gestionvpn-sql-dynamic-query -- sólo expande placeholders '?'; valores ligados aparte.
         `SELECT DISTINCT user_id FROM workspace_members WHERE user_id IN (${placeholders})`,
         wsUserIds
       );
@@ -355,7 +355,7 @@ router.delete('/moderators/:id', validate({ params: IdParamsSchema }), asyncHand
       const toDelete = wsUserIds.filter(id => !stillSet.has(id));
       if (toDelete.length) {
         const ph2 = toDelete.map(() => '?').join(',');
-        await tx.query(`DELETE FROM users WHERE id IN (${ph2})`, toDelete);
+      await tx.query(`DELETE FROM users WHERE id IN (${ph2})`, toDelete); // nosemgrep: gestionvpn-sql-dynamic-query -- sólo expande placeholders '?'; valores ligados aparte.
         // Invalida el cache de auth → el próximo request del user borrado
         // dará 401 USER_DELETED y el frontend lo redirigirá a login.
         toDelete.forEach(invalidateUserCache);

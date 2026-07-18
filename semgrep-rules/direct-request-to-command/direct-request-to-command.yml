@@ -1,0 +1,19 @@
+rules:
+  - id: gestionvpn-direct-request-to-command
+    languages: [javascript, typescript]
+    message: >-
+      Entrada HTTP cruda usada directamente en shell, SSH o un comando RouterOS.
+      Valida primero con un schema/allowlist y usa únicamente el valor parseado.
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: CWE-78
+    pattern-either:
+      - pattern: exec(<... req.$SOURCE ...>, ...)
+      - pattern: execSync(<... req.$SOURCE ...>, ...)
+      - pattern: spawn(<... req.$SOURCE ...>, ...)
+      - pattern: spawnSync(<... req.$SOURCE ...>, ...)
+      - pattern: $SSH.execCommand(<... req.$SOURCE ...>, ...)
+      - pattern: $SSH.exec(<... req.$SOURCE ...>, ...)
+      - pattern: safeWrite(..., <... req.$SOURCE ...>)
+      - pattern: writeIdempotent(..., <... req.$SOURCE ...>)

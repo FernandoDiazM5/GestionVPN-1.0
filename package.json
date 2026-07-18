@@ -29,7 +29,8 @@
     "audit:design": "node scripts/audit-design.js",
     "audit:design:json": "node scripts/audit-design.js --json",
     "audit:semgrep": "node scripts/semgrep.js",
-    "audit:semgrep:json": "node scripts/semgrep.js --json"
+    "audit:semgrep:json": "node scripts/semgrep.js --json",
+    "test:semgrep-rules": "node scripts/test-semgrep-rules.js"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",

@@ -27,6 +27,8 @@ const CONFIGS = [
   'p/react',
   'p/secrets',
   'p/security-audit',
+  'semgrep-rules/sql-dynamic-query/sql-dynamic-query.yml',
+  'semgrep-rules/direct-request-to-command/direct-request-to-command.yml',
 ];
 
 const root = path.resolve(__dirname, '..');
