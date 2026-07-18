@@ -6,6 +6,12 @@
 
 ---
 
+> **Sesión 2026-07-18 - límite y tipo estricto de JSON.** Rama `vps_prod`; commit local `590419b`. Skills: `handoff-keeper`, `semgrep`.
+> - Añadido un guard global previo al parser: las mutaciones POST/PUT/PATCH con body requieren `application/json`; las peticiones realmente vacías siguen permitidas.
+> - `express.json` queda en modo estricto con límite global de 100 KiB. El middleware central traduce JSON malformado/escalares a 400, exceso de tamaño a 413 y media type incorrecto a 415, con códigos estables.
+> - Verificación: 64 suites / 431 pruebas backend, `check:all`, `git diff --check` y Semgrep sobre 4 archivos (119 reglas, 0 hallazgos).
+> - Pendiente inmediato: cerrar schemas de 14 params y 2 query, luego crear reglas Semgrep locales test-first; después iniciar rate limiting de identidad.
+
 > **Sesión 2026-07-18 - cobertura completa de body en core tunnel y nodes.** Rama `vps_prod` (base `4639e36`; commits locales `b4cffa4`, `91097d3`, `7cfc2c8`). Skills: `handoff-keeper`, `semgrep`.
 > - Endurecidos los contratos de tunnel/nodes con IPv4/CIDR semánticos, allowlists para IDs RouterOS, límites de arrays/texto/secretos, claves WireGuard y objetos estrictos; se añadieron pruebas contra campos heredados, caracteres de control y payloads de comando.
 > - Migradas las 18 rutas restantes de core tunnel/repair y nodes a `validate({ body })`. El inventario pasa de 34 bodies sin schema al inicio de Fase 1 a **73/73 rutas consumidoras cubiertas**; quedan 14 params y 2 query para el siguiente lote.

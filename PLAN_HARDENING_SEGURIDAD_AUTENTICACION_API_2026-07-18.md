@@ -193,7 +193,7 @@ El middleware:
 - [x] Schemas estrictos y migración completa de core tunnel/repair y todos los módulos de nodes.
 - [x] El frontend dejó de enviar `ip/user/pass` de MikroTik en los flujos de listar, crear, editar y eliminar nodos; el servidor rechaza esas claves heredadas.
 - [x] Baseline tras el segundo lote: 63 suites / 427 pruebas backend, `check:all` y Semgrep focalizado (12 archivos, 125 reglas, 0 hallazgos).
-- [ ] Aplicar límites explícitos de payload/JSON estricto y Content-Type.
+- [x] Aplicar límite global de 100 KiB, JSON estructurado estricto y rechazo 415 de mutaciones con body y `Content-Type` incorrecto.
 - [ ] Crear y probar las reglas Semgrep locales para SQL y ejecución de comandos.
 
 ### Fase 2 — Rate limiting resistente a fuerza bruta
