@@ -32,9 +32,15 @@ const { sendOk, AppError, asyncHandler } = require('../../lib/apiResponse');
 const { mikrotikAppError } = require('../../lib/mikrotikError');
 const { requireMikrotik } = require('../../lib/routeGuards');
 const mgmtNet = require('../../lib/mgmtNet');
+const { validate } = require('../../middleware/validate');
+const {
+  RegisterMyIpRequestSchema,
+  TunnelActivateRequestSchema,
+  TunnelEmptyBodySchema,
+} = require('@gestionvpn/contracts');
 
 // ── POST /tunnel/activate — delega en lib/tunnelService (compartido con bot M1)
-router.post('/tunnel/activate', asyncHandler(async (req, res) => {
+router.post('/tunnel/activate', validate({ body: TunnelActivateRequestSchema }), asyncHandler(async (req, res) => {
   requireMikrotik(req);
   const result = await tunnelService.activateTunnel({
     account: req.account,
@@ -57,7 +63,7 @@ router.post('/tunnel/activate', asyncHandler(async (req, res) => {
 }));
 
 // ── POST /tunnel/deactivate — delega en lib/tunnelService
-router.post('/tunnel/deactivate', asyncHandler(async (req, res) => {
+router.post('/tunnel/deactivate', validate({ body: TunnelEmptyBodySchema }), asyncHandler(async (req, res) => {
   requireMikrotik(req);
   const result = await tunnelService.deactivateTunnel({
     account: req.account,
@@ -69,7 +75,7 @@ router.post('/tunnel/deactivate', asyncHandler(async (req, res) => {
 }));
 
 // ── POST /tunnel/keepalive — recrea la mangle DEL USUARIO si falta + renueva TTL ──
-router.post('/tunnel/keepalive', asyncHandler(async (req, res) => {
+router.post('/tunnel/keepalive', validate({ body: TunnelEmptyBodySchema }), asyncHandler(async (req, res) => {
   const { ip, user, pass } = requireMikrotik(req);
   const acc = req.account;
   if (!acc?.sub || !acc?.workspace_id) throw new AppError('Sesión inválida', 401, 'UNAUTHORIZED');
@@ -208,7 +214,7 @@ router.get('/tunnel/my-mgmt-ip', asyncHandler(async (req, res) => {
 //
 //  Anti-replay: aun pasando la validación, el UNIQUE de mgmt_ip en
 //  user_mgmt_ips impide colisiones (un usuario, una IP).
-router.post('/tunnel/register-my-ip', asyncHandler(async (req, res) => {
+router.post('/tunnel/register-my-ip', validate({ body: RegisterMyIpRequestSchema }), asyncHandler(async (req, res) => {
   const { ip, user, pass } = requireMikrotik(req);
   const acc = req.account;
   const { mgmtIp } = req.body;

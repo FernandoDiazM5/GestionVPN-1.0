@@ -26,7 +26,7 @@ export function useTunnelKeepalive(
         const res = await fetchWithTimeout(`${API_BASE_URL}/api/tunnel/keepalive`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ targetVRF: activeNodeVrf }),
+          body: JSON.stringify({}),
         }, 12_000);
         const data = await res.json();
         if (data.restored) {

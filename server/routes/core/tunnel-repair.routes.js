@@ -20,8 +20,10 @@ const sessionRepo = require('../../db/repos/sessionRepo');
 const { requireOperator } = require('../nodes/_shared');
 const mgmtNet = require('../../lib/mgmtNet');
 const scanIpRepo = require('../../db/repos/scanIpRepo');
+const { validate } = require('../../middleware/validate');
+const { TunnelRepairRequestSchema } = require('@gestionvpn/contracts');
 
-router.post('/tunnel/repair', requireOperator, async (req, res) => {
+router.post('/tunnel/repair', requireOperator, validate({ body: TunnelRepairRequestSchema }), async (req, res) => {
   if (!req.mikrotik) return res.status(503).json({ success: false, needsConfig: true, message: 'Configura las credenciales MikroTik en Ajustes antes de continuar.' });
   const { ip, user, pass } = req.mikrotik;
   const { pppUser, vrfName, lanSubnets, adminWgNet } = req.body;
