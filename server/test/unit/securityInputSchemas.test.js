@@ -12,6 +12,11 @@ const {
   NodeTagsSaveRequestSchema,
   RegisterMyIpRequestSchema,
   TunnelRepairRequestSchema,
+  AirOsAiAnalysesQuerySchema,
+  AnalysisUuidParamsSchema,
+  AuditLogsQuerySchema,
+  MemberIdParamsSchema,
+  WireGuardPublicKeyParamsSchema,
 } = require('@gestionvpn/contracts');
 
 describe('security input schemas', () => {
@@ -131,5 +136,24 @@ describe('security input schemas', () => {
       pppUser: 'ppp-test', vrfName: 'VRF-ND2-TEST',
       lanSubnets: ['10.10.0.0/24'], command: '/system/reset-configuration',
     }).success).toBe(false);
+  });
+
+  it('normaliza query strings y rechaza claves desconocidas', () => {
+    expect(AirOsAiAnalysesQuerySchema.parse({ type: 'device', limit: '30' }))
+      .toEqual({ type: 'DEVICE', limit: 30 });
+    expect(AirOsAiAnalysesQuerySchema.safeParse({ limit: '51' }).success).toBe(false);
+    expect(AuditLogsQuerySchema.parse({})).toEqual({ limit: 100 });
+    expect(AuditLogsQuerySchema.safeParse({ limit: '10', orderBy: 'created_at DESC' }).success)
+      .toBe(false);
+  });
+
+  it('valida UUID, alias me y claves WireGuard en parámetros de ruta', () => {
+    const uuid = 'adad02c4-caec-4a13-a95d-15e172035f14';
+    expect(AnalysisUuidParamsSchema.safeParse({ uuid }).success).toBe(true);
+    expect(AnalysisUuidParamsSchema.safeParse({ uuid: "' OR 1=1 --" }).success).toBe(false);
+    expect(MemberIdParamsSchema.safeParse({ id: 'me' }).success).toBe(true);
+    expect(WireGuardPublicKeyParamsSchema.safeParse({
+      publicKey: 'A'.repeat(43) + '=',
+    }).success).toBe(true);
   });
 });

@@ -2,6 +2,12 @@ import { z } from 'zod';
 
 export const AIR_OS_AI_POLICY_VERSION = 'air-os-ai-v1';
 
+export const AirOsAiAnalysesQuerySchema = z.object({
+  type: z.string().trim().transform((value) => value.toUpperCase())
+    .pipe(z.enum(['DEVICE', 'NETWORK'])).optional(),
+  limit: z.coerce.number().int().min(1).max(50).optional().default(20),
+}).strict();
+
 const NullableNumber = z.number().finite().nullable().optional();
 const NullableString = z.string().max(160).nullable().optional();
 

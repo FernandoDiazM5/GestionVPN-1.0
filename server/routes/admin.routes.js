@@ -12,6 +12,7 @@ const {
   ModeratorPatchRequestSchema,
   InviteModeratorRequestSchema,
   AirOsAiAccessPatchSchema,
+  IdParamsSchema,
 } = require('@gestionvpn/contracts');
 
 const { asyncHandler, AppError, sendOk } = require('../lib/apiResponse');
@@ -27,6 +28,7 @@ const { removePeersFromRouter } = require('../lib/routerCleanup');
 const { setPeersEnabled, removeUserMangles } = require('../lib/routerPeerState');
 const { deprovisionNodeOnRouter } = require('../lib/nodeDeprovision');
 const { getAppSetting, decryptPass } = require('../db.service');
+const { validate } = require('../middleware/validate');
 
 // Credenciales del router core desde app_settings (las rutas admin no pasan por
 // el middleware legacy que inyecta req.mikrotik). null si no hay config.
@@ -173,7 +175,7 @@ async function findModeratorOr404(userId) {
 }
 
 // ── PATCH /api/admin/moderators/:id/ai-access — entitlement individual ──
-router.patch('/moderators/:id/ai-access', asyncHandler(async (req, res) => {
+router.patch('/moderators/:id/ai-access', validate({ params: IdParamsSchema }), asyncHandler(async (req, res) => {
   const moderator = await findModeratorOr404(req.params.id);
   const { enabled } = AirOsAiAccessPatchSchema.parse(req.body);
   const previous = await aiAccessRepo.getForUser(req.params.id);
@@ -205,7 +207,7 @@ router.patch('/moderators/:id/ai-access', asyncHandler(async (req, res) => {
 // ── PATCH /api/admin/moderators/:id — editar nombre / workspace / clave / estado ──
 const patchSchema = ModeratorPatchRequestSchema;
 
-router.patch('/moderators/:id', asyncHandler(async (req, res) => {
+router.patch('/moderators/:id', validate({ params: IdParamsSchema }), asyncHandler(async (req, res) => {
   const mod = await findModeratorOr404(req.params.id);
   const { name, workspaceName, password, disabled } = patchSchema.parse(req.body);
   const now = Date.now();
@@ -273,7 +275,7 @@ router.patch('/moderators/:id', asyncHandler(async (req, res) => {
 //  Elimina TODO lo que pertenece al moderador: workspace, nodos+APs+CPEs+
 //  torres, peers WG, sesiones, invitaciones y miembros (cuando no estén en
 //  otros workspaces). Libera el email para poder reutilizarlo después.
-router.delete('/moderators/:id', asyncHandler(async (req, res) => {
+router.delete('/moderators/:id', validate({ params: IdParamsSchema }), asyncHandler(async (req, res) => {
   const mod = await findModeratorOr404(req.params.id);
   const wsId = mod.workspace_id;
 
@@ -488,7 +490,7 @@ router.get('/invitations', asyncHandler(async (req, res) => {
 //  El OTP original no se almacena en claro (solo su hash), así que para volver a
 //  obtener un enlace válido de un pendiente generamos un OTP nuevo (el anterior
 //  queda invalidado) y reseteamos el TTL.
-router.post('/invitations/:id/link', asyncHandler(async (req, res) => {
+router.post('/invitations/:id/link', validate({ params: IdParamsSchema }), asyncHandler(async (req, res) => {
   const inv = await invitationRepo.findById(req.params.id);
   if (!inv || inv.status !== 'PENDING' || inv.role !== 'OWNER') {
     throw new AppError('Invitación no encontrada o ya aceptada', 404, 'NOT_FOUND');

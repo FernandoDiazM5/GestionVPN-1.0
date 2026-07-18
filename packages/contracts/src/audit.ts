@@ -13,6 +13,12 @@
 //   • format — 'csv' (default) o 'json'.
 // ============================================================
 import { z } from 'zod';
+import { boundedText } from './network';
+
+export const AuditLogsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(500).optional().default(100),
+  tunnelId: boundedText(160, { allowEmpty: false }).optional(),
+}).strict();
 
 export const AuditExportFormatSchema = z.enum(['csv', 'json']);
 export type AuditExportFormat = z.infer<typeof AuditExportFormatSchema>;

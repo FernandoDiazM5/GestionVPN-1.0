@@ -9,9 +9,10 @@ const { requireSession } = require('../middleware/authJwt');
 const { recordTunnelLog } = require('../lib/audit');
 const { clientIp } = require('../lib/rateLimit');
 const auditRepo = require('../db/repos/auditRepo');
-const { AuditExportRequestSchema } = require('@gestionvpn/contracts');
+const { AuditExportRequestSchema, AuditLogsQuerySchema } = require('@gestionvpn/contracts');
 const { rowToCsv } = require('../lib/csv');
 const log = require('../lib/logger').child({ scope: 'audit-export' });
+const { validate } = require('../middleware/validate');
 
 const router = express.Router();
 
@@ -22,9 +23,8 @@ const logSchema = z.object({
 });
 
 // ── GET /logs  — timeline del workspace ──────────────────────
-router.get('/logs', requireSession, asyncHandler(async (req, res) => {
-  const limit = Math.min(Number(req.query.limit) || 100, 500);
-  const tunnelId = req.query.tunnelId ? String(req.query.tunnelId) : null;
+router.get('/logs', requireSession, validate({ query: AuditLogsQuerySchema }), asyncHandler(async (req, res) => {
+  const { limit, tunnelId = null } = req.query;
   const logs = await auditRepo.list(req.account.workspace_id, { limit, tunnelId });
   return sendOk(res, { logs });
 }));

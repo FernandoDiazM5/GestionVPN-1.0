@@ -5,6 +5,8 @@ const {
   AirOsAiDeviceAnalysisRequestSchema,
   AirOsAiDeviceHistoryRequestSchema,
   AirOsAiNetworkAnalysisRequestSchema,
+  AirOsAiAnalysesQuerySchema,
+  AnalysisUuidParamsSchema,
 } = require('@gestionvpn/contracts');
 const { asyncHandler, AppError, sendOk } = require('../lib/apiResponse');
 const { requireOwner, requireAiAccess, requireAiConsent } = require('../lib/ai/aiGuards');
@@ -17,6 +19,7 @@ const analysisService = require('../lib/ai/airOsAnalysisService');
 const { buildDeviceDto, buildNetworkDto, deviceFingerprint, snapshotHash } = require('../lib/ai/airOsDto');
 const { analysisRetentionDays, historyCutoff } = require('../lib/ai/aiRetention');
 const { PROMPT_VERSION } = require('../lib/ai/airOsPrompt');
+const { validate } = require('../middleware/validate');
 
 const router = express.Router();
 router.use(requireOwner);
@@ -144,12 +147,11 @@ router.post('/network-analysis', requireAiAccess, requireAiConsent, asyncHandler
   return sendOk(res, { result: { ...result, networkSelection: network.selection } }, result.cached ? 200 : 201);
 }));
 
-router.get('/analyses', requireAiAccess, requireAiConsent, asyncHandler(async (req, res) => {
-  const type = req.query.type ? String(req.query.type).toUpperCase() : undefined;
-  if (type && !['DEVICE', 'NETWORK'].includes(type)) throw new AppError('Tipo de análisis inválido', 422, 'VALIDATION_ERROR');
+router.get('/analyses', requireAiAccess, requireAiConsent, validate({ query: AirOsAiAnalysesQuerySchema }), asyncHandler(async (req, res) => {
+  const { type, limit } = req.query;
   const analyses = await aiAnalysisRepo.listForUser({
     workspaceId: req.account.workspace_id, userId: req.account.sub, type,
-    limit: req.query.limit, createdAfter: historyCutoff(),
+    limit, createdAfter: historyCutoff(),
   });
   return sendOk(res, { analyses, retentionDays: analysisRetentionDays() });
 }));
@@ -171,7 +173,7 @@ router.post('/analyses/device-history', requireAiAccess, requireAiConsent, async
   return sendOk(res, { analyses, retentionDays: analysisRetentionDays() });
 }));
 
-router.get('/analyses/:uuid', requireAiAccess, requireAiConsent, asyncHandler(async (req, res) => {
+router.get('/analyses/:uuid', requireAiAccess, requireAiConsent, validate({ params: AnalysisUuidParamsSchema }), asyncHandler(async (req, res) => {
   const analysis = await aiAnalysisRepo.getForUser({
     workspaceId: req.account.workspace_id, userId: req.account.sub,
     uuid: req.params.uuid, createdAfter: historyCutoff(),
@@ -180,7 +182,7 @@ router.get('/analyses/:uuid', requireAiAccess, requireAiConsent, asyncHandler(as
   return sendOk(res, { analysis });
 }));
 
-router.delete('/analyses/:uuid', requireAiAccess, requireAiConsent, asyncHandler(async (req, res) => {
+router.delete('/analyses/:uuid', requireAiAccess, requireAiConsent, validate({ params: AnalysisUuidParamsSchema }), asyncHandler(async (req, res) => {
   const removed = await aiAnalysisRepo.removeForUser({
     workspaceId: req.account.workspace_id, userId: req.account.sub, uuid: req.params.uuid,
   });

@@ -13,6 +13,10 @@ const {
   MemberPatchRequestSchema,
   MemberWireguardProvisionSchema,
   AssignmentCreateSchema,
+  IdParamsSchema,
+  MemberIdParamsSchema,
+  UserIdParamsSchema,
+  WireGuardPublicKeyParamsSchema,
 } = require('@gestionvpn/contracts');
 
 const { asyncHandler, AppError, sendOk } = require('../lib/apiResponse');
@@ -37,6 +41,7 @@ const { getAppSetting, decryptPass, getDb } = require('../db.service');
 const { removePeersFromRouter } = require('../lib/routerCleanup');
 const { setPeersEnabled, removeUserMangles } = require('../lib/routerPeerState');
 const log = require('../lib/logger').child({ scope: 'team' });
+const { validate } = require('../middleware/validate');
 
 // Único rol de moderación del workspace = OWNER (CO_MODERATOR retirado).
 const isModeratorRole = (role) => role === 'OWNER';
@@ -382,7 +387,7 @@ router.get('/my-invitations', requireSession, asyncHandler(async (req, res) => {
 // ── POST /invitations/:id/accept — aceptar EN LA APP (usuario logueado) ──
 //  Reemplaza al OTP: el usuario ya autenticado acepta y envía su clave pública WG.
 const inAppAcceptSchema = InAppAcceptRequestSchema;
-router.post('/invitations/:id/accept', requireSession, asyncHandler(async (req, res) => {
+router.post('/invitations/:id/accept', requireSession, validate({ params: IdParamsSchema }), asyncHandler(async (req, res) => {
   const { publicKey } = inAppAcceptSchema.parse(req.body);
   const inv = await invitationRepo.findById(req.params.id);
   if (!inv || inv.status !== 'PENDING') throw new AppError('Invitación no encontrada', 404, 'NO_INVITE');
@@ -454,6 +459,7 @@ router.get('/invitations', requireSession, requireRole('OWNER'),
 const memberPatchSchema = MemberPatchRequestSchema;
 
 router.patch('/member/:userId', requireSession, requireRole('OWNER'),
+  validate({ params: UserIdParamsSchema }),
   asyncHandler(async (req, res) => {
     const { userId } = req.params;
     const wsId = req.account.workspace_id;
@@ -512,6 +518,7 @@ router.patch('/member/:userId', requireSession, requireRole('OWNER'),
 //  mgmt_peer_owners + tunnel_assignments + user_mgmt_ips + sesiones +
 //  workspace_members. El user se borra solo si no pertenece a otros ws.
 router.delete('/member/:userId', requireSession, requireRole('OWNER'),
+  validate({ params: UserIdParamsSchema }),
   asyncHandler(async (req, res) => {
     const { userId } = req.params;
     const wsId = req.account.workspace_id;
@@ -568,6 +575,7 @@ router.delete('/member/:userId', requireSession, requireRole('OWNER'),
 
 // ── POST /invitation/:id/revoke  (solo OWNER) ────────────────
 router.post('/invitation/:id/revoke', requireSession, requireRole('OWNER'),
+  validate({ params: IdParamsSchema }),
   asyncHandler(async (req, res) => {
     const ok = await invitationRepo.revoke(req.params.id, req.account.workspace_id);
     if (!ok) throw new AppError('Invitación no encontrada o ya procesada', 404, 'NO_INVITE');
@@ -615,6 +623,7 @@ router.post('/assignments', requireSession, requireRole('OWNER'),
 
 // ── DELETE /assignments/:id — quitar asignación (Moderador) ──
 router.delete('/assignments/:id', requireSession, requireRole('OWNER'),
+  validate({ params: IdParamsSchema }),
   asyncHandler(async (req, res) => {
     const ok = await assignmentRepo.remove(req.params.id, req.account.workspace_id);
     if (!ok) throw new AppError('Asignación no encontrada', 404, 'NOT_FOUND');
@@ -626,6 +635,7 @@ router.delete('/assignments/:id', requireSession, requireRole('OWNER'),
 //  miembro (móvil/PC) y guarda su .conf cifrado. Devuelve el .conf una vez.
 const wgSchema = MemberWireguardProvisionSchema;
 router.post('/member/:id/wireguard', requireSession, requireRole('OWNER'),
+  validate({ params: IdParamsSchema }),
   asyncHandler(async (req, res) => {
     if (!req.mikrotik) throw new AppError('Configura el router MikroTik en Ajustes', 503, 'NO_ROUTER');
     const { mode, publicKey } = wgSchema.parse(req.body);
@@ -737,7 +747,7 @@ router.post('/me/wireguard', requireSession, asyncHandler(async (req, res) => {
 }));
 
 // ── GET /member/:id/wireguard — config del miembro (él o un moderador) ──
-router.get('/member/:id/wireguard', requireSession, asyncHandler(async (req, res) => {
+router.get('/member/:id/wireguard', requireSession, validate({ params: MemberIdParamsSchema }), asyncHandler(async (req, res) => {
   const targetId = req.params.id === 'me' ? req.account.sub : req.params.id;
   if (targetId !== req.account.sub && !isModeratorRole(req.account.role)) {
     throw new AppError('Permisos insuficientes', 403, 'FORBIDDEN');
@@ -759,6 +769,7 @@ router.get('/member/:id/wireguard', requireSession, asyncHandler(async (req, res
 //  Devuelve la conf descifrada del peer, restringida al workspace del moderador.
 //  Usado por la tabla "Gestión de Usuarios" para mostrar la conf en un modal.
 router.get('/wireguard/by-key/:publicKey', requireSession, requireRole('OWNER'),
+  validate({ params: WireGuardPublicKeyParamsSchema }),
   asyncHandler(async (req, res) => {
     const row = await memberWgRepo.getByPublicKey(req.account.workspace_id, req.params.publicKey);
     if (!row) throw new AppError('Peer no encontrado en este workspace', 404, 'NO_WG');
