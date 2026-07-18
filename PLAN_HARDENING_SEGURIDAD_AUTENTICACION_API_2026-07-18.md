@@ -182,6 +182,19 @@ El middleware:
 - payloads SQLi/XSS permanecen datos inertes y no alteran queries ni DOM;
 - no quedan lecturas crudas fuera del middleware salvo excepciones documentadas.
 
+#### Estado de implementación — 2026-07-18
+
+- [x] Middleware `server/middleware/validate.js` con normalización, error 400 genérico y logs sin valores.
+- [x] Primitivas compartidas para IPv4, MAC, puertos, IDs, textos y secretos acotados.
+- [x] Schemas estrictos y migración completa de `ap.routes.js` y `routes/device.routes.js`.
+- [x] Rechazo de campos desconocidos en endpoints SSH y límites de 20 credenciales / 100 CPEs por lote.
+- [x] Defensa SSRF al guardar direcciones y justo antes de conexiones SSH, con validación por lote contra subredes del workspace.
+- [x] Inventario actualizado: deuda de body reducida de 34 a 18; params de 27 a 14; query de 3 a 2.
+- [x] Baseline tras el lote: 63 suites / 423 pruebas backend y `check:all` correctos.
+- [ ] Migrar core tunnel/repair y los módulos de nodes.
+- [ ] Aplicar límites explícitos de payload/JSON estricto y Content-Type.
+- [ ] Crear y probar las reglas Semgrep locales para SQL y ejecución de comandos.
+
 ### Fase 2 — Rate limiting resistente a fuerza bruta
 
 #### Capas

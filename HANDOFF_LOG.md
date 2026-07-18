@@ -6,6 +6,13 @@
 
 ---
 
+> **Sesión 2026-07-18 - validación server-side de AP y device.** Rama `vps_prod` (base `1becbde`; commits locales `1877580`, `77fe0a8`, `245ef0a`). Skills: `handoff-keeper`, `semgrep`.
+> - Implementado `middleware/validate.js`: parseo/normalización Zod de body/params/query, rechazo 400 uniforme y logging de ruta/campos/request ID sin valores sensibles.
+> - Añadidos contratos estrictos de IPv4, MAC, puertos, IDs, texto, secretos y payloads AP/device. Migradas todas las entradas de `ap.routes.js` y `routes/device.routes.js`; la deuda del inventario bajó de 34→18 body, 27→14 params y 3→2 query.
+> - Cerrado un vector SSRF adicional: las IP se validan contra CIDRs del workspace tanto al guardar como inmediatamente antes de SSH; los lotes CPE se validan de una vez y se rechazan completos si una IP queda fuera.
+> - Verificación: 63 suites / 423 pruebas backend, contratos CJS+ESM, `check:all`, inventario actualizado y Semgrep focalizado sobre 4 archivos (119 reglas, 0 findings).
+> - Pendiente: migrar core tunnel/repair y nodes; límites JSON/Content-Type; reglas Semgrep locales; después rate limiting de identidad. Los 6 commits de hardening siguen sin push/deploy.
+
 > **Sesión 2026-07-18 - inicio de implementación del hardening API.** Rama `vps_prod` (base `767c7ae`; Fase 0 local). Skills: `documentation-writer`, `semgrep`, `handoff-keeper`.
 > - Creados threat model, invariantes backend/frontend, benchmark bcrypt reproducible e inventario generado de controles por ruta y sinks; el inventario detecta 142 rutas, 94 mutadoras, 34 bodies sin esquema directo y dos endpoints legacy de identidad sin rate limit.
 > - El inventario queda bloqueado contra desactualización mediante `check:security-routes` dentro de `check:all` y 5 pruebas unitarias. También se retiraron credenciales locales antiguas que estaban documentadas en el handoff.
