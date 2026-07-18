@@ -53,6 +53,12 @@ function errorMiddleware(err, _req, res, _next) {
   if (err instanceof AppError) {
     return sendError(res, err.status, err.message, err.code, err.data);
   }
+  if (err?.type === 'entity.too.large') {
+    return sendError(res, 413, 'Payload demasiado grande', 'PAYLOAD_TOO_LARGE');
+  }
+  if (err?.type === 'entity.parse.failed') {
+    return sendError(res, 400, 'JSON inválido', 'INVALID_JSON');
+  }
   // Errores de validación zod
   if (err && err.name === 'ZodError') {
     const msg = err.issues?.[0]?.message || 'Datos inválidos';

@@ -36,6 +36,7 @@ const aiRoutes = require('./routes/ai.routes');
 const dashboardMetrics = require('./lib/dashboardMetrics');
 const apRoutes  = require('./ap.routes');
 const { initDb } = require('./db.service');
+const { requireJsonForMutation, strictJsonParser } = require('./middleware/requestBodySecurity');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -130,7 +131,8 @@ app.use(cors({
     allowedHeaders: ['Content-Type'],
     credentials: true,
 }));
-app.use(express.json());
+app.use(requireJsonForMutation);
+app.use(strictJsonParser);
 app.use(cookieParser());
 
 // ── HTTP logger (pino-http) ────────────────────────────────────────
