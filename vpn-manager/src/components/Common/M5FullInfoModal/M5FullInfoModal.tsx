@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Database, History } from 'lucide-react';
+import { Database, History, TerminalSquare } from 'lucide-react';
 import type { M5FullInfoModalProps } from './types';
 import { useCopiedIpState } from './hooks/useCopiedIpState';
 import ModalHeader from './components/ModalHeader';
@@ -11,12 +11,13 @@ import InterfacesSection from './components/InterfacesSection';
 import ServicesSection from './components/ServicesSection';
 import DeviceOverview from './components/DeviceOverview';
 import AirOsDeviceHistory from './components/AirOsDeviceHistory';
+import TechnicalDataSection from './components/TechnicalDataSection';
 import { detectFamily } from './utils/deviceFamily';
 import { modalContainerStyles } from './utils/styles';
 import Dialog from '../Dialog';
 
 export default function M5FullInfoModal({ dev, onClose, onAnalyzeWithAi }: M5FullInfoModalProps) {
-  const [activeTab, setActiveTab] = useState<'data' | 'history'>('data');
+  const [activeTab, setActiveTab] = useState<'data' | 'technical' | 'history'>('data');
   const { copiedIp, copyIp } = useCopiedIpState(dev.ip);
   const s = dev.cachedStats;
   const family = detectFamily(dev);
@@ -39,6 +40,15 @@ export default function M5FullInfoModal({ dev, onClose, onAnalyzeWithAi }: M5Ful
             className={`flex min-h-11 items-center gap-2 border-b-2 px-3 text-xs font-bold transition-colors ${activeTab === 'data' ? 'border-sky-500 text-sky-700 dark:text-sky-300' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'}`}
           >
             <Database className="h-4 w-4" /> Datos
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'technical'}
+            onClick={() => setActiveTab('technical')}
+            className={`flex min-h-11 items-center gap-2 border-b-2 px-3 text-xs font-bold transition-colors ${activeTab === 'technical' ? 'border-slate-500 text-slate-700 dark:text-slate-200' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'}`}
+          >
+            <TerminalSquare className="h-4 w-4" /> Datos técnicos
           </button>
           {onAnalyzeWithAi && (
             <button
@@ -67,6 +77,8 @@ export default function M5FullInfoModal({ dev, onClose, onAnalyzeWithAi }: M5Ful
             </>
           )}
         </ModalContent>
+      ) : activeTab === 'technical' ? (
+        <ModalContent>{s ? <TechnicalDataSection stats={s} /> : <EmptyState />}</ModalContent>
       ) : (
         <ModalContent><AirOsDeviceHistory device={dev} /></ModalContent>
       )}

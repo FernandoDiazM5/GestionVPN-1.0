@@ -24,11 +24,12 @@ const device: ScannedDevice = {
     memoryPercent: 68,
     mode: 'sta',
     essid: 'H/Floresta/AP/EQUIDAD/ND-1',
+    _rawRoutes: '0.0.0.0 10.1.1.1 0.0.0.0 UG br0',
   },
 };
 
 describe('<M5FullInfoModal />', () => {
-  it('organiza datos completos e historial individual en pestañas', async () => {
+  it('separa datos ordenados, bloques técnicos e historial individual en pestañas', async () => {
     const user = userEvent.setup();
     const history = vi.spyOn(airOsAiApi, 'listDeviceAnalyses').mockResolvedValue({
       success: true,
@@ -45,8 +46,14 @@ describe('<M5FullInfoModal />', () => {
     );
 
     expect(screen.getByRole('tab', { name: 'Datos' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Datos técnicos' })).toBeInTheDocument();
     expect(screen.getAllByText('-58 dBm')).toHaveLength(2);
     expect(screen.getByText('H/Floresta/AP/EQUIDAD/ND-1')).not.toHaveClass('truncate');
+    expect(screen.queryByText(/0\.0\.0\.0 10\.1\.1\.1/)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: 'Datos técnicos' }));
+    expect(screen.getByText('Tabla de rutas')).toBeInTheDocument();
+    expect(screen.getByText(/0\.0\.0\.0 10\.1\.1\.1/)).toBeInTheDocument();
 
     await user.click(screen.getByRole('tab', { name: 'Historial de resultados' }));
 

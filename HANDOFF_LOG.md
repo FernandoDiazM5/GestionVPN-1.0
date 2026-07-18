@@ -6,6 +6,22 @@
 
 ---
 
+> **Sesion 2026-07-17 - corrección de red Gemini y orden integral del informe AirOS publicada.** Rama `vps_prod` (base `00bf042`; publicación directa, pendiente de deploy). Skills: `vercel-react-best-practices`, `github:yeet`, `handoff-keeper`.
+> - El 502 de `/api/ai/air-os/network-analysis` correspondía a `AI_INVALID_RESPONSE`; la salida NETWORK tenía sólo 1.200 tokens pese a admitir ocho hallazgos con listas extensas. Se elevó el default a 3.200, se pidieron seis hallazgos concisos, se añadieron `maxItems` admitidos por Gemini y se captura el `finishReason` de respuestas JSON inválidas.
+> - El icono individual `BrainCircuit` se sustituyó por `Sparkles`, igual que el análisis de red. El botón de historial de red abre ahora una lista filtrada a `NETWORK`; el historial individual sigue dentro de cada antena.
+> - El informe AirOS tiene tres pestañas: `Datos` con etiquetas operativas en español, `Datos técnicos` con tráfico/rutas/mca-cli/uname/iwconfig/wstalist/meminfo íntegros, e `Historial de resultados`. Ningún dato fue retirado.
+> - Verificación: 384 backend + 124 frontend, prueba focalizada del nuevo tab técnico, `check:all`, ESLint, build Vite, auditor de diseño sin violaciones y `git diff --check`. Pendiente: desplegar y repetir el análisis real de los 33 equipos.
+
+> **Sesion 2026-07-17 - despliegue de `00bf042` verificado en producción.** Rama `vps_prod`; backend reconstruido y migraciones idempotentes completas, incluida `migrate:air-os-ai`.
+> - Contenedores: `vpn-db` y `vpn-backend` healthy; `vpn-frontend` activo y HTTPS respondió HTTP/2 200.
+> - `/api/health`: estado general `ok`, con MySQL, RouterOS y SMTP `ok`. Gemini quedó globalmente habilitado; API key y clave de seudonimización se verificaron por presencia sin imprimirlas; retención 7/7.
+> - Pendiente: habilitar el entitlement del moderador piloto desde el Administrador y hacer QA autenticada del diagnóstico/historial.
+
+> **Sesion 2026-07-17 - publicación directa y regla de GitHub.** Rama `vps_prod`, commit publicado `00bf042`; local y `origin/vps_prod` verificados con el mismo hash.
+> - La mejora AirOS se publicó mediante la autenticación HTTPS existente de `git`, sin GitHub CLI.
+> - Regla durable: un push directo usa `git push origin vps_prod`; no bloquear ni pedir instalar `gh` salvo que se necesiten operaciones de pull request.
+> - Pendiente: desplegar `00bf042` en el VPS y validar health/UI.
+
 > **Sesion 2026-07-17 - mejora del diagnóstico AirOS e historial por antena.** Rama `vps_prod` (base publicada `4ee4fa9`; publicación directa solicitada para estos cambios). Skills: `ui-design-system`, `vercel-react-best-practices`, `handoff-keeper`.
 > - El informe AirOS conserva todos sus campos y ahora los presenta en tarjetas legibles, resumen operativo y pestañas `Datos`/`Historial de resultados`; valores largos ya no se truncan y los bloques raw conservan acceso por scroll.
 > - La acción de la tabla usa `BrainCircuit` y comunica “diagnóstico inteligente”. El diálogo de Gemini y el historial global usan header fijo + body `min-h-0/overflow-y-auto`, corrigiendo el contenido inaccesible sin barra.

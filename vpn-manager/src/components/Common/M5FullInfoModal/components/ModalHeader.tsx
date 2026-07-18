@@ -1,4 +1,4 @@
-import { BrainCircuit, Check, Copy, RadioTower, X } from 'lucide-react';
+import { Check, Copy, RadioTower, Sparkles, X } from 'lucide-react';
 import type { ScannedDevice, SavedDevice } from '../../../../types/devices';
 import { detectFamily } from '../utils/deviceFamily';
 import { headerStyles } from '../utils/styles';
@@ -49,7 +49,7 @@ export default function ModalHeader({ dev, copiedIp, copyIp, onClose, onAnalyzeW
             onClick={onAnalyzeWithAi}
             className="flex min-h-11 items-center gap-2 rounded-lg border border-violet-400/40 bg-violet-500/20 px-3 text-xs font-bold text-violet-100 hover:bg-violet-500/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300"
           >
-            <BrainCircuit className="h-4 w-4" />
+            <Sparkles className="h-4 w-4" />
             Analizar con Gemini
           </button>
         )}

@@ -67,8 +67,10 @@ export const airOsAiApi = {
     post<{ success: true; result: AirOsAiAnalysisResult }>('/api/ai/air-os/device-analysis', request),
   analyzeNetwork: (request: AirOsAiNetworkAnalysisRequest) =>
     post<{ success: true; result: AirOsAiAnalysisResult }>('/api/ai/air-os/network-analysis', request),
-  listAnalyses: () =>
-    get<{ success: true; analyses: AirOsAiHistoryItem[]; retentionDays: number }>('/api/ai/air-os/analyses?limit=30'),
+  listAnalyses: (type?: 'DEVICE' | 'NETWORK') =>
+    get<{ success: true; analyses: AirOsAiHistoryItem[]; retentionDays: number }>(
+      `/api/ai/air-os/analyses?limit=30${type ? `&type=${type}` : ''}`,
+    ),
   listDeviceAnalyses: (device: ScannedDevice | SavedDevice) =>
     post<{ success: true; analyses: AirOsAiHistoryItem[]; retentionDays: number }>(
       '/api/ai/air-os/analyses/device-history',

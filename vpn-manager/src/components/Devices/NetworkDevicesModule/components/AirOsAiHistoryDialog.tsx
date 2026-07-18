@@ -9,9 +9,10 @@ import Dialog from '../../../Common/Dialog';
 interface Props {
   open: boolean;
   onClose: () => void;
+  type?: 'DEVICE' | 'NETWORK';
 }
 
-export function AirOsAiHistoryDialog({ open, onClose }: Props) {
+export function AirOsAiHistoryDialog({ open, onClose, type }: Props) {
   const [items, setItems] = useState<AirOsAiHistoryItem[]>([]);
   const [detail, setDetail] = useState<AirOsAiHistoryDetail | null>(null);
   const [loading, setLoading] = useState(false);
@@ -22,14 +23,14 @@ export function AirOsAiHistoryDialog({ open, onClose }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const response = await airOsAiApi.listAnalyses();
+      const response = await airOsAiApi.listAnalyses(type);
       setItems(response.analyses);
     } catch (cause) {
       setError((cause as ApiError).message || 'No se pudo cargar el historial');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [type]);
 
   useEffect(() => {
     if (open) load();
@@ -67,12 +68,12 @@ export function AirOsAiHistoryDialog({ open, onClose }: Props) {
   };
 
   return (
-    <Dialog title="Historial de análisis AirOS" onClose={onClose} panelClassName="modal-panel modal-panel-3xl h-[min(90vh,780px)] max-h-[90vh]">
+    <Dialog title={type === 'NETWORK' ? 'Historial de análisis de red AirOS' : 'Historial de análisis AirOS'} onClose={onClose} panelClassName="modal-panel modal-panel-3xl h-[min(90vh,780px)] max-h-[90vh]">
       <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-700">
         <div className="flex items-center gap-3">
           {detail && <button onClick={() => setDetail(null)} aria-label="Volver al historial" className="btn-ghost btn-icon min-h-11 min-w-11"><ArrowLeft className="h-4 w-4" /></button>}
           <Sparkles className="h-5 w-5 text-violet-600 dark:text-violet-300" />
-          <div><p className="font-bold text-slate-800 dark:text-slate-100">{detail ? 'Detalle guardado' : 'Historial Gemini AirOS'}</p><p className="text-xs text-slate-500">Resultados consultivos · retención máxima de 7 días</p></div>
+          <div><p className="font-bold text-slate-800 dark:text-slate-100">{detail ? 'Detalle guardado' : type === 'NETWORK' ? 'Historial de la red visible' : 'Historial Gemini AirOS'}</p><p className="text-xs text-slate-500">Resultados consultivos · retención máxima de 7 días</p></div>
         </div>
         <button onClick={onClose} aria-label="Cerrar historial" className="btn-ghost btn-icon min-h-11 min-w-11"><X className="h-4 w-4" /></button>
       </div>
@@ -93,7 +94,7 @@ export function AirOsAiHistoryDialog({ open, onClose }: Props) {
             <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">Historial informativo: no representa una decisión ni una acción ejecutada.</p>
           </div>
         ) : (
-          <AsyncQueryState loading={loading} error={error} empty={!loading && !error && items.length === 0} onRetry={load} loadingLabel="Cargando historial…" emptyTitle="Sin análisis guardados" emptyMessage="Los análisis individuales y de red aparecerán aquí.">
+          <AsyncQueryState loading={loading} error={error} empty={!loading && !error && items.length === 0} onRetry={load} loadingLabel="Cargando historial…" emptyTitle="Sin análisis guardados" emptyMessage={type === 'NETWORK' ? 'Los análisis de la red visible aparecerán aquí.' : 'Los análisis individuales y de red aparecerán aquí.'}>
             <div className="space-y-2">
               {items.map(item => (
                 <article key={item.uuid} className="flex flex-col gap-3 rounded-xl border border-slate-200 p-4 sm:flex-row sm:items-center dark:border-slate-700">

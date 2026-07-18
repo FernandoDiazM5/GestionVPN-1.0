@@ -9,7 +9,7 @@
 import { memo, Fragment } from 'react';
 import {
   CheckCircle2, X, Loader2, ChevronDown, ChevronRight,
-  BrainCircuit, RefreshCw, PlusCircle, Save, Check,
+  Sparkles, RefreshCw, PlusCircle, Save, Check,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { ScannedDevice, SavedDevice, AntennaStats } from '../../../../types/devices';
@@ -380,7 +380,7 @@ function DeviceRowActions({
   if (hasStats) {
     actions.push({
       key: 'info',
-      Icon: BrainCircuit,
+      Icon: Sparkles,
       onClick: () => onOpenM5Detail(dev),
       title: 'Abrir diagnóstico inteligente AirOS — datos completos e historial IA',
       ariaLabel: 'Abrir diagnóstico inteligente AirOS',

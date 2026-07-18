@@ -1,10 +1,10 @@
 export const EMPTY_STATE_MESSAGE = 'Sin datos disponibles — escanea la red o sincroniza el AP para obtener información.';
 
 export const SECTION_TITLES = {
-  SYSTEM: 'Sistema (host)',
-  WIRELESS: 'Inalámbrico (wireless)',
+  SYSTEM: 'Sistema y recursos',
+  WIRELESS: 'Enlace inalámbrico',
   INTERFACES: 'Interfaces físicas y lógicas',
-  SERVICES: 'Servicios y Gestión Remota',
+  SERVICES: 'Servicios y gestión remota',
 };
 
 export const RAW_DATA_LABELS = {

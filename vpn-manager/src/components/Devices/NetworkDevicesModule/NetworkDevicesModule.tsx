@@ -611,7 +611,7 @@ export default function NetworkDevicesModule() {
       )}
 
       <AirOsAiDialog controller={airOsAi} />
-      <AirOsAiHistoryDialog open={showAiHistory && airOsAi.available} onClose={() => setShowAiHistory(false)} />
+      <AirOsAiHistoryDialog open={showAiHistory && airOsAi.available} onClose={() => setShowAiHistory(false)} type="NETWORK" />
 
       <ConfirmModal
         isOpen={showResetConfirm}

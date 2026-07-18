@@ -12,18 +12,20 @@ const RESPONSE_JSON_SCHEMA = {
     severity: { type: 'string', enum: ['info', 'warning', 'critical'] },
     confidence: { type: 'string', enum: ['low', 'medium', 'high'] },
     findings: {
-      type: 'array',
+      type: 'array', maxItems: 8,
       items: {
         type: 'object', additionalProperties: false,
         required: ['title', 'evidence', 'interpretation', 'possibleCauses', 'manualChecks'],
         properties: {
-          title: { type: 'string' }, evidence: { type: 'array', items: { type: 'string' } },
-          interpretation: { type: 'string' }, possibleCauses: { type: 'array', items: { type: 'string' } },
-          manualChecks: { type: 'array', items: { type: 'string' } },
+          title: { type: 'string' },
+          evidence: { type: 'array', maxItems: 8, items: { type: 'string' } },
+          interpretation: { type: 'string' },
+          possibleCauses: { type: 'array', maxItems: 5, items: { type: 'string' } },
+          manualChecks: { type: 'array', maxItems: 6, items: { type: 'string' } },
         },
       },
     },
-    limitations: { type: 'array', items: { type: 'string' } },
+    limitations: { type: 'array', maxItems: 8, items: { type: 'string' } },
     // `const` no pertenece al subconjunto JSON Schema aceptado por Gemini;
     // el literal true se valida obligatoriamente con Zod después de responder.
     advisoryOnly: { type: 'boolean' },
@@ -50,7 +52,7 @@ function getClient() {
 
 async function generateAnalysis({ kind, dto }) {
   const maxOutputTokens = kind === 'NETWORK'
-    ? Number(process.env.GEMINI_MAX_OUTPUT_TOKENS_NETWORK || 1200)
+    ? Number(process.env.GEMINI_MAX_OUTPUT_TOKENS_NETWORK || 3200)
     : Number(process.env.GEMINI_MAX_OUTPUT_TOKENS_DEVICE || 700);
   const timeoutMs = Number(process.env.GEMINI_TIMEOUT_MS || 30000);
   const response = await getClient().models.generateContent({
@@ -66,7 +68,13 @@ async function generateAnalysis({ kind, dto }) {
   });
   let parsed;
   try { parsed = JSON.parse(response.text || ''); }
-  catch (_) { throw Object.assign(new Error('Respuesta JSON inválida'), { code: 'AI_INVALID_RESPONSE' }); }
+  catch (_) {
+    const finishReason = response.candidates?.[0]?.finishReason || 'UNKNOWN';
+    throw Object.assign(new Error(`Respuesta JSON inválida (${finishReason})`), {
+      code: 'AI_INVALID_RESPONSE',
+      finishReason,
+    });
+  }
   const analysis = validateAnalysisPolicy(AirOsAiAnalysisSchema.parse(parsed), dto);
   const usage = response.usageMetadata || {};
   return {
