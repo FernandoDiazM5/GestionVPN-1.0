@@ -22,6 +22,7 @@ const LEVEL_CLASSES: Record<AirOsRiskLevel, string> = {
 export function AirOsNetworkPreview({ devices, preview, selectedIndexes, onToggle, disabled }: Props) {
   const selected = new Set(selectedIndexes);
   const candidates = preview.rows.filter(row => row.candidate).sort((a, b) => b.score - a.score);
+  const evaluated = preview.rows.filter(row => row.role === 'sta' && !row.candidate).sort((a, b) => b.score - a.score);
   const summary = preview.summary;
 
   return (
@@ -87,6 +88,28 @@ export function AirOsNetworkPreview({ devices, preview, selectedIndexes, onToggl
             })}
           </div>
         </section>
+      )}
+
+      {evaluated.length > 0 && (
+        <details className="rounded-xl border border-slate-200 dark:border-slate-700">
+          <summary className="cursor-pointer px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200">
+            Otros STA evaluados y no enviados ({evaluated.length})
+          </summary>
+          <div className="space-y-2 border-t border-slate-200 p-3 dark:border-slate-700">
+            {evaluated.map(row => {
+              const device = devices[row.index];
+              const stats = device?.cachedStats;
+              return (
+                <div key={row.index} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs dark:bg-slate-800">
+                  <span className="min-w-0 flex-1 truncate font-semibold text-slate-700 dark:text-slate-200">{stats?.deviceName || device?.name || row.alias}</span>
+                  <span className="text-slate-500">{device?.ip}</span>
+                  <span className={`rounded-full px-2 py-0.5 font-bold ${LEVEL_CLASSES[row.level]}`}>{RISK_LABELS[row.level]} · {row.score}/100</span>
+                  <span className="text-slate-500">S {stats?.signal ?? '—'} · CCQ {stats?.ccq ?? '—'} · TX/RX {stats?.txRate ?? '—'}/{stats?.rxRate ?? '—'}</span>
+                </div>
+              );
+            })}
+          </div>
+        </details>
       )}
 
       <div className="border-t border-slate-200 pt-3 text-xs text-slate-500 dark:border-slate-700">

@@ -28,9 +28,9 @@ const NETWORK_METRIC_KEYS = [
 ] as const satisfies readonly (keyof AntennaStats)[];
 
 export function roleOf(device: ScannedDevice | SavedDevice): AirOsAiDevice['role'] {
-  const raw = String(device.cachedStats?.mode || device.role || '').toLowerCase();
-  if (raw === 'ap' || raw === 'master' || raw.startsWith('ap-') || raw.startsWith('ap_')) return 'ap';
-  if (raw === 'sta' || raw.startsWith('sta-') || raw.startsWith('sta_')) return 'sta';
+  const raw = String(device.cachedStats?.mode || device.role || '').trim().toLowerCase();
+  if (raw === 'ap' || raw === 'master' || raw.includes('access point') || raw.startsWith('ap-') || raw.startsWith('ap_')) return 'ap';
+  if (raw === 'sta' || raw === 'station' || raw === 'client' || raw === 'subscriber' || raw.startsWith('sta-') || raw.startsWith('sta_') || raw.startsWith('station-')) return 'sta';
   return 'unknown';
 }
 

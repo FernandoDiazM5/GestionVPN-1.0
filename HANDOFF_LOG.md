@@ -6,6 +6,11 @@
 
 ---
 
+> **Sesión 2026-07-17 - ajuste del scoring tras validar velocidades TX/RX.** Rama `vps_prod` (base `785d2c0`; cambios locales pendientes de publicación directa). Skills: `vercel-react-best-practices`, `handoff-keeper`.
+> - El caso `-60 dBm / CCQ 82% / TX 19 Mbps / RX 39 Mbps` ahora se clasifica como candidato con score 60 (`bad`) por velocidades negociadas bajas, aunque señal y CCQ sean aceptables.
+> - Se añadieron bandas absolutas para TX/RX cuando no hay suficientes pares para una mediana, reconocimiento de modos AirOS `Station`, `Client` y `Subscriber`, y una sección de todos los STA evaluados que no se envían.
+> - Gates: **393/393 backend + 129/129 frontend**, contratos, `check:all`, build Vite, auditor de diseño 0 violaciones y `git diff --check`. Pendiente: deploy y prueba real autenticada.
+
 > **Sesión 2026-07-17 - preselección STA y reporte PDF para el análisis general AirOS publicados.** Rama `vps_prod` (base publicada `f65e401`; publicación directa solicitada, pendiente de deploy). Skills: `vercel-react-best-practices`, `pdf`, `github:yeet`, `handoff-keeper`.
 > - Se reemplazó el envío indiscriminado de la red por un score determinista compartido: excluye AP/desconocidos, toma sólo STA con score `>=40`, ordena los peores y preselecciona un máximo de 10 sin completar con equipos sanos. La combinación señal `-61 dBm` + CCQ `12%` queda crítica; señal `-44 dBm` sin otros defectos queda sana.
 > - El modal muestra una lista previa editable con nombre, IP, AP, score, nivel y causas. Si no hay candidatos, bloquea la solicitud y no consume Gemini. El navegador envía al backend sólo las métricas de red necesarias.

@@ -42,4 +42,12 @@ describe('preselección local de receptores AirOS', () => {
     const selectedScores = result.selectedIndexes.map(index => result.rows[index].score);
     expect(selectedScores).toEqual([...selectedScores].sort((a, b) => b - a));
   });
+
+  it('considera problemático un STA con TX/RX bajos aunque la señal y CCQ sean aceptables', () => {
+    const result = assessAirOsNetwork([
+      sta({ signal: -60, noiseFloor: -92, ccq: 82, txRate: 19, rxRate: 39 }),
+    ]);
+    expect(result.rows[0]).toMatchObject({ candidate: true });
+    expect(result.rows[0].reasons.map(reason => reason.code)).toEqual(expect.arrayContaining(['TX_RATE_BAD', 'RX_RATE_BAD']));
+  });
 });

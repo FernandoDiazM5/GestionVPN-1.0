@@ -70,4 +70,12 @@ describe('toAirOsAiDevice', () => {
     expect(preview.selectedIndexes).toEqual([1]);
     expect(preview.rows[1]).toMatchObject({ alias: 'STA-01', level: 'critical', score: 80 });
   });
+
+  it('reconoce modos AirOS escritos como Station', () => {
+    const device: ScannedDevice = {
+      ip: '10.1.1.4', mac: 'DD:DD:DD:DD:DD:DD', name: 'Station', model: 'LiteBeam M5', firmware: '', role: 'unknown',
+      cachedStats: { mode: 'Station', signal: -60, ccq: 82, txRate: 19, rxRate: 39 },
+    };
+    expect(buildAirOsNetworkPreview([device]).summary.sta).toBe(1);
+  });
 });

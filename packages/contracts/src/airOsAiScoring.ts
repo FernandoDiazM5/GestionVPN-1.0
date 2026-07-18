@@ -146,6 +146,19 @@ function airmaxBand(value: number, metric: 'quality' | 'capacity', reasons: AirO
   return 0;
 }
 
+function absoluteRateBand(value: number, direction: 'TX' | 'RX', reasons: AirOsRiskReason[]) {
+  if (direction === 'TX') {
+    if (value < 10) return addReason(reasons, 'TX_RATE_CRITICAL', 'TX muy bajo', value, 'Mbps', 30, 'critical');
+    if (value < 20) return addReason(reasons, 'TX_RATE_BAD', 'TX bajo', value, 'Mbps', 20, 'bad');
+    if (value < 30) return addReason(reasons, 'TX_RATE_DEFICIENT', 'TX reducido', value, 'Mbps', 12, 'deficient');
+    return 0;
+  }
+  if (value < 10) return addReason(reasons, 'RX_RATE_CRITICAL', 'RX muy bajo', value, 'Mbps', 30, 'critical');
+  if (value < 40) return addReason(reasons, 'RX_RATE_BAD', 'RX bajo', value, 'Mbps', 20, 'bad');
+  if (value < 60) return addReason(reasons, 'RX_RATE_DEFICIENT', 'RX reducido', value, 'Mbps', 12, 'deficient');
+  return 0;
+}
+
 function relativeRateBand(
   value: number | null,
   baseline: number | null,
@@ -205,6 +218,10 @@ export function assessAirOsNetwork(
     if (quality != null) score += airmaxBand(quality, 'quality', reasons);
     const capacity = finite(metrics.airmaxCapacity);
     if (capacity != null) score += airmaxBand(capacity, 'capacity', reasons);
+    const txRate = finite(metrics.txRate);
+    const rxRate = finite(metrics.rxRate);
+    if (txRate != null) score += absoluteRateBand(txRate, 'TX', reasons);
+    if (rxRate != null) score += absoluteRateBand(rxRate, 'RX', reasons);
 
     const retries = finite(metrics.txRetries);
     if (retries != null && retries >= 500) {
@@ -217,8 +234,8 @@ export function assessAirOsNetwork(
 
     const group = groupStats.get(input.groupKey || '__network__');
     const enoughPeers = !!group && Math.max(group.tx.length, group.rx.length) >= 3;
-    const txRelative = relativeRateBand(finite(metrics.txRate), enoughPeers ? median(group?.tx || []) : null, 'TX', reasons);
-    const rxRelative = relativeRateBand(finite(metrics.rxRate), enoughPeers ? median(group?.rx || []) : null, 'RX', reasons);
+    const txRelative = relativeRateBand(txRate, enoughPeers ? median(group?.tx || []) : null, 'TX', reasons);
+    const rxRelative = relativeRateBand(rxRate, enoughPeers ? median(group?.rx || []) : null, 'RX', reasons);
     score += txRelative.points + rxRelative.points;
 
     if (ccq != null && ccq <= 29) score = Math.max(score, 70);
