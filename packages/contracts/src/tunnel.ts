@@ -1,27 +1,39 @@
-// ────────────────────────────────────────────────────────────────────
-//  Tunnel — activación/keepalive multi-usuario (Fase F5.B)
-// ────────────────────────────────────────────────────────────────────
 import { z } from 'zod';
+import { EmptyStrictObjectSchema, EntityIdSchema } from './network';
 
-// ── Requests ────────────────────────────────────────────────────────
+const CidrV4Schema = z.cidrv4({ message: 'CIDR IPv4 inválido' });
+const MgmtIpInputSchema = z.string().trim().max(32).refine((value) => {
+  const [ip, prefix, ...rest] = value.split('/');
+  if (rest.length > 0 || !z.ipv4().safeParse(ip).success) return false;
+  if (prefix === undefined) return true;
+  const parsed = Number(prefix);
+  return Number.isInteger(parsed) && parsed >= 0 && parsed <= 32;
+}, 'IP de gestión inválida');
+
+export const TunnelEmptyBodySchema = EmptyStrictObjectSchema;
 
 export const TunnelActivateRequestSchema = z.object({
-  targetVRF: z.string().min(1, 'targetVRF requerido'),
-});
+  targetVRF: EntityIdSchema,
+}).strict();
 export type TunnelActivateRequest = z.infer<typeof TunnelActivateRequestSchema>;
 
 export const TunnelMangleAccessRequestSchema = z.object({
-  vrfSeleccionado: z.string().min(1, 'vrfSeleccionado es requerido'),
-  ipCliente: z.string().optional(),
-});
+  vrfSeleccionado: EntityIdSchema,
+  ipCliente: z.ipv4().optional(),
+}).strict();
 export type TunnelMangleAccessRequest = z.infer<typeof TunnelMangleAccessRequestSchema>;
 
 export const RegisterMyIpRequestSchema = z.object({
-  mgmtIp: z.string().regex(/^192\.168\.21\.\d{1,3}(\/\d+)?$/, 'Debe ser 192.168.21.x'),
-});
+  mgmtIp: MgmtIpInputSchema,
+}).strict();
 export type RegisterMyIpRequest = z.infer<typeof RegisterMyIpRequestSchema>;
 
-// ── Responses ───────────────────────────────────────────────────────
+export const TunnelRepairRequestSchema = z.object({
+  pppUser: EntityIdSchema,
+  vrfName: EntityIdSchema,
+  lanSubnets: z.array(CidrV4Schema).min(1).max(32),
+  adminWgNet: CidrV4Schema.optional(),
+}).strict();
 
 export const TunnelStatusResponseSchema = z.object({
   success: z.literal(true),
@@ -48,7 +60,6 @@ export const KeepaliveResponseSchema = z.object({
 });
 export type KeepaliveResponse = z.infer<typeof KeepaliveResponseSchema>;
 
-// Códigos máquina específicos del dominio tunnel (preservados de F5.A)
 export const TUNNEL_ERROR_CODES = {
   NO_MGMT_IP: 'NO_MGMT_IP',
   NOT_YOUR_PEER: 'NOT_YOUR_PEER',

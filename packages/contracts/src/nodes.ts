@@ -1,73 +1,137 @@
-// ────────────────────────────────────────────────────────────────────
-//  Nodes — túneles SSTP y WireGuard (Fase F5.B)
-// ────────────────────────────────────────────────────────────────────
 import { z } from 'zod';
+import {
+  EmptyStrictObjectSchema,
+  EntityIdSchema,
+  Ipv4Schema,
+  PortSchema,
+  SecretTextSchema,
+  SshUsernameSchema,
+  boundedText,
+} from './network';
 
-const CIDR_RE = /^\d{1,3}(\.\d{1,3}){3}\/\d{1,2}$/;
-const IPV4_RE = /^\d{1,3}(\.\d{1,3}){3}$/;
+const CidrV4Schema = z.cidrv4({ message: 'CIDR IPv4 inválido' });
+const LanSubnetsSchema = z.array(CidrV4Schema).max(32, 'Máximo 32 subredes');
+const NodeNameSchema = boundedText(100, { allowEmpty: false }).refine(
+  (value) => value.toUpperCase().replace(/[^A-Z0-9]/g, '').length >= 2,
+  'Nombre de nodo inválido',
+);
+const NonEmptySecretSchema = SecretTextSchema.refine((value) => value.length > 0, 'Secreto requerido');
+const WireGuardPublicKeySchema = z.string()
+  .trim()
+  .regex(/^[A-Za-z0-9+/]{43}=$/, 'Clave pública WireGuard inválida');
+const ProvisionIdSchema = z.string()
+  .trim()
+  .min(1)
+  .max(128)
+  .regex(/^[A-Za-z0-9-]+$/, 'provisionId inválido');
+const HostSchema = z.union([
+  Ipv4Schema,
+  z.string().trim().max(253).regex(
+    /^(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)(?:\.(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?))*$/,
+    'Host inválido',
+  ),
+]);
 
-// ── Requests ────────────────────────────────────────────────────────
+export const NodeEmptyBodySchema = EmptyStrictObjectSchema;
+
+export const NodeLookupRequestSchema = z.object({ pppUser: EntityIdSchema }).strict();
 
 export const NodeProvisionRequestSchema = z.object({
-  nodeNumber: z.union([z.number(), z.string()]),
-  nodeName: z.string().min(1),
-  pppUser: z.string().optional(),
-  pppPassword: z.string().optional(),
-  lanSubnet: z.string().regex(CIDR_RE).optional(),
-  lanSubnets: z.array(z.string().regex(CIDR_RE)).optional(),
-  remoteAddress: z.string().regex(IPV4_RE).optional(),
+  nodeNumber: z.coerce.number().int().min(1).max(254),
+  nodeName: NodeNameSchema,
+  pppUser: EntityIdSchema.optional(),
+  pppPassword: SecretTextSchema.optional(),
+  lanSubnet: CidrV4Schema.optional(),
+  lanSubnets: LanSubnetsSchema.optional(),
+  remoteAddress: Ipv4Schema.optional(),
   protocol: z.enum(['sstp', 'wireguard']),
-  // WireGuard: si se omite (o vacío), el servidor GENERA el par de llaves del CPE
-  // y entrega la privada embebida en el script. Pegarla aquí fuerza el modo manual.
-  cpePublicKey: z.string().optional(),
-  wgListenPort: z.union([z.number(), z.string()]).optional(),
+  cpePublicKey: z.union([WireGuardPublicKeySchema, z.literal('')]).optional(),
+  wgListenPort: PortSchema.optional(),
+  provisionId: ProvisionIdSchema.optional(),
+}).strict().superRefine((value, ctx) => {
+  if (!value.lanSubnet && (!value.lanSubnets || value.lanSubnets.length === 0)) {
+    ctx.addIssue({ code: 'custom', path: ['lanSubnets'], message: 'Se requiere al menos una subred LAN' });
+  }
 });
 export type NodeProvisionRequest = z.infer<typeof NodeProvisionRequestSchema>;
 
 export const NodeDeprovisionRequestSchema = z.object({
-  vrfName: z.string().optional(),
-  pppUser: z.string().min(1, 'pppUser es requerido'),
+  vrfName: EntityIdSchema.optional(),
+  pppUser: EntityIdSchema,
   protocol: z.enum(['sstp', 'wireguard']).optional(),
-});
+}).strict();
 export type NodeDeprovisionRequest = z.infer<typeof NodeDeprovisionRequestSchema>;
 
 export const NodeEditRequestSchema = z.object({
-  pppUser: z.string().min(1, 'pppUser requerido'),
-  newPppUser: z.string().optional(),
-  newPassword: z.string().optional(),
-  newRemoteAddress: z.string().regex(IPV4_RE).optional(),
-  newComment: z.string().nullable().optional(),
-  vrfName: z.string().optional(),
-  addSubnets: z.array(z.string().regex(CIDR_RE)).optional(),
-  removeSubnets: z.array(z.string().regex(CIDR_RE)).optional(),
-});
+  pppUser: EntityIdSchema,
+  newPppUser: EntityIdSchema.optional(),
+  newPassword: SecretTextSchema.optional(),
+  newRemoteAddress: Ipv4Schema.optional(),
+  newComment: boundedText(200).nullable().optional(),
+  vrfName: EntityIdSchema.optional(),
+  addSubnets: LanSubnetsSchema.optional(),
+  removeSubnets: LanSubnetsSchema.optional(),
+}).strict();
 export type NodeEditRequest = z.infer<typeof NodeEditRequestSchema>;
 
 export const NodeLabelRequestSchema = z.object({
-  pppUser: z.string().min(1, 'pppUser requerido'),
-  label: z.string().max(200).optional(),
-});
+  pppUser: EntityIdSchema,
+  label: boundedText(200).optional(),
+}).strict();
 export type NodeLabelRequest = z.infer<typeof NodeLabelRequestSchema>;
 
 export const NodeCredsSaveRequestSchema = z.object({
-  pppUser: z.string().min(1),
-  pppPassword: z.string().min(1),
-});
+  pppUser: EntityIdSchema,
+  pppPassword: NonEmptySecretSchema,
+}).strict();
 export type NodeCredsSaveRequest = z.infer<typeof NodeCredsSaveRequestSchema>;
 
 export const SshCredItemSchema = z.object({
-  user: z.string().optional(),
-  pass: z.string().optional(),
-  port: z.number().optional(),
-});
+  user: SshUsernameSchema.optional(),
+  pass: SecretTextSchema.optional(),
+  port: PortSchema.optional(),
+}).strict();
 export const NodeSshCredsSaveRequestSchema = z.object({
-  pppUser: z.string().min(1),
-  creds: z.array(SshCredItemSchema),
-});
+  pppUser: EntityIdSchema,
+  creds: z.array(SshCredItemSchema).max(20, 'Máximo 20 credenciales'),
+}).strict();
 export type NodeSshCredsSaveRequest = z.infer<typeof NodeSshCredsSaveRequestSchema>;
 
-// ── Responses ───────────────────────────────────────────────────────
+export const NodeDetailsRequestSchema = z.object({
+  vrfName: EntityIdSchema.optional(),
+  pppUser: EntityIdSchema,
+}).strict();
 
+export const NodeScriptRequestSchema = z.object({
+  pppUser: EntityIdSchema,
+  pppPassword: SecretTextSchema.optional(),
+  serverPublicIP: HostSchema,
+}).strict();
+
+export const NodeSetPeerRequestSchema = z.object({
+  pppUser: EntityIdSchema,
+  cpePublicKey: WireGuardPublicKeySchema,
+}).strict();
+
+export const NodeHistoryAddRequestSchema = z.object({
+  pppUser: EntityIdSchema,
+  event: boundedText(200, { allowEmpty: false }),
+}).strict();
+
+export const NodeTagsSaveRequestSchema = z.object({
+  pppUser: EntityIdSchema,
+  tags: z.array(boundedText(64, { allowEmpty: false })).max(20, 'Máximo 20 etiquetas')
+    .transform((tags) => [...new Set(tags)]),
+}).strict();
+
+export const NodeScanRequestSchema = z.object({
+  nodeLan: CidrV4Schema.refine(
+    (value) => Number(value.split('/')[1]) >= 16,
+    'CIDR demasiado grande',
+  ),
+}).strict();
+
+// Responses
 export const NodeStepSchema = z.object({
   step: z.union([z.number(), z.string()]),
   obj: z.string(),
