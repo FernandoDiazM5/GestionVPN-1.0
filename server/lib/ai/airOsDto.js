@@ -77,16 +77,12 @@ function buildDeviceDto({ workspaceId, device, alias = 'Equipo 01', secret }) {
   };
 }
 
-function average(values) {
-  const finiteValues = values.filter(value => typeof value === 'number' && Number.isFinite(value));
-  if (!finiteValues.length) return null;
-  return Math.round((finiteValues.reduce((sum, value) => sum + value, 0) / finiteValues.length) * 10) / 10;
-}
-
 function buildNetworkDto({ workspaceId, devices, snapshotAt, selectedDeviceIndexes, secret }) {
   const scoringInputs = devices.map(device => ({
     role: device.role,
-    groupKey: device.parentAp || device.essid || null,
+    groupKey: device.parentAp || device.essid
+      ? `${device.parentAp || device.essid}|${device.cachedStats?.channelWidth || 'width-unknown'}`
+      : null,
     metrics: pickNetworkMetrics(device.cachedStats),
   }));
   const assessment = assessAirOsNetwork(scoringInputs, 10);
@@ -118,16 +114,12 @@ function buildNetworkDto({ workspaceId, devices, snapshotAt, selectedDeviceIndex
     };
   });
 
-  const staRows = assessment.rows.filter(row => row.role === 'sta');
   const dto = {
     kind: 'network_sta_candidates',
     snapshotAt,
     summary: {
       ...assessment.summary,
       selected: compactDevices.length,
-      averageSignal: average(staRows.map(row => devices[row.index]?.cachedStats?.signal)),
-      averageCcq: average(staRows.map(row => devices[row.index]?.cachedStats?.ccq)),
-      averageSnr: average(staRows.map(row => row.derived.snrDb)),
     },
     devices: compactDevices,
   };

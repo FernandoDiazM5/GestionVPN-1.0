@@ -58,4 +58,13 @@ describe('preselección local de receptores AirOS', () => {
     ]);
     expect(result.rows[0].mandatory).toBe(true);
   });
+
+  it('no compara contra toda la red cuando falta el AP', () => {
+    const result = assessAirOsNetwork([
+      { role: 'sta', groupKey: null, metrics: { signal: -55, ccq: 95, txRate: 19, rxRate: 39 } },
+      { role: 'sta', groupKey: null, metrics: { signal: -55, ccq: 95, txRate: 150, rxRate: 150 } },
+    ]);
+    expect(result.rows[0].derived.txRateRatioPct).toBeNull();
+    expect(result.rows[0].derived.rxRateRatioPct).toBeNull();
+  });
 });

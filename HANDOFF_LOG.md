@@ -6,6 +6,11 @@
 
 ---
 
+> **Sesión 2026-07-17 - corrección de referencias globales.** Rama `vps_prod` (base `c9268a0`; cambios locales pendientes de publicación directa). Skills: `vercel-react-best-practices`, `handoff-keeper`.
+> - Se eliminó la comparación contra `__network__`: la mediana TX/RX sólo se calcula entre STA del mismo AP identificado y mismo ancho de canal.
+> - Si el AP no está identificado, el equipo sigue evaluándose con umbrales absolutos, pero no recibe una proporción inventada contra toda la red.
+> - Se retiraron `averageSignal`, `averageCcq` y `averageSnr` del DTO compacto de Gemini para evitar que el modelo use promedios globales como referencia de un enlace individual. Pruebas focalizadas: 11 backend, 3 frontend, `check:all` correcto.
+
 > **Sesión 2026-07-17 - prioridad obligatoria para desalineación RF.** Rama `vps_prod` (base `ecc16f2`; cambios locales pendientes de publicación directa). Skills: `vercel-react-best-practices`, `handoff-keeper`.
 > - Regla solicitada: `signal <= -56 dBm` con TX o RX `<72 Mbps` entra con prioridad obligatoria, aunque haya más de 10 candidatos; el orden prioriza estos equipos antes del score general.
 > - El ejemplo `-60 dBm / 19 Mbps / 39 Mbps` queda marcado y se enviará automáticamente en la preselección, con posibilidad de retiro manual.

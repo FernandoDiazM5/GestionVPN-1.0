@@ -37,9 +37,11 @@ export function roleOf(device: ScannedDevice | SavedDevice): AirOsAiDevice['role
 export function buildAirOsNetworkPreview(devices: Array<ScannedDevice | SavedDevice>): AirOsNetworkScoreResult {
   return assessAirOsNetwork(devices.map(device => {
     const normalized = toAirOsAiDevice(device);
+    const ap = normalized.parentAp || normalized.essid;
+    const width = normalized.cachedStats.channelWidth;
     return {
       role: normalized.role,
-      groupKey: normalized.parentAp || normalized.essid || null,
+      groupKey: ap ? `${ap}|${width || 'width-unknown'}` : null,
       metrics: normalized.cachedStats,
     };
   }), 10);

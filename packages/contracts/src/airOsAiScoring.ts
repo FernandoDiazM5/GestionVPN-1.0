@@ -183,7 +183,8 @@ export function assessAirOsNetwork(
   const groupStats = new Map<string, { tx: number[]; rx: number[] }>();
 
   for (const { input } of staInputs) {
-    const key = input.groupKey || '__network__';
+    const key = input.groupKey?.trim();
+    if (!key) continue;
     const stats = groupStats.get(key) || { tx: [], rx: [] };
     const tx = finite(input.metrics.txRate);
     const rx = finite(input.metrics.rxRate);
@@ -237,7 +238,7 @@ export function assessAirOsNetwork(
       score += addReason(reasons, 'LAN_SPEED_LOW', 'Enlace LAN lento', lanSpeed, 'Mbps', 10, 'deficient');
     }
 
-    const group = groupStats.get(input.groupKey || '__network__');
+    const group = input.groupKey?.trim() ? groupStats.get(input.groupKey.trim()) : null;
     const enoughPeers = !!group && Math.max(group.tx.length, group.rx.length) >= 3;
     const txRelative = relativeRateBand(txRate, enoughPeers ? median(group?.tx || []) : null, 'TX', reasons);
     const rxRelative = relativeRateBand(rxRate, enoughPeers ? median(group?.rx || []) : null, 'RX', reasons);
