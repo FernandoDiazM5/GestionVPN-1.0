@@ -223,6 +223,7 @@ router.patch('/moderators/:id', validate({ params: IdParamsSchema }), asyncHandl
   }
   if (password !== undefined) {
     await query('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?', [await hashPassword(password), now, mod.id]);
+    await invalidateUserCache(mod.id);
   }
   if (disabled !== undefined) {
     // 1) Persistir el estado en BD (todos los users del workspace cuando suspendemos,
@@ -261,7 +262,9 @@ router.patch('/moderators/:id', validate({ params: IdParamsSchema }), asyncHandl
           WHERE workspace_id = ? AND status = 'ACTIVE'`,
         [now, mod.workspace_id]
       );
-      userIds.forEach(invalidateUserCache);
+      await Promise.all(userIds.map(invalidateUserCache));
+    } else {
+      await invalidateUserCache(mod.id);
     }
   }
 
@@ -357,12 +360,13 @@ router.delete('/moderators/:id', validate({ params: IdParamsSchema }), asyncHand
       if (toDelete.length) {
         const ph2 = toDelete.map(() => '?').join(',');
       await tx.query(`DELETE FROM users WHERE id IN (${ph2})`, toDelete); // nosemgrep: gestionvpn-sql-dynamic-query -- sólo expande placeholders '?'; valores ligados aparte.
-        // Invalida el cache de auth → el próximo request del user borrado
-        // dará 401 USER_DELETED y el frontend lo redirigirá a login.
-        toDelete.forEach(invalidateUserCache);
       }
     }
   });
+
+  // Los usuarios que conservan otra membresía también deben perder tokens que
+  // apuntaban al workspace eliminado. Para usuarios borrados es un no-op por CASCADE.
+  await Promise.all(wsUserIds.map(invalidateUserCache));
 
   // Responder de inmediato: el borrado en BD ya está hecho. La limpieza del
   // router (peers WG + mangles + de-provisión de nodos) corre en segundo plano

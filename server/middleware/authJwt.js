@@ -1,52 +1,115 @@
-// ============================================================
-//  Middleware de sesión multi-tenant (Fase 2)
-//  Lee la cookie HttpOnly 'vpn_session' y expone req.account.
-//  requireRole(...) aplica RBAC por rol de workspace.
-// ============================================================
 const { COOKIE_NAME, verifySession, clearSessionCookie } = require('../lib/jwt');
 const { sendError } = require('../lib/apiResponse');
-const { getAccountStatus, invalidateAccountStatus } = require('../lib/accountStatus');
+const authSessionRepo = require('../db/repos/authSessionRepo');
+const { getAppSetting, decryptPass } = require('../db.service');
 const log = require('../lib/logger').child({ scope: 'auth' });
+const metrics = require('../lib/metrics');
 
-/** Invalida el cache de un user (llamar al borrarlo). */
-function invalidateUserCache(userId) {
-  invalidateAccountStatus(userId);
+async function invalidateUserCache(userId) {
+  if (!userId) return 0;
+  return authSessionRepo.revokeAll(userId);
 }
 
-/** Exige sesión válida. Setea req.account = { sub, email, workspace_id, role }. */
-async function requireSession(req, res, next) {
+function rejectSession(res, message, code) {
+  try { clearSessionCookie(res); } catch (_) { /* noop */ }
+  metrics.authFailsTotal.inc({ reason: code.toLowerCase() });
+  return sendError(res, 401, message, code, { logout: true });
+}
+
+async function resolveSession(req, res) {
   const token = req.cookies?.[COOKIE_NAME];
-  if (!token) return sendError(res, 401, 'No autenticado', 'NO_SESSION');
+  if (!token) {
+    metrics.authFailsTotal.inc({ reason: 'no_session' });
+    sendError(res, 401, 'No autenticado', 'NO_SESSION', { logout: true });
+    return null;
+  }
+
   let account;
   try {
     account = verifySession(token);
   } catch (_) {
-    return sendError(res, 401, 'Sesión expirada', 'SESSION_EXPIRED');
+    rejectSession(res, 'Sesión expirada', 'SESSION_EXPIRED');
+    return null;
   }
-  // El JWT es válido, pero ¿el usuario sigue existiendo?
-  // platform_admin (sub='admin') no está en la tabla users — saltamos esa check.
-  if (account.platform_admin) {
-    req.account = account;
-    return next();
+
+  if (!account?.sub || !account?.workspace_id || !account?.role || !account?.jti) {
+    rejectSession(res, 'Sesión inválida', 'SESSION_REVOKED');
+    return null;
   }
+
+  let state;
   try {
-    const status = await getAccountStatus(account.sub);
-    if (status !== 'active') {
-      try { clearSessionCookie(res); } catch (_) { /* noop */ }
-      return status === 'suspended'
-        ? sendError(res, 401, 'Tu cuenta fue suspendida por el Administrador', 'ACCOUNT_SUSPENDED')
-        : sendError(res, 401, 'Tu cuenta fue eliminada', 'USER_DELETED');
-    }
-  } catch (e) {
-    // Si MySQL falla acá, mejor dejar pasar (degradar) que tirar 500 a todas
-    // las rutas autenticadas. El cache evita que esto pase con frecuencia.
-    log.warn({ err: e.message, userId: account.sub }, 'No se pudo verificar existencia del user (degradando)');
+    state = await authSessionRepo.findState({
+      jti: account.jti,
+      userId: account.sub,
+      workspaceId: account.workspace_id,
+    });
+  } catch (error) {
+    log.error({ code: error?.code || 'UNKNOWN' }, 'No se pudo comprobar el estado de sesión');
+    metrics.authFailsTotal.inc({ reason: 'auth_state_unavailable' });
+    sendError(res, 503, 'No se pudo comprobar el estado de la sesión', 'AUTH_STATE_UNAVAILABLE');
+    return null;
   }
-  req.account = account;
+
+  const now = Date.now();
+  if (!state || state.revoked_at || Number(state.expires_at) <= now) {
+    rejectSession(res, 'La sesión fue revocada', 'SESSION_REVOKED');
+    return null;
+  }
+  if (state.deleted_at) {
+    rejectSession(res, 'Tu cuenta fue eliminada', 'USER_DELETED');
+    return null;
+  }
+  if (state.disabled_at) {
+    rejectSession(res, 'Tu cuenta fue suspendida por el Administrador', 'ACCOUNT_SUSPENDED');
+    return null;
+  }
+
+  const isPlatformAdmin = Number(state.is_platform_admin) === 1;
+  if (Boolean(account.platform_admin) !== isPlatformAdmin) {
+    rejectSession(res, 'La sesión fue revocada', 'SESSION_REVOKED');
+    return null;
+  }
+  if (!isPlatformAdmin && (!state.workspace_exists || !state.membership_role)) {
+    rejectSession(res, 'La sesión fue revocada', 'SESSION_REVOKED');
+    return null;
+  }
+
+  req.account = {
+    ...account,
+    email: state.email || account.email,
+    role: isPlatformAdmin ? account.role : state.membership_role,
+    platform_admin: isPlatformAdmin,
+  };
+  return req.account;
+}
+
+async function requireSession(req, res, next) {
+  const account = await resolveSession(req, res);
+  if (account) next();
+}
+
+async function injectMikrotik(req) {
+  const mtIp = await getAppSetting('MT_IP');
+  const mtUser = await getAppSetting('MT_USER');
+  const mtPassData = await getAppSetting('MT_PASS');
+  req.mikrotik = (mtIp && mtUser && mtPassData)
+    ? { ip: mtIp, user: mtUser, pass: decryptPass(mtPassData) }
+    : null;
+}
+
+async function requireSessionWithMikrotik(req, res, next) {
+  const account = await resolveSession(req, res);
+  if (!account) return;
+  try {
+    await injectMikrotik(req);
+  } catch (error) {
+    log.error({ code: error?.code || 'UNKNOWN' }, 'No se pudo cargar la configuración del router');
+    return sendError(res, 503, 'No se pudo cargar la configuración del router', 'ROUTER_CONFIG_UNAVAILABLE');
+  }
   next();
 }
 
-/** RBAC: exige que el rol del usuario esté entre los permitidos. */
 function requireRole(...roles) {
   return (req, res, next) => {
     if (!req.account) return sendError(res, 401, 'No autenticado', 'NO_SESSION');
@@ -57,11 +120,17 @@ function requireRole(...roles) {
   };
 }
 
-/** Exige Administrador de plataforma (Sistemas). */
 function requirePlatformAdmin(req, res, next) {
   if (!req.account) return sendError(res, 401, 'No autenticado', 'NO_SESSION');
   if (!req.account.platform_admin) return sendError(res, 403, 'Solo el Administrador', 'NOT_PLATFORM_ADMIN');
   next();
 }
 
-module.exports = { requireSession, requireRole, requirePlatformAdmin, invalidateUserCache };
+module.exports = {
+  resolveSession,
+  requireSession,
+  requireSessionWithMikrotik,
+  requireRole,
+  requirePlatformAdmin,
+  invalidateUserCache,
+};

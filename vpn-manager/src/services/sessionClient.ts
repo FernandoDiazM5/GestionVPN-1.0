@@ -8,6 +8,7 @@
 // ============================================================
 import { API_BASE_URL } from '../config';
 import { reportFrontendError } from './errorReporting';
+import { addCsrfHeader } from '../utils/csrf';
 
 export interface ApiError extends Error {
   status: number;
@@ -19,8 +20,11 @@ export interface ApiError extends Error {
 const AUTH_PUBLIC_PATHS = [
   '/api/auth/login', '/api/auth/status', '/api/team/accept',
   '/api/auth/password-reset/request', '/api/auth/password-reset/confirm',
+  '/api/account/login', '/api/account/register', '/api/account/verify', '/api/account/resend',
 ];
-const SESSION_INVALID_CODES = new Set(['USER_DELETED', 'ACCOUNT_SUSPENDED', 'SESSION_EXPIRED', 'NO_SESSION']);
+const SESSION_INVALID_CODES = new Set([
+  'USER_DELETED', 'ACCOUNT_SUSPENDED', 'SESSION_EXPIRED', 'SESSION_REVOKED', 'NO_SESSION',
+]);
 
 let dispatchedExpired = false;
 function dispatchAuthExpired() {
@@ -41,14 +45,14 @@ interface ApiResponseBody {
 
 export async function apiJson<T = unknown>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
+  const headers = new Headers(init?.headers);
+  if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+  addCsrfHeader(headers, init?.method);
   try {
     res = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers || {}),
-    },
+    headers,
     });
   } catch (error) {
     reportFrontendError(error, { source: 'async', route: path });

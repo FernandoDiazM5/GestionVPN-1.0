@@ -5,12 +5,12 @@ const withTransaction = vi.fn();
 const findByEmail = vi.fn();
 const findMembershipByUser = vi.fn();
 const createForOwner = vi.fn();
-const signSession = vi.fn(() => 'signed-token');
+const issueSession = vi.fn().mockResolvedValue({ token: 'signed-token' });
 
 stubModule(__dirname, '../../db/mysql', { query, withTransaction });
 stubModule(__dirname, '../../db/repos/userRepo', { findByEmail });
 stubModule(__dirname, '../../db/repos/workspaceRepo', { findMembershipByUser, createForOwner });
-stubModule(__dirname, '../../lib/jwt', { signSession });
+stubModule(__dirname, '../../lib/sessionService', { issueSession });
 
 const { buildSessionForLegacyUser } = require('../../lib/sessionBridge');
 
@@ -28,7 +28,7 @@ describe('sessionBridge', () => {
 
     expect(result.user.email).toBe('recuperacion@example.com');
     expect(withTransaction).not.toHaveBeenCalled();
-    expect(signSession).toHaveBeenCalledWith(expect.objectContaining({
+    expect(issueSession).toHaveBeenCalledWith(expect.objectContaining({
       sub: 'admin-id', email: 'recuperacion@example.com', platform_admin: true,
     }));
   });

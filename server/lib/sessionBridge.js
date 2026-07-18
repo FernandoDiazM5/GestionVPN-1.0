@@ -8,7 +8,7 @@
 const crypto = require('crypto');
 const { withTransaction } = require('../db/mysql');
 const { hashPassword, verifyAndUpgrade } = require('./passwordHasher');
-const { signSession } = require('./jwt');
+const { issueSession } = require('./sessionService');
 const userRepo = require('../db/repos/userRepo');
 const workspaceRepo = require('../db/repos/workspaceRepo');
 const metrics = require('./metrics');
@@ -66,7 +66,7 @@ async function buildSessionForLegacyUser(username) {
   }
 
   const platform_admin = Number(user.is_platform_admin) === 1;
-  const token = signSession({
+  const { token } = await issueSession({
     sub: user.id, email: user.email, workspace_id: membership.workspace_id,
     role: membership.role, platform_admin,
   });
@@ -115,7 +115,7 @@ async function authenticateMysqlUser(login, password) {
   }
 
   const platform_admin = Number(user.is_platform_admin) === 1;
-  const token = signSession({
+  const { token } = await issueSession({
     sub: user.id, email: user.email, workspace_id: membership.workspace_id,
     role: membership.role, platform_admin,
   });

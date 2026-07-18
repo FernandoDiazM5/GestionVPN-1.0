@@ -22,10 +22,11 @@ const {
 
 const { asyncHandler, AppError, sendOk } = require('../lib/apiResponse');
 const { withTransaction, query } = require('../db/mysql');
-const { signSession, setSessionCookie } = require('../lib/jwt');
+const { setSessionCookie } = require('../lib/jwt');
+const { issueSession, rotateSession, revokeAllSessions } = require('../lib/sessionService');
 const { sendOtp, sendInvitation } = require('../lib/mailer');
 const rl = require('../lib/rateLimit');
-const { requireSession, requireRole, invalidateUserCache } = require('../middleware/authJwt');
+const { requireSession, requireRole } = require('../middleware/authJwt');
 const userRepo = require('../db/repos/userRepo');
 const memberRepo = require('../db/repos/memberRepo');
 const invitationRepo = require('../db/repos/invitationRepo');
@@ -366,7 +367,9 @@ router.post('/accept', rl.guardPolicy('OTP_VERIFY'), asyncHandler(async (req, re
     }
   }
 
-  const token = signSession({ sub: user.id, email, workspace_id: inv.workspace_id, role: inv.role });
+  const { token } = await issueSession({
+    sub: user.id, email, workspace_id: inv.workspace_id, role: inv.role, platform_admin: false,
+  });
   setSessionCookie(res, token);
   return sendOk(res, {
     user: { id: user.id, email, role: inv.role, workspace_id: inv.workspace_id },
@@ -425,7 +428,11 @@ router.post('/invitations/:id/accept', requireSession, validate({ params: IdPara
   }
 
   // Cambia la sesión al workspace recién aceptado
-  const token = signSession({ sub: userId, email: req.account.email, workspace_id: inv.workspace_id, role: inv.role });
+  const { token } = await rotateSession(req.account, {
+    workspace_id: inv.workspace_id,
+    role: inv.role,
+    platform_admin: false,
+  });
   setSessionCookie(res, token);
   return sendOk(res, {
     user: { id: userId, email: req.account.email, role: inv.role, workspace_id: inv.workspace_id },
@@ -488,7 +495,11 @@ router.patch('/member/:userId', requireSession, requireRole('OWNER'),
     const publicKeys = wgRows.map(r => r.public_key);
     const routerSync = await setPeersEnabled(publicKeys, !disabled);
 
-    // 3) Si deshabilitamos: borrar mangle activo del usuario + cerrar sesión + invalidar cache
+    // Toda transición de estado invalida sesiones anteriores; al rehabilitar
+    // el usuario debe autenticarse de nuevo.
+    await revokeAllSessions(userId);
+
+    // 3) Si deshabilitamos: borrar mangle activo del usuario + cerrar sesión
     let mangleCleanup = null;
     if (disabled) {
       // Borrar la regla mangle del usuario del router (corte inmediato de acceso)
@@ -500,7 +511,6 @@ router.patch('/member/:userId', requireSession, requireRole('OWNER'),
           WHERE workspace_id = ? AND user_id = ? AND status = 'ACTIVE'`,
         [now, wsId, userId]
       );
-      invalidateUserCache(userId);
     }
 
     return sendOk(res, {
@@ -559,10 +569,10 @@ router.delete('/member/:userId', requireSession, requireRole('OWNER'),
       const otherWs = await tx.query('SELECT 1 FROM workspace_members WHERE user_id = ? LIMIT 1', [userId]);
       if (!otherWs.length) {
         await tx.query('DELETE FROM users WHERE id = ?', [userId]);
-        // Invalida el cache de auth → próximo request del user dará 401
-        invalidateUserCache(userId);
       }
     });
+
+    await revokeAllSessions(userId);
 
     return sendOk(res, {
       message: 'Miembro eliminado completamente',

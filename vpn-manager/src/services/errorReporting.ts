@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '../config';
+import { addCsrfHeader } from '../utils/csrf';
 
 export type FrontendErrorSource = 'render' | 'window-error' | 'unhandled-rejection' | 'async';
 
@@ -46,11 +47,12 @@ export function reportFrontendError(value: unknown, context: ErrorContext): void
     occurredAt: now,
   };
 
+  const headers = addCsrfHeader(new Headers({ 'Content-Type': 'application/json' }), 'POST');
   void fetch(`${API_BASE_URL}/api/error-reports`, {
     method: 'POST',
     credentials: 'include',
     keepalive: true,
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(payload),
   }).catch(() => undefined);
 }

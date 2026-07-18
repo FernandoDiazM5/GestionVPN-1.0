@@ -190,6 +190,19 @@ CREATE TABLE IF NOT EXISTS auth_attempts (
   KEY idx_aa_email_kind (email, kind, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Sesiones web revocables. El JWT identifica la fila mediante `jti`.
+CREATE TABLE IF NOT EXISTS auth_sessions (
+  jti         CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  user_id     CHAR(36) NOT NULL,
+  expires_at  BIGINT   NOT NULL,
+  revoked_at  BIGINT   DEFAULT NULL,
+  created_at  BIGINT   NOT NULL,
+  PRIMARY KEY (jti),
+  KEY idx_auth_sessions_user (user_id, revoked_at, expires_at),
+  KEY idx_auth_sessions_expiry (expires_at),
+  CONSTRAINT fk_auth_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ── 8b. Buckets atómicos de autenticación (sin identidades en claro) ──
 CREATE TABLE IF NOT EXISTS auth_rate_buckets (
   bucket_hash       CHAR(64)    NOT NULL,

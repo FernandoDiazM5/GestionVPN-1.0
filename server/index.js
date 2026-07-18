@@ -37,6 +37,8 @@ const dashboardMetrics = require('./lib/dashboardMetrics');
 const apRoutes  = require('./ap.routes');
 const { initDb } = require('./db.service');
 const { requireJsonForMutation, strictJsonParser } = require('./middleware/requestBodySecurity');
+const { csrfProtection } = require('./middleware/csrfProtection');
+const { allowedOrigins } = require('./lib/originPolicy');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -63,14 +65,6 @@ process.on('uncaughtException', (err) => {
 process.on('unhandledRejection', (reason) => {
     logger.warn({ err: reason }, 'unhandledRejection');
 });
-
-// Orígenes permitidos: variables de entorno (Docker) o valores por defecto (dev local)
-const defaultOrigins = ['http://localhost:5173','http://localhost:5174','http://localhost:4173',
-                        'http://127.0.0.1:5173','http://127.0.0.1:5174','http://localhost:8080','http://127.0.0.1:8080',
-                        'http://134.199.212.232:8080'];
-const allowedOrigins = process.env.CORS_ORIGINS
-    ? [...new Set([...process.env.CORS_ORIGINS.split(',').map(s => s.trim()), ...defaultOrigins])]
-    : defaultOrigins;
 
 const authRoutes = require('./auth.routes');
 const { verifyToken } = require('./auth.middleware');
@@ -129,12 +123,13 @@ app.use(cors({
         callback(new Error('Not allowed by CORS'));
     },
     methods: ['GET','POST','PUT','PATCH','DELETE'],
-    allowedHeaders: ['Content-Type'],
+    allowedHeaders: ['Content-Type', 'X-CSRF-Token'],
     credentials: true,
 }));
 app.use(requireJsonForMutation);
 app.use(strictJsonParser);
 app.use(cookieParser());
+app.use(csrfProtection);
 
 // ── HTTP logger (pino-http) ────────────────────────────────────────
 //  • Asigna reqId UUID a cada request, propagado a todos los logs de la

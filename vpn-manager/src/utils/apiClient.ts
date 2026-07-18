@@ -16,6 +16,7 @@
 
 import type { TunnelErrorCode } from '@gestionvpn/contracts';
 import { reportFrontendError } from '../services/errorReporting';
+import { addCsrfHeader } from './csrf';
 
 /**
  * Wrapper tipado de fetch que:
@@ -34,6 +35,7 @@ export const apiFetch = async (input: RequestInfo | URL, init?: RequestInit): Pr
       headers.set('Content-Type', 'application/json');
     }
   }
+  addCsrfHeader(headers, init?.method);
 
   let response: Response;
   try {
@@ -46,7 +48,6 @@ export const apiFetch = async (input: RequestInfo | URL, init?: RequestInit): Pr
     reportFrontendError(error, { source: 'async', route: typeof input === 'string' ? input : input.toString() });
     throw error;
   }
-
   // Interceptar sesión inválida/expirada.
   //  • 401 = sesión muerta SIEMPRE (token ausente/ilegible) → desloguear.
   //  • 403 = AMBIGUO: puede ser "token expirado" (auth.middleware marca

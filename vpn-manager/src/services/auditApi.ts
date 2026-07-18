@@ -5,6 +5,7 @@ import { get } from './sessionClient';
 import type { AuditLog } from '../types/account';
 import type { AuditExportRequest } from '@gestionvpn/contracts';
 import { API_BASE_URL } from '../config';
+import { apiFetch } from '../utils/apiClient';
 
 export const auditApi = {
   listLogs: (limit = 100, tunnelId?: string) => {
@@ -20,7 +21,7 @@ export const auditApi = {
    * necesitamos leer Content-Disposition.
    */
   exportLogs: async (req: AuditExportRequest): Promise<{ blob: Blob; filename: string }> => {
-    const res = await fetch(`${API_BASE_URL}/api/audit/export`, {
+    const res = await apiFetch(`${API_BASE_URL}/api/audit/export`, {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },

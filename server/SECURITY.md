@@ -72,7 +72,7 @@ Este archivo es referencia normativa para cualquier cambio en `server/` y `packa
 - Secretos se inyectan por entorno/secret store y nunca se versionan.
 - Claves persistentes no se generan dentro de una imagen efímera sin volumen seguro.
 - Archivos de claves usan permisos mínimos.
-- JWT soportará rotación active/previous con `kid`; no rotar borrando la única clave sin plan de sesión.
+- JWT usa keyring active/previous con `kid`; mantener la clave anterior al menos durante `JWT_EXPIRES` y nunca rotar borrando la única clave válida.
 - No inventar algoritmos criptográficos.
 
 ## 9. Dependencias y proveedores

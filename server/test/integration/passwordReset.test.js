@@ -30,6 +30,10 @@ const authJwtMocks = stubModule(__dirname, '../../middleware/authJwt', {
   invalidateUserCache: vi.fn(),
 });
 
+const sessionServiceMocks = stubModule(__dirname, '../../lib/sessionService', {
+  revokeAllSessions: vi.fn().mockResolvedValue(1),
+});
+
 // JWT_SECRET requerido por auth.middleware → stub minimalista
 stubModule(__dirname, '../../auth.middleware', {
   JWT_SECRET: 'test-jwt-secret',
@@ -189,7 +193,7 @@ describe('POST /api/auth/password-reset/confirm — single-use', () => {
     );
     expect(prMocks.markUsed).toHaveBeenCalledWith('pr1');
     expect(prMocks.invalidateForUser).toHaveBeenCalledWith('u1');
-    expect(authJwtMocks.invalidateUserCache).toHaveBeenCalledWith('u1');
+    expect(sessionServiceMocks.revokeAllSessions).toHaveBeenCalledWith('u1');
   });
 
   it('token INVÁLIDO (no encontrado) → 401 INVALID_TOKEN sin tocar BD', async () => {
@@ -200,7 +204,7 @@ describe('POST /api/auth/password-reset/confirm — single-use', () => {
     expect(r.body.code).toBe('INVALID_TOKEN');
     // No UPDATE password ni markUsed
     expect(prMocks.markUsed).not.toHaveBeenCalled();
-    expect(authJwtMocks.invalidateUserCache).not.toHaveBeenCalled();
+    expect(sessionServiceMocks.revokeAllSessions).not.toHaveBeenCalled();
   });
 
   it('newPassword < 12 chars → 400 (zod)', async () => {

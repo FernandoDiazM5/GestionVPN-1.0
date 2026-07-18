@@ -27,6 +27,7 @@ const scanMangleSync = require('./scanMangleSync');
 const sse = require('./sse');
 const { getAppSetting, decryptPass } = require('../db.service');
 const { analysisRetentionDays, snapshotRetentionDays } = require('./ai/aiRetention');
+const authSessionRepo = require('../db/repos/authSessionRepo');
 
 // Retención de la "Actividad reciente": guarda como MÁXIMO los últimos N días
 // (default 7) → purga rodante que va quitando el día más viejo. Se ejecuta como
@@ -86,6 +87,9 @@ async function runOnce() {
     // abajo para que corra aunque no haya sesiones expiradas este tick.
     await purgeOldAudit();
     await purgeOldAiData();
+    await authSessionRepo.purgeExpired().catch(error => {
+      log.warn({ code: error?.code || 'UNKNOWN' }, 'sesiones web: purga falló (best-effort)');
+    });
 
     const expired = await sessionRepo.findExpired();
     if (!expired.length) return;

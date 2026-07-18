@@ -25,6 +25,7 @@ describe('sessionClient.apiJson', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
   });
   afterEach(() => {
+    document.cookie = 'vpn_csrf=; Max-Age=0; path=/';
     window.removeEventListener('auth_expired', authExpiredSpy);
     // Avanza el cooldown completo y restaura timers reales
     vi.advanceTimersByTime(3500);
@@ -60,6 +61,26 @@ describe('sessionClient.apiJson', () => {
       HttpResponse.json({ success: false, code: 'SESSION_EXPIRED' }, { status: 401 })));
     await expect(apiJson('/api/test/x')).rejects.toThrow();
     expect(authExpiredSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('401 SESSION_REVOKED → dispara auth_expired', async () => {
+    server.use(http.get(`${API_BASE_URL}/api/test/revoked`, () =>
+      HttpResponse.json({ success: false, code: 'SESSION_REVOKED' }, { status: 401 })));
+    await expect(apiJson('/api/test/revoked')).rejects.toThrow();
+    expect(authExpiredSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('añade X-CSRF-Token a mutaciones cuando existe la cookie', async () => {
+    document.cookie = 'vpn_csrf=csrf-test-token; path=/';
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(
+      JSON.stringify({ success: true }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ));
+
+    await apiJson('/api/test/mutation', { method: 'POST', body: '{}' });
+
+    const headers = fetchSpy.mock.calls[0][1]?.headers as Headers;
+    expect(headers.get('X-CSRF-Token')).toBe('csrf-test-token');
   });
 
   it('401 ACCOUNT_SUSPENDED → dispara auth_expired', async () => {

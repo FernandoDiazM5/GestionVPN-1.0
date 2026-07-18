@@ -8,7 +8,7 @@ const userRepo = require('./db/repos/userRepo');
 const passwordResetRepo = require('./db/repos/passwordResetRepo');
 const { sendPasswordReset } = require('./lib/mailer');
 const rl = require('./lib/rateLimit');
-const { invalidateUserCache } = require('./middleware/authJwt');
+const { revokeAllSessions } = require('./lib/sessionService');
 const log = require('./lib/logger').child({ scope: 'auth' });
 const { sendOk, sendError } = require('./lib/apiResponse');
 const metrics = require('./lib/metrics');
@@ -214,8 +214,8 @@ router.post('/password-reset/confirm', rl.guardPolicy('RESET_CONFIRM'), async (r
     await passwordResetRepo.markUsed(found.id);
     await passwordResetRepo.invalidateForUser(found.userId);
 
-    // Por seguridad: invalidar sesiones activas del user (cache de auth)
-    invalidateUserCache(found.userId);
+    // Por seguridad: invalidar inmediatamente todas las sesiones web.
+    await revokeAllSessions(found.userId);
 
     return sendOk(res, { message: 'Contraseña actualizada. Ya puedes iniciar sesión con tu nueva clave.' });
   } catch (err) {

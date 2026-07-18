@@ -2,7 +2,7 @@
 
 Fecha: 2026-07-18  
 Rama base analizada: `vps_prod` (`767c7ae`)  
-Estado: plan de implementación; no aplica cambios funcionales por sí mismo.
+Estado: Fases 0–5 implementadas localmente; pendientes validación operativa, push y despliegue.
 
 ## 1. Objetivo
 
@@ -356,6 +356,20 @@ Aunque no reemplaza los cinco controles solicitados, esta fase es obligatoria po
 8. Fallar cerrado si no puede comprobarse el estado de cuenta: `503 AUTH_STATE_UNAVAILABLE`, sin ejecutar la operación. No confundir una caída de dependencia con token expirado.
 9. Añadir `kid` y keyring active/previous para rotar la firma sin cerrar todas las sesiones de forma accidental; secretos inyectados fuera del repo con permisos mínimos.
 10. Añadir pruebas de CSRF cross-site, Origin ausente/manipulado, cookie robada, token revocado, BD de estado caída y rotación de clave.
+
+#### Estado de implementación — 2026-07-18
+
+- [x] Allowlist de Origin centralizada; producción no arranca sin `CORS_ORIGINS` explícito.
+- [x] Double-submit CSRF ligado criptográficamente al `jti`: cookie legible `vpn_csrf` `SameSite=Strict` y header `X-CSRF-Token` en ambos clientes HTTP del SPA.
+- [x] `vpn_session` conserva `HttpOnly`, `Secure` en producción, `SameSite=Lax` y `Path=/`; ambas cookies se borran con atributos simétricos.
+- [x] Tabla `auth_sessions` y migración idempotente; cada sesión tiene `jti`, expiración y revocación server-side sin almacenar el JWT.
+- [x] Login/verify/accept emiten sesión registrada; renovación y cambio de workspace rotan `jti`; logout revoca la sesión y `logout-all` revoca todas.
+- [x] Cambio/reset de password, cambio de email, suspensión, rehabilitación y eliminaciones administrativas revocan sesiones inmediatamente.
+- [x] `verifyToken` es un adaptador del único middleware autoritativo `requireSessionWithMikrotik`; toda comprobación de sesión consulta MySQL y falla cerrado con `503 AUTH_STATE_UNAVAILABLE`.
+- [x] JWT valida algoritmo, issuer y audience, firma con el `kid` activo y acepta temporalmente una clave previous; secretos de 32+ bytes viven fuera del repo.
+- [x] Pruebas negativas cubren Origin hostil/ausente, token CSRF ausente o ajeno, cookie robada, revocación, caída de BD, cookies, migración, rotación de `jti` y convivencia active/previous.
+- [ ] Antes del primer despliegue: backup, ejecutar `migrate:auth-sessions`, asumir un cierre único de las sesiones legacy sin `jti`, probar login/logout/renovación con dos navegadores y conservar rollback de aplicación+BD.
+- [ ] Para futuras rotaciones: mantener active+previous durante al menos `JWT_EXPIRES`; retirar previous sólo cuando no queden tokens vigentes firmados por ella.
 
 ### Fase 6 — Decisión BaaS: Firebase Auth / Identity Platform
 

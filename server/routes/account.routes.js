@@ -22,12 +22,19 @@ const {
 
 const { asyncHandler, AppError, sendOk } = require('../lib/apiResponse');
 const { withTransaction } = require('../db/mysql');
-const { signSession, setSessionCookie, clearSessionCookie } = require('../lib/jwt');
+const { setSessionCookie, clearSessionCookie } = require('../lib/jwt');
+const {
+  issueSession,
+  rotateSession,
+  replaceAllSessions,
+  revokeSession,
+  revokeAllSessions,
+} = require('../lib/sessionService');
 const { sendOtp } = require('../lib/mailer');
 const rl = require('../lib/rateLimit');
 const userRepo = require('../db/repos/userRepo');
 const workspaceRepo = require('../db/repos/workspaceRepo');
-const { requireSession, invalidateUserCache } = require('../middleware/authJwt');
+const { requireSession } = require('../middleware/authJwt');
 const { query } = require('../db/mysql');
 const log = require('../lib/logger').child({ scope: 'account' });
 
@@ -111,7 +118,9 @@ router.post('/verify', rl.guardPolicy('OTP_VERIFY'), asyncHandler(async (req, re
 
   await rl.clearSuccessfulIdentity(req);
 
-  const token = signSession({ sub: user.id, email: user.email, workspace_id: workspaceId, role: 'OWNER' });
+  const { token } = await issueSession({
+    sub: user.id, email: user.email, workspace_id: workspaceId, role: 'OWNER', platform_admin: false,
+  });
   setSessionCookie(res, token);
   return sendOk(res, { user: { id: user.id, email: user.email, role: 'OWNER', workspace_id: workspaceId } });
 }));
@@ -144,22 +153,27 @@ router.post('/login', rl.guardPolicy('LOGIN'), asyncHandler(async (req, res) => 
 }));
 
 // ── POST /logout ─────────────────────────────────────────────
-router.post('/logout', (req, res) => {
+router.post('/logout', requireSession, asyncHandler(async (req, res) => {
+  await revokeSession(req.account.jti, req.account.sub);
   clearSessionCookie(res);
   return sendOk(res, { message: 'Sesión cerrada' });
-});
+}));
+
+router.post('/logout-all', requireSession, asyncHandler(async (req, res) => {
+  await revokeAllSessions(req.account.sub);
+  clearSessionCookie(res);
+  return sendOk(res, { message: 'Sesiones cerradas en todos los dispositivos' });
+}));
 
 router.get('/session-status', requireSession, (req, res) => sendOk(res, {
   expiresAt: Number(req.account.exp) * 1000,
 }));
 
-router.post('/session-renew', requireSession, (req, res) => {
-  const { iat: _iat, exp: _exp, ...identity } = req.account;
-  const token = signSession(identity);
-  const renewed = require('../lib/jwt').verifySession(token);
-  setSessionCookie(res, token);
-  return sendOk(res, { expiresAt: Number(renewed.exp) * 1000 });
-});
+router.post('/session-renew', requireSession, asyncHandler(async (req, res) => {
+  const renewed = await rotateSession(req.account);
+  setSessionCookie(res, renewed.token);
+  return sendOk(res, { expiresAt: renewed.expiresAt });
+}));
 
 // Ausencia de cookie durante el arranque del login no es un error. Si existe
 // cookie, requireSession conserva todas las validaciones (expirada/suspendida).
@@ -210,9 +224,10 @@ router.patch('/password', requireSession, asyncHandler(async (req, res) => {
   const newHash = await hashPassword(newPassword);
   await query('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?',
     [newHash, Date.now(), user.id]);
-  // Invalidar cache de auth: cualquier otra sesión existente del usuario
-  // quedará en 401 USER_DELETED en su próximo request.
-  invalidateUserCache(user.id);
+  // Revoca todas las sesiones previas y conserva únicamente esta sesión
+  // mediante un nuevo jti/cookie.
+  const renewed = await replaceAllSessions(req.account);
+  setSessionCookie(res, renewed.token);
 
   return sendOk(res, { message: 'Contraseña actualizada' });
 }));
@@ -287,9 +302,8 @@ router.post('/email/confirm', requireSession, asyncHandler(async (req, res) => {
     'UPDATE users SET email = ?, otp_hash = NULL, otp_expires_at = NULL, updated_at = ? WHERE id = ?',
     [lc, Date.now(), user.id]
   );
-  // Invalidar cache: el JWT viejo lleva el email anterior; en próximas requests
-  // el middleware recalculará y el frontend recibirá el nuevo /me.
-  invalidateUserCache(user.id);
+  const renewed = await replaceAllSessions(req.account, { email: lc });
+  setSessionCookie(res, renewed.token);
 
   return sendOk(res, { message: 'Correo actualizado', email: lc });
 }));

@@ -13,8 +13,8 @@ const passwordMocks = stubModule(__dirname, '../../lib/passwordHasher', {
   verifyAndUpgrade: vi.fn(),
 });
 
-const jwtMocks = stubModule(__dirname, '../../lib/jwt', {
-  signSession: vi.fn().mockReturnValue('signed-session'),
+const sessionMocks = stubModule(__dirname, '../../lib/sessionService', {
+  issueSession: vi.fn().mockResolvedValue({ token: 'signed-session' }),
 });
 
 const userRepoMocks = stubModule(__dirname, '../../db/repos/userRepo', {
@@ -81,7 +81,7 @@ describe('authenticateMysqlUser anti-enumeración', () => {
     expect(passwordMocks.verifyAndUpgrade).toHaveBeenCalledTimes(1);
     expect(workspaceRepoMocks.findMembershipByUser).toHaveBeenCalledWith(membershipLookupId);
     expect(metricsMocks.authFailsTotal.inc).toHaveBeenCalledWith({ reason });
-    expect(jwtMocks.signSession).not.toHaveBeenCalled();
+    expect(sessionMocks.issueSession).not.toHaveBeenCalled();
   });
 
   it('hace siempre lookup por email y nombre para usernames cortos', async () => {

@@ -540,11 +540,42 @@ Se usa un `/24` **dedicado** para el scan-pool (`10.11.252.0/24`), separado de l
 
 ---
 
+## 12. Seguridad de sesiones — activación de Fase 5
+
+El `entrypoint.sh` crea `auth_sessions` antes de iniciar Express. En el primer despliegue de esta fase, las cookies antiguas no poseen `jti`, issuer ni audience y serán rechazadas: es un **cierre de sesión único esperado**, no pérdida de cuentas ni passwords.
+
+Antes del rebuild:
+
+1. Crear backup verificable de MariaDB y del volumen `backend-data`.
+2. Confirmar `CORS_ORIGINS` con el origen exacto del panel (protocolo + host + puerto, sin path).
+3. Conservar `/data/.jwt_secret`; funciona como clave activa `kid=legacy` durante la activación inicial.
+4. Confirmar que `server/.env.production` tiene permisos `600` y no está versionado.
+
+Prueba posterior obligatoria: login, mutación autenticada, renovación, logout y `logout-all`; repetir con dos navegadores para comprobar revocación inmediata. Un fallo de MySQL durante una operación autenticada debe responder `503 AUTH_STATE_UNAVAILABLE`, nunca permitir la operación.
+
+### Rotación futura de la firma JWT sin corte
+
+Generar una clave nueva fuera del repo y configurar temporalmente el keyring completo en `server/.env.production`:
+
+```bash
+openssl rand -hex 64
+# JWT_ACTIVE_KID=2026-08
+# JWT_ACTIVE_SECRET=<nuevo secreto>
+# JWT_PREVIOUS_KID=legacy
+# JWT_PREVIOUS_SECRET=<contenido anterior de /data/.jwt_secret>
+chmod 600 server/.env.production
+docker compose -f docker-compose.prod.yml up -d --build backend
+```
+
+Mantener la clave previous durante al menos el valor completo de `JWT_EXPIRES` (8 h por defecto). Después se pueden retirar `JWT_PREVIOUS_KID` y `JWT_PREVIOUS_SECRET`; no retirar ni cambiar `JWT_ACTIVE_SECRET` en ese paso. Nunca imprimir los valores en logs, commits, capturas ni handoffs.
+
 ## ✅ Checklist operativo final (en el VPS)
 
 > Todo el código está cerrado y en `main`/`dev` (tip `9f785c1`, historial purgado). Lo que queda es operativo en el servidor.
 
 ### Seguridad (hacer al desplegar)
+- [ ] Backup de MariaDB y `backend-data`; aceptar el re-login único de cookies legacy tras activar `auth_sessions`.
+- [ ] `CORS_ORIGINS` exacto y HTTPS; login + mutación + renovación + logout global probados en dos navegadores.
 - [ ] **Cerrar el puerto 3001:** `sudo ufw deny 3001/tcp` (el backend en `network_mode: host` lo expone; solo nginx en 443 debe ser público). Verificar: `sudo ufw status`.
 - [ ] **Rotar credenciales históricas:** cambiar en los equipos las contraseñas SSH de antenas y la `MT_PASS` que existieron en el viejo `database.sqlite` (estaba junto a su `.db_secret` → descifrables). Producción usa secretos nuevos, pero los valores antiguos deben considerarse comprometidos.
 - [ ] Firewall: `22/tcp`, `80/tcp`, `443/tcp`, `51820/udp` abiertos; `3001` y `3307` NO.

@@ -26,6 +26,8 @@ export const accountApi = {
 
   logout: () => post('/api/account/logout'),
 
+  logoutAll: () => post('/api/account/logout-all'),
+
   sessionStatus: () => get<{ success: true; expiresAt: number }>('/api/account/session-status'),
 
   renewSession: () => post<{ success: true; expiresAt: number }>('/api/account/session-renew'),
