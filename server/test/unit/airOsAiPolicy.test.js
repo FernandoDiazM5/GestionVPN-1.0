@@ -11,7 +11,7 @@ describe('política de salida Gemini AirOS', () => {
     const analysis = {
       ...base,
       findings: [{
-        title: 'Señal adecuada', evidence: ['signal: -63 dBm', 'snrDb: 29 dB'],
+        title: 'Señal adecuada', deviceIds: ['Equipo 01'], evidence: ['signal: -63 dBm', 'snrDb: 29 dB'],
         interpretation: 'El margen es adecuado.', possibleCauses: [], manualChecks: ['Verificar estabilidad visualmente.'],
       }],
     };
@@ -31,10 +31,21 @@ describe('política de salida Gemini AirOS', () => {
     const analysis = {
       ...base,
       findings: [{
-        title: 'Dato inventado', evidence: ['temperatura: 95 C'], interpretation: 'Crítico',
+        title: 'Dato inventado', deviceIds: ['Equipo 01'], evidence: ['temperatura: 95 C'], interpretation: 'Crítico',
         possibleCauses: [], manualChecks: [],
       }],
     };
     expect(() => validateAnalysisPolicy(analysis, dto)).toThrow(/evidencia no sustentada/i);
+  });
+
+  it('rechaza alias de equipos que no pertenecen al snapshot', () => {
+    const analysis = {
+      ...base,
+      findings: [{
+        title: 'Equipo ajeno', deviceIds: ['STA-99'], evidence: ['signal: -63 dBm'],
+        interpretation: 'No válido', possibleCauses: [], manualChecks: [],
+      }],
+    };
+    expect(() => validateAnalysisPolicy(analysis, dto)).toThrow(/equipos ajenos/i);
   });
 });

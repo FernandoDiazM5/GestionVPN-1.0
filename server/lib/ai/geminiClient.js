@@ -15,9 +15,10 @@ const RESPONSE_JSON_SCHEMA = {
       type: 'array', maxItems: 8,
       items: {
         type: 'object', additionalProperties: false,
-        required: ['title', 'evidence', 'interpretation', 'possibleCauses', 'manualChecks'],
+        required: ['title', 'deviceIds', 'evidence', 'interpretation', 'possibleCauses', 'manualChecks'],
         properties: {
           title: { type: 'string' },
+          deviceIds: { type: 'array', maxItems: 10, items: { type: 'string' } },
           evidence: { type: 'array', maxItems: 8, items: { type: 'string' } },
           interpretation: { type: 'string' },
           possibleCauses: { type: 'array', maxItems: 5, items: { type: 'string' } },
@@ -52,7 +53,7 @@ function getClient() {
 
 async function generateAnalysis({ kind, dto }) {
   const maxOutputTokens = kind === 'NETWORK'
-    ? Number(process.env.GEMINI_MAX_OUTPUT_TOKENS_NETWORK || 3200)
+    ? Number(process.env.GEMINI_MAX_OUTPUT_TOKENS_NETWORK || 2000)
     : Number(process.env.GEMINI_MAX_OUTPUT_TOKENS_DEVICE || 700);
   const timeoutMs = Number(process.env.GEMINI_TIMEOUT_MS || 30000);
   const response = await getClient().models.generateContent({

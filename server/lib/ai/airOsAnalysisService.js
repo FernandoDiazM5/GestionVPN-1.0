@@ -44,7 +44,7 @@ function providerError(error) {
   return new AppError('No fue posible completar el análisis con Gemini', 502, 'AI_PROVIDER_ERROR');
 }
 
-async function analyzeOnce({ workspaceId, userId, type, dto, hash, promptVersion, scope }) {
+async function analyzeOnce({ workspaceId, userId, type, dto, snapshotDevices, hash, promptVersion, scope }) {
   if (!geminiClient.configured()) throw providerError({ code: 'AI_NOT_CONFIGURED' });
   const settings = config();
   const ttlMs = type === 'NETWORK' ? settings.networkCacheTtlMs : settings.deviceCacheTtlMs;
@@ -86,7 +86,7 @@ async function analyzeOnce({ workspaceId, userId, type, dto, hash, promptVersion
       workspaceId, userId, type, hash, promptVersion,
       model: geminiClient.model(), scope, ttlMs,
     });
-    const devices = type === 'NETWORK' ? dto.devices : [dto];
+    const devices = snapshotDevices || (type === 'NETWORK' ? dto.devices : [dto]);
     await aiSnapshotRepo.insertMany({
       workspaceId,
       analysisRunId: run.id,

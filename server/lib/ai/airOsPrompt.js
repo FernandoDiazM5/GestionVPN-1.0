@@ -1,4 +1,4 @@
-const PROMPT_VERSION = 'air-os-v1';
+const PROMPT_VERSION = 'air-os-v2-sta-candidates';
 
 function buildPrompt(kind, dto) {
   const maxFindings = kind === 'NETWORK' ? 6 : 5;
@@ -9,8 +9,11 @@ function buildPrompt(kind, dto) {
     'No inventes datos ausentes ni afirmes tendencias sin historial.',
     'La respuesta es sólo consultiva: no ejecutes acciones, no escribas comandos y no ordenes cambios.',
     'Cita evidencia mediante nombre de métrica y valor.',
+    'Cada hallazgo debe incluir deviceIds con los alias exactos afectados; no inventes alias.',
+    'En análisis NETWORK sólo recibes receptores STA preseleccionados por reglas locales.',
+    'No repitas en prosa todos los datos ni los equipos saludables del resumen.',
     `Devuelve como máximo ${maxFindings} hallazgos, en español claro.`,
-    'Prioriza los hallazgos; usa frases concisas y evita repetir la misma evidencia.',
+    'Prioriza los hallazgos; usa frases breves y evita repetir la misma evidencia.',
     `Tipo de análisis: ${kind}.`,
     `Datos: ${JSON.stringify(dto)}`,
   ].join('\n');

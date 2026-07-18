@@ -26,7 +26,7 @@ function limits() {
     dailyRequests: Number(process.env.GEMINI_DAILY_REQUEST_BUDGET || 20),
     workspaceDailyRequests: Number(process.env.GEMINI_WORKSPACE_DAILY_REQUEST_BUDGET || 10),
     dailyTokens: Number(process.env.GEMINI_DAILY_TOKEN_BUDGET || 150000),
-    maxDevicesPerNetwork: Number(process.env.GEMINI_MAX_DEVICES_PER_NETWORK || 40),
+    maxDevicesPerNetwork: Math.min(100, Number(process.env.GEMINI_MAX_DEVICES_PER_NETWORK || 100)),
     maxInputBytes: Number(process.env.GEMINI_MAX_INPUT_BYTES || 60000),
   };
 }
@@ -111,22 +111,37 @@ router.post('/network-analysis', requireAiAccess, requireAiConsent, asyncHandler
       { maximumDevices: maximum }
     );
   }
-  const dto = buildNetworkDto({
+  const network = buildNetworkDto({
     workspaceId: req.account.workspace_id,
     devices: input.devices,
     snapshotAt: input.snapshotAt,
+    selectedDeviceIndexes: input.selectedDeviceIndexes,
   });
-  const hash = snapshotHash(dto, PROMPT_VERSION);
+  if (!network.dto.devices.length) {
+    throw new AppError(
+      'No hay receptores STA con riesgo suficiente seleccionados para analizar',
+      422,
+      'AI_NO_NETWORK_CANDIDATES'
+    );
+  }
+  const hash = snapshotHash(network.dto, PROMPT_VERSION);
   const result = await analysisService.analyze({
     workspaceId: req.account.workspace_id,
     userId: req.account.sub,
     type: 'NETWORK',
-    dto,
+    dto: network.dto,
+    snapshotDevices: network.snapshotDevices,
     hash,
     promptVersion: PROMPT_VERSION,
-    scope: { ...input.scope, snapshotAt: input.snapshotAt, deviceCount: input.devices.length },
+    scope: {
+      ...input.scope,
+      snapshotAt: input.snapshotAt,
+      visibleDeviceCount: input.devices.length,
+      selectedDeviceCount: network.selection.devices.length,
+      scoreSummary: network.selection.summary,
+    },
   });
-  return sendOk(res, { result }, result.cached ? 200 : 201);
+  return sendOk(res, { result: { ...result, networkSelection: network.selection } }, result.cached ? 200 : 201);
 }));
 
 router.get('/analyses', requireAiAccess, requireAiConsent, asyncHandler(async (req, res) => {

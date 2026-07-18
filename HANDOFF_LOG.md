@@ -6,6 +6,13 @@
 
 ---
 
+> **Sesión 2026-07-17 - preselección STA y reporte PDF para el análisis general AirOS publicados.** Rama `vps_prod` (base publicada `f65e401`; publicación directa solicitada, pendiente de deploy). Skills: `vercel-react-best-practices`, `pdf`, `github:yeet`, `handoff-keeper`.
+> - Se reemplazó el envío indiscriminado de la red por un score determinista compartido: excluye AP/desconocidos, toma sólo STA con score `>=40`, ordena los peores y preselecciona un máximo de 10 sin completar con equipos sanos. La combinación señal `-61 dBm` + CCQ `12%` queda crítica; señal `-44 dBm` sin otros defectos queda sana.
+> - El modal muestra una lista previa editable con nombre, IP, AP, score, nivel y causas. Si no hay candidatos, bloquea la solicitud y no consume Gemini. El navegador envía al backend sólo las métricas de red necesarias.
+> - El backend recalcula y valida la selección, limita a 10, crea aliases `STA-xx`/`AP-xx` y entrega a Gemini un DTO compacto sin IP, MAC, nombre ni SSID real. El prompt y la salida estructurada exigen que cada hallazgo identifique los aliases afectados.
+> - El resultado recompone localmente nombre/IP/AP y métricas, lista los problemas por equipo, muestra ahorro por equipos no enviados y permite exportar un PDF A4 horizontal. El PDF de muestra se renderizó en 2 páginas y se revisó visualmente sin recortes, colisiones ni texto ilegible.
+> - Gates: **392/392 backend + 128/128 frontend**, contratos, `check:all`, TypeScript, ESLint, build Vite, auditor de diseño 0 violaciones, pruebas focalizadas del modal/API/PDF y `git diff --check`. Pendiente: deploy y prueba real autenticada con datos de producción.
+
 > **Sesion 2026-07-17 - corrección de red Gemini y orden integral del informe AirOS publicada.** Rama `vps_prod` (base `00bf042`; publicación directa, pendiente de deploy). Skills: `vercel-react-best-practices`, `github:yeet`, `handoff-keeper`.
 > - El 502 de `/api/ai/air-os/network-analysis` correspondía a `AI_INVALID_RESPONSE`; la salida NETWORK tenía sólo 1.200 tokens pese a admitir ocho hallazgos con listas extensas. Se elevó el default a 3.200, se pidieron seis hallazgos concisos, se añadieron `maxItems` admitidos por Gemini y se captura el `finishReason` de respuestas JSON inválidas.
 > - El icono individual `BrainCircuit` se sustituyó por `Sparkles`, igual que el análisis de red. El botón de historial de red abre ahora una lista filtrada a `NETWORK`; el historial individual sigue dentro de cada antena.

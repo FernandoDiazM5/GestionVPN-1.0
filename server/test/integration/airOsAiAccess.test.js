@@ -135,4 +135,33 @@ describe('control de acceso Gemini AirOS', () => {
     expect(response.body.code).toBe('AI_PAYLOAD_TOO_LARGE');
     expect(analysisService.analyze).not.toHaveBeenCalled();
   });
+
+  it('preselecciona sólo STA problemáticos y no envía identidad a Gemini', async () => {
+    const critical = { ...device, name: 'Cliente crítico', ip: '10.1.1.40', cachedStats: { signal: -61, noiseFloor: -90, ccq: 12 } };
+    const healthy = { ...device, name: 'Cliente sano', ip: '10.1.1.41', cachedStats: { signal: -44, noiseFloor: -92, ccq: 98 } };
+    const ap = { ...device, role: 'ap', name: 'AP privado', ip: '10.1.1.1', cachedStats: { signal: -90, ccq: 1 } };
+    const response = await request(app).post('/api/ai/air-os/network-analysis')
+      .set('x-test-identity', 'owner')
+      .send({ snapshotAt: Date.now(), scope: {}, devices: [ap, critical, healthy], selectedDeviceIndexes: [1] });
+
+    expect(response.status).toBe(201);
+    const params = analysisService.analyze.mock.calls[0][0];
+    expect(params.type).toBe('NETWORK');
+    expect(params.dto.devices).toHaveLength(1);
+    expect(params.dto.devices[0]).toMatchObject({ alias: 'STA-01', score: 80, level: 'critical' });
+    expect(params.snapshotDevices).toHaveLength(1);
+    expect(JSON.stringify(params.dto)).not.toContain(critical.ip);
+    expect(JSON.stringify(params.dto)).not.toContain(critical.name);
+    expect(response.body.result.networkSelection.summary).toMatchObject({ sta: 2, apExcluded: 1, selected: 1 });
+  });
+
+  it('no consume Gemini cuando todos los STA son saludables', async () => {
+    const healthy = { ...device, cachedStats: { signal: -44, noiseFloor: -92, ccq: 98 } };
+    const response = await request(app).post('/api/ai/air-os/network-analysis')
+      .set('x-test-identity', 'owner')
+      .send({ snapshotAt: Date.now(), scope: {}, devices: [healthy] });
+    expect(response.status).toBe(422);
+    expect(response.body.code).toBe('AI_NO_NETWORK_CANDIDATES');
+    expect(analysisService.analyze).not.toHaveBeenCalled();
+  });
 });

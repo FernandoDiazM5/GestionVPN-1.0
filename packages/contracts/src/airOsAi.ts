@@ -88,6 +88,7 @@ export const AirOsAiNetworkAnalysisRequestSchema = z.object({
     searchApplied: z.boolean().optional(),
   }).strict(),
   devices: z.array(AirOsAiDeviceSchema).min(1).max(100),
+  selectedDeviceIndexes: z.array(z.number().int().min(0).max(99)).max(10).optional(),
 }).strict();
 export type AirOsAiNetworkAnalysisRequest = z.infer<typeof AirOsAiNetworkAnalysisRequestSchema>;
 
@@ -102,6 +103,7 @@ export type AirOsAiAccessPatch = z.infer<typeof AirOsAiAccessPatchSchema>;
 
 export const AirOsAiFindingSchema = z.object({
   title: z.string().min(1).max(160),
+  deviceIds: z.array(z.string().min(1).max(24)).max(10),
   evidence: z.array(z.string().min(1).max(240)).max(8),
   interpretation: z.string().min(1).max(800),
   possibleCauses: z.array(z.string().min(1).max(300)).max(5),
@@ -130,6 +132,19 @@ export interface AirOsAiAnalysisResult {
   };
   model: string;
   createdAt: number;
+  networkSelection?: AirOsAiNetworkSelection;
+}
+
+export interface AirOsAiNetworkSelection {
+  summary: import('./airOsAiScoring').AirOsNetworkScoreSummary;
+  devices: Array<{
+    index: number;
+    alias: string;
+    score: number;
+    level: import('./airOsAiScoring').AirOsRiskLevel;
+    derived: import('./airOsAiScoring').AirOsNetworkScoreRow['derived'];
+    reasons: import('./airOsAiScoring').AirOsRiskReason[];
+  }>;
 }
 
 export interface AirOsAiStatus {

@@ -1,4 +1,5 @@
 import type {
+  AirOsNetworkScoreResult,
   AirOsAiAnalysisResult,
   AirOsAiDevice,
   AirOsAiDeviceIdentity,
@@ -8,6 +9,7 @@ import type {
   AirOsAiHistoryDetail,
   AirOsAiHistoryItem,
 } from '@gestionvpn/contracts';
+import { assessAirOsNetwork } from '@gestionvpn/contracts';
 import type { AntennaStats, ScannedDevice, SavedDevice } from '../types/devices';
 import { del, get, post } from './sessionClient';
 
@@ -20,18 +22,37 @@ const METRIC_KEYS = [
   'lanInfo', 'cinr', 'airtime', 'txAirtime', 'rxAirtime', 'txLatency',
 ] as const satisfies readonly (keyof AntennaStats)[];
 
-function roleOf(device: ScannedDevice | SavedDevice): AirOsAiDevice['role'] {
+const NETWORK_METRIC_KEYS = [
+  'signal', 'noiseFloor', 'ccq', 'txRate', 'rxRate', 'airmaxQuality',
+  'airmaxCapacity', 'txRetries', 'lanSpeed', 'txLatency',
+] as const satisfies readonly (keyof AntennaStats)[];
+
+export function roleOf(device: ScannedDevice | SavedDevice): AirOsAiDevice['role'] {
   const raw = String(device.cachedStats?.mode || device.role || '').toLowerCase();
   if (raw === 'ap' || raw === 'master' || raw.startsWith('ap-') || raw.startsWith('ap_')) return 'ap';
   if (raw === 'sta' || raw.startsWith('sta-') || raw.startsWith('sta_')) return 'sta';
   return 'unknown';
 }
 
+export function buildAirOsNetworkPreview(devices: Array<ScannedDevice | SavedDevice>): AirOsNetworkScoreResult {
+  return assessAirOsNetwork(devices.map(device => {
+    const normalized = toAirOsAiDevice(device);
+    return {
+      role: normalized.role,
+      groupKey: normalized.parentAp || normalized.essid || null,
+      metrics: normalized.cachedStats,
+    };
+  }), 10);
+}
+
 /** Construye exclusivamente la allowlist pública; nunca copia el objeto completo. */
-export function toAirOsAiDevice(device: ScannedDevice | SavedDevice): AirOsAiDevice {
+function toAirOsAiDeviceWithMetrics(
+  device: ScannedDevice | SavedDevice,
+  metricKeys: readonly (keyof AntennaStats)[],
+): AirOsAiDevice {
   const source = device.cachedStats || {};
   const cachedStats: Record<string, unknown> = {};
-  for (const key of METRIC_KEYS) {
+  for (const key of metricKeys) {
     const value = source[key];
     if (value !== undefined && value !== null && value !== '') cachedStats[key] = value;
   }
@@ -46,6 +67,15 @@ export function toAirOsAiDevice(device: ScannedDevice | SavedDevice): AirOsAiDev
     parentAp: device.parentAp,
     cachedStats: cachedStats as AirOsAiDevice['cachedStats'],
   };
+}
+
+export function toAirOsAiDevice(device: ScannedDevice | SavedDevice): AirOsAiDevice {
+  return toAirOsAiDeviceWithMetrics(device, METRIC_KEYS);
+}
+
+/** Reduce también el tráfico navegador-servidor para el análisis general. */
+export function toAirOsAiNetworkDevice(device: ScannedDevice | SavedDevice): AirOsAiDevice {
+  return toAirOsAiDeviceWithMetrics(device, NETWORK_METRIC_KEYS);
 }
 
 /** Envía sólo la identidad necesaria para que el backend derive la huella HMAC. */

@@ -43,7 +43,17 @@ function validateAnalysisPolicy(analysis, dto) {
   }
 
   const facts = collectFacts(dto);
+  const allowedAliases = new Set(
+    (Array.isArray(dto?.devices) ? dto.devices : [dto])
+      .map(device => device?.alias)
+      .filter(Boolean)
+  );
   for (const finding of analysis.findings) {
+    if (!finding.deviceIds.length || finding.deviceIds.some(id => !allowedAliases.has(id))) {
+      throw Object.assign(new Error('La respuesta referencia equipos ajenos al snapshot'), {
+        code: 'AI_POLICY_REJECTED',
+      });
+    }
     for (const evidence of finding.evidence) {
       const normalized = evidence.toLowerCase();
       const grounded = [...facts.keys].some(key => normalized.includes(key))

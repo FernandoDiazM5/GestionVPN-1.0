@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { AirOsAiAnalysisResult, AirOsAiStatus } from '@gestionvpn/contracts';
+import type { AirOsAiAnalysisResult, AirOsAiNetworkSelection, AirOsAiStatus, AirOsNetworkScoreResult } from '@gestionvpn/contracts';
 import type { ScannedDevice } from '../../../../types/devices';
 import type { ApiError } from '../../../../services/sessionClient';
-import { airOsAiApi, toAirOsAiDevice } from '../../../../services/airOsAiApi';
+import {
+  airOsAiApi,
+  buildAirOsNetworkPreview,
+  toAirOsAiDevice,
+  toAirOsAiNetworkDevice,
+} from '../../../../services/airOsAiApi';
 
 interface NetworkScope {
   subnet?: string;
@@ -14,12 +19,26 @@ interface NetworkScope {
 
 type PendingAnalysis =
   | { kind: 'DEVICE'; devices: ScannedDevice[]; visibleCount: 1 }
-  | { kind: 'NETWORK'; devices: ScannedDevice[]; scope: NetworkScope };
+  | {
+      kind: 'NETWORK';
+      devices: ScannedDevice[];
+      scope: NetworkScope;
+      preview: AirOsNetworkScoreResult;
+      selectedIndexes: number[];
+    };
+
+export interface AirOsNetworkReportContext {
+  devices: ScannedDevice[];
+  selection: AirOsAiNetworkSelection;
+  snapshotAt: number;
+  scope: NetworkScope;
+}
 
 export function useAirOsAi(isModerator: boolean) {
   const [status, setStatus] = useState<AirOsAiStatus | null>(null);
   const [pending, setPending] = useState<PendingAnalysis | null>(null);
   const [result, setResult] = useState<AirOsAiAnalysisResult | null>(null);
+  const [networkReport, setNetworkReport] = useState<AirOsNetworkReportContext | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,16 +59,29 @@ export function useAirOsAi(isModerator: boolean) {
     if (!available || !device.cachedStats) return;
     setError(null);
     setResult(null);
+    setNetworkReport(null);
     setPending({ kind: 'DEVICE', devices: [device], visibleCount: 1 });
   }, [available]);
 
   const requestNetwork = useCallback((devices: ScannedDevice[], scope: NetworkScope) => {
     const withStats = devices.filter(device => !!device.cachedStats);
     if (!available || withStats.length === 0) return;
+    const preview = buildAirOsNetworkPreview(withStats);
     setError(null);
     setResult(null);
-    setPending({ kind: 'NETWORK', devices: withStats, scope });
+    setNetworkReport(null);
+    setPending({ kind: 'NETWORK', devices: withStats, scope, preview, selectedIndexes: preview.selectedIndexes });
   }, [available]);
+
+  const toggleNetworkDevice = useCallback((index: number) => {
+    setPending(current => {
+      if (!current || current.kind !== 'NETWORK') return current;
+      const selected = new Set(current.selectedIndexes);
+      if (selected.has(index)) selected.delete(index);
+      else if (selected.size < 10 && current.preview.rows.some(row => row.index === index && row.candidate)) selected.add(index);
+      return { ...current, selectedIndexes: [...selected] };
+    });
+  }, []);
 
   const submit = useCallback(async () => {
     if (!pending || !status || busy) return;
@@ -74,9 +106,18 @@ export function useAirOsAi(isModerator: boolean) {
               ssidFilter: pending.scope.ssidFilter,
               searchApplied: pending.scope.searchApplied,
             },
-            devices: pending.devices.map(toAirOsAiDevice),
+            devices: pending.devices.map(toAirOsAiNetworkDevice),
+            selectedDeviceIndexes: pending.selectedIndexes,
           });
       setResult(response.result);
+      if (pending.kind === 'NETWORK' && response.result.networkSelection) {
+        setNetworkReport({
+          devices: pending.devices,
+          selection: response.result.networkSelection,
+          snapshotAt,
+          scope: pending.scope,
+        });
+      }
       setPending(null);
       setStatus(previous => previous ? {
         ...previous,
@@ -97,13 +138,14 @@ export function useAirOsAi(isModerator: boolean) {
     if (busy) return;
     setPending(null);
     setResult(null);
+    setNetworkReport(null);
     setError(null);
   }, [busy]);
 
   return useMemo(() => ({
-    available, status, pending, result, busy, error,
-    requestDevice, requestNetwork, submit, close,
-  }), [available, status, pending, result, busy, error, requestDevice, requestNetwork, submit, close]);
+    available, status, pending, result, networkReport, busy, error,
+    requestDevice, requestNetwork, toggleNetworkDevice, submit, close,
+  }), [available, status, pending, result, networkReport, busy, error, requestDevice, requestNetwork, toggleNetworkDevice, submit, close]);
 }
 
 export type AirOsAiController = ReturnType<typeof useAirOsAi>;
