@@ -6,6 +6,13 @@
 
 ---
 
+> **Sesión 2026-07-18 - Fase 4 anti-enumeración y equivalencia temporal.** Rama `vps_prod`; commit local `6474940`. Skill: `handoff-keeper`.
+> - Ambos logins devuelven el mismo `401 BAD_CREDENTIALS` y mensaje para usuario ausente, contraseña incorrecta, cuenta no verificada, suspendida o sin workspace. Las causas reales sólo incrementan métricas agregadas sin email.
+> - `passwordHasher.js` mantiene un dummy Argon2id por proceso; las cuentas ausentes pagan verificación costosa y lookup de membresía reservado. Usernames cortos hacen siempre lookup por email local y nombre; un fallo legacy ya no dispara una segunda autenticación. Añadida métrica `password_hash_verifications_total` por algoritmo/resultado.
+> - Registro, reenvío y reset responden de forma genérica, ejecutan hash equivalente y encadenan persistencia/correo fuera de la latencia HTTP. Se retiraron OTP de desarrollo y mensajes de error de correo potencialmente identificables de logs públicos.
+> - Pruebas nuevas cubren contratos y trabajo para cinco estados de rechazo, ambos logins, registro, reenvío, reset y dummy hash. Verificación final: 74 suites / 477 backend, 41 suites / 132 frontend, `check:all`, inventario de rutas y `git diff --check`.
+> - Pendiente operativo: benchmark Argon2 y comparación estadística de latencia en staging/VPS. Siguiente fase: CSRF, sesión fail-closed, revocación y rotación JWT (Fase 5). Sin push ni deploy.
+
 > **Sesión 2026-07-18 - migración sin corte de passwords humanos a Argon2id.** Rama `vps_prod`; commit local `818cbfb`. Skill: `handoff-keeper`.
 > - Añadido `passwordHasher.js` con Argon2id 19 MiB/t=2/p=1, verificación bcrypt heredada, rechazo de entradas bcrypt >72 bytes y rehash transparente mediante actualización condicionada al hash anterior.
 > - Setup, registro, invitaciones, altas/modificaciones admin, reset/cambio y ambos caminos de login usan la abstracción. bcrypt permanece sólo para OTP/tokens y lectura de hashes antiguos. Passwords nuevos exigen 12–128 caracteres en contratos y UI; seeds requieren secretos explícitos y eliminaron defaults conocidos.
