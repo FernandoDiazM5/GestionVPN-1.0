@@ -52,7 +52,7 @@ describe('análisis de red AirOS optimizado', () => {
     const selection = {
       summary: { ...preview.summary, selected: 1 },
       devices: [{
-        index: 1, alias: 'STA-01', score: 80, level: 'critical' as const,
+        index: 1, alias: 'STA-01', score: 80, level: 'critical' as const, mandatory: true,
         derived: preview.rows[1].derived, reasons: preview.rows[1].reasons,
       }],
     };
