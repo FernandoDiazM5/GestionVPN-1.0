@@ -6,6 +6,14 @@
 
 ---
 
+> **Sesión 2026-07-18 - Fase 5: CSRF, sesiones revocables y rotación JWT.** Rama `vps_prod`; commit funcional local `56b37d8`. Skill: `handoff-keeper`.
+> - Creada `auth_sessions` con migración/entrypoint y `jti` por sesión. Login/verify/accept registran el token; renovación y cambio de workspace rotan el identificador; logout global, password/email, suspensión, rehabilitación y borrados revocan inmediatamente. No se almacena el JWT.
+> - Consolidada la autenticación en un middleware autoritativo: cookie-only, HS256/issuer/audience, estado de sesión+usuario+membresía consultado en MySQL por request y fallo cerrado `503 AUTH_STATE_UNAVAILABLE`. La capa legacy es sólo un adaptador; se retiró el cache `accountStatus` que degradaba abierto.
+> - Protección CSRF global para mutaciones autenticadas: allowlist Origin canónica y obligatoria en producción, cookie `vpn_csrf` Strict ligada por HMAC al `jti`, header `X-CSRF-Token` en ambos clientes HTTP del SPA y bloqueo de origen hostil incluso en endpoints públicos. Cookies y CORS documentados/probados.
+> - JWT incorpora `kid` y keyring active/previous con secretos externos de 32+ bytes; el runbook cubre convivencia durante `JWT_EXPIRES`. El primer deploy invalidará una sola vez las cookies legacy sin `jti`/issuer/audience.
+> - Verificación final: 78 suites / 489 backend, 42 suites / 135 frontend, `check:all`, inventario 143 rutas, Semgrep focalizado 14 archivos/127 reglas/0 hallazgos y `git diff --check`. Sin push ni deploy.
+> - Pendiente operativo: backup, `AUTH_RATE_HMAC_KEY`, CORS exacto, migraciones, UFW/3001, pruebas con dos navegadores y rotación keyring; benchmark Argon2/latencias, dependencias de imagen y revisión humana del threat model.
+
 > **Sesión 2026-07-18 - Fase 4 anti-enumeración y equivalencia temporal.** Rama `vps_prod`; commit local `6474940`. Skill: `handoff-keeper`.
 > - Ambos logins devuelven el mismo `401 BAD_CREDENTIALS` y mensaje para usuario ausente, contraseña incorrecta, cuenta no verificada, suspendida o sin workspace. Las causas reales sólo incrementan métricas agregadas sin email.
 > - `passwordHasher.js` mantiene un dummy Argon2id por proceso; las cuentas ausentes pagan verificación costosa y lookup de membresía reservado. Usernames cortos hacen siempre lookup por email local y nombre; un fallo legacy ya no dispara una segunda autenticación. Añadida métrica `password_hash_verifications_total` por algoritmo/resultado.
