@@ -6,6 +6,12 @@
 
 ---
 
+> **Sesión 2026-07-18 - migración sin corte de passwords humanos a Argon2id.** Rama `vps_prod`; commit local `818cbfb`. Skill: `handoff-keeper`.
+> - Añadido `passwordHasher.js` con Argon2id 19 MiB/t=2/p=1, verificación bcrypt heredada, rechazo de entradas bcrypt >72 bytes y rehash transparente mediante actualización condicionada al hash anterior.
+> - Setup, registro, invitaciones, altas/modificaciones admin, reset/cambio y ambos caminos de login usan la abstracción. bcrypt permanece sólo para OTP/tokens y lectura de hashes antiguos. Passwords nuevos exigen 12–128 caracteres en contratos y UI; seeds requieren secretos explícitos y eliminaron defaults conocidos.
+> - Compatibilidad validada construyendo `server/Dockerfile.prod` (`node:22-alpine`) y ejecutando hash+verify dentro de la imagen. Verificación total: 71 suites / 460 backend, 41 suites / 132 frontend y `check:all` verde.
+> - Pendiente: benchmark/calibración en VPS, métrica agregada de algoritmo, tratamiento UX específico para legado >72 bytes y revisar 2 vulnerabilidades moderadas reportadas por `npm ci` en la imagen sin usar `audit fix --force`.
+
 > **Sesión 2026-07-18 - Fase 2 de rate limiting persistente y atómico.** Rama `vps_prod`; commit local `62680b4`. Skill: `handoff-keeper`.
 > - Creada `auth_rate_buckets` con migración/entrypoint, contador transaccional `SELECT ... FOR UPDATE`, índice de purga y estado compartido por varias instancias. IP, identidad y par IP+identidad se almacenan únicamente como HMAC-SHA256 con `AUTH_RATE_HMAC_KEY`; producción falla al arrancar si el secreto no tiene 32+ bytes.
 > - Aplicado antes de bcrypt a setup, ambos logins, registro, OTP verify/send, resend, aceptación pública de invitación y recuperación de contraseña. Respuestas 429 genéricas con `Retry-After`, cooldown OTP de 60 s, limpieza de identidad tras éxito, métricas sólo `kind/result` y job de retención sin PII.
