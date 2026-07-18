@@ -44,6 +44,18 @@ function providerError(error) {
   return new AppError('No fue posible completar el análisis con Gemini', 502, 'AI_PROVIDER_ERROR');
 }
 
+function normalizeNetworkAnalysis(analysis, type) {
+  if (type !== 'NETWORK' || !analysis?.findings) return analysis;
+  return {
+    ...analysis,
+    findings: analysis.findings.flatMap(finding => finding.deviceIds.map(deviceId => ({
+      ...finding,
+      title: `${finding.title} · ${deviceId}`,
+      deviceIds: [deviceId],
+    }))),
+  };
+}
+
 async function analyzeOnce({ workspaceId, userId, type, dto, snapshotDevices, hash, promptVersion, scope }) {
   if (!geminiClient.configured()) throw providerError({ code: 'AI_NOT_CONFIGURED' });
   const settings = config();
@@ -51,16 +63,17 @@ async function analyzeOnce({ workspaceId, userId, type, dto, snapshotDevices, ha
   const cached = await aiAnalysisRepo.findCached({ workspaceId, type, hash, promptVersion });
 
   if (cached) {
+    const cachedAnalysis = normalizeNetworkAnalysis(cached.summary_json, type);
     const copy = await aiAnalysisRepo.createPending({
       workspaceId, userId, type, hash, promptVersion,
       model: cached.model, scope, ttlMs,
     });
-    await aiAnalysisRepo.succeed(copy.id, { analysis: cached.summary_json, usage: {}, latencyMs: 0 });
+    await aiAnalysisRepo.succeed(copy.id, { analysis: cachedAnalysis, usage: {}, latencyMs: 0 });
     metrics.aiCacheHitsTotal.inc({ type });
     metrics.aiRequestsTotal.inc({ type, status: 'cache', model: cached.model });
     return {
       uuid: copy.uuid,
-      analysis: cached.summary_json,
+      analysis: cachedAnalysis,
       cached: true,
       usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
       model: cached.model,
@@ -107,8 +120,9 @@ async function analyzeOnce({ workspaceId, userId, type, dto, snapshotDevices, ha
     }
 
     const result = await geminiClient.generateAnalysis({ kind: type, dto });
+    const analysis = normalizeNetworkAnalysis(result.analysis, type);
     const latencyMs = Date.now() - startedAt;
-    await aiAnalysisRepo.succeed(run.id, { analysis: result.analysis, usage: result.usage, latencyMs });
+    await aiAnalysisRepo.succeed(run.id, { analysis, usage: result.usage, latencyMs });
     // El resultado ya es válido y persistido. Un fallo posterior de telemetría
     // no debe convertir artificialmente el análisis en FAILED ni repetirlo.
     await aiUsageRepo.recordResult({ workspaceId, ...result.usage }).catch(() => {});
@@ -118,7 +132,7 @@ async function analyzeOnce({ workspaceId, userId, type, dto, snapshotDevices, ha
     metrics.aiTokensTotal.inc({ direction: 'output', type, model: result.model }, result.usage.outputTokens);
     return {
       uuid: run.uuid,
-      analysis: result.analysis,
+      analysis,
       cached: false,
       usage: result.usage,
       model: result.model,

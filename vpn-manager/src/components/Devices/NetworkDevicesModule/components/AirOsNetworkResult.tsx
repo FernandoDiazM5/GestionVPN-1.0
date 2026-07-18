@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Download, Loader2, RadioTower } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clipboard, Download, Loader2, RadioTower } from 'lucide-react';
 import type { AirOsAiAnalysisResult } from '@gestionvpn/contracts';
 import type { AirOsNetworkReportContext } from '../hooks/useAirOsAi';
 import { buildAirOsNetworkReportData, RISK_LABELS } from '../utils/airOsAiReport';
+import { copyAirOsNetworkWhatsApp } from '../utils/formatAirOsWhatsApp';
 
 interface Props {
   result: AirOsAiAnalysisResult;
@@ -11,6 +12,7 @@ interface Props {
 
 export function AirOsNetworkResult({ result, context }: Props) {
   const [exporting, setExporting] = useState(false);
+  const [copying, setCopying] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const report = useMemo(() => buildAirOsNetworkReportData({
     analysis: result.analysis,
@@ -34,6 +36,12 @@ export function AirOsNetworkResult({ result, context }: Props) {
     }
   };
 
+  const copyWhatsApp = async () => {
+    setCopying(true);
+    try { await copyAirOsNetworkWhatsApp(report); }
+    finally { setCopying(false); }
+  };
+
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
@@ -50,10 +58,16 @@ export function AirOsNetworkResult({ result, context }: Props) {
           </div>
           <p className="mt-3 text-sm leading-6 text-slate-700 dark:text-slate-200">{result.analysis.summary}</p>
         </div>
+        <div className="flex flex-wrap gap-2">
+        <button onClick={copyWhatsApp} disabled={copying} className="btn-outline btn-md flex min-h-11 shrink-0 items-center gap-2">
+          {copying ? <Loader2 className="h-4 w-4 motion-safe:animate-spin" /> : <Clipboard className="h-4 w-4" />}
+          {copying ? 'Copiando…' : 'Copiar WhatsApp'}
+        </button>
         <button onClick={exportPdf} disabled={exporting} className="btn-outline btn-md flex min-h-11 shrink-0 items-center gap-2">
           {exporting ? <Loader2 className="h-4 w-4 motion-safe:animate-spin" /> : <Download className="h-4 w-4" />}
           {exporting ? 'Creando PDF…' : 'Exportar PDF'}
         </button>
+        </div>
       </div>
       {exportError && <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">{exportError}</p>}
 
@@ -87,8 +101,29 @@ export function AirOsNetworkResult({ result, context }: Props) {
         </div>
       </section>
 
+      <section aria-labelledby="local-observations-title">
+        <h3 id="local-observations-title" className="mb-2 text-sm font-bold text-slate-800 dark:text-slate-100">ParÃ¡metros observados por equipo</h3>
+        <div className="grid gap-3 md:grid-cols-2">
+          {report.devices.map(device => (
+            <article key={`local-${device.alias}`} className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+              <h4 className="font-bold text-slate-800 dark:text-slate-100">{device.name}</h4>
+              <p className="mt-1 text-xs text-slate-500">{device.ip} Â· {device.apName}</p>
+              {device.reasons.length > 0 ? (
+                <div className="mt-3 space-y-2">
+                  {device.reasons.map(reason => (
+                    <div key={reason.code} className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
+                      <strong>{reason.label}:</strong> {reason.value} {reason.unit}
+                    </div>
+                  ))}
+                </div>
+              ) : <p className="mt-3 text-xs text-slate-500">Sin parÃ¡metros locales adicionales fuera de la selecciÃ³n.</p>}
+            </article>
+          ))}
+        </div>
+      </section>
+
       <div className="border-t border-slate-200 pt-4 dark:border-slate-700">
-        <h3 className="mb-3 text-sm font-bold text-slate-800 dark:text-slate-100">Problemas y recomendaciones</h3>
+        <h3 className="mb-3 text-sm font-bold text-slate-800 dark:text-slate-100">Recomendaciones de Gemini por equipo</h3>
         <div className="space-y-3">
           {result.analysis.findings.map((finding, index) => (
             <article key={`${finding.title}-${index}`} className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">

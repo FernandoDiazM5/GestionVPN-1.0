@@ -68,15 +68,6 @@ export interface AirOsNetworkScoreResult {
 const finite = (value: unknown): number | null =>
   typeof value === 'number' && Number.isFinite(value) ? value : null;
 
-function median(values: number[]): number | null {
-  if (values.length === 0) return null;
-  const ordered = [...values].sort((a, b) => a - b);
-  const middle = Math.floor(ordered.length / 2);
-  return ordered.length % 2 === 0
-    ? (ordered[middle - 1] + ordered[middle]) / 2
-    : ordered[middle];
-}
-
 function levelForScore(score: number): AirOsRiskLevel {
   if (score >= 80) return 'critical';
   if (score >= 60) return 'bad';
@@ -161,38 +152,10 @@ function absoluteRateBand(value: number, direction: 'TX' | 'RX', reasons: AirOsR
   return 0;
 }
 
-function relativeRateBand(
-  value: number | null,
-  baseline: number | null,
-  direction: 'TX' | 'RX',
-  reasons: AirOsRiskReason[],
-) {
-  if (value == null || baseline == null || baseline <= 0) return { points: 0, ratio: null };
-  const ratio = Math.round((value / baseline) * 100);
-  if (ratio < 20) return { points: addReason(reasons, `${direction}_RATE_CRITICAL`, `${direction} muy inferior al grupo`, ratio, '% del grupo', 15, 'critical'), ratio };
-  if (ratio < 40) return { points: addReason(reasons, `${direction}_RATE_BAD`, `${direction} inferior al grupo`, ratio, '% del grupo', 10, 'bad'), ratio };
-  if (ratio < 60) return { points: addReason(reasons, `${direction}_RATE_DEFICIENT`, `${direction} por debajo del grupo`, ratio, '% del grupo', 5, 'deficient'), ratio };
-  return { points: 0, ratio };
-}
-
 export function assessAirOsNetwork(
   inputs: AirOsNetworkScoringInput[],
   maxSelected = 10,
 ): AirOsNetworkScoreResult {
-  const staInputs = inputs.map((input, index) => ({ input, index })).filter(row => row.input.role === 'sta');
-  const groupStats = new Map<string, { tx: number[]; rx: number[] }>();
-
-  for (const { input } of staInputs) {
-    const key = input.groupKey?.trim();
-    if (!key) continue;
-    const stats = groupStats.get(key) || { tx: [], rx: [] };
-    const tx = finite(input.metrics.txRate);
-    const rx = finite(input.metrics.rxRate);
-    if (tx != null && tx > 0) stats.tx.push(tx);
-    if (rx != null && rx > 0) stats.rx.push(rx);
-    groupStats.set(key, stats);
-  }
-
   let staOrdinal = 0;
   const rows = inputs.map((input, index): AirOsNetworkScoreRow => {
     if (input.role !== 'sta') {
@@ -239,12 +202,6 @@ export function assessAirOsNetwork(
       score += addReason(reasons, 'LAN_SPEED_LOW', 'Enlace LAN lento', lanSpeed, 'Mbps', 10, 'deficient');
     }
 
-    const group = input.groupKey?.trim() ? groupStats.get(input.groupKey.trim()) : null;
-    const enoughPeers = !!group && Math.max(group.tx.length, group.rx.length) >= 3;
-    const txRelative = relativeRateBand(txRate, enoughPeers ? median(group?.tx || []) : null, 'TX', reasons);
-    const rxRelative = relativeRateBand(rxRate, enoughPeers ? median(group?.rx || []) : null, 'RX', reasons);
-    score += txRelative.points + rxRelative.points;
-
     if (ccq != null && ccq <= 29) score = Math.max(score, 70);
     if (snr != null && snr < 10) score = Math.max(score, 70);
     if (signal != null && signal <= -75) score = Math.max(score, 70);
@@ -264,7 +221,7 @@ export function assessAirOsNetwork(
       level: levelForScore(score),
       candidate: score >= 40,
       mandatory,
-      derived: { snrDb: snr, txRateRatioPct: txRelative.ratio, rxRateRatioPct: rxRelative.ratio },
+      derived: { snrDb: snr, txRateRatioPct: null, rxRateRatioPct: null },
       reasons: reasons.sort((a, b) => b.points - a.points),
     };
   });

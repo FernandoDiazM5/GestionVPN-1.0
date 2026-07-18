@@ -1,4 +1,4 @@
-const PROMPT_VERSION = 'air-os-v2-sta-candidates';
+const PROMPT_VERSION = 'air-os-v3-per-device-metrics';
 
 function buildPrompt(kind, dto) {
   const maxFindings = kind === 'NETWORK' ? 6 : 5;
@@ -9,7 +9,7 @@ function buildPrompt(kind, dto) {
     'No inventes datos ausentes ni afirmes tendencias sin historial.',
     'La respuesta es sólo consultiva: no ejecutes acciones, no escribas comandos y no ordenes cambios.',
     'Cita evidencia mediante nombre de métrica y valor.',
-    'Cada hallazgo debe incluir deviceIds con los alias exactos afectados; no inventes alias.',
+    'Cada hallazgo NETWORK debe incluir exactamente un deviceId con el alias exacto afectado; nunca agrupes varios STA en un mismo hallazgo. Separa tambiÃ©n mÃ©tricas independientes dentro del mismo equipo cuando corresponda.',
     'En análisis NETWORK sólo recibes receptores STA preseleccionados por reglas locales.',
     'No repitas en prosa todos los datos ni los equipos saludables del resumen.',
     `Devuelve como máximo ${maxFindings} hallazgos, en español claro.`,
