@@ -24,7 +24,7 @@ const METRIC_KEYS = [
 
 const NETWORK_METRIC_KEYS = [
   'signal', 'noiseFloor', 'ccq', 'txRate', 'rxRate', 'airmaxQuality',
-  'airmaxCapacity', 'txRetries', 'lanSpeed', 'txLatency',
+  'airmaxCapacity', 'txRetries', 'lanSpeed', 'txLatency', 'channelWidth',
 ] as const satisfies readonly (keyof AntennaStats)[];
 
 export function roleOf(device: ScannedDevice | SavedDevice): AirOsAiDevice['role'] {

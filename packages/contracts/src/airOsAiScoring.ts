@@ -6,6 +6,7 @@ export interface AirOsScoringMetrics {
   ccq?: number | null;
   txRate?: number | null;
   rxRate?: number | null;
+  channelWidth?: number | null;
   airmaxQuality?: number | null;
   airmaxCapacity?: number | null;
   txRetries?: number | null;
@@ -222,7 +223,8 @@ export function assessAirOsNetwork(
     if (capacity != null) score += airmaxBand(capacity, 'capacity', reasons);
     const txRate = finite(metrics.txRate);
     const rxRate = finite(metrics.rxRate);
-    const mandatory = signal != null && signal <= -56 && (txRate != null && txRate < 72 || rxRate != null && rxRate < 72);
+    const expectedRate = finite(metrics.channelWidth) != null && Number(metrics.channelWidth) >= 40 ? 150 : 72;
+    const mandatory = signal != null && signal <= -56 && (txRate != null && txRate < expectedRate || rxRate != null && rxRate < expectedRate);
     if (txRate != null) score += absoluteRateBand(txRate, 'TX', reasons);
     if (rxRate != null) score += absoluteRateBand(rxRate, 'RX', reasons);
 

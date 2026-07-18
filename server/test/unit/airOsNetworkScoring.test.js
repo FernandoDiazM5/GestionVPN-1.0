@@ -51,4 +51,11 @@ describe('preselección local de receptores AirOS', () => {
     expect(result.rows[0].mandatory).toBe(true);
     expect(result.rows[0].reasons.map(reason => reason.code)).toEqual(expect.arrayContaining(['TX_RATE_BAD', 'RX_RATE_BAD']));
   });
+
+  it('eleva la referencia a 150 Mbps cuando el canal es de 40 MHz', () => {
+    const result = assessAirOsNetwork([
+      sta({ signal: -60, noiseFloor: -92, ccq: 82, txRate: 100, rxRate: 100, channelWidth: 40 }),
+    ]);
+    expect(result.rows[0].mandatory).toBe(true);
+  });
 });

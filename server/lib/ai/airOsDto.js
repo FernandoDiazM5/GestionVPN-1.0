@@ -13,7 +13,7 @@ const METRIC_KEYS = Object.freeze([
 
 const NETWORK_METRIC_KEYS = Object.freeze([
   'signal', 'noiseFloor', 'ccq', 'txRate', 'rxRate', 'airmaxQuality',
-  'airmaxCapacity', 'txRetries', 'txLatency', 'lanSpeed',
+  'airmaxCapacity', 'txRetries', 'txLatency', 'lanSpeed', 'channelWidth',
 ]);
 
 function pickMetrics(stats = {}) {
