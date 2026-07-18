@@ -6,6 +6,24 @@
 
 ---
 
+> **Sesión 2026-07-18 - tarjetas móviles para la tabla de Escanear.** Rama `vps_prod` (base `b26c189`; acumulada con correcciones responsive y publicada directamente en `origin/vps_prod`). Skills: `vercel-react-best-practices`, `github:yeet`, `handoff-keeper`.
+> - En viewport `<640 px`, `DeviceTable` deja de montar la cuadrícula horizontal de escritorio y muestra una lista de tarjetas sin overflow: nombre, IP, modelo, MAC, rol, frecuencia, estado SSH y estado guardado.
+> - Las columnas configuradas se conservan como métricas en una cuadrícula de dos columnas; también permanecen selección individual/masiva, guardar, diagnóstico AirOS, sincronizar y detalle expandible. Desde `sm` sigue activa la tabla completa configurable y redimensionable.
+> - La detección responsive usa `useSyncExternalStore` sobre `matchMedia`, evitando duplicar cientos de filas ocultas en el DOM y reaccionando a cambios de orientación/ancho.
+> - Añadida prueba que simula móvil y confirma que no se monta la tabla horizontal y que identidad, modelo, señal y SSH son legibles. Verificación: **132/132 frontend**, TypeScript, ESLint, build Vite, `check:all`, auditor de diseño 0 violaciones y `git diff --check`.
+
+> **Sesión 2026-07-18 - corrección responsive de cabeceras en Monitor AP.** Rama `vps_prod` (base `b26c189`; publicada directamente junto con los cambios responsive de Escanear). Skills: `vercel-react-best-practices`, `handoff-keeper`.
+> - La cabecera de cada torre dejó de forzar nombre, estado, contadores y `COLS AP` en una sola fila móvil: ahora usa identidad/estado arriba y métricas/selector en una segunda zona con wrap.
+> - El nombre de torre se trunca de forma controlada, expone el texto completo mediante `title` y ya no invade el estado ni el selector. El control expandir/contraer y `COLS AP` incorporan semántica ARIA y área táctil adecuada.
+> - Archivos tocados: `ApGroupCard.tsx` y `selectors/ApColSelector.tsx`.
+> - Verificación: 131/131 frontend, TypeScript, ESLint, build Vite, `check:all`, auditor de diseño 0 violaciones y `git diff --check`.
+
+> **Sesión 2026-07-18 - corrección responsive de la cabecera de Escanear.** Rama `vps_prod` (base `b26c189`; publicada directamente junto con la vista móvil de tarjetas). Skills: `vercel-react-best-practices`, `handoff-keeper`.
+> - Corregido el desbordamiento móvil de los contadores y acciones de la tabla: el bloque pasa a vertical en pantallas angostas, los contadores permiten wrap y los botones se distribuyen en una cuadrícula interna de dos columnas.
+> - `Analizar red visible` y el guardado masivo ocupan el ancho completo; historial, Exportar, Columnas y reset permanecen dentro de la tarjeta. En escritorio se conserva la disposición horizontal.
+> - Archivos tocados: `NetworkDevicesModule.tsx`, `ExportMenu.tsx` y `ColumnPicker.tsx`.
+> - Verificación: 131/131 frontend, TypeScript, ESLint, build Vite, `check:all`, auditor de diseño 0 violaciones y `git diff --check`.
+
 > **Sesión 2026-07-18 - rediseño estructurado del PDF y WhatsApp AirOS.** Rama `vps_prod` (base `26056da`; publicado directamente en `origin/vps_prod`). Skills: `network-engineer`, `pdf`, `handoff-keeper`.
 > - Reemplazado el bloque continuo del PDF por portada/resumen de red más una ficha profesional por cliente: estado, identidad, métricas clave, problema, causas y dos planes de acción en columnas.
 > - Las comprobaciones se clasifican y consolidan en remotas (espectro, canal, MCS, airMAX, reintentos) y campo (alineación, Fresnel, potencia, cadenas, cables/conectores/PoE); WhatsApp replica la estructura.

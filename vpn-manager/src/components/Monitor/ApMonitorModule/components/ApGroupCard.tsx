@@ -55,23 +55,31 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelAc
 
   return (
     <div className="card overflow-hidden">
-      <div className="flex items-center gap-3 px-5 py-3.5 bg-slate-50 border-b border-slate-100 dark:bg-slate-800/60 dark:border-slate-800">
-        <button onClick={() => setExpanded(e => !e)}
-          className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors dark:text-slate-500 dark:hover:text-indigo-400 dark:hover:bg-indigo-500/10">
+      <div className="grid min-w-0 grid-cols-[2.75rem_minmax(0,1fr)] gap-x-1 gap-y-2 border-b border-slate-100 bg-slate-50 px-3 py-3.5 sm:flex sm:items-center sm:gap-3 sm:px-5 dark:border-slate-800 dark:bg-slate-800/60">
+        <button
+          onClick={() => setExpanded(e => !e)}
+          aria-label={`${expanded ? 'Contraer' : 'Expandir'} torre ${group.nodeName}`}
+          aria-expanded={expanded}
+          className="flex min-h-11 min-w-11 items-center justify-center self-start rounded-lg text-slate-400 transition-colors hover:bg-indigo-50 hover:text-indigo-600 sm:self-auto dark:text-slate-500 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-400"
+        >
           {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
         </button>
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <Radio className="w-4 h-4 text-indigo-500 shrink-0" />
-          <span className="font-bold text-slate-800 dark:text-slate-100">{group.nodeName}</span>
-          <div className="flex items-center gap-1.5 ml-2">
+        <div className="flex min-w-0 flex-1 flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-2">
+          <div className="flex min-w-0 max-w-full items-center gap-2">
+            <Radio className="h-4 w-4 shrink-0 text-indigo-500" />
+            <span className="block max-w-full truncate font-bold text-slate-800 dark:text-slate-100" title={group.nodeName}>
+              {group.nodeName}
+            </span>
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5 sm:ml-2">
             <span className={`w-2 h-2 rounded-full ${statusColor} ${anyOnline ? 'status-live text-emerald-500' : ''}`} />
             <span className="text-2xs font-bold text-slate-500 dark:text-slate-400">{statusLabel}</span>
           </div>
         </div>
-        <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 shrink-0">
-          <span className="flex items-center gap-1"><Server className="w-3 h-3" /> {group.aps.length} AP{group.aps.length !== 1 ? 's' : ''}</span>
-          {group.stas.length > 0 && <span className="flex items-center gap-1 text-cyan-600 dark:text-cyan-400"><Users className="w-3 h-3" /> {group.stas.length} CPE{group.stas.length !== 1 ? 's' : ''}</span>}
-          {totalCpes > 0 && <span className="flex items-center gap-1 text-cyan-600 dark:text-cyan-400"><Users className="w-3 h-3" /> {totalCpes} live</span>}
+        <div className="col-start-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 text-xs text-slate-500 sm:ml-auto sm:shrink-0 sm:flex-nowrap dark:text-slate-400">
+          <span className="flex shrink-0 items-center gap-1"><Server className="w-3 h-3" /> {group.aps.length} AP{group.aps.length !== 1 ? 's' : ''}</span>
+          {group.stas.length > 0 && <span className="flex shrink-0 items-center gap-1 text-cyan-600 dark:text-cyan-400"><Users className="w-3 h-3" /> {group.stas.length} CPE{group.stas.length !== 1 ? 's' : ''}</span>}
+          {totalCpes > 0 && <span className="flex shrink-0 items-center gap-1 text-cyan-600 dark:text-cyan-400"><Users className="w-3 h-3" /> {totalCpes} live</span>}
           <ApColSelector hidden={hiddenApCols} onChange={handleApColChange} />
         </div>
       </div>

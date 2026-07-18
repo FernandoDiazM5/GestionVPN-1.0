@@ -24,13 +24,13 @@ export function ColumnPicker({ visibleCols, onChange }: ColumnPickerProps) {
   };
 
   return (
-    <div ref={kebabRef} className="relative">
+    <div ref={kebabRef} className="relative w-full sm:w-auto">
       <button
         type="button"
         onClick={handleKebabClick}
         aria-haspopup="menu"
         aria-expanded={showKebab}
-        className="flex min-h-11 items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 border border-slate-200 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-slate-400 dark:hover:text-indigo-400 dark:hover:bg-indigo-500/10 dark:border-slate-700"
+        className="flex min-h-11 w-full items-center justify-center space-x-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-500 transition-colors hover:bg-indigo-50 hover:text-indigo-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 sm:w-auto dark:border-slate-700 dark:text-slate-400 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-400"
       >
         <SlidersHorizontal className="w-3.5 h-3.5" />
         <span>Columnas</span>

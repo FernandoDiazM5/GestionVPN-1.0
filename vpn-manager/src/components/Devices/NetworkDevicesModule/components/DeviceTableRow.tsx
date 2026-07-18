@@ -295,6 +295,159 @@ export const DeviceTableRow = memo(DeviceTableRowImpl, (prev, next) =>
   (!prev.isExpanded || prev.stationNamesByMac === next.stationNamesByMac)
 );
 
+function DeviceMobileRowImpl({
+  dev, isSaved, rowIdx, sshStatus, isExpanded,
+  activeConfigCols, selectedNode, savedDevice,
+  isSelected, onToggleSelected, stationNamesByMac,
+  onToggleExpand, onOpenM5Detail, onSyncToSaved,
+  onDirectSave, onOpenAddModal, onRefreshStats,
+}: Omit<DeviceTableRowProps, 'compactNameMode'>) {
+  const hasStats = !!dev.cachedStats;
+  const rawMode = dev.cachedStats?.mode || dev.role;
+  const isAp = rawMode === 'ap' || rawMode === 'master';
+  const isSta = rawMode === 'sta';
+  const devId = dev.mac ? dev.mac.replace(/:/g, '') : dev.ip.replace(/\./g, '');
+  const isCandidate = !isSaved && sshStatus === 'success' && !!selectedNode;
+  const freq = dev.cachedStats?.frequency ?? dev.frequency;
+  const freqGhz = freq ? (freq / 1000).toFixed(1) : null;
+  const displayName = dev.cachedStats?.deviceName ?? (dev.name && dev.name !== dev.ip ? dev.name : null);
+  const displayModel = dev.cachedStats?.deviceModel || dev.model;
+  const displayMac = dev.cachedStats?.wlanMac || dev.mac;
+  const stateBorder = isExpanded
+    ? 'border-l-4 border-l-indigo-500 dark:border-l-indigo-400'
+    : isSaved
+      ? 'border-l-2 border-l-indigo-400'
+      : hasStats
+        ? 'border-l-2 border-l-emerald-400'
+        : 'border-l-2 border-l-transparent';
+  const stateBg = rowIdx % 2 === 0
+    ? 'bg-white dark:bg-slate-900'
+    : 'bg-slate-50/60 dark:bg-slate-800/40';
+  const sshLabel = sshStatus === 'pending' ? 'Probando SSH'
+    : sshStatus === 'success' ? `SSH conectado${dev.sshUser ? ` · ${dev.sshUser}` : ''}`
+      : sshStatus === 'failed' ? 'Sin acceso SSH'
+        : 'SSH no probado';
+
+  return (
+    <article className={`overflow-hidden rounded-xl border border-slate-200 shadow-sm dark:border-slate-700 ${stateBorder} ${stateBg}`}>
+      <div className="p-3">
+        <div className="flex min-w-0 items-start gap-2.5">
+          {isCandidate && (
+            <button
+              onClick={() => onToggleSelected(devId)}
+              role="checkbox"
+              aria-checked={isSelected}
+              aria-label={isSelected ? `Deseleccionar ${dev.ip} para guardar` : `Seleccionar ${dev.ip} para guardar`}
+              className="group/check flex h-11 w-11 shrink-0 items-center justify-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500"
+            >
+              <span className={`flex h-4 w-4 items-center justify-center rounded border-2 transition-colors
+                ${isSelected
+                  ? 'border-emerald-500 bg-emerald-500'
+                  : 'border-slate-400 group-hover/check:border-emerald-500 dark:border-slate-500'}`}>
+                {isSelected && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
+              </span>
+            </button>
+          )}
+
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-bold text-slate-800 dark:text-slate-100" title={displayName || dev.ip}>
+              {displayName || dev.ip}
+            </p>
+            <a
+              href={`http://${dev.ip}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-0.5 block font-mono text-xs font-semibold text-sky-700 hover:underline dark:text-sky-400"
+            >
+              {dev.ip}
+            </a>
+            <p className="truncate text-2xs text-slate-500 dark:text-slate-400" title={displayModel || undefined}>
+              {displayModel || 'Modelo no detectado'}
+            </p>
+            {displayMac && <p className="truncate font-mono text-2xs text-slate-500 dark:text-slate-400">{displayMac}</p>}
+          </div>
+
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            {(isAp || isSta) ? (
+              <span className={`rounded-md px-1.5 py-0.5 text-2xs font-bold
+                ${isAp ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-400' : 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-400'}`}>
+                {isAp ? 'AP' : 'CPE'}
+              </span>
+            ) : (
+              <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-2xs font-bold text-slate-600 dark:bg-slate-700/50 dark:text-slate-300">
+                {rawMode && rawMode !== 'unknown' ? String(rawMode).toUpperCase() : 'OTRO'}
+              </span>
+            )}
+            {freqGhz && <span className="text-2xs font-bold text-sky-600 dark:text-sky-400">{freqGhz} GHz</span>}
+            {isSaved && <span className="text-2xs font-bold text-indigo-600 dark:text-indigo-400">Guardado</span>}
+          </div>
+        </div>
+
+        {activeConfigCols.length > 0 && (
+          <dl className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+            {activeConfigCols.map(col => (
+              <div key={col.key} className="min-w-0 rounded-lg bg-slate-50 px-2.5 py-2 dark:bg-slate-800/60">
+                <dt className="truncate text-2xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400" title={col.label}>{col.label}</dt>
+                <dd className="mt-0.5 min-w-0 overflow-hidden text-sm text-slate-700 dark:text-slate-200">{col.render(dev)}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
+
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+          <span className={`mr-auto flex min-h-11 items-center gap-1.5 text-2xs font-bold
+            ${sshStatus === 'success' ? 'text-emerald-600 dark:text-emerald-400'
+              : sshStatus === 'failed' ? 'text-rose-600 dark:text-rose-400'
+                : 'text-slate-500 dark:text-slate-400'}`}>
+            {sshStatus === 'pending' && <Loader2 className="h-3.5 w-3.5 motion-safe:animate-spin" />}
+            {sshStatus === 'success' && <CheckCircle2 className="h-3.5 w-3.5" />}
+            {sshStatus === 'failed' && <X className="h-3.5 w-3.5" />}
+            <span>{sshLabel}</span>
+          </span>
+
+          <DeviceRowActions
+            dev={dev}
+            isSaved={isSaved}
+            savedDevice={savedDevice}
+            selectedNode={selectedNode}
+            sshStatus={sshStatus}
+            hasStats={hasStats}
+            onOpenM5Detail={onOpenM5Detail}
+            onSyncToSaved={onSyncToSaved}
+            onDirectSave={onDirectSave}
+            onOpenAddModal={onOpenAddModal}
+          />
+
+          {hasStats && (
+            <button
+              onClick={() => onToggleExpand(dev.ip)}
+              title={isExpanded ? 'Ocultar detalle' : 'Ver estadísticas completas'}
+              aria-label={isExpanded ? 'Ocultar detalle del dispositivo' : 'Ver estadísticas completas'}
+              aria-expanded={isExpanded}
+              className={`flex h-11 w-11 items-center justify-center rounded-lg border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500
+                ${isExpanded
+                  ? 'border-indigo-200 bg-indigo-100 text-indigo-600 dark:border-indigo-500/40 dark:bg-indigo-500/20 dark:text-indigo-300'
+                  : 'border-slate-200 bg-slate-100 text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400'}`}
+            >
+              {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {isExpanded && (
+        <DeviceStatusPanel
+          dev={dev}
+          stationNamesByMac={stationNamesByMac}
+          onRefresh={(freshStats) => onRefreshStats(dev.ip, freshStats)}
+        />
+      )}
+    </article>
+  );
+}
+
+export const DeviceMobileRow = memo(DeviceMobileRowImpl);
+
 // ────────────────────────────────────────────────────────────────────
 //  DeviceRowActions (§41) — botones icon-only inline, sin kebab
 //

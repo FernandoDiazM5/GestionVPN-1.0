@@ -62,4 +62,52 @@ describe('DeviceTable accessibility', () => {
     fireEvent.keyDown(resizeButton, { key: 'ArrowRight' });
     expect(props.startResize).toHaveBeenCalledWith('signal', 0, 10);
   });
+
+  it('usa tarjetas legibles en móvil sin montar la cuadrícula horizontal', () => {
+    const originalMatchMedia = window.matchMedia;
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: query === '(max-width: 639px)',
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+
+    try {
+      renderTable({
+        sortedRows: [{
+          devId: '88AA88BB88CC',
+          isSaved: false,
+          dev: {
+            ip: '10.1.1.213',
+            mac: '88:AA:88:BB:88:CC',
+            name: 'Cliente Floresta',
+            model: 'LiteBeam M5',
+            firmware: 'v6.3',
+            role: 'sta',
+            frequency: 5800,
+            cachedStats: { signal: -60 },
+          },
+        }],
+        activeConfigCols: [{
+          ...signalColumn,
+          render: dev => <span>{dev.cachedStats?.signal} dBm</span>,
+        }],
+        sshStatus: { '10.1.1.213': 'success' },
+      });
+
+      expect(screen.queryByRole('region', { name: /dispositivos escaneados/i })).not.toBeInTheDocument();
+      expect(screen.getByRole('region', { name: /equipos encontrados en vista móvil/i })).toBeInTheDocument();
+      expect(screen.getByText('Cliente Floresta')).toBeInTheDocument();
+      expect(screen.getByText('10.1.1.213')).toBeInTheDocument();
+      expect(screen.getByText('LiteBeam M5')).toBeInTheDocument();
+      expect(screen.getByText('-60 dBm')).toBeInTheDocument();
+      expect(screen.getByText(/ssh conectado/i)).toBeInTheDocument();
+    } finally {
+      window.matchMedia = originalMatchMedia;
+    }
+  });
 });

@@ -465,29 +465,23 @@ export default function NetworkDevicesModule() {
 
         {list.scanRows.length > 0 && (
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-2xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-2">
+            <div className="mb-3 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-2xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 <span>
                   {list.scanRows.length} dispositivo{list.scanRows.length !== 1 ? 's' : ''}
                 </span>
                 {list.scanRows.filter(r => r.dev.cachedStats).length > 0 && (
-                  <>
-                    <span className="text-slate-200">·</span>
-                    <span className="text-emerald-500">
-                      {list.scanRows.filter(r => r.dev.cachedStats).length} autenticados
-                    </span>
-                  </>
+                  <span className="text-emerald-500">
+                    {list.scanRows.filter(r => r.dev.cachedStats).length} autenticados
+                  </span>
                 )}
                 {list.scanRows.filter(r => r.isSaved).length > 0 && (
-                  <>
-                    <span className="text-slate-200">·</span>
-                    <span className="text-indigo-500">
-                      {list.scanRows.filter(r => r.isSaved).length} guardados
-                    </span>
-                  </>
+                  <span className="text-indigo-500">
+                    {list.scanRows.filter(r => r.isSaved).length} guardados
+                  </span>
                 )}
               </p>
-              <div className="flex items-center gap-1.5">
+              <div className="grid w-full min-w-0 grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:justify-end sm:gap-1.5">
                 {/* §42-2: Bulk save — opera SOLO sobre lo que el usuario marcó
                     con los checkbox de fila. Antes guardaba todo lo visible. */}
                 {bulkSaveSelection.length > 0 && effectiveNode && (
@@ -496,7 +490,7 @@ export default function NetworkDevicesModule() {
                     disabled={bulkSaving}
                     title={`Guardar los ${bulkSaveSelection.length} dispositivos seleccionados en la biblioteca del nodo`}
                     aria-label={`Guardar ${bulkSaveSelection.length} dispositivos seleccionados`}
-                    className="btn-success btn-sm flex items-center space-x-1.5"
+                    className="btn-success btn-sm col-span-2 flex min-h-11 w-full items-center justify-center space-x-1.5 sm:w-auto"
                   >
                     {bulkSaving
                       ? <Loader2 className="w-3.5 h-3.5 motion-safe:animate-spin" />
@@ -517,7 +511,7 @@ export default function NetworkDevicesModule() {
                       },
                     )}
                     title="Analizar con Gemini únicamente los equipos visibles que tienen datos AirOS"
-                    className="btn-secondary btn-sm flex min-h-11 items-center gap-1.5 border-violet-200 text-violet-700 hover:bg-violet-50 dark:border-violet-500/30 dark:text-violet-300 dark:hover:bg-violet-500/10"
+                    className="btn-secondary btn-sm col-span-2 flex min-h-11 w-full items-center justify-center gap-1.5 whitespace-nowrap border-violet-200 text-violet-700 hover:bg-violet-50 sm:w-auto dark:border-violet-500/30 dark:text-violet-300 dark:hover:bg-violet-500/10"
                   >
                     <Sparkles className="h-4 w-4" />
                     <span>Analizar red visible</span>
@@ -528,7 +522,7 @@ export default function NetworkDevicesModule() {
                     onClick={() => setShowAiHistory(true)}
                     title="Ver análisis AirOS guardados"
                     aria-label="Abrir historial de análisis AirOS"
-                    className="btn-outline btn-icon min-h-11 min-w-11 text-violet-700 dark:text-violet-300"
+                    className="btn-outline btn-icon min-h-11 w-full min-w-11 text-violet-700 sm:w-11 dark:text-violet-300"
                   >
                     <History className="h-4 w-4" />
                   </button>
@@ -544,7 +538,7 @@ export default function NetworkDevicesModule() {
                   onClick={() => setShowResetConfirm(true)}
                   title="Resetear preferencias de la tabla (columnas, orden, filtros)"
                   aria-label="Resetear preferencias de la tabla"
-                  className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors dark:text-slate-500 dark:hover:text-indigo-400 dark:hover:bg-indigo-500/10">
+                  className="flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-200 p-2 text-slate-400 transition-colors hover:bg-indigo-50 hover:text-indigo-600 sm:w-11 dark:border-slate-700 dark:text-slate-500 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-400">
                   <RotateCcw className="w-4 h-4" />
                 </button>
               </div>

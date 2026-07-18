@@ -6,13 +6,26 @@
 //  delega cada fila a <DeviceTableRow /> memoizada.
 // ============================================================
 
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useSyncExternalStore } from 'react';
 import { GripVertical, Check, Minus } from 'lucide-react';
 import type { ScannedDevice, SavedDevice, AntennaStats } from '../../../../types/devices';
 import type { NodeInfo } from '../../../../types/api';
 import type { ColumnDef, SshAuthStatus } from '../types';
 import type { DeviceRow } from '../hooks/useDeviceList';
-import { DeviceTableRow } from './DeviceTableRow';
+import { DeviceMobileRow, DeviceTableRow } from './DeviceTableRow';
+
+const MOBILE_TABLE_QUERY = '(max-width: 639px)';
+
+function subscribeToMobileTable(callback: () => void) {
+  if (typeof window === 'undefined' || !window.matchMedia) return () => undefined;
+  const media = window.matchMedia(MOBILE_TABLE_QUERY);
+  media.addEventListener('change', callback);
+  return () => media.removeEventListener('change', callback);
+}
+
+function getMobileTableSnapshot() {
+  return typeof window !== 'undefined' && !!window.matchMedia?.(MOBILE_TABLE_QUERY).matches;
+}
 
 interface DeviceTableProps {
   sortedRows: DeviceRow[];
@@ -101,6 +114,68 @@ function DeviceTableImpl(props: DeviceTableProps) {
     () => new Map(savedDevices.map(d => [d.id, d])),
     [savedDevices],
   );
+
+  const isMobileTable = useSyncExternalStore(
+    subscribeToMobileTable,
+    getMobileTableSnapshot,
+    () => false,
+  );
+
+  if (isMobileTable) {
+    return (
+      <section
+        className="space-y-2"
+        aria-label="Equipos encontrados en vista móvil"
+      >
+        <div className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-100 px-3 text-xs font-bold uppercase tracking-wider text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+          <span>{sortedRows.length} dispositivo{sortedRows.length !== 1 ? 's' : ''}</span>
+          {visibleCandidateCount > 0 && (
+            <button
+              type="button"
+              onClick={handleHeaderCheckboxClick}
+              aria-checked={headerCheckState === 'full' ? 'true' : headerCheckState === 'partial' ? 'mixed' : 'false'}
+              role="checkbox"
+              className="flex min-h-11 items-center gap-2 rounded-lg px-2 text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-emerald-400"
+            >
+              <span className={`flex h-4 w-4 items-center justify-center rounded border-2 transition-colors
+                ${headerCheckState === 'full'
+                  ? 'border-emerald-500 bg-emerald-500'
+                  : headerCheckState === 'partial'
+                    ? 'border-emerald-500 bg-emerald-100 dark:bg-emerald-500/30'
+                    : 'border-slate-400 dark:border-slate-500'}`}>
+                {headerCheckState === 'full' && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
+                {headerCheckState === 'partial' && <Minus className="h-3 w-3 text-emerald-700" strokeWidth={3} />}
+              </span>
+              <span>{headerCheckState === 'full' ? 'Quitar todos' : 'Seleccionar'}</span>
+            </button>
+          )}
+        </div>
+
+        {sortedRows.map(({ dev, isSaved, devId }, rowIdx) => (
+          <DeviceMobileRow
+            key={dev.ip}
+            dev={dev}
+            isSaved={isSaved}
+            rowIdx={rowIdx}
+            sshStatus={sshStatus[dev.ip]}
+            isExpanded={expandedRows.has(dev.ip)}
+            activeConfigCols={activeConfigCols}
+            selectedNode={selectedNode}
+            savedDevice={isSaved ? (savedById.get(devId) ?? null) : null}
+            isSelected={selectedIds.has(devId)}
+            onToggleSelected={onToggleSelected}
+            onToggleExpand={toggleExpand}
+            stationNamesByMac={stationNamesByMac}
+            onOpenM5Detail={onOpenM5Detail}
+            onSyncToSaved={onSyncToSaved}
+            onDirectSave={onDirectSave}
+            onOpenAddModal={onOpenAddModal}
+            onRefreshStats={onRefreshStats}
+          />
+        ))}
+      </section>
+    );
+  }
 
   return (
     <div

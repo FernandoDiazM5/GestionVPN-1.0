@@ -79,7 +79,7 @@ export function ExportMenu({ rows, meta, visibleColumnKeys, disabled }: ExportMe
   }, [rows, meta, visibleColumnKeys, busyFormat, setShowKebab]);
 
   return (
-    <div ref={kebabRef} className="relative">
+    <div ref={kebabRef} className="relative w-full sm:w-auto">
       <button
         onClick={handleKebabClick}
         disabled={disabled}
@@ -87,7 +87,7 @@ export function ExportMenu({ rows, meta, visibleColumnKeys, disabled }: ExportMe
         aria-expanded={showKebab}
         aria-label="Exportar la tabla visible"
         title="Exportar (CSV · JSON · Excel · PDF)"
-        className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 border border-slate-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-slate-500 dark:border-slate-700 dark:hover:bg-indigo-500/10 dark:text-slate-300"
+        className="flex min-h-11 w-full items-center justify-center space-x-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-500 transition-colors hover:bg-indigo-50 hover:text-indigo-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-slate-500 sm:w-auto dark:border-slate-700 dark:text-slate-300 dark:hover:bg-indigo-500/10"
       >
         <Download className="w-3.5 h-3.5" />
         <span>Exportar</span>

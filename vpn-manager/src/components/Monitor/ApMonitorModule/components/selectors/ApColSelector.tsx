@@ -17,9 +17,12 @@ function ApColSelector({ hidden, onChange }: { hidden: Set<string>; onChange: (h
     onChange(next);
   };
   return (
-    <div ref={ref} className="relative">
-      <button onClick={() => setOpen(v => !v)}
-        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-2xs font-bold
+    <div ref={ref} className="relative shrink-0">
+      <button
+        onClick={() => setOpen(v => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="flex min-h-11 items-center gap-1.5 rounded-lg px-2.5 py-1 text-2xs font-bold
           bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200 transition-colors dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:border-slate-700">
         <Columns className="w-3 h-3" />
         COLS AP
