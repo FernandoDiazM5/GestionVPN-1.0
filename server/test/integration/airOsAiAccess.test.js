@@ -148,7 +148,7 @@ describe('control de acceso Gemini AirOS', () => {
     const params = analysisService.analyze.mock.calls[0][0];
     expect(params.type).toBe('NETWORK');
     expect(params.dto.devices).toHaveLength(1);
-    expect(params.dto.devices[0]).toMatchObject({ alias: 'STA-01', score: 80, level: 'critical' });
+    expect(params.dto.devices[0]).toMatchObject({ alias: 'STA-01', role: 'sta', riskScore: 80, riskLevel: 'critical' });
     expect(params.snapshotDevices).toHaveLength(1);
     expect(JSON.stringify(params.dto)).not.toContain(critical.ip);
     expect(JSON.stringify(params.dto)).not.toContain(critical.name);

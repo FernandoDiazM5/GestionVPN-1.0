@@ -114,7 +114,7 @@ export const AirOsAiAnalysisSchema = z.object({
   summary: z.string().min(1).max(1200),
   severity: z.enum(['info', 'warning', 'critical']),
   confidence: z.enum(['low', 'medium', 'high']),
-  findings: z.array(AirOsAiFindingSchema).max(8),
+  findings: z.array(AirOsAiFindingSchema).max(10),
   limitations: z.array(z.string().min(1).max(300)).max(8),
   advisoryOnly: z.literal(true),
   actionsExecuted: z.array(z.never()).max(0),

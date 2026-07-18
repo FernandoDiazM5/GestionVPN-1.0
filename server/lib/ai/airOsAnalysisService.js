@@ -52,7 +52,7 @@ function normalizeNetworkAnalysis(analysis, type) {
       ...finding,
       title: `${finding.title} · ${deviceId}`,
       deviceIds: [deviceId],
-    }))),
+    }))).slice(0, 10),
   };
 }
 

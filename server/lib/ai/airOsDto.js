@@ -102,14 +102,16 @@ function buildNetworkDto({ workspaceId, devices, snapshotAt, selectedDeviceIndex
 
   const compactDevices = selectedRows.map(row => {
     const device = devices[row.index];
+    const metrics = pickNetworkMetrics(device.cachedStats, row.derived);
     return {
       alias: row.alias,
+      role: 'sta',
       apAlias: apAliasFor(device),
       family: String(device.model || '').toLowerCase().includes('ac') ? 'AC' : 'M5',
-      score: row.score,
-      level: row.level,
+      ...metrics,
+      riskScore: row.score,
+      riskLevel: row.level,
       mandatory: row.mandatory,
-      metrics: pickNetworkMetrics(device.cachedStats, row.derived),
       flags: row.reasons.map(reason => reason.code),
     };
   });

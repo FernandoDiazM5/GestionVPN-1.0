@@ -45,9 +45,10 @@ describe('airOsDto', () => {
     ];
     const network = buildNetworkDto({ workspaceId: 'ws-1', devices, snapshotAt: 123, secret: 'key' });
     expect(network.dto.devices).toHaveLength(1);
-    expect(network.dto.devices[0]).toMatchObject({ alias: 'STA-01', apAlias: 'AP-01', level: 'critical' });
-    expect(network.dto.devices[0].score).toBeGreaterThanOrEqual(80);
-    expect(network.dto.devices[0].metrics).not.toHaveProperty('cpuLoad');
+    expect(network.dto.devices[0]).toMatchObject({ alias: 'STA-01', role: 'sta', apAlias: 'AP-01', riskLevel: 'critical' });
+    expect(network.dto.devices[0].riskScore).toBeGreaterThanOrEqual(80);
+    expect(network.dto.devices[0]).not.toHaveProperty('metrics');
+    expect(network.dto.devices[0]).not.toHaveProperty('cpuLoad');
     expect(network.selection.summary).toMatchObject({ sta: 2, apExcluded: 1, selected: 1 });
     expect(network.selection.devices[0].index).toBe(1);
     expect(network.snapshotDevices[0].id).toMatch(/^[a-f0-9]{64}$/);

@@ -12,7 +12,7 @@ const RESPONSE_JSON_SCHEMA = {
     severity: { type: 'string', enum: ['info', 'warning', 'critical'] },
     confidence: { type: 'string', enum: ['low', 'medium', 'high'] },
     findings: {
-      type: 'array', maxItems: 8,
+      type: 'array', maxItems: 10,
       items: {
         type: 'object', additionalProperties: false,
         required: ['title', 'deviceIds', 'evidence', 'interpretation', 'possibleCauses', 'manualChecks'],

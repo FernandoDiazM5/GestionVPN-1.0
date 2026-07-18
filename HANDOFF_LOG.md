@@ -6,6 +6,11 @@
 
 ---
 
+> **Sesión 2026-07-17 - Gemini obligado a analizar todos los parámetros del STA.** Rama `vps_prod` (base `8e6f6fd`; cambios locales pendientes de publicación directa). Skills: `network-engineer`, `handoff-keeper`.
+> - El DTO NETWORK pasó de `metrics` anidado y `score` a campos planos exactos con `riskScore`, `riskLevel` y `flags`, preservando privacidad.
+> - El prompt v4 exige cubrir todos los flags de cada equipo, incluyendo señal/CCQ en observación, con un hallazgo por STA y hasta 10 hallazgos.
+> - Verificado: 395 backend + 129 frontend, `check:all`, build Vite y `git diff --check`.
+
 > **Sesión 2026-07-17 - corrección de referencias globales.** Rama `vps_prod` (base `c9268a0`; cambios locales pendientes de publicación directa). Skills: `vercel-react-best-practices`, `handoff-keeper`.
 > - Se eliminó la comparación contra `__network__`: la mediana TX/RX sólo se calcula entre STA del mismo AP identificado y mismo ancho de canal.
 > - Si el AP no está identificado, el equipo sigue evaluándose con umbrales absolutos, pero no recibe una proporción inventada contra toda la red.
