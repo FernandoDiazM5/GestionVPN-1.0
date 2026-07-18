@@ -6,6 +6,12 @@
 
 ---
 
+> **Sesión 2026-07-17 - informe AirOS por equipo y parámetro para campo.** Rama `vps_prod` (base `07c6e5d`; publicado directamente en `origin/vps_prod`). Skills: `network-engineer`, `vercel-react-best-practices`, `pdf`, `handoff-keeper`.
+> - Corregida la duplicación `STA-01 · STA-01`; el backend fusiona múltiples hallazgos del mismo alias y el frontend usa un título compuesto derivado de todos los flags locales.
+> - Creado `airOsFieldReport.ts`: por cada parámetro entrega valor, clasificación, diagnóstico y comprobaciones específicas para señal, TX/RX, CCQ, SNR, ruido, airMAX, reintentos, latencia y LAN.
+> - Pantalla, PDF y WhatsApp comparten la misma ficha de campo; el prompt v5 exige exactamente un hallazgo por STA y trata `-55..-60 dBm` como observación.
+> - Verificación: 397/397 backend, 131/131 frontend, contratos, `check:all`, build Vite, auditor de diseño 0 violaciones y PDF de muestra de 2 páginas inspeccionado visualmente sin defectos. Artefactos temporales eliminados (no recuperables; eran sólo archivos QA generados).
+
 > **Sesión 2026-07-17 - señal -55 a -60 reclasificada como observación.** Rama `vps_prod` (base `dd19fd8`; cambios locales pendientes de publicación directa). Skill: `handoff-keeper`.
 > - `SIGNAL_ACCEPTABLE` fue reemplazado por `SIGNAL_OBSERVATION`; el rango empieza en `-55 dBm` y se muestra como `Señal en observación`.
 > - La prioridad obligatoria combinada con tasa baja también comienza en `-55 dBm`.

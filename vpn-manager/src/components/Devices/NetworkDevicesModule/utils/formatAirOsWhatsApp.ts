@@ -1,30 +1,39 @@
 import type { AirOsNetworkReportData } from './airOsAiReport';
+import { buildAirOsDeviceFieldReports } from './airOsFieldReport';
 
 export function formatAirOsNetworkWhatsApp(report: AirOsNetworkReportData): string {
+  const deviceReports = buildAirOsDeviceFieldReports(report);
   const lines = [
-    '*📡 Diagnóstico consultivo AirOS*',
+    '*📡 DIAGNÓSTICO CONSULTIVO AirOS*',
     `📊 Equipos analizados: *${report.summary.selected}*`,
     `🕒 ${new Date(report.snapshotAt).toLocaleString('es-PE')}`,
     '',
   ];
-  report.devices.forEach((device, index) => {
+
+  deviceReports.forEach((deviceReport, index) => {
+    const { device } = deviceReport;
     lines.push(`*${index + 1}. ${device.name}*`);
-    lines.push(`📍 IP: ${device.ip} · AP: ${device.apName}`);
-    lines.push(`📶 Señal: ${device.signal ?? 'N/D'} dBm · CCQ: ${device.ccq ?? 'N/D'}%`);
+    lines.push(`📍 IP: ${device.ip}`);
+    lines.push(`📡 AP: ${device.apName}`);
+    lines.push(`⚠️ *Problemas:* ${deviceReport.title}`);
+    lines.push(`📶 Señal/SNR/CCQ: ${device.signal ?? 'N/D'} dBm · ${device.snr ?? 'N/D'} dB · ${device.ccq ?? 'N/D'}%`);
     lines.push(`🚀 TX/RX: ${device.txRate ?? 'N/D'} / ${device.rxRate ?? 'N/D'} Mbps`);
-    if (device.reasons.length > 0) device.reasons.forEach(reason => lines.push(`⚠️ *${reason.label}:* ${reason.value} ${reason.unit}`));
-    else lines.push('✅ Sin parámetros locales adicionales observados');
     lines.push('');
+
+    deviceReport.problems.forEach(problem => {
+      lines.push(`*🔎 ${problem.parameter}: ${problem.status} (${problem.value})*`);
+      lines.push(`🩺 *Diagnóstico:* ${problem.diagnosis}`);
+      lines.push(`🔧 *Acciones de campo:* ${problem.fieldChecks.join('; ')}`);
+      lines.push('');
+    });
+
+    lines.push(`🤖 *Diagnóstico general:* ${deviceReport.aiInterpretation}`);
+    if (deviceReport.possibleCauses.length > 0) lines.push(`🧩 *Posibles causas:* ${deviceReport.possibleCauses.join('; ')}`);
+    if (deviceReport.additionalChecks.length > 0) lines.push(`✅ *Comprobaciones adicionales:* ${deviceReport.additionalChecks.join('; ')}`);
+    lines.push('', '────────────────────', '');
   });
-  lines.push('*Recomendaciones de Gemini*');
-  report.analysis.findings.forEach(finding => {
-    const device = report.devices.find(item => item.alias === finding.deviceIds[0]);
-    lines.push(`🔎 *${device?.name || finding.deviceIds[0]} — ${finding.title}*`);
-    lines.push(finding.interpretation);
-    if (finding.manualChecks.length > 0) lines.push(`🔧 ${finding.manualChecks.join(' · ')}`);
-    lines.push('');
-  });
-  lines.push('ℹ️ Informe consultivo; verificar antes de ejecutar cambios.');
+
+  lines.push('ℹ️ Informe consultivo. Verificar los valores en ambos extremos antes de realizar cambios.');
   return lines.join('\n').trim();
 }
 

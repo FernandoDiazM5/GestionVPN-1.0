@@ -14,7 +14,7 @@ const report: AirOsNetworkReportData = {
     index: 1, alias: 'STA-01', name: 'Cliente San Martín', ip: '10.1.1.2',
     model: 'LiteBeam M5', apName: 'AP Floresta', score: 80, level: 'critical',
     signal: -61, noiseFloor: -90, snr: 29, ccq: 12, txRate: 20, rxRate: 15,
-    txLatency: null,
+    txLatency: null, channelWidth: 20,
     reasons: [{ code: 'CCQ_CRITICAL', label: 'CCQ crítico', value: 12, unit: '%', points: 35, level: 'critical' }],
   }],
   analysis: {

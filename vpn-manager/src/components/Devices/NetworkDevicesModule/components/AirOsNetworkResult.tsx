@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, Clipboard, Download, Loader2, RadioTower }
 import type { AirOsAiAnalysisResult } from '@gestionvpn/contracts';
 import type { AirOsNetworkReportContext } from '../hooks/useAirOsAi';
 import { buildAirOsNetworkReportData, RISK_LABELS } from '../utils/airOsAiReport';
+import { buildAirOsDeviceFieldReports } from '../utils/airOsFieldReport';
 import { copyAirOsNetworkWhatsApp } from '../utils/formatAirOsWhatsApp';
 
 interface Props {
@@ -21,7 +22,7 @@ export function AirOsNetworkResult({ result, context }: Props) {
     snapshotAt: context.snapshotAt,
     subnet: context.scope.subnet,
   }), [context, result.analysis]);
-  const deviceByAlias = useMemo(() => new Map(report.devices.map(device => [device.alias, device])), [report.devices]);
+  const deviceReports = useMemo(() => buildAirOsDeviceFieldReports(report), [report]);
 
   const exportPdf = async () => {
     setExporting(true);
@@ -101,47 +102,45 @@ export function AirOsNetworkResult({ result, context }: Props) {
         </div>
       </section>
 
-      <section aria-labelledby="local-observations-title">
-        <h3 id="local-observations-title" className="mb-2 text-sm font-bold text-slate-800 dark:text-slate-100">ParÃ¡metros observados por equipo</h3>
-        <div className="grid gap-3 md:grid-cols-2">
-          {report.devices.map(device => (
-            <article key={`local-${device.alias}`} className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
-              <h4 className="font-bold text-slate-800 dark:text-slate-100">{device.name}</h4>
-              <p className="mt-1 text-xs text-slate-500">{device.ip} Â· {device.apName}</p>
-              {device.reasons.length > 0 ? (
-                <div className="mt-3 space-y-2">
-                  {device.reasons.map(reason => (
-                    <div key={reason.code} className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
-                      <strong>{reason.label}:</strong> {reason.value} {reason.unit}
+      <section aria-labelledby="field-report-title" className="border-t border-slate-200 pt-4 dark:border-slate-700">
+        <h3 id="field-report-title" className="mb-3 text-sm font-bold text-slate-800 dark:text-slate-100">Diagnóstico y acciones para el técnico de campo</h3>
+        <div className="space-y-4">
+          {deviceReports.map((deviceReport, index) => (
+            <article key={deviceReport.device.alias} className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
+              <header className="bg-slate-50 px-4 py-3 dark:bg-slate-800/70">
+                <h4 className="font-bold text-slate-800 dark:text-slate-100">{index + 1}. {deviceReport.title}</h4>
+                <p className="mt-1 text-xs text-slate-500">{deviceReport.device.name} · {deviceReport.device.ip} · AP {deviceReport.device.apName}</p>
+              </header>
+              <div className="space-y-4 p-4">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-violet-700 dark:text-violet-300">Diagnóstico general de Gemini</p>
+                  <p className="mt-1 text-sm leading-5 text-slate-600 dark:text-slate-300">{deviceReport.aiInterpretation}</p>
+                  {deviceReport.possibleCauses.length > 0 && <p className="mt-2 text-xs text-slate-500"><strong>Posibles causas:</strong> {deviceReport.possibleCauses.join(' · ')}</p>}
+                </div>
+                <div className="space-y-3">
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">Parámetros observados</p>
+                  {deviceReport.problems.map(problem => (
+                    <div key={problem.code} className="rounded-lg border border-amber-200 bg-amber-50/70 p-3 dark:border-amber-500/30 dark:bg-amber-500/10">
+                      <div className="flex flex-wrap items-center gap-2 text-sm">
+                        <strong className="text-slate-800 dark:text-slate-100">{problem.parameter}</strong>
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900 dark:bg-amber-500/20 dark:text-amber-200">{problem.status}</span>
+                        <span className="font-mono text-xs text-slate-600 dark:text-slate-300">{problem.value}</span>
+                      </div>
+                      <p className="mt-2 text-xs leading-5 text-slate-600 dark:text-slate-300"><strong>Diagnóstico:</strong> {problem.diagnosis}</p>
+                      <ul className="mt-2 space-y-1 text-xs text-slate-600 dark:text-slate-300">
+                        {problem.fieldChecks.map(check => <li key={check} className="flex gap-2"><CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />{check}</li>)}
+                      </ul>
                     </div>
                   ))}
                 </div>
-              ) : <p className="mt-3 text-xs text-slate-500">Sin parÃ¡metros locales adicionales fuera de la selecciÃ³n.</p>}
+                {deviceReport.additionalChecks.length > 0 && (
+                  <p className="text-xs text-slate-500"><strong>Comprobaciones adicionales de Gemini:</strong> {deviceReport.additionalChecks.join(' · ')}</p>
+                )}
+              </div>
             </article>
           ))}
         </div>
       </section>
-
-      <div className="border-t border-slate-200 pt-4 dark:border-slate-700">
-        <h3 className="mb-3 text-sm font-bold text-slate-800 dark:text-slate-100">Recomendaciones de Gemini por equipo</h3>
-        <div className="space-y-3">
-          {result.analysis.findings.map((finding, index) => (
-            <article key={`${finding.title}-${index}`} className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
-              <h4 className="font-bold text-slate-800 dark:text-slate-100">{finding.title}</h4>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {(finding.deviceIds || []).map(alias => {
-                  const device = deviceByAlias.get(alias);
-                  return <span key={alias} className="rounded-md bg-violet-100 px-2 py-1 text-xs font-semibold text-violet-800 dark:bg-violet-500/15 dark:text-violet-200">{device ? `${device.name} · ${device.ip}` : alias}</span>;
-                })}
-              </div>
-              <p className="mt-2 text-sm leading-5 text-slate-600 dark:text-slate-300">{finding.interpretation}</p>
-              {finding.evidence.length > 0 && <p className="mt-2 text-xs text-slate-500"><strong>Evidencia:</strong> {finding.evidence.join(' · ')}</p>}
-              {finding.possibleCauses.length > 0 && <p className="mt-2 text-xs text-slate-500"><strong>Posibles causas:</strong> {finding.possibleCauses.join(' · ')}</p>}
-              {finding.manualChecks.length > 0 && <ul className="mt-3 space-y-1 text-xs text-slate-600 dark:text-slate-300">{finding.manualChecks.map(check => <li key={check} className="flex gap-2"><CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />{check}</li>)}</ul>}
-            </article>
-          ))}
-        </div>
-      </div>
 
       <div className="rounded-lg bg-slate-50 p-3 text-xs text-slate-500 dark:bg-slate-800/60">
         <strong>No enviados a Gemini:</strong> {report.summary.healthy} saludables · {report.summary.observation} en observación · {report.summary.apExcluded} AP excluidos. Esta separación se calculó localmente sin consumir tokens.

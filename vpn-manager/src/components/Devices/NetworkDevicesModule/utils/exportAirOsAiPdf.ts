@@ -1,5 +1,6 @@
 import { downloadBlob } from './exportShared';
 import { RISK_LABELS, type AirOsNetworkReportData } from './airOsAiReport';
+import { buildAirOsDeviceFieldReports } from './airOsFieldReport';
 
 const VIOLET: [number, number, number] = [109, 40, 217];
 const SLATE: [number, number, number] = [51, 65, 85];
@@ -16,6 +17,7 @@ export async function createAirOsNetworkAnalysisPdf(report: AirOsNetworkReportDa
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 34;
   const dateText = new Date(report.snapshotAt).toLocaleString('es-PE');
+  const deviceReports = buildAirOsDeviceFieldReports(report);
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(17);
@@ -85,20 +87,21 @@ export async function createAirOsNetworkAnalysisPdf(report: AirOsNetworkReportDa
   const tableState = doc as unknown as { lastAutoTable?: { finalY: number } };
   let cursorY = (tableState.lastAutoTable?.finalY || tableStartY) + 22;
 
-  for (const [index, finding] of report.analysis.findings.entries()) {
-    const affected = (finding.deviceIds || []).map(alias => {
-      const device = report.devices.find(item => item.alias === alias);
-      return device ? `${device.name} (${device.ip})` : alias;
-    }).join(', ');
+  for (const [index, deviceReport] of deviceReports.entries()) {
     const blocks = [
-      `Equipos: ${affected || 'No especificado'}`,
-      finding.interpretation,
-      finding.evidence.length ? `Evidencia: ${finding.evidence.join('; ')}` : '',
-      finding.possibleCauses.length ? `Posibles causas: ${finding.possibleCauses.join('; ')}` : '',
-      finding.manualChecks.length ? `Comprobaciones manuales: ${finding.manualChecks.join('; ')}` : '',
+      `Equipo: ${deviceReport.device.name} (${deviceReport.device.ip})`,
+      `AP asociado: ${deviceReport.device.apName}`,
+      `Diagnostico general de Gemini: ${deviceReport.aiInterpretation}`,
+      deviceReport.possibleCauses.length ? `Posibles causas: ${deviceReport.possibleCauses.join('; ')}` : '',
+      ...deviceReport.problems.flatMap(problem => [
+        `${problem.parameter} | ${problem.status} | ${problem.value}`,
+        `Diagnostico: ${problem.diagnosis}`,
+        `Acciones de campo: ${problem.fieldChecks.join('; ')}`,
+      ]),
+      deviceReport.additionalChecks.length ? `Comprobaciones adicionales de Gemini: ${deviceReport.additionalChecks.join('; ')}` : '',
     ].filter(Boolean);
     const lines = blocks.flatMap(text => doc.splitTextToSize(text, pageWidth - margin * 2 - 20));
-    const height = 34 + lines.length * 9;
+    const height = 38 + lines.length * 9;
     if (cursorY + height > pageHeight - 42) {
       doc.addPage();
       cursorY = 40;
@@ -109,7 +112,7 @@ export async function createAirOsNetworkAnalysisPdf(report: AirOsNetworkReportDa
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(...SLATE);
-    doc.text(`${index + 1}. ${finding.title}`, margin + 10, cursorY + 16);
+    doc.text(`${index + 1}. ${deviceReport.title}`, margin + 10, cursorY + 16);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.text(lines, margin + 10, cursorY + 30);

@@ -23,6 +23,7 @@ export interface AirOsNetworkReportDevice {
   txRate: number | null;
   rxRate: number | null;
   txLatency: number | null;
+  channelWidth: number | null;
   reasons: AirOsRiskReason[];
 }
 
@@ -63,6 +64,7 @@ export function buildAirOsNetworkReportData(args: {
       txRate: finite(stats?.txRate),
       rxRate: finite(stats?.rxRate),
       txLatency: finite(stats?.txLatency),
+      channelWidth: finite(stats?.channelWidth),
       reasons: selected.reasons,
     } satisfies AirOsNetworkReportDevice;
   });

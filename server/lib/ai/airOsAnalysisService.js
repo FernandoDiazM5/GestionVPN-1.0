@@ -44,16 +44,37 @@ function providerError(error) {
   return new AppError('No fue posible completar el análisis con Gemini', 502, 'AI_PROVIDER_ERROR');
 }
 
+function stripDeviceAlias(title, deviceId) {
+  return String(title || '')
+    .replaceAll(deviceId, '')
+    .replace(/\s*[·|–—-]\s*$/g, '')
+    .replace(/^\s*[·|–—-]\s*/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+function unique(values, limit) {
+  return [...new Set(values.filter(Boolean))].slice(0, limit);
+}
+
 function normalizeNetworkAnalysis(analysis, type) {
   if (type !== 'NETWORK' || !analysis?.findings) return analysis;
-  return {
-    ...analysis,
-    findings: analysis.findings.flatMap(finding => finding.deviceIds.map(deviceId => ({
-      ...finding,
-      title: `${finding.title} · ${deviceId}`,
-      deviceIds: [deviceId],
-    }))).slice(0, 10),
-  };
+  const byDevice = new Map();
+  for (const finding of analysis.findings) {
+    for (const deviceId of finding.deviceIds) {
+      const current = byDevice.get(deviceId) || {
+        title: '', deviceIds: [deviceId], evidence: [], interpretation: '', possibleCauses: [], manualChecks: [],
+      };
+      const cleanTitle = stripDeviceAlias(finding.title, deviceId);
+      current.title = (unique([current.title, cleanTitle], 2).join(' y ') || 'Diagnostico del enlace').slice(0, 160);
+      current.evidence = unique([...current.evidence, ...finding.evidence], 8);
+      current.interpretation = unique([current.interpretation, finding.interpretation], 3).join(' ').slice(0, 800);
+      current.possibleCauses = unique([...current.possibleCauses, ...finding.possibleCauses], 5);
+      current.manualChecks = unique([...current.manualChecks, ...finding.manualChecks], 6);
+      byDevice.set(deviceId, current);
+    }
+  }
+  return { ...analysis, findings: [...byDevice.values()].slice(0, 10) };
 }
 
 async function analyzeOnce({ workspaceId, userId, type, dto, snapshotDevices, hash, promptVersion, scope }) {
@@ -177,4 +198,4 @@ async function analyze(params) {
 
 function resetForTests() { inFlight.clear(); }
 
-module.exports = { analyze, config, providerError, resetForTests };
+module.exports = { analyze, config, providerError, normalizeNetworkAnalysis, resetForTests };
