@@ -6,6 +6,8 @@ import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
 import AcceptInvitationForm from './AcceptInvitationForm';
 import PasswordResetRequest from './PasswordResetRequest';
 import PasswordResetConfirm from './PasswordResetConfirm';
+import { federatedAuthAvailable } from '../../config/federatedAuth';
+import { signInWithFirebase } from '../../services/federatedAuth';
 
 import { API_BASE_URL } from '../../config';
 
@@ -101,6 +103,30 @@ export default function RouterAccess() {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error desconocido';
       setErrorDetail(msg);
+      setSyncStatus('error');
+      setIsConnecting(false);
+    }
+  };
+
+  const handleFederatedLogin = async () => {
+    if (!username.includes('@') || !password) {
+      setErrorDetail('Ingresa un correo completo y tu contraseña.');
+      setSyncStatus('error');
+      return;
+    }
+
+    setIsConnecting(true);
+    setSyncStatus('loading');
+    setErrorDetail('');
+    try {
+      const user = await signInWithFirebase(username, password);
+      setSyncStatus('success');
+      await handleLoginSuccess({
+        user: user.email,
+        role: user.role === 'MEMBER' ? 'viewer' : 'admin',
+      });
+    } catch (error) {
+      setErrorDetail(error instanceof Error ? error.message : 'Correo o contraseña incorrectos');
       setSyncStatus('error');
       setIsConnecting(false);
     }
@@ -251,6 +277,28 @@ export default function RouterAccess() {
                 </span>
               </button>
             </form>
+
+            {!needsSetup && federatedAuthAvailable && (
+              <div className="mt-5 space-y-4">
+                <div className="flex items-center gap-3" aria-hidden="true">
+                  <span className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Piloto seguro</span>
+                  <span className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleFederatedLogin}
+                  disabled={isConnecting || !username || !password}
+                  className="btn-outline btn-md w-full flex items-center justify-center gap-2"
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                  <span>Iniciar con Firebase</span>
+                </button>
+                <p className="text-center text-xs text-slate-600 dark:text-slate-300">
+                  Requiere una cuenta piloto previamente vinculada.
+                </p>
+              </div>
+            )}
 
             {!needsSetup && (
               <div className="space-y-2 mt-4">

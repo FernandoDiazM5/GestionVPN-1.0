@@ -37,7 +37,7 @@ sequenceDiagram
     A-->>B: vpn_session HttpOnly + vpn_csrf
 ```
 
-El token federado no se usa como sesion de la API. El futuro cliente debe configurar persistencia Firebase solo en memoria, intercambiar el token y ejecutar `signOut` al cerrar sesion; no debe copiar ID/refresh tokens a `localStorage`, `sessionStorage` ni IndexedDB. El intercambio exige autenticacion reciente (por defecto, no mas de 300 segundos), correo verificado, revision de revocacion, Origin permitido, double-submit CSRF dedicado y rate limit persistente por IP. Los rechazos usan un unico contrato `BAD_CREDENTIALS` para no enumerar cuentas.
+El token federado no se usa como sesion de la API. El cliente configura persistencia Firebase solo en memoria, intercambia el ID token por la cookie local y ejecuta `signOut` inmediatamente despues del intercambio; tambien limpia defensivamente Firebase al cerrar la sesion local. No copia ID/refresh tokens a `localStorage`, `sessionStorage` ni IndexedDB. El SDK web se carga con imports dinamicos solo cuando el piloto esta configurado y el usuario elige ese acceso. El intercambio exige autenticacion reciente (por defecto, no mas de 300 segundos), correo verificado, revision de revocacion, Origin permitido, double-submit CSRF dedicado y rate limit persistente por IP. Los rechazos usan un unico contrato `BAD_CREDENTIALS` para no enumerar cuentas.
 
 ## Modelo multi-tenant
 
@@ -91,4 +91,4 @@ Si falla cualquiera, mantener `FEDERATED_AUTH_ENABLED=false` y continuar con aut
 
 ## Consecuencias
 
-Ventajas: integracion aislada, rollback inmediato, RBAC sin duplicar y credenciales del proveedor fuera del codigo. Costes: dos planos de revocacion durante el piloto, mapping operativo, dependencia del proveedor y trabajo pendiente en cliente/importacion. Este ADR no autoriza habilitar Firebase ni subir credenciales a produccion.
+Ventajas: integracion aislada, rollback inmediato, RBAC sin duplicar y credenciales del proveedor fuera del codigo. Costes: dos planos de revocacion durante el piloto, mapping operativo, dependencia del proveedor y trabajo pendiente de configuracion externa, importacion y canary. Este ADR no autoriza habilitar Firebase ni subir credenciales a produccion.

@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   provisionMyWireguard: vi.fn(),
   requestReset: vi.fn(),
   confirmReset: vi.fn(),
+  signInWithFirebase: vi.fn(),
 }));
 
 vi.mock('../../context', () => ({
@@ -21,6 +22,12 @@ vi.mock('../../context', () => ({
 
 vi.mock('../../utils/fetchWithTimeout', () => ({
   fetchWithTimeout: (...args: unknown[]) => mocks.fetchWithTimeout(...args),
+}));
+
+vi.mock('../../config/federatedAuth', () => ({ federatedAuthAvailable: true }));
+
+vi.mock('../../services/federatedAuth', () => ({
+  signInWithFirebase: (...args: unknown[]) => mocks.signInWithFirebase(...args),
 }));
 
 vi.mock('../../services/teamApi', () => ({
@@ -83,6 +90,27 @@ describe('formularios de acceso', () => {
     await user.click(screen.getByRole('button', { name: 'Iniciar Sesión' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Credenciales inválidas');
+  });
+
+  it('intercambia el acceso Firebase sin reemplazar el login local', async () => {
+    mocks.fetchWithTimeout.mockResolvedValueOnce(jsonResponse({ success: true, needsSetup: false }));
+    mocks.signInWithFirebase.mockResolvedValueOnce({
+      id: 'user-1', email: 'moderador@example.com', role: 'OWNER', workspace_id: 'ws-1',
+    });
+    const user = userEvent.setup();
+    render(<RouterAccess />);
+
+    await user.type(await screen.findByLabelText('Usuario o correo'), 'moderador@example.com');
+    await user.type(screen.getByLabelText('Contraseña'), 'password-seguro');
+    expect(screen.getByRole('button', { name: 'Iniciar Sesión' })).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: 'Iniciar con Firebase' }));
+
+    await waitFor(() => {
+      expect(mocks.signInWithFirebase).toHaveBeenCalledWith('moderador@example.com', 'password-seguro');
+      expect(mocks.handleLoginSuccess).toHaveBeenCalledWith({
+        user: 'moderador@example.com', role: 'admin',
+      });
+    });
   });
 
   it('permite aceptar una invitación existente sin contraseña', async () => {

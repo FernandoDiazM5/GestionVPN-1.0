@@ -21,6 +21,7 @@ const AUTH_PUBLIC_PATHS = [
   '/api/auth/login', '/api/auth/status', '/api/team/accept',
   '/api/auth/password-reset/request', '/api/auth/password-reset/confirm',
   '/api/account/login', '/api/account/register', '/api/account/verify', '/api/account/resend',
+  '/api/account/federated/csrf', '/api/account/federated/exchange',
 ];
 const SESSION_INVALID_CODES = new Set([
   'USER_DELETED', 'ACCOUNT_SUSPENDED', 'SESSION_EXPIRED', 'SESSION_REVOKED', 'NO_SESSION',

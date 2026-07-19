@@ -406,8 +406,9 @@ Crear un prototipo aislado que responda:
 - [x] Mapping normalizado `auth_identities`, sin tokens ni contraseñas.
 - [x] Intercambio con autenticación reciente, correo verificado, CSRF dedicado, rate limit y error anti-enumeración.
 - [x] MySQL conserva usuario, workspace, rol y sesión revocable como autoridad.
+- [x] SDK web detrás de `VITE_FEDERATED_AUTH_ENABLED=false`, persistencia en memoria, carga dinámica, intercambio por sesión local y `signOut` inmediato.
 - [ ] Configurar proyecto/ADC fuera del repositorio y habilitar solo en staging.
-- [ ] Implementar SDK cliente y canary cuando exista un proyecto aprobado.
+- [ ] Ejecutar canary con un moderador previamente vinculado cuando exista un proyecto aprobado.
 - [ ] Probar importación Argon2 vía REST/Java o elegir migración progresiva.
 - [ ] Aprobar coste, cuotas, runbook y rollback antes de producción.
 

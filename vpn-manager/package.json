@@ -16,6 +16,7 @@
   "dependencies": {
     "@gestionvpn/contracts": "*",
     "exceljs": "^4.4.0",
+    "firebase": "^12.16.0",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "localforage": "^1.10.0",

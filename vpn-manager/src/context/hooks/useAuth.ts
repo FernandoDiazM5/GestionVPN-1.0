@@ -3,6 +3,7 @@ import type { RouterCredentials } from '../../store/db';
 import { dbService } from '../../store/db';
 import { accountApi } from '../../services/accountApi';
 import { clearUserScopedData } from '../../utils/sessionReset';
+import { clearFederatedClientSession } from '../../services/federatedAuth';
 
 const LAST_USER_KEY = 'vpn_last_user';
 
@@ -35,6 +36,7 @@ export function useAuth() {
     //  3) cachés locales (escaneo/dispositivos/CPEs) — privacidad en máquina compartida
     await Promise.allSettled([
       accountApi.logout(),
+      clearFederatedClientSession(),
       dbService.clearStore(),
       clearUserScopedData(),
     ]);
