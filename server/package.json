@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "API RouterOS Proxy",
   "main": "index.js",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
@@ -19,6 +22,7 @@
     "migrate:otp-send": "node db/migrateOtpSendRate.js",
     "migrate:auth-rate-buckets": "node db/migrateAuthRateBuckets.js",
     "migrate:auth-sessions": "node db/migrateAuthSessions.js",
+    "migrate:auth-identities": "node db/migrateAuthIdentities.js",
     "migrate:air-os-ai": "node db/migrateAirOsAi.js",
     "diagnose": "node db/diagnostics.js",
     "check:scanroute": "node db/checkScanRoute.js",
@@ -45,6 +49,7 @@
     "cors": "^2.8.5",
     "dotenv": "^17.4.2",
     "express": "^4.19.2",
+    "firebase-admin": "^14.2.0",
     "helmet": "^8.2.0",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.2.0",

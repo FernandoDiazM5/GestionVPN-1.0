@@ -6,15 +6,15 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 
 ## Resumen
 
-- Rutas detectadas: 143
-- Rutas de mutación (POST/PUT/PATCH): 95
-- Rutas que consumen `req.body`: 73
-- Rutas con esquema de `req.body` detectable: 73/73
+- Rutas detectadas: 145
+- Rutas de mutación (POST/PUT/PATCH): 96
+- Rutas que consumen `req.body`: 74
+- Rutas con esquema de `req.body` detectable: 74/74
 - Endpoints públicos de identidad sin rate limiting detectable: 0
 
 ## Alertas detectadas
 
-- `PUBLIC_MUTATION_REVIEW`: 2
+- `PUBLIC_MUTATION_REVIEW`: 3
 
 ## Criterios
 
@@ -122,6 +122,8 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `routes/diagnostics.routes.js` | 127 | POST | `/diagnostics/traceroute` | sí | — | sí | sí | network-admin | — |
 | `routes/errorReports.routes.js` | 49 | POST | `/` | no | — | no | sí | — | `PUBLIC_MUTATION_REVIEW` |
 | `routes/events.routes.js` | 13 | GET | `/stream` | sí | — | no | n/a | — | — |
+| `routes/federatedAuth.routes.js` | 35 | GET | `/csrf` | no | — | no | n/a | — | — |
+| `routes/federatedAuth.routes.js` | 43 | POST | `/exchange` | no | — | sí | sí | — | `PUBLIC_MUTATION_REVIEW` |
 | `routes/health.routes.js` | 64 | GET | `/` | no | — | no | n/a | network-admin | — |
 | `routes/health.routes.js` | 82 | GET | `/db` | no | — | no | n/a | — | — |
 | `routes/nodes/credentials.routes.js` | 25 | POST | `/node/creds/save` | sí | — | no | sí | sql | — |

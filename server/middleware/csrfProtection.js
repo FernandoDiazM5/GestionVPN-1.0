@@ -11,6 +11,8 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 const PUBLIC_MUTATIONS = [
   /^\/api\/auth\/(?:login|setup|password-reset\/request|password-reset\/confirm)\/?$/,
   /^\/api\/account\/(?:login|register|verify|resend)\/?$/,
+  // Tiene un bootstrap CSRF dedicado, separado de la cookie de sesion local.
+  /^\/api\/account\/federated\/exchange\/?$/,
   /^\/api\/team\/accept\/?$/,
   /^\/api\/error-reports\/?$/,
 ];

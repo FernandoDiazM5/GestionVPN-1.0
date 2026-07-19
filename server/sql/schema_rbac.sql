@@ -36,6 +36,25 @@ CREATE TABLE IF NOT EXISTS users (
   UNIQUE KEY uq_users_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Identidades externas vinculadas. Se separan de users para permitir piloto,
+-- dual-read y rollback sin eliminar password_hash ni mezclar autorización.
+CREATE TABLE IF NOT EXISTS auth_identities (
+  id                CHAR(36)     NOT NULL,
+  user_id           CHAR(36)     NOT NULL,
+  provider          VARCHAR(32)  CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  tenant_key        VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin NOT NULL DEFAULT '',
+  provider_subject  VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  email_at_link     VARCHAR(255) NOT NULL,
+  created_at        BIGINT       NOT NULL,
+  updated_at        BIGINT       NOT NULL,
+  last_verified_at  BIGINT       DEFAULT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_auth_identity_subject (provider, tenant_key, provider_subject),
+  UNIQUE KEY uq_auth_identity_user (user_id, provider, tenant_key),
+  KEY idx_auth_identity_user (user_id),
+  CONSTRAINT fk_auth_identity_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ── 2. Workspaces (inquilinos) ───────────────────────────────
 CREATE TABLE IF NOT EXISTS workspaces (
   id         CHAR(36)     NOT NULL,

@@ -10,6 +10,7 @@ function app() {
   instance.use(csrfProtection);
   instance.post('/api/protected', (_req, res) => res.sendStatus(204));
   instance.post('/api/auth/login', (_req, res) => res.sendStatus(204));
+  instance.post('/api/account/federated/exchange', (_req, res) => res.sendStatus(204));
   return instance;
 }
 
@@ -67,6 +68,14 @@ describe('csrfProtection', () => {
     await request(app()).post('/api/protected').expect(204);
     await request(app()).post('/api/auth/login')
       .set('Origin', 'http://localhost:5173')
+      .expect(204);
+  });
+
+  it('delega el exchange federado a su CSRF dedicado aunque exista una cookie local vieja', async () => {
+    const session = sessionCookies();
+    await request(app()).post('/api/account/federated/exchange')
+      .set('Origin', 'http://localhost:5173')
+      .set('Cookie', session.cookie)
       .expect(204);
   });
 });

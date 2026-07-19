@@ -399,6 +399,18 @@ Crear un prototipo aislado que responda:
 - No confiar sólo en claims para roles que requieren revocación inmediata; los claims pueden quedar obsoletos hasta refrescar token.
 - Todas las rutas continúan usando `requireSession`, RBAC y validación server-side adaptados al proveedor.
 
+#### Estado del piloto (2026-07-18)
+
+- [x] ADR creado en `docs/adr/0001-firebase-auth-pilot.md`.
+- [x] Admin SDK y verificación revocable integrados detrás de `FEDERATED_AUTH_ENABLED=false`.
+- [x] Mapping normalizado `auth_identities`, sin tokens ni contraseñas.
+- [x] Intercambio con autenticación reciente, correo verificado, CSRF dedicado, rate limit y error anti-enumeración.
+- [x] MySQL conserva usuario, workspace, rol y sesión revocable como autoridad.
+- [ ] Configurar proyecto/ADC fuera del repositorio y habilitar solo en staging.
+- [ ] Implementar SDK cliente y canary cuando exista un proyecto aprobado.
+- [ ] Probar importación Argon2 vía REST/Java o elegir migración progresiva.
+- [ ] Aprobar coste, cuotas, runbook y rollback antes de producción.
+
 #### Migración propuesta
 
 1. ADR aprobado con opción elegida, coste, riesgos y rollback.

@@ -25,6 +25,8 @@ const POLICIES = Object.freeze({
   OTP_SEND: { windowMs: ONE_HOUR, blockMs: ONE_HOUR, ip: 5, identity: 5, pair: 5, cooldownMs: 60_000 },
   RESET_REQUEST: { windowMs: ONE_HOUR, blockMs: ONE_HOUR, ip: 5, identity: 5, pair: 5 },
   RESET_CONFIRM: { windowMs: FIFTEEN_MINUTES, blockMs: FIFTEEN_MINUTES, ip: 10 },
+  // El token todavia no es confiable en esta etapa: limitar solo por IP.
+  FEDERATED_EXCHANGE: { windowMs: FIFTEEN_MINUTES, blockMs: FIFTEEN_MINUTES, ip: 20 },
 });
 
 function rateHmacKey() {

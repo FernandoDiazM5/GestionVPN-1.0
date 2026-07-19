@@ -1,6 +1,6 @@
 # Modelo de amenazas de autenticación y API
 
-Estado: actualizado hasta Fase 5
+Estado: actualizado hasta Fase 6 (piloto Firebase apagado)
 Fecha de revisión inicial: 2026-07-18  
 Propietario: equipo mantenedor de GestionVPN
 
@@ -92,6 +92,16 @@ Reglas del límite:
 - el envío de correo ocurre con límites por IP e identidad;
 - cambio/reset de contraseña revoca sesiones existentes.
 
+### Intercambio federado (piloto)
+
+1. El navegador obtiene un ID token corto desde Firebase y un CSRF dedicado desde la API.
+2. La API exige Origin permitido, double-submit CSRF y rate limit por IP antes de verificarlo.
+3. Firebase Admin valida firma, audiencia/proyecto, expiración, revocación y autenticación reciente.
+4. `auth_identities` debe vincular el UID a un usuario local preexistente; no hay auto-provision.
+5. MySQL vuelve a decidir usuario activo, email, workspace, membresía, rol y plataforma.
+6. El éxito emite una sesión local revocable; el ID token no se convierte en autorización ni se persiste.
+7. Cualquier rechazo de identidad/mapping/estado devuelve el mismo `BAD_CREDENTIALS`.
+
 ### Operación autenticada
 
 1. Validar cookie y revocación.
@@ -125,8 +135,8 @@ Reglas del límite:
 | T17 | Clave JWT comprometida | Una clave firma todas las sesiones | keyring active/previous, `kid`, rotación y revocación | Mitigado en código; practicar runbook |
 | T18 | DoS por hash | Ataque fuerza Argon2/bcrypt masivo | edge limit antes del hash y benchmark | Nginx + guard previo implementados; benchmark pendiente |
 | T19 | Fuga por logs | Password/cookie aparece en errores | redacción central y tests | Buena base |
-| T20 | BaaS mal integrado | Token válido obtiene permisos obsoletos | verificación server-side + RBAC MySQL | No adoptado |
-| T21 | Dependencia indisponible | proveedor identidad/BD falla | fail-closed para seguridad + respuesta 503 | Inconsistente |
+| T20 | BaaS mal integrado | Token válido obtiene permisos obsoletos | verificación server-side + RBAC MySQL | Piloto aislado y apagado; tests negativos |
+| T21 | Dependencia indisponible | proveedor identidad/BD falla | fail-closed para seguridad + login local de rollback | Piloto falla cerrado; operación pendiente |
 | T22 | Setup expuesto | carrera crea bootstrap débil | límite, transacción y secreto fuerte | Mitigado: límite, lock MySQL y password moderno |
 
 ## Riesgos prioritarios
@@ -148,7 +158,7 @@ Reglas del límite:
 ### P2 — decisión arquitectónica
 
 - MFA/adaptive auth;
-- Firebase Auth/Identity Platform;
+- aprobar o rechazar Firebase Auth/Identity Platform tras proyecto staging, importación Argon2 y canary;
 - rotación avanzada de claves y proveedor externo de secretos.
 
 ## Supuestos que deben verificarse en despliegue

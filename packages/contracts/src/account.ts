@@ -33,6 +33,12 @@ export const AccountLoginRequestSchema = z.object({
 });
 export type AccountLoginRequest = z.infer<typeof AccountLoginRequestSchema>;
 
+/** POST /api/account/federated/exchange */
+export const FederatedExchangeRequestSchema = z.object({
+  idToken: z.string().min(100).max(8192),
+}).strict();
+export type FederatedExchangeRequest = z.infer<typeof FederatedExchangeRequestSchema>;
+
 /** PATCH /api/account/password */
 export const ChangePasswordRequestSchema = z.object({
   currentPassword: z.string().min(1).max(128),

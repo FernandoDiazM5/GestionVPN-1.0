@@ -18,6 +18,7 @@ const logger = require('./lib/logger');
 const metrics = require('./lib/metrics');
 const healthRoutes = require('./routes/health.routes');
 const accountRoutes = require('./routes/account.routes');
+const federatedAuthRoutes = require('./routes/federatedAuth.routes');
 const teamRoutes = require('./routes/team.routes');
 const auditRoutes = require('./routes/audit.routes');
 const eventsRoutes = require('./routes/events.routes');
@@ -48,6 +49,9 @@ const PORT = process.env.PORT || 3001;
 // cerrado al acceso público; ver docker-compose.prod.yml y DESPLIEGUE_VPS.md.
 if (process.env.NODE_ENV === 'production') app.set('trust proxy', 1);
 require('./lib/rateLimit').assertRateLimitConfig();
+// Si el piloto se habilita, fallar al arrancar ante configuracion incompleta.
+// Deshabilitado no inicializa Firebase ni requiere credenciales externas.
+require('./lib/federatedAuthConfig').readFederatedAuthConfig();
 
 // ── Guard global: errores asincrónicos de node-routeros ──────────────────────
 const SAFE_CODES = new Set([
@@ -202,6 +206,7 @@ app.get('/metrics', async (req, res) => {
 // Montar rutas públicas e integradas
 app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/account/federated', federatedAuthRoutes);
 app.use('/api/account', accountRoutes);   // Fase 2: auth multi-usuario (cookies)
 app.use('/api/team', teamRoutes);          // Fase 3: invitaciones y roles (RBAC)
 app.use('/api/audit', auditRoutes);        // Fase 3: auditoría de túneles
