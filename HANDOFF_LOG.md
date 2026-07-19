@@ -6,6 +6,13 @@
 
 ---
 
+> **Sesión 2026-07-18 - Fase 6: piloto Firebase/Identity Platform reversible.** Rama `vps_prod`; commit funcional local `95c1e6b`. Skill: `handoff-keeper`.
+> - Integrado Firebase Admin SDK 14 con Node 22, ADC y tenant opcional detrás de `FEDERATED_AUTH_ENABLED=false`. Deshabilitado no inicializa Firebase ni exige credenciales; habilitado falla temprano ante configuración inválida.
+> - Creada `auth_identities` normalizada y su migración/entrypoint. El exchange verifica revocación, correo, autenticación reciente, Origin, CSRF dedicado y rate limit; exige mapping previo y revalida en MySQL usuario, email, workspace, membresía, rol y suspensión. No auto-provisiona ni usa claims para RBAC; emite una `auth_session` local.
+> - ADR `docs/adr/0001-firebase-auth-pilot.md`: directorio global inicial, WIF/ADC fuera del repo, costes/cuotas, importación bcrypt y bloqueo Argon2 en SDK Node (probar REST/Java o migración progresiva), canary, go/no-go y rollback conservando hashes/login local.
+> - Verificación final: 83 suites / 508 backend, 42 suites / 135 frontend, `check:all`, inventario 145 rutas con schemas 74/74, Semgrep focalizado 14 archivos/127 reglas/0 hallazgos, `npm ci --dry-run` y `git diff --check`. Auditoría npm: 7 moderadas, 0 altas/críticas; scan Semgrep global conserva 19 hallazgos históricos ajenos al cambio.
+> - Sin push, deploy, proyecto Firebase ni credenciales. Siguiente paso autorizado sólo con proyecto staging aprobado: SDK cliente en memoria + `signOut`, mapping de un canary, prueba Argon2 y observación 48 h.
+
 > **Sesión 2026-07-18 - Fase 5: CSRF, sesiones revocables y rotación JWT.** Rama `vps_prod`; commit funcional local `56b37d8`. Skill: `handoff-keeper`.
 > - Creada `auth_sessions` con migración/entrypoint y `jti` por sesión. Login/verify/accept registran el token; renovación y cambio de workspace rotan el identificador; logout global, password/email, suspensión, rehabilitación y borrados revocan inmediatamente. No se almacena el JWT.
 > - Consolidada la autenticación en un middleware autoritativo: cookie-only, HS256/issuer/audience, estado de sesión+usuario+membresía consultado en MySQL por request y fallo cerrado `503 AUTH_STATE_UNAVAILABLE`. La capa legacy es sólo un adaptador; se retiró el cache `accountStatus` que degradaba abierto.
