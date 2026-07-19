@@ -6,6 +6,13 @@
 
 ---
 
+> **Sesión 2026-07-18 - Operación segura del canary Firebase.** Rama `vps_prod`; commit funcional local `19d2346`. Skill: `handoff-keeper`.
+> - Añadido `firebase:preflight`: diagnóstico read-only del entorno, flags, esquema `auth_identities`, inventario agregado y ADC/API mediante un lookup sintético; no imprime ruta ADC, usuarios ni credenciales y sólo declara `LISTO` con `--provider`.
+> - Añadido `firebase:canary status|link|disable`: dry-run por defecto y confirmaciones literales. `link` exige un OWNER local activo y correo idéntico a una identidad Firebase activa/verificada; bloquea colisiones UID↔usuario y no crea usuarios ni recibe contraseñas. `disable` conserva el mapping con `disabled_at`, revoca sesiones locales y luego refresh tokens Firebase.
+> - La ruta de intercambio y `markVerified` excluyen mappings deshabilitados, cerrando también la carrera de desactivación durante el login. Migración idempotente amplía instalaciones existentes. Runbook completo: `docs/security/FIREBASE_STAGING_CANARY_RUNBOOK.md`.
+> - Verificación final: 84 suites / 515 backend, frontend vigente 44 suites / 140 pruebas, `check:all`, inventario 145 rutas, Semgrep focalizado 9 archivos/121 reglas/0 hallazgos, `npm ci --dry-run` y `git diff --check`. Auditoría npm: 7 moderadas, 0 altas/críticas. El preflight local terminó bloqueado como se esperaba por flags apagadas y MySQL no disponible, sin escrituras ni contacto con Google.
+> - Sin push, deploy, migración de BD, proyecto/ADC real ni activación. Pendiente externo: preparar staging y ejecutar el canary real durante 48 h.
+
 > **Sesión 2026-07-18 - Cliente web del piloto Firebase con sesión efímera.** Rama `vps_prod`; commit funcional local `ae693aa`. Skills: `vercel-react-best-practices`, `handoff-keeper`.
 > - Añadido Firebase Web SDK 12 detrás de `VITE_FEDERATED_AUTH_ENABLED=false` y configuración completa obligatoria. Los imports de `firebase/app` y `firebase/auth` son dinámicos y paralelos; la compilación confirmó chunks separados del acceso inicial.
 > - El login conserva el acceso local y ofrece Firebase sólo cuando el piloto está configurado. Firebase usa persistencia en memoria, normaliza el correo, obtiene un ID token renovado, solicita el CSRF federado, lo intercambia por `vpn_session` HttpOnly y ejecuta `signOut` inmediatamente; ningún token del proveedor se persiste. El logout local incluye una limpieza defensiva que no descarga el SDK si nunca se usó.
