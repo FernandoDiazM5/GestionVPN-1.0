@@ -1,6 +1,9 @@
 const {
   normalizeClaims,
   verifyFirebaseIdToken,
+  getFirebaseUser,
+  probeFirebaseAuthAccess,
+  revokeFirebaseSessions,
   resetForTests,
   setAuthClientForTests,
 } = require('../../lib/firebaseIdentityProvider');
@@ -65,5 +68,22 @@ describe('firebaseIdentityProvider', () => {
       subject: 'firebase-uid-1', email: 'user@example.com',
     });
     expect(authClient.verifyIdToken).toHaveBeenCalledWith('firebase-id-token', true);
+  });
+
+  it('expone operaciones administrativas minimas para preflight y rollback', async () => {
+    process.env.FEDERATED_AUTH_ENABLED = 'true';
+    process.env.FIREBASE_PROJECT_ID = 'gestion-vpn-pilot';
+    const authClient = {
+      getUser: vi.fn()
+        .mockResolvedValueOnce({ uid: 'firebase-uid-1' })
+        .mockRejectedValueOnce(Object.assign(new Error('not found'), { code: 'auth/user-not-found' })),
+      revokeRefreshTokens: vi.fn().mockResolvedValue(undefined),
+    };
+    setAuthClientForTests(authClient);
+
+    await expect(getFirebaseUser('firebase-uid-1')).resolves.toMatchObject({ uid: 'firebase-uid-1' });
+    await expect(probeFirebaseAuthAccess()).resolves.toEqual({ reachable: true });
+    await expect(revokeFirebaseSessions('firebase-uid-1')).resolves.toBeUndefined();
+    expect(authClient.getUser).toHaveBeenLastCalledWith('__gestionvpn_preflight_nonexistent__');
   });
 });

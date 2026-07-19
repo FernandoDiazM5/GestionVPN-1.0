@@ -81,6 +81,8 @@ Adoptar solo si:
 
 Si falla cualquiera, mantener `FEDERATED_AUTH_ENABLED=false` y continuar con auth local endurecido.
 
+El procedimiento operativo y los comandos de preflight, mapping canary y rollback viven en [`docs/security/FIREBASE_STAGING_CANARY_RUNBOOK.md`](../security/FIREBASE_STAGING_CANARY_RUNBOOK.md).
+
 ## Rollback
 
 1. Poner `FEDERATED_AUTH_ENABLED=false` y reiniciar el backend.

@@ -54,6 +54,19 @@ async function revokeFirebaseSessions(subject) {
   return getAuthClient().revokeRefreshTokens(subject);
 }
 
+async function getFirebaseUser(subject) {
+  return getAuthClient().getUser(subject);
+}
+
+async function probeFirebaseAuthAccess() {
+  try {
+    await getAuthClient().getUser('__gestionvpn_preflight_nonexistent__');
+  } catch (error) {
+    if (error?.code !== 'auth/user-not-found') throw error;
+  }
+  return Object.freeze({ reachable: true });
+}
+
 function resetForTests() {
   authClient = null;
 }
@@ -66,6 +79,8 @@ function setAuthClientForTests(client) {
 module.exports = {
   verifyFirebaseIdToken,
   revokeFirebaseSessions,
+  getFirebaseUser,
+  probeFirebaseAuthAccess,
   normalizeClaims,
   resetForTests,
   setAuthClientForTests,

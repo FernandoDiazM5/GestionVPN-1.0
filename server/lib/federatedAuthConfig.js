@@ -10,21 +10,21 @@ function positiveInt(value, fallback, min, max, label) {
   return parsed;
 }
 
-function readFederatedAuthConfig() {
-  const enabled = process.env.FEDERATED_AUTH_ENABLED === 'true';
+function readFederatedAuthConfig(env = process.env) {
+  const enabled = env.FEDERATED_AUTH_ENABLED === 'true';
   if (!enabled) {
     return Object.freeze({ enabled: false, provider: PROVIDER });
   }
 
-  const provider = String(process.env.FEDERATED_AUTH_PROVIDER || PROVIDER).trim().toLowerCase();
+  const provider = String(env.FEDERATED_AUTH_PROVIDER || PROVIDER).trim().toLowerCase();
   if (provider !== PROVIDER) throw new Error('FEDERATED_AUTH_PROVIDER no soportado');
 
-  const projectId = String(process.env.FIREBASE_PROJECT_ID || '').trim();
+  const projectId = String(env.FIREBASE_PROJECT_ID || '').trim();
   if (!PROJECT_ID_RE.test(projectId)) {
     throw new Error('FIREBASE_PROJECT_ID es obligatorio y debe ser válido');
   }
 
-  const tenantId = String(process.env.FIREBASE_TENANT_ID || '').trim();
+  const tenantId = String(env.FIREBASE_TENANT_ID || '').trim();
   if (tenantId && !ID_RE.test(tenantId)) throw new Error('FIREBASE_TENANT_ID inválido');
 
   return Object.freeze({
@@ -34,7 +34,7 @@ function readFederatedAuthConfig() {
     tenantId: tenantId || null,
     tenantKey: tenantId || '',
     maxAuthAgeSeconds: positiveInt(
-      process.env.FEDERATED_AUTH_MAX_AGE_SECONDS,
+      env.FEDERATED_AUTH_MAX_AGE_SECONDS,
       300,
       60,
       900,

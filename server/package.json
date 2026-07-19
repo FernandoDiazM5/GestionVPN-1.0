@@ -36,6 +36,8 @@
     "security:routes": "node tools/security-route-inventory.js --write",
     "security:routes:check": "node tools/security-route-inventory.js --check",
     "security:hash-benchmark": "node tools/benchmark-password-hash.js",
+    "firebase:preflight": "node tools/firebase-staging-preflight.js",
+    "firebase:canary": "node tools/firebase-canary.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
