@@ -6,6 +6,13 @@
 
 ---
 
+> **Sesión 2026-07-18 - Cliente web del piloto Firebase con sesión efímera.** Rama `vps_prod`; commit funcional local `ae693aa`. Skills: `vercel-react-best-practices`, `handoff-keeper`.
+> - Añadido Firebase Web SDK 12 detrás de `VITE_FEDERATED_AUTH_ENABLED=false` y configuración completa obligatoria. Los imports de `firebase/app` y `firebase/auth` son dinámicos y paralelos; la compilación confirmó chunks separados del acceso inicial.
+> - El login conserva el acceso local y ofrece Firebase sólo cuando el piloto está configurado. Firebase usa persistencia en memoria, normaliza el correo, obtiene un ID token renovado, solicita el CSRF federado, lo intercambia por `vpn_session` HttpOnly y ejecuta `signOut` inmediatamente; ningún token del proveedor se persiste. El logout local incluye una limpieza defensiva que no descarga el SDK si nunca se usó.
+> - Incorporadas flags vacías/apagadas en ejemplos, Dockerfiles y argumentos de `docker-compose.prod.yml`; no se añadieron proyecto, claves ni credenciales reales. ADR y plan de hardening actualizados: el cliente está hecho; siguen pendientes proyecto/ADC, staging, mapping canary, prueba Argon2, coste/cuotas y rollback.
+> - Verificación final: 83 suites / 508 backend, 44 suites / 140 frontend, `check:all`, TypeScript, ESLint, builds Vite normal y con el piloto habilitado, `audit:design` sin violaciones, Semgrep focalizado 7 archivos/127 reglas/0 hallazgos, `npm ci --dry-run` y `git diff --check`. Auditoría npm: 7 moderadas, 0 altas/críticas.
+> - Sin push, deploy ni activación del piloto.
+
 > **Sesión 2026-07-18 - Fase 6: piloto Firebase/Identity Platform reversible.** Rama `vps_prod`; commit funcional local `95c1e6b`. Skill: `handoff-keeper`.
 > - Integrado Firebase Admin SDK 14 con Node 22, ADC y tenant opcional detrás de `FEDERATED_AUTH_ENABLED=false`. Deshabilitado no inicializa Firebase ni exige credenciales; habilitado falla temprano ante configuración inválida.
 > - Creada `auth_identities` normalizada y su migración/entrypoint. El exchange verifica revocación, correo, autenticación reciente, Origin, CSRF dedicado y rate limit; exige mapping previo y revalida en MySQL usuario, email, workspace, membresía, rol y suspensión. No auto-provisiona ni usa claims para RBAC; emite una `auth_session` local.
