@@ -8,6 +8,7 @@ const configMocks = stubModule(__dirname, '../../lib/federatedAuthConfig', {
 });
 const providerMocks = stubModule(__dirname, '../../lib/firebaseIdentityProvider', {
   verifyFirebaseIdToken: vi.fn(),
+  revokeFirebaseSessions: vi.fn(),
 });
 const sessionMocks = stubModule(__dirname, '../../lib/sessionService', {
   issueSession: vi.fn(),
@@ -18,6 +19,29 @@ const jwtMocks = stubModule(__dirname, '../../lib/jwt', {
 const identityMocks = stubModule(__dirname, '../../db/repos/authIdentityRepo', {
   findLoginContext: vi.fn(),
   markVerified: vi.fn(),
+  findByUser: vi.fn(),
+  findBySubject: vi.fn(),
+  link: vi.fn(),
+  reactivate: vi.fn(),
+  setDisabled: vi.fn(),
+});
+const userMocks = stubModule(__dirname, '../../db/repos/userRepo', {
+  findById: vi.fn(),
+});
+const passwordMocks = stubModule(__dirname, '../../lib/passwordHasher', {
+  verifyPassword: vi.fn(),
+});
+const legacyMocks = stubModule(__dirname, '../../db.service', {
+  getUserByUsername: vi.fn(),
+});
+stubModule(__dirname, '../../middleware/authJwt', {
+  requireSession: (req, _res, next) => {
+    req.account = {
+      sub: 'user-1', email: 'user@example.com', workspace_id: 'ws-1', role: 'OWNER',
+      platform_admin: req.get('x-test-platform-admin') === '1',
+    };
+    next();
+  },
 });
 stubModule(__dirname, '../../lib/rateLimit', {
   guardPolicy: () => (req, _res, next) => next(),
@@ -60,12 +84,27 @@ async function bootstrap(agent) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  configMocks.readFederatedAuthConfig.mockReturnValue({ enabled: true });
+  configMocks.readFederatedAuthConfig.mockReturnValue({
+    enabled: true, provider: 'firebase', tenantKey: '',
+  });
   providerMocks.verifyFirebaseIdToken.mockResolvedValue({
     provider: 'firebase', tenantKey: '', subject: 'firebase-uid-1', email: 'user@example.com',
+    signInProvider: 'google.com',
   });
+  providerMocks.revokeFirebaseSessions.mockResolvedValue(undefined);
   identityMocks.findLoginContext.mockResolvedValue(linkedContext());
   identityMocks.markVerified.mockResolvedValue(true);
+  identityMocks.findByUser.mockResolvedValue(null);
+  identityMocks.findBySubject.mockResolvedValue(null);
+  identityMocks.link.mockResolvedValue('identity-1');
+  identityMocks.reactivate.mockResolvedValue(true);
+  identityMocks.setDisabled.mockResolvedValue(true);
+  userMocks.findById.mockResolvedValue({
+    id: 'user-1', email: 'user@example.com', password_hash: 'hash',
+    email_verified: 1, disabled_at: null, deleted_at: null,
+  });
+  passwordMocks.verifyPassword.mockResolvedValue(true);
+  legacyMocks.getUserByUsername.mockResolvedValue(null);
   sessionMocks.issueSession.mockResolvedValue({ token: 'local-session' });
 });
 
@@ -86,7 +125,10 @@ describe('piloto de autenticacion federada', () => {
       .send({ idToken: 'x'.repeat(100) })
       .expect(200);
 
-    expect(providerMocks.verifyFirebaseIdToken).toHaveBeenCalledWith('x'.repeat(100));
+    expect(providerMocks.verifyFirebaseIdToken).toHaveBeenCalledWith(
+      'x'.repeat(100),
+      { requiredSignInProvider: 'google.com' },
+    );
     expect(identityMocks.findLoginContext).toHaveBeenCalledWith(expect.objectContaining({
       provider: 'firebase', subject: 'firebase-uid-1',
     }));
@@ -106,6 +148,79 @@ describe('piloto de autenticacion federada', () => {
       .expect(403);
     expect(response.body.code).toBe('CSRF_INVALID');
     expect(providerMocks.verifyFirebaseIdToken).not.toHaveBeenCalled();
+  });
+
+  it('vincula Google al usuario autenticado sin recibir UID manualmente', async () => {
+    const response = await request(app()).post('/api/account/federated/link')
+      .send({ idToken: 'x'.repeat(100), currentPassword: 'password-seguro' })
+      .expect(200);
+
+    expect(passwordMocks.verifyPassword).toHaveBeenCalledWith('password-seguro', 'hash');
+    expect(providerMocks.verifyFirebaseIdToken).toHaveBeenCalledWith(
+      'x'.repeat(100),
+      { requiredSignInProvider: 'google.com' },
+    );
+    expect(identityMocks.link).toHaveBeenCalledWith({
+      userId: 'user-1',
+      provider: 'firebase',
+      tenantKey: '',
+      subject: 'firebase-uid-1',
+      emailAtLink: 'user@example.com',
+    });
+    expect(response.body).toMatchObject({ linked: true, email: 'user@example.com' });
+  });
+
+  it('rechaza vincular una cuenta Google con correo diferente', async () => {
+    providerMocks.verifyFirebaseIdToken.mockResolvedValueOnce({
+      provider: 'firebase', tenantKey: '', subject: 'firebase-uid-2', email: 'other@example.com',
+    });
+    const response = await request(app()).post('/api/account/federated/link')
+      .send({ idToken: 'x'.repeat(100), currentPassword: 'password-seguro' })
+      .expect(409);
+    expect(response.body.code).toBe('EMAIL_MISMATCH');
+    expect(identityMocks.link).not.toHaveBeenCalled();
+  });
+
+  it('verifica la contraseña local antes de consultar Firebase', async () => {
+    passwordMocks.verifyPassword.mockResolvedValueOnce(false);
+    const response = await request(app()).post('/api/account/federated/link')
+      .send({ idToken: 'x'.repeat(100), currentPassword: 'incorrecta' })
+      .expect(401);
+    expect(response.body.code).toBe('BAD_CURRENT');
+    expect(providerMocks.verifyFirebaseIdToken).not.toHaveBeenCalled();
+  });
+
+  it('reautentica al administrador con su credencial legacy real', async () => {
+    userMocks.findById.mockResolvedValueOnce({
+      id: 'user-1', email: 'admin@example.com', name: 'admin', password_hash: 'random-bridge-hash',
+      email_verified: 1, disabled_at: null, deleted_at: null,
+    });
+    legacyMocks.getUserByUsername.mockResolvedValueOnce({ password_hash: 'legacy-admin-hash' });
+    providerMocks.verifyFirebaseIdToken.mockResolvedValueOnce({
+      provider: 'firebase', tenantKey: '', subject: 'firebase-uid-admin', email: 'admin@example.com',
+    });
+
+    await request(app()).post('/api/account/federated/link')
+      .set('x-test-platform-admin', '1')
+      .send({ idToken: 'x'.repeat(100), currentPassword: 'password-admin' })
+      .expect(200);
+
+    expect(legacyMocks.getUserByUsername).toHaveBeenCalledWith('admin');
+    expect(passwordMocks.verifyPassword).toHaveBeenCalledWith('password-admin', 'legacy-admin-hash');
+  });
+
+  it('desvincula de forma reversible y revoca sesiones Firebase', async () => {
+    identityMocks.findByUser.mockResolvedValueOnce({
+      id: 'identity-1', user_id: 'user-1', provider_subject: 'firebase-uid-1', disabled_at: null,
+    });
+    const response = await request(app()).post('/api/account/federated/unlink')
+      .send({ currentPassword: 'password-seguro' })
+      .expect(200);
+    expect(identityMocks.setDisabled).toHaveBeenCalledWith({
+      id: 'identity-1', disabledAt: expect.any(Number),
+    });
+    expect(providerMocks.revokeFirebaseSessions).toHaveBeenCalledWith('firebase-uid-1');
+    expect(response.body.linked).toBe(false);
   });
 
   it.each([

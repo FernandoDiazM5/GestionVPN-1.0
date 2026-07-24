@@ -39,6 +39,19 @@ export const FederatedExchangeRequestSchema = z.object({
 }).strict();
 export type FederatedExchangeRequest = z.infer<typeof FederatedExchangeRequestSchema>;
 
+/** POST /api/account/federated/link */
+export const FederatedLinkRequestSchema = z.object({
+  idToken: z.string().min(100).max(8192),
+  currentPassword: z.string().min(1).max(128),
+}).strict();
+export type FederatedLinkRequest = z.infer<typeof FederatedLinkRequestSchema>;
+
+/** POST /api/account/federated/unlink */
+export const FederatedUnlinkRequestSchema = z.object({
+  currentPassword: z.string().min(1).max(128),
+}).strict();
+export type FederatedUnlinkRequest = z.infer<typeof FederatedUnlinkRequestSchema>;
+
 /** PATCH /api/account/password */
 export const ChangePasswordRequestSchema = z.object({
   currentPassword: z.string().min(1).max(128),

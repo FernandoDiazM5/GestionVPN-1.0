@@ -33,6 +33,9 @@ yarn-error.log*
 .env
 .env.local
 .env.*.local
+server/.env.staging
+firebase-credentials/
+ssl-staging/
 
 # Claude Code settings locales
 .claude/settings.local.json

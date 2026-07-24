@@ -10,6 +10,7 @@ Estado: **preparado, no ejecutado**. Este documento no autoriza activar Firebase
 - No introducir contraseñas, ID tokens, refresh tokens ni JSON de cuenta de servicio en Git, logs o comandos.
 - Conservar el login local y `password_hash` durante todo el piloto.
 - El canary inicial debe ser un único moderador `OWNER` activo, no el administrador de plataforma.
+- El UID se captura automáticamente al enlazar Google; nunca se pide al usuario ni se copia al `.env`.
 - Backend y frontend permanecen apagados hasta completar cada gate de este runbook.
 
 Referencias oficiales: [configurar Firebase Admin con ADC](https://firebase.google.com/docs/admin/setup), [consultar usuarios por UID](https://firebase.google.com/docs/auth/admin/manage-users) y [revocar refresh tokens](https://firebase.google.com/docs/auth/admin/manage-sessions).
@@ -17,11 +18,11 @@ Referencias oficiales: [configurar Firebase Admin con ADC](https://firebase.goog
 ## 2. Preparar el proyecto aislado
 
 1. Crear o seleccionar el proyecto Firebase de staging.
-2. Registrar una aplicación web y habilitar el proveedor Email/Password.
+2. Registrar una aplicación web y habilitar únicamente el proveedor Google para este piloto.
 3. Registrar únicamente los dominios de staging necesarios.
-4. Crear la identidad canary fuera de GestionVPN. Su correo debe coincidir exactamente con el usuario local y estar verificado.
+4. Confirmar que el correo del `OWNER` canary es una cuenta Google verificada y coincide exactamente con su perfil local.
 5. Configurar ADC fuera del repositorio y de la imagen. En infraestructura externa a Google, preferir Workload Identity Federation; un JSON temporal debe montarse read-only y rotarse/eliminarse al terminar.
-6. No importar todavía el universo de usuarios ni hashes Argon2.
+6. No importar usuarios, contraseñas ni hashes Argon2: la adopción es progresiva y autoservicio.
 
 ## 3. Configuración inicial del backend de staging
 
@@ -61,31 +62,9 @@ npm run firebase:preflight --prefix server -- --provider
 
 Todos los checks deben mostrar `OK` y el resultado debe ser `LISTO`. Si falla, no habilitar el frontend.
 
-## 5. Vincular el moderador canary
+## 5. Habilitar el frontend y enlazar el canary
 
-Consultar el estado sin modificar datos:
-
-```bash
-npm run firebase:canary --prefix server -- status --email <correo-canary>
-```
-
-Validar el plan. El CLI consulta el UID con Firebase Admin y exige que la identidad esté activa, verificada y tenga exactamente el mismo correo que el `OWNER` local:
-
-```bash
-npm run firebase:canary --prefix server -- link --email <correo-canary> --uid <firebase-uid>
-```
-
-Aplicar sólo después de revisar el dry-run:
-
-```bash
-npm run firebase:canary --prefix server -- link --email <correo-canary> --uid <firebase-uid> --apply --confirm LINK_FIREBASE_CANARY
-```
-
-El comando no crea usuarios Firebase, no recibe contraseñas y no modifica roles. Si el mapping estaba deshabilitado y conserva el mismo UID, lo reactiva; cualquier colisión usuario↔UID bloquea la operación.
-
-## 6. Habilitar el frontend y probar
-
-Sólo después del mapping:
+Sólo después de que el preflight quede `LISTO`:
 
 ```dotenv
 VITE_FEDERATED_AUTH_ENABLED=true
@@ -95,16 +74,35 @@ VITE_FIREBASE_PROJECT_ID=<proyecto-staging>
 VITE_FIREBASE_APP_ID=<app-id-web>
 ```
 
-Reconstruir el frontend de staging. Probar como mínimo:
+Reconstruir el frontend de staging. El `OWNER` canary debe:
 
-1. Login Firebase correcto crea `vpn_session` local y permite el workspace esperado.
+1. Entrar primero con su login local.
+2. Abrir **Perfil y seguridad → Google**.
+3. Escribir nuevamente su contraseña local y pulsar **Enlazar cuenta de Google**.
+4. Seleccionar la cuenta Google cuyo correo coincide exactamente con el perfil.
+5. Confirmar que aparece **Google enlazado**.
+
+El backend verifica sesión local, contraseña, token Firebase reciente y revocable, proveedor `google.com`, correo verificado, igualdad de correo y unicidad usuario↔UID. El navegador nunca recibe ni muestra el UID; MySQL lo conserva en `auth_identities`.
+
+El CLI queda como herramienta operativa de consulta y recuperación, no como flujo normal del usuario:
+
+```bash
+npm run firebase:canary --prefix server -- status --email <correo-canary>
+```
+
+## 6. Matriz de prueba
+
+Probar como mínimo:
+
+1. **Continuar con Google** crea `vpn_session` local y permite el workspace esperado.
 2. Recarga del navegador conserva sólo la sesión local; no existe sesión Firebase persistente.
 3. Login local del mismo usuario continúa funcionando.
-4. Correo/contraseña incorrectos siempre devuelven el mensaje genérico.
-5. UID no vinculado, correo distinto, usuario suspendido o mapping deshabilitado son rechazados.
-6. Logout y logout global invalidan la sesión local.
-7. MEMBER, OWNER y administrador conservan exactamente sus permisos MySQL; Firebase no concede RBAC.
-8. Observar errores, latencia, cuotas y coste durante al menos 48 horas antes de cualquier ampliación.
+4. Google no vinculado, correo distinto, token no Google, usuario suspendido o mapping deshabilitado son rechazados.
+5. Una cuenta Google no puede vincularse a dos usuarios y un usuario no puede vincular dos cuentas.
+6. Desvincular exige nuevamente la contraseña local, deshabilita el mapping y revoca refresh tokens Firebase.
+7. Logout y logout global invalidan la sesión local.
+8. MEMBER, OWNER y administrador conservan exactamente sus permisos MySQL; Firebase no concede RBAC.
+9. Observar errores, latencia, cuotas y coste durante al menos 48 horas antes de cualquier ampliación.
 
 ## 7. Rollback del canary
 
@@ -135,6 +133,6 @@ No avanzar a más usuarios ni producción hasta tener:
 
 - 48 horas sin regresiones de RBAC, suspensión, revocación o sesión;
 - prueba documentada de rollback;
-- decisión Argon2 REST/Java o migración progresiva sin texto plano;
+- confirmación de que no se importaron contraseñas ni hashes y el login local sigue disponible;
 - presupuesto, cuotas, alertas y responsable operativo aprobados;
 - revisión humana de seguridad y privacidad.

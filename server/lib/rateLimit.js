@@ -27,6 +27,8 @@ const POLICIES = Object.freeze({
   RESET_CONFIRM: { windowMs: FIFTEEN_MINUTES, blockMs: FIFTEEN_MINUTES, ip: 10 },
   // El token todavia no es confiable en esta etapa: limitar solo por IP.
   FEDERATED_EXCHANGE: { windowMs: FIFTEEN_MINUTES, blockMs: FIFTEEN_MINUTES, ip: 20 },
+  // Vincular/desvincular exige sesion + contrasena local; limita la reautenticacion.
+  FEDERATED_LINK: { windowMs: FIFTEEN_MINUTES, blockMs: FIFTEEN_MINUTES, ip: 10 },
 });
 
 function rateHmacKey() {

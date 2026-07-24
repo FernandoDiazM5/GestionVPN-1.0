@@ -6,10 +6,10 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 
 ## Resumen
 
-- Rutas detectadas: 145
-- Rutas de mutación (POST/PUT/PATCH): 96
-- Rutas que consumen `req.body`: 74
-- Rutas con esquema de `req.body` detectable: 74/74
+- Rutas detectadas: 148
+- Rutas de mutación (POST/PUT/PATCH): 98
+- Rutas que consumen `req.body`: 76
+- Rutas con esquema de `req.body` detectable: 76/76
 - Endpoints públicos de identidad sin rate limiting detectable: 0
 
 ## Alertas detectadas
@@ -122,8 +122,11 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `routes/diagnostics.routes.js` | 127 | POST | `/diagnostics/traceroute` | sí | — | sí | sí | network-admin | — |
 | `routes/errorReports.routes.js` | 49 | POST | `/` | no | — | no | sí | — | `PUBLIC_MUTATION_REVIEW` |
 | `routes/events.routes.js` | 13 | GET | `/stream` | sí | — | no | n/a | — | — |
-| `routes/federatedAuth.routes.js` | 35 | GET | `/csrf` | no | — | no | n/a | — | — |
-| `routes/federatedAuth.routes.js` | 43 | POST | `/exchange` | no | — | sí | sí | — | `PUBLIC_MUTATION_REVIEW` |
+| `routes/federatedAuth.routes.js` | 59 | GET | `/csrf` | no | — | no | n/a | — | — |
+| `routes/federatedAuth.routes.js` | 67 | GET | `/link-status` | sí | — | no | n/a | — | — |
+| `routes/federatedAuth.routes.js` | 87 | POST | `/link` | sí | — | sí | sí | — | — |
+| `routes/federatedAuth.routes.js` | 177 | POST | `/unlink` | sí | — | sí | sí | — | — |
+| `routes/federatedAuth.routes.js` | 210 | POST | `/exchange` | no | — | sí | sí | — | `PUBLIC_MUTATION_REVIEW` |
 | `routes/health.routes.js` | 64 | GET | `/` | no | — | no | n/a | network-admin | — |
 | `routes/health.routes.js` | 82 | GET | `/db` | no | — | no | n/a | — | — |
 | `routes/nodes/credentials.routes.js` | 25 | POST | `/node/creds/save` | sí | — | no | sí | sql | — |

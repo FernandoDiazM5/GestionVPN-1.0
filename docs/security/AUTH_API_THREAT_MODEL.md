@@ -158,7 +158,7 @@ Reglas del límite:
 ### P2 — decisión arquitectónica
 
 - MFA/adaptive auth;
-- aprobar o rechazar Firebase Auth/Identity Platform tras proyecto staging, importación Argon2 y canary;
+- aprobar o rechazar Firebase Auth/Identity Platform tras proyecto staging, enlace Google autoservicio y canary;
 - rotación avanzada de claves y proveedor externo de secretos.
 
 ## Supuestos que deben verificarse en despliegue

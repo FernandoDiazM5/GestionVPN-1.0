@@ -408,9 +408,10 @@ Crear un prototipo aislado que responda:
 - [x] MySQL conserva usuario, workspace, rol y sesión revocable como autoridad.
 - [x] SDK web detrás de `VITE_FEDERATED_AUTH_ENABLED=false`, persistencia en memoria, carga dinámica, intercambio por sesión local y `signOut` inmediato.
 - [x] Preflight read-only, mapping canary con dry-run/confirmación y rollback que conserva auditoría y revoca sesiones.
+- [x] Enlace Google autoservicio con sesión local, reautenticación, correo idéntico, UID automático y unicidad usuario↔cuenta.
+- [x] Login **Continuar con Google** sin persistir la sesión Firebase y desvinculación reversible desde Perfil/Seguridad.
 - [ ] Configurar proyecto/ADC fuera del repositorio y habilitar solo en staging.
-- [ ] Ejecutar canary con un moderador previamente vinculado cuando exista un proyecto aprobado.
-- [ ] Probar importación Argon2 vía REST/Java o elegir migración progresiva.
+- [ ] Ejecutar canary autoservicio con un moderador cuando exista un proyecto aprobado.
 - [ ] Aprobar coste, cuotas, runbook y rollback antes de producción.
 
 #### Migración propuesta
@@ -418,11 +419,11 @@ Crear un prototipo aislado que responda:
 1. ADR aprobado con opción elegida, coste, riesgos y rollback.
 2. Añadir integración Admin SDK y verificación de proyecto/audience/issuer.
 3. Crear mapping `external_uid` sin eliminar `password_hash`.
-4. Importar un lote piloto; Firebase admite importar bcrypt sin salt separado.
-5. Ejecutar reconciliación previa para evitar emails/UID duplicados.
-6. Habilitar dual-read detrás de feature flag para moderadores piloto.
+4. Habilitar Google detrás de feature flag para un moderador canary.
+5. Enlazar desde una sesión local reautenticada, sin importar contraseñas ni hashes.
+6. Ampliar progresivamente a miembros, moderadores y administradores.
 7. Comparar login, sesión, suspensión, logout global, invitaciones y recuperación.
-8. Migrar por lotes con reporte de éxito/fallo y backup cifrado.
+8. Conservar login local y rollback por `disabled_at` durante todo el piloto.
 9. Mantener rollback al auth local durante la ventana acordada.
 10. Sólo después de estabilidad, retirar creación/verificación local de passwords; conservar autorización MySQL.
 

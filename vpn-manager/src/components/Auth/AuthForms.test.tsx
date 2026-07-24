@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
   provisionMyWireguard: vi.fn(),
   requestReset: vi.fn(),
   confirmReset: vi.fn(),
-  signInWithFirebase: vi.fn(),
+  signInWithGoogle: vi.fn(),
 }));
 
 vi.mock('../../context', () => ({
@@ -27,7 +27,7 @@ vi.mock('../../utils/fetchWithTimeout', () => ({
 vi.mock('../../config/federatedAuth', () => ({ federatedAuthAvailable: true }));
 
 vi.mock('../../services/federatedAuth', () => ({
-  signInWithFirebase: (...args: unknown[]) => mocks.signInWithFirebase(...args),
+  signInWithGoogle: (...args: unknown[]) => mocks.signInWithGoogle(...args),
 }));
 
 vi.mock('../../services/teamApi', () => ({
@@ -94,19 +94,19 @@ describe('formularios de acceso', () => {
 
   it('intercambia el acceso Firebase sin reemplazar el login local', async () => {
     mocks.fetchWithTimeout.mockResolvedValueOnce(jsonResponse({ success: true, needsSetup: false }));
-    mocks.signInWithFirebase.mockResolvedValueOnce({
+    mocks.signInWithGoogle.mockResolvedValueOnce({
       id: 'user-1', email: 'moderador@example.com', role: 'OWNER', workspace_id: 'ws-1',
     });
     const user = userEvent.setup();
     render(<RouterAccess />);
 
-    await user.type(await screen.findByLabelText('Usuario o correo'), 'moderador@example.com');
-    await user.type(screen.getByLabelText('Contraseña'), 'password-seguro');
-    expect(screen.getByRole('button', { name: 'Iniciar Sesión' })).toBeEnabled();
-    await user.click(screen.getByRole('button', { name: 'Iniciar con Firebase' }));
+    await screen.findByLabelText('Usuario o correo');
+    expect(screen.getByRole('button', { name: 'Iniciar Sesión' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Continuar con Google' })).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: 'Continuar con Google' }));
 
     await waitFor(() => {
-      expect(mocks.signInWithFirebase).toHaveBeenCalledWith('moderador@example.com', 'password-seguro');
+      expect(mocks.signInWithGoogle).toHaveBeenCalledWith();
       expect(mocks.handleLoginSuccess).toHaveBeenCalledWith({
         user: 'moderador@example.com', role: 'admin',
       });

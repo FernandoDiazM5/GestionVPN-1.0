@@ -1,9 +1,16 @@
-import { useState } from 'react';
-import { Lock, Mail, Check, Loader2, AlertCircle, Eye, EyeOff, KeyRound } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Lock, Mail, Check, Loader2, AlertCircle, Eye, EyeOff, KeyRound, ShieldCheck, Unlink } from 'lucide-react';
 import { accountApi } from '../../../../services/accountApi';
 import { useWorkspaceSession } from '../../../../context/WorkspaceSession';
+import { federatedAuthAvailable } from '../../../../config/federatedAuth';
+import {
+  getGoogleLinkStatus,
+  linkGoogleAccount,
+  unlinkGoogleAccount,
+  type GoogleLinkStatus,
+} from '../../../../services/federatedAuth';
 
-type Section = 'password' | 'email';
+type Section = 'password' | 'email' | 'google';
 
 export default function ProfileTab() {
   const [section, setSection] = useState<Section>('password');
@@ -11,14 +18,18 @@ export default function ProfileTab() {
   return (
     <div className="card border border-slate-200 dark:border-slate-800 overflow-hidden">
       {/* Sub-tabs */}
-      <div className="border-b border-slate-100 dark:border-slate-800 px-4 flex gap-1">
+      <div className="border-b border-slate-100 dark:border-slate-800 px-4 flex gap-1 overflow-x-auto">
         <SubTab active={section === 'password'} onClick={() => setSection('password')} icon={Lock} label="Contraseña" />
         <SubTab active={section === 'email'}    onClick={() => setSection('email')}    icon={Mail} label="Correo" />
+        {federatedAuthAvailable ? (
+          <SubTab active={section === 'google'} onClick={() => setSection('google')} icon={ShieldCheck} label="Google" />
+        ) : null}
       </div>
 
       <div className="p-6">
         {section === 'password' && <ChangePassword />}
         {section === 'email'    && <ChangeEmail />}
+        {section === 'google' && federatedAuthAvailable ? <GoogleAccount /> : null}
       </div>
     </div>
   );
@@ -27,12 +38,139 @@ export default function ProfileTab() {
 function SubTab({ active, onClick, icon: Icon, label }: { active: boolean; onClick: () => void; icon: typeof Lock; label: string }) {
   return (
     <button onClick={onClick}
-      className={`px-4 py-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors
+      className={`shrink-0 px-4 py-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors
         ${active
           ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400'
           : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'}`}>
       <Icon className="w-3.5 h-3.5" /> {label}
     </button>
+  );
+}
+
+function GoogleAccount() {
+  const [status, setStatus] = useState<GoogleLinkStatus | null>(null);
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    getGoogleLinkStatus()
+      .then(next => { if (active) setStatus(next); })
+      .catch(err => { if (active) setError(err instanceof Error ? err.message : 'No se pudo consultar el enlace'); });
+    return () => { active = false; };
+  }, []);
+
+  const link = async () => {
+    if (!password) return;
+    setBusy(true); setError(null); setMessage(null);
+    try {
+      const result = await linkGoogleAccount(password);
+      setStatus(current => ({
+        linked: true,
+        email: result.email || current?.email || null,
+        linkedAt: current?.linkedAt || Date.now(),
+        lastVerifiedAt: Date.now(),
+      }));
+      setPassword('');
+      setMessage(result.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo enlazar Google');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const unlink = async () => {
+    if (!password) return;
+    setBusy(true); setError(null); setMessage(null);
+    try {
+      const result = await unlinkGoogleAccount(password);
+      setStatus({ linked: false, email: null, linkedAt: null, lastVerifiedAt: null });
+      setPassword('');
+      setMessage(result.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo desvincular Google');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!status && !error) {
+    return <div role="status" className="flex items-center gap-2 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" /> Consultando Google…</div>;
+  }
+
+  return (
+    <div className="space-y-4 max-w-lg">
+      <div>
+        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-1">Cuenta de Google</h3>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          {status?.linked
+            ? 'Puedes ingresar con Google. Tus permisos y rol continúan administrándose en esta plataforma.'
+            : 'Enlaza el mismo correo de tu perfil para habilitar el acceso con Google.'}
+        </p>
+      </div>
+
+      {status?.linked ? (
+        <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-500/30 dark:bg-emerald-500/10">
+          <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">Google enlazado</p>
+            <p className="truncate text-xs text-emerald-700/80 dark:text-emerald-300/80">{status.email}</p>
+          </div>
+        </div>
+      ) : null}
+
+      {message ? (
+        <div role="status" className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
+          <Check className="h-4 w-4" /> {message}
+        </div>
+      ) : null}
+      {error ? (
+        <div role="alert" className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> {error}
+        </div>
+      ) : null}
+
+      <div className="relative">
+        <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
+        <input
+          aria-label="Contraseña actual para Google"
+          type="password"
+          autoComplete="current-password"
+          value={password}
+          onChange={event => setPassword(event.target.value)}
+          placeholder="Confirma tu contraseña actual"
+          className="input-field pl-10"
+        />
+      </div>
+      <p className="text-2xs text-slate-500 dark:text-slate-400">
+        La contraseña se verifica en el servidor y nunca se envía a Google.
+      </p>
+
+      {status?.linked ? (
+        <button
+          type="button"
+          onClick={unlink}
+          disabled={busy || !password}
+          className="btn-outline px-5 py-2.5 flex items-center gap-2 text-sm text-rose-600 disabled:opacity-50 dark:text-rose-300"
+        >
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unlink className="h-4 w-4" />}
+          Desvincular Google
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={link}
+          disabled={busy || !password}
+          className="btn-primary px-5 py-2.5 flex items-center gap-2 text-sm disabled:opacity-50"
+        >
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+          Enlazar cuenta de Google
+        </button>
+      )}
+    </div>
   );
 }
 

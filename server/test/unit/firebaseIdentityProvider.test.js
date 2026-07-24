@@ -34,6 +34,7 @@ describe('firebaseIdentityProvider', () => {
       email: ' User@Example.com ',
       email_verified: true,
       auth_time: 900,
+      firebase: { sign_in_provider: 'google.com' },
     }, config, 1000)).toEqual({
       provider: 'firebase',
       tenantKey: '',
@@ -41,6 +42,7 @@ describe('firebaseIdentityProvider', () => {
       email: 'user@example.com',
       emailVerified: true,
       authTime: 900,
+      signInProvider: 'google.com',
     });
   });
 
@@ -61,6 +63,7 @@ describe('firebaseIdentityProvider', () => {
         email: 'user@example.com',
         email_verified: true,
         auth_time: Math.floor(Date.now() / 1000),
+        firebase: { sign_in_provider: 'google.com' },
       }),
     };
     setAuthClientForTests(authClient);
@@ -68,6 +71,23 @@ describe('firebaseIdentityProvider', () => {
       subject: 'firebase-uid-1', email: 'user@example.com',
     });
     expect(authClient.verifyIdToken).toHaveBeenCalledWith('firebase-id-token', true);
+  });
+
+  it('puede exigir que el token provenga del acceso con Google', async () => {
+    process.env.FEDERATED_AUTH_ENABLED = 'true';
+    process.env.FIREBASE_PROJECT_ID = 'gestion-vpn-pilot';
+    setAuthClientForTests({
+      verifyIdToken: vi.fn().mockResolvedValue({
+        uid: 'firebase-uid-1',
+        email: 'user@example.com',
+        email_verified: true,
+        auth_time: Math.floor(Date.now() / 1000),
+        firebase: { sign_in_provider: 'password' },
+      }),
+    });
+    await expect(verifyFirebaseIdToken('firebase-id-token', {
+      requiredSignInProvider: 'google.com',
+    })).rejects.toThrow('Proveedor de acceso no permitido');
   });
 
   it('expone operaciones administrativas minimas para preflight y rollback', async () => {

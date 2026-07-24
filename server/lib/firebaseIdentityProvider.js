@@ -26,6 +26,9 @@ function normalizeClaims(claims, config, nowSeconds = Math.floor(Date.now() / 10
   const subject = typeof claims?.uid === 'string' ? claims.uid : claims?.sub;
   const email = typeof claims?.email === 'string' ? claims.email.trim().toLowerCase() : '';
   const authTime = Number(claims?.auth_time || 0);
+  const signInProvider = typeof claims?.firebase?.sign_in_provider === 'string'
+    ? claims.firebase.sign_in_provider
+    : '';
   if (!subject || subject.length > 128 || !email || email.length > 255
       || claims?.email_verified !== true || !Number.isFinite(authTime) || authTime <= 0) {
     throw new Error('Identidad federada incompleta');
@@ -40,14 +43,19 @@ function normalizeClaims(claims, config, nowSeconds = Math.floor(Date.now() / 10
     email,
     emailVerified: true,
     authTime,
+    signInProvider,
   });
 }
 
-async function verifyFirebaseIdToken(idToken) {
+async function verifyFirebaseIdToken(idToken, { requiredSignInProvider } = {}) {
   const config = readFederatedAuthConfig();
   if (!config.enabled) throw new Error('Autenticación federada deshabilitada');
   const claims = await getAuthClient().verifyIdToken(idToken, true);
-  return normalizeClaims(claims, config);
+  const identity = normalizeClaims(claims, config);
+  if (requiredSignInProvider && identity.signInProvider !== requiredSignInProvider) {
+    throw new Error('Proveedor de acceso no permitido');
+  }
+  return identity;
 }
 
 async function revokeFirebaseSessions(subject) {

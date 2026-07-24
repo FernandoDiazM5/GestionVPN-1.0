@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => {
     initializeApp: vi.fn((_config: unknown, _name: string) => ({ name: 'gestionvpn-web-federated' })),
     initializeAuth: vi.fn((_app: unknown, _options: unknown) => auth),
     signIn: vi.fn(),
+    setCustomParameters: vi.fn(),
     signOut: vi.fn(async (_auth: unknown) => { auth.currentUser = null; }),
     getIdToken: vi.fn(),
   };
@@ -38,12 +39,19 @@ vi.mock('firebase/app', () => ({
 vi.mock('firebase/auth', () => ({
   inMemoryPersistence: { type: 'NONE' },
   initializeAuth: (app: unknown, options: unknown) => mocks.initializeAuth(app, options),
-  signInWithEmailAndPassword: (auth: unknown, email: string, password: string) =>
-    mocks.signIn(auth, email, password),
+  GoogleAuthProvider: class {
+    setCustomParameters(parameters: unknown) { mocks.setCustomParameters(parameters); }
+  },
+  signInWithPopup: (auth: unknown, provider: unknown) => mocks.signIn(auth, provider),
   signOut: (auth: unknown) => mocks.signOut(auth),
 }));
 
-import { signInWithFirebase } from './federatedAuth';
+import {
+  getGoogleLinkStatus,
+  linkGoogleAccount,
+  signInWithGoogle,
+  unlinkGoogleAccount,
+} from './federatedAuth';
 
 const sessionUser = {
   id: 'user-1',
@@ -62,21 +70,30 @@ beforeEach(() => {
   });
   mocks.apiJson.mockImplementation(async (path: string) => {
     if (path.endsWith('/csrf')) return { success: true, csrfToken: 'federated-csrf' };
+    if (path.endsWith('/link-status')) {
+      return { success: true, linked: false, email: null, linkedAt: null, lastVerifiedAt: null };
+    }
+    if (path.endsWith('/link')) {
+      return { success: true, linked: true, email: 'user@example.com', message: 'Cuenta vinculada' };
+    }
+    if (path.endsWith('/unlink')) {
+      return { success: true, linked: false, message: 'Cuenta desvinculada' };
+    }
     return { success: true, user: sessionUser };
   });
 });
 
-describe('signInWithFirebase', () => {
+describe('autenticación con Google', () => {
   it('usa memoria, intercambia el token y borra la sesión Firebase inmediatamente', async () => {
-    await expect(signInWithFirebase(' User@Example.com ', 'password-seguro'))
-      .resolves.toEqual(sessionUser);
+    await expect(signInWithGoogle()).resolves.toEqual(sessionUser);
 
     expect(mocks.initializeAuth).toHaveBeenCalledWith(
       expect.anything(),
       { persistence: { type: 'NONE' } },
     );
     expect(mocks.auth.tenantId).toBe('tenant-1');
-    expect(mocks.signIn).toHaveBeenCalledWith(mocks.auth, 'user@example.com', 'password-seguro');
+    expect(mocks.setCustomParameters).toHaveBeenCalledWith({ prompt: 'select_account' });
+    expect(mocks.signIn).toHaveBeenCalledWith(mocks.auth, expect.anything());
     expect(mocks.getIdToken).toHaveBeenCalledWith(true);
     expect(mocks.apiJson).toHaveBeenNthCalledWith(1, '/api/account/federated/csrf');
     expect(mocks.apiJson).toHaveBeenNthCalledWith(
@@ -94,7 +111,30 @@ describe('signInWithFirebase', () => {
     mocks.signIn.mockRejectedValueOnce(Object.assign(new Error('user-not-found'), {
       code: 'auth/user-not-found',
     }));
-    await expect(signInWithFirebase('missing@example.com', 'password-seguro'))
+    await expect(signInWithGoogle())
       .rejects.toThrow('Correo o contraseña incorrectos');
+  });
+
+  it('captura el UID mediante Google y envía solo el token y la reautenticación al backend', async () => {
+    await expect(linkGoogleAccount('password-local')).resolves.toMatchObject({
+      linked: true, email: 'user@example.com',
+    });
+    expect(mocks.apiJson).toHaveBeenCalledWith(
+      '/api/account/federated/link',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ idToken: 'firebase-id-token', currentPassword: 'password-local' }),
+      }),
+    );
+    expect(mocks.signOut).toHaveBeenCalledWith(mocks.auth);
+  });
+
+  it('consulta el estado y desvincula sin exponer el UID al cliente', async () => {
+    await expect(getGoogleLinkStatus()).resolves.toMatchObject({ linked: false });
+    await expect(unlinkGoogleAccount('password-local')).resolves.toMatchObject({ linked: false });
+    expect(mocks.apiJson).toHaveBeenCalledWith(
+      '/api/account/federated/unlink',
+      { method: 'POST', body: JSON.stringify({ currentPassword: 'password-local' }) },
+    );
   });
 });
