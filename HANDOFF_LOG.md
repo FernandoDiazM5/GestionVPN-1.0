@@ -6,6 +6,21 @@
 
 ---
 
+> **Sesión 2026-07-24 - Canary Google/Firebase desplegado en staging.** Rama `vps_prod`; commit `6cc1147` publicado. Skills: `browser:control-in-app-browser`, `handoff-keeper`.
+> - Firebase `vpn-noc`: Google habilitado como único proveedor, Email/Password inhabilitado, app web `GestionVPN` reutilizada y dominio `staging.134-199-212-232.nip.io` autorizado.
+> - Añadido `docker-compose.staging.yml` y plantillas separadas. Desplegado proyecto Compose `gestionvpn-staging` con BD/backend/frontend/volúmenes/secretos propios y HTTPS en `:8444`; producción permaneció arriba y con flags federadas apagadas.
+> - ADC Admin SDK montado fuera del repo con permisos mínimos de lectura para UID 1001; copia descargada local eliminada. Let's Encrypt emitido hasta 2026-10-22 y hook de renovación instalado.
+> - Migraciones completas; preflight real con proveedor: `LISTO`. Canary OWNER creado copiando sólo usuario/hash local/workspace/membresía desde producción, sin nodos, peers, credenciales RouterOS, sesiones ni importación a Firebase.
+> - Verificación: backend **84/521**, frontend **45/144**, build Vite, `check:all`; staging y producción HTTP 200, DB/backend healthy. Monitor de 48 h creado cada 30 minutos hasta 2026-07-26 23:45 UTC.
+> - Pendiente humano: login local en staging y enlace Google autoservicio; luego ejecutar suspensión, unicidad, desvinculación/rollback y confirmar login local.
+
+> **Sesión 2026-07-18 - Enlace Google autoservicio con Firebase.** Rama `vps_prod`; cambios locales sin commit/push/deploy. Skills: `vercel-react-best-practices`, `handoff-keeper`.
+> - Sustituido el piloto Email/Password/manual por Google progresivo: **Continuar con Google** en login y **Perfil y seguridad → Google** para consultar, enlazar y desvincular. Firebase Web sigue con imports dinámicos, persistencia en memoria y `signOut` inmediato.
+> - Nuevas APIs protegidas `GET /link-status`, `POST /link` y `POST /unlink`. Enlazar exige sesión+CSRF local, rate limit, contraseña actual, token reciente/revocable emitido por `google.com`, correo verificado idéntico y unicidad usuario↔UID; el UID se captura server-side y nunca se muestra. El admin puente reautentica contra `vpn_users`; desvincular conserva `disabled_at` y revoca refresh tokens Firebase.
+> - Contratos, pruebas, inventario de rutas, ADR, threat model, plan y runbook actualizados. La estrategia ya no importa usuarios, contraseñas ni hashes Argon2: adopción autoservicio con login local conservado.
+> - Verificación: backend **84 suites/521**, frontend **45/144**, build Vite, `check:all`, inventario **148 rutas**, Semgrep focalizado **7 archivos/127 reglas/0 hallazgos** y `git diff --check`. El scan global encontró las mismas 19 coincidencias históricas de SQL dinámico fuera del alcance.
+> - Pendiente externo: proyecto staging con Google, ADC/WIF fuera del repo, stack/BD staging en VPS, preflight real, canary OWNER y observación 48 h. Flags siguen apagadas; no se añadió ningún secreto.
+
 > **Sesión 2026-07-18 - Operación segura del canary Firebase.** Rama `vps_prod`; commit funcional local `19d2346`. Skill: `handoff-keeper`.
 > - Añadido `firebase:preflight`: diagnóstico read-only del entorno, flags, esquema `auth_identities`, inventario agregado y ADC/API mediante un lookup sintético; no imprime ruta ADC, usuarios ni credenciales y sólo declara `LISTO` con `--provider`.
 > - Añadido `firebase:canary status|link|disable`: dry-run por defecto y confirmaciones literales. `link` exige un OWNER local activo y correo idéntico a una identidad Firebase activa/verificada; bloquea colisiones UID↔usuario y no crea usuarios ni recibe contraseñas. `disable` conserva el mapping con `disabled_at`, revoca sesiones locales y luego refresh tokens Firebase.
