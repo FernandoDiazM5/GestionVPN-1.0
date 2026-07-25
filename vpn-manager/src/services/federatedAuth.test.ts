@@ -44,7 +44,9 @@ vi.mock('firebase/auth', () => ({
   GoogleAuthProvider: class {
     setCustomParameters(parameters: unknown) { mocks.setCustomParameters(parameters); }
   },
-  signInWithPopup: (auth: unknown, provider: unknown) => mocks.signIn(auth, provider),
+  signInWithPopup: (auth: unknown, provider: unknown, resolver: unknown) => (
+    mocks.signIn(auth, provider, resolver)
+  ),
   signOut: (auth: unknown) => mocks.signOut(auth),
 }));
 
@@ -98,7 +100,11 @@ describe('autenticación con Google', () => {
     );
     expect(mocks.auth.tenantId).toBe('tenant-1');
     expect(mocks.setCustomParameters).toHaveBeenCalledWith({ prompt: 'select_account' });
-    expect(mocks.signIn).toHaveBeenCalledWith(mocks.auth, expect.anything());
+    expect(mocks.signIn).toHaveBeenCalledWith(
+      mocks.auth,
+      expect.anything(),
+      mocks.popupRedirectResolver,
+    );
     expect(mocks.getIdToken).toHaveBeenCalledWith(true);
     expect(mocks.apiJson).toHaveBeenNthCalledWith(1, '/api/account/federated/csrf');
     expect(mocks.apiJson).toHaveBeenNthCalledWith(
