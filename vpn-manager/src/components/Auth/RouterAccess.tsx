@@ -248,7 +248,7 @@ export default function RouterAccess() {
                     name="password"
                     type="password"
                     required
-                    minLength={12}
+                    minLength={needsSetup ? 12 : 1}
                     maxLength={128}
                     autoComplete={needsSetup ? 'new-password' : 'current-password'}
                     placeholder="••••••••"

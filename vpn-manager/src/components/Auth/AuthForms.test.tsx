@@ -83,13 +83,23 @@ describe('formularios de acceso', () => {
     expect(username).toHaveAttribute('autocomplete', 'username');
     expect(password).toHaveAttribute('name', 'password');
     expect(password).toHaveAttribute('autocomplete', 'current-password');
-    expect(password).toHaveAttribute('minlength', '12');
+    expect(password).toHaveAttribute('minlength', '1');
 
     await user.type(username, 'moderador@example.com');
     await user.type(password, 'password-seguro');
     await user.click(screen.getByRole('button', { name: 'Iniciar Sesión' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Credenciales inválidas');
+  });
+
+  it('reserva el mínimo de 12 caracteres para la configuración inicial', async () => {
+    mocks.fetchWithTimeout.mockResolvedValueOnce(
+      jsonResponse({ success: true, needsSetup: true }),
+    );
+
+    render(<RouterAccess />);
+
+    expect(await screen.findByLabelText('Contraseña')).toHaveAttribute('minlength', '12');
   });
 
   it('intercambia el acceso Firebase sin reemplazar el login local', async () => {
