@@ -6,6 +6,12 @@
 
 ---
 
+> **Sesión 2026-07-25 - Diagnóstico corregido: faltaba el popup resolver.** Rama `vps_prod`; commit `55816fa` publicado, sin despliegue. Skills: `browser:control-in-app-browser`, `handoff-keeper`.
+> - Corrección de la entrada inmediatamente anterior: Identity Toolkit expone el número interno del mismo proyecto `vpn-noc`; la Web API Key, Web App, dominio y proyecto sí coinciden, y Google está habilitado. Se canceló el cambio de clave antes de modificar producción.
+> - Reproducción controlada: el botón falla inmediatamente, no crea popup y no llega al backend. Causa: `initializeAuth()` usaba `inMemoryPersistence` sin `browserPopupRedirectResolver`, dependencia requerida por `signInWithPopup`.
+> - `55816fa` añade el resolver y cobertura de prueba. Verificado: prueba focalizada **5/5**, TypeScript y build Vite correctos.
+> - Pendiente de nueva autorización por cambio de alcance: respaldar imagen actual, avanzar el checkout del VPS y reconstruir sólo frontend. No cambiar `.env`, Firebase, backend ni MySQL.
+
 > **Sesión 2026-07-25 - Causa del enlace Google identificada.** Rama `vps_prod`; commit `e769288` publicado, sin despliegue. Skills: `browser:control-in-app-browser`, `handoff-keeper`.
 > - La captura mostraba “Correo o contraseña incorrectos” sin campo de contraseña. Los logs sanitizados confirmaron `GET /link-status` 200 y ausencia total de `POST /federated/link`: Firebase falla en el cliente antes del backend.
 > - La Web API Key compilada resuelve a un proyecto Identity Toolkit diferente de `FIREBASE_PROJECT_ID`, con Google deshabilitado; el proyecto explícito del backend sí tiene Google habilitado y el dominio autorizado. No se imprimieron credenciales.
