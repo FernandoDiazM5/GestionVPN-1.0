@@ -6,6 +6,13 @@
 
 ---
 
+> **Sesión 2026-07-24 - Acceso legacy corregido en staging.** Rama `vps_prod`; commit `459b607` publicado y desplegado sólo en staging. Skill: `handoff-keeper`.
+> - Diagnosticado el bloqueo mostrado en navegador: `RouterAccess` imponía `minLength=12` también al login, aunque los contratos backend aceptan contraseñas existentes desde un carácter.
+> - El mínimo ahora es condicional: 12 sólo durante setup; login conserva compatibilidad con hashes/contraseñas legacy. Prueba focalizada de formularios: **7/7**.
+> - Copiado al stack aislado únicamente el MEMBER activo `fernandodiazmeza12@gmail.com` y su membresía; no se copiaron nodos, peers, sesiones ni datos operativos.
+> - Frontend de staging reconstruido; backend/DB healthy, API staging 200 y DOM verificado con `minlength=1`. Producción no fue reconstruida: sus tres contenedores siguen arriba y Firebase permanece apagado.
+> - Pendiente humano: reintentar el login del MEMBER con su contraseña real y completar el enlace interactivo de Google; después ejecutar la matriz de canary restante.
+
 > **Sesión 2026-07-24 - Canary Google/Firebase desplegado en staging.** Rama `vps_prod`; commit `6cc1147` publicado. Skills: `browser:control-in-app-browser`, `handoff-keeper`.
 > - Firebase `vpn-noc`: Google habilitado como único proveedor, Email/Password inhabilitado, app web `GestionVPN` reutilizada y dominio `staging.134-199-212-232.nip.io` autorizado.
 > - Añadido `docker-compose.staging.yml` y plantillas separadas. Desplegado proyecto Compose `gestionvpn-staging` con BD/backend/frontend/volúmenes/secretos propios y HTTPS en `:8444`; producción permaneció arriba y con flags federadas apagadas.
