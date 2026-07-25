@@ -43,6 +43,7 @@ services:
       # En host-mode, MariaDB se ve por el puerto publicado en el host.
       MYSQL_HOST: "127.0.0.1"
       MYSQL_PORT: "3307"
+      GOOGLE_APPLICATION_CREDENTIALS: "/run/secrets/google-application-credentials.json"
     volumes:
       # .db_secret y .jwt_secret viven aquí (DATA_DIR=/data). NO bind a /app.
       - backend-data:/data
@@ -50,6 +51,8 @@ services:
       # watcher del host (systemd path) la aplica. Ver deploy/wg0-autosync/.
       # Requiere en el host: install -d -o 1001 -g 1001 /opt/wg0-autosync
       - /opt/wg0-autosync:/wg0sync
+      # Firebase Admin SDK: credencial fuera del repositorio, sólo lectura.
+      - /etc/gestionvpn/firebase-admin.json:/run/secrets/google-application-credentials.json:ro
     depends_on:
       db:
         condition: service_healthy
