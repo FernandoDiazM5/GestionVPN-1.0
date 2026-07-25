@@ -40,6 +40,13 @@ async function hashPassword(password) {
   return argon2.hash(password, ARGON2_OPTIONS);
 }
 
+// Rehashear una contraseña heredada ya verificada no equivale a crear una
+// contraseña nueva. La política de longitud se aplica al alta/cambio, pero no
+// debe bloquear el login ni impedir la migración transparente bcrypt→Argon2id.
+async function hashVerifiedPassword(password) {
+  return argon2.hash(password, ARGON2_OPTIONS);
+}
+
 async function verifyPassword(password, encodedHash) {
   if (typeof password !== 'string' || typeof encodedHash !== 'string') return false;
   const algorithm = hashAlgorithm(encodedHash);
@@ -94,7 +101,7 @@ async function verifyAndUpgrade(password, encodedHash, updateIfCurrent) {
   if (!needsRehash(encodedHash)) return { valid: true, upgraded: false, dummy: false };
   if (typeof updateIfCurrent !== 'function') throw new TypeError('updateIfCurrent es obligatorio para rehash');
 
-  const upgradedHash = await hashPassword(password);
+  const upgradedHash = await hashVerifiedPassword(password);
   const updated = await updateIfCurrent(upgradedHash, encodedHash);
   return { valid: true, upgraded: Boolean(updated), dummy: false };
 }

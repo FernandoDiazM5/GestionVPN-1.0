@@ -43,6 +43,19 @@ describe('passwordHasher', () => {
     expect(previousHash).toBe(legacyHash);
   });
 
+  it('upgrades a verified legacy password shorter than the policy for new passwords', async () => {
+    const legacyPassword = '12345678';
+    const legacyHash = await bcrypt.hash(legacyPassword, 10);
+    const updateIfCurrent = vi.fn().mockResolvedValue(true);
+
+    await expect(verifyAndUpgrade(legacyPassword, legacyHash, updateIfCurrent))
+      .resolves.toEqual({ valid: true, upgraded: true, dummy: false });
+    const [newHash, previousHash] = updateIfCurrent.mock.calls[0];
+    expect(newHash).toMatch(/^\$argon2id\$/);
+    expect(previousHash).toBe(legacyHash);
+    await expect(verifyPassword(legacyPassword, newHash)).resolves.toBe(true);
+  });
+
   it('does not write or rehash when verification fails', async () => {
     const legacyHash = await bcrypt.hash(PASSWORD, 10);
     const updateIfCurrent = vi.fn();
