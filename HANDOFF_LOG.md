@@ -6,6 +6,12 @@
 
 ---
 
+> **Monitor 2026-07-25 00:21 UTC - Canary Firebase estable.** Rama `vps_prod`; observación read-only.
+> - Staging respondió **200** en la aplicación (91 ms) y `/api/health` (55 ms). DB/backend healthy, frontend running; los tres con 0 reinicios.
+> - Consumo estable: DB 107 MiB, backend 51 MiB y frontend 4 MiB; disco del VPS al 80% con ~4.9 GiB libres.
+> - Sin errores severos Firebase/federated/auth en los últimos 30 minutos. La única petición >1 s fue el SSE `/api/tunnel/events` (200, 1.6 s), comportamiento esperado para un stream.
+> - Producción: DB/backend healthy, 0 reinicios y flags backend/frontend federadas confirmadas apagadas. No se realizaron cambios.
+
 > **Sesión 2026-07-24 - Acceso legacy corregido en staging.** Rama `vps_prod`; commit `459b607` publicado y desplegado sólo en staging. Skill: `handoff-keeper`.
 > - Diagnosticado el bloqueo mostrado en navegador: `RouterAccess` imponía `minLength=12` también al login, aunque los contratos backend aceptan contraseñas existentes desde un carácter.
 > - El mínimo ahora es condicional: 12 sólo durante setup; login conserva compatibilidad con hashes/contraseñas legacy. Prueba focalizada de formularios: **7/7**.
