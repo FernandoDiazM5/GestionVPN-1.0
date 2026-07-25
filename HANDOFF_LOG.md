@@ -6,6 +6,12 @@
 
 ---
 
+> **Sesión 2026-07-25 - Rehash legacy corregido en staging.** Rama `vps_prod`; commit `95afb96` publicado y desplegado sólo en el backend de staging. Skill: `handoff-keeper`.
+> - Dos logins correctos de un MEMBER con contraseña bcrypt de 8 caracteres terminaban en 503: la verificación era válida, pero el rehash bcrypt→Argon2id reutilizaba la política de contraseña nueva (mínimo 12) y el error se etiquetaba erróneamente como MySQL no disponible.
+> - Separada la creación de contraseña nueva del rehash de una credencial ya verificada. Las contraseñas nuevas siguen exigiendo 12–128; las existentes pueden autenticarse y migrarse transparentemente.
+> - Pruebas focalizadas backend **16/16**. Backend staging reconstruido y healthy, API health 200, DB healthy y usuario piloto aún en bcrypt listo para migrarse en el próximo login correcto.
+> - Producción no fue reconstruida ni reiniciada; backend/DB siguen healthy y Firebase permanece apagado.
+
 > **Monitor 2026-07-25 00:21 UTC - Canary Firebase estable.** Rama `vps_prod`; observación read-only.
 > - Staging respondió **200** en la aplicación (91 ms) y `/api/health` (55 ms). DB/backend healthy, frontend running; los tres con 0 reinicios.
 > - Consumo estable: DB 107 MiB, backend 51 MiB y frontend 4 MiB; disco del VPS al 80% con ~4.9 GiB libres.
