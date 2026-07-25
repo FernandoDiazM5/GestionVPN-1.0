@@ -23,16 +23,20 @@ function parseOptions(argv) {
 }
 
 function staticChecks(env = process.env) {
+  const pilotEnvironment = String(env.FIREBASE_PILOT_ENV || '');
+  const supportedEnvironment = pilotEnvironment === 'staging' || pilotEnvironment === 'production';
   const checks = [
     {
       name: 'pilot_environment',
-      ok: env.FIREBASE_PILOT_ENV === 'staging',
-      detail: env.FIREBASE_PILOT_ENV === 'staging' ? 'staging' : 'debe ser staging',
+      ok: supportedEnvironment,
+      detail: supportedEnvironment ? pilotEnvironment : 'debe ser staging o production',
     },
     {
       name: 'backend_feature_flag',
       ok: env.FEDERATED_AUTH_ENABLED === 'true',
-      detail: env.FEDERATED_AUTH_ENABLED === 'true' ? 'habilitada en staging' : 'apagada',
+      detail: env.FEDERATED_AUTH_ENABLED === 'true'
+        ? `habilitada en ${pilotEnvironment || 'entorno no declarado'}`
+        : 'apagada',
     },
     {
       name: 'node_runtime',
@@ -98,7 +102,7 @@ function printReport(report, json) {
     console.log(JSON.stringify(report, null, 2));
     return;
   }
-  console.log('\nPreflight Firebase staging (solo lectura)');
+  console.log('\nPreflight Firebase (solo lectura)');
   for (const check of report.checks) {
     const marker = check.status === 'skipped' ? '-' : check.ok ? 'OK' : 'FAIL';
     console.log(`[${marker}] ${check.name}: ${check.detail}`);

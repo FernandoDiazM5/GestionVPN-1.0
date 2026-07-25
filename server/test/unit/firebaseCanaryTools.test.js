@@ -124,4 +124,18 @@ describe('firebase staging preflight', () => {
     expect(checks.find(check => check.name === 'adc_source')?.detail).toBe('archivo externo/ADC');
     expect(JSON.stringify(checks)).not.toContain('C:/secreto/adc.json');
   });
+
+  it('acepta el entorno production para el preflight de promoción', () => {
+    const checks = preflight.staticChecks({
+      FIREBASE_PILOT_ENV: 'production',
+      FEDERATED_AUTH_ENABLED: 'true',
+      FIREBASE_PROJECT_ID: 'vpn-noc',
+    });
+    expect(checks.find(check => check.name === 'pilot_environment')).toMatchObject({
+      ok: true,
+      detail: 'production',
+    });
+    expect(checks.find(check => check.name === 'backend_feature_flag')?.detail)
+      .toBe('habilitada en production');
+  });
 });
