@@ -129,6 +129,14 @@ describe('autenticación con Google', () => {
     expect(mocks.signOut).toHaveBeenCalledWith(mocks.auth);
   });
 
+  it('explica la configuración incorrecta al enlazar sin mencionar contraseñas', async () => {
+    mocks.signIn.mockRejectedValueOnce(Object.assign(new Error('provider-disabled'), {
+      code: 'auth/operation-not-allowed',
+    }));
+    await expect(linkGoogleAccount())
+      .rejects.toThrow('Google no está habilitado correctamente en Firebase');
+  });
+
   it('consulta el estado y desvincula sin exponer el UID al cliente', async () => {
     await expect(getGoogleLinkStatus()).resolves.toMatchObject({ linked: false });
     await expect(unlinkGoogleAccount('password-local')).resolves.toMatchObject({ linked: false });

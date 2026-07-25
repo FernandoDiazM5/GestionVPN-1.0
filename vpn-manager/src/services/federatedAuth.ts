@@ -75,6 +75,22 @@ function publicMessage(error: unknown): string {
   return GENERIC_BAD_CREDENTIALS;
 }
 
+function googleLinkMessage(error: unknown): string {
+  const apiError = error as Partial<ApiError>;
+  const firebaseCode = typeof apiError.code === 'string' ? apiError.code : '';
+  if (firebaseCode === 'auth/operation-not-allowed'
+      || firebaseCode === 'auth/configuration-not-found') {
+    return 'Google no está habilitado correctamente en Firebase';
+  }
+  if (firebaseCode === 'auth/invalid-api-key') {
+    return 'La configuración de Google no corresponde a este proyecto';
+  }
+  const message = publicMessage(error);
+  return message === GENERIC_BAD_CREDENTIALS
+    ? 'No se pudo conectar con Google. Inténtalo nuevamente.'
+    : message;
+}
+
 async function withGoogleIdToken<T>(operation: (idToken: string) => Promise<T>): Promise<T> {
   let runtime: FirebaseRuntime | null = null;
   try {
@@ -130,7 +146,7 @@ export async function linkGoogleAccount(): Promise<GoogleLinkResult> {
     if (typeof apiError.status === 'number' && apiError.status < 500 && apiError.message) {
       throw new Error(apiError.message);
     }
-    throw new Error(publicMessage(error));
+    throw new Error(googleLinkMessage(error));
   }
 }
 
