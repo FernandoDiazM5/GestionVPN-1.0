@@ -31,21 +31,19 @@ describe('ProfileTab Google', () => {
     mocks.unlink.mockResolvedValue({ linked: false, message: 'Cuenta de Google desvinculada' });
   });
 
-  it('enlaza Google tras confirmar la contraseña local', async () => {
+  it('abre Google y enlaza directamente sin solicitar contraseña local', async () => {
     const user = userEvent.setup();
     render(<ProfileTab />);
 
     await user.click(screen.getByRole('button', { name: 'Google' }));
     await screen.findByText('Enlaza el mismo correo de tu perfil para habilitar el acceso con Google.');
-    const password = screen.getByLabelText('Contraseña actual para Google');
     const linkButton = screen.getByRole('button', { name: 'Enlazar cuenta de Google' });
-    expect(password).toHaveAttribute('autocomplete', 'current-password');
-    expect(linkButton).toBeDisabled();
+    expect(screen.queryByLabelText('Contraseña actual para Google')).not.toBeInTheDocument();
+    expect(linkButton).toBeEnabled();
 
-    await user.type(password, 'password-local');
     await user.click(linkButton);
 
-    await waitFor(() => expect(mocks.link).toHaveBeenCalledWith('password-local'));
+    await waitFor(() => expect(mocks.link).toHaveBeenCalledWith());
     expect(await screen.findByText('Google enlazado')).toBeInTheDocument();
     expect(screen.getByText('user@example.com')).toBeInTheDocument();
   });

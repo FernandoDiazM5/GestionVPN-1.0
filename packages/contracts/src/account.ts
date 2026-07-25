@@ -42,7 +42,6 @@ export type FederatedExchangeRequest = z.infer<typeof FederatedExchangeRequestSc
 /** POST /api/account/federated/link */
 export const FederatedLinkRequestSchema = z.object({
   idToken: z.string().min(100).max(8192),
-  currentPassword: z.string().min(1).max(128),
 }).strict();
 export type FederatedLinkRequest = z.infer<typeof FederatedLinkRequestSchema>;
 

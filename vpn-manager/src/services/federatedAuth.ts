@@ -116,13 +116,13 @@ export async function getGoogleLinkStatus(): Promise<GoogleLinkStatus> {
   return apiJson<{ success: true } & GoogleLinkStatus>('/api/account/federated/link-status');
 }
 
-export async function linkGoogleAccount(currentPassword: string): Promise<GoogleLinkResult> {
+export async function linkGoogleAccount(): Promise<GoogleLinkResult> {
   try {
     return await withGoogleIdToken((idToken) => apiJson<{ success: true } & GoogleLinkResult>(
       '/api/account/federated/link',
       {
         method: 'POST',
-        body: JSON.stringify({ idToken, currentPassword }),
+        body: JSON.stringify({ idToken }),
       },
     ));
   } catch (error) {

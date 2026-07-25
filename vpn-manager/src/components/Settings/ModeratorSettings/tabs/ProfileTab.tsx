@@ -63,17 +63,15 @@ function GoogleAccount() {
   }, []);
 
   const link = async () => {
-    if (!password) return;
     setBusy(true); setError(null); setMessage(null);
     try {
-      const result = await linkGoogleAccount(password);
+      const result = await linkGoogleAccount();
       setStatus(current => ({
         linked: true,
         email: result.email || current?.email || null,
         linkedAt: current?.linkedAt || Date.now(),
         lastVerifiedAt: Date.now(),
       }));
-      setPassword('');
       setMessage(result.message);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo enlazar Google');
@@ -133,37 +131,38 @@ function GoogleAccount() {
         </div>
       ) : null}
 
-      <div className="relative">
-        <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
-        <input
-          aria-label="Contraseña actual para Google"
-          type="password"
-          autoComplete="current-password"
-          value={password}
-          onChange={event => setPassword(event.target.value)}
-          placeholder="Confirma tu contraseña actual"
-          className="input-field pl-10"
-        />
-      </div>
-      <p className="text-2xs text-slate-500 dark:text-slate-400">
-        La contraseña se verifica en el servidor y nunca se envía a Google.
-      </p>
-
       {status?.linked ? (
-        <button
-          type="button"
-          onClick={unlink}
-          disabled={busy || !password}
-          className="btn-outline px-5 py-2.5 flex items-center gap-2 text-sm text-rose-600 disabled:opacity-50 dark:text-rose-300"
-        >
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unlink className="h-4 w-4" />}
-          Desvincular Google
-        </button>
+        <>
+          <div className="relative">
+            <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
+            <input
+              aria-label="Contraseña actual para Google"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={event => setPassword(event.target.value)}
+              placeholder="Confirma tu contraseña para desvincular"
+              className="input-field pl-10"
+            />
+          </div>
+          <p className="text-2xs text-slate-500 dark:text-slate-400">
+            La contraseña sólo se solicita para desvincular la cuenta.
+          </p>
+          <button
+            type="button"
+            onClick={unlink}
+            disabled={busy || !password}
+            className="btn-outline px-5 py-2.5 flex items-center gap-2 text-sm text-rose-600 disabled:opacity-50 dark:text-rose-300"
+          >
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unlink className="h-4 w-4" />}
+            Desvincular Google
+          </button>
+        </>
       ) : (
         <button
           type="button"
           onClick={link}
-          disabled={busy || !password}
+          disabled={busy}
           className="btn-primary px-5 py-2.5 flex items-center gap-2 text-sm disabled:opacity-50"
         >
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}

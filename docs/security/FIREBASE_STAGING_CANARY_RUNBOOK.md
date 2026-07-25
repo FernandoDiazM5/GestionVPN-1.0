@@ -78,11 +78,11 @@ Reconstruir el frontend de staging. El `OWNER` canary debe:
 
 1. Entrar primero con su login local.
 2. Abrir **Perfil y seguridad → Google**.
-3. Escribir nuevamente su contraseña local y pulsar **Enlazar cuenta de Google**.
+3. Pulsar **Enlazar cuenta de Google**; el selector oficial de Google se abre inmediatamente.
 4. Seleccionar la cuenta Google cuyo correo coincide exactamente con el perfil.
 5. Confirmar que aparece **Google enlazado**.
 
-El backend verifica sesión local, contraseña, token Firebase reciente y revocable, proveedor `google.com`, correo verificado, igualdad de correo y unicidad usuario↔UID. El navegador nunca recibe ni muestra el UID; MySQL lo conserva en `auth_identities`.
+El backend verifica sesión local, CSRF, token Firebase reciente y revocable, proveedor `google.com`, correo verificado, igualdad de correo y unicidad usuario↔UID. El navegador nunca recibe ni muestra el UID; MySQL lo conserva en `auth_identities`.
 
 El CLI queda como herramienta operativa de consulta y recuperación, no como flujo normal del usuario:
 

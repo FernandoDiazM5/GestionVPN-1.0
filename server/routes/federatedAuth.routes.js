@@ -89,14 +89,11 @@ router.post(
   requireSession,
   rateLimit.guardPolicy('FEDERATED_LINK'),
   asyncHandler(async (req, res) => {
-    const { idToken, currentPassword } = FederatedLinkRequestSchema.parse(req.body);
+    const { idToken } = FederatedLinkRequestSchema.parse(req.body);
     const config = readFederatedAuthConfig();
     const user = await userRepo.findById(req.account.sub);
     if (!user || user.disabled_at || user.deleted_at || Number(user.email_verified) !== 1) {
       throw new AppError('No se pudo vincular la cuenta', 403, 'LINK_NOT_ALLOWED');
-    }
-    if (!await verifyCurrentPassword(req.account, user, currentPassword)) {
-      throw new AppError('La contraseña actual es incorrecta', 401, 'BAD_CURRENT');
     }
 
     let identity;

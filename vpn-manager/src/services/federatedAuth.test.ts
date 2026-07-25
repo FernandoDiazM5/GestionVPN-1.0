@@ -115,15 +115,15 @@ describe('autenticación con Google', () => {
       .rejects.toThrow('Correo o contraseña incorrectos');
   });
 
-  it('captura el UID mediante Google y envía solo el token y la reautenticación al backend', async () => {
-    await expect(linkGoogleAccount('password-local')).resolves.toMatchObject({
+  it('captura el UID mediante Google y envía sólo el token al backend', async () => {
+    await expect(linkGoogleAccount()).resolves.toMatchObject({
       linked: true, email: 'user@example.com',
     });
     expect(mocks.apiJson).toHaveBeenCalledWith(
       '/api/account/federated/link',
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({ idToken: 'firebase-id-token', currentPassword: 'password-local' }),
+        body: JSON.stringify({ idToken: 'firebase-id-token' }),
       }),
     );
     expect(mocks.signOut).toHaveBeenCalledWith(mocks.auth);

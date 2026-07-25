@@ -125,8 +125,8 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `routes/federatedAuth.routes.js` | 59 | GET | `/csrf` | no | — | no | n/a | — | — |
 | `routes/federatedAuth.routes.js` | 67 | GET | `/link-status` | sí | — | no | n/a | — | — |
 | `routes/federatedAuth.routes.js` | 87 | POST | `/link` | sí | — | sí | sí | — | — |
-| `routes/federatedAuth.routes.js` | 177 | POST | `/unlink` | sí | — | sí | sí | — | — |
-| `routes/federatedAuth.routes.js` | 210 | POST | `/exchange` | no | — | sí | sí | — | `PUBLIC_MUTATION_REVIEW` |
+| `routes/federatedAuth.routes.js` | 174 | POST | `/unlink` | sí | — | sí | sí | — | — |
+| `routes/federatedAuth.routes.js` | 207 | POST | `/exchange` | no | — | sí | sí | — | `PUBLIC_MUTATION_REVIEW` |
 | `routes/health.routes.js` | 64 | GET | `/` | no | — | no | n/a | network-admin | — |
 | `routes/health.routes.js` | 82 | GET | `/db` | no | — | no | n/a | — | — |
 | `routes/nodes/credentials.routes.js` | 25 | POST | `/node/creds/save` | sí | — | no | sí | sql | — |

@@ -17,7 +17,7 @@ Se implementa un **piloto reversible y apagado por defecto**. Firebase prueba la
 - bandera de administrador de plataforma;
 - sesiones locales `auth_sessions` y revocacion inmediata.
 
-No se crean usuarios locales ni roles automaticamente desde claims de Firebase. Cada identidad externa requiere un vinculo autoservicio previo en `auth_identities`: el usuario entra primero por el login local, confirma nuevamente su contraseña y selecciona una cuenta Google con el mismo correo verificado. El UID se obtiene del ID token en el servidor; nunca se pide ni se muestra al usuario. Se conserva `users.password_hash` durante todo el piloto y la ruta local de login sigue disponible.
+No se crean usuarios locales ni roles automaticamente desde claims de Firebase. Cada identidad externa requiere un vinculo autoservicio previo en `auth_identities`: el usuario entra primero por el login local y selecciona una cuenta Google con el mismo correo verificado. El UID se obtiene del ID token en el servidor; nunca se pide ni se muestra al usuario. Se conserva `users.password_hash` y la ruta local de login sigue disponible.
 
 ```mermaid
 sequenceDiagram
@@ -37,7 +37,7 @@ sequenceDiagram
     A-->>B: vpn_session HttpOnly + vpn_csrf
 ```
 
-El token federado no se usa como sesion de la API. El cliente configura persistencia Firebase solo en memoria, intercambia el ID token por la cookie local y ejecuta `signOut` inmediatamente despues del intercambio; tambien limpia defensivamente Firebase al cerrar la sesion local. No copia ID/refresh tokens a `localStorage`, `sessionStorage` ni IndexedDB. El SDK web se carga con imports dinamicos solo cuando el piloto esta configurado y el usuario elige ese acceso. Tanto el enlace como el intercambio exigen proveedor `google.com`, autenticacion reciente (por defecto, no mas de 300 segundos), correo verificado, revision de revocacion y rate limit. El enlace exige ademas una sesion local, CSRF de sesion, contraseña actual, correo identico y unicidad usuario↔UID. El intercambio publico usa Origin permitido y double-submit CSRF dedicado; sus rechazos usan un unico contrato `BAD_CREDENTIALS` para no enumerar cuentas.
+El token federado no se usa como sesion de la API. El cliente configura persistencia Firebase solo en memoria, intercambia el ID token por la cookie local y ejecuta `signOut` inmediatamente despues del intercambio; tambien limpia defensivamente Firebase al cerrar la sesion local. No copia ID/refresh tokens a `localStorage`, `sessionStorage` ni IndexedDB. El SDK web se carga con imports dinamicos solo cuando Firebase esta configurado y el usuario elige ese acceso. Tanto el enlace como el intercambio exigen proveedor `google.com`, autenticacion reciente (por defecto, no mas de 300 segundos), correo verificado, revision de revocacion y rate limit. El enlace exige ademas una sesion local, CSRF de sesion, correo identico y unicidad usuario↔UID. El intercambio publico usa Origin permitido y double-submit CSRF dedicado; sus rechazos usan un unico contrato `BAD_CREDENTIALS` para no enumerar cuentas. La contraseña local se mantiene como requisito sólo para desvincular.
 
 ## Modelo multi-tenant
 
@@ -50,7 +50,7 @@ El Admin SDK usa Application Default Credentials. En el VPS se prefiere [Workloa
 ## Adopcion progresiva
 
 1. No importar usuarios, contraseñas ni hashes Argon2 a Firebase.
-2. Habilitar primero un `OWNER` canary que se vincula desde una sesión local reautenticada.
+2. Habilitar primero un `OWNER` que se vincula desde una sesión local activa.
 3. Ampliar después a `MEMBER`, otros `OWNER` y finalmente administradores, conservando los mismos controles MySQL.
 4. Mantener el login local como recuperación y alternativa durante todo el piloto.
 5. Desvincular de forma reversible: conservar la fila `auth_identities` con `disabled_at` y revocar los refresh tokens Firebase.
