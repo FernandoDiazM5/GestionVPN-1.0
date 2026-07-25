@@ -6,6 +6,11 @@
 
 ---
 
+> **Sesión 2026-07-25 - Git obligatorio antes de producción.** Rama `vps_prod`; regla operativa durable solicitada por el propietario. Skill: `handoff-keeper`.
+> - Todo cambio versionado debe validarse, confirmarse en un commit, publicarse en `origin/vps_prod` y verificarse por SHA antes de desplegarse al VPS.
+> - Se prohíben las ediciones manuales de código en producción y los despliegues sin historial remoto previo.
+> - El retorno ante una regresión se realiza con `git revert` y un nuevo despliegue, conservando el historial. Secretos y credenciales continúan fuera de Git y usan respaldo/rollback independientes.
+
 > **Sesión 2026-07-25 - Enlace Google directo sin contraseña.** Rama `vps_prod`; commit `245f8e3` publicado y desplegado en producción. Skills: `vercel-react-best-practices`, `handoff-keeper`.
 > - El botón **Enlazar cuenta de Google** abre inmediatamente `signInWithPopup`; se retiraron el campo y la reautenticación local únicamente del enlace. Desvincular conserva la confirmación por contraseña.
 > - Contrato y backend aceptan sólo `idToken` en `/federated/link`. Permanecen sesión local, CSRF global, rate limit, token Google reciente/revocable, correo verificado idéntico y unicidad usuario↔UID.
