@@ -6,6 +6,12 @@
 
 ---
 
+> **Sesión 2026-07-25 - Causa del enlace Google identificada.** Rama `vps_prod`; commit `e769288` publicado, sin despliegue. Skills: `browser:control-in-app-browser`, `handoff-keeper`.
+> - La captura mostraba “Correo o contraseña incorrectos” sin campo de contraseña. Los logs sanitizados confirmaron `GET /link-status` 200 y ausencia total de `POST /federated/link`: Firebase falla en el cliente antes del backend.
+> - La Web API Key compilada resuelve a un proyecto Identity Toolkit diferente de `FIREBASE_PROJECT_ID`, con Google deshabilitado; el proyecto explícito del backend sí tiene Google habilitado y el dominio autorizado. No se imprimieron credenciales.
+> - El frontend ahora distingue fallos seguros de configuración Google y no los presenta como contraseña incorrecta durante el enlace. Verificado: prueba focalizada **5/5**, TypeScript y build Vite correctos.
+> - Pendiente de autorización: respaldo de `.env`, alinear `VITE_FIREBASE_*`, rebuild sólo del frontend y prueba real del popup/enlace. No se modificó el VPS.
+
 > **Sesión 2026-07-25 - Autorización obligatoria antes del despliegue.** Rama `vps_prod`; ampliación de la regla operativa solicitada por el propietario. Skill: `handoff-keeper`.
 > - Después de validar, confirmar, publicar y verificar el SHA, se debe informar el alcance, servicios afectados, migraciones/indisponibilidad y rollback.
 > - El despliegue al VPS queda bloqueado hasta recibir un “sí” explícito; aprobar el desarrollo o el commit no equivale a aprobar el despliegue.
