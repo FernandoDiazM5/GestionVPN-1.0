@@ -6,6 +6,13 @@
 
 ---
 
+> **Sesión 2026-07-25 — Plan para convertir GestionVPN en servicio vendible en Perú.** Rama `vps_prod`; sólo documentación, sin despliegue. Skills: `process-discovery-interviewer`, `handoff-keeper`.
+> - Creado `PLAN_COMERCIALIZACION_GESTIONVPN_PERU_2026-07-25.md` con diagnóstico, cliente ideal, propuesta de valor, bloqueadores, arquitectura de entrega, mejoras P0/P1/P2, cobro, cumplimiento peruano, proceso comercial, cronograma, métricas y decisiones pendientes.
+> - Recomendación: iniciar con 3–5 WISP como servicio administrado y stack aislado por cliente; implementación pagada + mensualidad. Evolucionar a SaaS compartido sólo después del aislamiento por `core_server_id`, entitlements, medición, exportación/baja y pruebas entre tenants.
+> - Tarifas iniciales a validar: Piloto S/ 199, Starter S/ 249, Growth S/ 499, Business S/ 899 y Dedicado desde S/ 1,800, antes de IGV; implementación, Core/equipos extra, fuera de horario y consultoría se cobran por separado.
+> - Fuentes oficiales consultadas: SUNAT, ANPD/MINJUSDH, Indecopi, Culqi y Mercado Pago; referencias de mercado: UISP, Sonar y DigitalOcean.
+> - Pendiente humano: entrevistar cinco WISP, validar disposición de pago y responder las ocho decisiones del plan antes de generar el backlog técnico.
+
 > **Sesión 2026-07-25 - Primer popup fix desplegado; resolver explícito preparado.** Rama `vps_prod`; `55816fa` desplegado y `a3543d8` publicado, este último pendiente de autorización. Skills: `browser:control-in-app-browser`, `handoff-keeper`.
 > - Antes del deploy se etiquetó la imagen anterior como `gestionvpn-frontend:backup-popup-20260725T200854Z`. El VPS avanzó a `673d0d1` y sólo se recreó `vpn-frontend`; backend y DB conservaron tiempo de inicio y 0 reinicios. App y health respondieron 200.
 > - La validación controlada todavía falló antes del popup. Firebase REST devolvió 200, `authUri` presente y proveedor `google.com`, descartando clave, dominio o proveedor deshabilitado.
