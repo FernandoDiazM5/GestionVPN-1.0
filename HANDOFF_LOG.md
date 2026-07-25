@@ -6,6 +6,10 @@
 
 ---
 
+> **Sesión 2026-07-25 - Autorización obligatoria antes del despliegue.** Rama `vps_prod`; ampliación de la regla operativa solicitada por el propietario. Skill: `handoff-keeper`.
+> - Después de validar, confirmar, publicar y verificar el SHA, se debe informar el alcance, servicios afectados, migraciones/indisponibilidad y rollback.
+> - El despliegue al VPS queda bloqueado hasta recibir un “sí” explícito; aprobar el desarrollo o el commit no equivale a aprobar el despliegue.
+
 > **Sesión 2026-07-25 - Git obligatorio antes de producción.** Rama `vps_prod`; regla operativa durable solicitada por el propietario. Skill: `handoff-keeper`.
 > - Todo cambio versionado debe validarse, confirmarse en un commit, publicarse en `origin/vps_prod` y verificarse por SHA antes de desplegarse al VPS.
 > - Se prohíben las ediciones manuales de código en producción y los despliegues sin historial remoto previo.
