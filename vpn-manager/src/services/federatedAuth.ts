@@ -41,6 +41,7 @@ async function loadRuntime(): Promise<FirebaseRuntime> {
         || appModule.initializeApp(config.client, FIREBASE_APP_NAME);
       const auth = authModule.initializeAuth(app, {
         persistence: authModule.inMemoryPersistence,
+        popupRedirectResolver: authModule.browserPopupRedirectResolver,
       });
       if (config.tenantId) auth.tenantId = config.tenantId;
       return { auth, authModule };

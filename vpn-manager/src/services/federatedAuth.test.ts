@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => {
     getApps: vi.fn(() => []),
     initializeApp: vi.fn((_config: unknown, _name: string) => ({ name: 'gestionvpn-web-federated' })),
     initializeAuth: vi.fn((_app: unknown, _options: unknown) => auth),
+    popupRedirectResolver: { type: 'browser-popup' },
     signIn: vi.fn(),
     setCustomParameters: vi.fn(),
     signOut: vi.fn(async (_auth: unknown) => { auth.currentUser = null; }),
@@ -38,6 +39,7 @@ vi.mock('firebase/app', () => ({
 
 vi.mock('firebase/auth', () => ({
   inMemoryPersistence: { type: 'NONE' },
+  browserPopupRedirectResolver: mocks.popupRedirectResolver,
   initializeAuth: (app: unknown, options: unknown) => mocks.initializeAuth(app, options),
   GoogleAuthProvider: class {
     setCustomParameters(parameters: unknown) { mocks.setCustomParameters(parameters); }
@@ -89,7 +91,10 @@ describe('autenticación con Google', () => {
 
     expect(mocks.initializeAuth).toHaveBeenCalledWith(
       expect.anything(),
-      { persistence: { type: 'NONE' } },
+      {
+        persistence: { type: 'NONE' },
+        popupRedirectResolver: { type: 'browser-popup' },
+      },
     );
     expect(mocks.auth.tenantId).toBe('tenant-1');
     expect(mocks.setCustomParameters).toHaveBeenCalledWith({ prompt: 'select_account' });
