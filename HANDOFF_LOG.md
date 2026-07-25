@@ -6,6 +6,12 @@
 
 ---
 
+> **Sesión 2026-07-25 - Enlace Google directo sin contraseña.** Rama `vps_prod`; commit `245f8e3` publicado y desplegado en producción. Skills: `vercel-react-best-practices`, `handoff-keeper`.
+> - El botón **Enlazar cuenta de Google** abre inmediatamente `signInWithPopup`; se retiraron el campo y la reautenticación local únicamente del enlace. Desvincular conserva la confirmación por contraseña.
+> - Contrato y backend aceptan sólo `idToken` en `/federated/link`. Permanecen sesión local, CSRF global, rate limit, token Google reciente/revocable, correo verificado idéntico y unicidad usuario↔UID.
+> - Verificación: contratos, backend **10/10**, frontend **6/6**, build Vite y `check:all`. Producción: preflight Firebase **LISTO**, DB/backend healthy, frontend running, HTTPS/health 200 y sin errores de arranque.
+> - Pendiente humano: actualizar la página, enlazar el primer usuario con el selector Google y validar login federado.
+
 > **Sesión 2026-07-25 - Firebase promovido a producción; staging eliminado.** Rama `vps_prod`; commits `c8e2004` y `a7e1225` publicados y desplegados. Skills: `browser:control-in-app-browser`, `handoff-keeper`.
 > - Autorizado `134-199-212-232.nip.io` en Firebase y emitido certificado Let's Encrypt productivo con renovación; producción responde HTTPS 200 con TLS verificado.
 > - ADC copiada fuera del repo con lectura exclusiva del UID del backend, flags web/backend activadas y `AUTH_RATE_HMAC_KEY` generado fuera del repo. Se creó dump pre-Firebase y copia del certificado anterior bajo `/root`, ambos con permisos restrictivos.
