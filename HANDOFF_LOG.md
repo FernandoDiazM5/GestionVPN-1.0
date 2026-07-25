@@ -6,6 +6,13 @@
 
 ---
 
+> **Sesión 2026-07-25 - Firebase promovido a producción; staging eliminado.** Rama `vps_prod`; commits `c8e2004` y `a7e1225` publicados y desplegados. Skills: `browser:control-in-app-browser`, `handoff-keeper`.
+> - Autorizado `134-199-212-232.nip.io` en Firebase y emitido certificado Let's Encrypt productivo con renovación; producción responde HTTPS 200 con TLS verificado.
+> - ADC copiada fuera del repo con lectura exclusiva del UID del backend, flags web/backend activadas y `AUTH_RATE_HMAC_KEY` generado fuera del repo. Se creó dump pre-Firebase y copia del certificado anterior bajo `/root`, ambos con permisos restrictivos.
+> - Primer arranque detectó `AUTH_RATE_HMAC_KEY` ausente y reinició el backend; se corrigió antes de retirar staging. Estado final: DB/backend healthy, frontend running, 0 reinicios actuales y preflight productivo **LISTO** (ADC/API, esquema y configuración).
+> - Eliminados contenedores, imágenes propias, volúmenes, BD, secretos, certificado, dominio Firebase, regla 8444, archivos runtime y automatización de staging. Del repo se retiraron `.env.staging.example`, `server/.env.staging.example` y `docker-compose.staging.yml`.
+> - Pendiente humano: entrar localmente en producción, enlazar Google desde Perfil y seguridad y probar login Google, suspensión, unicidad y desvinculación. El login local se conserva.
+
 > **Sesión 2026-07-25 - Rehash legacy corregido en staging.** Rama `vps_prod`; commit `95afb96` publicado y desplegado sólo en el backend de staging. Skill: `handoff-keeper`.
 > - Dos logins correctos de un MEMBER con contraseña bcrypt de 8 caracteres terminaban en 503: la verificación era válida, pero el rehash bcrypt→Argon2id reutilizaba la política de contraseña nueva (mínimo 12) y el error se etiquetaba erróneamente como MySQL no disponible.
 > - Separada la creación de contraseña nueva del rehash de una credencial ya verificada. Las contraseñas nuevas siguen exigiendo 12–128; las existentes pueden autenticarse y migrarse transparentemente.
