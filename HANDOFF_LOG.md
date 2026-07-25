@@ -6,6 +6,12 @@
 
 ---
 
+> **Sesión 2026-07-25 - Primer popup fix desplegado; resolver explícito preparado.** Rama `vps_prod`; `55816fa` desplegado y `a3543d8` publicado, este último pendiente de autorización. Skills: `browser:control-in-app-browser`, `handoff-keeper`.
+> - Antes del deploy se etiquetó la imagen anterior como `gestionvpn-frontend:backup-popup-20260725T200854Z`. El VPS avanzó a `673d0d1` y sólo se recreó `vpn-frontend`; backend y DB conservaron tiempo de inicio y 0 reinicios. App y health respondieron 200.
+> - La validación controlada todavía falló antes del popup. Firebase REST devolvió 200, `authUri` presente y proveedor `google.com`, descartando clave, dominio o proveedor deshabilitado.
+> - `a3543d8` pasa `browserPopupRedirectResolver` explícitamente a `signInWithPopup` además de registrarlo en `initializeAuth`. Verificado: prueba focalizada **5/5**, TypeScript y build Vite correctos.
+> - Pendiente: nueva autorización para desplegar sólo frontend con `a3543d8`; sin `.env`, Firebase, backend, MySQL ni migraciones.
+
 > **Sesión 2026-07-25 - Diagnóstico corregido: faltaba el popup resolver.** Rama `vps_prod`; commit `55816fa` publicado, sin despliegue. Skills: `browser:control-in-app-browser`, `handoff-keeper`.
 > - Corrección de la entrada inmediatamente anterior: Identity Toolkit expone el número interno del mismo proyecto `vpn-noc`; la Web API Key, Web App, dominio y proyecto sí coinciden, y Google está habilitado. Se canceló el cambio de clave antes de modificar producción.
 > - Reproducción controlada: el botón falla inmediatamente, no crea popup y no llega al backend. Causa: `initializeAuth()` usaba `inMemoryPersistence` sin `browserPopupRedirectResolver`, dependencia requerida por `signInWithPopup`.
