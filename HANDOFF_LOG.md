@@ -6,6 +6,23 @@
 
 ---
 
+> **Sesión 2026-07-26 — Plan integral de arquitectura VPS multiusuario.** Rama nueva `vps-multiusuario`, creada desde `2734e88`; sólo documentación, sin cambios funcionales ni despliegue. Skills: `architecture-blueprint-generator`, `process-discovery-interviewer`, `network-engineer`, `documentation-writer`, `handoff-keeper`.
+> - Auditado el stack y los límites reales: `workspace_routers` aún no gobierna la conexión; `authJwt` inyecta un Core global desde `app_settings`, los jobs y la suspensión actúan sobre ese Core, los pools/identificadores son globales y la reconciliación wg0 necesita converger también en eliminaciones.
+> - Creado `PLAN_ARQUITECTURA_VPS_MULTIUSUARIO_2026-07-26.md` con arquitectura, responsabilidades, dominio/DNS, red, panel central y tenant, modelos de datos, APIs central–agente, onboarding, actualizaciones, suspensión/baja, seguridad, observabilidad, backup/DR, escenarios, migración, pruebas y plan de 36 commits.
+> - Arquitectura recomendada: control plane compartido sin tráfico operativo; un VPS Linux aislado por cliente; MikroTik físico privado con transporte WireGuard saliente; CHR/segundo VPS sólo como opción premium. El VPS cliente usa reglas estáticas para UDP `13233` y `13302–13554`, por lo que crear/eliminar nodos no reconfigura el host.
+> - Automatización propuesta: bootstrap idempotente por estado deseado, Edge Agent local allowlist con mTLS, DNS/certificados por instalación, releases firmados con rollback, entitlement firmado con gracia y backups restaurables en una IP nueva.
+> - Pendiente humano: resolver las 15 decisiones del §25 antes de iniciar ADR/contratos y laboratorio. Producción permanece en `vps_prod`; no se tocó VPS, Cloudflare, Firebase, DigitalOcean ni MikroTik.
+
+> **Sesión 2026-07-25 — Alternativa de dos VPS por cliente.** Rama `vps_prod`; análisis arquitectónico, sin cambios funcionales ni despliegue. Skills: `network-engineer`, `handoff-keeper`.
+> - Si cada cliente dispone de un VPS RouterOS/CHR con IP pública y otro VPS para web/backend/BD, los puertos WireGuard `13300+ND` sólo deben ser únicos dentro de ese Core; otros clientes pueden repetirlos porque usan otra IP pública.
+> - El VPS web no expone los puertos de nodos: se comunica con el Core por una red privada o túnel de gestión y restringe RouterOS API a ese origen. Esta opción elimina el gateway/NAT central para nodos, mejora el aislamiento y simplifica el código actual, a cambio de dos VPS, una licencia CHR y más operación por cliente.
+
+> **Sesión 2026-07-25 — Análisis del puerto WireGuard por nodo.** Rama `vps_prod`; diagnóstico de código, sin cambios funcionales ni despliegue. Skills: `network-engineer`, `handoff-keeper`.
+> - Confirmado que cada nodo WireGuard crea en el Core una interfaz `WG-ND<n>-<NOMBRE>` con puerto por defecto `13300+n`, peer, IP `/32`, VRF y rutas independientes. El flujo de gestión de moderadores/members es distinto y sí comparte `VPN-WG-CLIENTES:13233`.
+> - Para concentrar clientes detrás de una sola IP pública, el diseño compatible con el código actual asigna un puerto UDP público por nodo y lo traduce al puerto interno de su Core. Se requieren bloques o asignación central de puertos por cliente.
+> - Limitación detectada: hoy `wgPort` se usa simultáneamente como `listen-port` interno y `endpoint-port` público. Una traducción entre puertos externos e internos exige modelar ambos por separado y actualizar aprovisionamiento, script CPE, inventario y validación de colisiones.
+> - La comprobación SSH de solo lectura del RouterOS a través del backend no completó dentro del plazo; no emitió escrituras. La conclusión se apoya en las rutas vigentes de provisión, regeneración, reparación y sus pruebas.
+
 > **Sesión 2026-07-25 — Plan para convertir GestionVPN en servicio vendible en Perú.** Rama `vps_prod`; sólo documentación, sin despliegue. Skills: `process-discovery-interviewer`, `handoff-keeper`.
 > - Creado `PLAN_COMERCIALIZACION_GESTIONVPN_PERU_2026-07-25.md` con diagnóstico, cliente ideal, propuesta de valor, bloqueadores, arquitectura de entrega, mejoras P0/P1/P2, cobro, cumplimiento peruano, proceso comercial, cronograma, métricas y decisiones pendientes.
 > - Recomendación: iniciar con 3–5 WISP como servicio administrado y stack aislado por cliente; implementación pagada + mensualidad. Evolucionar a SaaS compartido sólo después del aislamiento por `core_server_id`, entitlements, medición, exportación/baja y pruebas entre tenants.

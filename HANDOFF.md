@@ -3,11 +3,13 @@
 > **Contexto DURABLE y vigente.** Léelo al iniciar cualquier sesión nueva.
 > La narrativa cronológica por sesión vive en [`HANDOFF_LOG.md`](./HANDOFF_LOG.md) (append-only).
 > Mantenimiento gobernado por la skill **`handoff-keeper`** (`.claude/skills/handoff-keeper/`).
-> Rama de trabajo de este workspace: **`vps_prod`** · Remote: `github.com/FernandoDiazM5/GestionVPN-1.0`.
+> Rama de trabajo actual: **`vps-multiusuario`** · Rama de producción protegida: **`vps_prod`** · Remote: `github.com/FernandoDiazM5/GestionVPN-1.0`.
 
 ---
 
 ## 0) Estado actual
+
+- **Arquitectura VPS multiusuario documentada en rama aislada (2026-07-26; sólo documentación, sin deploy):** creado [`PLAN_ARQUITECTURA_VPS_MULTIUSUARIO_2026-07-26.md`](./PLAN_ARQUITECTURA_VPS_MULTIUSUARIO_2026-07-26.md) después de auditar el monorepo, rutas de provisión, modelo RBAC, jobs, red y despliegue. Recomendación: un plano de control central compartido, un VPS Linux aislado por cliente y un MikroTik físico privado que inicia un transporte WireGuard hacia su VPS; CHR en un segundo VPS queda como opción premium. El VPS cliente expone estáticamente UDP `13233` y `13302–13554`, preserva los puertos hacia el Core y no cambia reglas al crear/eliminar nodos. Bloqueadores principales: el Core y `app_settings` siguen siendo globales, los jobs operan sobre el mismo router, faltan límites por instalación y la reconciliación de wg0 es incompleta. El plan incluye panel central/cliente, modelos de datos, Edge Agent, DNS/TLS, onboarding idempotente, entitlements, releases, backup/DR, escenarios de falla, migración, pruebas y 36 commits pequeños. Pendiente humano: decidir dominio, proveedor/titularidad de VPS, planes/límites, gracia/suspensión, backups/RPO-RTO, Firebase inicial, modalidad CHR y alcance de automatización antes de implementar. Producción continúa exclusivamente en `vps_prod`.
 
 - **Plan de comercialización para Perú documentado (2026-07-25; sólo documentación, sin deploy):** creado [`PLAN_COMERCIALIZACION_GESTIONVPN_PERU_2026-07-25.md`](./PLAN_COMERCIALIZACION_GESTIONVPN_PERU_2026-07-25.md). La recomendación es iniciar como servicio B2B administrado con stack aislado por WISP, implementación pagada y mensualidad; no lanzar todavía un SaaS masivo. Bloqueadores P0: restaurar staging, perfiles de Core y aislamiento por `core_server_id`, dominio/marca, validación u ocultamiento de Google, suscripciones/entitlements, onboarding, backups/restore, observabilidad, soporte y cumplimiento peruano. Precios de validación: Piloto S/ 199, Starter S/ 249, Growth S/ 499, Business S/ 899 y Dedicado desde S/ 1,800, todos antes de IGV y con implementación separada. Pendiente humano: entrevistar cinco WISP y responder las ocho decisiones de §14 antes de convertirlo en backlog técnico.
 
@@ -105,6 +107,8 @@ Panel **multi-tenant (SaaS)** para administrar túneles VPN sobre un **MikroTik 
 
 **Plano de red de gestión (`10.x`, migrado desde `192.168.21.x`):** nodos WG `10.11.250.<ND>` · nodos SSTP `10.11.251.<ND>` · scan-pool VPS `10.11.252.0/24` · **VPN-WG-VPS** `10.12.250.1/24` · **VPN-WG-CLIENTES** `10.13.250.1/24` (mod/members) · **VPN-WG-ADMIN** `10.14.250.1/24` (admin). Fuente de verdad: `server/lib/mgmtNet.js` (backend) + `vpn-manager/src/config.ts` (frontend). Runbook: [`MIGRACION_RED_GESTION.md`](./MIGRACION_RED_GESTION.md).
 
+**Puertos WireGuard actuales:** los accesos de moderadores/members comparten `VPN-WG-CLIENTES:13233` con múltiples peers. Los nodos de torre usan otro modelo: cada `ND<n>` crea una interfaz Core `WG-ND<n>-<NOMBRE>` y escucha en `13300+n` por defecto (por ejemplo, ND2→13302), con peer, IP `/32`, VRF y rutas propios. Por tanto, si varios Cores privados salen por una sola IP pública central, el gateway necesita un puerto UDP público único por nodo y DNAT hacia el puerto interno del Core correspondiente; un único puerto por cliente no representa la implementación vigente. Como distintos clientes pueden tener el mismo ND/puerto interno, el puerto público y el `listen-port` interno deben modelarse por separado.
+
 ---
 
 ## 3) Datos y APIs (referencia rápida)
@@ -194,6 +198,7 @@ Ver también `vpn-manager/CLAUDE.md` y `DESIGN_SYSTEM.md`.
 > Aquí van los **flujos que siguen activos** (no cómo se construyeron). Cuando el usuario pida "enviar al handoff" una regla/función/proceso, va a §4 o §5.
 
 - **Alta de nodo (WG):** backend genera el par de llaves si no se pega una propia, registra la pública en el peer del Core, embebe la privada en el script + rutas de retorno. Columnas `nodes.wg_cpe_public` + `wg_cpe_private_enc` (AES-GCM). Salida: script autocontenido.
+- **Asignación de puerto por nodo WG:** el flujo normal no envía `wgListenPort`, por lo que `provision.routes` calcula `13300 + ND`, crea una interfaz WireGuard separada en el Core y `cpeScript` usa ese mismo valor como `endpoint-port`. En una topología futura con gateway público y traducción de puertos se requieren dos valores: `core_listen_port` interno y `public_endpoint_port` externo. El gateway administrará la asignación/colisión y el script del CPE debe anunciar el externo; no reutilizar un mismo puerto público para Cores distintos.
 - **Alta de nodo (SSTP):** no requiere ruta de retorno (RouterOS la arma con la `remote-address` del PPP). Usuario/contraseña PPP se generan server-side (`ppp-<nombre>-nd<ND>` + pass segura) y se embeben en el script.
 - **Invitación de MEMBER (modelo seguro):** el invitado envía **solo su public key**; el server crea el peer, asigna el túnel de la invitación y devuelve `{allowedIp, serverPublicKey, endpoint, allowedIps}` para que arme su `.conf` (la clave privada nunca sale del dispositivo). Provisión WG = best-effort.
 - **Recuperación WireGuard self-service:** `POST /api/team/me/wireguard` — el moderador/member (re)genera su propio acceso WG si quedó sin él (la provisión al aceptar es best-effort y puede fallar si el router está caído). UI en **Ajustes → tab WireGuard** (`WireGuardTab.tsx`) con QR + descargar `.conf` + regenerar. Idempotente: limpia el peer anterior al regenerar.
