@@ -6,6 +6,13 @@
 
 ---
 
+> **Sesión 2026-07-26 — Dropdown de acciones de Nodos contenido en el viewport.** Rama `vps_prod`, basada en el checkout activo `673d0d1`; sin despliegue. Skills: `vercel-react-best-practices`, `handoff-keeper`.
+> - Causa 1: `useKebabMenu` estimaba sólo `280px`, aunque el menú completo supera esa altura, y aplicaba `70vh` sin considerar la posición del botón; el contenido quedaba debajo del borde inferior.
+> - Causa 2: el listener global de scroll también recibía el scroll interno del dropdown y lo cerraba, impidiendo alcanzar las últimas acciones.
+> - Solución: geometría pura con margen de viewport, apertura arriba/abajo, altura disponible, clamp horizontal, `overscroll-contain` y exclusión del scroll interno.
+> - Archivos: `NodeCardKebabMenu.tsx`, `useKebabMenu.ts` y nueva prueba `useKebabMenu.test.ts`.
+> - Verificación: **152/152 frontend**, ESLint, TypeScript, build Vite y `git diff --check`. `audit:design` mantiene 1 error + 1 warning preexistentes en `RouterAccess.tsx`, no introducidos por este cambio.
+
 > **Sesión 2026-07-25 - Diagnóstico corregido: faltaba el popup resolver.** Rama `vps_prod`; commit `55816fa` publicado, sin despliegue. Skills: `browser:control-in-app-browser`, `handoff-keeper`.
 > - Corrección de la entrada inmediatamente anterior: Identity Toolkit expone el número interno del mismo proyecto `vpn-noc`; la Web API Key, Web App, dominio y proyecto sí coinciden, y Google está habilitado. Se canceló el cambio de clave antes de modificar producción.
 > - Reproducción controlada: el botón falla inmediatamente, no crea popup y no llega al backend. Causa: `initializeAuth()` usaba `inMemoryPersistence` sin `browserPopupRedirectResolver`, dependencia requerida por `signInWithPopup`.

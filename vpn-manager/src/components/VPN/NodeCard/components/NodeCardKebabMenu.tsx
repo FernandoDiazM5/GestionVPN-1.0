@@ -5,7 +5,12 @@ import type { NodeInfo } from '../../../../types/api';
 interface NodeCardKebabMenuProps {
   node: NodeInfo;
   showKebab: boolean;
-  kebabCoords: { top?: number; bottom?: number; right: number };
+  kebabCoords: {
+    top?: number;
+    bottom?: number;
+    right: number;
+    maxHeight: number;
+  };
   kebabRef: React.RefObject<HTMLDivElement | null>;
   dropdownRef: React.RefObject<HTMLDivElement | null>;
   logs: string[];
@@ -69,7 +74,7 @@ export function NodeCardKebabMenu({
           role="menu"
           aria-label={`Acciones de ${node.nombre_nodo}`}
           style={kebabCoords}
-          className="fixed w-52 max-h-[70vh] overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-lg shadow-slate-200/60 z-[9999] py-1 dark:bg-slate-800 dark:border-slate-700 dark:shadow-black/40"
+          className="fixed w-52 max-w-[calc(100vw-1rem)] overflow-y-auto overscroll-contain bg-white border border-slate-200 rounded-xl shadow-lg shadow-slate-200/60 z-[9999] py-1 dark:bg-slate-800 dark:border-slate-700 dark:shadow-black/40"
         >
           {/* ── Sección: Configuración del nodo ──
               Color = intención (sistema de diseño): los ítems son acciones

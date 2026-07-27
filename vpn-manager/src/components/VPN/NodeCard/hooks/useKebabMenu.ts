@@ -4,11 +4,77 @@ interface KebabCoords {
   top?: number;
   bottom?: number;
   right: number;
+  maxHeight: number;
+}
+
+const MENU_WIDTH = 208;
+const MENU_PREFERRED_HEIGHT = 520;
+const MENU_GAP = 4;
+const VIEWPORT_MARGIN = 8;
+
+interface ViewportSize {
+  width: number;
+  height: number;
+}
+
+type AnchorRect = Pick<DOMRect, 'top' | 'right' | 'bottom'>;
+
+export function calculateKebabCoords(
+  rect: AnchorRect,
+  viewport: ViewportSize,
+): KebabCoords {
+  const spaceBelow = Math.max(
+    0,
+    viewport.height - rect.bottom - MENU_GAP - VIEWPORT_MARGIN,
+  );
+  const spaceAbove = Math.max(
+    0,
+    rect.top - MENU_GAP - VIEWPORT_MARGIN,
+  );
+  const openAbove = (
+    spaceBelow < MENU_PREFERRED_HEIGHT
+    && spaceAbove > spaceBelow
+  );
+
+  const unclampedRight = viewport.width - rect.right;
+  const maxRight = Math.max(
+    VIEWPORT_MARGIN,
+    viewport.width - MENU_WIDTH - VIEWPORT_MARGIN,
+  );
+  const right = Math.min(
+    Math.max(unclampedRight, VIEWPORT_MARGIN),
+    maxRight,
+  );
+
+  if (openAbove) {
+    return {
+      bottom: viewport.height - rect.top + MENU_GAP,
+      right,
+      maxHeight: spaceAbove,
+    };
+  }
+
+  return {
+    top: rect.bottom + MENU_GAP,
+    right,
+    maxHeight: spaceBelow,
+  };
+}
+
+export function shouldCloseKebabOnScroll(
+  target: EventTarget | null,
+  menu: HTMLElement | null,
+): boolean {
+  return !(target instanceof Node && menu?.contains(target));
 }
 
 export function useKebabMenu() {
   const [showKebab, setShowKebab] = useState(false);
-  const [kebabCoords, setKebabCoords] = useState<KebabCoords>({ top: 0, right: 0 });
+  const [kebabCoords, setKebabCoords] = useState<KebabCoords>({
+    top: 0,
+    right: VIEWPORT_MARGIN,
+    maxHeight: 0,
+  });
   const kebabRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -23,7 +89,12 @@ export function useKebabMenu() {
         setShowKebab(false);
       }
     };
-    const scrollHandler = () => setShowKebab(false);
+    const scrollHandler = (event: Event) => {
+      if (shouldCloseKebabOnScroll(event.target, dropdownRef.current)) {
+        setShowKebab(false);
+      }
+    };
+    const resizeHandler = () => setShowKebab(false);
     const keyHandler = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
@@ -49,30 +120,23 @@ export function useKebabMenu() {
     document.addEventListener('mousedown', handler);
     document.addEventListener('keydown', keyHandler);
     window.addEventListener('scroll', scrollHandler, true);
+    window.addEventListener('resize', resizeHandler);
     return () => {
       cancelAnimationFrame(focusFrame);
       document.removeEventListener('mousedown', handler);
       document.removeEventListener('keydown', keyHandler);
       window.removeEventListener('scroll', scrollHandler, true);
+      window.removeEventListener('resize', resizeHandler);
     };
   }, [showKebab]);
 
   const handleKebabClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     if (!showKebab) {
       const rect = e.currentTarget.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const MENU_HEIGHT = 280;
-      if (spaceBelow < MENU_HEIGHT) {
-        setKebabCoords({
-          bottom: window.innerHeight - rect.top + 4,
-          right: window.innerWidth - rect.right
-        });
-      } else {
-        setKebabCoords({
-          top: rect.bottom + 4,
-          right: window.innerWidth - rect.right
-        });
-      }
+      setKebabCoords(calculateKebabCoords(rect, {
+        width: window.innerWidth,
+        height: window.innerHeight,
+      }));
     }
     setShowKebab(v => !v);
   };
