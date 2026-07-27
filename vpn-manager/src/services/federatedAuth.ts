@@ -98,11 +98,7 @@ async function withGoogleIdToken<T>(operation: (idToken: string) => Promise<T>):
     runtime = await loadRuntime();
     const provider = new runtime.authModule.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
-    const credential = await runtime.authModule.signInWithPopup(
-      runtime.auth,
-      provider,
-      runtime.authModule.browserPopupRedirectResolver,
-    );
+    const credential = await runtime.authModule.signInWithPopup(runtime.auth, provider);
     const idToken = await credential.user.getIdToken(true);
     return await operation(idToken);
   } finally {
