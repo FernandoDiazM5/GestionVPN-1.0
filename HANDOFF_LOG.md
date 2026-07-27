@@ -6,6 +6,12 @@
 
 ---
 
+> **Sesión 2026-07-26 — Rama funcional alineada con el checkout activo del VPS.** Rama `vps_prod`; VPS inspeccionado por SSH en modo lectura, sin despliegue.
+> - Confirmado checkout VPS `673d0d1` en `vps_prod`; `vpn-db` y `vpn-backend` healthy, `vpn-frontend` activo. El host sólo tiene archivos `.env.production*` y `ssl/` no versionados, sin modificaciones tracked.
+> - Entre `673d0d1` y el HEAD previo había dos commits de documentación y un único cambio funcional: `a3543d8`, nunca desplegado. Se revirtió preservando historial mediante `196a5df`; `federatedAuth.ts` y su prueba quedaron idénticos al checkout del VPS.
+> - Validación: prueba focalizada federated auth **5/5**, TypeScript y build Vite correctos; sólo permanecen advertencias no bloqueantes de tamaño de chunks.
+> - `a3543d8` deja de ser candidato de despliegue. Pendiente: diagnosticar el fallo pre-popup desde la base estable y presentar un nuevo commit antes de solicitar autorización de deploy.
+
 > **Sesión 2026-07-25 — Plan para convertir GestionVPN en servicio vendible en Perú.** Rama `vps_prod`; sólo documentación, sin despliegue. Skills: `process-discovery-interviewer`, `handoff-keeper`.
 > - Creado `PLAN_COMERCIALIZACION_GESTIONVPN_PERU_2026-07-25.md` con diagnóstico, cliente ideal, propuesta de valor, bloqueadores, arquitectura de entrega, mejoras P0/P1/P2, cobro, cumplimiento peruano, proceso comercial, cronograma, métricas y decisiones pendientes.
 > - Recomendación: iniciar con 3–5 WISP como servicio administrado y stack aislado por cliente; implementación pagada + mensualidad. Evolucionar a SaaS compartido sólo después del aislamiento por `core_server_id`, entitlements, medición, exportación/baja y pruebas entre tenants.
