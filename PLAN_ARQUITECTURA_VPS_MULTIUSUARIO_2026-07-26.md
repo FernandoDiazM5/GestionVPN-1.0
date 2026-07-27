@@ -370,7 +370,9 @@ Módulos:
 - Resumen del negocio.
 - Clientes/tenants.
 - Workspaces e identidad DNS.
-- Suscripciones y planes.
+- Planes comerciales.
+- Membresías, capacidades y límites por cliente.
+- Consumo, renovaciones y vencimientos.
 - Instalaciones y VPS.
 - Estado de MikroTik/transporte.
 - Dominios y certificados.
@@ -486,6 +488,8 @@ No existe una acción genérica `RUN_SHELL`.
 | Activar nodo asignado | No habitual | Sí | Sí | No |
 | Invitar miembros | No habitual | Sí | No | No |
 | Cambiar plan | Sí | Solicita | No | Aplica entitlements |
+| Habilitar/deshabilitar función del cliente | Sí, con motivo y vista previa | Solicita | No | Sincroniza estado |
+| Consultar plan, funciones y consumo | Sí | Sí, sólo su tenant | Limitado | Reporta consumo |
 | Desplegar versión | Sí con autorización | No | No | Ejecuta |
 | Restaurar backup | Sí con doble confirmación | Solicita | No | Ejecuta |
 | Acceder a secretos | Referencias limitadas | No | No | Sólo secretos locales necesarios |
@@ -497,6 +501,189 @@ No existe una acción genérica `RUN_SHELL`.
 - **Cuenta operacional:** usuario OWNER/MEMBER dentro del VPS cliente.
 - Inicialmente pueden compartir correo, pero no deben compartir la misma sesión ni base.
 - Un futuro SSO debe usar tokens con audiencia distinta para control y tenant.
+
+### 6.2 Módulo administrativo de membresías y funciones
+
+La membresía es el contrato operativo entre un `tenant` y una versión de plan. No debe confundirse con los usuarios `MEMBER` del workspace.
+
+El Administrador necesita un módulo propio llamado **Membresías y funciones**, con dos niveles:
+
+1. **Catálogo de planes:** define la plantilla que recibirán los nuevos clientes.
+2. **Membresía del cliente:** muestra el plan contratado y permite excepciones individuales sin modificar a los demás clientes del mismo plan.
+
+#### Pantallas del Administrador
+
+**Listado de membresías**
+
+- Cliente, workspace y estado.
+- Plan y versión contratada.
+- Fecha de inicio, renovación, vencimiento y gracia.
+- Uso actual frente a límites.
+- Instalación conectada, última sincronización y revisión aplicada.
+- Alertas por exceso, mora, lease pendiente o agente offline.
+
+**Detalle de membresía**
+
+- Resumen comercial.
+- Plan vigente y comparación con otros planes.
+- Funciones efectivas.
+- Límites y consumo.
+- Excepciones del cliente.
+- Cambios programados.
+- Historial y auditoría.
+- Estado de entrega al VPS cliente.
+
+**Editor de plan**
+
+- Plan en borrador.
+- Matriz de funciones y límites.
+- Precio/metadatos comerciales.
+- Vista previa de impacto.
+- Publicación como versión inmutable.
+- Retiro del catálogo sin alterar contratos anteriores.
+
+Modificar un plan publicado no debe cambiar silenciosamente a los clientes existentes. Se crea una nueva `plan_version` y el Administrador decide qué membresías migrar.
+
+#### Catálogo inicial de capacidades
+
+| Clave estable | Tipo | Controla | Comportamiento seguro al deshabilitar |
+|---|---|---|---|
+| `nodes.manage` | Booleano | Alta, edición y baja de nodos | Bloquear mutaciones; conservar y mostrar nodos existentes |
+| `nodes.limit` | Límite entero | Número máximo de nodos | Bloquear nuevas altas; nunca eliminar excedentes |
+| `scan.execute` | Booleano | Nuevos escaneos | Bloquear ejecución; conservar resultados anteriores |
+| `monitor.ap` | Booleano | Monitor AP y SSE | Detener nuevas consultas; conservar inventario |
+| `team.members.limit` | Límite entero | Miembros activos | Bloquear invitaciones/altas; no expulsar usuarios |
+| `auth.google.link` | Booleano | Vincular nuevas cuentas Google | Bloquear nuevos enlaces; no bloquear identidades existentes automáticamente |
+| `notifications.telegram` | Booleano | Integración Telegram | Detener job y ocultar configuración |
+| `reports.export` | Booleano | PDF/Excel/JSON | Bloquear generación nueva; no borrar exportaciones |
+| `ai.air_os` | Booleano | Análisis Gemini/AirOS | Bloquear nuevos análisis; historial sujeto a retención |
+| `backups.automatic` | Booleano | Backup programado | No cancelar la copia de seguridad mínima obligatoria del proveedor |
+| `backups.retention_days` | Límite entero | Retención contratada | Aplicar sólo hacia adelante; nunca borrar sin job auditado |
+| `cores.limit` | Límite entero | Cantidad de MikroTik Core | Bloquear alta adicional; no desconectar Cores existentes |
+| `support.level` | Enumerado | Horario/SLA de soporte | Cambiar colas y alertas, no capacidades de red |
+
+La lista exacta se validará comercialmente. Las claves son contratos técnicos y no deben renombrarse al cambiar el texto visible.
+
+#### Tipos de valor
+
+- `BOOLEAN`: habilitado o deshabilitado.
+- `INTEGER_LIMIT`: máximo cuantificable.
+- `ENUM`: modalidad seleccionada de un catálogo cerrado.
+- `PERIODIC_QUOTA`: consumo máximo dentro de un período.
+
+No se recomienda guardar todas las funciones en una sola columna JSON editable. El catálogo, los valores del plan y las excepciones se normalizan; sólo el lease firmado se materializa como snapshot JSON.
+
+#### Precedencia de cálculo
+
+El estado efectivo se resuelve en este orden:
+
+1. **Bloqueo global de seguridad:** sólo puede reducir capacidades.
+2. **Estado de suscripción:** `SUSPENDED_SOFT` o `SUSPENDED_HARD` impone restricciones globales.
+3. **Excepción temporal o permanente del cliente.**
+4. **Valor de la versión de plan contratada.**
+5. **Valor seguro del código:** apagado o límite cero si falta configuración.
+
+Cada valor efectivo debe indicar `source`: `SECURITY`, `SUBSCRIPTION`, `OVERRIDE`, `PLAN` o `DEFAULT`.
+
+#### Membresía no reemplaza RBAC
+
+La membresía determina si el cliente contrató una capacidad. Los roles y permisos determinan quién puede usarla dentro del cliente:
+
+```text
+Acceso efectivo = entitlement de membresía
+                   AND permiso RBAC
+                   AND estado válido del usuario/sesión
+```
+
+| Entitlement | Permiso RBAC | Resultado |
+|---|---|---|
+| Habilitado | Permitido | Acción disponible |
+| Habilitado | Denegado | `FORBIDDEN` |
+| Deshabilitado | Permitido | `FEATURE_DISABLED` |
+| Deshabilitado | Denegado | Denegado sin revelar detalles del plan |
+
+En la primera versión, los overrides comerciales se aplican al tenant o instalación. Excepciones por usuario se manejan como permisos/entitlements operativos separados —por ejemplo, habilitar IA sólo a determinados OWNER— y no como una membresía distinta.
+
+#### Flujo de habilitación/deshabilitación
+
+```mermaid
+flowchart TD
+  A["Administrador abre membresía"] --> B["Selecciona función o límite"]
+  B --> C["Sistema calcula valor actual, nuevo valor e impacto"]
+  C --> D{"¿Afecta sesiones, acceso o datos?"}
+  D -- "Sí" --> E["Exigir motivo, confirmación reforzada y fecha"]
+  D -- "No" --> F["Exigir motivo y fecha"]
+  E --> G["Crear cambio DRAFT"]
+  F --> G
+  G --> H{"Aplicar ahora o programar"}
+  H -- "Programar" --> I["Estado SCHEDULED"]
+  H -- "Ahora" --> J["Emitir revisión firmada"]
+  I --> J
+  J --> K["Tenant valida firma y aplica"]
+  K --> L{"¿Tenant confirmó?"}
+  L -- "Sí" --> M["Estado APPLIED + auditoría"]
+  L -- "No" --> N["PENDING/FAILED + alerta y reintento"]
+  M --> O["Disponible revertir a revisión anterior"]
+```
+
+No existe un interruptor que cambie producción sin vista previa. Toda modificación muestra:
+
+- Funciones que se habilitan o bloquean.
+- Cantidad de nodos/miembros actual frente al nuevo límite.
+- Sesiones o jobs afectados.
+- Momento de aplicación.
+- Instalación y revisión destinataria.
+- Plan de reversión.
+
+#### Política al deshabilitar
+
+La deshabilitación nunca elimina datos ni configuraciones de RouterOS. Cada función declara una estrategia:
+
+| Estrategia | Efecto |
+|---|---|
+| `HIDE_AND_BLOCK` | Oculta UI y bloquea API; sólo para módulos sin datos críticos |
+| `READ_ONLY` | Permite consultar, bloquea crear/editar/eliminar |
+| `NO_NEW` | Conserva lo existente, bloquea nuevas altas o ejecuciones |
+| `STOP_JOB` | Detiene el job asociado de forma idempotente |
+| `WARN_ONLY` | Muestra exceso y permite operar durante transición |
+| `REVOKE_ACCESS` | Revoca sesiones/accesos; reservado para suspensión hard o seguridad |
+
+La estrategia `REVOKE_ACCESS` requiere confirmación reforzada. Un toggle comercial normal no debe desconectar túneles existentes.
+
+#### Aplicación en backend y frontend
+
+- El backend cliente es la autoridad con `requireEntitlement(feature_key)`.
+- Los límites se verifican dentro de la misma transacción que crea el recurso.
+- Los jobs validan entitlement antes de iniciar y registran por qué no corrieron.
+- El frontend consume `/api/capabilities` para presentar u ocultar opciones, pero ocultar un botón no sustituye la autorización del backend.
+- Los errores usan códigos estables como `FEATURE_DISABLED`, `LIMIT_REACHED`, `SUBSCRIPTION_READ_ONLY` y `ENTITLEMENT_EXPIRED`.
+- Al reactivar una función se reutilizan datos/configuración existentes y el reconciliador corrige drift.
+
+#### Visibilidad para el cliente
+
+El OWNER tendrá una vista de sólo lectura **Plan y consumo**:
+
+- Nombre del plan.
+- Estado de membresía y próxima fecha relevante.
+- Funciones incluidas.
+- Uso de nodos, miembros, Cores y cuotas.
+- Motivo de una función no disponible.
+- Acción para solicitar ampliación.
+
+El MEMBER no administra la membresía. Sólo ve mensajes funcionales cuando intenta una acción no incluida, sin información comercial sensible.
+
+#### Roles centrales recomendados
+
+Para el primer piloto, sólo `platform_admin` modifica membresías. En una etapa posterior:
+
+| Rol central | Alcance |
+|---|---|
+| `PLATFORM_SUPER_ADMIN` | Planes, membresías, overrides, suspensión y seguridad |
+| `BILLING_ADMIN` | Plan, fechas, renovación y estados comerciales; no despliegues |
+| `SUPPORT_ADMIN` | Consulta y override temporal previamente permitido |
+| `AUDITOR` | Sólo lectura de configuración e historial |
+
+Toda ampliación de roles debe usar permisos explícitos; no comparar únicamente el nombre del rol.
 
 ---
 
@@ -714,9 +901,15 @@ DNS reduce la necesidad de regenerar `.conf`, pero no reemplaza backups ni recon
 |---|---|---|
 | `tenants` | Cliente comercial | id, legal_name, display_name, slug, status |
 | `tenant_contacts` | Contactos | tenant_id, type, name, email, phone |
-| `plans` | Catálogo comercial | code, limits, features, price metadata |
-| `subscriptions` | Contrato vigente | tenant_id, plan_id, state, dates, grace |
-| `entitlements` | Capacidades efectivas | feature, limit, value, revision |
+| `feature_catalog` | Contrato de capacidades | key, type, category, scope, safe_default, disable_strategy, status |
+| `plans` | Identidad del producto comercial | code, name, status |
+| `plan_versions` | Versión inmutable del plan | plan_id, version, state, price_metadata, published_at |
+| `plan_feature_values` | Funciones/límites de la versión | plan_version_id, feature_id, value, enforcement |
+| `subscriptions` | Membresía vigente | tenant_id, plan_version_id, state, dates, grace |
+| `subscription_feature_overrides` | Excepción individual | subscription_id, feature_id, value, reason, starts_at, ends_at |
+| `entitlement_revisions` | Snapshot efectivo firmado | subscription_id, revision, payload_hash, valid_until, grace_until, state |
+| `entitlement_deliveries` | Entrega/aplicación | revision_id, installation_id, issued_at, ack_at, result |
+| `usage_snapshots` | Consumo observado | subscription_id, feature_id, used_value, period, observed_at |
 | `installations` | Stack desplegado | tenant_id, mode, provider, region, status |
 | `installation_endpoints` | Dominios/IP | web_host, vpn_host, public_ip |
 | `agents` | Identidad del edge-agent | installation_id, cert fingerprint, version |
@@ -741,6 +934,14 @@ DNS reduce la necesidad de regenerar `.conf`, pero no reemplaza backups ni recon
 - La baja comercial no borra inmediatamente una instalación.
 - El slug tiene índice único.
 - Un tenant puede tener más de una instalación en el futuro: producción, laboratorio, DR.
+- `feature_catalog.key` y `plans.code` son únicos y estables.
+- `plan_versions` publicadas son inmutables; una modificación crea otra versión.
+- Existe un único valor por `(plan_version_id, feature_id)`.
+- Existe como máximo un override activo por `(subscription_id, feature_id, intervalo)`.
+- Todo override tiene motivo, actor, vigencia y revisión de auditoría.
+- Un límite inferior al consumo actual bloquea nuevas altas, pero no elimina recursos.
+- El snapshot firmado es una proyección; las tablas normalizadas son la fuente de verdad.
+- `usage_snapshots` es telemetría para decisión central; el límite se aplica autoritativamente en el tenant.
 
 ---
 
@@ -829,14 +1030,65 @@ El control central firma:
   "tenantId": "...",
   "installationId": "...",
   "revision": 12,
-  "features": {},
-  "limits": {},
+  "features": {
+    "nodes.manage": true,
+    "scan.execute": true,
+    "monitor.ap": false
+  },
+  "limits": {
+    "nodes.limit": 25,
+    "team.members.limit": 10,
+    "cores.limit": 1
+  },
   "validUntil": 0,
   "graceUntil": 0
 }
 ```
 
 El tenant valida la firma con una clave pública embebida. No llama al control plane en cada request.
+
+El lease no contiene precios, notas internas ni información de otros clientes. Cuando el control plane está disponible, el tenant consulta nuevas revisiones; si está offline, usa la última revisión válida hasta `graceUntil`.
+
+### 11.5 API de membresías y capacidades
+
+Endpoints centrales propuestos:
+
+```text
+GET    /admin/features
+GET    /admin/plans
+POST   /admin/plans
+POST   /admin/plans/:id/versions
+PUT    /admin/plan-versions/:id/features
+POST   /admin/plan-versions/:id/publish
+
+GET    /admin/subscriptions
+GET    /admin/subscriptions/:id
+POST   /admin/subscriptions/:id/change-plan
+POST   /admin/subscriptions/:id/overrides
+DELETE /admin/subscriptions/:id/overrides/:overrideId
+GET    /admin/subscriptions/:id/effective-entitlements
+GET    /admin/subscriptions/:id/usage
+GET    /admin/subscriptions/:id/history
+POST   /admin/subscriptions/:id/reissue-lease
+POST   /admin/subscriptions/:id/rollback-entitlements
+```
+
+Endpoints tenant:
+
+```text
+GET /api/capabilities
+GET /api/account/plan-usage
+```
+
+Reglas de API:
+
+- Toda mutación requiere CSRF, sesión reciente, permiso explícito y `reason`.
+- Cambios de alto impacto requieren confirmación reforzada.
+- El servidor calcula el resultado efectivo; el cliente nunca envía el snapshot final.
+- Las respuestas de vista previa incluyen impacto, pero nunca secretos.
+- Cada mutación genera un `audit_event` y una nueva revisión monotónica.
+- Repetir una solicitud con el mismo `idempotency_key` no duplica overrides ni revisiones.
+- El rollback crea una revisión nueva basada en la anterior; no borra historia.
 
 ---
 
@@ -924,6 +1176,71 @@ Nunca eliminar nodos o backups sólo por un pago vencido.
 7. Revocar agente.
 8. Destruir VPS sólo si su propiedad y contrato lo permiten.
 9. Registrar hashes y acta de baja.
+
+### 12.5 Gestión de membresía y funciones
+
+#### Proceso de negocio
+
+El Administrador asigna al cliente un plan comercial. Si necesita una excepción, no crea un plan duplicado: registra un override justificado, temporal o permanente. El cliente puede solicitar el cambio, pero no aplicarlo.
+
+#### Flujo del sistema
+
+1. Cargar membresía, versión de plan, overrides, uso y última revisión aplicada.
+2. Seleccionar cambio de plan, función o límite.
+3. Calcular el resultado efectivo y comparar uso actual.
+4. Mostrar impacto sobre UI, API, jobs, sesiones y recursos existentes.
+5. Exigir motivo, fecha y confirmación según riesgo.
+6. Guardar cambio como `DRAFT` o `SCHEDULED`.
+7. Emitir snapshot firmado con revisión monotónica.
+8. Entregarlo a cada instalación de la membresía.
+9. Esperar `ACK` con hash y resultado.
+10. Mostrar `APPLIED`, `PARTIALLY_APPLIED`, `PENDING` o `FAILED`.
+11. Alertar si la instalación permanece offline o aplica una revisión distinta.
+12. Permitir rollback mediante una revisión nueva.
+
+Estados del cambio:
+
+```mermaid
+stateDiagram-v2
+  [*] --> DRAFT
+  DRAFT --> SCHEDULED
+  DRAFT --> ISSUED
+  SCHEDULED --> ISSUED
+  ISSUED --> PENDING_ACK
+  PENDING_ACK --> APPLIED
+  PENDING_ACK --> PARTIALLY_APPLIED
+  PENDING_ACK --> FAILED
+  PARTIALLY_APPLIED --> APPLIED
+  PARTIALLY_APPLIED --> ROLLED_BACK
+  FAILED --> ISSUED: Reintentar
+  FAILED --> ROLLED_BACK
+  APPLIED --> SUPERSEDED
+  SCHEDULED --> CANCELLED
+```
+
+Tabla de decisión:
+
+| Situación | Resultado recomendado | Datos existentes | Confirmación |
+|---|---|---|---|
+| Habilitar una función | Emitir entitlement y mostrar módulo | Conservar/reutilizar | Normal |
+| Deshabilitar función no crítica | `READ_ONLY`, `NO_NEW` o `STOP_JOB` | Conservar | Normal con motivo |
+| Bajar límite por debajo del consumo | Bloquear nuevas altas y mostrar exceso | Conservar | Reforzada |
+| Deshabilitar enlace Google | Bloquear nuevos enlaces; mantener login ya vinculado | Conservar identidades | Reforzada para cortar login existente |
+| Deshabilitar análisis IA | Bloquear nuevos análisis | Conservar historial según retención | Normal |
+| Suspensión soft | Sólo lectura global | Conservar | Reforzada |
+| Suspensión hard | Revocar sesiones/accesos según política | Conservar configuración y backups | Reforzada |
+| Tenant offline | Dejar cambio pendiente; no afirmar que fue aplicado | Sin cambios hasta entrega/expiración | Alerta |
+| Reactivación | Emitir revisión que restaura capacidades | Reconciliar sin recrear innecesariamente | Normal |
+
+#### Trazabilidad mínima
+
+```text
+Solicitud -> actor -> motivo -> valor anterior -> valor nuevo
+-> fuente efectiva -> impacto previsto -> revisión firmada
+-> instalación destinataria -> ACK -> resultado -> rollback
+```
+
+No debe existir una modificación directa en la base cliente que el plano central desconozca. Si soporte necesita una excepción de emergencia, se registra como override con expiración automática.
 
 ---
 
@@ -1324,6 +1641,36 @@ Las claves internas de laptops/nodos se conservan porque terminan en el MikroTik
 
 **Resultado:** export, retención, revocación y destrucción auditada.
 
+### UC-11 — Cambiar plan de una membresía
+
+**Actor:** Platform Admin
+
+**Resultado:** nueva versión de plan programada o aplicada, con impacto, revisión y ACK trazables.
+
+### UC-12 — Habilitar una función para un solo cliente
+
+**Actor:** Platform Admin
+
+**Resultado:** override individual con motivo y vigencia, sin modificar el plan de otros clientes.
+
+### UC-13 — Deshabilitar una función sin perder datos
+
+**Actor:** Platform Admin
+
+**Resultado:** backend y frontend aplican la estrategia segura; recursos existentes permanecen intactos.
+
+### UC-14 — Consultar plan y consumo
+
+**Actor:** OWNER
+
+**Resultado:** consulta de plan, capacidades, límites, consumo y motivos de bloqueo sin permiso de edición.
+
+### UC-15 — Revertir un cambio de entitlement
+
+**Actor:** Platform Admin
+
+**Resultado:** nueva revisión restaura el estado anterior y conserva toda la auditoría.
+
 ---
 
 ## 19. Matriz de impacto sobre módulos actuales
@@ -1332,6 +1679,8 @@ Las claves internas de laptops/nodos se conservan porque terminan en el MikroTik
 |---|---|---|
 | Admin Dashboard | Separar | `control-web` |
 | Moderadores | Convertir en tenants/owners | `control-web/control-api` |
+| Membresías y funciones | Crear | `control-web/control-api` |
+| Plan y consumo OWNER | Crear, sólo lectura | `tenant-web/tenant-api` |
 | Ajustes Core global | Retirar del central | Tenant/instalación |
 | Servidor VPN/backup | Mover operación local | Tenant API + agent |
 | Nodos | Mantener/adaptar | `tenant-web/api` |
@@ -1459,11 +1808,18 @@ Entregables:
 
 ### 21.8 Fase 7 — Entitlements
 
-- Planes/límites.
+- Catálogo de funciones tipadas.
+- Planes versionados e inmutables.
+- Membresías y overrides con vigencia.
+- Vista previa de impacto.
+- Matriz administrativa de funciones/límites.
+- Vista OWNER de plan y consumo.
 - Lease firmado.
+- ACK por instalación.
+- Enforcement en API, jobs y transacciones.
 - Período de gracia.
 - Suspensión soft/hard.
-- Auditoría.
+- Auditoría y rollback por revisión.
 
 ### 21.9 Fase 8 — Releases
 
@@ -1489,39 +1845,50 @@ Entregables:
 1. `docs(multi): record target architecture decisions`
 2. `contracts(multi): add tenant and installation schemas`
 3. `contracts(multi): add agent registration schemas`
-4. `contracts(multi): add entitlement lease schemas`
-5. `db(control): add tenant and plan tables`
-6. `db(control): add installation and endpoint tables`
-7. `db(control): add audit and command outbox`
-8. `feat(control-api): create tenant lifecycle`
-9. `feat(control-api): reserve immutable workspace slug`
-10. `feat(control-web): add tenants list and detail`
-11. `feat(control-web): add installation state view`
-12. `feat(agent): scaffold local service`
-13. `feat(agent): register with one-time token`
-14. `feat(agent): add signed heartbeat`
-15. `feat(agent): reconcile Docker services`
-16. `feat(agent): reconcile nftables gateway`
-17. `feat(agent): reconcile WireGuard transport`
-18. `fix(network): support ND2-ND254 port range`
-19. `test(network): cover boundary ports 13302 and 13554`
-20. `feat(tenant): persist installation identity`
-21. `refactor(tenant): isolate local operational settings`
-22. `feat(control): automate DNS records`
-23. `feat(agent): automate certificate lifecycle`
-24. `feat(agent): run idempotent tenant bootstrap`
-25. `feat(control): issue signed entitlement leases`
-26. `feat(tenant): enforce limits with offline grace`
-27. `feat(control): add soft and hard suspension`
-28. `feat(agent): add backup and restore preview`
-29. `feat(control): publish immutable releases`
-30. `feat(agent): deploy and rollback signed releases`
-31. `feat(observability): report sanitized health`
-32. `feat(control-web): add incidents and backup status`
-33. `test(e2e): onboard customer-owned VPS`
-34. `test(e2e): validate OWNER and MEMBER access`
-35. `test(dr): restore tenant to replacement IP`
-36. `docs(runbook): add onboarding and disaster recovery`
+4. `contracts(membership): add feature catalog and plan schemas`
+5. `contracts(membership): add signed entitlement lease schemas`
+6. `db(control): add tenant and installation tables`
+7. `db(control): add feature catalog and plan versions`
+8. `db(control): add subscriptions overrides and entitlement revisions`
+9. `db(control): add usage snapshots and delivery acknowledgements`
+10. `db(control): add audit and command outbox`
+11. `feat(control-api): create tenant lifecycle`
+12. `feat(control-api): reserve immutable workspace slug`
+13. `feat(control-api): manage versioned plan catalog`
+14. `feat(control-api): preview effective membership changes`
+15. `feat(control-api): apply scheduled subscription overrides`
+16. `feat(control-web): add tenants list and detail`
+17. `feat(control-web): add installation state view`
+18. `feat(control-web): add plan catalog editor`
+19. `feat(control-web): add membership features and usage matrix`
+20. `feat(agent): scaffold local service`
+21. `feat(agent): register with one-time token`
+22. `feat(agent): add signed heartbeat`
+23. `feat(agent): reconcile Docker services`
+24. `feat(agent): reconcile nftables gateway`
+25. `feat(agent): reconcile WireGuard transport`
+26. `fix(network): support ND2-ND254 port range`
+27. `test(network): cover boundary ports 13302 and 13554`
+28. `feat(tenant): persist installation identity`
+29. `refactor(tenant): isolate local operational settings`
+30. `feat(tenant): enforce capabilities in API and jobs`
+31. `feat(tenant-web): show OWNER plan and usage`
+32. `feat(control): automate DNS records`
+33. `feat(agent): automate certificate lifecycle`
+34. `feat(agent): run idempotent tenant bootstrap`
+35. `feat(control): issue and track signed entitlement leases`
+36. `feat(tenant): enforce limits with offline grace`
+37. `feat(control): add soft and hard suspension`
+38. `feat(agent): add backup and restore preview`
+39. `feat(control): publish immutable releases`
+40. `feat(agent): deploy and rollback signed releases`
+41. `feat(observability): report sanitized health and usage`
+42. `feat(control-web): add incidents and backup status`
+43. `test(e2e): onboard customer-owned VPS`
+44. `test(e2e): enable disable membership capabilities safely`
+45. `test(e2e): validate OWNER and MEMBER access`
+46. `test(dr): restore tenant to replacement IP`
+47. `docs(runbook): add onboarding membership and disaster recovery`
 
 Cada commit debe ser independiente, testeable y reversible.
 
@@ -1533,6 +1900,11 @@ Cada commit debe ser independiente, testeable y reversible.
 
 - Slug.
 - Estados de suscripción.
+- Precedencia `SECURITY > SUBSCRIPTION > OVERRIDE > PLAN > DEFAULT`.
+- Validación de tipos de feature.
+- Versiones publicadas inmutables.
+- Overrides temporales y expiración.
+- Estrategia segura al deshabilitar.
 - Firma/verificación de lease.
 - Validación de comandos.
 - Cálculo ND/puerto.
@@ -1548,6 +1920,11 @@ Cada commit debe ser independiente, testeable y reversible.
 - Agent reconcile.
 - Migraciones.
 - Suspensión/reactivación.
+- Cambio de plan y override individual.
+- ACK de revisión y reintento idempotente.
+- Límites concurrentes sin sobreasignación.
+- Backend bloquea aunque la UI sea manipulada.
+- Tenant offline conserva el lease anterior hasta gracia.
 
 ### 23.3 Red
 
@@ -1608,6 +1985,12 @@ Cada commit debe ser independiente, testeable y reversible.
 - Rollback recupera versión anterior.
 - No hay secretos en Git/logs/telemetría.
 - Auditoría muestra actor, instalación, acción y resultado.
+- El Administrador puede habilitar/deshabilitar una función para un solo cliente sin alterar otros tenants.
+- Bajar límites no elimina nodos, miembros, identidades ni backups existentes.
+- Frontend y backend aplican la misma revisión de capacidades.
+- El OWNER ve plan, uso y motivo de bloqueo en modo de sólo lectura.
+- Cada cambio muestra impacto, exige motivo, recibe ACK y puede revertirse.
+- Un plan publicado no cambia contratos existentes hasta una migración explícita.
 
 ---
 
@@ -1619,17 +2002,21 @@ Estas decisiones no bloquean el documento, pero sí la implementación:
 2. Proveedor VPS inicial.
 3. Quién es titular y quién paga cada VPS.
 4. Planes y límites de nodos/miembros.
-5. Duración del período de gracia.
-6. Comportamiento exacto de suspensión soft/hard.
-7. Retención después de baja.
-8. Destino de backups externos.
-9. Soporte 24/7 o por horario.
-10. Si Google se habilita desde el primer piloto.
-11. Si el cliente puede gestionar su infraestructura o sólo verla.
-12. Si CHR premium entra en la primera versión.
-13. RPO/RTO por plan.
-14. Si el slug muestra la marca del cliente o usa un código opaco.
-15. Alcance de automatización inicial de Cloudflare/DigitalOcean.
+5. Funciones incluidas en cada plan inicial.
+6. Qué funciones admiten override individual y su duración máxima.
+7. Estrategia de deshabilitación de cada función (`READ_ONLY`, `NO_NEW`, `STOP_JOB` o bloqueo total).
+8. Quiénes, además del propietario, podrán modificar membresías.
+9. Duración del período de gracia.
+10. Comportamiento exacto de suspensión soft/hard.
+11. Retención después de baja.
+12. Destino de backups externos.
+13. Soporte 24/7 o por horario.
+14. Si Google se habilita desde el primer piloto.
+15. Si el cliente puede gestionar su infraestructura o sólo verla.
+16. Si CHR premium entra en la primera versión.
+17. RPO/RTO por plan.
+18. Si el slug muestra la marca del cliente o usa un código opaco.
+19. Alcance de automatización inicial de Cloudflare/DigitalOcean.
 
 ---
 

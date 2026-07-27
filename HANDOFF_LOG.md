@@ -6,6 +6,13 @@
 
 ---
 
+> **Sesión 2026-07-26 — Módulo administrativo de membresías y funciones añadido al plan.** Rama `vps-multiusuario`; sólo documentación, sin cambios funcionales ni despliegue. Skills: `process-discovery-interviewer`, `database-schema-design`, `documentation-writer`, `handoff-keeper`.
+> - El panel central incorpora catálogo de planes versionados, membresía por tenant, matriz de funciones/límites, consumo, overrides individuales con vigencia, vista previa de impacto, programación, historial y estado de aplicación.
+> - Modelo normalizado: `feature_catalog`, `plan_versions`, `plan_feature_values`, `subscription_feature_overrides`, `entitlement_revisions`, `entitlement_deliveries` y `usage_snapshots`. El JSON firmado es sólo una proyección entregable, no la fuente de verdad.
+> - Precedencia: seguridad > estado de suscripción > override > plan > valor seguro. Frontend sólo presenta; backend, jobs y transacciones aplican los límites.
+> - Deshabilitar una función no elimina datos ni objetos RouterOS: usa políticas explícitas `HIDE_AND_BLOCK`, `READ_ONLY`, `NO_NEW`, `STOP_JOB`, `WARN_ONLY` o `REVOKE_ACCESS`. Esta última se reserva para suspensión hard/seguridad y exige confirmación reforzada.
+> - OWNER obtiene vista de sólo lectura de plan y consumo; MEMBER no puede administrar membresía. Plan ampliado a 47 commits, nuevas pruebas E2E y 19 decisiones del propietario.
+
 > **Sesión 2026-07-26 — Plan integral de arquitectura VPS multiusuario.** Rama nueva `vps-multiusuario`, creada desde `2734e88`; sólo documentación, sin cambios funcionales ni despliegue. Skills: `architecture-blueprint-generator`, `process-discovery-interviewer`, `network-engineer`, `documentation-writer`, `handoff-keeper`.
 > - Auditado el stack y los límites reales: `workspace_routers` aún no gobierna la conexión; `authJwt` inyecta un Core global desde `app_settings`, los jobs y la suspensión actúan sobre ese Core, los pools/identificadores son globales y la reconciliación wg0 necesita converger también en eliminaciones.
 > - Creado `PLAN_ARQUITECTURA_VPS_MULTIUSUARIO_2026-07-26.md` con arquitectura, responsabilidades, dominio/DNS, red, panel central y tenant, modelos de datos, APIs central–agente, onboarding, actualizaciones, suspensión/baja, seguridad, observabilidad, backup/DR, escenarios, migración, pruebas y plan de 36 commits.
