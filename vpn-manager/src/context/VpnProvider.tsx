@@ -31,9 +31,11 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
   } = useSession({ autoLoad: false });
   const { handleLoginSuccess: authenticate, setIsReady } = auth;
   const {
-    setNodes, setActiveNodeVrf, setTunnelExpiry, deactivateAllNodes, tunnelExpiry,
+    setNodes, setActiveNodeVrf, setTunnelExpiry,
+    deactivateAllNodes: deactivateManagedNodes,
   } = nodes;
   const initializationStarted = useRef(false);
+  const logoutInProgress = useRef(false);
 
   // Inicializar BD
   useEffect(() => {
@@ -81,7 +83,11 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
     nodes.setTunnelExpiry
   );
 
-  useTunnelTimeout(nodes.tunnelExpiry, () => nodes.deactivateAllNodes(auth.credentials));
+  const deactivateExpiredTunnel = useCallback(
+    () => deactivateManagedNodes(auth.credentials),
+    [auth.credentials, deactivateManagedNodes],
+  );
+  useTunnelTimeout(nodes.tunnelExpiry, deactivateExpiredTunnel);
   useTunnelKeepalive(nodes.tunnelExpiry, auth.credentials, nodes.activeNodeVrf);
   useAuthExpiry(auth.handleLogout);
   const sessionExpiry = useSessionExpiry(auth.isAuthenticated, auth.handleLogout);
@@ -92,13 +98,6 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
     nodes: nodes.nodes,
   });
 
-  // Cuando isReady, desactivar si hace falta
-  useEffect(() => {
-    if (auth.isReady && tunnelExpiry && tunnelExpiry <= Date.now()) {
-      deactivateAllNodes(auth.credentials);
-    }
-  }, [auth.credentials, auth.isReady, deactivateAllNodes, tunnelExpiry]);
-
   const handleLoginSuccess = useCallback(async (creds: Parameters<typeof authenticate>[0]) => {
     await authenticate(creds);
     await refreshWorkspaceSession();
@@ -106,14 +105,30 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
 
   // Logout completo
   const handleLogout = async () => {
-    if (nodes.activeNodeVrf) {
-      await nodes.deactivateAllNodes(auth.credentials);
+    if (logoutInProgress.current) return;
+    logoutInProgress.current = true;
+    try {
+      if (nodes.activeNodeVrf) {
+        try {
+          await nodes.deactivateAllNodes(auth.credentials);
+        } catch (error) {
+          // El cierre de la sesión web no debe quedar bloqueado por una caída
+          // del router. El backend conserva la sesión VPN para reintentar su
+          // limpieza por expiración en lugar de reportar una revocación falsa.
+          console.warn(
+            '[VPNContext] No se pudo revocar el túnel antes de cerrar sesión.',
+            error instanceof Error ? error.message : 'Error desconocido',
+          );
+        }
+      }
+      nodes.setNodes([]);
+      nodes.setActiveNodeVrf(null);
+      nodes.setTunnelExpiry(null);
+      clearWorkspaceSession();
+      await auth.handleLogout();
+    } finally {
+      logoutInProgress.current = false;
     }
-    nodes.setNodes([]);
-    nodes.setActiveNodeVrf(null);
-    nodes.setTunnelExpiry(null);
-    clearWorkspaceSession();
-    await auth.handleLogout();
   };
 
   const value = {

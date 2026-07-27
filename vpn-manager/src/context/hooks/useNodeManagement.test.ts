@@ -1,6 +1,9 @@
 import { act, renderHook } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { http, HttpResponse } from 'msw';
+import { API_BASE_URL } from '../../config';
+import { server } from '../../test/setup';
 import type { NodeInfo } from '../../types/api';
+import type { RouterCredentials } from '../../store/db';
 import { useNodeManagement } from './useNodeManagement';
 import { useTunnelTimeout } from './useTunnelTimeout';
 
@@ -24,6 +27,11 @@ const inactiveNode: NodeInfo = {
   ppp_user: 'ppp-inactive',
   nombre_vrf: 'vrf-inactive',
   running: false,
+};
+
+const credentials: RouterCredentials = {
+  user: 'moderador@example.test',
+  role: 'admin',
 };
 
 describe('useNodeManagement', () => {
@@ -91,5 +99,65 @@ describe('useNodeManagement', () => {
 
     expect(result.current.tunnelExpiry).toBeNull();
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('limpia el estado solo cuando backend confirma la revocacion', async () => {
+    server.use(
+      http.post(`${API_BASE_URL}/api/tunnel/deactivate`, () =>
+        HttpResponse.json({ success: true, message: 'Acceso revocado' }),
+      ),
+    );
+    const { result } = renderHook(() => useNodeManagement());
+
+    act(() => {
+      result.current.setActiveNodeVrf(activeNode.nombre_vrf);
+      result.current.setTunnelExpiry(123_456);
+    });
+    await act(async () => {
+      await result.current.deactivateAllNodes(credentials);
+    });
+
+    expect(result.current.activeNodeVrf).toBeNull();
+    expect(result.current.tunnelExpiry).toBeNull();
+  });
+
+  it('conserva el tunel activo y propaga el mensaje cuando la revocacion falla', async () => {
+    server.use(
+      http.post(`${API_BASE_URL}/api/tunnel/deactivate`, () =>
+        HttpResponse.json(
+          { success: false, message: 'El router no respondió' },
+          { status: 503 },
+        ),
+      ),
+    );
+    const { result } = renderHook(() => useNodeManagement());
+
+    act(() => {
+      result.current.setActiveNodeVrf(activeNode.nombre_vrf);
+      result.current.setTunnelExpiry(123_456);
+    });
+
+    await expect(result.current.deactivateAllNodes(credentials))
+      .rejects.toThrow('El router no respondió');
+    expect(result.current.activeNodeVrf).toBe(activeNode.nombre_vrf);
+    expect(result.current.tunnelExpiry).toBe(123_456);
+  });
+
+  it('no limpia el estado si la respuesta de revocacion no es JSON', async () => {
+    server.use(
+      http.post(`${API_BASE_URL}/api/tunnel/deactivate`, () =>
+        new HttpResponse('<html>Bad gateway</html>', { status: 502 }),
+      ),
+    );
+    const { result } = renderHook(() => useNodeManagement());
+
+    act(() => {
+      result.current.setActiveNodeVrf(activeNode.nombre_vrf);
+      result.current.setTunnelExpiry(123_456);
+    });
+
+    await expect(result.current.deactivateAllNodes(credentials))
+      .rejects.toThrow('HTTP 502');
+    expect(result.current.activeNodeVrf).toBe(activeNode.nombre_vrf);
   });
 });

@@ -11,7 +11,11 @@ export function useLogsAndRepair(node: NodeInfo) {
     logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
-  const handleRepair = async (addLog: (msg: string) => void, setLogs: React.Dispatch<React.SetStateAction<string[]>>) => {
+  const handleRepair = async (
+    addLog: (msg: string) => void,
+    setLogs: React.Dispatch<React.SetStateAction<string[]>>,
+    scheduleLogsClear: (delayMs: number) => void,
+  ) => {
     setIsRepairing(true);
     setLogs([]);
     addLog('Verificando configuración MikroTik...');
@@ -41,7 +45,7 @@ export function useLogsAndRepair(node: NodeInfo) {
       addLog(`✗ Error: ${err instanceof Error ? err.message : 'Error desconocido'}`);
     } finally {
       setIsRepairing(false);
-      setTimeout(() => setLogs([]), 3000);
+      scheduleLogsClear(3000);
     }
   };
 

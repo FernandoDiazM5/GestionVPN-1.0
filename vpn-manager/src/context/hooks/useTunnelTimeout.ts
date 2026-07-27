@@ -6,6 +6,7 @@ export function useTunnelTimeout(
   deactivateAllNodes: () => Promise<void>
 ) {
   const timeoutRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const deactivationInFlightRef = useRef(false);
 
   useEffect(() => {
     if (timeoutRef.current) {
@@ -16,7 +17,18 @@ export function useTunnelTimeout(
       const checkExpiry = () => {
         if (Date.now() >= tunnelExpiry) {
           if (navigator.onLine) {
-            deactivateAllNodes();
+            if (deactivationInFlightRef.current) return;
+            deactivationInFlightRef.current = true;
+            void deactivateAllNodes()
+              .catch((error: unknown) => {
+                console.warn(
+                  '[VPNContext] No se pudo revocar el túnel expirado; se reintentará.',
+                  error instanceof Error ? error.message : 'Error desconocido',
+                );
+              })
+              .finally(() => {
+                deactivationInFlightRef.current = false;
+              });
           } else {
             console.warn('[VPNContext] Túnel expirado pero no hay red — esperando reconexión...');
           }

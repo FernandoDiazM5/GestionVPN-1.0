@@ -43,6 +43,8 @@ export default function NodeCard({
     isThisNodeActive,
     isPending,
     setLogs,
+    clearLogs,
+    scheduleLogsClear,
   } = useNodeActivation(node);
 
   const {
@@ -124,7 +126,7 @@ export default function NodeCard({
       : 'border-l-2 border-l-transparent';
 
   const handleRepair = async () => {
-    await repairFunc(addLog, setLogs);
+    await repairFunc(addLog, setLogs, scheduleLogsClear);
   };
 
   const handleWgPeerClick = () => {
@@ -260,6 +262,7 @@ export default function NodeCard({
         rowIndex={rowIndex}
         isPending={isPending}
         isThisNodeActive={isThisNodeActive}
+        onClose={clearLogs}
       />
 
       {/* WireGuard Peer Form */}

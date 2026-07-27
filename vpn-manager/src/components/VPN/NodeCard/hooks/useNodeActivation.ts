@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import { apiFetch } from '../../../../utils/apiClient';
 import { fetchWithTimeout } from '../../../../utils/fetchWithTimeout';
 import { useVpn, TUNNEL_TIMEOUT_MS } from '../../../../context';
@@ -16,9 +17,39 @@ export function useNodeActivation(node: NodeInfo) {
 
   const [isActivating, setIsActivating] = useState(false);
   const [isDeactivating, setIsDeactivating] = useState(false);
-  const [logs, setLogs] = useState<string[]>([]);
+  const [logs, setLogsState] = useState<string[]>([]);
+  const logsClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const addLog = (msg: string) => setLogs(prev => [...prev.slice(-8), msg]);
+  const cancelScheduledLogsClear = useCallback(() => {
+    if (logsClearTimerRef.current) {
+      clearTimeout(logsClearTimerRef.current);
+      logsClearTimerRef.current = null;
+    }
+  }, []);
+
+  const setLogs = useCallback<Dispatch<SetStateAction<string[]>>>((value) => {
+    cancelScheduledLogsClear();
+    setLogsState(value);
+  }, [cancelScheduledLogsClear]);
+
+  const clearLogs = useCallback(() => {
+    cancelScheduledLogsClear();
+    setLogsState([]);
+  }, [cancelScheduledLogsClear]);
+
+  const scheduleLogsClear = useCallback((delayMs: number) => {
+    cancelScheduledLogsClear();
+    logsClearTimerRef.current = setTimeout(() => {
+      logsClearTimerRef.current = null;
+      setLogsState([]);
+    }, delayMs);
+  }, [cancelScheduledLogsClear]);
+
+  const addLog = useCallback((msg: string) => {
+    setLogs(prev => [...prev.slice(-8), msg]);
+  }, [setLogs]);
+
+  useEffect(() => cancelScheduledLogsClear, [cancelScheduledLogsClear]);
 
   const handleActivate = async () => {
     if (!credentials || !node.nombre_vrf) return;
@@ -66,15 +97,16 @@ export function useNodeActivation(node: NodeInfo) {
 
   const handleDeactivate = async () => {
     setIsDeactivating(true);
-    addLog('Revocando acceso...');
+    // Reemplaza los mensajes de activación: mientras se revoca no debe quedar
+    // visible una consola que todavía afirme que el acceso está abierto.
+    setLogs(['Revocando acceso...']);
     try {
       await deactivateAllNodes();
-      addLog('✓ Acceso revocado correctamente');
+      clearLogs();
       apiFetch(`${API_BASE_URL}/api/node/history/add`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pppUser: node.ppp_user, event: 'tunnel_deactivated' }),
       }).catch(() => {});
-      setTimeout(() => setLogs([]), 1500);
     } catch (err: unknown) {
       addLog(`✗ Error: ${err instanceof Error ? err.message : 'Error desconocido'}`);
     } finally {
@@ -85,6 +117,19 @@ export function useNodeActivation(node: NodeInfo) {
   const isThisNodeActive = activeNodeVrf === node.nombre_vrf && !!node.nombre_vrf;
   const isAnyNodeActive = !!activeNodeVrf;
   const isPending = isActivating || isDeactivating;
+  const wasThisNodeActiveRef = useRef(isThisNodeActive);
+
+  useEffect(() => {
+    const wasThisNodeActive = wasThisNodeActiveRef.current;
+    wasThisNodeActiveRef.current = isThisNodeActive;
+
+    // Expiración, revocación desde otra pestaña/SSE o cambio a otro nodo:
+    // al dejar de ser el túnel activo, elimina los mensajes locales obsoletos.
+    // Los errores de una operación local se conservan para que sean accionables.
+    if (wasThisNodeActive && !isThisNodeActive && !isPending) {
+      clearLogs();
+    }
+  }, [clearLogs, isPending, isThisNodeActive]);
 
   return {
     isActivating,
@@ -97,5 +142,7 @@ export function useNodeActivation(node: NodeInfo) {
     isAnyNodeActive,
     isPending,
     setLogs,
+    clearLogs,
+    scheduleLogsClear,
   };
 }

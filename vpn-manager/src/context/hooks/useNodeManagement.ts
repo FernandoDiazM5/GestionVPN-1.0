@@ -1,6 +1,7 @@
 import { useCallback, useReducer } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { NodeInfo } from '../../types/api';
+import type { TunnelDeactivateResponse } from '../../types/api';
 import type { RouterCredentials } from '../../store/db';
 import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
 import { API_BASE_URL } from '../../config';
@@ -19,16 +20,30 @@ export function useNodeManagement() {
   }, []);
 
   const deactivateAllNodes = useCallback(async (credentials?: RouterCredentials) => {
-    if (!credentials) return;
-    try {
-      await fetchWithTimeout(`${API_BASE_URL}/api/tunnel/deactivate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      }, 15_000);
-    } catch (err) {
-      console.error('Error desactivando tunnels:', err);
+    if (!credentials) {
+      throw new Error('No hay una sesión activa para revocar el acceso');
     }
+
+    const response = await fetchWithTimeout(`${API_BASE_URL}/api/tunnel/deactivate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    }, 15_000);
+
+    let data: TunnelDeactivateResponse | null = null;
+    try {
+      data = await response.json() as TunnelDeactivateResponse;
+    } catch {
+      // Un proxy puede devolver HTML o un body vacío. En ese caso se conserva
+      // el estado activo y se informa el HTTP, nunca se simula una revocación.
+    }
+
+    if (!response.ok || !data?.success) {
+      throw new Error(data?.message ?? `No se pudo revocar el acceso (HTTP ${response.status})`);
+    }
+
+    // El estado local solo se limpia después de que backend + MikroTik
+    // confirman la revocación. Así la UI no muestra un falso éxito.
     dispatch({ type: 'clearTunnel' });
   }, []);
 

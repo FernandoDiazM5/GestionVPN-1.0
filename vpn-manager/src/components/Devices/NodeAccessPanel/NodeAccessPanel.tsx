@@ -115,8 +115,16 @@ export default function NodeAccessPanel() {
 
   const handleRevokeAll = async () => {
     setIsRevoking(true);
-    await deactivateAllNodes();
-    setIsRevoking(false);
+    setErrorMsg('');
+    try {
+      await deactivateAllNodes();
+      return true;
+    } catch (error) {
+      setErrorMsg(error instanceof Error ? error.message : 'No se pudo revocar el acceso');
+      return false;
+    } finally {
+      setIsRevoking(false);
+    }
   };
 
   // ── M1 closer — handler para los deep-links del bot Telegram ──
@@ -146,8 +154,12 @@ export default function NodeAccessPanel() {
 
   const handleDeepDeactivate = async () => {
     addToast('Desactivando túnel…', 'info');
-    await handleRevokeAll();
-    addToast('Túnel desactivado', 'info');
+    const revoked = await handleRevokeAll();
+    if (revoked) {
+      addToast('Túnel desactivado', 'info');
+    } else {
+      addToast('No se pudo desactivar el túnel', 'warn');
+    }
   };
 
 

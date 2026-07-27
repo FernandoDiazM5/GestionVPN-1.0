@@ -6,6 +6,13 @@
 
 ---
 
+> **Sesión 2026-07-26 — Revocación confirmada y consola de nodo autocerrable.** Rama `vps_prod`, basada en `70e7356`; sin despliegue. Skills: `vercel-react-best-practices`, `handoff-keeper`.
+> - La captura mostraba una transición parcial: el botón ya decía `Acceder`, pero la fila seguía expandida con mensajes de la activación anterior. Las revocaciones externas (SSE, otra pestaña o expiración) no tocaban el estado local `logs`.
+> - Se detectó además que `deactivateAllNodes` absorbía errores de red/HTTP y limpiaba el túnel local de todas formas, pudiendo reportar un falso éxito mientras la regla del MikroTik seguía activa.
+> - La revocación ahora reemplaza logs antiguos, cierra el panel al éxito confirmado y conserva estado+error al fallar. Las transiciones externas limpian mensajes obsoletos, hay cierre manual accesible y un temporizador viejo no puede borrar una operación nueva.
+> - Se endurecieron `Revocar Todo`, deep-link, expiración y logout: indicador siempre finaliza, éxito sólo tras confirmación, reintento de expiración sin solapamiento y protección contra logout reentrante.
+> - Verificación: **47 archivos / 160 pruebas frontend**, ESLint completo, TypeScript, build Vite y `git diff --check`. VPS sin cambios; permanece en `673d0d1`.
+
 > **Sesión 2026-07-26 — Dropdown de acciones de Nodos contenido en el viewport.** Rama `vps_prod`, basada en el checkout activo `673d0d1`; sin despliegue. Skills: `vercel-react-best-practices`, `handoff-keeper`.
 > - Causa 1: `useKebabMenu` estimaba sólo `280px`, aunque el menú completo supera esa altura, y aplicaba `70vh` sin considerar la posición del botón; el contenido quedaba debajo del borde inferior.
 > - Causa 2: el listener global de scroll también recibía el scroll interno del dropdown y lo cerraba, impidiendo alcanzar las últimas acciones.
