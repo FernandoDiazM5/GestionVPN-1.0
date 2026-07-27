@@ -6,6 +6,12 @@
 
 ---
 
+> **Sesión 2026-07-26 — Selector de columnas de Escanear no se cierra durante scroll interno.** Rama `vps_prod`, basada en `1707b55`; sin despliegue. Skills: `vercel-react-best-practices`, `handoff-keeper`.
+> - La producción aún usa el listener antiguo que cerraba los portales ante cualquier scroll. El fix compartido `70e7356` ya distingue scroll interno/externo, pero el selector mantenía `max-height:70vh` y permitía scroll encadenado hacia la página al alcanzar un extremo.
+> - `ColumnPicker` ahora aplica el `maxHeight` real calculado para su ancla y `overscroll-contain`; permanece abierto al recorrer o cambiar columnas y conserva cierre por scroll externo.
+> - Nueva prueba de componente verifica apertura, altura disponible, contención, selección sin cierre, scroll interno sin cierre y scroll externo con cierre.
+> - Verificación: **48 archivos / 162 pruebas frontend**, ESLint completo, TypeScript, build Vite y `git diff --check`. VPS sin cambios; permanece en `673d0d1`.
+
 > **Sesión 2026-07-26 — Revocación confirmada y consola de nodo autocerrable.** Rama `vps_prod`, basada en `70e7356`; sin despliegue. Skills: `vercel-react-best-practices`, `handoff-keeper`.
 > - La captura mostraba una transición parcial: el botón ya decía `Acceder`, pero la fila seguía expandida con mensajes de la activación anterior. Las revocaciones externas (SSE, otra pestaña o expiración) no tocaban el estado local `logs`.
 > - Se detectó además que `deactivateAllNodes` absorbía errores de red/HTTP y limpiaba el túnel local de todas formas, pudiendo reportar un falso éxito mientras la regla del MikroTik seguía activa.
