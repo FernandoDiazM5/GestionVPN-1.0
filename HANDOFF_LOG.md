@@ -6,6 +6,13 @@
 
 ---
 
+> **Sesión 2026-07-26 — Guardado de equipos AirOS confirmado por servidor.** Rama `vps_prod`, basada en `0771bac`; sin despliegue. Skills: `vercel-react-best-practices`, `handoff-keeper`.
+> - Producción confirmó tres `POST /api/db/devices` HTTP 400 por `body.chains`: AirOS entregaba `chains:null`, el contrato sólo admitía texto opcional y el frontend absorbía el error, marcando falsos guardados.
+> - La frontera de persistencia omite todos los valores `null/undefined` y `cachedStats`; `saveSingle` valida HTTP/body, conserva `status/code/fields` y escribe los cachés locales únicamente después del éxito.
+> - Guardado individual/masivo y Monitor AP pasan a estado transaccional: progreso por equipo, sin doble envío, fallidos seleccionados para reintento y contadores basados sólo en confirmaciones reales.
+> - El script de nodo consume `server_public_ip` en solo lectura y ya no intenta modificar el setting global desde una sesión de moderador, eliminando el 403 ajeno al guardado.
+> - Verificación: **50 archivos / 167 pruebas frontend**, build Vite, ESLint completo, `check:all` y `git diff --check`. `audit:design` conserva 1 error + 1 warning preexistentes en `RouterAccess.tsx`.
+
 > **Sesión 2026-07-26 — Selector de columnas de Escanear no se cierra durante scroll interno.** Rama `vps_prod`, basada en `1707b55`; sin despliegue. Skills: `vercel-react-best-practices`, `handoff-keeper`.
 > - La producción aún usa el listener antiguo que cerraba los portales ante cualquier scroll. El fix compartido `70e7356` ya distingue scroll interno/externo, pero el selector mantenía `max-height:70vh` y permitía scroll encadenado hacia la página al alcanzar un extremo.
 > - `ColumnPicker` ahora aplica el `maxHeight` real calculado para su ancla y `overscroll-contain`; permanece abierto al recorrer o cambiar columnas y conserva cierre por scroll externo.

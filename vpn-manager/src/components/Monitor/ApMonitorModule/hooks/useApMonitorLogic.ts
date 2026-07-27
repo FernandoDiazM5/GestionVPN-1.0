@@ -135,10 +135,16 @@ export function useApMonitorLogic(nodes: NodeInfo[], activeNodeName: string | nu
     showToast('Equipo eliminado');
   };
 
-  const handleUpdateApDevice = async (updated: SavedDevice) => {
-    setDevices(prev => prev.map(d => d.id === updated.id ? updated : d));
-    await deviceDb.saveSingle(updated);
-    if (viewingApDevice?.id === updated.id) setViewingApDevice(updated);
+  const handleUpdateApDevice = async (updated: SavedDevice): Promise<boolean> => {
+    try {
+      await deviceDb.saveSingle(updated);
+      setDevices(prev => prev.map(d => d.id === updated.id ? updated : d));
+      if (viewingApDevice?.id === updated.id) setViewingApDevice(updated);
+      return true;
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'No se pudo actualizar el dispositivo', 'error');
+      return false;
+    }
   };
 
   const handleMoveConfirm = async (nodeId: string, nodeName: string) => {
@@ -183,11 +189,17 @@ export function useApMonitorLogic(nodes: NodeInfo[], activeNodeName: string | nu
     }
   };
 
-  const handleSaveApDetail = async (dev: SavedDevice, newStats: AntennaStats) => {
+  const handleSaveApDetail = async (dev: SavedDevice, newStats: AntennaStats): Promise<boolean> => {
     const updated: SavedDevice = { ...dev, cachedStats: { ...(dev.cachedStats ?? {}), ...newStats } };
-    await deviceDb.saveSingle(updated);
-    setDevices(prev => prev.map(d => d.id === dev.id ? updated : d));
-    showToast('Datos del AP guardados');
+    try {
+      await deviceDb.saveSingle(updated);
+      setDevices(prev => prev.map(d => d.id === dev.id ? updated : d));
+      showToast('Datos del AP guardados');
+      return true;
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'No se pudieron guardar los datos del AP', 'error');
+      return false;
+    }
   };
 
   useEffect(() => () => {

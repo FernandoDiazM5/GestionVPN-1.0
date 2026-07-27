@@ -41,6 +41,7 @@ interface DeviceTableProps {
   expandedRows: Set<string>;
   toggleExpand: (ip: string) => void;
   savedDevices: SavedDevice[];
+  savingIds: Set<string>;
   selectedNode: NodeInfo | null;
   /** §42-2: ids de filas marcadas para bulk save selectivo. */
   selectedIds: Set<string>;
@@ -58,7 +59,7 @@ interface DeviceTableProps {
   stationNamesByMac: Map<string, string>;
   onOpenM5Detail: (dev: ScannedDevice) => void;
   onSyncToSaved: (dev: ScannedDevice, savedDev: SavedDevice) => void;
-  onDirectSave: (dev: ScannedDevice, node: NodeInfo) => void;
+  onDirectSave: (dev: ScannedDevice, node: NodeInfo) => Promise<boolean>;
   onOpenAddModal: (dev: ScannedDevice) => void;
   onRefreshStats: (ip: string, stats: AntennaStats) => void;
 }
@@ -67,7 +68,7 @@ function DeviceTableImpl(props: DeviceTableProps) {
   const {
     sortedRows, activeConfigCols, gridTemplate, minTableWidth, compactNameMode,
     sortConfig, toggleSort, startResize, sshStatus, expandedRows, toggleExpand,
-    savedDevices, selectedNode,
+    savedDevices, savingIds, selectedNode,
     selectedIds, onToggleSelected, onSelectAllVisibleCandidates, onClearSelection,
     visibleCandidateCount, stationNamesByMac,
     onOpenM5Detail, onSyncToSaved,
@@ -156,6 +157,7 @@ function DeviceTableImpl(props: DeviceTableProps) {
             key={dev.ip}
             dev={dev}
             isSaved={isSaved}
+            isSaving={savingIds.has(devId)}
             rowIdx={rowIdx}
             sshStatus={sshStatus[dev.ip]}
             isExpanded={expandedRows.has(dev.ip)}
@@ -316,6 +318,7 @@ function DeviceTableImpl(props: DeviceTableProps) {
             key={dev.ip}
             dev={dev}
             isSaved={isSaved}
+            isSaving={savingIds.has(devId)}
             rowIdx={rowIdx}
             sshStatus={sshStatus[dev.ip]}
             isExpanded={expandedRows.has(dev.ip)}

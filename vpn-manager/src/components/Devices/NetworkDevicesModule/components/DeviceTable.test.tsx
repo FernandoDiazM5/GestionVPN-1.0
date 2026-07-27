@@ -27,6 +27,7 @@ function renderTable(overrides: Partial<React.ComponentProps<typeof DeviceTable>
     expandedRows: new Set(),
     toggleExpand: vi.fn(),
     savedDevices: [],
+    savingIds: new Set(),
     selectedNode: null,
     selectedIds: new Set(),
     onToggleSelected: vi.fn(),

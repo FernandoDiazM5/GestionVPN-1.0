@@ -233,11 +233,11 @@ export default function ApMonitorModule() {
           dev={logic.apDetailDev}
           onClose={() => logic.setApDetailDev(null)}
           onTunnelInactive={logic.notifyTunnelInactive}
-          onSave={stats => {
+          onSave={async stats => {
             if (logic.apDetailDev) {
-              logic.handleSaveApDetail(logic.apDetailDev, stats);
-              logic.setApDetailDev(null);
+              return logic.handleSaveApDetail(logic.apDetailDev, stats);
             }
+            return false;
           }}
         />
       )}

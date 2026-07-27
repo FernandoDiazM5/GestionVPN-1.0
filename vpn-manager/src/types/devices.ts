@@ -96,19 +96,19 @@ export interface AntennaStats {
   deviceName?: string;   // hostname airOS
   deviceModel?: string;   // modelo (LiteBeam M5, etc.)
   firmwareVersion?: string; // versión firmware (v6.1.7 XW)
-  wlanMac?: string;   // MAC WLAN
-  lanMac?: string;   // MAC LAN (eth0)
-  apMac?: string;   // MAC del AP remoto (modo STA)
+  wlanMac?: string | null;   // MAC WLAN
+  lanMac?: string | null;   // MAC LAN (eth0)
+  apMac?: string | null;   // MAC del AP remoto (modo STA)
   essid?: string;   // SSID
-  security?: string;   // wpa2aes, etc.
+  security?: string | null;   // wpa2aes, etc.
   mode?: string;   // sta / ap
-  networkMode?: string;   // router / bridge
+  networkMode?: string | null;   // router / bridge
   frequency?: number;   // MHz
   channelNumber?: number;   // número de canal
   channelWidth?: number;   // MHz
   txPower?: number;   // dBm
   distance?: number;   // metros
-  chains?: string;   // "1X1"
+  chains?: string | null;   // "1X1"
   airmaxEnabled?: boolean;
   airmaxPriority?: string;
   channelWidthExt?: string;  // "Inferior" | "Superior" (extensión HT40-/HT40+)

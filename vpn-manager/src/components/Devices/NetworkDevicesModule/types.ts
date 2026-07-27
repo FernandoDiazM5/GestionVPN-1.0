@@ -17,7 +17,7 @@ export interface AddDeviceModalProps {
   device: ScannedDevice;
   node: NodeInfo;
   existing?: Pick<SavedDevice, 'sshUser' | 'sshPass' | 'sshPort' | 'routerPort'>;
-  onSave: (d: SavedDevice) => void;
+  onSave: (d: SavedDevice) => Promise<boolean>;
   onClose: () => void;
 }
 

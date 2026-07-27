@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Cpu, Wifi, Radio, AlertCircle, Check } from 'lucide-react';
+import { X, Cpu, Wifi, Radio, AlertCircle, Check, Loader2 } from 'lucide-react';
 import type { AddDeviceModalProps } from '../types';
 import type { SavedDevice } from '../../../../types/devices';
 import { ipInCidr } from '../constants';
@@ -10,11 +10,13 @@ export function AddDeviceModal({ device, node, existing, onSave, onClose }: AddD
   const [sshPass, setSshPass] = useState(existing?.sshPass ?? device.sshPass ?? '');
   const [sshPort, setSshPort] = useState(existing?.sshPort ?? device.sshPort ?? 22);
   const [routerPort, setRouterPort] = useState(existing?.routerPort ?? 8075);
+  const [saving, setSaving] = useState(false);
   const prefilledFromScan = !existing && !!device.sshPass;
 
   const deviceId = device.mac ? device.mac.replace(/:/g, '') : device.ip.replace(/\./g, '');
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (saving) return;
     const saved: SavedDevice = {
       id: deviceId,
       mac: device.mac,
@@ -34,7 +36,9 @@ export function AddDeviceModal({ device, node, existing, onSave, onClose }: AddD
       routerPort: routerPort !== 8075 ? routerPort : undefined,
       addedAt: Date.now(),
     };
-    onSave(saved);
+    setSaving(true);
+    const savedOk = await onSave(saved);
+    if (!savedOk) setSaving(false);
   };
 
   const isEdit = !!existing;
@@ -127,14 +131,14 @@ export function AddDeviceModal({ device, node, existing, onSave, onClose }: AddD
         )}
 
         <div className="flex gap-2 pt-1">
-          <button onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700">
+          <button onClick={onClose} disabled={saving}
+            className="flex-1 py-2.5 rounded-xl text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors disabled:cursor-wait disabled:opacity-60 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700">
             Cancelar
           </button>
-          <button onClick={handleSave}
-            className="flex-1 flex items-center justify-center space-x-2 py-2.5 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition-all active:scale-[0.98]">
-            <Check className="w-4 h-4" />
-            <span>{isEdit ? 'Actualizar' : 'Guardar'}</span>
+          <button onClick={() => void handleSave()} disabled={saving}
+            className="flex-1 flex items-center justify-center space-x-2 py-2.5 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition-all active:scale-[0.98] disabled:cursor-wait disabled:opacity-70">
+            {saving ? <Loader2 className="h-4 w-4 motion-safe:animate-spin" /> : <Check className="h-4 w-4" />}
+            <span>{saving ? 'Guardando…' : isEdit ? 'Actualizar' : 'Guardar'}</span>
           </button>
         </div>
     </Dialog>

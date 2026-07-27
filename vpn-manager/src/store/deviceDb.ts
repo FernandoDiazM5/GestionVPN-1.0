@@ -94,10 +94,52 @@ export const statsCache = {
 
 // ── Esqueleto SQLite (Backend) ────────────────────────────────────────────
 // Extrae SOLO los campos estáticos relevantes — nunca envía cachedStats al servidor.
-function toSQLiteSkeleton(device: SavedDevice): Omit<SavedDevice, 'cachedStats'> {
+export type DevicePersistencePayload = Omit<SavedDevice, 'cachedStats'>;
+
+export interface DevicePersistenceError extends Error {
+  status: number;
+  code?: string;
+  fields?: string[];
+}
+
+interface DeviceApiResponse {
+  success?: boolean;
+  message?: string;
+  code?: string;
+  fields?: string[];
+}
+
+/**
+ * AirOS usa `null` cuando una métrica no está disponible; el DTO de
+ * persistencia expresa esos datos como opcionales. Omitirlos en esta frontera
+ * evita que una métrica ausente invalide el guardado completo.
+ */
+export function toDevicePersistencePayload(device: SavedDevice): DevicePersistencePayload {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { cachedStats, ...skeleton } = device;
-  return skeleton;
+  return Object.fromEntries(
+    Object.entries(skeleton).filter(([, value]) => value !== null && value !== undefined),
+  ) as DevicePersistencePayload;
+}
+
+async function expectSuccessfulDeviceResponse(
+  response: Response,
+  fallbackMessage: string,
+): Promise<DeviceApiResponse> {
+  let body: DeviceApiResponse | null = null;
+  try {
+    const parsed: unknown = await response.json();
+    if (parsed && typeof parsed === 'object') body = parsed as DeviceApiResponse;
+  } catch { /* respuesta sin JSON */ }
+
+  if (!response.ok || body?.success === false) {
+    const error = new Error(body?.message || fallbackMessage) as DevicePersistenceError;
+    error.status = response.status;
+    error.code = body?.code;
+    error.fields = Array.isArray(body?.fields) ? body.fields : undefined;
+    throw error;
+  }
+  return body ?? {};
 }
 
 // Backfill: re-empuja al backend las claves SSH que siguen en memoria
@@ -113,7 +155,7 @@ async function backfillBackendCreds(
   for (const d of pending) {
     const cred = allCreds[d.id]!;
     try {
-      await apiFetch(`${API_BASE_URL}/api/db/devices/${d.id}`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/db/devices/${d.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -122,6 +164,7 @@ async function backfillBackendCreds(
           sshPort: d.sshPort || cred.port || 22,
         }),
       });
+      await expectSuccessfulDeviceResponse(response, 'No se pudieron actualizar las credenciales SSH');
     } catch { /* best-effort: se reintenta en la próxima carga */ }
   }
 }
@@ -163,52 +206,42 @@ export const deviceDb = {
   },
 
   async saveSingle(device: SavedDevice): Promise<void> {
-    try {
-      // Guardrail: el bug §51 mostró que un caller podía pasar `undefined` si
-      // intentaba leer una variable que dependía de un setState con functional
-      // updater (que React no procesa sincrónicamente). El fix raíz vive en el
-      // caller; este check evita el crash si una regresión similar reaparece.
-      if (!device || !device.id) {
-        console.warn('deviceDb.saveSingle: device sin id — ignorado', device);
-        return;
-      }
-      // 1. Guardar stats COMPLETAS en IndexedDB (sin filtro)
-      if (device.cachedStats) {
-        await statsCache.save(device.id, device.cachedStats);
-      }
-
-      // 2. Garantizar que la clave SSH llegue al BACKEND (aps.clave_ssh_enc): si el
-      //    device perdió sshPass en memoria (p.ej. tras F5/re-login, que la borra de
-      //    sessionStorage por seguridad) la recuperamos de credCache. Así Monitor AP
-      //    —que lee la clave del backend, NO de credCache— siempre la tiene.
-      let toSave = device;
-      if (!device.sshPass) {
-        const cred = await credCache.get(device.id);
-        if (cred?.pass) {
-          toSave = {
-            ...device,
-            sshUser: device.sshUser || cred.user,
-            sshPass: cred.pass,
-            sshPort: device.sshPort ?? cred.port,
-          };
-        }
-      }
-
-      // 3. Conservar temporalmente las credenciales SSH en memoria.
-      if (toSave.sshUser && toSave.sshPass) {
-        await credCache.save(toSave.id, toSave.sshUser, toSave.sshPass, toSave.sshPort);
-      }
-
-      // 4. Enviar el esqueleto estático a SQLite via backend (con la clave incluida)
-      const skeleton = toSQLiteSkeleton(toSave);
-      await apiFetch(`${API_BASE_URL}/api/db/devices`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(skeleton),
-      });
-    } catch (err) {
-      console.error('Error guardando device:', err);
+    // Un input inválido debe fallar explícitamente, nunca aparentar éxito.
+    if (!device?.id) {
+      const error = new Error('El dispositivo no tiene un identificador válido') as DevicePersistenceError;
+      error.status = 0;
+      throw error;
     }
+
+    // Recuperar la credencial efímera si el objeto React ya no la contiene.
+    let toSave = device;
+    if (!device.sshPass) {
+      const cred = await credCache.get(device.id);
+      if (cred?.pass) {
+        toSave = {
+          ...device,
+          sshUser: device.sshUser || cred.user,
+          sshPass: cred.pass,
+          sshPort: device.sshPort ?? cred.port,
+        };
+      }
+    }
+
+    // El backend confirma primero; sólo entonces se actualizan cachés locales.
+    const payload = toDevicePersistencePayload(toSave);
+    const response = await apiFetch(`${API_BASE_URL}/api/db/devices`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    await expectSuccessfulDeviceResponse(response, 'No se pudo guardar el dispositivo');
+
+    await Promise.all([
+      toSave.cachedStats ? statsCache.save(toSave.id, toSave.cachedStats) : Promise.resolve(),
+      toSave.sshUser && toSave.sshPass
+        ? credCache.save(toSave.id, toSave.sshUser, toSave.sshPass, toSave.sshPort)
+        : Promise.resolve(),
+    ]);
   },
 
   async removeSingle(id: string): Promise<void> {

@@ -15,11 +15,12 @@ function ApDetailModal({
 }: {
   dev: SavedDevice;
   onClose: () => void;
-  onSave: (stats: AntennaStats) => void;
+  onSave: (stats: AntennaStats) => Promise<boolean>;
   onTunnelInactive?: (message: string) => void;
 }) {
   const [stats, setStats] = useState<AntennaStats | null>(dev.cachedStats ?? null);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
 
@@ -48,10 +49,12 @@ function ApDetailModal({
     }
   }, [dev.id, dev.cachedStats, refresh]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!stats) return;
-    onSave(stats);
-    setSaved(true);
+    setSaving(true);
+    const savedOk = await onSave(stats);
+    setSaving(false);
+    setSaved(savedOk);
   };
 
   const s = stats;
@@ -172,11 +175,13 @@ function ApDetailModal({
         {s && (
           <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 shrink-0 bg-slate-50 rounded-b-2xl dark:border-slate-800 dark:bg-slate-900/60">
             <p className="text-2xs text-slate-400">Los datos de señal y tráfico son instantáneos y no se persisten</p>
-            <button onClick={handleSave} disabled={saved}
+            <button onClick={() => void handleSave()} disabled={saved || saving}
               className={saved
                 ? 'flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400'
                 : 'btn-primary btn-sm'}>
-              {saved ? <><CheckCircle2 className="w-3.5 h-3.5" /> Guardado</> : 'Guardar en dispositivo'}
+              {saving
+                ? <><Loader2 className="h-3.5 w-3.5 motion-safe:animate-spin" /> Guardando…</>
+                : saved ? <><CheckCircle2 className="w-3.5 h-3.5" /> Guardado</> : 'Guardar en dispositivo'}
             </button>
           </div>
         )}

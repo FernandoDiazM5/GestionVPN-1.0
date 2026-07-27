@@ -1,0 +1,112 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { SavedDevice } from '../types/devices';
+
+const localStores = vi.hoisted(() => Array.from({ length: 3 }, () => ({
+  setItem: vi.fn(async () => undefined),
+  getItem: vi.fn(async () => null),
+  removeItem: vi.fn(async () => undefined),
+  iterate: vi.fn(async () => undefined),
+  clear: vi.fn(async () => undefined),
+})));
+
+vi.mock('localforage', () => {
+  let index = 0;
+  return {
+    default: {
+      createInstance: vi.fn(() => localStores[index++] ?? localStores[0]),
+    },
+  };
+});
+
+import {
+  credCache,
+  deviceDb,
+  toDevicePersistencePayload,
+} from './deviceDb';
+
+const baseDevice: SavedDevice = {
+  id: 'F492BF000001',
+  mac: 'F4:92:BF:00:00:01',
+  ip: '192.168.30.10',
+  name: 'AP prueba',
+  model: 'LiteAP GPS',
+  firmware: 'v8.7.11',
+  role: 'ap',
+  nodeId: 'node-1',
+  nodeName: 'Torre prueba',
+  addedAt: 1_700_000_000_000,
+};
+
+describe('deviceDb.saveSingle', () => {
+  beforeEach(async () => {
+    vi.restoreAllMocks();
+    localStores.forEach(store => Object.values(store).forEach(mock => mock.mockClear()));
+    await credCache.clear();
+  });
+
+  it('omite los null de AirOS y nunca envía cachedStats al endpoint', async () => {
+    const runtimeDevice = {
+      ...baseDevice,
+      chains: null,
+      security: null,
+      networkMode: null,
+      lanMac: null,
+      wlanMac: null,
+      apMac: null,
+      cachedStats: { chains: null, security: null },
+    } as unknown as SavedDevice;
+
+    const payload = toDevicePersistencePayload(runtimeDevice);
+
+    expect(payload).toMatchObject({ id: baseDevice.id, ip: baseDevice.ip });
+    expect(payload).not.toHaveProperty('chains');
+    expect(payload).not.toHaveProperty('security');
+    expect(payload).not.toHaveProperty('networkMode');
+    expect(payload).not.toHaveProperty('lanMac');
+    expect(payload).not.toHaveProperty('wlanMac');
+    expect(payload).not.toHaveProperty('apMac');
+    expect(payload).not.toHaveProperty('cachedStats');
+  });
+
+  it('propaga HTTP 400 con sus campos y no escribe caché local', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(
+      JSON.stringify({
+        success: false,
+        code: 'VALIDATION_ERROR',
+        message: 'Solicitud rechazada por validación',
+        fields: ['body.chains'],
+      }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } },
+    ));
+
+    await expect(deviceDb.saveSingle({
+      ...baseDevice,
+      cachedStats: { chains: null },
+    })).rejects.toMatchObject({
+      status: 400,
+      code: 'VALIDATION_ERROR',
+      fields: ['body.chains'],
+    });
+    expect(localStores[0].setItem).not.toHaveBeenCalled();
+  });
+
+  it('confirma el backend antes de guardar las estadísticas locales', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(
+      JSON.stringify({ success: true, id: baseDevice.id }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ));
+
+    await deviceDb.saveSingle({
+      ...baseDevice,
+      cachedStats: { chains: null, security: null },
+    });
+
+    const requestInit = fetchSpy.mock.calls[0][1];
+    const sent = JSON.parse(String(requestInit?.body));
+    expect(sent).not.toHaveProperty('cachedStats');
+    expect(localStores[0].setItem).toHaveBeenCalledWith(
+      baseDevice.id,
+      expect.objectContaining({ stats: expect.any(Object) }),
+    );
+  });
+});

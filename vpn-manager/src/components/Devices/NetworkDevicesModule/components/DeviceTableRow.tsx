@@ -20,6 +20,7 @@ import { DeviceStatusPanel } from './DeviceStatusPanel';
 interface DeviceTableRowProps {
   dev: ScannedDevice;
   isSaved: boolean;
+  isSaving: boolean;
   rowIdx: number;
   sshStatus: SshAuthStatus | undefined;
   isExpanded: boolean;
@@ -42,13 +43,13 @@ interface DeviceTableRowProps {
   onToggleExpand: (ip: string) => void;
   onOpenM5Detail: (dev: ScannedDevice) => void;
   onSyncToSaved: (dev: ScannedDevice, savedDev: SavedDevice) => void;
-  onDirectSave: (dev: ScannedDevice, node: NodeInfo) => void;
+  onDirectSave: (dev: ScannedDevice, node: NodeInfo) => Promise<boolean>;
   onOpenAddModal: (dev: ScannedDevice) => void;
   onRefreshStats: (ip: string, stats: AntennaStats) => void;
 }
 
 function DeviceTableRowImpl({
-  dev, isSaved, rowIdx, sshStatus, isExpanded,
+  dev, isSaved, isSaving, rowIdx, sshStatus, isExpanded,
   activeConfigCols, compactNameMode, selectedNode, savedDevice,
   isSelected, onToggleSelected, stationNamesByMac,
   onToggleExpand, onOpenM5Detail, onSyncToSaved,
@@ -253,6 +254,7 @@ function DeviceTableRowImpl({
           <DeviceRowActions
             dev={dev}
             isSaved={isSaved}
+            isSaving={isSaving}
             savedDevice={savedDevice}
             selectedNode={selectedNode}
             sshStatus={sshStatus}
@@ -283,6 +285,7 @@ function DeviceTableRowImpl({
 export const DeviceTableRow = memo(DeviceTableRowImpl, (prev, next) =>
   prev.dev === next.dev &&
   prev.isSaved === next.isSaved &&
+  prev.isSaving === next.isSaving &&
   prev.sshStatus === next.sshStatus &&
   prev.isExpanded === next.isExpanded &&
   prev.savedDevice === next.savedDevice &&
@@ -296,7 +299,7 @@ export const DeviceTableRow = memo(DeviceTableRowImpl, (prev, next) =>
 );
 
 function DeviceMobileRowImpl({
-  dev, isSaved, rowIdx, sshStatus, isExpanded,
+  dev, isSaved, isSaving, rowIdx, sshStatus, isExpanded,
   activeConfigCols, selectedNode, savedDevice,
   isSelected, onToggleSelected, stationNamesByMac,
   onToggleExpand, onOpenM5Detail, onSyncToSaved,
@@ -408,6 +411,7 @@ function DeviceMobileRowImpl({
           <DeviceRowActions
             dev={dev}
             isSaved={isSaved}
+            isSaving={isSaving}
             savedDevice={savedDevice}
             selectedNode={selectedNode}
             sshStatus={sshStatus}
@@ -471,13 +475,14 @@ export const DeviceMobileRow = memo(DeviceMobileRowImpl);
 interface DeviceRowActionsProps {
   dev: ScannedDevice;
   isSaved: boolean;
+  isSaving: boolean;
   savedDevice: SavedDevice | null;
   selectedNode: NodeInfo | null;
   sshStatus: SshAuthStatus | undefined;
   hasStats: boolean;
   onOpenM5Detail: (dev: ScannedDevice) => void;
   onSyncToSaved: (dev: ScannedDevice, savedDev: SavedDevice) => void;
-  onDirectSave: (dev: ScannedDevice, node: NodeInfo) => void;
+  onDirectSave: (dev: ScannedDevice, node: NodeInfo) => Promise<boolean>;
   onOpenAddModal: (dev: ScannedDevice) => void;
 }
 
@@ -504,7 +509,7 @@ const SCHEME_CLASSES: Record<ColorScheme, string> = {
 };
 
 function DeviceRowActions({
-  dev, isSaved, savedDevice, selectedNode, sshStatus, hasStats,
+  dev, isSaved, isSaving, savedDevice, selectedNode, sshStatus, hasStats,
   onOpenM5Detail, onSyncToSaved, onDirectSave, onOpenAddModal,
 }: DeviceRowActionsProps) {
   const actions: RowAction[] = [];
@@ -517,14 +522,16 @@ function DeviceRowActions({
       // El disquete (Save) es metáfora universal de "guardar" — en §42 se
       // sustituyó el Check porque el usuario reportó que confundía con
       // "ya está OK / verificado" en vez de "haz click para guardar".
-      Icon: directSave ? Save : PlusCircle,
+      Icon: isSaving ? Loader2 : directSave ? Save : PlusCircle,
       onClick: () => directSave
         ? onDirectSave(dev, selectedNode)
         : onOpenAddModal(dev),
-      title: directSave
+      title: isSaving
+        ? 'Guardando dispositivo'
+        : directSave
         ? 'Guardar con las credenciales SSH ya validadas'
         : 'Guardar — ingresar credenciales SSH manualmente',
-      ariaLabel: 'Guardar dispositivo',
+      ariaLabel: isSaving ? 'Guardando dispositivo' : 'Guardar dispositivo',
       scheme: directSave ? 'emerald-solid' : 'indigo-solid',
     });
   }
@@ -559,11 +566,12 @@ function DeviceRowActions({
         <button
           key={key}
           onClick={onClick}
+          disabled={key === 'save' && isSaving}
           title={title}
           aria-label={ariaLabel}
-          className={`flex h-11 w-11 items-center justify-center rounded-lg transition-all active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${SCHEME_CLASSES[scheme]}`}
+          className={`flex h-11 w-11 items-center justify-center rounded-lg transition-all active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-70 dark:focus-visible:ring-offset-slate-900 ${SCHEME_CLASSES[scheme]}`}
         >
-          <Icon className="w-3.5 h-3.5" />
+          <Icon className={`h-3.5 w-3.5 ${key === 'save' && isSaving ? 'motion-safe:animate-spin' : ''}`} />
         </button>
       ))}
     </>

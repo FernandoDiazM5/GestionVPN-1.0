@@ -13,7 +13,7 @@
 // ============================================================
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { deviceDb } from '../../../../store/deviceDb';
+import { deviceDb, type DevicePersistenceError } from '../../../../store/deviceDb';
 import { fetchWithTimeout } from '../../../../utils/fetchWithTimeout';
 import type { ScannedDevice, SavedDevice } from '../../../../types/devices';
 import type { NodeInfo } from '../../../../types/api';
@@ -28,13 +28,21 @@ interface UseDeviceLibraryInput {
   setAddingDevice: (d: ScannedDevice | null) => void;
 }
 
+function persistenceErrorMessage(error: unknown): string {
+  const apiError = error as Partial<DevicePersistenceError>;
+  if (apiError.message) return apiError.message;
+  return 'No se recibió confirmación del servidor';
+}
+
 export function useDeviceLibrary({
   nodesLength, setScanResults, setSshStatus, setAddingDevice,
 }: UseDeviceLibraryInput) {
   const [savedDevices, setSavedDevices] = useState<SavedDevice[]>([]);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState('');
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const savingIdsRef = useRef<Set<string>>(new Set());
 
   // Ref sincronizado con `savedDevices` para lookup síncrono dentro de
   // handlers async. Sin este ref, el patrón `setSavedDevices(prev => ...)`
@@ -73,98 +81,114 @@ export function useDeviceLibrary({
     }
   }, [nodesLength]);
 
-  const handleAddDevice = useCallback(async (device: SavedDevice) => {
-    // Computamos `merged` SINCRÓNICAMENTE desde el ref para tenerlo disponible
-    // antes del `await` siguiente. El functional setState (más abajo) recalcula
-    // el merge con el `prev` que React le pasa: si hubo un save concurrente
-    // entre la lectura del ref y el commit, el segundo merge re-aplica los
-    // nuevos campos sobre la versión actual — idempotente porque
-    // saveSingle es un upsert por id en el backend.
-    const prevList = savedDevicesRef.current;
-    const existing = prevList.find(d => d.id === device.id);
-    const wasExisting = !!existing;
-    const merged: SavedDevice = existing
-      ? { ...existing, ...device, addedAt: existing.addedAt }
-      : device;
+  const handleAddDevice = useCallback(async (device: SavedDevice): Promise<boolean> => {
+    if (savingIdsRef.current.has(device.id)) return false;
+    savingIdsRef.current.add(device.id);
+    setSavingIds(prev => new Set(prev).add(device.id));
 
-    setSavedDevices(prev => {
-      const e = prev.find(d => d.id === device.id);
-      const m = e ? { ...e, ...device, addedAt: e.addedAt } : device;
-      return e
-        ? prev.map(d => d.id === device.id ? m : d)
-        : [...prev, m];
-    });
-    setSavedIds(prev => {
-      if (prev.has(device.id)) return prev;
-      const next = new Set(prev);
-      next.add(device.id);
-      return next;
-    });
-    await deviceDb.saveSingle(merged);
-    setAddingDevice(null);
+    try {
+      const prevList = savedDevicesRef.current;
+      const existing = prevList.find(d => d.id === device.id);
+      const wasExisting = !!existing;
+      const merged: SavedDevice = existing
+        ? { ...existing, ...device, addedAt: existing.addedAt }
+        : device;
 
-    // Si tiene creds SSH pero no stats, intentamos enriquecer en background
-    if (merged.sshUser && merged.sshPass && !merged.cachedStats) {
-      showToast('Guardado. Conectando SSH para obtener datos…');
-      try {
-        const res = await fetchWithTimeout(`${API_BASE_URL}/api/device/antenna`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            deviceIP: merged.ip, deviceUser: merged.sshUser,
-            devicePass: merged.sshPass, devicePort: merged.sshPort ?? 22,
-          }),
-        }, 20_000);
-        const d = await res.json();
-        if (d.success && d.stats) {
-          const s = d.stats;
-          const enriched: SavedDevice = {
-            ...merged, lastSeen: Date.now(),
-            name: s.deviceName || merged.name, model: s.deviceModel || merged.model,
-            firmware: s.firmwareVersion || merged.firmware, mac: s.wlanMac || merged.mac,
-            essid: s.essid ?? merged.essid, frequency: s.frequency ?? merged.frequency,
-            deviceName: s.deviceName ?? merged.deviceName, lanMac: s.lanMac ?? merged.lanMac,
-            security: s.security ?? merged.security, channelWidth: s.channelWidth ?? merged.channelWidth,
-            networkMode: s.networkMode ?? merged.networkMode, chains: s.chains ?? merged.chains,
-            apMac: s.apMac ?? merged.apMac, cachedStats: s,
-          };
-          setSavedDevices(prev => prev.map(d => d.id === enriched.id ? enriched : d));
-          await deviceDb.saveSingle(enriched);
+      // Persistir primero. El estado React sólo cambia si el backend confirma.
+      await deviceDb.saveSingle(merged);
+      setSavedDevices(prev => {
+        const current = prev.find(d => d.id === device.id);
+        const confirmed = current
+          ? { ...current, ...device, addedAt: current.addedAt }
+          : device;
+        return current
+          ? prev.map(d => d.id === device.id ? confirmed : d)
+          : [...prev, confirmed];
+      });
+      setSavedIds(prev => {
+        if (prev.has(device.id)) return prev;
+        const next = new Set(prev);
+        next.add(device.id);
+        return next;
+      });
+      setAddingDevice(null);
 
-          setScanResults(prev => {
-            const next = [...prev];
-            const idx = next.findIndex(r => r.ip === merged.ip);
-            if (idx !== -1) {
-              next[idx] = {
-                ...next[idx],
-                sshUser: merged.sshUser,
-                sshPass: merged.sshPass,
-                sshPort: merged.sshPort,
-                cachedStats: s,
-                name: s.deviceName || next[idx].name,
-                model: s.deviceModel || next[idx].model,
-                firmware: s.firmwareVersion || next[idx].firmware,
-                mac: s.wlanMac || next[idx].mac,
-                essid: s.essid ?? next[idx].essid,
-                frequency: s.frequency ?? next[idx].frequency,
-                role: (s.mode === 'ap' || s.mode === 'master') ? 'ap' : s.mode === 'sta' ? 'sta' : next[idx].role,
-              };
+      // El enriquecimiento no bloquea la confirmación del guardado inicial.
+      if (merged.sshUser && merged.sshPass && !merged.cachedStats) {
+        showToast('Guardado. Conectando SSH para obtener datos…');
+        void (async () => {
+          try {
+            const res = await fetchWithTimeout(`${API_BASE_URL}/api/device/antenna`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                deviceIP: merged.ip, deviceUser: merged.sshUser,
+                devicePass: merged.sshPass, devicePort: merged.sshPort ?? 22,
+              }),
+            }, 20_000);
+            const data = await res.json();
+            if (!res.ok || !data.success || !data.stats) {
+              showToast('Guardado. SSH sin respuesta aún');
+              return;
             }
-            return next;
-          });
-          setSshStatus(prev => ({ ...prev, [merged.ip]: 'success' }));
 
-          showToast('Dispositivo guardado con datos completos');
-        } else {
-          showToast('Guardado. SSH sin respuesta aún');
-        }
-      } catch {
-        showToast('Guardado. No se pudo conectar por SSH');
+            const s = data.stats;
+            const enriched: SavedDevice = {
+              ...merged, lastSeen: Date.now(),
+              name: s.deviceName || merged.name, model: s.deviceModel || merged.model,
+              firmware: s.firmwareVersion || merged.firmware, mac: s.wlanMac || merged.mac,
+              essid: s.essid ?? merged.essid, frequency: s.frequency ?? merged.frequency,
+              deviceName: s.deviceName ?? merged.deviceName, lanMac: s.lanMac ?? merged.lanMac,
+              security: s.security ?? merged.security, channelWidth: s.channelWidth ?? merged.channelWidth,
+              networkMode: s.networkMode ?? merged.networkMode, chains: s.chains ?? merged.chains,
+              apMac: s.apMac ?? merged.apMac, cachedStats: s,
+            };
+            await deviceDb.saveSingle(enriched);
+            setSavedDevices(prev => prev.map(d => d.id === enriched.id ? enriched : d));
+
+            setScanResults(prev => {
+              const next = [...prev];
+              const idx = next.findIndex(r => r.ip === merged.ip);
+              if (idx !== -1) {
+                next[idx] = {
+                  ...next[idx],
+                  sshUser: merged.sshUser,
+                  sshPass: merged.sshPass,
+                  sshPort: merged.sshPort,
+                  cachedStats: s,
+                  name: s.deviceName || next[idx].name,
+                  model: s.deviceModel || next[idx].model,
+                  firmware: s.firmwareVersion || next[idx].firmware,
+                  mac: s.wlanMac || next[idx].mac,
+                  essid: s.essid ?? next[idx].essid,
+                  frequency: s.frequency ?? next[idx].frequency,
+                  role: (s.mode === 'ap' || s.mode === 'master') ? 'ap' : s.mode === 'sta' ? 'sta' : next[idx].role,
+                };
+              }
+              return next;
+            });
+            setSshStatus(prev => ({ ...prev, [merged.ip]: 'success' }));
+            showToast('Dispositivo guardado con datos completos');
+          } catch (error) {
+            showToast(`Dispositivo guardado, pero no se pudieron actualizar sus datos: ${persistenceErrorMessage(error)}`);
+          }
+        })();
+      } else {
+        showToast(wasExisting
+          ? 'Dispositivo actualizado'
+          : merged.cachedStats ? 'Dispositivo guardado (con estadísticas)' : 'Dispositivo guardado');
       }
-    } else {
-      showToast(wasExisting
-        ? 'Dispositivo actualizado'
-        : merged.cachedStats ? 'Dispositivo guardado (con estadísticas)' : 'Dispositivo guardado');
+      return true;
+    } catch (error) {
+      showToast(`No se pudo guardar el dispositivo: ${persistenceErrorMessage(error)}`);
+      return false;
+    } finally {
+      savingIdsRef.current.delete(device.id);
+      setSavingIds(prev => {
+        const next = new Set(prev);
+        next.delete(device.id);
+        return next;
+      });
     }
   }, [setAddingDevice, setScanResults, setSshStatus, showToast]);
 
@@ -174,17 +198,23 @@ export function useDeviceLibrary({
     await deviceDb.removeSingle(id);
   }, []);
 
-  const handleUpdateDevice = useCallback(async (updated: SavedDevice) => {
-    setSavedDevices(prev => prev.map(d => d.id === updated.id ? updated : d));
-    await deviceDb.saveSingle(updated);
-  }, []);
+  const handleUpdateDevice = useCallback(async (updated: SavedDevice): Promise<boolean> => {
+    try {
+      await deviceDb.saveSingle(updated);
+      setSavedDevices(prev => prev.map(d => d.id === updated.id ? updated : d));
+      return true;
+    } catch (error) {
+      showToast(`No se pudo actualizar el dispositivo: ${persistenceErrorMessage(error)}`);
+      return false;
+    }
+  }, [showToast]);
 
   // Guardado rápido (SSH ya validado durante el scan). Si la IP cae fuera del
   // segmento del nodo, abre el modal de creación para que el operador confirme.
   const handleDirectSave = useCallback(async (dev: ScannedDevice, node: NodeInfo) => {
     if (node.segmento_lan && !ipInCidr(dev.ip, node.segmento_lan)) {
       setAddingDevice(dev);
-      return;
+      return false;
     }
     const deviceId = dev.mac ? dev.mac.replace(/:/g, '') : dev.ip.replace(/\./g, '');
     const s = dev.cachedStats;
@@ -208,22 +238,23 @@ export function useDeviceLibrary({
       sshPass: dev.sshPass,
       sshPort: dev.sshPort !== 22 ? dev.sshPort : undefined,
       deviceName: s?.deviceName,
-      lanMac: s?.lanMac,
-      security: s?.security,
+      lanMac: s?.lanMac ?? undefined,
+      security: s?.security ?? undefined,
       channelWidth: s?.channelWidth,
-      networkMode: s?.networkMode,
-      chains: s?.chains,
-      apMac: s?.apMac,
+      networkMode: s?.networkMode ?? undefined,
+      chains: s?.chains ?? undefined,
+      apMac: s?.apMac ?? undefined,
       cachedStats: s,
       addedAt: Date.now(),
       lastSeen: Date.now(),
     };
-    await handleAddDevice(saved);
+    return handleAddDevice(saved);
   }, [handleAddDevice, setAddingDevice]);
 
   return {
     savedDevices,
     savedIds,
+    savingIds,
     toast,
     handleAddDevice,
     handleRemoveDevice,

@@ -313,25 +313,27 @@ export default function NetworkDevicesModule() {
     const results = await Promise.allSettled(
       bulkSaveSelection.map(r => handleDirectSave(r.dev, effectiveNode))
     );
-    const failed = results.filter(r => r.status === 'rejected').length;
+    const succeeded = results.filter(r => r.status === 'fulfilled' && r.value === true).length;
+    const failed = results.length - succeeded;
     setBulkSaving(false);
     // Limpia los ids guardados con éxito (los fallidos se mantienen seleccionados
     // por si el usuario quiere reintentar).
     setSelectedIds(prev => {
       const next = new Set(prev);
       bulkSaveSelection.forEach((r, idx) => {
-        if (results[idx].status === 'fulfilled') next.delete(r.devId);
+        const result = results[idx];
+        if (result.status === 'fulfilled' && result.value === true) next.delete(r.devId);
       });
       return next;
     });
     if (failed > 0) {
-      showToast(`Guardados ${results.length - failed}. ${failed} fallaron.`);
+      showToast(`Guardados ${succeeded}. ${failed} fallaron y permanecen seleccionados.`);
     } else {
-      showToast(`Guardados ${results.length} dispositivos`);
+      showToast(`Guardados ${succeeded} dispositivos`);
     }
   }, [effectiveNode, bulkSaveSelection, bulkSaving, handleDirectSave, showToast, setSelectedIds]);
 
-  const handleSyncToSaved = useCallback((dev: ScannedDevice, savedDev: SavedDevice) => {
+  const handleSyncToSaved = useCallback(async (dev: ScannedDevice, savedDev: SavedDevice) => {
     const updated: SavedDevice = {
       ...savedDev,
       cachedStats: dev.cachedStats,
@@ -343,8 +345,8 @@ export default function NetworkDevicesModule() {
       frequency: dev.cachedStats?.frequency ?? savedDev.frequency,
       lastSeen: Date.now(),
     };
-    handleUpdateDevice(updated);
-    showToast('Stats actualizadas en el dispositivo guardado');
+    const updatedOk = await handleUpdateDevice(updated);
+    if (updatedOk) showToast('Stats actualizadas en el dispositivo guardado');
   }, [handleUpdateDevice, showToast]);
 
   const handleRefreshStats = useCallback((ip: string, freshStats: AntennaStats) => {
@@ -569,6 +571,7 @@ export default function NetworkDevicesModule() {
               expandedRows={expandedRows}
               toggleExpand={toggleExpand}
               savedDevices={library.savedDevices}
+              savingIds={library.savingIds}
               selectedNode={effectiveNode}
               selectedIds={selectedIds}
               onToggleSelected={handleToggleSelected}
