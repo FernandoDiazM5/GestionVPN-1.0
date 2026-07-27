@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   Radio,
   CheckCircle2, WifiOff,
@@ -21,6 +21,9 @@ import MonitorHeader from './components/MonitorHeader';
 import { useApMonitorLogic } from './hooks/useApMonitorLogic';
 import { usePolling } from './hooks/usePolling';
 import { useApPollEvents } from './hooks/useApPollEvents';
+import { buildNodeApReport } from './utils/nodeApReport';
+import { exportNodeApReportPdf } from './utils/exportNodeApReportPdf';
+import type { NodeGroup } from './utils/types';
 
 export default function ApMonitorModule() {
   const { nodes, activeNodeVrf, tunnelExpiry, setActiveModule } = useVpn();
@@ -30,7 +33,7 @@ export default function ApMonitorModule() {
 
   const logic = useApMonitorLogic(nodes, activeNodeName);
   const polling = usePolling(logic.devices, activeNodeName, logic.notifyTunnelInactive);
-  const { pingWatch, seedFromDb, ingestApPoll } = polling;
+  const { pingWatch, seedFromDb, ingestApPoll, pollApDirect } = polling;
 
   const [expandedAps, setExpandedAps] = useState<Set<string>>(() => {
     try {
@@ -71,6 +74,8 @@ export default function ApMonitorModule() {
   useEffect(() => { seedFromDb(); }, [seedFromDb]);
 
   const apPollConnectionStatus = useApPollEvents(ingestApPoll, true);
+  const [exportingReportNodeId, setExportingReportNodeId] = useState<string | null>(null);
+  const [syncingAll, setSyncingAll] = useState(false);
 
   const toggleAp = (apId: string) => {
     setExpandedAps(prev => {
@@ -112,8 +117,38 @@ export default function ApMonitorModule() {
     () => logic.filteredGroups.flatMap(g => g.aps).filter(ap => ap.sshUser && (ap.sshPass || ap.hasSshPass)),
     [logic.filteredGroups],
   );
-  const syncAllVisible = () => {
-    syncableAps.forEach((ap, i) => setTimeout(() => polling.pollApDirect(ap.id, true), i * 600));
+  const syncAllVisible = useCallback(async () => {
+    if (syncingAll || syncableAps.length === 0) return;
+    setSyncingAll(true);
+    try {
+      const batchSize = 3;
+      for (let index = 0; index < syncableAps.length; index += batchSize) {
+        const batch = syncableAps.slice(index, index + batchSize);
+        await Promise.allSettled(batch.map(ap => pollApDirect(ap.id, true)));
+        if (index + batchSize < syncableAps.length) {
+          await new Promise(resolve => setTimeout(resolve, 400));
+        }
+      }
+    } finally {
+      setSyncingAll(false);
+    }
+  }, [pollApDirect, syncableAps, syncingAll]);
+
+  const exportNodeReport = async (group: NodeGroup) => {
+    if (exportingReportNodeId) return;
+    setExportingReportNodeId(group.nodeId);
+    try {
+      const report = buildNodeApReport(group, polling.pollResults);
+      await exportNodeApReportPdf(report);
+      logic.showToast(`Informe de ${group.nodeName} generado`);
+    } catch (error) {
+      logic.showToast(
+        error instanceof Error ? error.message : 'No se pudo generar el informe del nodo',
+        'error',
+      );
+    } finally {
+      setExportingReportNodeId(null);
+    }
   };
 
   return (
@@ -135,7 +170,8 @@ export default function ApMonitorModule() {
         search={logic.apSearch}
         connectionStatus={apPollConnectionStatus}
         lastPolledAt={lastPolledAt}
-        canSync={syncableAps.length > 0}
+        canSync={syncableAps.length > 0 && !syncingAll}
+        syncing={syncingAll}
         reloading={logic.loading}
         onFilterChange={logic.setNodeFilter}
         onSearchChange={logic.setApSearch}
@@ -193,6 +229,8 @@ export default function ApMonitorModule() {
           pollResults={polling.pollResults}
           activeNodeName={activeNodeName}
           tunnelActive={tunnelActive}
+          reportExporting={exportingReportNodeId === group.nodeId}
+          onExportReport={exportNodeReport}
           onToggleAp={toggleAp}
           onCpeDetail={(mac, ip, dev) => {
             if (!dev) return;
@@ -208,7 +246,7 @@ export default function ApMonitorModule() {
           onApDetail={dev => logic.setApDetailDev(dev)}
           onM5Detail={dev => logic.setM5DetailDevice(dev)}
           onApView={dev => logic.setViewingApDevice(dev)}
-          onApSync={apId => polling.pollApDirect(apId, true)}
+          onApSync={apId => pollApDirect(apId, true)}
           onApDelete={dev => logic.handleDeleteDev(dev)}
           onApMove={dev => logic.setMovingDevice(dev)}
           onApRevealSsh={dev => logic.handleRevealSsh(dev)}

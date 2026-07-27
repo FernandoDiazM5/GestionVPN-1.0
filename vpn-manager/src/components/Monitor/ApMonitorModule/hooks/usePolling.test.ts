@@ -3,6 +3,7 @@ import {
   AP_POLL_CACHE_KEY,
   AP_POLL_CACHE_TTL_MS,
   AP_POLL_PERSIST_INTERVAL_MS,
+  mergeApPollEvent,
   persistPollResultsCache,
   readPollResultsCache,
   usePolling,
@@ -66,5 +67,42 @@ describe('usePolling persistence', () => {
 
     expect(readPollResultsCache(sessionStorage, now)).toEqual({});
     expect(sessionStorage.getItem(AP_POLL_CACHE_KEY)).toBeNull();
+  });
+});
+
+describe('mergeApPollEvent', () => {
+  it('ignora un evento SSE anterior al último intento ya aplicado', () => {
+    const current: PollResult = {
+      stations: [{ mac: 'AA:AA:AA:AA:AA:AA', signal: -55 }],
+      polledAt: 2_000,
+      lastAttemptAt: 2_000,
+      loading: false,
+    };
+
+    expect(mergeApPollEvent(current, {
+      apId: 'ap-1',
+      stations: [{ mac: 'BB:BB:BB:BB:BB:BB', signal: -80 }],
+      polledAt: 1_000,
+    })).toBe(current);
+  });
+
+  it('conserva el último snapshot bueno cuando llega un error más reciente', () => {
+    const current: PollResult = {
+      stations: [{ mac: 'AA:AA:AA:AA:AA:AA', signal: -55 }],
+      polledAt: 2_000,
+      lastAttemptAt: 2_000,
+      loading: true,
+    };
+    const merged = mergeApPollEvent(current, {
+      apId: 'ap-1',
+      error: 'SSH timeout',
+      polledAt: 3_000,
+    });
+
+    expect(merged.stations).toEqual(current.stations);
+    expect(merged.polledAt).toBe(2_000);
+    expect(merged.lastAttemptAt).toBe(3_000);
+    expect(merged.error).toBe('SSH timeout');
+    expect(merged.loading).toBe(false);
   });
 });

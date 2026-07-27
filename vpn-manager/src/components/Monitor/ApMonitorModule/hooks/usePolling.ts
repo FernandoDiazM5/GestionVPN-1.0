@@ -19,6 +19,13 @@ interface PollCachePayload {
   results: Record<string, PollResult>;
 }
 
+interface ApPollEvent {
+  apId: string;
+  stations?: LiveCpe[];
+  polledAt?: number;
+  error?: string;
+}
+
 type PollCacheStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
 function compactStation(station: LiveCpe): LiveCpe {
@@ -93,6 +100,32 @@ export function persistPollResultsCache(
   }
 }
 
+export function mergeApPollEvent(
+  current: PollResult | undefined,
+  event: ApPollEvent,
+  receivedAt = Date.now(),
+): PollResult {
+  const eventAt = event.polledAt && event.polledAt > 0 ? event.polledAt : receivedAt;
+  const currentEventAt = current?.lastAttemptAt ?? current?.polledAt ?? 0;
+  if (current && eventAt < currentEventAt) return current;
+
+  if (event.error) {
+    return {
+      ...(current ?? { stations: [], polledAt: 0 }),
+      lastAttemptAt: eventAt,
+      loading: false,
+      error: event.error,
+    };
+  }
+
+  return {
+    stations: event.stations ?? [],
+    polledAt: eventAt,
+    lastAttemptAt: eventAt,
+    loading: false,
+  };
+}
+
 export function usePolling(devices: SavedDevice[], _activeNodeName: string | null, onTunnelInactive?: (message: string) => void) {
   const [pollResults, setPollResults] = useState<Record<string, PollResult>>(() => {
     try {
@@ -163,21 +196,45 @@ export function usePolling(devices: SavedDevice[], _activeNodeName: string | nul
       }, 20_000);
       const data = await res.json();
       if (data.success) {
-        setPollResults(prev => ({ ...prev, [apId]: { stations: data.stations || [], polledAt: data.polledAt, loading: false } }));
+        setPollResults(prev => ({
+          ...prev,
+          [apId]: mergeApPollEvent(prev[apId], {
+            apId,
+            stations: data.stations || [],
+            polledAt: data.polledAt,
+          }),
+        }));
         if (saveCount) {
           const count = (data.stations || []).length;
           const updatedDev = { ...dev, lastCpeCount: count, lastCpeCountAt: Date.now() };
-          await deviceDb.saveSingle(updatedDev);
+          try {
+            await deviceDb.saveSingle(updatedDev);
+          } catch (persistenceError) {
+            // El snapshot recibido sigue siendo válido aunque falle este dato
+            // auxiliar. No lo conviertas en un falso error de SSH.
+            console.warn('[Monitor AP] No se pudo persistir el conteo de CPE', persistenceError);
+          }
         }
       } else {
         // Túnel del nodo no activo → aviso con opción de activarlo (no es error de SSH).
         if (data.code === 'TUNNEL_NOT_ACTIVE') onTunnelInactive?.(data.message);
-        setPollResults(prev => ({ ...prev, [apId]: { ...(prev[apId] ?? { stations: [] }), loading: false, error: data.message } }));
+        setPollResults(prev => ({
+          ...prev,
+          [apId]: mergeApPollEvent(prev[apId], {
+            apId,
+            error: data.message || 'No se pudo sincronizar el AP',
+            polledAt: Date.now(),
+          }),
+        }));
       }
     } catch (e) {
       setPollResults(prev => ({
         ...prev,
-        [apId]: { ...(prev[apId] ?? { stations: [] }), loading: false, error: e instanceof Error ? e.message : 'Error SSH' },
+        [apId]: mergeApPollEvent(prev[apId], {
+          apId,
+          error: e instanceof Error ? e.message : 'Error SSH',
+          polledAt: Date.now(),
+        }),
       }));
     }
   }, [onTunnelInactive]);
@@ -202,8 +259,13 @@ export function usePolling(devices: SavedDevice[], _activeNodeName: string | nul
         const next = { ...prev };
         for (const [apId, info] of Object.entries(data.aps as Record<string, { stations: LiveCpe[]; polledAt: number }>)) {
           const cur = prev[apId];
-          if (!cur || (info.polledAt ?? 0) >= (cur.polledAt ?? 0)) {
-            next[apId] = { stations: info.stations || [], polledAt: info.polledAt || 0, loading: false };
+          if (!cur || (info.polledAt ?? 0) >= (cur.lastAttemptAt ?? cur.polledAt ?? 0)) {
+            next[apId] = {
+              stations: info.stations || [],
+              polledAt: info.polledAt || 0,
+              lastAttemptAt: info.polledAt || 0,
+              loading: false,
+            };
           }
         }
         return next;
@@ -212,13 +274,11 @@ export function usePolling(devices: SavedDevice[], _activeNodeName: string | nul
   }, []);
 
   // ingestApPoll: aplica un evento SSE 'ap-poll' del backend.
-  const ingestApPoll = useCallback((ev: { apId: string; stations?: LiveCpe[]; polledAt?: number; error?: string }) => {
+  const ingestApPoll = useCallback((ev: ApPollEvent) => {
     if (!ev?.apId) return;
     setPollResults(prev => ({
       ...prev,
-      [ev.apId]: ev.error
-        ? { ...(prev[ev.apId] ?? { stations: [] }), loading: false, error: ev.error }
-        : { stations: ev.stations || [], polledAt: ev.polledAt || Date.now(), loading: false },
+      [ev.apId]: mergeApPollEvent(prev[ev.apId], ev),
     }));
   }, []);
 

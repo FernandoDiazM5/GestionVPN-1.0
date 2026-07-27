@@ -174,6 +174,9 @@ export const deviceDb = {
     try {
       const res = await apiFetch(`${API_BASE_URL}/api/db/devices`);
       const data = await res.json();
+      if (!res.ok || data?.success === false) {
+        throw new Error(data?.message || 'No se pudieron cargar los equipos');
+      }
       if (data.success && data.devices) {
         // Enriquecer con stats persistidas y credenciales efímeras de esta sesión
         const [allStats, allCreds] = await Promise.all([
@@ -201,7 +204,7 @@ export const deviceDb = {
       return [];
     } catch (err) {
       console.error('Error cargando devices de SQLite:', err);
-      return [];
+      throw err;
     }
   },
 
@@ -245,15 +248,12 @@ export const deviceDb = {
   },
 
   async removeSingle(id: string): Promise<void> {
-    try {
-      await Promise.all([
-        apiFetch(`${API_BASE_URL}/api/db/devices/${id}`, { method: 'DELETE' }),
-        statsCache.remove(id),
-        credCache.remove(id),
-      ]);
-    } catch (err) {
-      console.error('Error eliminando device:', err);
-    }
+    const response = await apiFetch(`${API_BASE_URL}/api/db/devices/${id}`, { method: 'DELETE' });
+    await expectSuccessfulDeviceResponse(response, 'No se pudo eliminar el dispositivo');
+    await Promise.all([
+      statsCache.remove(id),
+      credCache.remove(id),
+    ]);
   },
 
   async removeByIds(ids: string[]): Promise<void> {

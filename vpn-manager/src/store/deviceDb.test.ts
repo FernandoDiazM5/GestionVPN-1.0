@@ -109,4 +109,37 @@ describe('deviceDb.saveSingle', () => {
       expect.objectContaining({ stats: expect.any(Object) }),
     );
   });
+
+  it('no elimina cachés locales cuando el backend rechaza el borrado', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(
+      JSON.stringify({ success: false, message: 'No se pudo eliminar' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } },
+    ));
+
+    await expect(deviceDb.removeSingle(baseDevice.id)).rejects.toMatchObject({
+      status: 500,
+      message: 'No se pudo eliminar',
+    });
+    expect(localStores[0].removeItem).not.toHaveBeenCalled();
+  });
+
+  it('elimina cachés locales únicamente después de la confirmación del backend', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(
+      JSON.stringify({ success: true }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ));
+
+    await deviceDb.removeSingle(baseDevice.id);
+
+    expect(localStores[0].removeItem).toHaveBeenCalledWith(baseDevice.id);
+  });
+
+  it('propaga el error de carga para que la interfaz no muestre un inventario vacío falso', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(
+      JSON.stringify({ success: false, message: 'Base de datos no disponible' }),
+      { status: 503, headers: { 'Content-Type': 'application/json' } },
+    ));
+
+    await expect(deviceDb.load()).rejects.toThrow('Base de datos no disponible');
+  });
 });

@@ -65,8 +65,10 @@ export function useDeviceLibrary({
     deviceDb.load().then(devices => {
       setSavedDevices(devices);
       setSavedIds(new Set(devices.map(d => d.id)));
+    }).catch(error => {
+      showToast(`No se pudieron cargar los dispositivos: ${persistenceErrorMessage(error)}`);
     });
-  }, []);
+  }, [showToast]);
 
   // Recarga si se eliminó un nodo (puede haber cascadeado dispositivos)
   const nodesLengthRef = useRef(nodesLength);
@@ -77,9 +79,11 @@ export function useDeviceLibrary({
       deviceDb.load().then(devices => {
         setSavedDevices(devices);
         setSavedIds(new Set(devices.map(d => d.id)));
+      }).catch(error => {
+        showToast(`No se pudieron recargar los dispositivos: ${persistenceErrorMessage(error)}`);
       });
     }
-  }, [nodesLength]);
+  }, [nodesLength, showToast]);
 
   const handleAddDevice = useCallback(async (device: SavedDevice): Promise<boolean> => {
     if (savingIdsRef.current.has(device.id)) return false;
@@ -193,10 +197,14 @@ export function useDeviceLibrary({
   }, [setAddingDevice, setScanResults, setSshStatus, showToast]);
 
   const handleRemoveDevice = useCallback(async (id: string) => {
-    setSavedDevices(prev => prev.filter(d => d.id !== id));
-    setSavedIds(prev => { const n = new Set(prev); n.delete(id); return n; });
-    await deviceDb.removeSingle(id);
-  }, []);
+    try {
+      await deviceDb.removeSingle(id);
+      setSavedDevices(prev => prev.filter(d => d.id !== id));
+      setSavedIds(prev => { const n = new Set(prev); n.delete(id); return n; });
+    } catch (error) {
+      showToast(`No se pudo eliminar el dispositivo: ${persistenceErrorMessage(error)}`);
+    }
+  }, [showToast]);
 
   const handleUpdateDevice = useCallback(async (updated: SavedDevice): Promise<boolean> => {
     try {

@@ -12,6 +12,7 @@ const baseProps = {
   connectionStatus: 'connected' as const,
   lastPolledAt: 0,
   canSync: true,
+  syncing: false,
   reloading: false,
   onFilterChange: vi.fn(),
   onSearchChange: vi.fn(),

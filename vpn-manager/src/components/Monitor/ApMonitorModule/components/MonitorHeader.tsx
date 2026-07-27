@@ -24,6 +24,7 @@ interface MonitorHeaderProps {
   connectionStatus: ApPollConnectionStatus;
   lastPolledAt: number;
   canSync: boolean;
+  syncing: boolean;
   reloading: boolean;
   onFilterChange: (filter: NodeFilter) => void;
   onSearchChange: (value: string) => void;
@@ -86,6 +87,7 @@ export default function MonitorHeader({
   connectionStatus,
   lastPolledAt,
   canSync,
+  syncing,
   reloading,
   onFilterChange,
   onSearchChange,
@@ -176,8 +178,8 @@ export default function MonitorHeader({
                 className="btn-outline inline-flex min-h-11 flex-1 items-center justify-center gap-2 px-4 text-xs md:flex-none"
                 title="Sincronizar ahora los CPE de todos los AP visibles"
               >
-                <RotateCw className="h-4 w-4" aria-hidden="true" />
-                <span>Sincronizar AP</span>
+                <RotateCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} aria-hidden="true" />
+                <span>{syncing ? 'Sincronizando…' : 'Sincronizar AP'}</span>
               </button>
               <button
                 type="button"

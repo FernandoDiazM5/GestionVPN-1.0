@@ -1,19 +1,21 @@
 import { useState, useEffect } from 'react';
-import { ChevronDown, ChevronRight, Radio, Wifi, Server, Users, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, FileText, Loader2, Radio, Wifi, Server, Users, Trash2 } from 'lucide-react';
 import type { SavedDevice } from '../../../../types/devices';
 import type { PollResult } from '../../../../types/apMonitor';
 import ApRow from './ApRow';
 import ApColSelector from './selectors/ApColSelector';
 import { AP_COL_DEFS, loadApColPrefs, saveApColPrefs } from '../utils/columnDefs';
-import { getApStatus } from '../utils/statusHelpers';
+import { getApStatus, getNodeApStatus } from '../utils/statusHelpers';
 import type { NodeGroup } from '../utils/types';
 
-function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelActive, onToggleAp, onCpeDetail, onApDetail: _onApDetail, onM5Detail, onApView, onApSync, onApDelete, onApMove, onApRevealSsh }: {
+function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelActive, reportExporting, onExportReport, onToggleAp, onCpeDetail, onApDetail: _onApDetail, onM5Detail, onApView, onApSync, onApDelete, onApMove, onApRevealSsh }: {
   group: NodeGroup;
   expandedAps: Set<string>;
   pollResults: Record<string, PollResult>;
   activeNodeName: string | null;
   tunnelActive: boolean;
+  reportExporting: boolean;
+  onExportReport: (group: NodeGroup) => void;
   onToggleAp: (apId: string) => void;
   onCpeDetail: (mac: string, ip: string | null, dev: SavedDevice) => void;
   onApDetail: (dev: SavedDevice) => void;
@@ -38,18 +40,15 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelAc
   const handleApColChange = (h: Set<string>) => { setHiddenApCols(h); saveApColPrefs(h); };
 
   const apStatuses = group.aps.map(ap => getApStatus(ap, pollResults, activeNodeName, tunnelActive));
-  const anyOnline = apStatuses.some(s => s === 'online');
-  const anyPartial = apStatuses.some(s => s === 'partial');
-  const anyConnecting = apStatuses.some(s => s === 'connecting');
-  const statusColor = group.aps.length === 0 ? 'bg-slate-300'
-    : anyOnline ? 'bg-emerald-500'
-      : anyPartial ? 'bg-amber-400'
-        : anyConnecting ? 'bg-sky-400 animate-pulse'
-          : 'bg-slate-300';
-  const statusLabel = group.aps.length === 0 ? 'Sin APs'
-    : anyOnline ? 'Online'
-      : anyPartial ? 'Parcial'
-        : anyConnecting ? 'Conectando…'
+  const nodeStatus = getNodeApStatus(apStatuses);
+  const statusColor = nodeStatus === 'online' ? 'bg-emerald-500'
+    : nodeStatus === 'partial' ? 'bg-amber-400'
+      : nodeStatus === 'connecting' ? 'bg-sky-400 animate-pulse'
+        : 'bg-slate-300';
+  const statusLabel = nodeStatus === 'empty' ? 'Sin APs'
+    : nodeStatus === 'online' ? 'Online'
+      : nodeStatus === 'partial' ? 'Parcial'
+        : nodeStatus === 'connecting' ? 'Conectando…'
           : 'Sin datos';
   const totalCpes = group.aps.reduce((s, ap) => s + (pollResults[ap.id]?.stations.length ?? 0), 0);
 
@@ -72,7 +71,7 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelAc
             </span>
           </div>
           <div className="flex shrink-0 items-center gap-1.5 sm:ml-2">
-            <span className={`w-2 h-2 rounded-full ${statusColor} ${anyOnline ? 'status-live text-emerald-500' : ''}`} />
+            <span className={`w-2 h-2 rounded-full ${statusColor} ${nodeStatus === 'online' ? 'status-live text-emerald-500' : ''}`} />
             <span className="text-2xs font-bold text-slate-500 dark:text-slate-400">{statusLabel}</span>
           </div>
         </div>
@@ -80,6 +79,18 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelAc
           <span className="flex shrink-0 items-center gap-1"><Server className="w-3 h-3" /> {group.aps.length} AP{group.aps.length !== 1 ? 's' : ''}</span>
           {group.stas.length > 0 && <span className="flex shrink-0 items-center gap-1 text-cyan-600 dark:text-cyan-400"><Users className="w-3 h-3" /> {group.stas.length} CPE{group.stas.length !== 1 ? 's' : ''}</span>}
           {totalCpes > 0 && <span className="flex shrink-0 items-center gap-1 text-cyan-600 dark:text-cyan-400"><Users className="w-3 h-3" /> {totalCpes} live</span>}
+          <button
+            type="button"
+            onClick={() => onExportReport(group)}
+            disabled={reportExporting || group.aps.length === 0}
+            title="Generar informe PDF de este nodo"
+            className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border border-indigo-200 bg-white px-2.5 text-2xs font-bold text-indigo-700 transition-colors hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-indigo-500/30 dark:bg-slate-900 dark:text-indigo-300 dark:hover:bg-indigo-500/10"
+          >
+            {reportExporting
+              ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+              : <FileText className="h-3.5 w-3.5" aria-hidden="true" />}
+            <span>{reportExporting ? 'Generando…' : 'Informe'}</span>
+          </button>
           <ApColSelector hidden={hiddenApCols} onChange={handleApColChange} />
         </div>
       </div>

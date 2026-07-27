@@ -128,11 +128,15 @@ export function useApMonitorLogic(nodes: NodeInfo[], activeNodeName: string | nu
     const dev = deleteTarget;
     if (!dev) return;
     setDeleteTarget(null);
-    setDevices(prev => prev.filter(d => d.id !== dev.id));
-    if (viewingApDevice?.id === dev.id) setViewingApDevice(null);
-    if (apDetailDev?.id === dev.id) setApDetailDev(null);
-    await deviceDb.removeSingle(dev.id);
-    showToast('Equipo eliminado');
+    try {
+      await deviceDb.removeSingle(dev.id);
+      setDevices(prev => prev.filter(d => d.id !== dev.id));
+      if (viewingApDevice?.id === dev.id) setViewingApDevice(null);
+      if (apDetailDev?.id === dev.id) setApDetailDev(null);
+      showToast('Equipo eliminado');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'No se pudo eliminar el equipo', 'error');
+    }
   };
 
   const handleUpdateApDevice = async (updated: SavedDevice): Promise<boolean> => {

@@ -91,6 +91,8 @@ export interface LiveCpe {
 export interface PollResult {
   stations: LiveCpe[];
   polledAt: number;
+  /** Marca el último evento recibido, incluso si fue un intento fallido. */
+  lastAttemptAt?: number;
   loading: boolean;
   error?: string;
 }

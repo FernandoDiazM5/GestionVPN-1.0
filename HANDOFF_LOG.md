@@ -6,6 +6,13 @@
 
 ---
 
+> **Sesión 2026-07-27 — Informe por nodo y auditoría de Monitor AP.** Rama `vps_prod`, basada en `0b53774`; sin despliegue. Skills: `vercel-react-best-practices`, `pdf`, `handoff-keeper`.
+> - Cada nodo ofrece un PDF A4 horizontal generado con imports diferidos: KPIs, calidad/frescura, inventario, ficha completa de AP y tabla de CPE con métricas RF/airMAX/salud. El snapshot omite secretos; conteos históricos se distinguen de CPE live.
+> - Corregidos estados engañosos: el grupo sólo está `Online` si todos sus AP lo están; 0 CPE tras poll exitoso no es error; datos de más de 5 minutos y errores aparecen `Parcial`.
+> - Seed, SSE y sync manual ahora se fusionan por timestamp para impedir que eventos tardíos reemplacen datos nuevos. Sync masivo usa lotes de 3, espera cada lote y bloquea doble ejecución.
+> - Carga y borrado de dispositivos dejan de absorber errores: la UI/cachés sólo cambian tras confirmación backend. Un fallo al persistir el conteo auxiliar ya no convierte un poll SSH correcto en falso error.
+> - Verificación: **84 archivos / 521 pruebas backend + 52 archivos / 177 pruebas frontend**, `check:all`, build Vite y PDF renderizado/inspeccionado sin recortes ni página final vacía. VPS permanece en `673d0d1`.
+
 > **Sesión 2026-07-26 — Guardado de equipos AirOS confirmado por servidor.** Rama `vps_prod`, basada en `0771bac`; sin despliegue. Skills: `vercel-react-best-practices`, `handoff-keeper`.
 > - Producción confirmó tres `POST /api/db/devices` HTTP 400 por `body.chains`: AirOS entregaba `chains:null`, el contrato sólo admitía texto opcional y el frontend absorbía el error, marcando falsos guardados.
 > - La frontera de persistencia omite todos los valores `null/undefined` y `cachedStats`; `saveSingle` valida HTTP/body, conserva `status/code/fields` y escribe los cachés locales únicamente después del éxito.
