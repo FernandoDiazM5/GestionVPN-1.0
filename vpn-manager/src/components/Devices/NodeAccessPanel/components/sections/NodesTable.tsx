@@ -162,9 +162,9 @@ export default function NodesTable({
               <td colSpan={totalCols} className="px-4 py-12 text-center">
                 <div className="flex flex-col items-center gap-2">
                   <Search className="w-8 h-8 text-slate-500 dark:text-slate-500" />
-                  <p className="text-slate-500 dark:text-slate-400 font-semibold">Sin resultados</p>
+                  <p className="text-slate-600 dark:text-slate-300 font-semibold">No encontramos sitios con esos filtros</p>
                   <p className="text-slate-500 dark:text-slate-400 text-xs">
-                    {searchQuery ? `No se encontraron sitios coincidentes con "${searchQuery}"` : 'No hay sitios para mostrar'}
+                    {searchQuery ? `Prueba con otro nombre o ubicación en lugar de "${searchQuery}"` : 'Cambia o limpia los filtros para ver más resultados'}
                   </p>
                 </div>
               </td>

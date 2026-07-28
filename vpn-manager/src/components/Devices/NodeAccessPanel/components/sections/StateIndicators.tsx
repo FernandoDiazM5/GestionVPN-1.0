@@ -1,4 +1,4 @@
-import { AlertCircle, ShieldCheck, ShieldOff, Bell } from 'lucide-react';
+import { AlertCircle, ShieldCheck, ShieldOff, Bell, RefreshCw } from 'lucide-react';
 import { AnimatedCountdown } from '../shared';
 
 interface StateIndicatorsProps {
@@ -10,6 +10,8 @@ interface StateIndicatorsProps {
   onRenew: () => void;
   onRevokeAll: () => void;
   isRevoking: boolean;
+  onRetry?: () => void;
+  isRetrying?: boolean;
 }
 
 export default function StateIndicators({
@@ -21,6 +23,8 @@ export default function StateIndicators({
   onRenew,
   onRevokeAll,
   isRevoking,
+  onRetry,
+  isRetrying = false,
 }: StateIndicatorsProps) {
   return (
     <>
@@ -28,7 +32,16 @@ export default function StateIndicators({
       {errorMsg && (
         <div className="card p-4 flex items-start space-x-3 border-rose-200 bg-rose-50 dark:border-rose-500/30 dark:bg-rose-500/10">
           <AlertCircle className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
-          <p className="text-sm text-rose-600 dark:text-rose-400 font-medium">{errorMsg}</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-rose-700 dark:text-rose-300">No pudimos actualizar la lista</p>
+            <p className="mt-0.5 text-sm text-rose-600 dark:text-rose-400">{errorMsg}</p>
+          </div>
+          {onRetry && (
+            <button type="button" onClick={onRetry} disabled={isRetrying} className="btn-outline btn-sm inline-flex min-h-11 shrink-0 items-center">
+              <RefreshCw className={`h-3.5 w-3.5 ${isRetrying ? 'animate-spin' : ''}`} />
+              <span>Reintentar</span>
+            </button>
+          )}
         </div>
       )}
 

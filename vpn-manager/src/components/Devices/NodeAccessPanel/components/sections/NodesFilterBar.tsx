@@ -51,10 +51,10 @@ function NodesFilterBarImpl({
   const hasActiveFilter = !!(search || filterProtocol || filterStatus);
 
   return (
-    <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50/50 to-white dark:border-slate-800 dark:from-slate-800/30 dark:to-slate-900 space-y-2">
+    <div className="space-y-2 border-b border-slate-100 bg-gradient-to-r from-slate-50/50 to-white px-5 py-3 dark:border-slate-800 dark:from-slate-800/30 dark:to-slate-900">
       {/* Línea 1 — controles */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[220px]">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[240px] flex-[1_1_300px]">
           {/* Dummy inputs para evitar autofill agresivo de Chrome */}
           <input type="text" name="dummy-user" style={{ display: 'none' }} />
           <input type="password" name="dummy-pass" style={{ display: 'none' }} />
@@ -88,9 +88,9 @@ function NodesFilterBarImpl({
           onChange={e => setFilterProtocol(e.target.value as ProtocolFilter)}
           aria-label="Filtrar por tipo de conexión"
           title="Filtrar por tipo de conexión"
-          className="text-sm border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 text-slate-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300"
+          className="min-h-11 w-[170px] rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
         >
-          <option value="">Todos los tipos</option>
+          <option value="">Conexión: todas</option>
           <option value="sstp">Conexión SSTP</option>
           <option value="wireguard">Conexión WireGuard</option>
         </select>
@@ -100,9 +100,9 @@ function NodesFilterBarImpl({
           onChange={e => setFilterStatus(e.target.value as StatusFilter)}
           aria-label="Filtrar por disponibilidad"
           title="Filtrar por disponibilidad"
-          className="text-sm border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 text-slate-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300"
+          className="min-h-11 w-[160px] rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
         >
-          <option value="">Cualquier estado</option>
+          <option value="">Estado: todos</option>
           <option value="connected">En línea</option>
           <option value="disconnected">No disponibles</option>
         </select>
@@ -110,10 +110,16 @@ function NodesFilterBarImpl({
         <NodeColumnPicker visibleCols={visibleCols} onChange={setVisibleCols} />
 
         {exportSlot}
+
+        <span className="ml-auto inline-flex min-h-8 items-center rounded-full bg-slate-100 px-3 text-xs font-semibold tabular-nums text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+          {hasActiveFilter
+            ? `${resultCount} de ${totalCount} ${totalCount === 1 ? 'sitio' : 'sitios'}`
+            : `${totalCount} ${totalCount === 1 ? 'sitio' : 'sitios'}`}
+        </span>
       </div>
 
-      {/* Línea 2 — chips + contador permanente */}
-      <div className="flex flex-wrap gap-1.5 items-center text-2xs">
+      {/* Segunda línea sólo cuando existen filtros activos. */}
+      {hasActiveFilter && <div className="flex flex-wrap gap-1.5 items-center text-2xs">
         {search && (
           <FilterChip
             label={`"${search}"`}
@@ -141,25 +147,7 @@ function NodesFilterBarImpl({
             ariaLabel={`Quitar filtro de estado ${STATUS_LABEL[filterStatus]}`}
           />
         )}
-
-        <span className="flex-1" />
-
-        <span className="text-slate-500 dark:text-slate-400 font-mono tabular-nums">
-          {hasActiveFilter ? (
-            <>
-              <span className="font-bold text-indigo-600 dark:text-indigo-400">{resultCount}</span>
-              <span className="text-slate-500 dark:text-slate-600 mx-1">/</span>
-              <span>{totalCount}</span>
-              <span className="ml-1 text-slate-500 dark:text-slate-400">{totalCount === 1 ? 'sitio' : 'sitios'}</span>
-            </>
-          ) : (
-            <>
-              <span className="font-bold text-slate-600 dark:text-slate-300">{totalCount}</span>
-              <span className="ml-1 text-slate-500 dark:text-slate-400">{totalCount === 1 ? 'sitio' : 'sitios'}</span>
-            </>
-          )}
-        </span>
-      </div>
+      </div>}
     </div>
   );
 }

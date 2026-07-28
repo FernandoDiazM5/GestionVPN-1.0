@@ -45,11 +45,11 @@ export function NodeColumnPicker({ visibleCols, onChange }: NodeColumnPickerProp
         onClick={handleKebabClick}
         aria-haspopup="menu"
         aria-expanded={showKebab}
-        title="Elegir los datos visibles"
+        title="Personalizar las columnas de la tabla"
         className="flex items-center space-x-1.5 px-3 py-2.5 rounded-lg text-xs font-bold text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 border border-slate-200 transition-colors dark:border-slate-700 dark:hover:bg-indigo-500/10 dark:text-slate-300"
       >
         <SlidersHorizontal className="w-3.5 h-3.5" />
-        <span>Datos visibles</span>
+        <span>Columnas</span>
         <span className="bg-indigo-100 text-indigo-600 text-3xs font-black px-1.5 py-0.5 rounded-md min-w-[18px] text-center dark:bg-indigo-500/20 dark:text-indigo-300">
           {visibleCols.length}
         </span>

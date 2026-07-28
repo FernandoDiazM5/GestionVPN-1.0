@@ -6,7 +6,7 @@ import { isPlatformAdmin } from '../../../utils/permissions';
 // MEMBER → solo "Acceder" en la fila + sin "Nuevo Nodo" / "Exportar" / kebab.
 
 // ── Modales (importados desde ./modals)
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   NuevoNodo,
   EditarNodo,
@@ -71,6 +71,15 @@ export default function NodeAccessPanel() {
   // Modal de diagnóstico (Q3) — local; no merece entrar a useNodeModals porque
   // sólo se abre/cierra desde NodeCard y no es parte del lifecycle de nodos.
   const [diagnoseNode, setDiagnoseNode] = useState<NodeInfo | null>(null);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
+  const wasLoadingRef = useRef(false);
+
+  useEffect(() => {
+    if (wasLoadingRef.current && !isLoading && hasLoaded && !errorMsg) {
+      setLastUpdatedAt(Date.now());
+    }
+    wasLoadingRef.current = isLoading;
+  }, [errorMsg, hasLoaded, isLoading]);
 
   // ── Inicializar hooks de lógica compleja
   const { fetchNodes, handleLoadNodes } = useNodeFetching({
@@ -194,6 +203,7 @@ export default function NodeAccessPanel() {
         onRefresh={handleLoadNodes}
         isLoading={isLoading}
         hasLoaded={hasLoaded}
+        lastUpdatedAt={lastUpdatedAt}
         showServerIP={showCoreInfra}
         canCreateNode={canManageNodes}
       />
@@ -208,6 +218,8 @@ export default function NodeAccessPanel() {
         onRenew={() => setTunnelExpiry(Date.now() + TUNNEL_TIMEOUT_MS)}
         onRevokeAll={handleRevokeAll}
         isRevoking={isRevoking}
+        onRetry={handleLoadNodes}
+        isRetrying={isLoading}
       />
 
       {/* ── WireGuardSection (VPS/core) — solo Administrador de plataforma ── */}

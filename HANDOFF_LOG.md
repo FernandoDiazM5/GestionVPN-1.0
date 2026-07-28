@@ -6,6 +6,15 @@
 
 ---
 
+> **Sesión 2026-07-28 — Vista de Sitios compacta sin alterar columnas elegibles.** Rama `vps_prod`, base `0b4d0fb`; sin despliegue. Skills: `ui-design-system`, `vercel-react-best-practices`, `handoff-keeper`.
+> - Encabezado simplificado a `Sitios remotos`, descripción breve, botón `Actualizar` y hora real de última actualización después de una carga confirmada.
+> - Barra compacta con búsqueda, `Conexión: todas`, `Estado: todos`, `Columnas`, descarga y contador `X de Y sitios`; chips aparecen sólo con filtros activos.
+> - Se preservaron exactamente el selector, orden, columnas opcionales, vista simple y preferencias locales; no se añadió ninguna columna obligatoria.
+> - `Conectar` usa índigo sólido; el menú se reorganizó como `Administrar/Consultar` y eliminó términos `nodo`, `script`, `ping/trace` y `logs` de sus acciones visibles.
+> - Añadidos skeleton inicial, error con `Reintentar` y estados vacíos accionables.
+> - Verificación: **55 archivos / 182 pruebas frontend**, ESLint, build Vite, `git diff --check` y auditor de diseño sin hallazgos nuevos.
+> - Pendiente: commit/publicación y autorización explícita antes de desplegar sólo el frontend.
+
 > **Sesión 2026-07-28 — Capitalización uniforme en columnas de Sitios.** Rama `vps_prod`, base `7f90bef`; sin despliegue.
 > - Corregida la mezcla causada por `uppercase`: las columnas normales aparecían en mayúsculas completas, mientras las ordenables conservaban formato de frase.
 > - Todos los encabezados usan ahora capitalización de frase: `Sitio`, `Disponibilidad`, `Etiquetas`, `Ruta asignada`, `Dirección de conexión`, `Red del sitio` y `Opciones`.

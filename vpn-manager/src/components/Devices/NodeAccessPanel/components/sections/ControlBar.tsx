@@ -11,6 +11,7 @@ interface ControlBarProps {
   onRefresh: () => void;
   isLoading: boolean;
   hasLoaded: boolean;
+  lastUpdatedAt?: number | null;
   /** Mostrar la IP del servidor SSTP (solo Administrador de plataforma). */
   showServerIP?: boolean;
   /** Permitir crear nodos. Falso para MEMBER (solo visualiza). */
@@ -26,19 +27,25 @@ export default function ControlBar({
   onRefresh,
   isLoading,
   hasLoaded,
+  lastUpdatedAt = null,
   showServerIP = false,
   canCreateNode = true,
 }: ControlBarProps) {
   return (
-    <div className="card p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="card flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center">
       <div>
         <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center space-x-2">
           <Waypoints className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
-          <span>Conexión a sitios remotos</span>
+          <span>Sitios remotos</span>
         </h2>
         <p className="text-slate-500 dark:text-slate-500 text-sm mt-1">
-          Conéctate de forma segura a las antenas y equipos de tus sitios remotos
+          Conecta de forma segura con las antenas y equipos de cada sitio
         </p>
+        {lastUpdatedAt && (
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400" aria-live="polite">
+            Última actualización: {new Date(lastUpdatedAt).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
+          </p>
+        )}
         {/* IP global del servidor SSTP — solo visible para Administrador de plataforma */}
         {showServerIP && (
         <div className="flex items-center gap-1.5 mt-2">
@@ -93,10 +100,10 @@ export default function ControlBar({
         <button
           onClick={onRefresh}
           disabled={isLoading}
-          className="btn-outline px-5 py-2.5 flex items-center space-x-2 text-sm disabled:opacity-50"
+          className="btn-outline px-4 py-2.5 flex items-center space-x-2 text-sm disabled:opacity-50"
         >
           <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-          <span>{isLoading ? 'Actualizando...' : hasLoaded ? 'Actualizar lista' : 'Cargar sitios'}</span>
+          <span>{isLoading ? 'Actualizando...' : hasLoaded ? 'Actualizar' : 'Cargar sitios'}</span>
         </button>
       </div>
     </div>

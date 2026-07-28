@@ -217,14 +217,30 @@ export default function NodesListSection({
         </div>
       )}
 
+      {isLoading && !hasLoaded && (
+        <div className="card overflow-hidden" role="status" aria-label="Cargando sitios">
+          <div className="space-y-3 p-5">
+            <div className="h-11 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
+            {[0, 1, 2].map(row => (
+              <div key={row} className="flex items-center gap-4 border-t border-slate-100 py-4 dark:border-slate-800">
+                <div className="h-10 w-10 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
+                <div className="h-4 w-40 animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
+                <div className="ml-auto h-10 w-28 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
+              </div>
+            ))}
+          </div>
+          <span className="sr-only">Cargando la lista de sitios…</span>
+        </div>
+      )}
+
       {/* Empty state: Sin nodos */}
       {hasLoaded && nodes.length === 0 && (
         <div className="card border-dashed border-2 border-slate-200 dark:border-slate-700 py-16 flex flex-col items-center text-center space-y-3">
           <div className="w-14 h-14 bg-indigo-50 dark:bg-indigo-500/15 rounded-2xl flex items-center justify-center">
             <Radio className="w-7 h-7 text-indigo-400" />
           </div>
-          <p className="text-slate-500 dark:text-slate-300 font-medium">Aún no hay sitios</p>
-          <p className="text-slate-500 dark:text-slate-500 text-sm">Agrega un sitio remoto para comenzar</p>
+          <p className="text-slate-600 dark:text-slate-300 font-semibold">Todavía no agregaste ningún sitio</p>
+          <p className="text-slate-500 dark:text-slate-400 text-sm">Usa “Agregar sitio” para crear el primero</p>
         </div>
       )}
 
@@ -234,8 +250,8 @@ export default function NodesListSection({
           <div className="w-14 h-14 bg-indigo-50 dark:bg-indigo-500/15 rounded-2xl flex items-center justify-center">
             <Search className="w-7 h-7 text-indigo-400" />
           </div>
-          <p className="text-slate-500 dark:text-slate-300 font-medium">Sin datos aún</p>
-          <p className="text-slate-500 dark:text-slate-500 text-sm">Haz clic en “Cargar sitios” para obtener la lista</p>
+          <p className="text-slate-600 dark:text-slate-300 font-semibold">La lista aún no se ha cargado</p>
+          <p className="text-slate-500 dark:text-slate-400 text-sm">Usa “Cargar sitios” para comenzar</p>
         </div>
       )}
     </>

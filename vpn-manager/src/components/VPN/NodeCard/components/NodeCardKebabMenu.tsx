@@ -80,7 +80,7 @@ export function NodeCardKebabMenu({
               Color = intención (sistema de diseño): los ítems son acciones
               neutras (slate) salvo dos con semántica propia — violeta = peer
               WireGuard (protocolo), ámbar = recuperación/atención (reparar). */}
-          <p className="px-3 pt-2 pb-1 text-3xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-500">Configuración</p>
+          <p className="px-3 pt-2 pb-1 text-3xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-500">Administrar</p>
 
           {node.service === 'wireguard' && !node.wg_public_key && (
             <button
@@ -116,7 +116,7 @@ export function NodeCardKebabMenu({
             className="w-full min-h-11 flex items-center gap-2.5 px-3 py-2 text-xs text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 dark:text-slate-300 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-400"
           >
             <Pencil className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-            <span>Editar nodo</span>
+            <span>Editar sitio</span>
           </button>
 
           <button
@@ -126,12 +126,12 @@ export function NodeCardKebabMenu({
             className="w-full min-h-11 flex items-center gap-2.5 px-3 py-2 text-xs text-slate-600 hover:bg-sky-50 hover:text-sky-700 transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 dark:text-slate-300 dark:hover:bg-sky-500/10 dark:hover:text-sky-400"
           >
             <KeyRound className="w-3.5 h-3.5 text-sky-500 shrink-0" />
-            <span>Credenciales SSH</span>
+            <span>Acceso a equipos</span>
           </button>
 
           {/* ── Sección: Información y herramientas (solo lectura) ── */}
           <div className="my-1 border-t border-slate-100 dark:border-slate-700" />
-          <p className="px-3 pt-1 pb-1 text-3xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-500">Información</p>
+          <p className="px-3 pt-1 pb-1 text-3xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-500">Consultar</p>
 
           <button
             type="button"
@@ -140,7 +140,7 @@ export function NodeCardKebabMenu({
             className="w-full min-h-11 flex items-center gap-2.5 px-3 py-2 text-xs text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 dark:text-slate-300 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-400"
           >
             <FileCode className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-            <span>Script de configuración</span>
+            <span>Ver configuración</span>
           </button>
 
           <button
@@ -150,7 +150,7 @@ export function NodeCardKebabMenu({
             className="w-full min-h-11 flex items-center gap-2.5 px-3 py-2 text-xs text-slate-600 hover:bg-sky-50 hover:text-sky-700 transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 dark:text-slate-300 dark:hover:bg-sky-500/10 dark:hover:text-sky-400"
           >
             <History className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-            <span>Historial de conexión</span>
+            <span>Actividad del sitio</span>
           </button>
 
           <button
@@ -160,7 +160,7 @@ export function NodeCardKebabMenu({
             className="w-full min-h-11 flex items-center gap-2.5 px-3 py-2 text-xs text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 dark:text-slate-300 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-400"
           >
             <Network className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-            <span>Diagnosticar (ping/trace)</span>
+            <span>Comprobar conexión</span>
           </button>
 
           <button
@@ -170,7 +170,7 @@ export function NodeCardKebabMenu({
             className="w-full min-h-11 flex items-center gap-2.5 px-3 py-2 text-xs text-slate-600 hover:bg-amber-50 hover:text-amber-700 transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 dark:text-slate-300 dark:hover:bg-amber-500/10 dark:hover:text-amber-400"
           >
             <Tag className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-            <span>Gestionar etiquetas</span>
+            <span>Organizar sitio</span>
           </button>
 
           {/* ── Zona de peligro ── */}
@@ -183,7 +183,7 @@ export function NodeCardKebabMenu({
             className="w-full min-h-11 flex items-center gap-2.5 px-3 py-2 text-xs text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 dark:text-rose-400 dark:hover:bg-rose-500/10 dark:hover:text-rose-300"
           >
             <Trash2 className="w-3.5 h-3.5 shrink-0" />
-            <span>Eliminar nodo</span>
+            <span>Eliminar sitio</span>
           </button>
 
           {/* Logs activos */}
@@ -192,7 +192,7 @@ export function NodeCardKebabMenu({
               <div className="my-1 border-t border-slate-100 dark:border-slate-700" />
               <div className="flex items-center gap-2.5 px-3 py-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" />
-                <span className="text-2xs text-indigo-500 font-semibold dark:text-indigo-400">Logs activos ({logs.length})</span>
+                <span className="text-2xs text-indigo-500 font-semibold dark:text-indigo-400">Actividad en curso ({logs.length})</span>
               </div>
             </>
           )}

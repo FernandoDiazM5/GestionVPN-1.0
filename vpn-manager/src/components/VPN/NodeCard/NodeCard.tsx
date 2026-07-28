@@ -199,7 +199,7 @@ export default function NodeCard({
                 title={accessBlockReason ?? undefined}
                 className={`flex min-h-11 items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500
                   ${canActivate
-                    ? 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white group-hover:shadow-sm active:scale-[0.97] dark:bg-indigo-500/15 dark:text-indigo-300 dark:group-hover:bg-indigo-500 dark:group-hover:text-white'
+                    ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/20 hover:bg-indigo-700 hover:shadow-indigo-500/30 active:scale-[0.97] dark:bg-indigo-500 dark:hover:bg-indigo-400'
                     : 'bg-slate-50 text-slate-300 cursor-not-allowed dark:bg-slate-800 dark:text-slate-600'}`}
               >
                 {isActivating
