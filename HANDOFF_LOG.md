@@ -6,6 +6,14 @@
 
 ---
 
+> **Sesión 2026-07-28 — Persistencia SSH blindada de extremo a extremo.** Rama `vps_prod`, base `a1ed871`; cambio `a37bf1f`, sin despliegue. Skills: `network-engineer`, `vercel-react-best-practices`, `handoff-keeper`.
+> - Resultados restaurados eliminan estados `success/pending`; sólo vuelven a éxito al recuperar una credencial real de memoria.
+> - Caché usa aliases canónicos de UUID/IP/MAC LAN/WLAN, conserva contraseña vacía explícita y purga todos los aliases al borrar.
+> - Guardado individual/masivo abre confirmación si falta el secreto; sincronización propaga la credencial validada.
+> - Backend rechaza nuevos equipos con usuario sin clave, preserva credenciales existentes en actualizaciones y cifra correctamente una clave vacía.
+> - Pruebas: **57/188 frontend + 88/532 backend**, TypeScript, ESLint, build Vite, `check:all`, inventario de seguridad actualizado y `git diff --check`.
+> - Pendiente: autorización de despliegue backend+frontend y reescaneo/confirmación manual de `142.152.7.237`; la clave desconocida no se inventó ni se modificó en BD.
+
 > **Sesión 2026-07-28 — Diagnóstico de AP guardado sin clave SSH.** Rama `vps_prod`, base `e678223`; sólo lectura, sin cambios funcionales ni despliegue. Skill: `network-engineer`, `handoff-keeper`.
 > - Producción confirma que `142.152.7.237`/`E43883BCEFC4` se insertó a las 18:48:41 UTC con usuario `ubnt`, pero `clave_ssh_enc=NULL`; el `POST /api/db/devices` respondió 200.
 > - Causa principal: el caché persistente del escaneo conserva `sshStatus=success`, estadísticas y usuario, pero quita la contraseña; tras recargar la página la caché secreta en memoria desaparece y el guardado rápido sigue habilitado basándose sólo en el estado antiguo.
