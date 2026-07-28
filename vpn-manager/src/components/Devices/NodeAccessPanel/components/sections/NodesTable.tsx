@@ -52,7 +52,7 @@ function SortableHeader({ label, columnKey, activeKey, direction, onSort }: Sort
 
   return (
     <th
-      className="p-0 text-left text-2xs font-bold uppercase tracking-wider text-slate-500 transition-colors hover:bg-slate-100 group dark:text-slate-400 dark:hover:bg-slate-800"
+      className="p-0 text-left text-2xs font-bold tracking-wide text-slate-500 transition-colors hover:bg-slate-100 group dark:text-slate-400 dark:hover:bg-slate-800"
       aria-sort={active ? (direction === 'asc' ? 'ascending' : 'descending') : 'none'}
     >
       <button
@@ -124,7 +124,7 @@ export default function NodesTable({
                     onSort={onSort}
                   />
                 ) : (
-                  <th key={key} className="h-11 px-4 text-left text-2xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <th key={key} className="h-11 px-4 text-left text-2xs font-bold tracking-wide text-slate-500 dark:text-slate-400">
                     {meta.label}
                   </th>
                 )
@@ -134,7 +134,7 @@ export default function NodesTable({
             {/* Fija: Acciones — §44 sticky-right (patrón §39 de Escanear).
                 Shadow sutil hacia la izquierda marca que está flotando
                 cuando hay overflow horizontal. */}
-            <th className="px-4 py-3 text-right font-bold text-slate-500 uppercase tracking-wider text-2xs sticky right-0 z-10 bg-slate-50 shadow-[-2px_0_6px_-3px_rgba(0,0,0,0.06)] dark:text-slate-400 dark:bg-slate-800/50">
+            <th className="px-4 py-3 text-right font-bold text-slate-500 tracking-wide text-2xs sticky right-0 z-10 bg-slate-50 shadow-[-2px_0_6px_-3px_rgba(0,0,0,0.06)] dark:text-slate-400 dark:bg-slate-800/50">
               Opciones
             </th>
           </tr>

@@ -6,6 +6,13 @@
 
 ---
 
+> **Sesión 2026-07-28 — Capitalización uniforme en columnas de Sitios.** Rama `vps_prod`, base `7f90bef`; sin despliegue.
+> - Corregida la mezcla causada por `uppercase`: las columnas normales aparecían en mayúsculas completas, mientras las ordenables conservaban formato de frase.
+> - Todos los encabezados usan ahora capitalización de frase: `Sitio`, `Disponibilidad`, `Etiquetas`, `Ruta asignada`, `Dirección de conexión`, `Red del sitio` y `Opciones`.
+> - La prueba de `NodesTable` cubre explícitamente los cinco encabezados mostrados por el usuario y verifica que ninguno reciba `uppercase`.
+> - Verificación: prueba focalizada **1/1**, ESLint, TypeScript/build Vite y `git diff --check`.
+> - Pendiente: commit/publicación y autorización explícita antes de desplegar sólo el frontend.
+
 > **Sesión 2026-07-28 — Identidad de Sitios desplegada en producción.** Rama/checkpoint productivo `b5fd7d0`.
 > - Con autorización explícita se etiquetó la imagen frontend anterior como `gestionvpn-10-frontend:pre-b5fd7d0-20260728`.
 > - El VPS avanzó de `dab950b` a `b5fd7d0`; se reconstruyó y recreó únicamente `vpn-frontend` con `--no-deps`.

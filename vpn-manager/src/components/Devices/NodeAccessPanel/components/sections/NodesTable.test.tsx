@@ -22,12 +22,17 @@ describe('NodesTable accessibility', () => {
         onHistoryNode={vi.fn()}
         onTagClick={vi.fn()}
         onDiagnoseNode={vi.fn()}
-        visibleCols={['vrf', 'lan']}
+        visibleCols={['disabled', 'tags', 'vrf', 'ip_tunnel', 'lan']}
       />,
     );
 
     expect(screen.getByRole('region', { name: /sitios remotos/i })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: /^sitio$/i })).toHaveAttribute('aria-sort', 'descending');
+    expect(screen.getByRole('columnheader', { name: 'Disponibilidad' })).not.toHaveClass('uppercase');
+    expect(screen.getByRole('columnheader', { name: 'Etiquetas' })).not.toHaveClass('uppercase');
+    expect(screen.getByRole('columnheader', { name: 'Ruta asignada' })).not.toHaveClass('uppercase');
+    expect(screen.getByRole('columnheader', { name: 'Dirección de conexión' })).not.toHaveClass('uppercase');
+    expect(screen.getByRole('columnheader', { name: 'Red del sitio' })).not.toHaveClass('uppercase');
 
     const sortButton = screen.getByRole('button', { name: /ordenar por sitio ascendente/i });
     sortButton.focus();
