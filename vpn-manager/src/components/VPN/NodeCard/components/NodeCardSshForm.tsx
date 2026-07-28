@@ -53,7 +53,7 @@ export function NodeCardSshForm({
         onClose={onCloseSshForm}
       />
 
-      <div className="modal-body space-y-5">
+      <div className="modal-body space-y-3 !p-4 sm:!px-5">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Credenciales guardadas</p>
@@ -69,24 +69,17 @@ export function NodeCardSshForm({
           </button>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-2">
           {sshCredsArr.map((cred, i) => (
-            <div key={i} className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-800/50">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-xs font-bold text-indigo-600 dark:text-indigo-300">Opción {i + 1}</span>
-                {sshCredsArr.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => onRemoveCred(i)}
-                    aria-label={`Eliminar opción ${i + 1}`}
-                    className="btn-ghost btn-icon min-h-11 min-w-11 text-slate-500 hover:text-rose-600 dark:hover:text-rose-400"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
+            <div
+              key={i}
+              className="grid items-end gap-2 rounded-xl border border-slate-200 bg-slate-50/70 p-2.5 sm:grid-cols-[4.25rem_minmax(0,1fr)_minmax(0,1fr)_2.75rem] dark:border-slate-700 dark:bg-slate-800/50"
+            >
+              <div className="flex min-h-11 items-center">
+                <span className="text-xs font-bold text-indigo-600 dark:text-indigo-300">{i + 1}.</span>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="space-y-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
+              <div className="grid gap-2 sm:contents">
+                <label className="space-y-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
                   <span>Usuario</span>
                   <input
                     type="text"
@@ -95,10 +88,10 @@ export function NodeCardSshForm({
                     onChange={e => onUpdateCred(i, 'user', e.target.value)}
                     autoFocus={i === 0}
                     autoComplete="username"
-                    className="input-field min-h-11 px-3 py-2.5"
+                    className="input-field min-h-11 px-3 py-2"
                   />
                 </label>
-                <label className="space-y-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                <label className="space-y-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
                   <span>Contraseña</span>
                   <input
                     type={showPasswords ? 'text' : 'password'}
@@ -107,9 +100,22 @@ export function NodeCardSshForm({
                     onChange={e => onUpdateCred(i, 'pass', e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && onSaveSshCreds()}
                     autoComplete="current-password"
-                    className="input-field min-h-11 px-3 py-2.5"
+                    className="input-field min-h-11 px-3 py-2"
                   />
                 </label>
+              </div>
+              <div className="flex min-h-11 items-center justify-end">
+                {sshCredsArr.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => onRemoveCred(i)}
+                    aria-label={`Eliminar opción ${i + 1}`}
+                    title={`Eliminar opción ${i + 1}`}
+                    className="btn-ghost btn-icon min-h-11 min-w-11 text-slate-500 hover:text-rose-600 dark:hover:text-rose-400"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -126,7 +132,7 @@ export function NodeCardSshForm({
         </button>
       </div>
 
-      <div className="modal-footer">
+      <div className="modal-footer !px-4 !py-3 sm:!px-5">
         <button type="button" onClick={onCloseSshForm} disabled={sshLoading} className="btn-outline btn-md min-h-11">
           Cancelar
         </button>
