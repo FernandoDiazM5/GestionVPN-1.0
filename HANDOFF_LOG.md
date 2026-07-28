@@ -6,6 +6,13 @@
 
 ---
 
+> **Sesión 2026-07-28 — Identidad de Sitios desplegada en producción.** Rama/checkpoint productivo `b5fd7d0`.
+> - Con autorización explícita se etiquetó la imagen frontend anterior como `gestionvpn-10-frontend:pre-b5fd7d0-20260728`.
+> - El VPS avanzó de `dab950b` a `b5fd7d0`; se reconstruyó y recreó únicamente `vpn-frontend` con `--no-deps`.
+> - Backend y MySQL no se reiniciaron; no hubo migraciones ni cambios de `.env`.
+> - Verificación: HTTPS 200, API health `ok`, MySQL/RouterOS/SMTP `ok`, frontend `running` con 0 reinicios y texto `Organizar sitio` confirmado en `NodeAccessPanel-DKj0bo6u.js`.
+> - El primer comando de despliegue agotó el timeout local después de que Compose reportó el frontend iniciado; la comprobación independiente confirmó que el despliegue sí había terminado correctamente.
+
 > **Sesión 2026-07-28 — Identidad única para las acciones de Sitios.** Rama `vps_prod`, base `941ca5d`; sin despliegue. Skills: `ui-design-system`, `vercel-react-best-practices`, `handoff-keeper`.
 > - Se creó `SiteModalHeader`, cabecera índigo reutilizable con icono, nombre del sitio, descripción, cierre accesible y truncado responsivo.
 > - Editar, configuración, actividad, comprobación de conexión, etiquetas, credenciales y eliminación comparten ahora la misma identidad; colores semánticos aparecen sólo en estados y acciones de riesgo.
