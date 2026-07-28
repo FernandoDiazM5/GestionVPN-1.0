@@ -6,6 +6,13 @@
 
 ---
 
+> **Sesión 2026-07-28 — Modal de credenciales de acceso más compacto.** Rama `vps_prod`, base `2194fdd`; cambio `5abf2a2`, sin despliegue. Skills: `ui-design-system`, `vercel-react-best-practices`, `handoff-keeper`.
+> - Cada opción pasa de una tarjeta alta con dos niveles a una fila compacta de número, usuario, contraseña y eliminación en escritorio.
+> - En móvil los campos siguen apilándose; mostrar claves, añadir, eliminar y guardar conservan su comportamiento y áreas táctiles de 44 px.
+> - Se redujeron padding, separación entre tarjetas y pie del modal sin modificar API, backend ni datos.
+> - Verificación: prueba focalizada **2/2**, suite completa **55 archivos / 182 pruebas**, ESLint, TypeScript/build Vite y `git diff --check`.
+> - Pendiente: publicar `vps_prod` y obtener autorización explícita antes de reconstruir sólo el frontend en producción.
+
 > **Sesión 2026-07-28 — Vista de Sitios compacta sin alterar columnas elegibles.** Rama `vps_prod`, base `0b4d0fb`; sin despliegue. Skills: `ui-design-system`, `vercel-react-best-practices`, `handoff-keeper`.
 > - Encabezado simplificado a `Sitios remotos`, descripción breve, botón `Actualizar` y hora real de última actualización después de una carga confirmada.
 > - Barra compacta con búsqueda, `Conexión: todas`, `Estado: todos`, `Columnas`, descarga y contador `X de Y sitios`; chips aparecen sólo con filtros activos.
