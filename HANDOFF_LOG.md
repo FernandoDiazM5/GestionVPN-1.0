@@ -6,6 +6,13 @@
 
 ---
 
+> **Sesión 2026-07-28 — Diagnóstico de AP guardado sin clave SSH.** Rama `vps_prod`, base `e678223`; sólo lectura, sin cambios funcionales ni despliegue. Skill: `network-engineer`, `handoff-keeper`.
+> - Producción confirma que `142.152.7.237`/`E43883BCEFC4` se insertó a las 18:48:41 UTC con usuario `ubnt`, pero `clave_ssh_enc=NULL`; el `POST /api/db/devices` respondió 200.
+> - Causa principal: el caché persistente del escaneo conserva `sshStatus=success`, estadísticas y usuario, pero quita la contraseña; tras recargar la página la caché secreta en memoria desaparece y el guardado rápido sigue habilitado basándose sólo en el estado antiguo.
+> - Barreras ausentes: guardado rápido no verifica secreto recuperable, `saveSingle` no rechaza la contradicción y backend admite usuario sin clave.
+> - Escenarios relacionados a cubrir: carrera al rehidratar, cambio de MAC/ID entre descubrimiento y estadísticas, sincronización de un AP existente sin propagar credenciales recién validadas, contraseña SSH vacía y credenciales cambiadas después de un resultado cacheado.
+> - Pendiente: implementar defensa en profundidad frontend/backend, pruebas de regresión y reparación explícita del registro afectado; no se modificó la BD.
+
 > **Sesión 2026-07-28 — Reordenamiento de credenciales desplegado.** Rama/checkpoint productivo `a1c545f`.
 > - Añadidos controles accesibles para subir y bajar credenciales; los límites quedan deshabilitados y el orden guardado define la secuencia de prueba.
 > - Verificación local: prueba focalizada **3/3**, suite completa **55 archivos / 183 pruebas**, ESLint, TypeScript/build Vite y `git diff --check`.
