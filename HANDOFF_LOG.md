@@ -6,6 +6,13 @@
 
 ---
 
+> **Sesión 2026-07-28 — Reordenamiento de credenciales desplegado.** Rama/checkpoint productivo `a1c545f`.
+> - Añadidos controles accesibles para subir y bajar credenciales; los límites quedan deshabilitados y el orden guardado define la secuencia de prueba.
+> - Verificación local: prueba focalizada **3/3**, suite completa **55 archivos / 183 pruebas**, ESLint, TypeScript/build Vite y `git diff --check`.
+> - Con autorización explícita se respaldó el frontend como `gestionvpn-10-frontend:pre-a1c545f-20260728`, se avanzó el VPS de `b5fd7d0` a `a1c545f` y se reconstruyó sólo `vpn-frontend`.
+> - Producción: HTTPS 200, bundle `NodeAccessPanel-C6ybEIQk.js` confirmado, frontend running con 0 reinicios; backend y DB conservaron sus tiempos de inicio y 0 reinicios.
+> - Health: MySQL y SMTP `ok`; RouterOS `stale` por la edad de la última escritura, pero `/api/nodes` siguió respondiendo 200 y no aparecieron errores nuevos.
+
 > **Sesión 2026-07-28 — Modal de credenciales de acceso más compacto.** Rama `vps_prod`, base `2194fdd`; cambio `5abf2a2`, sin despliegue. Skills: `ui-design-system`, `vercel-react-best-practices`, `handoff-keeper`.
 > - Cada opción pasa de una tarjeta alta con dos niveles a una fila compacta de número, usuario, contraseña y eliminación en escritorio.
 > - En móvil los campos siguen apilándose; mostrar claves, añadir, eliminar y guardar conservan su comportamiento y áreas táctiles de 44 px.
