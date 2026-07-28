@@ -1,5 +1,6 @@
-import { Eye, EyeOff, X, PlusCircle, KeyRound, Check, Loader2 } from 'lucide-react';
+import { Check, Eye, EyeOff, KeyRound, Loader2, PlusCircle, X } from 'lucide-react';
 import type { NodeInfo } from '../../../../types/api';
+import Dialog from '../../../Common/Dialog';
 
 interface SshCred {
   user: string;
@@ -9,9 +10,6 @@ interface SshCred {
 interface NodeCardSshFormProps {
   showSshForm: boolean;
   node: NodeInfo;
-  rowIndex: number;
-  isPending: boolean;
-  isThisNodeActive: boolean;
   sshCredsArr: SshCred[];
   showPasswords: boolean;
   sshLoading: boolean;
@@ -27,9 +25,6 @@ interface NodeCardSshFormProps {
 export function NodeCardSshForm({
   showSshForm,
   node,
-  rowIndex,
-  isPending,
-  isThisNodeActive,
   sshCredsArr,
   showPasswords,
   sshLoading,
@@ -43,86 +38,118 @@ export function NodeCardSshForm({
 }: NodeCardSshFormProps) {
   if (!showSshForm) return null;
 
-  const rowBg = isThisNodeActive
-    ? 'bg-emerald-50/60 dark:bg-emerald-500/10'
-    : isPending
-      ? 'bg-indigo-50/60 dark:bg-indigo-500/10'
-      : rowIndex % 2 === 0
-        ? 'bg-white dark:bg-slate-900'
-        : 'bg-slate-50/40 dark:bg-slate-800/40';
-
   return (
-    <tr className={rowBg}>
-      <td colSpan={7} className="px-4 pb-3 pt-0">
-        <div className="ml-10 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 space-y-2.5 dark:bg-amber-500/10 dark:border-amber-500/30">
-          <div className="flex items-center justify-between">
-            <p className="text-2xs font-bold text-amber-600 uppercase tracking-wider flex items-center gap-1.5">
-              <KeyRound className="w-3 h-3" />
-              Credenciales SSH — {node.nombre_nodo}
-            </p>
-            <div className="flex items-center gap-1">
-              <button onClick={() => onSetShowPasswords(!showPasswords)} title={showPasswords ? 'Ocultar contraseñas' : 'Mostrar contraseñas'}
-                className="p-1 text-slate-500 dark:text-slate-400 hover:text-amber-600 rounded transition-colors">
-                {showPasswords ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-              </button>
-              <button onClick={onCloseSshForm} aria-label="Cerrar credenciales SSH" className="btn-ghost p-1">
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
+    <Dialog
+      title={`Acceso a equipos — ${node.nombre_nodo}`}
+      onClose={onCloseSshForm}
+      panelClassName="modal-panel modal-panel-xl"
+    >
+      <div className="modal-header gap-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
+            <KeyRound className="h-5 w-5" />
           </div>
+          <div className="min-w-0">
+            <h3 className="modal-title truncate">Acceso a equipos — {node.nombre_nodo}</h3>
+            <p className="modal-subtitle">Usuarios y contraseñas para acceder a los equipos de este sitio.</p>
+          </div>
+        </div>
+        <button type="button" onClick={onCloseSshForm} aria-label="Cerrar" className="modal-close btn-ghost">
+          <X className="h-5 w-5" />
+        </button>
+      </div>
 
-          <div className="space-y-2">
-            {sshCredsArr.map((cred, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <span className="text-2xs font-black text-amber-400 w-4 text-center shrink-0">{i + 1}º</span>
-                <input
-                  type="text"
-                  placeholder="Usuario (ej: ubnt)"
-                  value={cred.user}
-                  onChange={e => onUpdateCred(i, 'user', e.target.value)}
-                  className="px-3 py-1.5 text-xs border border-amber-200 bg-white rounded-lg outline-none focus:border-amber-400 font-semibold text-slate-700 w-32 flex-1 dark:bg-slate-800 dark:border-amber-500/40 dark:text-slate-100"
-                />
-                <input
-                  type={showPasswords ? 'text' : 'password'}
-                  placeholder="Contraseña"
-                  value={cred.pass}
-                  onChange={e => onUpdateCred(i, 'pass', e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && onSaveSshCreds()}
-                  className="px-3 py-1.5 text-xs border border-amber-200 bg-white rounded-lg outline-none focus:border-amber-400 font-mono text-slate-700 w-36 flex-1 dark:bg-slate-800 dark:border-amber-500/40 dark:text-slate-100"
-                />
+      <div className="modal-body space-y-5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Credenciales guardadas</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Se probarán en este orden cuando busques equipos.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onSetShowPasswords(!showPasswords)}
+            className="btn-outline btn-sm inline-flex min-h-11 shrink-0 items-center"
+          >
+            {showPasswords ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            <span className="hidden sm:inline">{showPasswords ? 'Ocultar claves' : 'Mostrar claves'}</span>
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          {sshCredsArr.map((cred, i) => (
+            <div key={i} className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-800/50">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs font-bold text-indigo-600 dark:text-indigo-300">Opción {i + 1}</span>
                 {sshCredsArr.length > 1 && (
-                  <button onClick={() => onRemoveCred(i)} className="p-1 text-slate-300 hover:text-rose-500 rounded transition-colors shrink-0">
-                    <X className="w-3.5 h-3.5" />
+                  <button
+                    type="button"
+                    onClick={() => onRemoveCred(i)}
+                    aria-label={`Eliminar opción ${i + 1}`}
+                    className="btn-ghost btn-icon min-h-11 min-w-11 text-slate-500 hover:text-rose-600 dark:hover:text-rose-400"
+                  >
+                    <X className="h-4 w-4" />
                   </button>
                 )}
               </div>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-3 pt-1">
-            <button
-              onClick={onAddCred}
-              disabled={sshCredsArr.length >= 5}
-              className="flex items-center gap-1 text-2xs font-bold text-amber-600 hover:text-amber-800 disabled:opacity-40 transition-colors"
-            >
-              <PlusCircle className="w-3.5 h-3.5" />
-              <span>Añadir ({sshCredsArr.length}/5)</span>
-            </button>
-            <button
-              onClick={onSaveSshCreds}
-              disabled={sshLoading}
-              className="btn-warning btn-sm flex items-center gap-1.5 ml-auto"
-            >
-              {sshLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : sshSaved ? <Check className="w-3 h-3" /> : <KeyRound className="w-3 h-3" />}
-              {sshSaved ? 'Guardado' : 'Guardar'}
-            </button>
-          </div>
-
-          <p className="text-2xs text-amber-500">
-            Se probarán en orden al escanear equipos en este nodo.
-          </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="space-y-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  <span>Usuario</span>
+                  <input
+                    type="text"
+                    placeholder="Ej.: ubnt"
+                    value={cred.user}
+                    onChange={e => onUpdateCred(i, 'user', e.target.value)}
+                    autoFocus={i === 0}
+                    autoComplete="username"
+                    className="input-field min-h-11 px-3 py-2.5"
+                  />
+                </label>
+                <label className="space-y-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  <span>Contraseña</span>
+                  <input
+                    type={showPasswords ? 'text' : 'password'}
+                    placeholder="Ingresa la contraseña"
+                    value={cred.pass}
+                    onChange={e => onUpdateCred(i, 'pass', e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && onSaveSshCreds()}
+                    autoComplete="current-password"
+                    className="input-field min-h-11 px-3 py-2.5"
+                  />
+                </label>
+              </div>
+            </div>
+          ))}
         </div>
-      </td>
-    </tr>
+
+        <button
+          type="button"
+          onClick={onAddCred}
+          disabled={sshCredsArr.length >= 5}
+          className="btn-outline btn-sm inline-flex min-h-11 items-center"
+        >
+          <PlusCircle className="h-4 w-4" />
+          <span>Agregar otra credencial ({sshCredsArr.length}/5)</span>
+        </button>
+      </div>
+
+      <div className="modal-footer">
+        <button type="button" onClick={onCloseSshForm} disabled={sshLoading} className="btn-outline btn-md min-h-11">
+          Cancelar
+        </button>
+        <button
+          type="button"
+          onClick={onSaveSshCreds}
+          disabled={sshLoading}
+          className="btn-primary btn-md inline-flex min-h-11 items-center"
+        >
+          {sshLoading
+            ? <Loader2 className="h-4 w-4 animate-spin" />
+            : sshSaved
+              ? <Check className="h-4 w-4" />
+              : <KeyRound className="h-4 w-4" />}
+          <span>{sshLoading ? 'Guardando…' : sshSaved ? 'Cambios guardados' : 'Guardar cambios'}</span>
+        </button>
+      </div>
+    </Dialog>
   );
 }

@@ -6,6 +6,14 @@
 
 ---
 
+> **Sesión 2026-07-27 — Credenciales SSH convertidas a modal con identidad unificada.** Rama `vps_prod`, base `df27b8a`; sin despliegue. Skills: `ui-design-system`, `vercel-react-best-practices`, `handoff-keeper`.
+> - El formulario dejó de abrir una fila ámbar debajo del sitio y ahora usa el `Dialog` accesible compartido: portal centrado, bloqueo de fondo, foco contenido, Escape/backdrop y restauración de foco.
+> - La ventana usa la identidad índigo/pizarra, tipografía sans, encabezado, espaciado, campos, botones y tamaños táctiles canónicos; el mismo contenedor común propaga tipografía y tokens de encabezado a las demás ventanas.
+> - El texto se simplificó a `Acceso a equipos`, `Opción`, `Agregar otra credencial`, `Cancelar` y `Guardar cambios`; avisa antes de descartar cambios no guardados.
+> - Archivos: `NodeCardSshForm.tsx`, `useSshCredentials.ts`, `NodeCard.tsx`, `index.css` y prueba focalizada nueva.
+> - Verificación: **54 archivos / 180 pruebas frontend**, incluidas 2 focalizadas nuevas, TypeScript, ESLint, build Vite y `git diff --check`. El auditor no detecta hallazgos nuevos; conserva sólo 2 preexistentes en `RouterAccess.tsx`.
+> - Pendiente: revisión visual autenticada, commit/publicación y autorización explícita antes de desplegar sólo el frontend.
+
 > **Sesión 2026-07-27 — Lease y vista Sitios desplegados en producción.** Rama `vps_prod`, checkout productivo `dab950b` con implementación `7b3a6db`.
 > - Autorización explícita recibida después de publicar y verificar el SHA. Se etiquetaron las imágenes anteriores como `pre-dab950b-20260727`.
 > - Reconstruidos y recreados únicamente `vpn-backend` y `vpn-frontend` con `--no-deps`; `vpn-db` no fue reiniciado y no hubo migraciones nuevas.

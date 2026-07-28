@@ -60,7 +60,6 @@ export default function NodeCard({
 
   const {
     showSshForm,
-    setShowSshForm,
     sshCredsArr,
     setSshCredsArr,
     sshLoading,
@@ -68,6 +67,7 @@ export default function NodeCard({
     showPasswords,
     setShowPasswords,
     openSshForm,
+    closeSshForm,
     saveSshCreds,
     updateCred,
     removeCred,
@@ -282,15 +282,12 @@ export default function NodeCard({
       <NodeCardSshForm
         showSshForm={showSshForm}
         node={node}
-        rowIndex={rowIndex}
-        isPending={isPending}
-        isThisNodeActive={isThisNodeActive}
         sshCredsArr={sshCredsArr}
         showPasswords={showPasswords}
         sshLoading={sshLoading}
         sshSaved={sshSaved}
         onSetShowPasswords={setShowPasswords}
-        onCloseSshForm={() => setShowSshForm(false)}
+        onCloseSshForm={closeSshForm}
         onUpdateCred={updateCred}
         onRemoveCred={removeCred}
         onAddCred={() => { if (sshCredsArr.length < 5) setSshCredsArr([...sshCredsArr, { user: '', pass: '' }]); }}
