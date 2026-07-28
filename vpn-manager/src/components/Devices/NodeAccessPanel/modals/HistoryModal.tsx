@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { X, History } from 'lucide-react';
+import { History } from 'lucide-react';
 import AsyncQueryState from '../../../Common/AsyncQueryState';
 import { apiFetch } from '../../../../utils/apiClient';
 import { API_BASE_URL } from '../../../../config';
 import type { NodeInfo } from '../../../../types/api';
 import Dialog from '../../../Common/Dialog';
+import SiteModalHeader from '../../../Common/SiteModalHeader';
 
 export default function HistoryModal({ node, onClose }: { node: NodeInfo; onClose: () => void }) {
   const [history, setHistory] = useState<{ event: string; timestamp: number }[]>([]);
@@ -35,24 +36,17 @@ export default function HistoryModal({ node, onClose }: { node: NodeInfo; onClos
 
   return (
     <Dialog
-      title={`Historial de ${node.nombre_nodo}`}
+      title={`Actividad del sitio ${node.nombre_nodo}`}
       onClose={onClose}
       panelClassName="modal-panel modal-panel-md max-h-[80vh]"
     >
-        <div className="modal-header-decorated modal-header-sky">
-          <div className="flex items-center gap-3">
-            <div className="modal-header-icon">
-              <History className="w-4 h-4 text-white" />
-            </div>
-            <div>
-              <p className="text-sm font-bold text-white">Historial — {node.nombre_nodo}</p>
-              <p className="text-2xs text-sky-200">{node.ppp_user}</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="modal-header-close">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+        <SiteModalHeader
+          icon={History}
+          title="Actividad del sitio"
+          siteName={node.nombre_nodo}
+          description="Conexiones recientes"
+          onClose={onClose}
+        />
         <div className="overflow-y-auto flex-1 p-4">
           <AsyncQueryState
             loading={loading}
@@ -66,10 +60,10 @@ export default function HistoryModal({ node, onClose }: { node: NodeInfo; onClos
             <div className="space-y-2">
               {history.map((h, i) => {
                 const cfg: Record<string, { dot: string; label: string; row: string; text: string }> = {
-                  connected: { dot: 'bg-emerald-500', label: 'Conectado VPN', row: 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-100', text: 'text-emerald-700' },
-                  disconnected: { dot: 'bg-rose-500', label: 'Desconectado VPN', row: 'bg-rose-50 dark:bg-rose-500/10 border-rose-100', text: 'text-rose-700' },
-                  tunnel_activated: { dot: 'bg-sky-500', label: 'Túnel activado', row: 'bg-sky-50 dark:bg-sky-500/10 border-sky-100', text: 'text-sky-700' },
-                  tunnel_deactivated: { dot: 'bg-amber-500', label: 'Túnel desactivado', row: 'bg-amber-50 dark:bg-amber-500/10 border-amber-100', text: 'text-amber-700' },
+                  connected: { dot: 'bg-emerald-500', label: 'Conexión iniciada', row: 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-100', text: 'text-emerald-700' },
+                  disconnected: { dot: 'bg-slate-400', label: 'Conexión finalizada', row: 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700', text: 'text-slate-700 dark:text-slate-300' },
+                  tunnel_activated: { dot: 'bg-emerald-500', label: 'Conexión iniciada', row: 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-100', text: 'text-emerald-700' },
+                  tunnel_deactivated: { dot: 'bg-slate-400', label: 'Conexión finalizada', row: 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700', text: 'text-slate-700 dark:text-slate-300' },
                 };
                 const c = cfg[h.event] ?? { dot: 'bg-slate-400', label: h.event, row: 'bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-800', text: 'text-slate-600 dark:text-slate-300' };
                 return (
@@ -84,7 +78,7 @@ export default function HistoryModal({ node, onClose }: { node: NodeInfo; onClos
           </AsyncQueryState>
         </div>
         <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-800 shrink-0">
-          <button onClick={onClose} className="w-full py-2 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+          <button onClick={onClose} className="btn-outline btn-md w-full">
             Cerrar
           </button>
         </div>

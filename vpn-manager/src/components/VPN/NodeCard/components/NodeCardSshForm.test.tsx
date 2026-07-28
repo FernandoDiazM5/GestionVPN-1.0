@@ -34,6 +34,8 @@ describe('<NodeCardSshForm />', () => {
 
     const dialog = screen.getByRole('dialog', { name: 'Acceso a equipos — Torre Housenet' });
     expect(dialog).toHaveClass('modal-panel', 'modal-panel-xl');
+    expect(screen.getByText('Acceso a equipos').closest('.modal-header-indigo')).toBeInTheDocument();
+    expect(screen.getByText(/Torre Housenet · Credenciales de acceso/)).toBeInTheDocument();
     expect(screen.getByText('Se probarán en este orden cuando busques equipos.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Guardar cambios' })).toHaveClass('btn-primary');
     expect(document.querySelector('tr')).not.toBeInTheDocument();

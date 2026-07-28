@@ -6,6 +6,15 @@
 
 ---
 
+> **Sesión 2026-07-28 — Identidad única para las acciones de Sitios.** Rama `vps_prod`, base `941ca5d`; sin despliegue. Skills: `ui-design-system`, `vercel-react-best-practices`, `handoff-keeper`.
+> - Se creó `SiteModalHeader`, cabecera índigo reutilizable con icono, nombre del sitio, descripción, cierre accesible y truncado responsivo.
+> - Editar, configuración, actividad, comprobación de conexión, etiquetas, credenciales y eliminación comparten ahora la misma identidad; colores semánticos aparecen sólo en estados y acciones de riesgo.
+> - La UI reemplaza `Nodo`, `Túnel`, `PPP` y `VRF` por `Sitio`, `Conexión`, `Usuario de conexión` y `Ruta asignada` donde el detalle técnico no es imprescindible.
+> - La configuración dejó el panel negro/verde en modo claro: usa tarjetas claras con borde, tipografía monoespaciada neutra, pasos índigo y botones `Copiar instrucciones`/`Generar nuevamente`.
+> - Actividad muestra `Conexión iniciada/finalizada`; diagnóstico se presenta como `Comprobar conexión`; etiquetas usan cápsulas índigo y botones canónicos.
+> - Verificación: **54 archivos / 180 pruebas frontend**, TypeScript, ESLint, build Vite y `git diff --check`. Auditor de diseño sin hallazgos nuevos; sólo permanecen 2 preexistentes en `RouterAccess.tsx`.
+> - Pendiente: revisión visual autenticada, commit/publicación y autorización explícita antes de desplegar sólo el frontend.
+
 > **Sesión 2026-07-27 — Credenciales SSH convertidas a modal con identidad unificada.** Rama `vps_prod`, base `df27b8a`; sin despliegue. Skills: `ui-design-system`, `vercel-react-best-practices`, `handoff-keeper`.
 > - El formulario dejó de abrir una fila ámbar debajo del sitio y ahora usa el `Dialog` accesible compartido: portal centrado, bloqueo de fondo, foco contenido, Escape/backdrop y restauración de foco.
 > - La ventana usa la identidad índigo/pizarra, tipografía sans, encabezado, espaciado, campos, botones y tamaños táctiles canónicos; el mismo contenedor común propaga tipografía y tokens de encabezado a las demás ventanas.

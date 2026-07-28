@@ -9,9 +9,10 @@
 //  el path de red coincide con el real.
 // ============================================================
 import { useState } from 'react';
-import { X, Wifi, Network, Loader2, Play, AlertCircle, Check } from 'lucide-react';
+import { Wifi, Network, Loader2, Play, AlertCircle, Check } from 'lucide-react';
 import { diagnosticsApi } from '../../../../services/diagnosticsApi';
 import Dialog from '../../../Common/Dialog';
+import SiteModalHeader from '../../../Common/SiteModalHeader';
 import type {
   DiagnosticsPingResponse,
   DiagnosticsTraceResponse,
@@ -61,36 +62,28 @@ export default function DiagnosticsModal({ initialTarget, nodeName, onClose }: D
 
   return (
     <Dialog
-      title="Diagnóstico de red"
+      title={`Comprobar conexión${nodeName ? ` de ${nodeName}` : ''}`}
       onClose={onClose}
       panelClassName="modal-panel modal-panel-2xl"
     >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 dark:border-slate-800">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-500/15 flex items-center justify-center">
-              <Network className="w-4 h-4 text-indigo-600" />
-            </div>
-            <div>
-              <h2 id="diag-title" className="text-sm font-bold text-slate-800 dark:text-slate-100">Diagnóstico de red</h2>
-              {nodeName && <p className="text-xs text-slate-500">{nodeName}</p>}
-            </div>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Cerrar">
-            <X className="w-4 h-4 text-slate-500" />
-          </button>
-        </div>
+        <SiteModalHeader
+          icon={Network}
+          title="Comprobar conexión"
+          siteName={nodeName || 'Sitio remoto'}
+          description="Verifica si el sitio responde"
+          onClose={onClose}
+        />
 
         {/* Tabs */}
         <div className="border-b border-slate-100 dark:border-slate-800 px-3 flex gap-1">
-          <SubTab active={tab === 'ping'} onClick={() => setTab('ping')} icon={Wifi} label="Ping" />
-          <SubTab active={tab === 'trace'} onClick={() => setTab('trace')} icon={Network} label="Traceroute" />
+          <SubTab active={tab === 'ping'} onClick={() => setTab('ping')} icon={Wifi} label="Respuesta" />
+          <SubTab active={tab === 'trace'} onClick={() => setTab('trace')} icon={Network} label="Recorrido de red" />
         </div>
 
         {/* Target input + Run */}
         <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-end gap-3">
           <div className="flex-1">
-            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Destino</label>
+            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Dirección que deseas comprobar</label>
             <input
               type="text"
               value={target}
@@ -103,7 +96,7 @@ export default function DiagnosticsModal({ initialTarget, nodeName, onClose }: D
           </div>
           <button onClick={execute} disabled={busy || !target.trim()} className="btn-primary btn-sm inline-flex items-center">
             {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-            {busy ? 'Ejecutando…' : 'Ejecutar'}
+            {busy ? 'Comprobando…' : 'Iniciar comprobación'}
           </button>
         </div>
 
@@ -118,8 +111,8 @@ export default function DiagnosticsModal({ initialTarget, nodeName, onClose }: D
           {!err && !pingResult && !traceResult && !busy && (
             <div className="text-center py-10 text-slate-500 dark:text-slate-400">
               <Play className="w-10 h-10 mx-auto mb-3 opacity-40" />
-              <p className="text-sm">Pulsa <b>Ejecutar</b> para iniciar.</p>
-              <p className="text-xs mt-1">El comando se ejecuta en el router central, no desde tu navegador.</p>
+              <p className="text-sm">Inicia la comprobación para verificar si el sitio responde.</p>
+              <p className="text-xs mt-1">La prueba se realiza de forma segura desde el servidor de conexión.</p>
             </div>
           )}
 

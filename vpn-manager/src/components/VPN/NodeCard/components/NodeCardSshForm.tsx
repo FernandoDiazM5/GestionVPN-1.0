@@ -1,6 +1,7 @@
 import { Check, Eye, EyeOff, KeyRound, Loader2, PlusCircle, X } from 'lucide-react';
 import type { NodeInfo } from '../../../../types/api';
 import Dialog from '../../../Common/Dialog';
+import SiteModalHeader from '../../../Common/SiteModalHeader';
 
 interface SshCred {
   user: string;
@@ -44,20 +45,13 @@ export function NodeCardSshForm({
       onClose={onCloseSshForm}
       panelClassName="modal-panel modal-panel-xl"
     >
-      <div className="modal-header gap-4">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
-            <KeyRound className="h-5 w-5" />
-          </div>
-          <div className="min-w-0">
-            <h3 className="modal-title truncate">Acceso a equipos — {node.nombre_nodo}</h3>
-            <p className="modal-subtitle">Usuarios y contraseñas para acceder a los equipos de este sitio.</p>
-          </div>
-        </div>
-        <button type="button" onClick={onCloseSshForm} aria-label="Cerrar" className="modal-close btn-ghost">
-          <X className="h-5 w-5" />
-        </button>
-      </div>
+      <SiteModalHeader
+        icon={KeyRound}
+        title="Acceso a equipos"
+        siteName={node.nombre_nodo}
+        description="Credenciales de acceso del sitio"
+        onClose={onCloseSshForm}
+      />
 
       <div className="modal-body space-y-5">
         <div className="flex items-center justify-between gap-3">

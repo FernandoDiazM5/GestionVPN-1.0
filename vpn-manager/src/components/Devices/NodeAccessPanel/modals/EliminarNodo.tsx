@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Trash2, X, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { Trash2, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { useVpn } from '../../../../context';
 import { fetchWithTimeout } from '../../../../utils/fetchWithTimeout';
 import { API_BASE_URL } from '../../../../config';
@@ -7,6 +7,7 @@ import { ProvisionSteps } from '../components';
 import type { NodeInfo } from '../../../../types/api';
 import type { ProvisionResult } from '../types';
 import Dialog from '../../../Common/Dialog';
+import SiteModalHeader from '../../../Common/SiteModalHeader';
 
 interface EliminarNodoProps {
   node: NodeInfo;
@@ -79,29 +80,20 @@ export default function EliminarNodo({ node, onClose, onSuccess }: EliminarNodoP
 
   return (
     <Dialog
-      title={`Eliminar nodo ${node.nombre_nodo}`}
+      title={`Eliminar sitio ${node.nombre_nodo}`}
       onClose={onClose}
       closeOnBackdrop={!deleting && !result}
       closeOnEscape={!deleting && !result}
       panelClassName="modal-panel modal-panel-xl"
     >
 
-        <div className="modal-header-decorated modal-header-rose">
-          <div className="flex items-center gap-3">
-            <div className="modal-header-icon">
-              <Trash2 className="w-4 h-4 text-white" />
-            </div>
-            <div>
-              <p className="text-sm font-bold text-white">Eliminar Nodo VPN</p>
-              <p className="text-2xs text-rose-200 mt-0.5">Reverso completo del provisionamiento — 8 pasos</p>
-            </div>
-          </div>
-          {!deleting && !result && (
-            <button onClick={onClose} className="modal-header-close">
-              <X className="w-4 h-4" />
-            </button>
-          )}
-        </div>
+        <SiteModalHeader
+          icon={Trash2}
+          title="Eliminar sitio"
+          siteName={node.nombre_nodo}
+          description="Esta acción es permanente"
+          onClose={!deleting && !result ? onClose : undefined}
+        />
 
         <div className="overflow-y-auto flex-1 p-5 space-y-4">
           {deleting && !result && (
@@ -130,7 +122,7 @@ export default function EliminarNodo({ node, onClose, onSuccess }: EliminarNodoP
                   : <AlertCircle className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />}
                 <div>
                   <p className={`text-sm font-bold ${result.success ? 'text-emerald-700' : 'text-rose-700'}`}>
-                    {result.success ? 'Nodo eliminado correctamente' : 'Error al eliminar'}
+                    {result.success ? 'Sitio eliminado correctamente' : 'Error al eliminar'}
                   </p>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{result.message}</p>
                 </div>
@@ -150,16 +142,16 @@ export default function EliminarNodo({ node, onClose, onSuccess }: EliminarNodoP
             <div className="space-y-4">
               <div className="bg-rose-50 dark:bg-rose-500/10 border border-rose-200 rounded-xl p-4">
                 <p className="text-sm font-bold text-rose-700 mb-1">¿Eliminar permanentemente?</p>
-                <p className="text-xs text-rose-600">Se eliminarán todos los objetos de MikroTik asociados a este nodo. Esta acción no se puede deshacer.</p>
+                <p className="text-xs text-rose-600">Se eliminará la configuración asociada a este sitio. Esta acción no se puede deshacer.</p>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { l: 'Nodo', v: node.nombre_nodo },
-                  { l: 'VRF', v: node.nombre_vrf },
+                  { l: 'Sitio', v: node.nombre_nodo },
+                  { l: 'Ruta asignada', v: node.nombre_vrf },
                   { l: 'Interfaz', v: ifaceName },
-                  { l: 'Usuario PPP', v: node.ppp_user },
+                  { l: 'Usuario de conexión', v: node.ppp_user },
                   { l: 'LAN(s)', v: node.segmento_lan || '—' },
-                  { l: 'IP Túnel', v: node.ip_tunnel || '—' },
+                  { l: 'Dirección de conexión', v: node.ip_tunnel || '—' },
                 ].map(row => (
                   <div key={row.l} className="bg-slate-50 dark:bg-slate-800/50 rounded-lg px-3 py-2 border border-slate-100 dark:border-slate-800">
                     <p className="text-3xs font-bold text-slate-400 uppercase tracking-wider">{row.l}</p>
@@ -170,7 +162,7 @@ export default function EliminarNodo({ node, onClose, onSuccess }: EliminarNodoP
               <label className="flex items-center gap-2.5 cursor-pointer">
                 <input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)}
                   className="w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500" />
-                <span className="text-xs text-slate-600 dark:text-slate-300 font-medium">Confirmo que quiero eliminar este nodo y toda su configuración en MikroTik</span>
+                <span className="text-xs text-slate-600 dark:text-slate-300 font-medium">Confirmo que quiero eliminar este sitio y toda su configuración</span>
               </label>
             </div>
           )}
@@ -183,7 +175,7 @@ export default function EliminarNodo({ node, onClose, onSuccess }: EliminarNodoP
             </button>
             <button onClick={handleDelete} disabled={!confirmed}
               className="btn-danger btn-md flex items-center gap-2">
-              <Trash2 className="w-4 h-4" /><span>Eliminar Nodo</span>
+              <Trash2 className="w-4 h-4" /><span>Eliminar sitio</span>
             </button>
           </div>
         )}

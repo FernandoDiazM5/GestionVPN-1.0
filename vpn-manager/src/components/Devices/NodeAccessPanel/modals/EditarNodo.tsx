@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  Pencil, X, CheckCircle2, AlertCircle, Loader2, Eye, EyeOff,
+  Pencil, CheckCircle2, AlertCircle, Loader2, Eye, EyeOff,
   RefreshCw, Copy, Check, Plus, Minus, ShieldCheck,
 } from 'lucide-react';
 import Spinner from '../../../Common/Spinner';
@@ -13,6 +13,7 @@ import type { NodeInfo } from '../../../../types/api';
 import type { ProvisionResult } from '../types';
 import Dialog from '../../../Common/Dialog';
 import ModuleSkeleton from '../../../Common/ModuleSkeleton';
+import SiteModalHeader from '../../../Common/SiteModalHeader';
 
 interface EditarNodoProps {
   node: NodeInfo;
@@ -82,7 +83,7 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
       if (!details?.success) {
         const message = detailsRes.status === 'rejected' && detailsRes.reason instanceof Error
           ? detailsRes.reason.message
-          : details?.message || 'No se pudieron cargar los datos actuales del nodo.';
+          : details?.message || 'No se pudieron cargar los datos actuales del sitio.';
         setDetailsError(message);
       }
       const mikrotikPass: string = (details?.success && details?.pppPassword) ? details.pppPassword : '';
@@ -192,29 +193,20 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
 
   return (
     <Dialog
-      title={`Editar nodo ${node.nombre_nodo}`}
+      title={`Editar sitio ${node.nombre_nodo}`}
       onClose={onClose}
       closeOnBackdrop={!saving && !result}
       closeOnEscape={!saving && !result}
       panelClassName="modal-panel modal-panel-xl"
     >
 
-        <div className="modal-header-decorated modal-header-indigo">
-          <div className="flex items-center gap-3">
-            <div className="modal-header-icon">
-              <Pencil className="w-4 h-4 text-white" />
-            </div>
-            <div>
-              <p className="text-sm font-bold text-white">Editar Nodo — {node.nombre_nodo}</p>
-              <p className="text-2xs text-indigo-200 mt-0.5">{node.nombre_vrf}</p>
-            </div>
-          </div>
-          {!saving && !result && (
-            <button onClick={onClose} className="modal-header-close">
-              <X className="w-4 h-4" />
-            </button>
-          )}
-        </div>
+        <SiteModalHeader
+          icon={Pencil}
+          title="Editar sitio"
+          siteName={node.nombre_nodo}
+          description="Actualiza su información y conexión"
+          onClose={!saving && !result ? onClose : undefined}
+        />
 
         <div className="overflow-y-auto flex-1 p-5 space-y-4">
           {result && (
@@ -223,7 +215,7 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
                 {result.success ? <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" /> : <AlertCircle className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />}
                 <div>
                   <p className={`text-sm font-bold ${result.success ? 'text-emerald-700' : 'text-rose-700'}`}>
-                    {result.success ? 'Nodo actualizado' : 'Error al actualizar'}
+                    {result.success ? 'Sitio actualizado' : 'Error al actualizar'}
                   </p>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{result.message}</p>
                 </div>
@@ -253,10 +245,10 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
 
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { l: 'Nodo', v: node.nombre_nodo },
-                  { l: 'VRF', v: node.nombre_vrf || '—' },
-                  { l: isWg ? 'Interfaz WG' : 'Interfaz SSTP', v: node.nombre_vrf?.replace(/^VRF-/, isWg ? 'VPN-WG-' : 'VPN-SSTP-') || '—' },
-                  { l: 'IP Túnel actual', v: currentRemoteIP || node.ip_tunnel || '—' },
+                  { l: 'Sitio', v: node.nombre_nodo },
+                  { l: 'Ruta asignada', v: node.nombre_vrf || '—' },
+                  { l: 'Interfaz de conexión', v: node.nombre_vrf?.replace(/^VRF-/, isWg ? 'VPN-WG-' : 'VPN-SSTP-') || '—' },
+                  { l: 'Dirección de conexión', v: currentRemoteIP || node.ip_tunnel || '—' },
                 ].map(row => (
                   <div key={row.l} className="bg-slate-50 dark:bg-slate-800/50 rounded-lg px-3 py-2 border border-slate-100 dark:border-slate-800">
                     <p className="text-3xs font-bold text-slate-400 uppercase tracking-wider">{row.l}</p>
@@ -266,10 +258,10 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
               </div>
 
               <div className="border-t border-slate-100 dark:border-slate-800 pt-4 space-y-3">
-                <p className="text-2xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Campos editables</p>
+                <p className="text-2xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Información del sitio</p>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Nombre / Etiqueta del nodo</label>
+                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Nombre del sitio</label>
                   <input value={newLabel} onChange={e => setNewLabel(e.target.value)}
                     placeholder={node.nombre_nodo || ''}
                     className={`w-full px-3 py-2 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300
@@ -279,7 +271,7 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
 
                 {!isWg && (
                   <div>
-                    <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Usuario PPP</label>
+                    <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Usuario de conexión</label>
                     <input value={newPppUser} onChange={e => setNewPppUser(e.target.value)}
                       placeholder={node.ppp_user || ''}
                       autoComplete="off"
@@ -292,7 +284,7 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
                 {!isWg && (
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">Contraseña PPP</label>
+                      <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">Contraseña de conexión</label>
                       {passChanged && (
                         <span className="text-2xs text-amber-600 font-medium">Se actualizará en MikroTik al guardar</span>
                       )}
@@ -302,7 +294,7 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
                     <div className="relative">
                       <input type={showPass ? 'text' : 'password'} value={newPass}
                         onChange={e => setNewPass(e.target.value)}
-                        placeholder="Contraseña actual del nodo"
+                        placeholder="Contraseña actual del sitio"
                         autoComplete="new-password"
                         name={`ppp-pass-${node.ppp_user}`}
                         className={`w-full px-3 py-2 pr-24 text-sm border rounded-xl focus:outline-none focus:ring-2 font-mono
@@ -358,7 +350,7 @@ export default function EditarNodo({ node, onClose, onSuccess }: EditarNodoProps
 
                 {!isWg && (
                   <div>
-                    <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">IP Túnel remota (PPP remote-address)</label>
+                    <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Dirección remota de conexión</label>
                     <input value={newRemote} onChange={e => setNewRemote(e.target.value)}
                       placeholder={currentRemoteIP || '10.10.250.xxx'}
                       className={`w-full px-3 py-2 text-sm border rounded-xl focus:outline-none focus:ring-2 font-mono
