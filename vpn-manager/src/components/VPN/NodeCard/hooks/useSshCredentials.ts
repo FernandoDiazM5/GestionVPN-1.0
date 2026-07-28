@@ -55,6 +55,15 @@ export function useSshCredentials(node: NodeInfo) {
   };
 
   const removeCred = (i: number) => setSshCredsArr(sshCredsArr.filter((_, idx) => idx !== i));
+  const moveCred = (from: number, to: number) => {
+    setSshCredsArr(current => {
+      if (to < 0 || to >= current.length || from === to) return current;
+      const next = [...current];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  };
   const closeSshForm = () => {
     if (
       JSON.stringify(sshCredsArr) !== initialCredsRef.current
@@ -77,5 +86,6 @@ export function useSshCredentials(node: NodeInfo) {
     saveSshCreds,
     updateCred,
     removeCred,
+    moveCred,
   };
 }

@@ -71,6 +71,7 @@ export default function NodeCard({
     saveSshCreds,
     updateCred,
     removeCred,
+    moveCred,
   } = useSshCredentials(node);
 
   const {
@@ -290,6 +291,7 @@ export default function NodeCard({
         onCloseSshForm={closeSshForm}
         onUpdateCred={updateCred}
         onRemoveCred={removeCred}
+        onMoveCred={moveCred}
         onAddCred={() => { if (sshCredsArr.length < 5) setSshCredsArr([...sshCredsArr, { user: '', pass: '' }]); }}
         onSaveSshCreds={saveSshCreds}
       />

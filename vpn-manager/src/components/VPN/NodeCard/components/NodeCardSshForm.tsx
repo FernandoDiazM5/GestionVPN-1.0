@@ -1,4 +1,4 @@
-import { Check, Eye, EyeOff, KeyRound, Loader2, PlusCircle, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, Eye, EyeOff, KeyRound, Loader2, PlusCircle, X } from 'lucide-react';
 import type { NodeInfo } from '../../../../types/api';
 import Dialog from '../../../Common/Dialog';
 import SiteModalHeader from '../../../Common/SiteModalHeader';
@@ -19,6 +19,7 @@ interface NodeCardSshFormProps {
   onCloseSshForm: () => void;
   onUpdateCred: (i: number, field: 'user' | 'pass', value: string) => void;
   onRemoveCred: (i: number) => void;
+  onMoveCred: (from: number, to: number) => void;
   onAddCred: () => void;
   onSaveSshCreds: () => void;
 }
@@ -34,6 +35,7 @@ export function NodeCardSshForm({
   onCloseSshForm,
   onUpdateCred,
   onRemoveCred,
+  onMoveCred,
   onAddCred,
   onSaveSshCreds,
 }: NodeCardSshFormProps) {
@@ -73,10 +75,30 @@ export function NodeCardSshForm({
           {sshCredsArr.map((cred, i) => (
             <div
               key={i}
-              className="grid items-end gap-2 rounded-xl border border-slate-200 bg-slate-50/70 p-2.5 sm:grid-cols-[4.25rem_minmax(0,1fr)_minmax(0,1fr)_2.75rem] dark:border-slate-700 dark:bg-slate-800/50"
+              className="grid items-end gap-2 rounded-xl border border-slate-200 bg-slate-50/70 p-2.5 sm:grid-cols-[6.5rem_minmax(0,1fr)_minmax(0,1fr)_2.75rem] dark:border-slate-700 dark:bg-slate-800/50"
             >
-              <div className="flex min-h-11 items-center">
-                <span className="text-xs font-bold text-indigo-600 dark:text-indigo-300">{i + 1}.</span>
+              <div className="flex min-h-11 items-center gap-1">
+                <span className="mr-1 min-w-4 text-xs font-bold text-indigo-600 dark:text-indigo-300">{i + 1}.</span>
+                <button
+                  type="button"
+                  onClick={() => onMoveCred(i, i - 1)}
+                  disabled={i === 0}
+                  aria-label={`Subir opción ${i + 1}`}
+                  title="Subir credencial"
+                  className="btn-ghost btn-icon min-h-11 min-w-9 text-slate-500 disabled:opacity-30"
+                >
+                  <ArrowUp className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onMoveCred(i, i + 1)}
+                  disabled={i === sshCredsArr.length - 1}
+                  aria-label={`Bajar opción ${i + 1}`}
+                  title="Bajar credencial"
+                  className="btn-ghost btn-icon min-h-11 min-w-9 text-slate-500 disabled:opacity-30"
+                >
+                  <ArrowDown className="h-4 w-4" />
+                </button>
               </div>
               <div className="grid gap-2 sm:contents">
                 <label className="space-y-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
