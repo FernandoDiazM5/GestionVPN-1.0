@@ -26,20 +26,56 @@ const legacyKeyStore = localforage.createInstance({
 type MemoryCred = { user: string; pass: string; port: number };
 const memoryCredentials = new Map<string, MemoryCred>();
 
+type CredentialIdentity = Pick<SavedDevice, 'id' | 'ip' | 'mac'> & {
+  cachedStats?: Pick<AntennaStats, 'lanMac' | 'wlanMac'>;
+};
+
+function normalizeCredentialKey(value?: string): string {
+  return (value ?? '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+}
+
+export function deviceCredentialKeys(device: Partial<CredentialIdentity>): string[] {
+  return [...new Set([
+    normalizeCredentialKey(device.id),
+    normalizeCredentialKey(device.mac),
+    normalizeCredentialKey(device.cachedStats?.lanMac ?? undefined),
+    normalizeCredentialKey(device.cachedStats?.wlanMac ?? undefined),
+    normalizeCredentialKey(device.ip),
+  ].filter(Boolean))];
+}
+
 // Purga best-effort de las credenciales cifradas y su llave de versiones previas.
 void Promise.allSettled([legacyCredStore.clear(), legacyKeyStore.clear()]);
 
 export const credCache = {
   async save(deviceId: string, user: string, pass: string, port?: number): Promise<void> {
-    memoryCredentials.set(deviceId, { user, pass, port: port ?? 22 });
+    memoryCredentials.set(normalizeCredentialKey(deviceId), { user, pass, port: port ?? 22 });
   },
 
   async get(deviceId: string): Promise<{ user: string; pass: string; port: number } | null> {
-    return memoryCredentials.get(deviceId) ?? null;
+    return memoryCredentials.get(normalizeCredentialKey(deviceId)) ?? null;
+  },
+
+  async saveForDevice(device: Partial<CredentialIdentity>, user: string, pass: string, port?: number): Promise<void> {
+    const cred = { user, pass, port: port ?? 22 };
+    deviceCredentialKeys(device).forEach(key => memoryCredentials.set(key, cred));
+  },
+
+  async getForDevice(device: Partial<CredentialIdentity>): Promise<MemoryCred | null> {
+    for (const key of deviceCredentialKeys(device)) {
+      const credential = memoryCredentials.get(key);
+      if (credential) return credential;
+    }
+    return null;
   },
 
   async remove(deviceId: string): Promise<void> {
-    memoryCredentials.delete(deviceId);
+    const key = normalizeCredentialKey(deviceId);
+    const credential = memoryCredentials.get(key);
+    if (!credential) return;
+    for (const [storedKey, storedCredential] of memoryCredentials) {
+      if (storedCredential === credential) memoryCredentials.delete(storedKey);
+    }
   },
 
   async clear() { memoryCredentials.clear(); },
@@ -151,9 +187,9 @@ async function backfillBackendCreds(
   backendDevices: Array<SavedDevice & { hasSshPass?: boolean }>,
   allCreds: Record<string, { user: string; pass: string; port?: number } | undefined>,
 ): Promise<void> {
-  const pending = backendDevices.filter(d => !d.hasSshPass && allCreds[d.id]?.pass);
+  const pending = backendDevices.filter(d => !d.hasSshPass && allCreds[normalizeCredentialKey(d.id)]);
   for (const d of pending) {
-    const cred = allCreds[d.id]!;
+    const cred = allCreds[normalizeCredentialKey(d.id)]!;
     try {
       const response = await apiFetch(`${API_BASE_URL}/api/db/devices/${d.id}`, {
         method: 'PUT',
@@ -218,9 +254,9 @@ export const deviceDb = {
 
     // Recuperar la credencial efímera si el objeto React ya no la contiene.
     let toSave = device;
-    if (!device.sshPass) {
-      const cred = await credCache.get(device.id);
-      if (cred?.pass) {
+    if (device.sshPass === undefined) {
+      const cred = await credCache.getForDevice(device);
+      if (cred) {
         toSave = {
           ...device,
           sshUser: device.sshUser || cred.user,
@@ -241,8 +277,8 @@ export const deviceDb = {
 
     await Promise.all([
       toSave.cachedStats ? statsCache.save(toSave.id, toSave.cachedStats) : Promise.resolve(),
-      toSave.sshUser && toSave.sshPass
-        ? credCache.save(toSave.id, toSave.sshUser, toSave.sshPass, toSave.sshPort)
+      toSave.sshUser && toSave.sshPass !== undefined
+        ? credCache.saveForDevice(toSave, toSave.sshUser, toSave.sshPass, toSave.sshPort)
         : Promise.resolve(),
     ]);
   },

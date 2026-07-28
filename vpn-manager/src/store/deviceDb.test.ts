@@ -20,6 +20,7 @@ vi.mock('localforage', () => {
 
 import {
   credCache,
+  deviceCredentialKeys,
   deviceDb,
   toDevicePersistencePayload,
 } from './deviceDb';
@@ -141,5 +142,48 @@ describe('deviceDb.saveSingle', () => {
     ));
 
     await expect(deviceDb.load()).rejects.toThrow('Base de datos no disponible');
+  });
+
+  it('recupera la credencial aunque AirOS cambie entre MAC LAN y WLAN', async () => {
+    const identity = {
+      ...baseDevice,
+      cachedStats: {
+        lanMac: 'F4:92:BF:00:00:01',
+        wlanMac: 'F4:92:BF:00:00:02',
+      },
+    };
+    await credCache.saveForDevice(identity, 'ubnt', '', 22);
+
+    expect(deviceCredentialKeys(identity)).toEqual(expect.arrayContaining([
+      'F492BF000001',
+      'F492BF000002',
+      '1921683010',
+    ]));
+    await expect(credCache.get('F4:92:BF:00:00:02')).resolves.toEqual({
+      user: 'ubnt',
+      pass: '',
+      port: 22,
+    });
+    await credCache.remove(baseDevice.id);
+    await expect(credCache.get('F4:92:BF:00:00:02')).resolves.toBeNull();
+  });
+
+  it('persiste una contraseña SSH vacía validada en vez de tratarla como ausente', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(
+      JSON.stringify({ success: true, id: baseDevice.id }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ));
+
+    await deviceDb.saveSingle({ ...baseDevice, sshUser: 'ubnt', sshPass: '' });
+
+    const requestInit = fetchSpy.mock.calls[0][1];
+    expect(JSON.parse(String(requestInit?.body))).toMatchObject({
+      sshUser: 'ubnt',
+      sshPass: '',
+    });
+    await expect(credCache.getForDevice(baseDevice)).resolves.toMatchObject({
+      user: 'ubnt',
+      pass: '',
+    });
   });
 });

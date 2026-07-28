@@ -31,7 +31,7 @@ export function AddDeviceModal({ device, node, existing, onSave, onClose }: AddD
       nodeId: node.id,
       nodeName: node.nombre_nodo,
       sshUser: sshUser || undefined,
-      sshPass: sshPass || undefined,
+      sshPass: sshUser ? sshPass : undefined,
       sshPort: sshPort !== 22 ? sshPort : undefined,
       routerPort: routerPort !== 8075 ? routerPort : undefined,
       addedAt: Date.now(),

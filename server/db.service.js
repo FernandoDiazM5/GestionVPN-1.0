@@ -246,7 +246,7 @@ async function getDb() {
 const GCM_OPTS = { authTagLength: 16 };
 
 function encryptPass(plaintext) {
-    if (!plaintext) return null;
+    if (plaintext === null || plaintext === undefined) return null;
     const iv = crypto.randomBytes(12);
     const cipher = crypto.createCipheriv('aes-256-gcm', ENCRYPTION_KEY, iv, GCM_OPTS);
     let enc = cipher.update(plaintext, 'utf8', 'hex');

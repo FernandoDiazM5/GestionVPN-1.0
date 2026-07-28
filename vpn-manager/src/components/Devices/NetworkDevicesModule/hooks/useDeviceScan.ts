@@ -43,6 +43,14 @@ interface CachedScanPayload {
   sshStatus: Record<string, SshAuthStatus>;
 }
 
+export function sanitizeRestoredSshStatus(
+  restoredStatus: Record<string, SshAuthStatus>,
+): Record<string, SshAuthStatus> {
+  return Object.fromEntries(
+    Object.entries(restoredStatus).filter(([, status]) => status === 'failed'),
+  ) as Record<string, SshAuthStatus>;
+}
+
 function loadCachedScan(): CachedScanPayload | null {
   try {
     const raw = sessionStorage.getItem(SESSION_SCAN_KEY);
@@ -51,13 +59,16 @@ function loadCachedScan(): CachedScanPayload | null {
     if (parsed?.v !== SCAN_CACHE_VERSION) return null;          // schema viejo
     if (!Array.isArray(parsed.results) || parsed.results.length === 0) return null;
     // Backfill defensivo del sshStatus si vino vacío en payloads previos.
-    const sshStatus = (parsed.sshStatus && typeof parsed.sshStatus === 'object')
+    const restoredStatus = (parsed.sshStatus && typeof parsed.sshStatus === 'object')
       ? parsed.sshStatus as Record<string, SshAuthStatus>
       : Object.fromEntries(
           (parsed.results as Array<{ ip: string; cachedStats?: unknown }>).map(
             dev => [dev.ip, (dev.cachedStats ? 'success' : 'failed') as SshAuthStatus]
           )
         );
+    // Una contraseña nunca se persiste en sessionStorage. Por tanto un
+    // `success` restaurado no demuestra que aún exista una credencial usable.
+    const sshStatus = sanitizeRestoredSshStatus(restoredStatus);
     return {
       v: SCAN_CACHE_VERSION,
       results: parsed.results,
@@ -96,15 +107,23 @@ export function useDeviceScan(input: UseDeviceScanInput) {
     if (!cached?.results?.length) return;
     let cancelled = false;
     (async () => {
-      const byIp: Record<string, string> = {};
+      const byIp: Record<string, { user: string; pass: string; port: number }> = {};
       for (const r of cached.results) {
         if (r.sshPass) continue;
-        const devId = r.mac ? r.mac.replace(/:/g, '') : r.ip.replace(/\./g, '');
-        const c = await credCache.get(devId);
-        if (c?.pass) byIp[r.ip] = c.pass;
+        const c = await credCache.getForDevice(r);
+        if (c) byIp[r.ip] = c;
       }
       if (cancelled || Object.keys(byIp).length === 0) return;
-      setScanResults(prev => prev.map(r => byIp[r.ip] ? { ...r, sshPass: byIp[r.ip] } : r));
+      setScanResults(prev => prev.map(r => {
+        const credential = byIp[r.ip];
+        return credential
+          ? { ...r, sshUser: credential.user, sshPass: credential.pass, sshPort: credential.port }
+          : r;
+      }));
+      setSshStatus(prev => ({
+        ...prev,
+        ...Object.fromEntries(Object.keys(byIp).map(ip => [ip, 'success' as const])),
+      }));
     })();
     return () => { cancelled = true; };
   }, [cached]);
@@ -266,7 +285,7 @@ export function useDeviceScan(input: UseDeviceScanInput) {
           if (foundStats) {
             const s = foundStats;
             setSshStatus(prev => ({ ...prev, [dev.ip]: 'success' }));
-            await credCache.save(devId, foundUser, foundPass);
+            await credCache.saveForDevice({ ...dev, cachedStats: s }, foundUser, foundPass);
 
             setScanResults(prev => {
               const next = [...prev];

@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 
 import { useVpn } from '../../../context';
+import { credCache } from '../../../store/deviceDb';
 import { fetchWithTimeout } from '../../../utils/fetchWithTimeout';
 import type { ScannedDevice, SavedDevice, AntennaStats } from '../../../types/devices';
 import type { NodeInfo } from '../../../types/api';
@@ -334,8 +335,13 @@ export default function NetworkDevicesModule() {
   }, [effectiveNode, bulkSaveSelection, bulkSaving, handleDirectSave, showToast, setSelectedIds]);
 
   const handleSyncToSaved = useCallback(async (dev: ScannedDevice, savedDev: SavedDevice) => {
+    const cachedCredential = dev.sshPass === undefined ? await credCache.getForDevice(dev) : null;
+    const scannedPass = dev.sshPass !== undefined ? dev.sshPass : cachedCredential?.pass;
     const updated: SavedDevice = {
       ...savedDev,
+      sshUser: dev.sshUser || cachedCredential?.user || savedDev.sshUser,
+      sshPass: scannedPass !== undefined ? scannedPass : savedDev.sshPass,
+      sshPort: dev.sshPort ?? cachedCredential?.port ?? savedDev.sshPort,
       cachedStats: dev.cachedStats,
       name: dev.cachedStats?.deviceName || savedDev.name,
       model: dev.cachedStats?.deviceModel || savedDev.model,

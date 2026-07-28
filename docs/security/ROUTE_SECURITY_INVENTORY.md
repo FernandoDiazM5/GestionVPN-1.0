@@ -111,13 +111,13 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `routes/coreServer.routes.js` | 47 | POST | `/provision` | sí | platform-admin | no | sí | — | — |
 | `routes/coreServer.routes.js` | 57 | POST | `/backup-now` | sí | platform-admin | no | n/a | — | — |
 | `routes/dashboard.routes.js` | 16 | GET | `/dashboard/metrics` | sí | — | no | n/a | — | — |
-| `routes/device.routes.js` | 25 | POST | `/device/auto-login` | sí | — | no | sí | network-admin | — |
-| `routes/device.routes.js` | 47 | POST | `/device/antenna` | sí | — | no | sí | sql, network-admin | — |
-| `routes/device.routes.js` | 108 | GET | `/db/devices` | sí | — | no | n/a | sql | — |
-| `routes/device.routes.js` | 156 | POST | `/db/devices` | sí | — | no | sí | sql | — |
-| `routes/device.routes.js` | 260 | PUT | `/db/devices/:id` | sí | — | no | sí | sql | — |
-| `routes/device.routes.js` | 327 | DELETE | `/db/devices/:id` | sí | — | no | n/a | sql | — |
-| `routes/device.routes.js` | 336 | POST | `/db/cleanup-orphan-devices` | sí | — | no | n/a | sql | — |
+| `routes/device.routes.js` | 26 | POST | `/device/auto-login` | sí | — | no | sí | network-admin | — |
+| `routes/device.routes.js` | 48 | POST | `/device/antenna` | sí | — | no | sí | sql, network-admin | — |
+| `routes/device.routes.js` | 109 | GET | `/db/devices` | sí | — | no | n/a | sql | — |
+| `routes/device.routes.js` | 157 | POST | `/db/devices` | sí | — | no | sí | sql | — |
+| `routes/device.routes.js` | 263 | PUT | `/db/devices/:id` | sí | — | no | sí | sql | — |
+| `routes/device.routes.js` | 330 | DELETE | `/db/devices/:id` | sí | — | no | n/a | sql | — |
+| `routes/device.routes.js` | 339 | POST | `/db/cleanup-orphan-devices` | sí | — | no | n/a | sql | — |
 | `routes/diagnostics.routes.js` | 76 | POST | `/diagnostics/ping` | sí | — | sí | sí | network-admin | — |
 | `routes/diagnostics.routes.js` | 127 | POST | `/diagnostics/traceroute` | sí | — | sí | sí | network-admin | — |
 | `routes/errorReports.routes.js` | 49 | POST | `/` | no | — | no | sí | — | `PUBLIC_MUTATION_REVIEW` |

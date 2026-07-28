@@ -13,7 +13,7 @@
 // ============================================================
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { deviceDb, type DevicePersistenceError } from '../../../../store/deviceDb';
+import { credCache, deviceDb, type DevicePersistenceError } from '../../../../store/deviceDb';
 import { fetchWithTimeout } from '../../../../utils/fetchWithTimeout';
 import type { ScannedDevice, SavedDevice } from '../../../../types/devices';
 import type { NodeInfo } from '../../../../types/api';
@@ -224,6 +224,14 @@ export function useDeviceLibrary({
       setAddingDevice(dev);
       return false;
     }
+    const cachedCredential = dev.sshPass === undefined ? await credCache.getForDevice(dev) : null;
+    const sshPass = dev.sshPass !== undefined ? dev.sshPass : cachedCredential?.pass;
+    const sshUser = dev.sshUser || cachedCredential?.user;
+    if (!sshUser || sshPass === undefined) {
+      setAddingDevice(dev);
+      showToast('La sesión ya no conserva la clave SSH. Confírmala para guardar el equipo.');
+      return false;
+    }
     const deviceId = dev.mac ? dev.mac.replace(/:/g, '') : dev.ip.replace(/\./g, '');
     const s = dev.cachedStats;
     const rawMode = s?.mode || dev.role;
@@ -242,9 +250,9 @@ export function useDeviceLibrary({
       frequency: s?.frequency ?? dev.frequency,
       nodeId: node.id,
       nodeName: node.nombre_nodo,
-      sshUser: dev.sshUser,
-      sshPass: dev.sshPass,
-      sshPort: dev.sshPort !== 22 ? dev.sshPort : undefined,
+      sshUser,
+      sshPass,
+      sshPort: (dev.sshPort ?? cachedCredential?.port) !== 22 ? (dev.sshPort ?? cachedCredential?.port) : undefined,
       deviceName: s?.deviceName,
       lanMac: s?.lanMac ?? undefined,
       security: s?.security ?? undefined,
@@ -257,7 +265,7 @@ export function useDeviceLibrary({
       lastSeen: Date.now(),
     };
     return handleAddDevice(saved);
-  }, [handleAddDevice, setAddingDevice]);
+  }, [handleAddDevice, setAddingDevice, showToast]);
 
   return {
     savedDevices,

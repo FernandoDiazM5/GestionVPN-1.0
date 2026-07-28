@@ -9,9 +9,13 @@ const deviceDbMock = vi.hoisted(() => ({
   saveSingle: vi.fn<(...args: unknown[]) => Promise<void>>(async () => undefined),
   removeSingle: vi.fn<(...args: unknown[]) => Promise<void>>(async () => undefined),
 }));
+const credCacheMock = vi.hoisted(() => ({
+  getForDevice: vi.fn(async () => null),
+}));
 
 vi.mock('../../../../store/deviceDb', () => ({
   deviceDb: deviceDbMock,
+  credCache: credCacheMock,
 }));
 
 import { useDeviceLibrary } from './useDeviceLibrary';
@@ -44,6 +48,7 @@ describe('useDeviceLibrary guardado transaccional', () => {
     vi.clearAllMocks();
     deviceDbMock.load.mockResolvedValue([]);
     deviceDbMock.saveSingle.mockResolvedValue(undefined);
+    credCacheMock.getForDevice.mockResolvedValue(null);
   });
 
   it('no marca el equipo como guardado mientras el backend sigue pendiente', async () => {

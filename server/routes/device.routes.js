@@ -11,6 +11,7 @@ const { reqWorkspace, ownedGroupIntIds, ownsApUuid, ownsGroupUuid, ipInOwnedSubn
 const { resolveOwnerNodeId } = require('../lib/apNode');
 const { sendOk, AppError, asyncHandler } = require('../lib/apiResponse');
 const scanIpRepo = require('../db/repos/scanIpRepo');
+const { assertPersistableSshCredential } = require('../lib/deviceCredentials');
 const { validate } = require('../middleware/validate');
 const {
   DeviceAntennaRequestSchema,
@@ -163,12 +164,14 @@ router.post('/db/devices', validate({ body: DevicePersistRequestSchema }), async
     }
 
     // Aislamiento: no sobrescribir un AP existente de otro workspace
+    let existing = null;
     if (d.id) {
-        const existing = await db.get('SELECT id FROM aps WHERE uuid = ?', [d.id]);
+        existing = await db.get('SELECT id, usuario_ssh, clave_ssh_enc, puerto_ssh FROM aps WHERE uuid = ?', [d.id]);
         if (existing && !(await ownsApUuid(db, req, d.id))) {
             throw new AppError('AP no encontrado', 404, 'NOT_FOUND');
         }
     }
+    const { hasIncomingPass } = assertPersistableSshCredential(d, existing);
 
         let cpesCount = 0;
         if (d.cachedStats && d.cachedStats.stations) {
@@ -177,7 +180,7 @@ router.post('/db/devices', validate({ body: DevicePersistRequestSchema }), async
             cpesCount = d.lastCpeCount;
         }
 
-        const sshEncrypted = d.sshPass ? encryptPass(d.sshPass) : null;
+        const sshEncrypted = hasIncomingPass ? encryptPass(d.sshPass) : null;
         const wifiEncrypted = d.wifiPassword ? encryptPass(d.wifiPassword) : null;
 
         // Resolve ap_group_id from the nodeId sent by frontend
@@ -232,9 +235,9 @@ router.post('/db/devices', validate({ body: DevicePersistRequestSchema }), async
                 ssid = excluded.ssid,
                 canal_mhz = excluded.canal_mhz,
                 modo_red = excluded.modo_red,
-                usuario_ssh = excluded.usuario_ssh,
+                usuario_ssh = CASE WHEN excluded.usuario_ssh <> '' THEN excluded.usuario_ssh ELSE aps.usuario_ssh END,
                 clave_ssh_enc = CASE WHEN excluded.clave_ssh_enc IS NOT NULL THEN excluded.clave_ssh_enc ELSE aps.clave_ssh_enc END,
-                puerto_ssh = excluded.puerto_ssh,
+                puerto_ssh = CASE WHEN excluded.clave_ssh_enc IS NOT NULL THEN excluded.puerto_ssh ELSE aps.puerto_ssh END,
                 wifi_password_enc = CASE WHEN excluded.wifi_password_enc IS NOT NULL THEN excluded.wifi_password_enc ELSE aps.wifi_password_enc END,
                 cpes_conectados_count = excluded.cpes_conectados_count,
                 last_saved = excluded.last_saved,
