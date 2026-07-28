@@ -6,6 +6,14 @@
 
 ---
 
+> **Sesión 2026-07-27 — Lease y vista Sitios desplegados en producción.** Rama `vps_prod`, checkout productivo `dab950b` con implementación `7b3a6db`.
+> - Autorización explícita recibida después de publicar y verificar el SHA. Se etiquetaron las imágenes anteriores como `pre-dab950b-20260727`.
+> - Reconstruidos y recreados únicamente `vpn-backend` y `vpn-frontend` con `--no-deps`; `vpn-db` no fue reiniciado y no hubo migraciones nuevas.
+> - Resultado: HTTPS/TLS 200, health con MySQL/RouterOS/SMTP `ok`, tres contenedores con 0 reinicios, job de expiración iniciado a 30 s y copy nuevo confirmado dentro del bundle.
+> - Hubo 502 transitorios durante los segundos de arranque del backend; no reaparecieron después de quedar healthy. Logs backend sin errores severos posteriores.
+> - Rollback: imágenes `pre-dab950b-20260727` o Git a `8e0b0a8` + rebuild backend/frontend.
+> - Pendiente humano: validar logout, inactividad >5 min, concurrencia de dos usuarios y textos autenticados.
+
 > **Sesión 2026-07-27 — Lenguaje sencillo y vista simple de Sitios.** Rama `vps_prod`, implementación `7b3a6db`; pendiente de despliegue. Skills: `vercel-react-best-practices`, `handoff-keeper`.
 > - Cambio sólo frontend: `Nodos` pasa a `Sitios`; acciones, navegación, estados, filtros, contador, vacíos y alta usan lenguaje cotidiano.
 > - La vista inicial oculta identificadores técnicos; VRF/LAN/IP/PPP/protocolo permanecen disponibles en `Datos visibles` con etiquetas explicativas.
