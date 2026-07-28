@@ -37,6 +37,8 @@ const workspaceRepo = require('../db/repos/workspaceRepo');
 const { requireSession } = require('../middleware/authJwt');
 const { query } = require('../db/mysql');
 const log = require('../lib/logger').child({ scope: 'account' });
+const tunnelService = require('../lib/tunnelService');
+const { loadCoreMikrotik } = require('../lib/coreMikrotikSettings');
 
 const router = express.Router();
 
@@ -45,6 +47,24 @@ const OTP_MAX_ATTEMPTS = 5;
 const GENERIC_REGISTER_MESSAGE = 'Si el registro puede procesarse, recibirás un código de verificación.';
 const GENERIC_RESEND_MESSAGE = 'Si la cuenta requiere verificación, se enviará un código.';
 const GENERIC_BAD_CREDENTIALS = 'Correo o contraseña incorrectos';
+
+async function revokeTunnelBeforeLogout(account, requestIp) {
+  if (!account?.sub || !account?.workspace_id) return;
+  const mikrotik = await loadCoreMikrotik();
+  if (!mikrotik) {
+    log.warn({ userId: account.sub }, 'logout: MikroTik no configurado; expiración reintentará la revocación');
+    return;
+  }
+  const result = await tunnelService.deactivateTunnel({
+    account,
+    mikrotik,
+    clientIp: requestIp,
+    action: 'LOGOUT',
+  });
+  if (!result.ok) {
+    log.warn({ userId: account.sub, code: result.code }, 'logout: no se pudo revocar el túnel; expiración reintentará');
+  }
+}
 
 // Schemas centralizados en @gestionvpn/contracts (F5).
 // Aliases locales sin duplicar definiciones — mismo comportamiento Zod.
@@ -154,12 +174,14 @@ router.post('/login', rl.guardPolicy('LOGIN'), asyncHandler(async (req, res) => 
 
 // ── POST /logout ─────────────────────────────────────────────
 router.post('/logout', requireSession, asyncHandler(async (req, res) => {
+  await revokeTunnelBeforeLogout(req.account, req.ip);
   await revokeSession(req.account.jti, req.account.sub);
   clearSessionCookie(res);
   return sendOk(res, { message: 'Sesión cerrada' });
 }));
 
 router.post('/logout-all', requireSession, asyncHandler(async (req, res) => {
+  await revokeTunnelBeforeLogout(req.account, req.ip);
   await revokeAllSessions(req.account.sub);
   clearSessionCookie(res);
   return sendOk(res, { message: 'Sesiones cerradas en todos los dispositivos' });

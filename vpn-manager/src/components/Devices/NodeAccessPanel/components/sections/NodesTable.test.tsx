@@ -26,10 +26,10 @@ describe('NodesTable accessibility', () => {
       />,
     );
 
-    expect(screen.getByRole('region', { name: /nodos vpn/i })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: /nodo/i })).toHaveAttribute('aria-sort', 'descending');
+    expect(screen.getByRole('region', { name: /sitios remotos/i })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /^sitio$/i })).toHaveAttribute('aria-sort', 'descending');
 
-    const sortButton = screen.getByRole('button', { name: /ordenar por nodo ascendente/i });
+    const sortButton = screen.getByRole('button', { name: /ordenar por sitio ascendente/i });
     sortButton.focus();
     await user.keyboard('{Enter}');
     expect(onSort).toHaveBeenCalledWith('nombre_nodo');

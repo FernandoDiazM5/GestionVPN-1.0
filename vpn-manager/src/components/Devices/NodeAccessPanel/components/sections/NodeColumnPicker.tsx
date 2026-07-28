@@ -45,11 +45,11 @@ export function NodeColumnPicker({ visibleCols, onChange }: NodeColumnPickerProp
         onClick={handleKebabClick}
         aria-haspopup="menu"
         aria-expanded={showKebab}
-        title="Mostrar/ocultar columnas de la tabla"
+        title="Elegir los datos visibles"
         className="flex items-center space-x-1.5 px-3 py-2.5 rounded-lg text-xs font-bold text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 border border-slate-200 transition-colors dark:border-slate-700 dark:hover:bg-indigo-500/10 dark:text-slate-300"
       >
         <SlidersHorizontal className="w-3.5 h-3.5" />
-        <span>Columnas</span>
+        <span>Datos visibles</span>
         <span className="bg-indigo-100 text-indigo-600 text-3xs font-black px-1.5 py-0.5 rounded-md min-w-[18px] text-center dark:bg-indigo-500/20 dark:text-indigo-300">
           {visibleCols.length}
         </span>
@@ -60,14 +60,14 @@ export function NodeColumnPicker({ visibleCols, onChange }: NodeColumnPickerProp
         <div
           ref={dropdownRef}
           role="menu"
-          aria-label="Mostrar/ocultar columnas"
+          aria-label="Elegir los datos visibles"
           style={{ position: 'fixed', top: kebabCoords.top, bottom: kebabCoords.bottom, right: kebabCoords.right }}
           className="z-[60] bg-white border border-slate-200 rounded-xl shadow-xl p-3 w-64 max-h-[70vh] overflow-y-auto dark:bg-slate-800 dark:border-slate-700"
         >
 
           {visibleCols.length > 0 && (
             <>
-              <p className="text-3xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Visibles · orden</p>
+              <p className="text-3xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Datos mostrados · orden</p>
               <div className="space-y-0.5 mb-2">
                 {visibleCols.map((key, idx) => {
                   const col = NODE_COLUMN_DEFS.find(c => c.key === key);
@@ -102,7 +102,7 @@ export function NodeColumnPicker({ visibleCols, onChange }: NodeColumnPickerProp
           {hiddenCols.length > 0 && (
             <>
               <div className="border-t border-slate-100 dark:border-slate-700 my-1" />
-              <p className="text-3xs font-bold text-slate-500 dark:text-slate-500 uppercase tracking-wider mb-1.5 mt-2">Ocultas</p>
+              <p className="text-3xs font-bold text-slate-500 dark:text-slate-500 uppercase tracking-wider mb-1.5 mt-2">Datos adicionales</p>
               <div className="space-y-0.5">
                 {hiddenCols.map(col => (
                   <button key={col.key} onClick={() => addCol(col.key)}
@@ -119,12 +119,12 @@ export function NodeColumnPicker({ visibleCols, onChange }: NodeColumnPickerProp
           <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-700 flex gap-1.5">
             <button onClick={() => onChange(NODE_COLUMN_DEFS.map(c => c.key))}
               className="flex-1 text-2xs font-bold text-indigo-600 hover:text-indigo-700 transition-colors">
-              Todas
+              Mostrar todos
             </button>
             <span className="text-slate-200">|</span>
             <button onClick={() => onChange(NODE_COLUMN_DEFS.filter(c => c.defaultVisible).map(c => c.key))}
               className="flex-1 text-2xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-600 transition-colors">
-              Resetear
+              Vista simple
             </button>
           </div>
         </div>,

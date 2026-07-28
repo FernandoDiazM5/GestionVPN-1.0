@@ -32,11 +32,11 @@ export interface NodesPreferences {
 }
 
 const PREFS_STORAGE_KEY = 'vpn_nodes_prefs_v1';
-const PREFS_SCHEMA_VERSION = 1;
+const PREFS_SCHEMA_VERSION = 2;
 
 // Columnas opcionales por defecto visibles. Las fijas (Estado / Nodo /
 // Acciones) NO entran aquí — siempre se renderizan.
-export const DEFAULT_VISIBLE_NODE_COLS = ['vrf', 'lan', 'ip_tunnel', 'ppp_user'];
+export const DEFAULT_VISIBLE_NODE_COLS: string[] = [];
 
 const DEFAULT_PREFS: NodesPreferences = {
   visibleCols: DEFAULT_VISIBLE_NODE_COLS,
@@ -83,7 +83,11 @@ function loadPrefs(): NodesPreferences {
     if (raw) {
       const parsed = JSON.parse(raw) as Record<string, unknown>;
       if (parsed && typeof parsed === 'object') {
-        const visibleCols = sanitizeVisibleCols(parsed.visibleCols);
+        // v2 simplifica la primera vista. Preferencias v1 mostraban cuatro
+        // identificadores técnicos; se migran una sola vez al resumen limpio.
+        const visibleCols = parsed.schemaVersion === PREFS_SCHEMA_VERSION
+          ? sanitizeVisibleCols(parsed.visibleCols)
+          : DEFAULT_VISIBLE_NODE_COLS;
         return {
           ...DEFAULT_PREFS,
           ...(visibleCols !== null ? { visibleCols } : {}),

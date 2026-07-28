@@ -226,7 +226,7 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
               <Plus className="w-4 h-4 text-white" />
             </div>
             <div>
-              <p className="text-sm font-bold text-white">Nuevo Nodo VPN</p>
+              <p className="text-sm font-bold text-white">Agregar sitio remoto</p>
               <p className="text-2xs text-indigo-200 mt-0.5">Provisionado completo en MikroTik — 7 pasos</p>
             </div>
           </div>

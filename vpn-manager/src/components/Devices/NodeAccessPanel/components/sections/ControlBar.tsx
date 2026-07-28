@@ -34,10 +34,10 @@ export default function ControlBar({
       <div>
         <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center space-x-2">
           <Waypoints className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
-          <span>Acceso a Nodos VRF</span>
+          <span>Conexión a sitios remotos</span>
         </h2>
         <p className="text-slate-500 dark:text-slate-500 text-sm mt-1">
-          Abre acceso a APs y CPEs remotos mediante enrutamiento VRF
+          Conéctate de forma segura a las antenas y equipos de tus sitios remotos
         </p>
         {/* IP global del servidor SSTP — solo visible para Administrador de plataforma */}
         {showServerIP && (
@@ -86,7 +86,7 @@ export default function ControlBar({
             className="btn-primary px-4 py-2.5 flex items-center space-x-2 text-sm"
           >
             <Plus className="w-4 h-4" />
-            <span>Nuevo Nodo</span>
+            <span>Agregar sitio</span>
           </button>
         )}
         {/* Secundarios → outline */}
@@ -96,7 +96,7 @@ export default function ControlBar({
           className="btn-outline px-5 py-2.5 flex items-center space-x-2 text-sm disabled:opacity-50"
         >
           <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-          <span>{isLoading ? 'Cargando...' : hasLoaded ? 'Actualizar Nodos' : 'Cargar Nodos'}</span>
+          <span>{isLoading ? 'Actualizando...' : hasLoaded ? 'Actualizar lista' : 'Cargar sitios'}</span>
         </button>
       </div>
     </div>

@@ -26,7 +26,7 @@ const { getDb } = require('../../db.service');
 const provisioner = require('../../lib/tunnelProvisioner');
 const tunnelService = require('../../lib/tunnelService');
 const {
-  addSseClient, removeSseClient, emitToUser, clientIpOf,
+  addSseClient, removeSseClient, clientIpOf,
 } = require('./_shared');
 const { sendOk, AppError, asyncHandler } = require('../../lib/apiResponse');
 const { mikrotikAppError } = require('../../lib/mikrotikError');
@@ -85,6 +85,13 @@ router.post('/tunnel/keepalive', validate({ body: TunnelEmptyBodySchema }), asyn
     const session = await sessionRepo.getActiveByUser(acc.workspace_id, acc.sub);
     if (!session) return sendOk(res, { restored: false, restoredItems: [], note: 'sin sesión activa' });
 
+    // Renueva primero mediante UPDATE condicional. Así una expiración que ya
+    // ganó la carrera no puede ser resucitada ni recrear su mangle.
+    const expiresAt = await sessionRepo.touch(session.id);
+    if (!expiresAt) {
+      throw new AppError('El lease del túnel ya venció y está pendiente de revocación', 409, 'TUNNEL_LEASE_EXPIRED');
+    }
+
     const targetVRF = session.vrf_name;
     const mgmtIp = session.mgmt_ip;
     const restoredItems = [];
@@ -101,10 +108,9 @@ router.post('/tunnel/keepalive', validate({ body: TunnelEmptyBodySchema }), asyn
       restoredItems.push(`mangle ${provisioner.mangleComment(acc.sub)}`);
     }
 
-    await sessionRepo.touch(session.id);   // renueva TTL
     const restored = restoredItems.length > 0;
     log.debug({ userId: acc.sub, vrf: targetVRF, restored }, 'KEEPALIVE');
-    return sendOk(res, { restored, restoredItems });
+    return sendOk(res, { restored, restoredItems, tunnelExpiry: expiresAt });
   } catch (error) {
     if (apiRead) try { await apiRead.close(); } catch (_) { /* ignore */ }
     if (apiWrite) try { await apiWrite.close(); } catch (_) { /* ignore */ }
@@ -158,30 +164,22 @@ router.get('/tunnel/status', asyncHandler(async (req, res) => {
     // Si la limpieza falla (router caído), se MANTIENE la sesión ACTIVE para que
     // un próximo poll reintente — así nunca queda mangle huérfana con acceso vivo.
     if (session.expires_at && Date.now() > session.expires_at) {
-      if (req.mikrotik) {
-        let a, b;
-        try {
-          const { ip, user, pass } = req.mikrotik;
-          a = await connectToMikrotik(ip, user, pass);
-          const ids = await provisioner.findUserMangleIds(a, acc.sub);  // lanza si print falla
-          await a.close().catch(() => {});
-          if (ids.length) {
-            b = await connectToMikrotik(ip, user, pass);
-            await provisioner.removeMangleIds(b, ids);               // lanza si algún remove falla
-            await b.close().catch(() => {});
-          }
-        } catch (e) {
-          if (a) try { await a.close(); } catch (_) { /* ignore */ }
-          if (b) try { await b.close(); } catch (_) { /* ignore */ }
-          // No se pudo revocar en el router → NO cerramos la sesión; se reintenta.
-          log.warn({ err: e?.message }, 'TUNNEL-STATUS: limpieza falló al expirar, se mantiene ACTIVE');
-          return sendOk(res, { activeNodeVrf: session.vrf_name, tunnelExpiry: session.expires_at });
-        }
+      if (!req.mikrotik) {
+        return sendOk(res, { activeNodeVrf: session.vrf_name, tunnelExpiry: session.expires_at });
       }
-      // Mangle eliminada (o sin router configurado) → ahora sí cerrar en BD.
-      await sessionRepo.closeSession(session.id);
-      await sessionRepo.log({ workspaceId: acc.workspace_id, sessionId: session.id, userId: acc.sub, tunnelId: session.tunnel_id, action: 'EXPIRE', statusCode: 200 });
-      emitToUser(acc.sub, null, null);
+      const result = await tunnelService.deactivateTunnel({
+        account: acc,
+        mikrotik: req.mikrotik,
+        clientIp: clientIpOf(req),
+        action: 'EXPIRE',
+        onlyIfExpired: true,
+      });
+      if (!result.ok) {
+        return sendOk(res, { activeNodeVrf: session.vrf_name, tunnelExpiry: session.expires_at });
+      }
+      if (result.skipped) {
+        return sendOk(res, { activeNodeVrf: result.vrf, tunnelExpiry: result.expiresAt });
+      }
       return sendOk(res, { activeNodeVrf: null, tunnelExpiry: null });
     }
 

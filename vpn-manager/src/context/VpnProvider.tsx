@@ -88,7 +88,12 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
     [auth.credentials, deactivateManagedNodes],
   );
   useTunnelTimeout(nodes.tunnelExpiry, deactivateExpiredTunnel);
-  useTunnelKeepalive(nodes.tunnelExpiry, auth.credentials, nodes.activeNodeVrf);
+  useTunnelKeepalive(
+    nodes.tunnelExpiry,
+    auth.credentials,
+    nodes.activeNodeVrf,
+    nodes.setTunnelExpiry,
+  );
   useAuthExpiry(auth.handleLogout);
   const sessionExpiry = useSessionExpiry(auth.isAuthenticated, auth.handleLogout);
 
@@ -108,19 +113,8 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
     if (logoutInProgress.current) return;
     logoutInProgress.current = true;
     try {
-      if (nodes.activeNodeVrf) {
-        try {
-          await nodes.deactivateAllNodes(auth.credentials);
-        } catch (error) {
-          // El cierre de la sesión web no debe quedar bloqueado por una caída
-          // del router. El backend conserva la sesión VPN para reintentar su
-          // limpieza por expiración en lugar de reportar una revocación falsa.
-          console.warn(
-            '[VPNContext] No se pudo revocar el túnel antes de cerrar sesión.',
-            error instanceof Error ? error.message : 'Error desconocido',
-          );
-        }
-      }
+      // /api/account/logout revoca servidor-side el túnel antes de invalidar
+      // la cookie. Así el cierre no depende del estado React ni duplica calls.
       nodes.setNodes([]);
       nodes.setActiveNodeVrf(null);
       nodes.setTunnelExpiry(null);

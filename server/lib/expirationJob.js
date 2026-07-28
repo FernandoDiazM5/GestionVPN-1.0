@@ -1,33 +1,26 @@
 // ============================================================
 //  lib/expirationJob.js — cierre proactivo de sesiones expiradas
 //
-//  Hoy la expiración era LAZY: solo se cerraba al consultar /tunnel/status.
-//  Si un usuario activaba un túnel y cerraba el navegador, la sesión quedaba
-//  ACTIVE en BD hasta que volviera. Ahora corre cada N segundos y cierra +
-//  notifica.
-//
-//  La mangle del USUARIO (ACCESO-USER) se cierra cuando él active otro túnel
-//  (esa transacción ya limpia su mangle previa); aquí no la tocamos. SÍ
-//  limpiamos best-effort la mangle de ESCANEO (SCAN-WS) cuando el workspace
-//  se queda sin túnel activo, para que no sobreviva al túnel (atada al ciclo
-//  del túnel, no a un timer — ver scanMangleSync). Una caída del router no
-//  rompe el job (best-effort).
+//  El lease se renueva mientras el navegador sigue trabajando. Al vencer,
+//  este job elimina primero la mangle del USUARIO (ACCESO-USER) en MikroTik
+//  y sólo entonces cierra MySQL. Si RouterOS falla, conserva ACTIVE y
+//  reintenta. También limpia best-effort la mangle de ESCANEO (SCAN-WS)
+//  cuando el workspace se queda sin túneles activos.
 //
 //  Config:
 //     EXPIRATION_JOB_ENABLED=false   → desactiva (default: true en prod, true en dev)
-//     EXPIRATION_JOB_INTERVAL_MS=60000 → cada cuánto
+//     EXPIRATION_JOB_INTERVAL_MS=30000 → cada cuánto
 // ============================================================
 const log = require('./logger').child({ scope: 'expiration-job' });
 const sessionRepo = require('../db/repos/sessionRepo');
 const auditRepo = require('../db/repos/auditRepo');
 const aiAnalysisRepo = require('../db/repos/aiAnalysisRepo');
 const aiSnapshotRepo = require('../db/repos/aiSnapshotRepo');
-const notifier = require('./notifier');
 const scanMangleSync = require('./scanMangleSync');
-const sse = require('./sse');
-const { getAppSetting, decryptPass } = require('../db.service');
+const { loadCoreMikrotik } = require('./coreMikrotikSettings');
 const { analysisRetentionDays, snapshotRetentionDays } = require('./ai/aiRetention');
 const authSessionRepo = require('../db/repos/authSessionRepo');
+const tunnelService = require('./tunnelService');
 
 // Retención de la "Actividad reciente": guarda como MÁXIMO los últimos N días
 // (default 7) → purga rodante que va quitando el día más viejo. Se ejecuta como
@@ -68,12 +61,7 @@ async function purgeOldAiData() {
 
 /** Credenciales del router core desde app_settings (igual que apPollJob). null si faltan. */
 async function loadMikrotik() {
-  try {
-    const ip = await getAppSetting('MT_IP');
-    const user = await getAppSetting('MT_USER');
-    const passEnc = await getAppSetting('MT_PASS');
-    return (ip && user && passEnc) ? { ip, user, pass: decryptPass(passEnc) } : null;
-  } catch (_) { return null; }
+  return loadCoreMikrotik();
 }
 
 let _handle = null;
@@ -95,42 +83,37 @@ async function runOnce() {
     if (!expired.length) return;
     log.info({ count: expired.length }, 'Cerrando sesiones expiradas');
     const affectedWs = new Set();
-    for (const s of expired) {
-      try {
-        await sessionRepo.closeSession(s.id);
-        affectedWs.add(s.workspace_id);
-        await sessionRepo.log({
-          workspaceId: s.workspace_id,
-          sessionId: s.id,
-          userId: s.user_id,
-          tunnelId: s.tunnel_id,
-          action: 'EXPIRE',
-          mgmtIp: s.mgmt_ip,
-          statusCode: 200,
-          message: 'Cerrada por job de expiración',
-        });
-        // Notificación best-effort — los errores no abortan el ciclo.
-        notifier.notify({
-          userId: s.user_id,
-          event: 'SESSION_EXPIRED',
-          payload: { tunnelId: s.tunnel_id, vrf: s.vrf_name },
-        }).catch((err) => log.warn({ err: err.message, userId: s.user_id }, 'notify falló'));
-        // SSE 'tunnel' → la "Actividad reciente" del workspace muestra el EXPIRE en vivo.
-        try { sse.publish(s.workspace_id, 'tunnel', { tunnelId: s.tunnel_id, action: 'EXPIRE', userId: s.user_id, ts: Date.now() }); } catch (_) { /* best-effort */ }
-      } catch (err) {
-        log.warn({ err: err.message, sessionId: s.id }, 'fallo cerrando sesión expirada');
-      }
+    const mikrotik = await loadMikrotik();
+    // Lotes pequeños: usuarios distintos progresan en paralelo sin lanzar una
+    // ráfaga ilimitada de conexiones contra RouterOS.
+    for (let offset = 0; offset < expired.length; offset += 3) {
+      const batch = expired.slice(offset, offset + 3);
+      await Promise.all(batch.map(async (s) => {
+        try {
+          if (!mikrotik) throw new Error('MikroTik no configurado');
+          const result = await tunnelService.deactivateTunnel({
+            account: { sub: s.user_id, workspace_id: s.workspace_id },
+            mikrotik,
+            action: 'EXPIRE',
+            onlyIfExpired: true,
+          });
+          if (!result.ok) throw new Error(result.message);
+          if (!result.skipped) affectedWs.add(s.workspace_id);
+        } catch (err) {
+          // Fail closed: conservar ACTIVE permite reintentar en el siguiente
+          // tick. Nunca declarar cerrado mientras la mangle pueda seguir viva.
+          log.warn({ err: err.message, sessionId: s.id }, 'fallo revocando sesión expirada; se reintentará');
+        }
+      }));
     }
 
     // La mangle de ESCANEO muere con el túnel: para cada workspace que se quedó
     // SIN túnel activo tras expirar, la borramos best-effort. Cargamos las creds
     // del router UNA sola vez por tick y solo si hubo expiraciones.
-    let mikrotik;
     for (const ws of affectedWs) {
       try {
         const stillActive = await sessionRepo.listActiveForWorkspace(ws);
         if (stillActive.length) continue; // otro túnel sigue activo → no tocar la scan mangle
-        if (mikrotik === undefined) mikrotik = await loadMikrotik();
         if (!mikrotik) break; // sin creds del router no hay nada que limpiar este tick
         await scanMangleSync.onTunnelClosed({ workspaceId: ws, mikrotik });
       } catch (err) {
@@ -150,7 +133,7 @@ function start() {
     log.info('Deshabilitado por EXPIRATION_JOB_ENABLED=false');
     return;
   }
-  const interval = Number(process.env.EXPIRATION_JOB_INTERVAL_MS || 60000);
+  const interval = Math.max(10_000, Number(process.env.EXPIRATION_JOB_INTERVAL_MS || 30_000));
   _handle = setInterval(runOnce, interval);
   log.info({ intervalMs: interval }, 'Job de expiración iniciado');
 }

@@ -104,11 +104,11 @@ export default function NodeCard({
   const showLogs = logs.length > 0 || isPending;
   const canActivate = !isPending && !!node.nombre_vrf && !node.disabled && node.running;
   const accessBlockReason = !node.nombre_vrf
-    ? 'Sin VRF asignado'
+    ? 'Este sitio no tiene una ruta de acceso asignada'
     : node.disabled
-      ? 'Secret PPP deshabilitado'
+      ? 'Este sitio no está disponible'
       : !node.running
-        ? 'Torre no conectada al VPN'
+        ? 'Este sitio está fuera de línea'
         : null;
 
   const rowBg = isThisNodeActive
@@ -205,7 +205,7 @@ export default function NodeCard({
                 {isActivating
                   ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   : <Play className="w-3.5 h-3.5" />}
-                <span>{isActivating ? 'Abriendo...' : 'Acceder'}</span>
+                <span>{isActivating ? 'Conectando...' : 'Conectar'}</span>
               </button>
             )}
 
@@ -219,7 +219,7 @@ export default function NodeCard({
                 {isDeactivating
                   ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   : <ShieldOff className="w-3.5 h-3.5" />}
-                <span>{isDeactivating ? 'Revocando...' : 'Revocar'}</span>
+                <span>{isDeactivating ? 'Desconectando...' : 'Desconectar'}</span>
               </button>
             )}
 

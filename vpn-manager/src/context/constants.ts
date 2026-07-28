@@ -1,6 +1,6 @@
 // Tunnel timeouts
 export const TUNNEL_TIMEOUT_MS = 30 * 60 * 1000;      // 30 minutos
-export const TUNNEL_KEEPALIVE_MS = 5 * 60 * 1000;     // 5 minutos
+export const TUNNEL_KEEPALIVE_MS = 60 * 1000;          // lease: cada minuto
 export const TUNNEL_KEEPALIVE_CHECK_MS = 5000;        // 5 segundos (polling)
 export const DEBOUNCE_SAVE_MS = 500;                  // 500 ms
 

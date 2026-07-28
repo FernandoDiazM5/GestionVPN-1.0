@@ -75,12 +75,12 @@ export function NodesExportMenu({ rows, meta, disabled }: NodesExportMenuProps) 
         disabled={disabled}
         aria-haspopup="menu"
         aria-expanded={showKebab}
-        aria-label="Exportar el inventario visible"
-        title="Exportar (CSV · JSON · Excel · PDF)"
+        aria-label="Descargar la lista visible"
+        title="Descargar (CSV · JSON · Excel · PDF)"
         className="btn-outline flex items-center gap-1.5 px-3 py-2.5 text-xs shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
       >
         <Download className="w-4 h-4" />
-        <span>Exportar</span>
+        <span>Descargar</span>
       </button>
 
       {exportError && (

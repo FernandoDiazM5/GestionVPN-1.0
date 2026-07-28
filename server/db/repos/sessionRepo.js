@@ -9,7 +9,9 @@ const { query, withTransaction } = require('../mysql');
 // Renombrado a `logger` porque este módulo expone una función `log()`
 const logger = require('../../lib/logger').child({ scope: 'session-repo' });
 
-const TTL_MS = 30 * 60 * 1000; // 30 min — igual al timeout legacy
+// Lease corto renovado por el cliente. Si el navegador/laptop desaparece,
+// el backend revoca el acceso sin depender de beforeunload.
+const TTL_MS = Math.max(2 * 60 * 1000, Number(process.env.TUNNEL_LEASE_TTL_MS || 5 * 60 * 1000));
 
 /** Sesión ACTIVE del usuario (o null). */
 async function getActiveByUser(workspaceId, userId) {
@@ -103,11 +105,14 @@ async function findExpired(now = Date.now()) {
 
 /** Renueva el TTL de una sesión (keepalive). */
 async function touch(id, now = Date.now()) {
-  await query(
+  const expiresAt = now + TTL_MS;
+  const result = await query(
     `UPDATE tunnel_user_sessions SET expires_at = ?
-      WHERE id = ? AND status = 'ACTIVE'`,
-    [now + TTL_MS, id]
+      WHERE id = ? AND status = 'ACTIVE'
+        AND (expires_at IS NULL OR expires_at >= ?)`,
+    [expiresAt, id, now]
   );
+  return result.affectedRows > 0 ? expiresAt : null;
 }
 
 /** Inserta una línea de auditoría (append-only, nunca lanza hacia arriba). */

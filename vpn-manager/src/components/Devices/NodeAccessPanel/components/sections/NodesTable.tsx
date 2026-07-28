@@ -28,14 +28,14 @@ interface NodesTableProps {
 
 // Mapa key→{label, sortKey?}. sortKey opcional: solo algunas columnas sortean.
 const COL_HEADER_META: Record<string, { label: string; sortKey?: SortKey }> = {
-  vrf:       { label: 'VRF',          sortKey: 'nombre_vrf' },
-  lan:       { label: 'Red LAN' },
-  ip_tunnel: { label: 'IP Túnel',     sortKey: 'ip_tunnel' },
-  ppp_user:  { label: 'Usuario PPP' },
+  vrf:       { label: 'Ruta asignada', sortKey: 'nombre_vrf' },
+  lan:       { label: 'Red del sitio' },
+  ip_tunnel: { label: 'Dirección de conexión', sortKey: 'ip_tunnel' },
+  ppp_user:  { label: 'Identificador de acceso' },
   tags:      { label: 'Etiquetas' },
-  service:   { label: 'Protocolo' },
-  disabled:  { label: 'Habilitado' },
-  uptime:    { label: 'Tiempo activo' },
+  service:   { label: 'Tipo de conexión' },
+  disabled:  { label: 'Disponibilidad' },
+  uptime:    { label: 'Tiempo en línea' },
 };
 
 interface SortableHeaderProps {
@@ -97,7 +97,7 @@ export default function NodesTable({
     <div
       className="max-w-full min-w-0 overflow-x-auto overscroll-x-contain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-400"
       role="region"
-      aria-label="Nodos VPN. Desplaza horizontalmente para ver todas las columnas."
+      aria-label="Sitios remotos. Desplaza horizontalmente para ver todos los datos."
       tabIndex={0}
     >
       <table className="w-full min-w-[760px] text-xs">
@@ -107,7 +107,7 @@ export default function NodesTable({
             <th className="h-11 w-11 px-0 py-0" aria-label="Estado" />
 
             {/* Fija: Nodo (sortable) */}
-            <SortableHeader label="Nodo" columnKey="nombre_nodo" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+            <SortableHeader label="Sitio" columnKey="nombre_nodo" activeKey={sortKey} direction={sortDir} onSort={onSort} />
 
             {/* Opcionales dinámicas */}
             {orderedCols.map(key => {
@@ -135,7 +135,7 @@ export default function NodesTable({
                 Shadow sutil hacia la izquierda marca que está flotando
                 cuando hay overflow horizontal. */}
             <th className="px-4 py-3 text-right font-bold text-slate-500 uppercase tracking-wider text-2xs sticky right-0 z-10 bg-slate-50 shadow-[-2px_0_6px_-3px_rgba(0,0,0,0.06)] dark:text-slate-400 dark:bg-slate-800/50">
-              Acciones
+              Opciones
             </th>
           </tr>
         </thead>
@@ -164,7 +164,7 @@ export default function NodesTable({
                   <Search className="w-8 h-8 text-slate-500 dark:text-slate-500" />
                   <p className="text-slate-500 dark:text-slate-400 font-semibold">Sin resultados</p>
                   <p className="text-slate-500 dark:text-slate-400 text-xs">
-                    {searchQuery ? `No se encontraron nodos coincidentes con "${searchQuery}"` : 'No hay nodos para mostrar'}
+                    {searchQuery ? `No se encontraron sitios coincidentes con "${searchQuery}"` : 'No hay sitios para mostrar'}
                   </p>
                 </div>
               </td>

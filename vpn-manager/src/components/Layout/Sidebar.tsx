@@ -30,8 +30,8 @@ const NAV: NavGroup[] = [
   {
     category: 'Red',
     items: [
-      { id: 'nodes', label: 'Nodos', icon: Radio },
-      { id: 'devices', label: 'Escanear', icon: Cpu },
+      { id: 'nodes', label: 'Sitios', icon: Radio },
+      { id: 'devices', label: 'Buscar equipos', icon: Cpu },
     ],
   },
   {
@@ -39,19 +39,19 @@ const NAV: NavGroup[] = [
     items: [
       // 'Workspace' unifica los antiguos "Usuarios" (WG peers) y "Equipo"
       // (miembros del workspace) en una sola vista con sub-tabs.
-      { id: 'team', label: 'Workspace', icon: Briefcase },
+      { id: 'team', label: 'Mi equipo', icon: Briefcase },
     ],
   },
   {
     category: 'Monitoreo',
     items: [
-      { id: 'monitor', label: 'Monitor AP', icon: Activity },
+      { id: 'monitor', label: 'Estado de antenas', icon: Activity },
     ],
   },
   {
     category: 'Sistema',
     items: [
-      { id: 'settings', label: 'Ajustes', icon: Settings },
+      { id: 'settings', label: 'Configuración', icon: Settings },
     ],
   },
 ];
@@ -123,8 +123,8 @@ export default function Sidebar() {
           </div>
           {!mini && (
             <div className="min-w-0">
-              <p className="text-2xs font-bold uppercase tracking-wide text-emerald-600/70 dark:text-emerald-400/70 leading-none">Router activo</p>
-              <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400 truncate mt-0.5">MikroTik</p>
+              <p className="text-2xs font-bold uppercase tracking-wide text-emerald-600/70 dark:text-emerald-400/70 leading-none">Servicio disponible</p>
+              <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400 truncate mt-0.5">Conexión principal</p>
             </div>
           )}
         </div>
@@ -178,7 +178,7 @@ export default function Sidebar() {
           <div className="flex items-center justify-between px-2 py-1.5">
             <span className="flex items-center gap-2 text-2xs font-semibold text-emerald-600 dark:text-emerald-400">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Sistema en línea
+              Todo funciona correctamente
             </span>
           </div>
         )}
@@ -194,7 +194,7 @@ export default function Sidebar() {
             ${mini ? 'justify-center px-0 py-2.5' : 'px-3 py-2.5'}`}
         >
           {darkMode ? <Sun className="w-[18px] h-[18px] shrink-0" /> : <Moon className="w-[18px] h-[18px] shrink-0" />}
-          {!mini && <span>{darkMode ? 'Modo claro' : 'Modo oscuro'}</span>}
+          {!mini && <span>{darkMode ? 'Tema claro' : 'Tema oscuro'}</span>}
         </button>
 
         <div className={`flex items-center gap-2.5 rounded-xl bg-slate-50 border border-slate-200 dark:bg-slate-800 dark:border-slate-700 ${mini ? 'p-2 justify-center' : 'px-3 py-2'}`}>

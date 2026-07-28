@@ -64,7 +64,7 @@ function NodesFilterBarImpl({
             type="text"
             name="node-search-filter-off"
             autoComplete="new-password"
-            placeholder="Buscar nodo, VRF, red, usuario…"
+            placeholder="Buscar por nombre o ubicación…"
             value={search}
             onChange={e => onSearchChange(e.target.value)}
             className="w-full pl-11 pr-9 py-2.5 text-sm rounded-xl border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500
@@ -86,25 +86,25 @@ function NodesFilterBarImpl({
         <select
           value={filterProtocol}
           onChange={e => setFilterProtocol(e.target.value as ProtocolFilter)}
-          aria-label="Filtrar por protocolo"
-          title="Filtrar por protocolo (SSTP / WireGuard)"
+          aria-label="Filtrar por tipo de conexión"
+          title="Filtrar por tipo de conexión"
           className="text-sm border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 text-slate-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300"
         >
-          <option value="">Todos los protocolos</option>
-          <option value="sstp">Solo SSTP</option>
-          <option value="wireguard">Solo WireGuard</option>
+          <option value="">Todos los tipos</option>
+          <option value="sstp">Conexión SSTP</option>
+          <option value="wireguard">Conexión WireGuard</option>
         </select>
 
         <select
           value={filterStatus}
           onChange={e => setFilterStatus(e.target.value as StatusFilter)}
-          aria-label="Filtrar por estado del túnel"
-          title="Filtrar por estado del túnel (Conectado / Desconectado)"
+          aria-label="Filtrar por disponibilidad"
+          title="Filtrar por disponibilidad"
           className="text-sm border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 text-slate-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300"
         >
-          <option value="">Todos los estados</option>
-          <option value="connected">Conectados</option>
-          <option value="disconnected">Desconectados</option>
+          <option value="">Cualquier estado</option>
+          <option value="connected">En línea</option>
+          <option value="disconnected">No disponibles</option>
         </select>
 
         <NodeColumnPicker visibleCols={visibleCols} onChange={setVisibleCols} />
@@ -150,12 +150,12 @@ function NodesFilterBarImpl({
               <span className="font-bold text-indigo-600 dark:text-indigo-400">{resultCount}</span>
               <span className="text-slate-500 dark:text-slate-600 mx-1">/</span>
               <span>{totalCount}</span>
-              <span className="ml-1 text-slate-500 dark:text-slate-400">nodos</span>
+              <span className="ml-1 text-slate-500 dark:text-slate-400">{totalCount === 1 ? 'sitio' : 'sitios'}</span>
             </>
           ) : (
             <>
               <span className="font-bold text-slate-600 dark:text-slate-300">{totalCount}</span>
-              <span className="ml-1 text-slate-500 dark:text-slate-400">nodos</span>
+              <span className="ml-1 text-slate-500 dark:text-slate-400">{totalCount === 1 ? 'sitio' : 'sitios'}</span>
             </>
           )}
         </span>

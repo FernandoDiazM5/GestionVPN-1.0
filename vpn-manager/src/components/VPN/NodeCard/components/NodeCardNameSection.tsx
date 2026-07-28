@@ -56,10 +56,6 @@ export function NodeCardNameSection({
           </div>
         ) : (
           <div className="flex items-center gap-1.5 group/name">
-            {node.service === 'wireguard'
-              ? <span className="badge badge-accent shrink-0" title="WireGuard">WG</span>
-              : <span className="badge badge-info shrink-0" title="SSTP">SSTP</span>
-            }
             <p className="font-semibold text-slate-800 dark:text-slate-100 text-xs flex-1 leading-tight truncate max-w-[200px]" title={node.nombre_nodo}>
               {node.nombre_nodo}
             </p>
@@ -76,7 +72,7 @@ export function NodeCardNameSection({
             /* Estado normal → discreto (la señal verde ya está en el ícono) */
             <span className="inline-flex items-center gap-1 text-2xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              Conectado
+              En línea
             </span>
           ) : (
             /* Excepción → badge prominente */
@@ -90,7 +86,7 @@ export function NodeCardNameSection({
               }
               className={`badge ${node.disabled ? 'badge-danger' : 'badge-warning'}`}
             >
-              {node.disabled ? 'Deshabilitado' : 'Desconectado'}
+              {node.disabled ? 'No disponible' : 'Fuera de línea'}
             </span>
           )}
           {isThisNodeActive && countdown && (

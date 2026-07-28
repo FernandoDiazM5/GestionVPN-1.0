@@ -7,7 +7,8 @@ import type { RouterCredentials } from '../../store/db';
 export function useTunnelKeepalive(
   tunnelExpiry: number | null,
   credentials: RouterCredentials | undefined,
-  activeNodeVrf: string | null
+  activeNodeVrf: string | null,
+  setTunnelExpiry: (expiresAt: number | null) => void,
 ) {
   const keepaliveRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -29,6 +30,12 @@ export function useTunnelKeepalive(
           body: JSON.stringify({}),
         }, 12_000);
         const data = await res.json();
+        if (!res.ok || !data?.success) {
+          throw new Error(data?.message ?? `Keepalive rechazado (HTTP ${res.status})`);
+        }
+        if (typeof data.tunnelExpiry === 'number') {
+          setTunnelExpiry(data.tunnelExpiry);
+        }
         if (data.restored) {
           console.warn('[KEEPALIVE] Reglas mangle restauradas:', data.restoredItems);
         }
@@ -45,7 +52,7 @@ export function useTunnelKeepalive(
         keepaliveRef.current = null;
       }
     };
-  }, [tunnelExpiry, credentials, activeNodeVrf]);
+  }, [tunnelExpiry, credentials, activeNodeVrf, setTunnelExpiry]);
 
   return { keepaliveRef };
 }

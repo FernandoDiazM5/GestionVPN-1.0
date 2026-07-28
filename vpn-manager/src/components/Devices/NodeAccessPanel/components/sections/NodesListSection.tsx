@@ -140,7 +140,7 @@ export default function NodesListSection({
           <div className="flex-1 min-w-0">
             <span className="font-bold text-amber-700 dark:text-amber-400">MikroTik no disponible</span>
             <span className="text-amber-600 dark:text-amber-500 ml-1.5">
-              Mostrando {nodes.length} nodo{nodes.length !== 1 ? 's' : ''} desde la base de datos local.
+              Mostrando {nodes.length} {nodes.length === 1 ? 'sitio' : 'sitios'} desde los datos guardados.
             </span>
           </div>
           <button onClick={onRefreshNodes}
@@ -194,7 +194,7 @@ export default function NodesListSection({
 
           {totalPages > 1 && (
             <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-400">
-              <span>Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1} a {Math.min(currentPage * ITEMS_PER_PAGE, sortedNodes.length)} de {sortedNodes.length} nodos</span>
+              <span>Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1} a {Math.min(currentPage * ITEMS_PER_PAGE, sortedNodes.length)} de {sortedNodes.length} {sortedNodes.length === 1 ? 'sitio' : 'sitios'}</span>
               <div className="flex items-center gap-1">
                 <button
                   disabled={currentPage === 1}
@@ -223,8 +223,8 @@ export default function NodesListSection({
           <div className="w-14 h-14 bg-indigo-50 dark:bg-indigo-500/15 rounded-2xl flex items-center justify-center">
             <Radio className="w-7 h-7 text-indigo-400" />
           </div>
-          <p className="text-slate-500 dark:text-slate-300 font-medium">Sin nodos SSTP</p>
-          <p className="text-slate-500 dark:text-slate-500 text-sm">El router no tiene túneles SSTP configurados</p>
+          <p className="text-slate-500 dark:text-slate-300 font-medium">Aún no hay sitios</p>
+          <p className="text-slate-500 dark:text-slate-500 text-sm">Agrega un sitio remoto para comenzar</p>
         </div>
       )}
 
@@ -235,7 +235,7 @@ export default function NodesListSection({
             <Search className="w-7 h-7 text-indigo-400" />
           </div>
           <p className="text-slate-500 dark:text-slate-300 font-medium">Sin datos aún</p>
-          <p className="text-slate-500 dark:text-slate-500 text-sm">Haz clic en "Actualizar" para obtener los túneles VRF del router</p>
+          <p className="text-slate-500 dark:text-slate-500 text-sm">Haz clic en “Cargar sitios” para obtener la lista</p>
         </div>
       )}
     </>

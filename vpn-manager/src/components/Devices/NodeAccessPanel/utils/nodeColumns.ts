@@ -24,12 +24,12 @@ export interface NodeColumnDef {
 }
 
 export const NODE_COLUMN_DEFS: NodeColumnDef[] = [
-  { key: 'vrf',       label: 'VRF',          defaultVisible: true,  group: 'Identificadores' },
-  { key: 'lan',       label: 'Red LAN',      defaultVisible: true,  group: 'Identificadores' },
-  { key: 'ip_tunnel', label: 'IP Túnel',     defaultVisible: true,  group: 'Identificadores' },
-  { key: 'ppp_user',  label: 'Usuario PPP',  defaultVisible: true,  group: 'Identificadores' },
-  { key: 'tags',      label: 'Etiquetas',    defaultVisible: false, group: 'Metadata' },
-  { key: 'service',   label: 'Protocolo',    defaultVisible: false, group: 'Metadata' },
-  { key: 'disabled',  label: 'Habilitado',   defaultVisible: false, group: 'Metadata' },
-  { key: 'uptime',    label: 'Tiempo activo', defaultVisible: false, group: 'Metadata' },
+  { key: 'vrf',       label: 'Ruta asignada',         defaultVisible: false, group: 'Detalles técnicos' },
+  { key: 'lan',       label: 'Red del sitio',         defaultVisible: false, group: 'Detalles técnicos' },
+  { key: 'ip_tunnel', label: 'Dirección de conexión', defaultVisible: false, group: 'Detalles técnicos' },
+  { key: 'ppp_user',  label: 'Identificador de acceso', defaultVisible: false, group: 'Detalles técnicos' },
+  { key: 'tags',      label: 'Etiquetas',             defaultVisible: false, group: 'Información adicional' },
+  { key: 'service',   label: 'Tipo de conexión',      defaultVisible: false, group: 'Detalles técnicos' },
+  { key: 'disabled',  label: 'Disponibilidad',        defaultVisible: false, group: 'Información adicional' },
+  { key: 'uptime',    label: 'Tiempo en línea',       defaultVisible: false, group: 'Información adicional' },
 ];

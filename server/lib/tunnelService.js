@@ -20,6 +20,7 @@ const scanMangleSync = require('./scanMangleSync');
 const sse = require('./sse');
 const { resolveOwnedMgmtIps } = require('./mgmtIpResolver');
 const { canUseTunnelForAccount, emitToUser } = require('../routes/core/_shared');
+const revocations = new Map();
 
 /**
  * Activa el VRF indicado para el usuario.
@@ -162,7 +163,13 @@ async function activateTunnel({ account, targetVRF, mikrotik, clientIp = '-' }) 
  *
  * @returns {Promise<{ok:true, hadSession:boolean, tunnelId?:string, vrf?:string}|{ok:false, code, message}>}
  */
-async function deactivateTunnel({ account, mikrotik, clientIp = '-' }) {
+async function deactivateTunnelUnlocked({
+  account,
+  mikrotik,
+  clientIp = '-',
+  action = 'DEACTIVATE',
+  onlyIfExpired = false,
+}) {
   if (!account?.sub || !account?.workspace_id) return { ok: false, code: 401, message: 'Sesión inválida' };
   if (!mikrotik?.ip || !mikrotik?.user) return { ok: false, code: 503, message: 'MikroTik no configurado' };
   const { ip, user, pass } = mikrotik;
@@ -170,6 +177,16 @@ async function deactivateTunnel({ account, mikrotik, clientIp = '-' }) {
   let apiRead, apiWrite;
   try {
     const session = await sessionRepo.getActiveByUser(account.workspace_id, account.sub);
+    if (onlyIfExpired && session?.expires_at && session.expires_at >= Date.now()) {
+      return {
+        ok: true,
+        hadSession: true,
+        skipped: true,
+        tunnelId: session.tunnel_id,
+        vrf: session.vrf_name,
+        expiresAt: session.expires_at,
+      };
+    }
 
     apiRead = await connectToMikrotik(ip, user, pass);
     const ids = await provisioner.findUserMangleIds(apiRead, account.sub);
@@ -182,8 +199,8 @@ async function deactivateTunnel({ account, mikrotik, clientIp = '-' }) {
     }
 
     if (session) await sessionRepo.closeSession(session.id);
-    await sessionRepo.log({ workspaceId: account.workspace_id, sessionId: session?.id, userId: account.sub, tunnelId: session?.tunnel_id || '-', action: 'DEACTIVATE', statusCode: 200, ipAddress: clientIp });
-    log.info({ userId: account.sub, count: ids.length }, 'DEACTIVATE OK');
+    await sessionRepo.log({ workspaceId: account.workspace_id, sessionId: session?.id, userId: account.sub, tunnelId: session?.tunnel_id || '-', action, statusCode: 200, ipAddress: clientIp });
+    log.info({ userId: account.sub, count: ids.length, action }, 'TUNNEL REVOKE OK');
 
     emitToUser(account.sub, null, null);
 
@@ -191,12 +208,12 @@ async function deactivateTunnel({ account, mikrotik, clientIp = '-' }) {
     void scanMangleSync.onTunnelClosed({ workspaceId: account.workspace_id, mikrotik });
 
     // SSE 'tunnel' → refresca la "Actividad reciente" del workspace en vivo.
-    try { sse.publish(account.workspace_id, 'tunnel', { tunnelId: session?.tunnel_id || '-', action: 'DEACTIVATE', userId: account.sub, ts: Date.now() }); } catch (_) { /* best-effort */ }
+    try { sse.publish(account.workspace_id, 'tunnel', { tunnelId: session?.tunnel_id || '-', action, userId: account.sub, ts: Date.now() }); } catch (_) { /* best-effort */ }
 
     if (session) {
       notifier.notify({
         userId: account.sub,
-        event: 'TUNNEL_DEACTIVATED',
+        event: action === 'EXPIRE' ? 'SESSION_EXPIRED' : 'TUNNEL_DEACTIVATED',
         payload: { tunnelId: session.tunnel_id, vrf: session.vrf_name, ip: clientIp },
       }).catch((err) => log.warn({ err: err.message }, 'notify TUNNEL_DEACTIVATED falló'));
     }
@@ -208,6 +225,20 @@ async function deactivateTunnel({ account, mikrotik, clientIp = '-' }) {
     await sessionRepo.log({ workspaceId: account.workspace_id, userId: account.sub, tunnelId: '-', action: 'ERROR', statusCode: 500, message: `deactivate falló: ${error?.message}`, ipAddress: clientIp });
     return { ok: false, code: 500, message: `No se pudo revocar el acceso (router sin responder). ${getErrorMessage(error, ip, user)}` };
   }
+}
+
+// Deduplica revocaciones simultáneas del mismo usuario (logout, botón,
+// timeout y job). Usuarios diferentes conservan concurrencia independiente.
+async function deactivateTunnel(options) {
+  const key = `${options.account?.workspace_id || '-'}:${options.account?.sub || '-'}`;
+  const pending = revocations.get(key);
+  if (pending) return pending;
+
+  const operation = deactivateTunnelUnlocked(options).finally(() => {
+    if (revocations.get(key) === operation) revocations.delete(key);
+  });
+  revocations.set(key, operation);
+  return operation;
 }
 
 module.exports = { activateTunnel, deactivateTunnel };
