@@ -6,6 +6,21 @@
 
 ---
 
+> **Sesión 2026-07-27 — Lenguaje sencillo y vista simple de Sitios.** Rama `vps_prod`, implementación `7b3a6db`; pendiente de despliegue. Skills: `vercel-react-best-practices`, `handoff-keeper`.
+> - Cambio sólo frontend: `Nodos` pasa a `Sitios`; acciones, navegación, estados, filtros, contador, vacíos y alta usan lenguaje cotidiano.
+> - La vista inicial oculta identificadores técnicos; VRF/LAN/IP/PPP/protocolo permanecen disponibles en `Datos visibles` con etiquetas explicativas.
+> - Preferencias de columnas migran de v1 a v2 una sola vez para aplicar la vista simple también a usuarios existentes.
+> - Verificación: **53/178 frontend**, TypeScript, ESLint, build Vite y `git diff --check`; auditor de diseño sólo reporta los 2 hallazgos preexistentes de `RouterAccess.tsx`.
+> - Pendiente: autorización explícita, rebuild backend+frontend y revisión visual autenticada.
+
+> **Sesión 2026-07-27 — Lease y revocación automática de túneles inactivos.** Rama `vps_prod`, implementación `7b3a6db`; pendiente de despliegue. Skills: `vercel-react-best-practices`, `handoff-keeper`.
+> - Diagnosticado que el job marcaba sesiones expiradas `CLOSED` sin eliminar la mangle del usuario, y que el frontend dejaba de renovar al alcanzar la expiración original.
+> - Implementado lease server-authoritative de 5 minutos con heartbeat cada minuto, renovación condicional anti-resurrección y barrido cada 30 segundos.
+> - Logout/logout-all, estado, timeout y job usan revocación centralizada: deduplicada por usuario, paralela entre usuarios y en lotes de 3 para RouterOS.
+> - La regla `ACCESO-USER-*` se elimina antes de cerrar MySQL; fallos conservan `ACTIVE` para reintentar. Las carreras heartbeat/expiración revalidan el lease.
+> - Verificación: **86/527 backend + 53/178 frontend**, `check:all`, ESLint, TypeScript, build Vite y `git diff --check`.
+> - Pendiente: autorización explícita para rebuild de backend+frontend; sin migraciones.
+
 > **Sesión 2026-07-27 — Informe por nodo, auditoría y despliegue de Monitor AP.** Rama `vps_prod`, implementación `8e0b0a8`; desplegada sólo en frontend. Skills: `vercel-react-best-practices`, `pdf`, `handoff-keeper`.
 > - Cada nodo ofrece un PDF A4 horizontal generado con imports diferidos: KPIs, calidad/frescura, inventario, ficha completa de AP y tabla de CPE con métricas RF/airMAX/salud. El snapshot omite secretos; conteos históricos se distinguen de CPE live.
 > - Corregidos estados engañosos: el grupo sólo está `Online` si todos sus AP lo están; 0 CPE tras poll exitoso no es error; datos de más de 5 minutos y errores aparecen `Parcial`.
