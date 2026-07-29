@@ -12,26 +12,26 @@ sesión, el workspace y los permisos en cada petición.
 
 ## Estado de implementación
 
-- **Checkpoint 1 — implementado en `ac47312`, pendiente de despliegue:** registro
+- **Checkpoint 1 — implementado en `ac47312`, desplegado mediante `46ff33d`:** registro
   único de importadores dinámicos, precarga por hover/foco/touch, precarga ociosa
   limitada a `Sitios`/`Buscar equipos`, medición desde clic hasta contenido
   confirmado por `Suspense` y formato Nginx sin datos personales para tiempos de
   request/backend/bytes.
-- **Checkpoint 2 — implementado en `163715a`, pendiente de despliegue:** gzip
+- **Checkpoint 2 — implementado en `163715a`, desplegado mediante `46ff33d`:** gzip
   para JS/CSS/JSON/XML/SVG, exclusión natural de SSE al no incluir
   `text/event-stream`, `Vary: Accept-Encoding`, revalidación obligatoria del
   HTML y caché inmutable para assets versionados. Las cabeceras de seguridad se
   preservan explícitamente en ubicaciones con `Cache-Control`.
 - Validación aislada: `Buscar equipos` pasó de 140,423 a 34,069 bytes
   transferidos (aprox. 76% menos).
-- **Checkpoint 3 — implementado en `c8d5a86`, pendiente de despliegue:**
+- **Checkpoint 3 — implementado en `c8d5a86`, desplegado mediante `46ff33d`:**
   TanStack Query por ámbito autenticado y primer recurso compartido
   (`device-inventory`) entre Buscar equipos y Estado de antenas. La clave incluye
   workspace, usuario, rol y alcance; `staleTime` 45 s, `gcTime` 5 min, sin
   persistencia ni reintentos automáticos. `sshPass` se elimina tanto al cargar
   como al mutar la caché; Buscar equipos hidrata secretos sólo desde memoria
   efímera. Logout/cambio de ámbito cancela y destruye el cliente.
-- **Checkpoint 4 — implementado en `0cb2efb`, pendiente de despliegue:**
+- **Checkpoint 4 — implementado en `0cb2efb`, desplegado mediante `46ff33d`:**
   `Sitios` y `Buscar equipos` comparten una consulta `node-inventory`; se eliminó
   la solicitud independiente de Buscar equipos y el `setTimeout(2000)` de
   Sitios. La caché en memoria y la restauración rápida de sesión se segmentan
@@ -39,8 +39,8 @@ sesión, el workspace y los permisos en cada petición.
   sobre el estado operativo del túnel; editar, renombrar o eliminar sincroniza
   el inventario compartido. El polling de 60 s reutiliza la misma consulta y
   deduplica solicitudes concurrentes.
-- Pendiente inmediato: desplegar los cuatro checkpoints, medir solicitudes y
-  navegación reales, y después migrar el Monitor de antenas.
+- Pendiente inmediato: medir P50/P95 y solicitudes reales con uso normal, y
+  después migrar los datos propios del Monitor de antenas.
 - Migración del Monitor y centralización SSE aún no se implementan.
 
 ## Principios obligatorios

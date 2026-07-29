@@ -6,7 +6,14 @@
 
 ---
 
-> **Sesión 2026-07-28 — Sitios compartidos sin recargas duplicadas.** Rama `vps_prod`, base `6f6233c`; cambio `0cb2efb`, sin despliegue. Skills: `vercel-react-best-practices`, `handoff-keeper`.
+> **Sesión 2026-07-28 — Checkpoints de rendimiento desplegados.** Rama y producción `46ff33d`. Skills: `vercel-react-best-practices`, `handoff-keeper`.
+> - Con autorización explícita se avanzó el VPS desde `a1c545f` hasta `46ff33d` y se reconstruyeron backend y frontend; MariaDB y sus volúmenes permanecieron intactos.
+> - Respaldos: `gestionvpn-10-backend:pre-46ff33d-20260728` y `gestionvpn-10-frontend:pre-46ff33d-20260728`.
+> - Verificación: checkout exacto, contenedores saludables, cero reinicios, HTTPS/health 200, MySQL/RouterOS/SMTP `ok`, Nginx válido, HTML `no-cache` y assets con gzip+caché inmutable.
+> - Durante el reinicio hubo dos 502 transitorios de SSE antes de que backend escuchara; EventSource reconectó y no hubo errores posteriores al arranque estable.
+> - Quedan activos los checkpoints 1–4: precarga/métricas, compresión, inventario compartido de equipos y de Sitios con aislamiento multiusuario.
+
+> **Sesión 2026-07-28 — Sitios compartidos sin recargas duplicadas.** Rama `vps_prod`, base `6f6233c`; cambio `0cb2efb`, sin despliegue inicial. Skills: `vercel-react-best-practices`, `handoff-keeper`.
 > - `Sitios` y `Buscar equipos` consumen una única consulta `node-inventory`, deduplicada por workspace, usuario, rol y alcance.
 > - Se eliminaron la petición propia de Buscar equipos y el refresco fijo a los 2 segundos; la revalidación inicial ocurre de inmediato y en segundo plano.
 > - La restauración rápida de Sitios en `sessionStorage` quedó segmentada para impedir cruces entre usuarios consecutivos en el mismo navegador.
