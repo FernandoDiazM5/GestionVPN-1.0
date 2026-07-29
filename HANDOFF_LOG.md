@@ -6,6 +6,13 @@
 
 ---
 
+> **Sesión 2026-07-28 — Plan de rendimiento y navegación multiusuario.** Rama `vps_prod`, base `c4aca87`; documentación únicamente, sin implementación ni despliegue. Skills: `vercel-react-best-practices`, `handoff-keeper`.
+> - Creado `docs/PERFORMANCE_NAVIGATION_PLAN.md` con nueve fases independientes y reversibles.
+> - El diseño segmenta caché por workspace/usuario/alcance, excluye secretos y conserva autorización server-side.
+> - Se contempla centralizar las dos conexiones actuales a `/api/events/stream`, manteniendo separado `/api/tunnel/events`.
+> - Incluye fallos de red, 401/403, varias pestañas, cambio de rol/workspace, eventos duplicados o tardíos, chunks antiguos, carga concurrente y rollback.
+> - Pendiente: aprobar alcance e implementar desde la Fase 0, sin desplegar fases mezcladas.
+
 > **Sesión 2026-07-28 — Diagnóstico de navegación lenta.** Rama `vps_prod`, base `f696325`; sólo lectura funcional, sin despliegue. Skills: `vercel-react-best-practices`, `browser:control-in-app-browser`, `handoff-keeper`.
 > - Producción sirve chunks lazy de 120–157 KB con caché inmutable, pero sin gzip/Brotli y sin precarga desde el menú.
 > - Cambiar entre Buscar equipos y Estado de antenas vuelve a montar los módulos y repite `/api/db/devices`; los access logs confirman la alternancia.
