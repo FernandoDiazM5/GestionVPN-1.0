@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Radio, Cpu, Briefcase, Activity, Settings, LayoutDashboard, UserCog,
   LogOut, ChevronLeft, Menu, X, Wifi, Server, Sun, Moon,
@@ -7,6 +7,8 @@ import { useVpn } from '../../context';
 import { useWorkspaceSession } from '../../context/WorkspaceSession';
 import { visibleModules, roleLabel, type ModuleId } from '../../utils/permissions';
 import Drawer from '../Common/Drawer';
+import { preloadModule } from '../../performance/moduleLoaders';
+import { markNavigationStart } from '../../performance/navigationMetrics';
 
 interface NavItem {
   id: ModuleId;
@@ -70,7 +72,7 @@ export default function Sidebar() {
   }, [collapsed]);
 
   // Módulos visibles según la sesión (rol + plataforma)
-  const visible = visibleModules(session);
+  const visible = useMemo(() => visibleModules(session), [session]);
 
   // Si el módulo activo no es visible para este rol, salta al primero permitido
   useEffect(() => {
@@ -80,9 +82,31 @@ export default function Sidebar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, activeModule]);
 
+  useEffect(() => {
+    const likelyNext = (['nodes', 'devices'] as ModuleId[])
+      .filter(id => id !== activeModule && visible.includes(id));
+    if (likelyNext.length === 0) return undefined;
+
+    const preloadLikelyNext = () => {
+      likelyNext.forEach(id => preloadModule(id, !!session?.platform_admin));
+    };
+    if ('requestIdleCallback' in window) {
+      const idleId = window.requestIdleCallback(preloadLikelyNext, { timeout: 2_000 });
+      return () => window.cancelIdleCallback(idleId);
+    }
+    const timerId = setTimeout(preloadLikelyNext, 1_500);
+    return () => clearTimeout(timerId);
+  }, [activeModule, session?.platform_admin, visible]);
+
   const handleNav = (id: ModuleId) => {
+    if (id !== activeModule) markNavigationStart(id);
     setActiveModule(id as never);
     setMobileOpen(false);
+  };
+
+  const prepareModule = (id: ModuleId) => {
+    if (!visible.includes(id)) return;
+    preloadModule(id, !!session?.platform_admin);
   };
 
   /** Cuerpo del sidebar. `mini` = modo icono (solo desktop colapsado). */
@@ -150,6 +174,9 @@ export default function Sidebar() {
                     <button
                       key={item.id}
                       onClick={() => handleNav(item.id)}
+                      onPointerEnter={() => prepareModule(item.id)}
+                      onFocus={() => prepareModule(item.id)}
+                      onTouchStart={() => prepareModule(item.id)}
                       title={mini ? item.label : undefined}
                       aria-label={item.label}
                       className={`relative w-full flex items-center gap-3 rounded-xl text-sm font-semibold transition-all

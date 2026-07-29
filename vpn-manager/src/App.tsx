@@ -10,6 +10,8 @@ import RouterMaintenanceOverlay from './components/Common/RouterMaintenanceOverl
 import ModuleErrorBoundary from './components/Common/ModuleErrorBoundary';
 import NotFoundPage from './components/Common/NotFoundPage';
 import AsyncQueryState from './components/Common/AsyncQueryState';
+import ModuleRenderMetric from './performance/ModuleRenderMetric';
+import { moduleLoaders } from './performance/moduleLoaders';
 
 // ── Code-splitting (FASE 10 del REFACTOR_PLAN) ─────────────────────
 //  Cada módulo se carga bajo demanda en su propio chunk. Esto baja el
@@ -21,16 +23,16 @@ import AsyncQueryState from './components/Common/AsyncQueryState';
 //  skeleton es el fallback de Suspense, no tiene sentido lazify-arlos
 //  (fallback de un fallback = pantalla blanca momentánea).
 const RouterAccess              = lazy(() => import('./components/Auth/RouterAccess'));
-const AdminDashboard            = lazy(() => import('./components/Admin/AdminDashboard/AdminDashboard'));
-const ModeratorsModule          = lazy(() => import('./components/Admin/ModeratorsModule/ModeratorsModule'));
-const NodeAccessPanel           = lazy(() => import('./components/Devices/NodeAccessPanel'));
+const AdminDashboard            = lazy(moduleLoaders.dashboard);
+const ModeratorsModule          = lazy(moduleLoaders.moderators);
+const NodeAccessPanel           = lazy(moduleLoaders.nodes);
 // UserManagementPanel ya no es un módulo independiente: el TeamModule lo
 // monta como sub-tab "Usuarios VPN" dentro del módulo Workspace.
-const TeamModule                = lazy(() => import('./components/Team/TeamModule'));
-const NetworkDevicesModule      = lazy(() => import('./components/Devices/NetworkDevicesModule'));
-const ApMonitorModule           = lazy(() => import('./components/Monitor/ApMonitorModule'));
-const SettingsModule            = lazy(() => import('./components/Settings/SettingsModule'));
-const ModeratorSettingsModule   = lazy(() => import('./components/Settings/ModeratorSettings/ModeratorSettingsModule'));
+const TeamModule                = lazy(moduleLoaders.team);
+const NetworkDevicesModule      = lazy(moduleLoaders.devices);
+const ApMonitorModule           = lazy(moduleLoaders.monitor);
+const SettingsModule            = lazy(moduleLoaders.platformSettings);
+const ModeratorSettingsModule   = lazy(moduleLoaders.workspaceSettings);
 
 import { useWorkspaceSession } from './context/WorkspaceSession';
 import { isPlatformAdmin, visibleModules, type ModuleId } from './utils/permissions';
@@ -174,6 +176,7 @@ function ModuleRouter() {
   return (
     <ModuleErrorBoundary resetKey={activeModule}>
       <Suspense fallback={<ModuleSkeleton />}>
+        <ModuleRenderMetric moduleId={activeModule as ModuleId} />
         {activeModule === 'dashboard'   && <AdminDashboard />}
         {activeModule === 'moderators'  && <ModeratorsModule />}
         {activeModule === 'nodes'       && <NodeAccessPanel />}
