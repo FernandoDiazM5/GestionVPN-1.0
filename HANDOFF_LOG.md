@@ -6,6 +6,12 @@
 
 ---
 
+> **Sesión 2026-07-29 — Verificación de CCQ y capacidad airMAX por firmware.** Rama `vps_prod`, base `ee17715`; sólo lectura de código y 71 snapshots de producción, sin cambio de producto ni despliegue. Skills: `network-engineer`, `handoff-keeper`.
+> - `CCQ`, `AM Qual` y `AM Cap`: 12/71 con valor, concentrados en CPE/AP XW/M-series.
+> - `DL Cap` y `UL Cap`: 45/71 con valor, principalmente en AP WA 8.5.7.
+> - Los AP WA 8.7.11 observados tienen 14/14 filas sin ninguna de las cinco métricas, explicando la captura.
+> - Conclusión: no eliminarlas globalmente. Pendiente recomendado: disponibilidad dinámica por tabla/AP, ocultando columnas con cobertura 0 y señalándolas como “Sin datos en esta antena” en el selector.
+
 > **Sesión 2026-07-29 — Se omite “Última IP” de la tabla CPE.** Rama `vps_prod`, base `a2f0aaf`; cambio frontend pendiente de commit/deploy. Skills: `ui-design-system`, `handoff-keeper`.
 > - Se retiraron encabezado y celdas de `lastip`; “Distancia (m)” y el resto de datos permanecen.
 > - `ColSelector` dejó de mantener una copia divergente de las columnas y consume la definición central de `columnDefs`.
