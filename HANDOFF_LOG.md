@@ -6,6 +6,13 @@
 
 ---
 
+> **Sesión 2026-07-28 — Diagnóstico de navegación lenta.** Rama `vps_prod`, base `f696325`; sólo lectura funcional, sin despliegue. Skills: `vercel-react-best-practices`, `browser:control-in-app-browser`, `handoff-keeper`.
+> - Producción sirve chunks lazy de 120–157 KB con caché inmutable, pero sin gzip/Brotli y sin precarga desde el menú.
+> - Cambiar entre Buscar equipos y Estado de antenas vuelve a montar los módulos y repite `/api/db/devices`; los access logs confirman la alternancia.
+> - Sitios agenda una revalidación `/api/nodes` dos segundos después de cada montaje; la animación global sólo añade 300 ms.
+> - Causa: suma de descarga/parseo inicial, consultas por montaje y estados de carga; no hay evidencia de que la animación sea la causa principal.
+> - Pendiente: implementar precarga, compresión y caché compartida con revalidación no bloqueante; medir después con tiempos por solicitud.
+
 > **Sesión 2026-07-28 — Monitor de antenas orientado al usuario.** Rama `vps_prod`, base `f020964`, sin despliegue. Skills: `ui-design-system`, `vercel-react-best-practices`, `handoff-keeper`.
 > - Se reemplazó la terminología técnica y ambigua por sitios, antenas, clientes, actualización, estado e información.
 > - Los filtros ahora reflejan su comportamiento real (`Sitio conectado/Otros sitios`) y se eliminó la recarga duplicada.
