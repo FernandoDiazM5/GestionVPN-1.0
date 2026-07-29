@@ -6,6 +6,14 @@
 
 ---
 
+> **Sesión 2026-07-28 — Sitios compartidos sin recargas duplicadas.** Rama `vps_prod`, base `6f6233c`; cambio `0cb2efb`, sin despliegue. Skills: `vercel-react-best-practices`, `handoff-keeper`.
+> - `Sitios` y `Buscar equipos` consumen una única consulta `node-inventory`, deduplicada por workspace, usuario, rol y alcance.
+> - Se eliminaron la petición propia de Buscar equipos y el refresco fijo a los 2 segundos; la revalidación inicial ocurre de inmediato y en segundo plano.
+> - La restauración rápida de Sitios en `sessionStorage` quedó segmentada para impedir cruces entre usuarios consecutivos en el mismo navegador.
+> - El contexto VPN conserva el control del túnel; polling, renombres, ediciones y eliminaciones mantienen sincronizada la caché de inventario.
+> - Verificación: **63 archivos / 204 pruebas frontend**, build Vite, `check:all`, TypeScript, ESLint y `git diff --check`.
+> - Pendiente: desplegar los checkpoints 1–4 con autorización explícita, medir producción y continuar con Monitor/SSE.
+
 > **Sesión 2026-07-28 — Checkpoint 3 de inventario compartido.** Rama `vps_prod`, base `b1aed8b`; cambio `c8d5a86`, sin despliegue. Skills: `vercel-react-best-practices`, `handoff-keeper`.
 > - Añadido TanStack Query 5 y cliente en memoria por workspace/usuario/rol/alcance.
 > - Buscar equipos y Monitor comparten y deduplican `/api/db/devices` durante 45 s.

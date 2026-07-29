@@ -31,9 +31,17 @@ sesión, el workspace y los permisos en cada petición.
   persistencia ni reintentos automáticos. `sshPass` se elimina tanto al cargar
   como al mutar la caché; Buscar equipos hidrata secretos sólo desde memoria
   efímera. Logout/cambio de ámbito cancela y destruye el cliente.
-- Pendiente inmediato: desplegar los tres checkpoints, medir solicitudes y
-  navegación reales, y después migrar Sitios.
-- Migración de Sitios y centralización SSE aún no se implementan.
+- **Checkpoint 4 — implementado en `0cb2efb`, pendiente de despliegue:**
+  `Sitios` y `Buscar equipos` comparten una consulta `node-inventory`; se eliminó
+  la solicitud independiente de Buscar equipos y el `setTimeout(2000)` de
+  Sitios. La caché en memoria y la restauración rápida de sesión se segmentan
+  por workspace, usuario, rol y alcance. El contexto VPN conserva la autoridad
+  sobre el estado operativo del túnel; editar, renombrar o eliminar sincroniza
+  el inventario compartido. El polling de 60 s reutiliza la misma consulta y
+  deduplica solicitudes concurrentes.
+- Pendiente inmediato: desplegar los cuatro checkpoints, medir solicitudes y
+  navegación reales, y después migrar el Monitor de antenas.
+- Migración del Monitor y centralización SSE aún no se implementan.
 
 ## Principios obligatorios
 
