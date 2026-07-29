@@ -30,6 +30,7 @@ import {
 } from './components';
 import { fetchWithTimeout } from '../../../utils/fetchWithTimeout';
 import { API_BASE_URL } from '../../../config';
+import { useNodeInventoryCache } from '../../../query/nodeInventory';
 
 // ── Custom Hooks
 import {
@@ -54,6 +55,7 @@ export default function NodeAccessPanel() {
   const serverSettings = useServerSettings();
   const wgState = useWireGuardState();
   const nodeState = useNodeState();
+  const nodeInventoryCache = useNodeInventoryCache();
 
   // Extraer valores del nodeState para compatibilidad con JSX
   const { isLoading, setIsLoading, hasLoaded, setHasLoaded, errorMsg, setErrorMsg, isRevoking, setIsRevoking, showRenewalWarn, setShowRenewalWarn, prevRunningRef, pollingRef } = nodeState;
@@ -243,7 +245,10 @@ export default function NodeAccessPanel() {
         onEditNode={setEditNode}
         onDeleteNode={setDeleteNode}
         onScriptNode={setScriptNode}
-        onRenameNode={(node, newName) => setNodes(prev => prev.map(n => n.ppp_user === node.ppp_user ? { ...n, nombre_nodo: newName } : n))}
+        onRenameNode={(node, newName) => {
+          setNodes(prev => prev.map(n => n.ppp_user === node.ppp_user ? { ...n, nombre_nodo: newName } : n));
+          nodeInventoryCache.update(node.ppp_user, { nombre_nodo: newName });
+        }}
         onHistoryNode={setHistoryNode}
         onDiagnoseNode={setDiagnoseNode}
         onTagClick={setTagNode}
@@ -266,6 +271,7 @@ export default function NodeAccessPanel() {
             const pppUser = deleteNode.ppp_user;
             setDeleteNode(null);
             removeNodeFromState(pppUser);
+            nodeInventoryCache.remove(pppUser);
             // Limpiar devices huérfanos de SQLite + cache IndexedDB de CPEs
             deviceDb.cleanupOrphans().catch(() => { });
             if (deletedDeviceIds.length > 0) {
@@ -281,6 +287,7 @@ export default function NodeAccessPanel() {
           onSuccess={(newLabel) => {
             if (newLabel) {
               setNodes(prev => prev.map(n => n.id === editNode.id ? { ...n, nombre_nodo: newLabel } : n));
+              nodeInventoryCache.update(editNode.ppp_user, { nombre_nodo: newLabel });
             }
             setEditNode(null);
             handleLoadNodes();

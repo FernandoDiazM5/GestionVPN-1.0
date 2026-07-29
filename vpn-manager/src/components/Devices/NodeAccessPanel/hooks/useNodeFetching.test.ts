@@ -1,6 +1,7 @@
 import {
   NODE_CACHE_KEY,
   NODE_CACHE_TTL_MS,
+  nodeSessionCacheKey,
   persistNodesCache,
   readNodesCache,
 } from './useNodeFetching';
@@ -40,5 +41,20 @@ describe('node session cache', () => {
     sessionStorage.setItem(NODE_CACHE_KEY, '{invalido');
     expect(readNodesCache(sessionStorage, now)).toBeNull();
     expect(sessionStorage.getItem(NODE_CACHE_KEY)).toBeNull();
+  });
+
+  it('aísla la restauración por workspace, usuario, rol y alcance', () => {
+    const base = {
+      id: 'user-1',
+      email: 'owner@example.com',
+      role: 'OWNER' as const,
+      workspace_id: 'workspace-1',
+    };
+    expect(nodeSessionCacheKey({ ...base, id: 'user-2' }))
+      .not.toBe(nodeSessionCacheKey(base));
+    expect(nodeSessionCacheKey({ ...base, workspace_id: 'workspace-2' }))
+      .not.toBe(nodeSessionCacheKey(base));
+    expect(nodeSessionCacheKey({ ...base, platform_admin: true }))
+      .not.toBe(nodeSessionCacheKey(base));
   });
 });

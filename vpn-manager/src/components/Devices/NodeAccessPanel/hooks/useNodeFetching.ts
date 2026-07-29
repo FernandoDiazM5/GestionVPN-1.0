@@ -1,8 +1,10 @@
-import { useCallback, useRef, useEffect } from 'react';
-import { apiFetch } from '../../../../utils/apiClient';
-import { fetchWithTimeout } from '../../../../utils/fetchWithTimeout';
+import { useCallback, useEffect, useRef } from 'react';
 import { API_BASE_URL } from '../../../../config';
+import { useWorkspaceSession } from '../../../../context/WorkspaceSession';
+import { useNodeInventory } from '../../../../query/nodeInventory';
+import type { SessionUser } from '../../../../types/account';
 import type { NodeInfo } from '../../../../types/api';
+import { apiFetch } from '../../../../utils/apiClient';
 
 interface UseNodeFetchingProps {
   credentials: { ip?: string; user: string; pass?: string } | null | undefined;
@@ -23,13 +25,24 @@ export const NODE_CACHE_KEY = 'vpn_nodes_cache_v1';
 export const NODE_CACHE_TTL_MS = 5 * 60_000;
 type NodeCacheStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
+export function nodeSessionCacheKey(session: SessionUser | null): string {
+  return [
+    NODE_CACHE_KEY,
+    session?.workspace_id ?? 'no-workspace',
+    session?.id ?? 'no-user',
+    session?.role ?? 'no-role',
+    session?.platform_admin ? 'platform' : 'workspace',
+  ].join(':');
+}
+
 export function persistNodesCache(
   storage: NodeCacheStorage,
   nodes: NodeInfo[],
   now = Date.now(),
+  cacheKey = NODE_CACHE_KEY,
 ): boolean {
   try {
-    storage.setItem(NODE_CACHE_KEY, JSON.stringify({ at: now, nodes }));
+    storage.setItem(cacheKey, JSON.stringify({ at: now, nodes }));
     return true;
   } catch {
     return false;
@@ -39,19 +52,20 @@ export function persistNodesCache(
 export function readNodesCache(
   storage: NodeCacheStorage,
   now = Date.now(),
+  cacheKey = NODE_CACHE_KEY,
 ): NodeInfo[] | null {
   try {
-    const raw = storage.getItem(NODE_CACHE_KEY);
+    const raw = storage.getItem(cacheKey);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as { at?: unknown; nodes?: unknown };
     const age = now - Number(parsed.at);
     if (!Number.isFinite(age) || age < 0 || age > NODE_CACHE_TTL_MS || !Array.isArray(parsed.nodes)) {
-      storage.removeItem(NODE_CACHE_KEY);
+      storage.removeItem(cacheKey);
       return null;
     }
     return parsed.nodes as NodeInfo[];
   } catch {
-    try { storage.removeItem(NODE_CACHE_KEY); } catch { /* storage unavailable */ }
+    try { storage.removeItem(cacheKey); } catch { /* storage unavailable */ }
     return null;
   }
 }
@@ -71,106 +85,113 @@ export function useNodeFetching(props: UseNodeFetchingProps) {
     pollingRef,
     addToast,
   } = props;
+  const { session } = useWorkspaceSession();
+  const sessionCacheKey = nodeSessionCacheKey(session);
+
+  const {
+    data: inventoryNodes,
+    error: inventoryError,
+    isFetching,
+    refetch,
+  } = useNodeInventory(!!credentials && isReady);
 
   const fetchNodes = useCallback(async () => {
     if (!credentials) return null;
-    const res = await fetchWithTimeout(`${API_BASE_URL}/api/nodes`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
-    }, 20_000);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    return Array.isArray(data) ? data as NodeInfo[] : null;
-  }, [credentials]);
+    const result = await refetch();
+    if (result.error) throw result.error;
+    return result.data ?? null;
+  }, [credentials, refetch]);
 
-  // La caché solo acelera el primer render; el TTL limita cuánto tiempo puede
-  // mostrarse antes de exigir una carga fresca desde el backend.
-  const handleLoadNodes = async () => {
+  const handleLoadNodes = useCallback(async () => {
     if (!credentials) return;
     setIsLoading(true);
     setErrorMsg('');
     try {
       const nodeList = await fetchNodes();
       if (!nodeList) throw new Error('Respuesta inválida del servidor');
-      // Inicializar estado previo de running para el polling
-      nodeList.forEach(n => {
-        prevRunningRef.current[n.ppp_user] = n.running;
-      });
-      setNodes(nodeList);
-      setHasLoaded(true);
-      persistNodesCache(sessionStorage, nodeList);
-    } catch (err: unknown) {
-      setErrorMsg(`Error: ${err instanceof Error ? err.message : 'Error desconocido'}`);
+    } catch (error: unknown) {
+      setErrorMsg(`Error: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [credentials, fetchNodes, setErrorMsg, setIsLoading]);
 
-  // ── Restauración del cache + autoload de primera vez ────────────────
-  // En cada montaje (al cambiar de pestaña y volver) restauramos desde cache.
-  // Si no hay cache, hacemos UN autoload contra el router. El botón "Actualizar"
-  // sigue siendo la única forma de forzar refetch dentro de la sesión.
+  // La caché de sesión acelera el primer render. La consulta compartida se
+  // ejecuta inmediatamente y revalida estos datos sin bloquear la pantalla.
   const bootstrapDoneRef = useRef(false);
   useEffect(() => {
-    if (bootstrapDoneRef.current) return;
-    if (!credentials || !isReady) return;
+    if (bootstrapDoneRef.current || !credentials || !isReady) return;
     bootstrapDoneRef.current = true;
-    const cached = readNodesCache(sessionStorage);
-    if (cached && cached.length) {
-      cached.forEach(n => { prevRunningRef.current[n.ppp_user] = n.running; });
-      setNodes(cached);
-      setHasLoaded(true);
-    } else if (!hasLoaded) {
-      // Autoload de primera vez: el usuario abrió la pestaña sin cache previa
-      void handleLoadNodes();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [credentials, isReady]);
+    const cached = readNodesCache(sessionStorage, Date.now(), sessionCacheKey);
+    if (!cached?.length) return;
+    cached.forEach(node => { prevRunningRef.current[node.ppp_user] = node.running; });
+    setNodes(cached);
+    setHasLoaded(true);
+  }, [credentials, isReady, prevRunningRef, sessionCacheKey, setHasLoaded, setNodes]);
 
-  // Polling silencioso cada 60s — detecta desconexiones
+  // El contexto VPN sigue siendo la fuente operativa del túnel. React Query
+  // únicamente comparte/revalida el inventario entre Sitios y Buscar equipos.
+  const hasSyncedLiveRef = useRef(false);
+  useEffect(() => {
+    if (!inventoryNodes) return;
+    const detectTransitions = hasSyncedLiveRef.current;
+    const disconnected = detectTransitions
+      ? inventoryNodes.filter(node => prevRunningRef.current[node.ppp_user] === true && !node.running)
+      : [];
+    const reconnected = detectTransitions
+      ? inventoryNodes.filter(node => prevRunningRef.current[node.ppp_user] === false && node.running)
+      : [];
+
+    inventoryNodes.forEach(node => {
+      prevRunningRef.current[node.ppp_user] = node.running;
+    });
+    setNodes(inventoryNodes);
+    setHasLoaded(true);
+    setErrorMsg('');
+    persistNodesCache(sessionStorage, inventoryNodes, Date.now(), sessionCacheKey);
+    hasSyncedLiveRef.current = true;
+
+    disconnected.forEach(node => {
+      addToast(`${node.nombre_nodo} se desconectó del VPN`, 'warn');
+      apiFetch(`${API_BASE_URL}/api/node/history/add`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pppUser: node.ppp_user, event: 'disconnected' }),
+      }).catch(() => {});
+    });
+    reconnected.forEach(node => {
+      apiFetch(`${API_BASE_URL}/api/node/history/add`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pppUser: node.ppp_user, event: 'connected' }),
+      }).catch(() => {});
+    });
+  }, [addToast, inventoryNodes, prevRunningRef, sessionCacheKey, setErrorMsg, setHasLoaded, setNodes]);
+
+  useEffect(() => {
+    if (!inventoryError || hasLoaded) return;
+    setErrorMsg(`Error: ${inventoryError instanceof Error ? inventoryError.message : 'Error desconocido'}`);
+  }, [hasLoaded, inventoryError, setErrorMsg]);
+
+  useEffect(() => {
+    if (!hasLoaded) setIsLoading(isFetching);
+  }, [hasLoaded, isFetching, setIsLoading]);
+
+  // El polling usa la misma promesa compartida; no abre solicitudes paralelas.
   const pollErrorCountRef = useRef(0);
   const silentPoll = useCallback(async () => {
     try {
       const nodeList = await fetchNodes();
       if (!nodeList) return;
-      pollErrorCountRef.current = 0; // reset contador de errores al tener éxito
-      const disconnected = nodeList.filter(
-        n => prevRunningRef.current[n.ppp_user] === true && !n.running
-      );
-      const reconnected = nodeList.filter(
-        n => prevRunningRef.current[n.ppp_user] === false && n.running
-      );
-      nodeList.forEach(n => {
-        prevRunningRef.current[n.ppp_user] = n.running;
-      });
-      setNodes(nodeList);
-      persistNodesCache(sessionStorage, nodeList);
-      disconnected.forEach(n => {
-        addToast(`${n.nombre_nodo} se desconectó del VPN`, 'warn');
-        apiFetch(`${API_BASE_URL}/api/node/history/add`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pppUser: n.ppp_user, event: 'disconnected' }),
-        }).catch(() => {});
-      });
-      reconnected.forEach(n => {
-        apiFetch(`${API_BASE_URL}/api/node/history/add`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pppUser: n.ppp_user, event: 'connected' }),
-        }).catch(() => {});
-      });
+      pollErrorCountRef.current = 0;
     } catch {
       pollErrorCountRef.current += 1;
-      // Avisar al usuario después de 2 fallos consecutivos (2 min sin respuesta)
       if (pollErrorCountRef.current === 2) {
         addToast('Sin respuesta del router — verifica que WireGuard esté activo', 'warn');
       }
     }
-  }, [fetchNodes, setNodes, addToast, prevRunningRef]);
+  }, [addToast, fetchNodes]);
 
-  // Iniciar polling cuando hay nodos cargados
   useEffect(() => {
     if (!hasLoaded || !credentials) return;
     if (pollingRef.current) clearInterval(pollingRef.current);
@@ -178,43 +199,21 @@ export function useNodeFetching(props: UseNodeFetchingProps) {
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
-  }, [hasLoaded, credentials, silentPoll, pollingRef]);
+  }, [credentials, hasLoaded, pollingRef, silentPoll]);
 
-  // Auto-sync silencioso al montar
-  const autoSyncRanRef = useRef(false);
-  useEffect(() => {
-    if (!isReady || !credentials || autoSyncRanRef.current) return;
-    autoSyncRanRef.current = true;
-    const timer = setTimeout(async () => {
-      try {
-        const live = await fetchNodes();
-        if (!live) return;
-        live.forEach(n => { prevRunningRef.current[n.ppp_user] = n.running; });
-        setNodes(live);
-        setHasLoaded(true);
-        persistNodesCache(sessionStorage, live);
-      } catch {
-        // Silencioso — si el backend no responde, conservar caché
-      }
-    }, 2000);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isReady, credentials]);
-
-  // Alerta de renovación cuando quedan < 2 min
   useEffect(() => {
     if (!tunnelExpiry) {
       setShowRenewalWarn(false);
       return;
     }
     const check = () => {
-      const rem = tunnelExpiry - Date.now();
-      setShowRenewalWarn(rem > 0 && rem < 2 * 60 * 1000);
+      const remaining = tunnelExpiry - Date.now();
+      setShowRenewalWarn(remaining > 0 && remaining < 2 * 60 * 1000);
     };
     check();
     const id = setInterval(check, 10_000);
     return () => clearInterval(id);
-  }, [tunnelExpiry, setShowRenewalWarn]);
+  }, [setShowRenewalWarn, tunnelExpiry]);
 
   return { fetchNodes, handleLoadNodes, silentPoll, pollErrorCountRef };
 }

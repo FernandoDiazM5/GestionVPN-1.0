@@ -23,7 +23,6 @@ import {
 
 import { useVpn } from '../../../context';
 import { credCache } from '../../../store/deviceDb';
-import { fetchWithTimeout } from '../../../utils/fetchWithTimeout';
 import type { ScannedDevice, SavedDevice, AntennaStats } from '../../../types/devices';
 import type { NodeInfo } from '../../../types/api';
 
@@ -46,8 +45,8 @@ import { useDeviceList } from './hooks/useDeviceList';
 import { useColumnPrefs } from './hooks/useColumnPrefs';
 import { useDeviceLibrary } from './hooks/useDeviceLibrary';
 import { useScanPreferences } from './hooks/useScanPreferences';
-import { API_BASE_URL } from '../../../config';
 import { useWorkspaceSession } from '../../../context/WorkspaceSession';
+import { useNodeInventory } from '../../../query/nodeInventory';
 import { useAirOsAi } from './hooks/useAirOsAi';
 import { AirOsAiDialog } from './components/AirOsAiDialog';
 import { AirOsAiHistoryDialog } from './components/AirOsAiHistoryDialog';
@@ -55,6 +54,7 @@ import { AirOsAiHistoryDialog } from './components/AirOsAiHistoryDialog';
 export default function NetworkDevicesModule() {
   const { credentials, activeNodeVrf, nodes, setNodes } = useVpn();
   const { session } = useWorkspaceSession();
+  const nodeInventory = useNodeInventory(!!credentials);
   const airOsAi = useAirOsAi(session?.role === 'OWNER' && !session.platform_admin);
 
   // ── Preferencias persistentes (§40) ───────────────────────────────
@@ -125,26 +125,9 @@ export default function NetworkDevicesModule() {
   });
 
   // ── Carga inicial de nodos ────────────────────────────────────────
-  const loadNodes = useCallback(async () => {
-    if (!credentials) return;
-    try {
-      const res = await fetchWithTimeout(`${API_BASE_URL}/api/nodes`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      }, 20_000);
-      const data = await res.json();
-      if (!res.ok) throw new Error((data as { message?: string }).message ?? `HTTP ${res.status}`);
-      setNodes(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error('Error cargando nodos:', err);
-    }
-  }, [credentials, setNodes]);
-
   useEffect(() => {
-    if (nodes.length === 0 && credentials) loadNodes();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (nodeInventory.data) setNodes(nodeInventory.data);
+  }, [nodeInventory.data, setNodes]);
 
   // Auto-seleccionar el nodo activo + autocompletar su subred. Es un efecto de
   // SINCRONIZACIÓN de estado derivado (prop externo del context → state local) y
