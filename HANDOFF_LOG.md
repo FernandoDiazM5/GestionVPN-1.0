@@ -6,6 +6,12 @@
 
 ---
 
+> **Sesión 2026-07-29 — Columnas airMAX adaptativas por antena.** Rama `vps_prod`, base `c395f1c`; cambio frontend pendiente de commit/deploy. Skills: `ui-design-system`, `handoff-keeper`.
+> - `CCQ`, `AM Qual`, `AM Cap`, `DL Cap` y `UL Cap` se ocultan sólo si todos los CPE de la antena carecen de esa métrica.
+> - El selector mantiene esas opciones deshabilitadas y explica “Sin datos en esta antena”; `0` se considera dato válido.
+> - Encabezado y filas consumen el mismo conjunto efectivo de columnas; no cambian backend, BD, CSV ni informes.
+> - Verificación: **64 archivos / 209 pruebas frontend**, ESLint sin warnings, TypeScript, build Vite y `git diff --check`.
+
 > **Sesión 2026-07-29 — Verificación de CCQ y capacidad airMAX por firmware.** Rama `vps_prod`, base `ee17715`; sólo lectura de código y 71 snapshots de producción, sin cambio de producto ni despliegue. Skills: `network-engineer`, `handoff-keeper`.
 > - `CCQ`, `AM Qual` y `AM Cap`: 12/71 con valor, concentrados en CPE/AP XW/M-series.
 > - `DL Cap` y `UL Cap`: 45/71 con valor, principalmente en AP WA 8.5.7.

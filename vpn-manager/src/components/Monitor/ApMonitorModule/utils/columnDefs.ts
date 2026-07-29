@@ -1,5 +1,28 @@
 interface ColDef { key: string; label: string; always?: boolean; width: string; right?: boolean; }
 
+const CPE_AVAILABILITY_METRICS = {
+  ccq: 'ccq',
+  am_qual: 'airmax_quality',
+  am_cap: 'airmax_capacity',
+  am_dcap: 'airmax_dcap',
+  am_ucap: 'airmax_ucap',
+} as const;
+
+type CpeMetricSource = Partial<Record<(typeof CPE_AVAILABILITY_METRICS)[keyof typeof CPE_AVAILABILITY_METRICS], unknown>>;
+
+function getUnavailableCpeMetricColumns(stations: CpeMetricSource[]): Set<string> {
+  if (stations.length === 0) return new Set();
+
+  return new Set(
+    Object.entries(CPE_AVAILABILITY_METRICS)
+      .filter(([, field]) => stations.every(station => {
+        const value = station[field];
+        return value == null || value === '' || (typeof value === 'number' && !Number.isFinite(value));
+      }))
+      .map(([column]) => column),
+  );
+}
+
 const CPE_COL_DEFS: ColDef[] = [
   { key: 'status', label: 'Estado', always: true, width: '64px' },
   { key: 'mac', label: 'MAC / Host', always: true, width: '180px' },
@@ -66,4 +89,17 @@ function saveApColPrefs(hidden: Set<string>) {
 }
 
 export type { ColDef, ApColDef };
-export { CPE_COL_DEFS, DEFAULT_HIDDEN, LS_KEY, loadColPrefs, saveColPrefs, AP_COL_DEFS, AP_DEFAULT_HIDDEN, AP_LS_KEY, loadApColPrefs, saveApColPrefs };
+export {
+  CPE_AVAILABILITY_METRICS,
+  CPE_COL_DEFS,
+  DEFAULT_HIDDEN,
+  LS_KEY,
+  getUnavailableCpeMetricColumns,
+  loadColPrefs,
+  saveColPrefs,
+  AP_COL_DEFS,
+  AP_DEFAULT_HIDDEN,
+  AP_LS_KEY,
+  loadApColPrefs,
+  saveApColPrefs,
+};

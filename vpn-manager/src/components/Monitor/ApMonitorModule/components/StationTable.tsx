@@ -6,7 +6,12 @@ import { fetchWithTimeout } from '../../../../utils/fetchWithTimeout';
 import { API_BASE_URL } from '../../../../config';
 import CpeRow from './CpeRow';
 import ColSelector from './selectors/ColSelector';
-import { CPE_COL_DEFS, loadColPrefs, saveColPrefs } from '../utils/columnDefs';
+import {
+  CPE_COL_DEFS,
+  getUnavailableCpeMetricColumns,
+  loadColPrefs,
+  saveColPrefs,
+} from '../utils/columnDefs';
 import { cpeHealth, degradedSummary } from '../utils/health';
 import { exportCpesCsv } from '../utils/exportCpesCsv';
 
@@ -50,6 +55,15 @@ function StationTable({ poll, onCpeDetail, dev }: {
     s.lastip && !s.isKnown && !s.remote_hostname && !s.cpe_name
   );
 
+  const unavailableCols = useMemo(
+    () => getUnavailableCpeMetricColumns(poll.stations),
+    [poll.stations],
+  );
+  const effectiveHiddenCols = useMemo(
+    () => new Set([...hiddenCols, ...unavailableCols]),
+    [hiddenCols, unavailableCols],
+  );
+
   const handleEnrichAll = async () => {
     if (!dev.sshUser || (!dev.sshPass && !dev.hasSshPass) || needEnrich.length === 0) return;
     setEnriching(true); setEnrichMsg('');
@@ -75,8 +89,8 @@ function StationTable({ poll, onCpeDetail, dev }: {
   };
 
   const visibleColDefs = useMemo(
-    () => CPE_COL_DEFS.filter(c => c.always || !hiddenCols.has(c.key)),
-    [hiddenCols]
+    () => CPE_COL_DEFS.filter(c => c.always || !effectiveHiddenCols.has(c.key)),
+    [effectiveHiddenCols]
   );
   const gridCols = useMemo(() => visibleColDefs.map(c => c.width).join(' '), [visibleColDefs]);
   const minW = useMemo(
@@ -145,7 +159,7 @@ function StationTable({ poll, onCpeDetail, dev }: {
             <Download className="w-3 h-3" />
             CSV
           </button>
-          <ColSelector hidden={hiddenCols} onChange={handleColChange} />
+          <ColSelector hidden={hiddenCols} unavailable={unavailableCols} onChange={handleColChange} />
           {poll.polledAt > 0 && (
             <span className="text-3xs text-slate-500 dark:text-slate-500 font-mono">
               {new Date(poll.polledAt).toLocaleTimeString()}
@@ -177,7 +191,7 @@ function StationTable({ poll, onCpeDetail, dev }: {
               ))}
             </div>
             {filtered.map((cpe, idx) => (
-              <CpeRow key={cpe.mac} cpe={cpe} idx={idx} onDetail={onCpeDetail} hiddenCols={hiddenCols} gridCols={gridCols} />
+              <CpeRow key={cpe.mac} cpe={cpe} idx={idx} onDetail={onCpeDetail} hiddenCols={effectiveHiddenCols} gridCols={gridCols} />
             ))}
             {filtered.length === 0 && (cpeSearch || onlyDegraded) && (
               <div className="text-center py-4 text-xs text-slate-500 dark:text-slate-400">
