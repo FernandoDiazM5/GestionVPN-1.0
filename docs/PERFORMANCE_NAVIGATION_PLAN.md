@@ -24,9 +24,16 @@ sesión, el workspace y los permisos en cada petición.
   preservan explícitamente en ubicaciones con `Cache-Control`.
 - Validación aislada: `Buscar equipos` pasó de 140,423 a 34,069 bytes
   transferidos (aprox. 76% menos).
-- Pendiente inmediato: desplegar ambos checkpoints para obtener línea base real
-  y comenzar la capa de datos compartida en un cambio separado.
-- TanStack Query, migración de datos y centralización SSE aún no se implementan.
+- **Checkpoint 3 — implementado en `c8d5a86`, pendiente de despliegue:**
+  TanStack Query por ámbito autenticado y primer recurso compartido
+  (`device-inventory`) entre Buscar equipos y Estado de antenas. La clave incluye
+  workspace, usuario, rol y alcance; `staleTime` 45 s, `gcTime` 5 min, sin
+  persistencia ni reintentos automáticos. `sshPass` se elimina tanto al cargar
+  como al mutar la caché; Buscar equipos hidrata secretos sólo desde memoria
+  efímera. Logout/cambio de ámbito cancela y destruye el cliente.
+- Pendiente inmediato: desplegar los tres checkpoints, medir solicitudes y
+  navegación reales, y después migrar Sitios.
+- Migración de Sitios y centralización SSE aún no se implementan.
 
 ## Principios obligatorios
 

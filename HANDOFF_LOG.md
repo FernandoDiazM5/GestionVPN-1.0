@@ -6,6 +6,15 @@
 
 ---
 
+> **Sesión 2026-07-28 — Checkpoint 3 de inventario compartido.** Rama `vps_prod`, base `b1aed8b`; cambio `c8d5a86`, sin despliegue. Skills: `vercel-react-best-practices`, `handoff-keeper`.
+> - Añadido TanStack Query 5 y cliente en memoria por workspace/usuario/rol/alcance.
+> - Buscar equipos y Monitor comparten y deduplican `/api/db/devices` durante 45 s.
+> - `loadInventory` y todas las escrituras de caché eliminan `sshPass`; las claves operativas permanecen en `credCache` efímero.
+> - Logout/cambio de ámbito cancela consultas; mutaciones actualizan la clave exacta y los fallos de revalidación conservan datos anteriores.
+> - Pruebas: **62/200 frontend**, build Vite, TypeScript, ESLint, `check:all` y `git diff --check`.
+> - `npm audit --omit=dev` conserva hallazgos existentes de React Router/ExcelJS/brace-expansion; no se aplicaron downgrades automáticos fuera de alcance.
+> - Pendiente: desplegar checkpoints 1–3, medir en producción y luego migrar Sitios.
+
 > **Sesión 2026-07-28 — Checkpoint 2 de compresión HTTP.** Rama `vps_prod`, base `47fcaaa`; cambio `163715a`, sin despliegue. Skills: `vercel-react-best-practices`, `handoff-keeper`.
 > - Gzip habilitado para contenido textual/versionado; SSE permanece fuera de los tipos comprimibles.
 > - HTML y rutas SPA revalidan la versión; chunks con hash mantienen caché anual inmutable.
