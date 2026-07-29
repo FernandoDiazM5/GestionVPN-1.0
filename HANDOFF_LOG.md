@@ -6,6 +6,12 @@
 
 ---
 
+> **Sesión 2026-07-29 — Mejoras CPE desplegadas en producción.** Rama y código funcional de producción `7e848c1`; despliegue frontend autorizado y completado. Skill: `handoff-keeper`.
+> - El VPS avanzó desde checkout `9e00f02` hasta `7e848c1`; se reconstruyó y recreó exclusivamente `vpn-frontend`.
+> - Se despliegan la geometría corregida, retiro de “Última IP” y disponibilidad dinámica de CCQ/capacidades airMAX.
+> - Verificación: Nginx válido, frontend/bundle HTTPS 200, marcador “Sin datos en esta antena” presente, health MySQL/RouterOS/SMTP `ok`; backend y BD sin reinicios.
+> - Rollback: imagen `gestionvpn-10-frontend:pre-7e848c1-20260729` (`sha256:70f5e3158a1094b639692c9070ed57365c958c6760a7751d0d92b06ac1c0e942`).
+
 > **Sesión 2026-07-29 — Columnas airMAX adaptativas por antena.** Rama `vps_prod`, base `c395f1c`; cambio frontend pendiente de commit/deploy. Skills: `ui-design-system`, `handoff-keeper`.
 > - `CCQ`, `AM Qual`, `AM Cap`, `DL Cap` y `UL Cap` se ocultan sólo si todos los CPE de la antena carecen de esa métrica.
 > - El selector mantiene esas opciones deshabilitadas y explica “Sin datos en esta antena”; `0` se considera dato válido.
