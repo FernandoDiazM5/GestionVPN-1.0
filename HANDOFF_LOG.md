@@ -6,6 +6,14 @@
 
 ---
 
+> **Sesión 2026-07-28 — Checkpoint 2 de compresión HTTP.** Rama `vps_prod`, base `47fcaaa`; cambio `163715a`, sin despliegue. Skills: `vercel-react-best-practices`, `handoff-keeper`.
+> - Gzip habilitado para contenido textual/versionado; SSE permanece fuera de los tipos comprimibles.
+> - HTML y rutas SPA revalidan la versión; chunks con hash mantienen caché anual inmutable.
+> - Se corrigió la herencia de `add_header` para conservar HSTS, SAMEORIGIN y nosniff.
+> - Nginx real confirmó 140,423→34,069 bytes en Buscar equipos (~76% menos), `Vary`, gzip y cachés correctas.
+> - Verificación: `nginx -t`, `check:all`, TypeScript, ESLint y `git diff --check`.
+> - Pendiente: autorización de despliegue de checkpoints 1+2 y medición productiva antes de migrar caché de datos.
+
 > **Sesión 2026-07-28 — Checkpoint 1 de rendimiento implementado.** Rama `vps_prod`, base `a60dd78`; cambio `ac47312`, sin despliegue. Skills: `vercel-react-best-practices`, `handoff-keeper`.
 > - Registro único de loaders preserva code splitting y permite precarga por hover, foco, touch e idle limitada a Sitios/Buscar equipos.
 > - La precarga respeta `visibleModules` y el tipo de Configuración según plataforma/workspace.

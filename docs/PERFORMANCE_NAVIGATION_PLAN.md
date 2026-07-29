@@ -17,8 +17,15 @@ sesión, el workspace y los permisos en cada petición.
   limitada a `Sitios`/`Buscar equipos`, medición desde clic hasta contenido
   confirmado por `Suspense` y formato Nginx sin datos personales para tiempos de
   request/backend/bytes.
-- Pendiente inmediato: desplegar este checkpoint para obtener línea base real y
-  habilitar compresión en un checkpoint separado.
+- **Checkpoint 2 — implementado en `163715a`, pendiente de despliegue:** gzip
+  para JS/CSS/JSON/XML/SVG, exclusión natural de SSE al no incluir
+  `text/event-stream`, `Vary: Accept-Encoding`, revalidación obligatoria del
+  HTML y caché inmutable para assets versionados. Las cabeceras de seguridad se
+  preservan explícitamente en ubicaciones con `Cache-Control`.
+- Validación aislada: `Buscar equipos` pasó de 140,423 a 34,069 bytes
+  transferidos (aprox. 76% menos).
+- Pendiente inmediato: desplegar ambos checkpoints para obtener línea base real
+  y comenzar la capa de datos compartida en un cambio separado.
 - TanStack Query, migración de datos y centralización SSE aún no se implementan.
 
 ## Principios obligatorios
