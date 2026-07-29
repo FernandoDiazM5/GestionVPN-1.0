@@ -55,28 +55,28 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelAc
 
   return (
     <div className="card overflow-hidden">
-      <div className="grid min-w-0 grid-cols-[2.75rem_minmax(0,1fr)] gap-x-1 gap-y-2 border-b border-slate-100 bg-slate-50 px-3 py-3.5 sm:flex sm:items-center sm:gap-3 sm:px-5 dark:border-slate-800 dark:bg-slate-800/60">
+      <div className="grid min-w-0 grid-cols-[2.75rem_minmax(0,1fr)] gap-x-2 gap-y-2 border-b border-slate-100 bg-slate-50 px-3 py-3.5 sm:px-5 dark:border-slate-800 dark:bg-slate-800/60">
         <button
           onClick={() => setExpanded(e => !e)}
           aria-label={`${expanded ? 'Contraer' : 'Expandir'} torre ${group.nodeName}`}
           aria-expanded={expanded}
-          className="flex min-h-11 min-w-11 items-center justify-center self-start rounded-lg text-slate-400 transition-colors hover:bg-indigo-50 hover:text-indigo-600 sm:self-auto dark:text-slate-500 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-400"
+          className="row-span-2 flex min-h-11 min-w-11 items-center justify-center self-start rounded-lg text-slate-400 transition-colors hover:bg-indigo-50 hover:text-indigo-600 dark:text-slate-500 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-400"
         >
           {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
         </button>
-        <div className="flex min-w-0 flex-1 flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-2">
+        <div className="col-start-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
           <div className="flex min-w-0 max-w-full items-center gap-2">
             <Radio className="h-4 w-4 shrink-0 text-indigo-500" />
-            <span className="block max-w-full truncate font-bold text-slate-800 dark:text-slate-100" title={group.nodeName}>
+            <span className="block min-w-0 truncate text-sm font-bold text-slate-800 sm:text-base dark:text-slate-100" title={group.nodeName}>
               {group.nodeName}
             </span>
           </div>
-          <div className="flex shrink-0 items-center gap-1.5 sm:ml-2">
+          <div className="flex shrink-0 items-center gap-1.5">
             <span className={`w-2 h-2 rounded-full ${statusColor} ${nodeStatus === 'online' ? 'status-live text-emerald-500' : ''}`} />
             <span className="text-2xs font-bold text-slate-500 dark:text-slate-400">{statusLabel}</span>
           </div>
         </div>
-        <div className="col-start-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 text-xs text-slate-500 sm:ml-auto sm:shrink-0 sm:flex-nowrap dark:text-slate-400">
+        <div className="col-start-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 text-xs text-slate-500 dark:text-slate-400">
           <span className="flex shrink-0 items-center gap-1"><Server className="w-3 h-3" /> {group.aps.length} {group.aps.length === 1 ? 'antena' : 'antenas'}</span>
           {totalCpes > 0 && <span className="flex shrink-0 items-center gap-1 text-cyan-600 dark:text-cyan-400"><Users className="w-3 h-3" /> {totalCpes} {totalCpes === 1 ? 'cliente conectado' : 'clientes conectados'}</span>}
           {attentionCount > 0 && <span className="flex shrink-0 items-center gap-1 text-amber-700 dark:text-amber-300">{attentionCount} {attentionCount === 1 ? 'requiere atención' : 'requieren atención'}</span>}
