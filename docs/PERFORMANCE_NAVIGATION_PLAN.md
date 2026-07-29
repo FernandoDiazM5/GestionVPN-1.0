@@ -10,6 +10,17 @@ entre usuarios, espacios de trabajo o roles.
 Este plan no cambia las reglas de autorización: el backend seguirá validando la
 sesión, el workspace y los permisos en cada petición.
 
+## Estado de implementación
+
+- **Checkpoint 1 — implementado en `ac47312`, pendiente de despliegue:** registro
+  único de importadores dinámicos, precarga por hover/foco/touch, precarga ociosa
+  limitada a `Sitios`/`Buscar equipos`, medición desde clic hasta contenido
+  confirmado por `Suspense` y formato Nginx sin datos personales para tiempos de
+  request/backend/bytes.
+- Pendiente inmediato: desplegar este checkpoint para obtener línea base real y
+  habilitar compresión en un checkpoint separado.
+- TanStack Query, migración de datos y centralización SSE aún no se implementan.
+
 ## Principios obligatorios
 
 1. La navegación nunca espera una API.
@@ -264,4 +275,3 @@ requieren migración de base de datos.
 - Una conexión SSE general por pestaña autenticada.
 - Cero exposición cruzada en pruebas multiusuario.
 - Reducción medible de bytes y solicitudes sin aumentar errores.
-

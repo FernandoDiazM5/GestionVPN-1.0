@@ -6,6 +6,13 @@
 
 ---
 
+> **Sesión 2026-07-28 — Checkpoint 1 de rendimiento implementado.** Rama `vps_prod`, base `a60dd78`; cambio `ac47312`, sin despliegue. Skills: `vercel-react-best-practices`, `handoff-keeper`.
+> - Registro único de loaders preserva code splitting y permite precarga por hover, foco, touch e idle limitada a Sitios/Buscar equipos.
+> - La precarga respeta `visibleModules` y el tipo de Configuración según plataforma/workspace.
+> - Performance API mide clic→contenido confirmado por Suspense; Nginx medirá request/backend/bytes sin identificadores ni query strings.
+> - Pruebas: **59/194 frontend**, build Vite, TypeScript, ESLint, `check:all`, `git diff --check` y `nginx -t` en contenedor real.
+> - Pendiente: autorización para desplegar frontend/Nginx, capturar línea base y abordar compresión como checkpoint independiente.
+
 > **Sesión 2026-07-28 — Plan de rendimiento y navegación multiusuario.** Rama `vps_prod`, base `c4aca87`; documentación únicamente, sin implementación ni despliegue. Skills: `vercel-react-best-practices`, `handoff-keeper`.
 > - Creado `docs/PERFORMANCE_NAVIGATION_PLAN.md` con nueve fases independientes y reversibles.
 > - El diseño segmenta caché por workspace/usuario/alcance, excluye secretos y conserva autorización server-side.
