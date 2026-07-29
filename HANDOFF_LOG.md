@@ -6,6 +6,13 @@
 
 ---
 
+> **Sesión 2026-07-28 — Diagnóstico de presentación del Monitor e IP CPE.** Rama `vps_prod`, base `9e00f02`; sólo lectura de producto/producción, sin corrección ni despliegue. Skills: `network-engineer`, `handoff-keeper`.
+> - La cabecera del sitio deja colapsar el nombre frente a métricas y botones no encogibles.
+> - La pista `Estado` mide 28 px y su texto desborda sobre `MAC / Host`; otras etiquetas también exceden sus pistas.
+> - Producción confirma siete CPE de los AP `.235/.238` con `lastip` e `ip_lan` literalmente `0.0.0.0`; otros AP conservan IP reales.
+> - Causa de datos: Station List AirOS WA no conoce una IP de capa 3 para esas asociaciones bridge; la aplicación no valida el sentinel y lo muestra como dirección/enlace.
+> - Recomendación: redistribuir la cabecera, dimensionar/contener títulos CPE y normalizar `0.0.0.0` a ausente, preservando la última IP válida y agregando enriquecimiento ARP/DHCP/directo.
+
 > **Sesión 2026-07-28 — Checkpoints de rendimiento desplegados.** Rama y producción `46ff33d`. Skills: `vercel-react-best-practices`, `handoff-keeper`.
 > - Con autorización explícita se avanzó el VPS desde `a1c545f` hasta `46ff33d` y se reconstruyeron backend y frontend; MariaDB y sus volúmenes permanecieron intactos.
 > - Respaldos: `gestionvpn-10-backend:pre-46ff33d-20260728` y `gestionvpn-10-frontend:pre-46ff33d-20260728`.
