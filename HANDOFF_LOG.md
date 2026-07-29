@@ -6,6 +6,12 @@
 
 ---
 
+> **Sesión 2026-07-28 — Causa acotada de IP CPE `0.0.0.0`.** Rama `vps_prod`, base `b66a5b3`; diagnóstico de sólo lectura, sin cambio de producto ni despliegue. Skills: `network-engineer`, `handoff-keeper`.
+> - Los siete registros afectados de producción pertenecen a estaciones XW con AirOS `6.1.7`; estaciones WA recientes y una XW `6.3.24` del mismo AP sí entregan IP válidas.
+> - AirOS entrega literalmente `lastip="0.0.0.0"` como ausencia de IP aprendida; `parseWstalist` no lo fabrica. Persistencia y UI sí tienen un defecto secundario: aceptan el sentinel como IP válida, sobrescriben valores previos y lo convierten en enlace.
+> - La prueba SSH cruda quedó pendiente porque el túnel del sitio estaba inactivo. Al activarlo, comparar `wstalist`, `wstalist -p`, ARP/neighbors del AP y ARP/DHCP del gateway usando la MAC como clave.
+> - Solución posterior recomendada: normalizar sentinels, preservar última IP válida con fuente/frescura, enriquecer por MAC y mostrar “IP no detectada”; no inventar una dirección.
+
 > **Sesión 2026-07-28 — Cabecera del sitio y tabla CPE corregidas.** Rama `vps_prod`, base `ef0fa20`; cambio `079910d`, sin despliegue. Skills: `ui-design-system`, `vercel-react-best-practices`, `handoff-keeper`.
 > - El nombre/estado del sitio ocupa una fila reservada; métricas y acciones se distribuyen debajo y pueden envolver sin ocultarlo.
 > - `Estado`, `MAC / Host`, señales, tasas y acciones usan mínimos legibles; los títulos quedan contenidos y el scroll horizontal se conserva.
