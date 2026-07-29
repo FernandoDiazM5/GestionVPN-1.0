@@ -144,6 +144,20 @@ describe('deviceDb.saveSingle', () => {
     await expect(deviceDb.load()).rejects.toThrow('Base de datos no disponible');
   });
 
+  it('nunca expone sshPass desde la frontera de inventario compartido', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(
+      JSON.stringify({
+        success: true,
+        devices: [{ ...baseDevice, sshUser: 'ubnt', sshPass: 'filtrada' }],
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ));
+
+    const inventory = await deviceDb.loadInventory();
+    expect(inventory[0]).toMatchObject({ id: baseDevice.id, sshUser: 'ubnt' });
+    expect(inventory[0]).not.toHaveProperty('sshPass');
+  });
+
   it('recupera la credencial aunque AirOS cambie entre MAC LAN y WLAN', async () => {
     const identity = {
       ...baseDevice,

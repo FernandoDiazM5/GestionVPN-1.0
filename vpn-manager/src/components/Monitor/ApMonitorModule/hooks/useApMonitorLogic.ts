@@ -5,6 +5,7 @@ import { fetchWithTimeout } from '../../../../utils/fetchWithTimeout';
 import { API_BASE_URL } from '../../../../config';
 import { deviceDb } from '../../../../store/deviceDb';
 import type { NodeGroup } from '../utils/types';
+import { useDeviceInventory, useDeviceInventoryCache } from '../../../../query/deviceInventory';
 
 export function useApMonitorLogic(nodes: NodeInfo[], activeNodeName: string | null) {
   const [devices, setDevices] = useState<SavedDevice[]>([]);
@@ -23,6 +24,13 @@ export function useApMonitorLogic(nodes: NodeInfo[], activeNodeName: string | nu
   const [viewingApDevice, setViewingApDevice] = useState<SavedDevice | null>(null);
   const [movingDevice, setMovingDevice] = useState<SavedDevice | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SavedDevice | null>(null);
+  const inventory = useDeviceInventory();
+  const {
+    data: inventoryDevices,
+    error: inventoryError,
+    refetch: refetchInventory,
+  } = inventory;
+  const inventoryCache = useDeviceInventoryCache();
   // D: revelar la clave SSH guardada del AP (la que autenticó la antena). La
   // clave vive cifrada en el backend; se pide bajo clic explícito a /reveal-ssh.
   const [revealSsh, setRevealSsh] = useState<{ apName: string; user: string; pass: string; port: number } | null>(null);
@@ -98,19 +106,43 @@ export function useApMonitorLogic(nodes: NodeInfo[], activeNodeName: string | nu
     })).filter(g => g.aps.length > 0 || g.stas.length > 0);
   }, [nodeGroups, apSearch, nodeFilter, activeNodeName]);
 
+  useEffect(() => {
+    if (!inventoryDevices) return;
+    setDevices(inventoryDevices);
+    setLoading(false);
+    setLoadError(null);
+  }, [inventoryDevices]);
+
+  useEffect(() => {
+    if (!inventoryError) return;
+    setLoading(false);
+    const message = inventoryError instanceof Error
+      ? inventoryError.message
+      : 'No se pudieron cargar los equipos.';
+    if ((inventoryDevices?.length ?? devicesRef.current.length) > 0) {
+      showToast(message, 'error');
+      return;
+    }
+    setLoadError(message);
+  }, [inventoryDevices, inventoryError]);
+
   const loadDevices = useCallback(async () => {
-    setLoading(true);
+    const hasCachedDevices = devicesRef.current.length > 0;
+    if (!hasCachedDevices) setLoading(true);
     setLoadError(null);
     try {
-      const devs = await deviceDb.load();
-      setDevices(devs);
+      const result = await refetchInventory();
+      if (result.error) throw result.error;
+      setDevices(result.data ?? []);
     } catch (reason) {
-      setLoadError(reason instanceof Error ? reason.message : 'No se pudieron cargar los equipos.');
+      const message = reason instanceof Error ? reason.message : 'No se pudieron cargar los equipos.';
+      if (hasCachedDevices) showToast(message, 'error');
+      else setLoadError(message);
     }
-    finally { setLoading(false); }
-  }, []);
-
-  useEffect(() => { loadDevices(); }, [loadDevices]);
+    finally {
+      if (!hasCachedDevices) setLoading(false);
+    }
+  }, [refetchInventory]);
 
   const nodesLenRef = useRef(nodes.length);
   useEffect(() => {
@@ -131,6 +163,7 @@ export function useApMonitorLogic(nodes: NodeInfo[], activeNodeName: string | nu
     try {
       await deviceDb.removeSingle(dev.id);
       setDevices(prev => prev.filter(d => d.id !== dev.id));
+      inventoryCache.remove(dev.id);
       if (viewingApDevice?.id === dev.id) setViewingApDevice(null);
       if (apDetailDev?.id === dev.id) setApDetailDev(null);
       showToast('Equipo eliminado');
@@ -143,6 +176,7 @@ export function useApMonitorLogic(nodes: NodeInfo[], activeNodeName: string | nu
     try {
       await deviceDb.saveSingle(updated);
       setDevices(prev => prev.map(d => d.id === updated.id ? updated : d));
+      inventoryCache.upsert(updated);
       if (viewingApDevice?.id === updated.id) setViewingApDevice(updated);
       return true;
     } catch (error) {
@@ -161,7 +195,9 @@ export function useApMonitorLogic(nodes: NodeInfo[], activeNodeName: string | nu
       }, 10_000);
       const data = await res.json();
       if (data.success) {
-        setDevices(prev => prev.map(d => d.id === movingDevice.id ? { ...d, nodeId, nodeName } : d));
+        const moved = { ...movingDevice, nodeId, nodeName };
+        setDevices(prev => prev.map(d => d.id === movingDevice.id ? moved : d));
+        inventoryCache.upsert(moved);
         showToast(`Movido a ${nodeName}`);
         setMovingDevice(null);
       } else {
@@ -198,6 +234,7 @@ export function useApMonitorLogic(nodes: NodeInfo[], activeNodeName: string | nu
     try {
       await deviceDb.saveSingle(updated);
       setDevices(prev => prev.map(d => d.id === dev.id ? updated : d));
+      inventoryCache.upsert(updated);
       showToast('Datos del AP guardados');
       return true;
     } catch (error) {

@@ -1,4 +1,4 @@
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import type { Dispatch, SetStateAction } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NodeInfo } from '../../../../types/api';
@@ -9,6 +9,10 @@ const mocks = vi.hoisted(() => ({
   load: vi.fn(async (): Promise<SavedDevice[]> => []),
   saveSingle: vi.fn(async () => undefined),
   getForDevice: vi.fn(async () => null as { user: string; pass: string; port: number } | null),
+  data: [] as SavedDevice[],
+  refetch: vi.fn(async () => ({ data: [], error: null })),
+  upsert: vi.fn(),
+  remove: vi.fn(),
 }));
 
 vi.mock('../../../../store/deviceDb', () => ({
@@ -19,6 +23,10 @@ vi.mock('../../../../store/deviceDb', () => ({
   credCache: {
     getForDevice: mocks.getForDevice,
   },
+}));
+vi.mock('../../../../query/deviceInventory', () => ({
+  useDeviceInventory: () => ({ data: mocks.data, error: null, refetch: mocks.refetch }),
+  useDeviceInventoryCache: () => ({ upsert: mocks.upsert, remove: mocks.remove }),
 }));
 
 import { useDeviceLibrary } from './useDeviceLibrary';
@@ -54,14 +62,12 @@ function renderLibrary(setAddingDevice = vi.fn()) {
 describe('guardado SSH después de restaurar un escaneo', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.load.mockResolvedValue([]);
     mocks.saveSingle.mockResolvedValue(undefined);
     mocks.getForDevice.mockResolvedValue(null);
   });
 
   it('abre confirmación y no persiste si la clave ya no está en memoria', async () => {
     const { result, setAddingDevice } = renderLibrary();
-    await waitFor(() => expect(mocks.load).toHaveBeenCalled());
 
     let saved = true;
     await act(async () => { saved = await result.current.handleDirectSave(scanned, node); });
@@ -75,7 +81,6 @@ describe('guardado SSH después de restaurar un escaneo', () => {
   it('recupera una clave por alias y la persiste antes de confirmar el guardado', async () => {
     mocks.getForDevice.mockResolvedValue({ user: 'ubnt', pass: 'recuperada', port: 22 });
     const { result } = renderLibrary();
-    await waitFor(() => expect(mocks.load).toHaveBeenCalled());
 
     let saved = false;
     await act(async () => { saved = await result.current.handleDirectSave(scanned, node); });

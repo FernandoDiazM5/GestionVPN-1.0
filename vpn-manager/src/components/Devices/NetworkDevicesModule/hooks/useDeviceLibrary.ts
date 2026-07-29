@@ -20,6 +20,7 @@ import type { NodeInfo } from '../../../../types/api';
 import type { SshAuthStatus } from '../types';
 import { ipInCidr } from '../constants';
 import { API_BASE_URL } from '../../../../config';
+import { useDeviceInventory, useDeviceInventoryCache } from '../../../../query/deviceInventory';
 
 interface UseDeviceLibraryInput {
   nodesLength: number;
@@ -43,6 +44,13 @@ export function useDeviceLibrary({
   const [toast, setToast] = useState('');
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const savingIdsRef = useRef<Set<string>>(new Set());
+  const inventory = useDeviceInventory();
+  const {
+    data: inventoryDevices,
+    error: inventoryError,
+    refetch: refetchInventory,
+  } = inventory;
+  const inventoryCache = useDeviceInventoryCache();
 
   // Ref sincronizado con `savedDevices` para lookup síncrono dentro de
   // handlers async. Sin este ref, el patrón `setSavedDevices(prev => ...)`
@@ -60,15 +68,36 @@ export function useDeviceLibrary({
     toastTimer.current = setTimeout(() => setToast(''), 4000);
   }, []);
 
-  // Carga inicial desde IndexedDB
+  // El inventario se comparte entre módulos sin secretos. Esta vista hidrata
+  // una copia local con las claves efímeras que sólo viven en credCache.
   useEffect(() => {
-    deviceDb.load().then(devices => {
-      setSavedDevices(devices);
-      setSavedIds(new Set(devices.map(d => d.id)));
-    }).catch(error => {
-      showToast(`No se pudieron cargar los dispositivos: ${persistenceErrorMessage(error)}`);
-    });
-  }, [showToast]);
+    let cancelled = false;
+    const hydrateCredentials = async () => {
+      const devices = inventoryDevices ?? [];
+      const hydrated = await Promise.all(devices.map(async device => {
+        const credential = await credCache.getForDevice(device);
+        return credential
+          ? {
+              ...device,
+              sshUser: device.sshUser || credential.user,
+              sshPass: credential.pass,
+              sshPort: device.sshPort || credential.port,
+            }
+          : device;
+      }));
+      if (cancelled) return;
+      setSavedDevices(hydrated);
+      setSavedIds(new Set(hydrated.map(device => device.id)));
+    };
+    void hydrateCredentials();
+    return () => { cancelled = true; };
+  }, [inventoryDevices]);
+
+  useEffect(() => {
+    if (inventoryError) {
+      showToast(`No se pudieron cargar los dispositivos: ${persistenceErrorMessage(inventoryError)}`);
+    }
+  }, [inventoryError, showToast]);
 
   // Recarga si se eliminó un nodo (puede haber cascadeado dispositivos)
   const nodesLengthRef = useRef(nodesLength);
@@ -76,14 +105,9 @@ export function useDeviceLibrary({
     const prev = nodesLengthRef.current;
     nodesLengthRef.current = nodesLength;
     if (prev > nodesLength) {
-      deviceDb.load().then(devices => {
-        setSavedDevices(devices);
-        setSavedIds(new Set(devices.map(d => d.id)));
-      }).catch(error => {
-        showToast(`No se pudieron recargar los dispositivos: ${persistenceErrorMessage(error)}`);
-      });
+      void refetchInventory();
     }
-  }, [nodesLength, showToast]);
+  }, [nodesLength, refetchInventory]);
 
   const handleAddDevice = useCallback(async (device: SavedDevice): Promise<boolean> => {
     if (savingIdsRef.current.has(device.id)) return false;
@@ -115,6 +139,7 @@ export function useDeviceLibrary({
         next.add(device.id);
         return next;
       });
+      inventoryCache.upsert(merged);
       setAddingDevice(null);
 
       // El enriquecimiento no bloquea la confirmación del guardado inicial.
@@ -149,6 +174,7 @@ export function useDeviceLibrary({
             };
             await deviceDb.saveSingle(enriched);
             setSavedDevices(prev => prev.map(d => d.id === enriched.id ? enriched : d));
+            inventoryCache.upsert(enriched);
 
             setScanResults(prev => {
               const next = [...prev];
@@ -194,28 +220,30 @@ export function useDeviceLibrary({
         return next;
       });
     }
-  }, [setAddingDevice, setScanResults, setSshStatus, showToast]);
+  }, [inventoryCache, setAddingDevice, setScanResults, setSshStatus, showToast]);
 
   const handleRemoveDevice = useCallback(async (id: string) => {
     try {
       await deviceDb.removeSingle(id);
       setSavedDevices(prev => prev.filter(d => d.id !== id));
       setSavedIds(prev => { const n = new Set(prev); n.delete(id); return n; });
+      inventoryCache.remove(id);
     } catch (error) {
       showToast(`No se pudo eliminar el dispositivo: ${persistenceErrorMessage(error)}`);
     }
-  }, [showToast]);
+  }, [inventoryCache, showToast]);
 
   const handleUpdateDevice = useCallback(async (updated: SavedDevice): Promise<boolean> => {
     try {
       await deviceDb.saveSingle(updated);
       setSavedDevices(prev => prev.map(d => d.id === updated.id ? updated : d));
+      inventoryCache.upsert(updated);
       return true;
     } catch (error) {
       showToast(`No se pudo actualizar el dispositivo: ${persistenceErrorMessage(error)}`);
       return false;
     }
-  }, [showToast]);
+  }, [inventoryCache, showToast]);
 
   // Guardado rápido (SSH ya validado durante el scan). Si la IP cae fuera del
   // segmento del nodo, abre el modal de creación para que el operador confirme.

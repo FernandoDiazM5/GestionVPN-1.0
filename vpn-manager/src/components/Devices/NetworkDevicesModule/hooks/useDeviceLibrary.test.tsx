@@ -1,4 +1,4 @@
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import type { Dispatch, SetStateAction } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SavedDevice, ScannedDevice } from '../../../../types/devices';
@@ -12,10 +12,20 @@ const deviceDbMock = vi.hoisted(() => ({
 const credCacheMock = vi.hoisted(() => ({
   getForDevice: vi.fn(async () => null),
 }));
+const inventoryMock = vi.hoisted(() => ({
+  data: [] as SavedDevice[],
+  refetch: vi.fn(async () => ({ data: [], error: null })),
+  upsert: vi.fn(),
+  remove: vi.fn(),
+}));
 
 vi.mock('../../../../store/deviceDb', () => ({
   deviceDb: deviceDbMock,
   credCache: credCacheMock,
+}));
+vi.mock('../../../../query/deviceInventory', () => ({
+  useDeviceInventory: () => ({ data: inventoryMock.data, error: null, refetch: inventoryMock.refetch }),
+  useDeviceInventoryCache: () => ({ upsert: inventoryMock.upsert, remove: inventoryMock.remove }),
 }));
 
 import { useDeviceLibrary } from './useDeviceLibrary';
@@ -46,7 +56,6 @@ function renderLibrary() {
 describe('useDeviceLibrary guardado transaccional', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    deviceDbMock.load.mockResolvedValue([]);
     deviceDbMock.saveSingle.mockResolvedValue(undefined);
     credCacheMock.getForDevice.mockResolvedValue(null);
   });
@@ -57,7 +66,6 @@ describe('useDeviceLibrary guardado transaccional', () => {
       confirmSave = resolve;
     }));
     const { result } = renderLibrary();
-    await waitFor(() => expect(deviceDbMock.load).toHaveBeenCalled());
 
     let savePromise!: Promise<boolean>;
     act(() => {
@@ -85,7 +93,6 @@ describe('useDeviceLibrary guardado transaccional', () => {
     });
     deviceDbMock.saveSingle.mockRejectedValueOnce(apiError);
     const { result } = renderLibrary();
-    await waitFor(() => expect(deviceDbMock.load).toHaveBeenCalled());
 
     let savedOk = true;
     await act(async () => {

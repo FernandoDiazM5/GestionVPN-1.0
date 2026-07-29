@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@gestionvpn/contracts": "*",
+    "@tanstack/react-query": "^5.101.4",
     "exceljs": "^4.4.0",
     "firebase": "^12.16.0",
     "jspdf": "^4.2.1",

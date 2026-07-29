@@ -206,7 +206,7 @@ async function backfillBackendCreds(
 }
 
 export const deviceDb = {
-  async load(): Promise<SavedDevice[]> {
+  async loadInventory(): Promise<SavedDevice[]> {
     try {
       const res = await apiFetch(`${API_BASE_URL}/api/db/devices`);
       const data = await res.json();
@@ -214,20 +214,17 @@ export const deviceDb = {
         throw new Error(data?.message || 'No se pudieron cargar los equipos');
       }
       if (data.success && data.devices) {
-        // Enriquecer con stats persistidas y credenciales efímeras de esta sesión
+        // Inventario compartible: estadísticas locales, nunca claves SSH.
         const [allStats, allCreds] = await Promise.all([
           statsCache.getAll(),
           credCache.getAll(),
         ]);
         const enriched = data.devices.map((d: SavedDevice) => {
-          const cred = allCreds[d.id];
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { sshPass: _secret, ...safeDevice } = d;
           return {
-            ...d,
+            ...safeDevice,
             cachedStats: allStats[d.id]?.stats ?? undefined,
-            // Si hay credenciales en memoria, usarlas durante esta pestaña.
-            sshUser: d.sshUser || cred?.user,
-            sshPass: cred?.pass ?? undefined,
-            sshPort: d.sshPort || cred?.port,
           };
         });
         // Cura APs que el backend tiene "Sin SSH" pero credCache sí conoce (F&F).
@@ -242,6 +239,21 @@ export const deviceDb = {
       console.error('Error cargando devices de SQLite:', err);
       throw err;
     }
+  },
+
+  async load(): Promise<SavedDevice[]> {
+    const inventory = await deviceDb.loadInventory();
+    return Promise.all(inventory.map(async device => {
+      const credential = await credCache.getForDevice(device);
+      return credential
+        ? {
+            ...device,
+            sshUser: device.sshUser || credential.user,
+            sshPass: credential.pass,
+            sshPort: device.sshPort || credential.port,
+          }
+        : device;
+    }));
   },
 
   async saveSingle(device: SavedDevice): Promise<void> {
