@@ -6,6 +6,14 @@
 
 ---
 
+> **Sesión 2026-07-28 — Monitor de antenas orientado al usuario.** Rama `vps_prod`, base `f020964`, sin despliegue. Skills: `ui-design-system`, `vercel-react-best-practices`, `handoff-keeper`.
+> - Se reemplazó la terminología técnica y ambigua por sitios, antenas, clientes, actualización, estado e información.
+> - Los filtros ahora reflejan su comportamiento real (`Sitio conectado/Otros sitios`) y se eliminó la recarga duplicada.
+> - Estados, leyenda, columnas, menús e informe PDF comparten el mismo vocabulario y jerarquía visual.
+> - Se añadió una tarjeta móvil específica, acciones táctiles accesibles y un llamado visible para credenciales requeridas.
+> - Pruebas: **57/188 frontend**, `check:all`, TypeScript, ESLint y `git diff --check`.
+> - Cambio funcional: `c886844`. Pendiente: autorización explícita antes de desplegar el frontend.
+
 > **Sesión 2026-07-28 — Persistencia SSH blindada de extremo a extremo.** Rama `vps_prod`, base `a1ed871`; cambio `a37bf1f`, sin despliegue. Skills: `network-engineer`, `vercel-react-best-practices`, `handoff-keeper`.
 > - Resultados restaurados eliminan estados `success/pending`; sólo vuelven a éxito al recuperar una credencial real de memoria.
 > - Caché usa aliases canónicos de UUID/IP/MAC LAN/WLAN, conserva contraseña vacía explícita y purga todos los aliases al borrar.
