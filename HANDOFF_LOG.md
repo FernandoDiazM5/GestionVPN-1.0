@@ -6,6 +6,12 @@
 
 ---
 
+> **Sesión 2026-07-28 — Cabecera del sitio y tabla CPE corregidas.** Rama `vps_prod`, base `ef0fa20`; cambio `079910d`, sin despliegue. Skills: `ui-design-system`, `vercel-react-best-practices`, `handoff-keeper`.
+> - El nombre/estado del sitio ocupa una fila reservada; métricas y acciones se distribuyen debajo y pueden envolver sin ocultarlo.
+> - `Estado`, `MAC / Host`, señales, tasas y acciones usan mínimos legibles; los títulos quedan contenidos y el scroll horizontal se conserva.
+> - Prueba nueva fija la geometría mínima de columnas. Verificación: **64 archivos / 206 pruebas frontend**, build Vite, `check:all`, TypeScript, ESLint y `git diff --check`.
+> - `0.0.0.0` no se modificó; se atenderá en un cambio separado.
+
 > **Sesión 2026-07-28 — Diagnóstico de presentación del Monitor e IP CPE.** Rama `vps_prod`, base `9e00f02`; sólo lectura de producto/producción, sin corrección ni despliegue. Skills: `network-engineer`, `handoff-keeper`.
 > - La cabecera del sitio deja colapsar el nombre frente a métricas y botones no encogibles.
 > - La pista `Estado` mide 28 px y su texto desborda sobre `MAC / Host`; otras etiquetas también exceden sus pistas.
