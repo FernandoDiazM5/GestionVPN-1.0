@@ -33,7 +33,7 @@ const STATUS_LABELS: Record<NodeApReportAp['status'], string> = {
   fresh: 'Actualizado',
   stale: 'Desactualizado',
   error: 'Error',
-  'no-data': 'Sin datos',
+  'no-data': 'Sin información',
 };
 
 const HEALTH_LABELS: Record<NodeApReportCpe['health'], string> = {
@@ -47,7 +47,7 @@ function text(value: string | number | null | undefined, suffix = ''): string {
 }
 
 function dateTime(value: number): string {
-  return value > 0 ? new Date(value).toLocaleString('es-PE') : 'Sin datos';
+  return value > 0 ? new Date(value).toLocaleString('es-PE') : 'Sin información';
 }
 
 function safeFilePart(value: string): string {
@@ -85,7 +85,7 @@ function addApInventory(doc: PdfDoc, autoTable: AutoTable, report: NodeApReport,
       text(ap.cpuLoad, '%'),
       text(ap.memoryPercent, '%'),
       `${ap.cpeCount}${ap.cpeCountIsHistorical ? '*' : ''}`,
-      `${STATUS_LABELS[ap.status]}${ap.hasSsh ? '' : '\nSin SSH'}`,
+      `${STATUS_LABELS[ap.status]}${ap.hasSsh ? '' : '\nCredenciales requeridas'}`,
       dateTime(ap.polledAt),
     ]),
     styles: { fontSize: 6.7, cellPadding: 3, overflow: 'linebreak', textColor: SLATE_700 },
@@ -140,7 +140,7 @@ function addCpeTable(doc: PdfDoc, autoTable: AutoTable, ap: NodeApReportAp, star
 }
 
 function addApDetailTable(doc: PdfDoc, autoTable: AutoTable, ap: NodeApReportAp, startY: number): number {
-  const statusText = `${STATUS_LABELS[ap.status]}${ap.hasSsh ? '' : ' / Sin SSH'}`;
+  const statusText = `${STATUS_LABELS[ap.status]}${ap.hasSsh ? '' : ' / Credenciales requeridas'}`;
   autoTable(doc, {
     startY,
     margin: { left: 32, right: 32, bottom: 34 },

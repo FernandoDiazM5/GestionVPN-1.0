@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type CSSProperties } from 'react';
 import { ChevronDown, ChevronRight, FileText, Loader2, Radio, Wifi, Server, Users, Trash2 } from 'lucide-react';
 import type { SavedDevice } from '../../../../types/devices';
 import type { PollResult } from '../../../../types/apMonitor';
@@ -45,12 +45,13 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelAc
     : nodeStatus === 'partial' ? 'bg-amber-400'
       : nodeStatus === 'connecting' ? 'bg-sky-400 animate-pulse'
         : 'bg-slate-300';
-  const statusLabel = nodeStatus === 'empty' ? 'Sin APs'
-    : nodeStatus === 'online' ? 'Online'
-      : nodeStatus === 'partial' ? 'Parcial'
-        : nodeStatus === 'connecting' ? 'Conectando…'
-          : 'Sin datos';
+  const statusLabel = nodeStatus === 'empty' ? 'Sin antenas'
+    : nodeStatus === 'online' ? 'En línea'
+      : nodeStatus === 'partial' ? 'Requiere atención'
+        : nodeStatus === 'connecting' ? 'Actualizando…'
+          : 'Sin información';
   const totalCpes = group.aps.reduce((s, ap) => s + (pollResults[ap.id]?.stations.length ?? 0), 0);
+  const attentionCount = apStatuses.filter(status => status === 'partial' || status === 'inactive').length;
 
   return (
     <div className="card overflow-hidden">
@@ -76,20 +77,20 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelAc
           </div>
         </div>
         <div className="col-start-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 text-xs text-slate-500 sm:ml-auto sm:shrink-0 sm:flex-nowrap dark:text-slate-400">
-          <span className="flex shrink-0 items-center gap-1"><Server className="w-3 h-3" /> {group.aps.length} AP{group.aps.length !== 1 ? 's' : ''}</span>
-          {group.stas.length > 0 && <span className="flex shrink-0 items-center gap-1 text-cyan-600 dark:text-cyan-400"><Users className="w-3 h-3" /> {group.stas.length} CPE{group.stas.length !== 1 ? 's' : ''}</span>}
-          {totalCpes > 0 && <span className="flex shrink-0 items-center gap-1 text-cyan-600 dark:text-cyan-400"><Users className="w-3 h-3" /> {totalCpes} live</span>}
+          <span className="flex shrink-0 items-center gap-1"><Server className="w-3 h-3" /> {group.aps.length} {group.aps.length === 1 ? 'antena' : 'antenas'}</span>
+          {totalCpes > 0 && <span className="flex shrink-0 items-center gap-1 text-cyan-600 dark:text-cyan-400"><Users className="w-3 h-3" /> {totalCpes} {totalCpes === 1 ? 'cliente conectado' : 'clientes conectados'}</span>}
+          {attentionCount > 0 && <span className="flex shrink-0 items-center gap-1 text-amber-700 dark:text-amber-300">{attentionCount} {attentionCount === 1 ? 'requiere atención' : 'requieren atención'}</span>}
           <button
             type="button"
             onClick={() => onExportReport(group)}
             disabled={reportExporting || group.aps.length === 0}
-            title="Generar informe PDF de este nodo"
+            title="Descargar el informe de este sitio"
             className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border border-indigo-200 bg-white px-2.5 text-2xs font-bold text-indigo-700 transition-colors hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-indigo-500/30 dark:bg-slate-900 dark:text-indigo-300 dark:hover:bg-indigo-500/10"
           >
             {reportExporting
               ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
               : <FileText className="h-3.5 w-3.5" aria-hidden="true" />}
-            <span>{reportExporting ? 'Generando…' : 'Informe'}</span>
+            <span>{reportExporting ? 'Generando…' : 'Descargar informe'}</span>
           </button>
           <ApColSelector hidden={hiddenApCols} onChange={handleApColChange} />
         </div>
@@ -100,7 +101,7 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelAc
           {group.aps.length === 0 && group.stas.length === 0 && (
             <div className="flex flex-col items-center py-10 gap-3 text-slate-500 dark:text-slate-400">
               <Wifi className="w-8 h-8" />
-              <p className="text-sm">No hay APs guardados en este nodo</p>
+              <p className="text-sm">No hay antenas guardadas en este sitio</p>
             </div>
           )}
           {group.aps.length > 0 && (
@@ -113,8 +114,11 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelAc
                   return a + (m ? parseInt(m[1]) : 120);
                 }, 0);
                 return (
-                  <div style={{ minWidth: `${minW}px` }}>
-                    <div className="grid bg-slate-50 border-b border-slate-200 text-3xs font-bold text-slate-400 uppercase tracking-wider px-4 py-2 dark:bg-slate-800/60 dark:border-slate-800"
+                  <div
+                    className="sm:min-w-[var(--ap-table-min-width)]"
+                    style={{ '--ap-table-min-width': `${minW}px` } as CSSProperties}
+                  >
+                    <div className="hidden bg-slate-50 border-b border-slate-200 text-3xs font-bold text-slate-400 uppercase tracking-wider px-4 py-2 sm:grid dark:bg-slate-800/60 dark:border-slate-800"
                       style={{ gridTemplateColumns: gridCols }}>
                       {visibleCols.map(col => (
                         <span key={col.key} className={`truncate ${col.right ? 'text-right pr-2' : col.key === 'cpes' || col.key === 'estado' ? 'text-center' : col.key === 'actions' ? 'text-right' : ''}`}>
@@ -148,7 +152,7 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelAc
           {group.stas.length > 0 && (
             <div className="border-t border-cyan-100 bg-cyan-50/30 dark:border-cyan-500/20 dark:bg-cyan-500/5">
               <div className="px-4 py-2 flex items-center gap-2 border-b border-cyan-100 dark:border-cyan-500/20">
-                <span className="text-3xs font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-wider">CPEs guardados · {group.stas.length}</span>
+                <span className="text-3xs font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-wider">Equipos cliente guardados · {group.stas.length}</span>
               </div>
               {group.stas.map(sta => (
                 <div key={sta.id} className="flex items-center gap-3 px-4 py-2.5 border-b border-cyan-100/60 last:border-0 hover:bg-cyan-50 transition-colors text-xs dark:border-cyan-500/10 dark:hover:bg-cyan-500/10">

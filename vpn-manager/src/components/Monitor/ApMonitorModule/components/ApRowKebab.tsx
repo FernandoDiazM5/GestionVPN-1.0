@@ -45,9 +45,9 @@ export function ApRowKebab({ items }: { items: KebabItem[] }) {
 
   return (
     <>
-      <button ref={btnRef} onClick={() => setOpen(o => !o)} title="Más acciones" aria-label="Más acciones"
+      <button ref={btnRef} onClick={() => setOpen(o => !o)} title="Más opciones" aria-label="Más opciones"
         aria-haspopup="menu" aria-expanded={open}
-        className={`p-1.5 rounded-lg transition-colors ${open
+        className={`flex min-h-11 min-w-11 items-center justify-center rounded-lg transition-colors ${open
           ? 'text-slate-700 bg-slate-100 dark:text-slate-100 dark:bg-slate-800'
           : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-500 dark:hover:text-slate-100 dark:hover:bg-slate-800'}`}>
         <MoreVertical className="w-3.5 h-3.5" />
@@ -62,7 +62,7 @@ export function ApRowKebab({ items }: { items: KebabItem[] }) {
               {it.danger && i > 0 && <div className="my-1 border-t border-slate-100 dark:border-slate-700" />}
               <button role="menuitem" disabled={it.disabled}
                 onClick={() => { setOpen(false); it.onClick(); }}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs text-left transition-colors disabled:opacity-40 disabled:cursor-not-allowed
+                className={`flex min-h-11 w-full items-center gap-2.5 px-3 py-2 text-left text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-40
                   ${it.danger
                     ? 'text-rose-500 hover:bg-rose-50 hover:text-rose-700 dark:text-rose-400 dark:hover:bg-rose-500/10 dark:hover:text-rose-300'
                     : 'text-slate-600 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-slate-100'}`}>

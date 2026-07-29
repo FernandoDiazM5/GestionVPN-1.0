@@ -42,18 +42,18 @@ function saveColPrefs(hidden: Set<string>) {
 
 interface ApColDef { key: string; label: string; always?: boolean; width: string; right?: boolean; }
 const AP_COL_DEFS: ApColDef[] = [
-  { key: 'modo', label: 'Modo', always: true, width: '72px' },
-  { key: 'nombre', label: 'Nombre / IP', always: true, width: 'minmax(120px,1fr)' },
+  { key: 'modo', label: 'Tipo', always: true, width: '72px' },
+  { key: 'nombre', label: 'Antena', always: true, width: 'minmax(120px,1fr)' },
   { key: 'modelo', label: 'Modelo', width: '130px' },
   { key: 'ssid', label: 'SSID / Canal', width: '140px' },
   { key: 'signal', label: 'Señal', width: '72px', right: true },
   { key: 'ccq', label: 'CCQ', width: '60px', right: true },
-  { key: 'txpwr', label: 'TX Pwr', width: '72px', right: true },
-  { key: 'uptime', label: 'Uptime', width: '96px' },
+  { key: 'txpwr', label: 'Potencia', width: '72px', right: true },
+  { key: 'uptime', label: 'Tiempo en línea', width: '96px' },
   { key: 'cpu', label: 'CPU', width: '56px', right: true },
-  { key: 'cpes', label: 'CPEs', always: true, width: '64px' },
-  { key: 'estado', label: '', always: true, width: '32px' },
-  { key: 'actions', label: 'Acciones', always: true, width: '150px' },
+  { key: 'cpes', label: 'Clientes', always: true, width: '70px' },
+  { key: 'estado', label: 'Estado', always: true, width: '56px' },
+  { key: 'actions', label: 'Opciones', always: true, width: '190px' },
 ];
 const AP_DEFAULT_HIDDEN = new Set<string>(['signal', 'ccq', 'uptime', 'cpu']);
 const AP_LS_KEY = 'ap_monitor_ap_cols_v1';

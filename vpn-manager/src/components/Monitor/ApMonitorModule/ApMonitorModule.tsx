@@ -172,11 +172,9 @@ export default function ApMonitorModule() {
         lastPolledAt={lastPolledAt}
         canSync={syncableAps.length > 0 && !syncingAll}
         syncing={syncingAll}
-        reloading={logic.loading}
         onFilterChange={logic.setNodeFilter}
         onSearchChange={logic.setApSearch}
         onSync={syncAllVisible}
-        onReload={() => { void logic.loadDevices(); polling.seedFromDb(); }}
       />
 
       {(logic.loading || logic.loadError) && (
@@ -184,7 +182,7 @@ export default function ApMonitorModule() {
           loading={logic.loading}
           error={logic.loadError}
           onRetry={() => { void logic.loadDevices(); }}
-          loadingLabel="Cargando equipos..."
+          loadingLabel="Cargando antenas..."
           skeletonRows={4}
         >
           <div />
@@ -197,9 +195,9 @@ export default function ApMonitorModule() {
             <Radio className="w-7 h-7 text-indigo-400" />
           </div>
           <div>
-            <p className="text-slate-600 dark:text-slate-300 font-semibold">Sin APs guardados</p>
+            <p className="text-slate-600 dark:text-slate-300 font-semibold">Aún no hay antenas guardadas</p>
             <p className="text-slate-500 dark:text-slate-500 text-sm mt-1 max-w-sm">
-              Ve a la pestaña <strong>Escanear</strong>, agrega dispositivos con rol "AP" y vuelve aquí para monitorearlos.
+              Ve a <strong>Buscar equipos</strong>, guarda las antenas encontradas y vuelve aquí para revisar su estado.
             </p>
           </div>
         </div>
@@ -208,14 +206,14 @@ export default function ApMonitorModule() {
       {!logic.loading && !logic.loadError && logic.nodeFilter === 'active' && !tunnelActive && logic.filteredGroups.length === 0 && (
         <div className="card p-8 text-center text-slate-500 dark:text-slate-400">
           <WifiOff className="w-8 h-8 mx-auto mb-3 text-amber-400" />
-          <p className="font-semibold text-slate-600 dark:text-slate-300">Sin túnel VPN activo</p>
-          <p className="text-sm mt-1">Conéctate a un nodo para ver sus APs en tiempo real</p>
+          <p className="font-semibold text-slate-600 dark:text-slate-300">No hay un sitio conectado</p>
+          <p className="text-sm mt-1">Conéctate a un sitio para actualizar sus antenas en tiempo real.</p>
           <div className="flex items-center justify-center gap-2 mt-4">
             <button onClick={() => setActiveModule('nodes')} className="btn-primary btn-sm">
-              Conectar a un nodo
+              Conectar a un sitio
             </button>
             <button onClick={() => logic.setNodeFilter('all')} className="btn-outline btn-sm">
-              Ver todos los nodos
+              Ver todos los sitios
             </button>
           </div>
         </div>

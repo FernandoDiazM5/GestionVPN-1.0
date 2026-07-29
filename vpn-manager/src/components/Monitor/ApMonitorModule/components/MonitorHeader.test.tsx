@@ -13,23 +13,21 @@ const baseProps = {
   lastPolledAt: 0,
   canSync: true,
   syncing: false,
-  reloading: false,
   onFilterChange: vi.fn(),
   onSearchChange: vi.fn(),
   onSync: vi.fn(),
-  onReload: vi.fn(),
 };
 
 describe('MonitorHeader', () => {
   it('presenta la jerarquía, las métricas y el estado de actualización en español', () => {
     render(<MonitorHeader {...baseProps} />);
 
-    expect(screen.getByRole('heading', { name: 'Monitor de APs' })).toBeInTheDocument();
-    expect(screen.getByText('Supervisa en tiempo real los AP agrupados por nodo.')).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent('Actualización en vivo');
-    expect(screen.getByText('2 nodos')).toBeInTheDocument();
-    expect(screen.getByText('3 AP')).toBeInTheDocument();
-    expect(screen.getByText('4 CPE conectados')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Estado de antenas' })).toBeInTheDocument();
+    expect(screen.getByText('Revisa el estado de las antenas y equipos conectados en cada sitio.')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Actualización automática');
+    expect(screen.getByText('2 sitios')).toBeInTheDocument();
+    expect(screen.getByText('3 antenas')).toBeInTheDocument();
+    expect(screen.getByText('4 clientes conectados')).toBeInTheDocument();
     expect(screen.queryByText(/CPEs live/i)).not.toBeInTheDocument();
   });
 
@@ -38,7 +36,6 @@ describe('MonitorHeader', () => {
     const onFilterChange = vi.fn();
     const onSearchChange = vi.fn();
     const onSync = vi.fn();
-    const onReload = vi.fn();
 
     const { rerender } = render(
       <MonitorHeader
@@ -46,24 +43,20 @@ describe('MonitorHeader', () => {
         onFilterChange={onFilterChange}
         onSearchChange={onSearchChange}
         onSync={onSync}
-        onReload={onReload}
       />,
     );
 
-    expect(screen.getByRole('button', { name: 'Activos' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'Inactivos' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'Sitio conectado' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Otros sitios' })).toHaveAttribute('aria-pressed', 'false');
 
-    await user.click(screen.getByRole('button', { name: 'Inactivos' }));
+    await user.click(screen.getByRole('button', { name: 'Otros sitios' }));
     expect(onFilterChange).toHaveBeenCalledWith('inactive');
 
-    await user.type(screen.getByRole('searchbox', { name: /buscar AP por nombre/i }), 'torre');
+    await user.type(screen.getByRole('searchbox', { name: /buscar antena por nombre/i }), 'torre');
     expect(onSearchChange).toHaveBeenLastCalledWith('e');
 
-    await user.click(screen.getByRole('button', { name: 'Sincronizar AP' }));
+    await user.click(screen.getByRole('button', { name: 'Actualizar información' }));
     expect(onSync).toHaveBeenCalledOnce();
-
-    await user.click(screen.getByRole('button', { name: 'Recargar equipos guardados' }));
-    expect(onReload).toHaveBeenCalledOnce();
 
     rerender(
       <MonitorHeader
@@ -73,11 +66,10 @@ describe('MonitorHeader', () => {
         onFilterChange={onFilterChange}
         onSearchChange={onSearchChange}
         onSync={onSync}
-        onReload={onReload}
       />,
     );
 
-    expect(screen.getByRole('button', { name: 'Sincronizar AP' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Actualizar información' })).toBeDisabled();
     await user.click(screen.getByRole('button', { name: 'Limpiar búsqueda' }));
     expect(onSearchChange).toHaveBeenLastCalledWith('');
   });

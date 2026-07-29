@@ -3,7 +3,6 @@ import {
   CheckCircle2,
   Clock,
   Loader2,
-  RefreshCw,
   RotateCw,
   Search,
   Users,
@@ -25,41 +24,39 @@ interface MonitorHeaderProps {
   lastPolledAt: number;
   canSync: boolean;
   syncing: boolean;
-  reloading: boolean;
   onFilterChange: (filter: NodeFilter) => void;
   onSearchChange: (value: string) => void;
   onSync: () => void;
-  onReload: () => void;
 }
 
 const FILTERS = [
   {
     value: 'active',
-    label: 'Activos',
-    title: 'Nodos activos',
+    label: 'Sitio conectado',
+    title: 'Antenas del sitio conectado',
     Icon: CheckCircle2,
     selectedClass: 'bg-emerald-700 text-white',
   },
   {
     value: 'inactive',
-    label: 'Inactivos',
-    title: 'Nodos inactivos',
+    label: 'Otros sitios',
+    title: 'Antenas de otros sitios',
     Icon: ZapOff,
     selectedClass: 'bg-amber-800 text-white',
   },
   {
     value: 'all',
     label: 'Todos',
-    title: 'Todos los nodos',
+    title: 'Todos los sitios',
     Icon: Users,
     selectedClass: 'bg-indigo-600 text-white',
   },
 ] as const;
 
 const CONNECTION_LABELS: Record<ApPollConnectionStatus, string> = {
-  connecting: 'Conectando actualizaciones',
-  connected: 'Actualización en vivo',
-  reconnecting: 'Reconectando actualizaciones',
+  connecting: 'Iniciando actualización',
+  connected: 'Actualización automática',
+  reconnecting: 'Recuperando actualización',
 };
 
 const CONNECTION_STYLES: Record<ApPollConnectionStatus, string> = {
@@ -88,11 +85,9 @@ export default function MonitorHeader({
   lastPolledAt,
   canSync,
   syncing,
-  reloading,
   onFilterChange,
   onSearchChange,
   onSync,
-  onReload,
 }: MonitorHeaderProps) {
   return (
     <section className="card overflow-hidden" aria-labelledby="ap-monitor-title">
@@ -100,10 +95,10 @@ export default function MonitorHeader({
         <div className="min-w-0">
           <h2 id="ap-monitor-title" className="flex items-center gap-2 text-xl font-semibold text-slate-900 dark:text-slate-100">
             <Activity className="h-5 w-5 shrink-0 text-indigo-600 dark:text-indigo-400" aria-hidden="true" />
-            <span>Monitor de APs</span>
+            <span>Estado de antenas</span>
           </h2>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-            Supervisa en tiempo real los AP agrupados por nodo.
+            Revisa el estado de las antenas y equipos conectados en cada sitio.
           </p>
         </div>
 
@@ -119,16 +114,16 @@ export default function MonitorHeader({
 
       <div className="border-t border-slate-200 px-4 py-4 dark:border-slate-800 sm:px-6">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-          <p className="shrink-0 text-sm text-slate-600 dark:text-slate-400" aria-label={`${nodeCount} nodos, ${apCount} AP, ${cpeCount} CPE conectados`}>
-            <span className="font-semibold text-indigo-700 dark:text-indigo-300">{countLabel(nodeCount, 'nodo', 'nodos')}</span>
+          <p className="shrink-0 text-sm text-slate-600 dark:text-slate-400" aria-label={`${nodeCount} sitios, ${apCount} antenas, ${cpeCount} clientes conectados`}>
+            <span className="font-semibold text-indigo-700 dark:text-indigo-300">{countLabel(nodeCount, 'sitio', 'sitios')}</span>
             <span aria-hidden="true"> · </span>
-            <span className="font-semibold text-indigo-700 dark:text-indigo-300">{countLabel(apCount, 'AP', 'AP')}</span>
+            <span className="font-semibold text-indigo-700 dark:text-indigo-300">{countLabel(apCount, 'antena', 'antenas')}</span>
             <span aria-hidden="true"> · </span>
-            <span className="font-semibold text-cyan-700 dark:text-cyan-300">{countLabel(cpeCount, 'CPE conectado', 'CPE conectados')}</span>
+            <span className="font-semibold text-cyan-700 dark:text-cyan-300">{countLabel(cpeCount, 'cliente conectado', 'clientes conectados')}</span>
           </p>
 
           <div className="flex min-w-0 flex-col gap-3 md:flex-row md:flex-wrap md:items-center xl:justify-end">
-            <div className="grid min-h-11 grid-cols-3 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700" role="group" aria-label="Filtrar nodos por estado">
+            <div className="grid min-h-11 grid-cols-3 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700" role="group" aria-label="Filtrar antenas por sitio">
               {FILTERS.map(({ value, label, title, Icon, selectedClass }, index) => {
                 const selected = nodeFilter === value;
                 return (
@@ -153,8 +148,8 @@ export default function MonitorHeader({
                 type="search"
                 value={search}
                 onChange={event => onSearchChange(event.target.value)}
-                placeholder="Buscar AP…"
-                aria-label="Buscar AP por nombre, IP, modelo o SSID"
+                placeholder="Buscar antena…"
+                aria-label="Buscar antena por nombre, IP, modelo o red"
                 className="min-h-11 w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-10 text-sm text-slate-900 placeholder:text-slate-500 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
               />
               {search ? (
@@ -170,37 +165,27 @@ export default function MonitorHeader({
               ) : null}
             </div>
 
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={onSync}
-                disabled={!canSync}
-                className="btn-outline inline-flex min-h-11 flex-1 items-center justify-center gap-2 px-4 text-xs md:flex-none"
-                title="Sincronizar ahora los CPE de todos los AP visibles"
-              >
-                <RotateCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} aria-hidden="true" />
-                <span>{syncing ? 'Sincronizando…' : 'Sincronizar AP'}</span>
-              </button>
-              <button
-                type="button"
-                onClick={onReload}
-                disabled={reloading}
-                aria-label="Recargar equipos guardados"
-                title="Recargar equipos guardados"
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition-colors hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-300"
-              >
-                {reloading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <RefreshCw className="h-4 w-4" aria-hidden="true" />}
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={onSync}
+              disabled={!canSync}
+              className="btn-primary inline-flex min-h-11 items-center justify-center gap-2 px-4 text-xs"
+              title="Actualizar la información de las antenas visibles"
+            >
+              {syncing
+                ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                : <RotateCw className="h-4 w-4" aria-hidden="true" />}
+              <span>{syncing ? 'Actualizando…' : 'Actualizar información'}</span>
+            </button>
           </div>
         </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-slate-200 bg-slate-50/70 px-4 py-3 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-400 sm:px-6">
-        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" /> Online</span>
-        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-amber-500" aria-hidden="true" /> Parcial/error</span>
-        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-sky-500" aria-hidden="true" /> Conectando</span>
-        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-slate-400" aria-hidden="true" /> Sin datos</span>
+        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" /> En línea</span>
+        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-amber-500" aria-hidden="true" /> Requiere atención</span>
+        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-sky-500" aria-hidden="true" /> Actualizando</span>
+        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-slate-400" aria-hidden="true" /> Sin información</span>
         {lastPolledAt > 0 ? (
           <span className="flex items-center gap-1.5 sm:ml-auto">
             <Clock className="h-3.5 w-3.5" aria-hidden="true" />
