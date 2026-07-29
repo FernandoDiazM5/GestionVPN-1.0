@@ -153,10 +153,6 @@ function CpeRow({ cpe, idx, onDetail, hiddenCols, gridCols }: {
         </div>
       )}
 
-      {show('lastip') && (
-        <div className="px-2 py-2 font-mono text-2xs text-slate-500 dark:text-slate-400 truncate">{cpe.lastip || '—'}</div>
-      )}
-
       <div className="px-2 py-2 flex items-center justify-end gap-0.5">
         <button onClick={() => onDetail(cpe.mac, cpe.lastip || null)} title="Ver detalle del CPE"
           className="p-1.5 text-indigo-500 hover:bg-indigo-50 rounded-lg transition-colors dark:text-indigo-400 dark:hover:bg-indigo-500/10">

@@ -6,6 +6,12 @@
 
 ---
 
+> **Sesión 2026-07-29 — Se omite “Última IP” de la tabla CPE.** Rama `vps_prod`, base `a2f0aaf`; cambio frontend pendiente de commit/deploy. Skills: `ui-design-system`, `handoff-keeper`.
+> - Se retiraron encabezado y celdas de `lastip`; “Distancia (m)” y el resto de datos permanecen.
+> - `ColSelector` dejó de mantener una copia divergente de las columnas y consume la definición central de `columnDefs`.
+> - El valor continúa disponible internamente para diagnóstico, búsqueda, detalle y CSV; no se alteraron backend ni BD.
+> - Verificación: prueba focalizada **3/3**, ESLint sin warnings, TypeScript y build Vite.
+
 > **Sesión 2026-07-28 — Causa acotada de IP CPE `0.0.0.0`.** Rama `vps_prod`, base `b66a5b3`; diagnóstico de sólo lectura, sin cambio de producto ni despliegue. Skills: `network-engineer`, `handoff-keeper`.
 > - Los siete registros afectados de producción pertenecen a estaciones XW con AirOS `6.1.7`; estaciones WA recientes y una XW `6.3.24` del mismo AP sí entregan IP válidas.
 > - AirOS entrega literalmente `lastip="0.0.0.0"` como ausencia de IP aprendida; `parseWstalist` no lo fabrica. Persistencia y UI sí tienen un defecto secundario: aceptan el sentinel como IP válida, sobrescriben valores previos y lo convierten en enlace.

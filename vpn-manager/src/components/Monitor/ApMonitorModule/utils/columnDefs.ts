@@ -22,7 +22,6 @@ const CPE_COL_DEFS: ColDef[] = [
   { key: 'thr_tx', label: 'Thr ↑', width: '84px', right: true },
   { key: 'uptime', label: 'Uptime', width: '110px' },
   { key: 'distance', label: 'Dist (m)', width: '76px', right: true },
-  { key: 'lastip', label: 'Última IP', width: '116px' },
   { key: 'actions', label: 'Acciones', always: true, width: '80px' },
 ];
 const DEFAULT_HIDDEN = new Set<string>(['noise', 'cinr', 'am_qual', 'am_cap', 'am_dcap', 'am_ucap', 'air_tx', 'air_rx', 'thr_rx', 'thr_tx']);

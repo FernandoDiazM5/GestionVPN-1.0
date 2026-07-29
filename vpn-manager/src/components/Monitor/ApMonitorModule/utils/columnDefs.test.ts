@@ -7,6 +7,10 @@ function widthOf(key: string) {
 }
 
 describe('CPE column geometry', () => {
+  it('omite la IP no confiable de la tabla visible', () => {
+    expect(CPE_COL_DEFS.some(column => column.key === 'lastip')).toBe(false);
+  });
+
   it('reserva espacio suficiente para los encabezados fijos', () => {
     expect(widthOf('status')).toBeGreaterThanOrEqual(56);
     expect(widthOf('mac')).toBeGreaterThanOrEqual(180);
