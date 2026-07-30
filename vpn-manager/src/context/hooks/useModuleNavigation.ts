@@ -38,6 +38,17 @@ function parseRoute(pathname: string): ParsedRoute {
   const segments = pathname.split('/').filter(Boolean);
   if (segments.length === 0) return { kind: 'root' };
 
+  if (segments[0] === 'GestionVPN-1.0') {
+    if (segments.length === 1) return { kind: 'root' };
+    if (segments.length === 2) {
+      const legacyModule = SEGMENT_MODULES.get(segments[1]);
+      return legacyModule
+        ? { kind: 'legacy-module', module: legacyModule }
+        : { kind: 'unknown' };
+    }
+    return { kind: 'unknown' };
+  }
+
   if (segments.length === 1) {
     const legacyModule = SEGMENT_MODULES.get(segments[0]);
     return legacyModule

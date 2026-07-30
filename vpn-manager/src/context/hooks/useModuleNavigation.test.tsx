@@ -58,6 +58,25 @@ describe('useModuleNavigation', () => {
     expect(screen.getByLabelText('pathname')).toHaveTextContent('/dm/housenet/team');
   });
 
+  it('acepta el public path histórico y lo canoniza después del login', async () => {
+    render(
+      <MemoryRouter initialEntries={['/GestionVPN-1.0/monitor']}>
+        <Probe />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByLabelText('pathname')).toHaveTextContent('/dm/housenet/monitor');
+  });
+
+  it('muestra login en el public path histórico sin crear un bucle', () => {
+    render(
+      <MemoryRouter initialEntries={['/GestionVPN-1.0/']}>
+        <Probe authenticated={false} session={null} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByLabelText('pathname')).toHaveTextContent('/GestionVPN-1.0/');
+    expect(screen.getByLabelText('not-found')).toHaveTextContent('false');
+  });
+
   it('conserva una ruta desconocida para que la aplicacion muestre 404', () => {
     render(<MemoryRouter initialEntries={['/ruta-inexistente']}><Probe /></MemoryRouter>);
     expect(screen.getByLabelText('not-found')).toHaveTextContent('true');
