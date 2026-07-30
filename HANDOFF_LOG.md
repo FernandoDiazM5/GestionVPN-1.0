@@ -6,6 +6,13 @@
 
 ---
 
+> **Sesión 2026-07-30 — Endurecimiento SSH, Fail2ban, actualizaciones y reinicio verificado.** Producción funcional sin despliegue de código; skills `network-engineer` y `handoff-keeper`.
+> - Respaldo previo root-only `/root/ssh-hardening-20260730T050400Z/system-config.tar.gz`, checksum SHA-256 verificado. Se creó `vpsadmin` con dos llaves públicas independientes, acceso `sudo` no interactivo y pruebas reales de ambas llaves antes y después del reinicio.
+> - SSH admite exclusivamente clave pública para `vpsadmin`; acceso directo de `root`, contraseñas y keyboard-interactive quedaron deshabilitados. `sshd -t` pasó y el rollback temporizado se canceló sólo después de probar la ruta alternativa. El alias local canónico es `ssh gestionvpn-vps`; `.env` guarda únicamente host/usuario/rutas/fingerprint, nunca la llave privada.
+> - Fail2ban instalado, enabled+active con jail `sshd`, backend systemd, acción UFW, 5 intentos en 10 minutos y bans incrementales de 1 hora a 1 día. La regla pública 8080 sigue ausente.
+> - Actualización completa: 21 paquetes actualizados, 2 nuevos, 0 eliminados y 0 pendientes. Reinicio al kernel `5.15.0-186-generic`; HTTPS estuvo fuera ~56 s y se recuperó solo. El override manual Compose v5.1.0 se movió de `/root/.docker/cli-plugins` al respaldo de la fase, por lo que Docker usa ahora el plugin v5.3.1 administrado por APT.
+> - Validación posterior: SSH, Fail2ban, Docker y `wg-quick@wg0` activos; 0 unidades fallidas; WireGuard con handshake, ruta y ping correctos; DB/backend healthy, frontend arriba, MariaDB viva y HTTPS raíz/health 200. Backend quedó estable en 6 reinicios acumulados por esperas transitorias de MariaDB durante los arranques, sin errores nuevos. Dump y respaldo conservaron checksums. El checkout productivo permanece en `e465c88`; el fix visual `6a13563` continúa pendiente de despliegue separado.
+
 > **Sesión 2026-07-30 — Limpieza segura del VPS sin indisponibilidad.** Producción funcional sin cambio de código; skills `network-engineer` y `handoff-keeper`.
 > - Respaldo previo: dump `/root/pre-cleanup-20260730T044235Z/vpn_manager.sql.gz` con gzip/checksum correcto, restauración real en MariaDB temporal aislada, 47/47 tablas y conteos críticos iguales. La instancia temporal y su volumen se eliminaron al terminar.
 > - Eliminado: volumen huérfano `gestionvpn-10_vpn-data` con SQLite legacy, `.env.production.bak-before-gemini`, certificado supersedido del 2026-07-25, 10 imágenes/tags obsoletos, 3.23 GB de build cache, caché APT y 1.9 GB de journal.
