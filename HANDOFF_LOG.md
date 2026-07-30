@@ -6,6 +6,13 @@
 
 ---
 
+> **Sesión 2026-07-30 — URLs canónicas `/dm/<workspace>/<module>` desplegadas y login diagnosticado.** Producción `e465c88`; commits `c396428`, `2a367d7` y `e465c88`. Skills: `vercel-react-best-practices`, `browser:control-in-app-browser`, `handoff-keeper`.
+> - Vite/Nginx sirven desde `/`; al autenticar, React deriva una URL estable con el slug único del workspace y conserva la autorización server-side. La migración creó slugs para los 3 workspaces existentes, sin faltantes ni duplicados.
+> - `www` queda canónico hacia raíz. `/GestionVPN-1.0/` ahora sirve el shell con `no-cache` para recuperar navegadores que conservaron redirecciones 301 antiguas; una pestaña limpia cargó `/dm/prueba/nodes` y mostró el login.
+> - Verificación: frontend completo 64 archivos/212 pruebas; backend 89/536; routing 10/10; slug 4/4; build Vite, TypeScript, ESLint, `check:all` y Nginx correctos. En producción, raíz, ruta legacy y `/dm` responden 200; frontend/backend/DB con cero reinicios.
+> - Respaldo: `/root/pre-dm-routing-20260730T032852Z`, dump gzip verificado y tags de rollback `gestionvpn-10-{backend,frontend}:pre-c396428-20260730T032852Z`. MariaDB no fue recreada.
+> - Login: la BD conserva usuarios, workspaces y membresías activos. Los intentos devolvieron 401 `BAD_CREDENTIALS`; el mensaje visible es genérico. El admin legacy usa `admin`; usuarios de workspace usan correo. No se cambió ninguna contraseña. Pendiente humano: probar la credencial correcta o autorizar recuperación/reset, además del popup Google.
+
 > **Sesión 2026-07-30 — Dominio propio y HTTPS desplegados.** Producción `c5af6e1`; cambio operativo de DNS/VPS/Firebase, sin cambio de código ni recreación de MariaDB. Skills: `browser:control-in-app-browser`, `handoff-keeper`.
 > - `joinpoint.cloud` y `www.joinpoint.cloud` resuelven al VPS `134.199.212.232`; el dominio temporal se conserva como fallback.
 > - Certificado Let's Encrypt ampliado a los tres nombres, válido hasta 2026-10-28; respaldo previo en `/root/domain-migration-20260730T025213Z`.
