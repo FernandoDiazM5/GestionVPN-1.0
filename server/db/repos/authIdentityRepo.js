@@ -18,7 +18,7 @@ async function findLoginContext({ provider, tenantKey = '', subject }) {
   const rows = await query(
     `SELECT ai.user_id, ai.email_at_link,
             u.email, u.name, u.email_verified, u.disabled_at, u.deleted_at, u.is_platform_admin,
-            wm.workspace_id, wm.role, w.name AS workspace_name
+            wm.workspace_id, wm.role, w.name AS workspace_name, w.slug AS workspace_slug
        FROM auth_identities ai
        JOIN users u ON u.id = ai.user_id
        JOIN workspace_members wm

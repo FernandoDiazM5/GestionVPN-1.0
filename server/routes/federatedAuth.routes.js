@@ -254,6 +254,7 @@ router.post(
         role: context.role,
         workspace_id: context.workspace_id,
         workspace_name: context.workspace_name,
+        workspace_slug: context.workspace_slug,
         platform_admin: platformAdmin,
       },
     });

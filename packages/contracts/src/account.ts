@@ -85,6 +85,8 @@ export interface SessionUser {
   workspace_id: string;
   /** Nombre legible del workspace (para headers de UI). */
   workspace_name?: string;
+  /** Identificador estable y seguro para rutas /dm/<workspace>. */
+  workspace_slug?: string;
   /** Administrador de plataforma (Sistemas) — opera la plataforma. */
   platform_admin?: boolean;
 }

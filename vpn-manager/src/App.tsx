@@ -209,9 +209,8 @@ function SettingsModuleRouter() {
 }
 
 export default function App() {
-  const basename = import.meta.env.BASE_URL.replace(/\/$/, '');
   return (
-    <BrowserRouter basename={basename}>
+    <BrowserRouter>
       <ModuleErrorBoundary resetKey="application">
         <VpnProvider>
           <AppContent />

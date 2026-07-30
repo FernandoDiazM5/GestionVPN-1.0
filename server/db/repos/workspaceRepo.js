@@ -4,6 +4,7 @@
 const crypto = require('crypto');
 const { query } = require('../mysql');
 const scanIpRepo = require('./scanIpRepo');
+const { allocateWorkspaceSlug } = require('../../lib/workspaceSlug');
 const log = require('../../lib/logger').child({ scope: 'workspace-repo' });
 
 /**
@@ -15,10 +16,11 @@ async function createForOwner(tx, { ownerId, name }) {
   const now = Date.now();
   const workspaceId = crypto.randomUUID();
   const memberId = crypto.randomUUID();
+  const slug = await allocateWorkspaceSlug(tx.query, { name, workspaceId });
 
   await tx.query(
-    'INSERT INTO workspaces (id, name, owner_id, created_at, updated_at) VALUES (?,?,?,?,?)',
-    [workspaceId, name, ownerId, now, now]
+    'INSERT INTO workspaces (id, name, slug, owner_id, created_at, updated_at) VALUES (?,?,?,?,?,?)',
+    [workspaceId, name, slug, ownerId, now, now]
   );
   await tx.query(
     `INSERT INTO workspace_members (id, workspace_id, user_id, role, invited_by, created_at)
@@ -45,7 +47,7 @@ async function createForOwner(tx, { ownerId, name }) {
 /** Membresía activa de un usuario (primer workspace). */
 async function findMembershipByUser(userId) {
   const rows = await query(
-    `SELECT wm.workspace_id, wm.role, w.name AS workspace_name
+    `SELECT wm.workspace_id, wm.role, w.name AS workspace_name, w.slug AS workspace_slug
        FROM workspace_members wm
        JOIN workspaces w ON w.id = wm.workspace_id
       WHERE wm.user_id = ? AND wm.deleted_at IS NULL AND w.deleted_at IS NULL
@@ -58,7 +60,7 @@ async function findMembershipByUser(userId) {
 /** Workspace por id (no devuelve los borrados). */
 async function findById(workspaceId) {
   const rows = await query(
-    'SELECT id, name FROM workspaces WHERE id = ? AND deleted_at IS NULL LIMIT 1',
+    'SELECT id, name, slug FROM workspaces WHERE id = ? AND deleted_at IS NULL LIMIT 1',
     [workspaceId]
   );
   return rows[0] || null;

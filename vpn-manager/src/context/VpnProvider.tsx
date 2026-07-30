@@ -20,7 +20,6 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
   // Orquestar todos los hooks
   const auth = useAuth();
   const nodes = useNodeManagement();
-  const navigation = useModuleNavigation(auth.isAuthenticated);
   const theme = useDarkMode();
   const {
     session: restoredWorkspaceSession,
@@ -29,6 +28,11 @@ export function VpnProvider({ children }: { children: React.ReactNode }) {
     refresh: refreshWorkspaceSession,
     clear: clearWorkspaceSession,
   } = useSession({ autoLoad: false });
+  const navigation = useModuleNavigation(
+    auth.isAuthenticated,
+    restoredWorkspaceSession,
+    workspaceSessionLoading,
+  );
   const { handleLoginSuccess: authenticate, setIsReady } = auth;
   const {
     setNodes, setActiveNodeVrf, setTunnelExpiry,

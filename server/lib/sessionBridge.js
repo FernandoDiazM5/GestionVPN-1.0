@@ -75,7 +75,9 @@ async function buildSessionForLegacyUser(username) {
     user: {
       id: user.id, email: user.email, name: user.name,
       role: membership.role, workspace_id: membership.workspace_id,
-      workspace_name: membership.workspace_name, platform_admin,
+      workspace_name: membership.workspace_name,
+      workspace_slug: membership.workspace_slug,
+      platform_admin,
     },
   };
 }
@@ -124,7 +126,9 @@ async function authenticateMysqlUser(login, password) {
     user: {
       id: user.id, email: user.email, name: user.name,
       role: membership.role, workspace_id: membership.workspace_id,
-      workspace_name: membership.workspace_name, platform_admin,
+      workspace_name: membership.workspace_name,
+      workspace_slug: membership.workspace_slug,
+      platform_admin,
     },
   };
 }

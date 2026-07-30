@@ -23,6 +23,7 @@ node db/migrateOtpSendRate.js      # enum/índice para rate limit persistente de
 node db/migrateAuthRateBuckets.js  # buckets atómicos por IP/identidad para autenticación
 node db/migrateAuthSessions.js     # jti revocables para sesiones web
 node db/migrateAuthIdentities.js   # mapping Firebase/externo -> users sin retirar auth local
+node db/migrateWorkspaceSlugs.js   # slug estable y único para rutas /dm/<workspace>
 node db/migrateAirOsAi.js           # acceso, cuota, análisis e historial AirOS con Gemini
 
 # Siembra de usuarios demo (admin/admin + moderador fernando) SOLO si se pide.

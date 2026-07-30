@@ -23,6 +23,7 @@
     "migrate:auth-rate-buckets": "node db/migrateAuthRateBuckets.js",
     "migrate:auth-sessions": "node db/migrateAuthSessions.js",
     "migrate:auth-identities": "node db/migrateAuthIdentities.js",
+    "migrate:workspace-slugs": "node db/migrateWorkspaceSlugs.js",
     "migrate:air-os-ai": "node db/migrateAirOsAi.js",
     "diagnose": "node db/diagnostics.js",
     "check:scanroute": "node db/checkScanRoute.js",

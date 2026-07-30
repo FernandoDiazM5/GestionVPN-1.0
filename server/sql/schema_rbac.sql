@@ -59,11 +59,13 @@ CREATE TABLE IF NOT EXISTS auth_identities (
 CREATE TABLE IF NOT EXISTS workspaces (
   id         CHAR(36)     NOT NULL,
   name       VARCHAR(160) NOT NULL,
+  slug       VARCHAR(80)  CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
   owner_id   CHAR(36)     NOT NULL,
   created_at BIGINT       NOT NULL,
   updated_at BIGINT       NOT NULL,
   deleted_at BIGINT       DEFAULT NULL,
   PRIMARY KEY (id),
+  UNIQUE KEY uq_workspaces_slug (slug),
   KEY idx_ws_owner (owner_id),
   CONSTRAINT fk_ws_owner FOREIGN KEY (owner_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

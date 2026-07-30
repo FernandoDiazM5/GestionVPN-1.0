@@ -18,7 +18,7 @@ export default defineConfig({
       open: false,
     }),
   ].filter(Boolean),
-  base: '/GestionVPN-1.0/',
+  base: '/',
   resolve: {
     dedupe: ['react', 'react-dom'],
   },

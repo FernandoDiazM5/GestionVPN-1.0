@@ -6,6 +6,14 @@
 
 ---
 
+> **Sesión 2026-07-30 — Dominio propio y HTTPS desplegados.** Producción `c5af6e1`; cambio operativo de DNS/VPS/Firebase, sin cambio de código ni recreación de MariaDB. Skills: `browser:control-in-app-browser`, `handoff-keeper`.
+> - `joinpoint.cloud` y `www.joinpoint.cloud` resuelven al VPS `134.199.212.232`; el dominio temporal se conserva como fallback.
+> - Certificado Let's Encrypt ampliado a los tres nombres, válido hasta 2026-10-28; respaldo previo en `/root/domain-migration-20260730T025213Z`.
+> - `APP_BASE_URL` quedó canónico en `https://joinpoint.cloud/GestionVPN-1.0/`; CORS admite raíz, `www`, dominio temporal e IP. Firebase `vpn-noc` autoriza los dos dominios nuevos.
+> - Renovación automática corregida para el autenticador `standalone` mediante hooks pre/deploy/post; `certbot renew --dry-run` terminó correctamente.
+> - Verificación externa: TLS sin excepción, redirecciones raíz, HTML 200/no-cache, API health, CORS permitido/rechazado, SSE protegido 401 y fallback HTTPS. Navegador real cargó el login y Google sin errores de consola.
+> - Servicios: frontend/backend/DB activos; backend y DB healthy. RouterOS quedó `stale` por frescura de escritura, condición operativa conocida. Pendiente humano: login local real y popup Google desde el dominio nuevo.
+
 > **Sesión 2026-07-29 — Mejoras CPE desplegadas en producción.** Rama y código funcional de producción `7e848c1`; despliegue frontend autorizado y completado. Skill: `handoff-keeper`.
 > - El VPS avanzó desde checkout `9e00f02` hasta `7e848c1`; se reconstruyó y recreó exclusivamente `vpn-frontend`.
 > - Se despliegan la geometría corregida, retiro de “Última IP” y disponibilidad dinámica de CCQ/capacidades airMAX.
