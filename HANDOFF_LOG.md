@@ -6,6 +6,12 @@
 
 ---
 
+> **Sesión 2026-07-29 — Recuperación automática de URLs de workspace obsoletas.** Rama `vps_prod`; commit funcional `6a13563`, pendiente de despliegue. Skills: `vercel-react-best-practices`, `browser:control-in-app-browser`, `handoff-keeper`.
+> - Causa: una URL guardada con un slug anterior o distinto al `workspace_slug` de la sesión se clasificaba como 404 aunque `/nodes` fuera un módulo válido; “Ir a nodos” funcionaba porque obligaba una segunda canonización.
+> - Solución: la URL nunca autoriza. Tras restaurar la sesión, React sustituye el slug por el workspace autorizado server-side y conserva el módulo; sólo un módulo/ruta desconocidos permanecen en 404.
+> - Verificación: regresión focalizada 11/11, frontend completo 64 archivos/215 pruebas, build Vite, TypeScript, ESLint, `check:all`, inventario de seguridad y `git diff --check`. Sin cambios de API, backend, BD ni datos.
+> - Pendiente: publicar el registro documental, presentar el alcance/rollback y obtener autorización explícita antes de reconstruir únicamente `vpn-frontend`.
+
 > **Sesión 2026-07-30 — URLs canónicas `/dm/<workspace>/<module>` desplegadas y login diagnosticado.** Producción `e465c88`; commits `c396428`, `2a367d7` y `e465c88`. Skills: `vercel-react-best-practices`, `browser:control-in-app-browser`, `handoff-keeper`.
 > - Vite/Nginx sirven desde `/`; al autenticar, React deriva una URL estable con el slug único del workspace y conserva la autorización server-side. La migración creó slugs para los 3 workspaces existentes, sin faltantes ni duplicados.
 > - `www` queda canónico hacia raíz. `/GestionVPN-1.0/` ahora sirve el shell con `no-cache` para recuperar navegadores que conservaron redirecciones 301 antiguas; una pestaña limpia cargó `/dm/prueba/nodes` y mostró el login.
