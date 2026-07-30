@@ -105,10 +105,34 @@ describe('useModuleNavigation', () => {
     expect(await screen.findByLabelText('pathname')).toHaveTextContent('/dm/housenet/nodes');
   });
 
-  it('rechaza un slug que no pertenece a la sesion', () => {
+  it('corrige un slug obsoleto al workspace autorizado y conserva el modulo', async () => {
     render(<MemoryRouter initialEntries={['/dm/otro/nodes']}><Probe /></MemoryRouter>);
-    expect(screen.getByLabelText('not-found')).toHaveTextContent('true');
-    expect(screen.getByLabelText('pathname')).toHaveTextContent('/dm/otro/nodes');
+    expect(screen.getByLabelText('not-found')).toHaveTextContent('false');
+    expect(await screen.findByLabelText('pathname')).toHaveTextContent('/dm/housenet/nodes');
+  });
+
+  it('autocorrige una URL guardada cuando termina de restaurar la sesion', async () => {
+    const { rerender } = render(
+      <MemoryRouter initialEntries={['/dm/soportehousenet/nodes']}>
+        <Probe authenticated={false} session={null} sessionLoading />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByLabelText('not-found')).toHaveTextContent('false');
+    expect(screen.getByLabelText('pathname')).toHaveTextContent('/dm/soportehousenet/nodes');
+
+    rerender(
+      <MemoryRouter>
+        <Probe
+          authenticated
+          session={{ ...SESSION, workspace_slug: 'soporte-housenet' }}
+          sessionLoading={false}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByLabelText('not-found')).toHaveTextContent('false');
+    expect(await screen.findByLabelText('pathname')).toHaveTextContent('/dm/soporte-housenet/nodes');
   });
 
   it('no decide la ruta hasta recuperar la sesion', () => {

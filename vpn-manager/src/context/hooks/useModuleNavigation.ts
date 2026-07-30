@@ -85,18 +85,19 @@ export function useModuleNavigation(
   const parsed = useMemo(() => parseRoute(location.pathname), [location.pathname]);
   const activeModule = parsed.module ?? storedModule();
   const workspaceSlug = session?.workspace_slug;
-  const wrongWorkspace = parsed.kind === 'workspace'
-    && !!workspaceSlug
-    && parsed.slug !== workspaceSlug;
   const isNotFound = authenticated
     && !sessionLoading
-    && (!!session && (parsed.kind === 'unknown' || wrongWorkspace));
+    && !!session
+    && parsed.kind === 'unknown';
 
   useEffect(() => {
     if (!authenticated || sessionLoading || !session || !workspaceSlug || isNotFound) return;
 
     try { localStorage.setItem(LS_ACTIVE_MODULE, activeModule); } catch { /* storage opcional */ }
 
+    // El slug de la URL es solo navegacion, nunca una fuente de autorizacion.
+    // Una URL guardada con un slug anterior se autocorrige al workspace que
+    // el servidor ya autorizo en la sesion, conservando el modulo solicitado.
     const canonicalPath = modulePath(activeModule, workspaceSlug);
     if (location.pathname !== canonicalPath) {
       navigate({ pathname: canonicalPath, search: location.search }, { replace: true });
