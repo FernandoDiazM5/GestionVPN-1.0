@@ -6,6 +6,13 @@
 
 ---
 
+> **Sesión 2026-07-30 — Limpieza segura del VPS sin indisponibilidad.** Producción funcional sin cambio de código; skills `network-engineer` y `handoff-keeper`.
+> - Respaldo previo: dump `/root/pre-cleanup-20260730T044235Z/vpn_manager.sql.gz` con gzip/checksum correcto, restauración real en MariaDB temporal aislada, 47/47 tablas y conteos críticos iguales. La instancia temporal y su volumen se eliminaron al terminar.
+> - Eliminado: volumen huérfano `gestionvpn-10_vpn-data` con SQLite legacy, `.env.production.bak-before-gemini`, certificado supersedido del 2026-07-25, 10 imágenes/tags obsoletos, 3.23 GB de build cache, caché APT y 1.9 GB de journal.
+> - Conservado: imágenes actuales; frontend/backend `pre-c396428-20260730T032852Z`; respaldos recientes de dominio/rutas y dump nuevo. Los 3.141 GB que Docker marca aún como reclamables corresponden principalmente al rollback deliberadamente retenido.
+> - Red: retiradas las reglas públicas `8080/tcp` IPv4/IPv6; no existía listener. UFW conserva SSH limitado, HTTP/HTTPS y el allow/deny de backend 3001. Verificado desde fuera: 8080 cerrado, SSH correcto y web/health 200.
+> - Resultado: raíz 77%→47% (19 GB→12 GB), journal 496 MB, build cache 0. Frontend/backend/DB sin recrear ni reiniciar, mismos image IDs, restart count 0 y MariaDB viva. Sin despliegue del fix visual pendiente.
+
 > **Sesión 2026-07-29 — Recuperación automática de URLs de workspace obsoletas.** Rama `vps_prod`; commit funcional `6a13563`, pendiente de despliegue. Skills: `vercel-react-best-practices`, `browser:control-in-app-browser`, `handoff-keeper`.
 > - Causa: una URL guardada con un slug anterior o distinto al `workspace_slug` de la sesión se clasificaba como 404 aunque `/nodes` fuera un módulo válido; “Ir a nodos” funcionaba porque obligaba una segunda canonización.
 > - Solución: la URL nunca autoriza. Tras restaurar la sesión, React sustituye el slug por el workspace autorizado server-side y conserva el módulo; sólo un módulo/ruta desconocidos permanecen en 404.
