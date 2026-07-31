@@ -25,6 +25,7 @@
     "migrate:auth-identities": "node db/migrateAuthIdentities.js",
     "migrate:workspace-slugs": "node db/migrateWorkspaceSlugs.js",
     "migrate:air-os-ai": "node db/migrateAirOsAi.js",
+    "migrate:platform-security": "node db/migratePlatformSecurity.js",
     "diagnose": "node db/diagnostics.js",
     "check:scanroute": "node db/checkScanRoute.js",
     "sync:wg0": "node db/syncWg0.js",

@@ -6,10 +6,10 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 
 ## Resumen
 
-- Rutas detectadas: 148
-- Rutas de mutación (POST/PUT/PATCH): 98
-- Rutas que consumen `req.body`: 76
-- Rutas con esquema de `req.body` detectable: 76/76
+- Rutas detectadas: 156
+- Rutas de mutación (POST/PUT/PATCH): 102
+- Rutas que consumen `req.body`: 81
+- Rutas con esquema de `req.body` detectable: 81/81
 - Endpoints públicos de identidad sin rate limiting detectable: 0
 
 ## Alertas detectadas
@@ -83,6 +83,14 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `routes/admin.routes.js` | 416 | POST | `/invite-moderator` | sí | platform-admin | no | sí | — | — |
 | `routes/admin.routes.js` | 483 | GET | `/invitations` | sí | platform-admin | no | n/a | — | — |
 | `routes/admin.routes.js` | 498 | POST | `/invitations/:id/link` | sí | platform-admin | no | n/a | network-admin | — |
+| `routes/adminSecurity.routes.js` | 40 | POST | `/step-up` | sí | platform-admin | no | sí | — | — |
+| `routes/adminSecurity.routes.js` | 95 | GET | `/status` | sí | platform-admin | no | n/a | network-admin | — |
+| `routes/adminSecurity.routes.js` | 117 | GET | `/history` | sí | platform-admin | no | n/a | — | — |
+| `routes/adminSecurity.routes.js` | 119 | GET | `/attempts` | sí | platform-admin | no | n/a | — | — |
+| `routes/adminSecurity.routes.js` | 122 | POST | `/ban` | sí | platform-admin | no | sí | — | — |
+| `routes/adminSecurity.routes.js` | 127 | POST | `/unban` | sí | platform-admin | no | sí | — | — |
+| `routes/adminSecurity.routes.js` | 131 | POST | `/trust` | sí | platform-admin | no | sí | — | — |
+| `routes/adminSecurity.routes.js` | 145 | DELETE | `/trust` | sí | platform-admin | no | sí | — | — |
 | `routes/ai.routes.js` | 56 | GET | `/status` | sí | — | no | n/a | — | — |
 | `routes/ai.routes.js` | 80 | POST | `/consent` | sí | — | no | sí | — | — |
 | `routes/ai.routes.js` | 86 | POST | `/device-analysis` | sí | — | no | sí | — | — |

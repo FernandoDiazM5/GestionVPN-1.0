@@ -1,0 +1,22 @@
+[Unit]
+Description=Agente mínimo de seguridad de GestionVPN
+After=network.target fail2ban.service
+Requires=fail2ban.service
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/gestionvpn/security-agent.env
+ExecStart=/usr/bin/python3 /usr/local/lib/gestionvpn/security-agent.py
+User=root
+Group=root
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/etc/fail2ban/jail.d /run/fail2ban
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

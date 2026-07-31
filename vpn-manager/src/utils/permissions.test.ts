@@ -53,9 +53,9 @@ describe('visibleModules', () => {
     expect(visibleModules(undefined)).toEqual(['nodes']);
   });
 
-  it('platform_admin: dashboard + moderators + settings (sin equipo/nodos)', () => {
+  it('platform_admin: dashboard + moderators + seguridad + settings (sin equipo/nodos)', () => {
     const mods = visibleModules(u({ platform_admin: true }));
-    expect(mods).toEqual(['dashboard', 'moderators', 'settings']);
+    expect(mods).toEqual(['dashboard', 'moderators', 'security', 'settings']);
     expect(mods).not.toContain('users');
     expect(mods).not.toContain('team');
   });
@@ -93,6 +93,11 @@ describe('canSeeModule', () => {
 
   it('platform_admin SÍ ve "moderators"', () => {
     expect(canSeeModule(u({ platform_admin: true }), 'moderators')).toBe(true);
+  });
+
+  it('solo platform_admin ve "security"', () => {
+    expect(canSeeModule(u({ platform_admin: true }), 'security')).toBe(true);
+    expect(canSeeModule(u({ role: 'OWNER' }), 'security')).toBe(false);
   });
 });
 

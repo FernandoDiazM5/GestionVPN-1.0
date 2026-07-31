@@ -10,13 +10,13 @@ const OUTPUT_FILE = path.join(REPO_ROOT, 'docs', 'security', 'ROUTE_SECURITY_INV
 const GLOBALLY_AUTHENTICATED_FILES = [
   /^ap\.routes\.js$/,
   /^routes\/(?:ai|dashboard|device|diagnostics|settings|wireguard)\.routes\.js$/,
-  /^routes\/(?:admin|coreServer)\.routes\.js$/,
+  /^routes\/(?:admin|adminSecurity|coreServer)\.routes\.js$/,
   /^routes\/core\//,
   /^routes\/nodes\//,
 ];
 
 const GLOBAL_ROLES = [
-  { pattern: /^routes\/(?:admin|coreServer)\.routes\.js$/, role: 'platform-admin' },
+  { pattern: /^routes\/(?:admin|adminSecurity|coreServer)\.routes\.js$/, role: 'platform-admin' },
 ];
 
 const IDENTITY_ENDPOINTS = /\/(?:login|setup|register|verify|resend|password-reset)(?:\/|$)/;

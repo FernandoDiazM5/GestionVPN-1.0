@@ -212,6 +212,7 @@ app.use('/api/team', teamRoutes);          // Fase 3: invitaciones y roles (RBAC
 app.use('/api/audit', auditRoutes);        // Fase 3: auditoría de túneles
 app.use('/api/events', eventsRoutes);      // Fase 4: SSE tiempo real (por workspace)
 app.use('/api/admin', adminRoutes);        // Roles v2: Administrador de plataforma
+app.use('/api/admin/security', require('./routes/adminSecurity.routes'));
 app.use('/api/workspace', workspaceRoutes); // Fase C: ajustes + import/export del workspace
 app.use('/api/error-reports', errorReportsRoutes); // errores del SPA -> correo del administrador
 

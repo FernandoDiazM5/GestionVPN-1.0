@@ -58,3 +58,38 @@ export interface AdminSummary {
   miembros: number;
   acciones_24h: number;
 }
+export const SecurityReasonCategorySchema = z.enum([
+  'FALSE_POSITIVE', 'ADMIN_ACCESS', 'MAINTENANCE', 'SECURITY_TEST', 'OTHER',
+]);
+export const SecurityDurationSchema = z.enum(['15m', '1h', '6h', '24h', '7d', 'indefinite']);
+const SecurityTargetSchema = z.string().trim().min(3).max(64).refine((value) => {
+  const bare = value.split('/')[0];
+  const family = z.ipv4().safeParse(bare).success ? 4 : z.ipv6().safeParse(bare).success ? 6 : 0;
+  if (!family) return false;
+  if (!value.includes('/')) return true;
+  const prefix = Number(value.split('/')[1]);
+  return Number.isInteger(prefix) && (family === 4 ? prefix >= 24 && prefix <= 32 : prefix >= 64 && prefix <= 128);
+}, 'IP/CIDR inválido o demasiado amplio');
+const SecurityReasonSchema = z.string().trim().min(10).max(500);
+
+export const SecurityStepUpRequestSchema = z.object({
+  password: z.string().max(1024).optional(),
+  firebaseIdToken: z.string().max(8192).optional(),
+}).strict().refine((value) => Boolean(value.password) !== Boolean(value.firebaseIdToken),
+  'Envía contraseña o confirmación de Google');
+
+export const SecurityMutationSchema = z.object({
+  target: SecurityTargetSchema,
+  jail: z.string().trim().regex(/^[a-zA-Z0-9_-]{1,64}$/).optional(),
+  duration: SecurityDurationSchema.optional(),
+  category: SecurityReasonCategorySchema,
+  reason: SecurityReasonSchema,
+  stepUpToken: z.string().trim().min(32).max(256),
+  confirmIndefinite: z.boolean().optional(),
+  confirmNetworkTrust: z.boolean().optional(),
+}).strict();
+
+export const SecurityHistoryQuerySchema = z.object({
+  target: SecurityTargetSchema.optional(),
+  limit: z.coerce.number().int().min(1).max(500).default(100),
+}).strict();

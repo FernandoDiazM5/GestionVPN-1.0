@@ -25,6 +25,7 @@ node db/migrateAuthSessions.js     # jti revocables para sesiones web
 node db/migrateAuthIdentities.js   # mapping Firebase/externo -> users sin retirar auth local
 node db/migrateWorkspaceSlugs.js   # slug estable y único para rutas /dm/<workspace>
 node db/migrateAirOsAi.js           # acceso, cuota, análisis e historial AirOS con Gemini
+node db/migratePlatformSecurity.js  # auditoría, confianza y step-up del Administrador
 
 # Siembra de usuarios demo (admin/admin + moderador fernando) SOLO si se pide.
 # En producción se deja apagada → BD sin usuarios → el panel muestra el

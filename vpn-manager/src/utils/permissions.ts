@@ -11,7 +11,7 @@ export const isModerator = (role?: Role) => role === 'OWNER';
 /** Administrador de plataforma (Sistemas). */
 export const isPlatformAdmin = (s?: SessionUser | null) => !!s?.platform_admin;
 
-export type ModuleId = 'dashboard' | 'moderators' | 'nodes' | 'devices' | 'users' | 'team' | 'monitor' | 'settings';
+export type ModuleId = 'dashboard' | 'moderators' | 'security' | 'nodes' | 'devices' | 'users' | 'team' | 'monitor' | 'settings';
 
 /**
  * Módulos visibles según la sesión (RBAC + plataforma).
@@ -26,7 +26,7 @@ export function visibleModules(s?: SessionUser | null): ModuleId[] {
   // Administrador (Sistemas): operador de plataforma. Dashboard + Moderadores +
   // Ajustes (única vista que configura el router core compartido).
   if (s.platform_admin) {
-    return ['dashboard', 'moderators', 'settings'];
+    return ['dashboard', 'moderators', 'security', 'settings'];
   }
   // MEMBER: nodos + equipo + ajustes (perfil + vincular Telegram).
   // El ModeratorSettingsModule filtra tabs según el rol — el MEMBER solo

@@ -29,6 +29,8 @@ const POLICIES = Object.freeze({
   FEDERATED_EXCHANGE: { windowMs: FIFTEEN_MINUTES, blockMs: FIFTEEN_MINUTES, ip: 20 },
   // Vincular/desvincular exige sesión local; limita intentos contra Google y el mapping.
   FEDERATED_LINK: { windowMs: FIFTEEN_MINUTES, blockMs: FIFTEEN_MINUTES, ip: 10 },
+  // Una sesión ya autenticada no debe poder probar contraseñas de administrador sin límite.
+  SECURITY_STEP_UP: { windowMs: FIFTEEN_MINUTES, blockMs: FIFTEEN_MINUTES, ip: 10 },
 });
 
 function rateHmacKey() {

@@ -21,6 +21,7 @@ const { loadCoreMikrotik } = require('./coreMikrotikSettings');
 const { analysisRetentionDays, snapshotRetentionDays } = require('./ai/aiRetention');
 const authSessionRepo = require('../db/repos/authSessionRepo');
 const tunnelService = require('./tunnelService');
+const platformSecurityRepo = require('../db/repos/platformSecurityRepo');
 
 // Retención de la "Actividad reciente": guarda como MÁXIMO los últimos N días
 // (default 7) → purga rodante que va quitando el día más viejo. Se ejecuta como
@@ -30,6 +31,15 @@ const RETENTION_DAYS = Math.max(1, Number(process.env.AUDIT_RETENTION_DAYS || 7)
 const PURGE_THROTTLE_MS = Number(process.env.AUDIT_PURGE_THROTTLE_MS || 60 * 60 * 1000); // 1h
 let _lastPurge = 0;
 let _lastAiPurge = 0;
+let _lastSecurityPurge = 0;
+
+async function purgeOldSecurityAudit() {
+  if (Date.now() - _lastSecurityPurge < PURGE_THROTTLE_MS) return;
+  _lastSecurityPurge = Date.now();
+  await platformSecurityRepo.purgeOlderThan(Date.now() - 365 * 86400000).catch(error => {
+    log.warn({ code: error?.code || 'UNKNOWN' }, 'seguridad VPS: purga de auditoría falló (best-effort)');
+  });
+}
 
 async function purgeOldAudit() {
   if (Date.now() - _lastPurge < PURGE_THROTTLE_MS) return;
@@ -74,6 +84,7 @@ async function runOnce() {
     // Retención de auditoría (throttle interno 1×/hora). Antes del early-return de
     // abajo para que corra aunque no haya sesiones expiradas este tick.
     await purgeOldAudit();
+    await purgeOldSecurityAudit();
     await purgeOldAiData();
     await authSessionRepo.purgeExpired().catch(error => {
       log.warn({ code: error?.code || 'UNKNOWN' }, 'sesiones web: purga falló (best-effort)');

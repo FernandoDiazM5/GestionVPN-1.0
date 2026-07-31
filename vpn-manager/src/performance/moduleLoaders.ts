@@ -10,6 +10,7 @@ type ModuleLoaderKey = Exclude<ModuleId, 'settings' | 'users'>
 export const moduleLoaders: Record<ModuleLoaderKey, Loader> = {
   dashboard: () => import('../components/Admin/AdminDashboard/AdminDashboard'),
   moderators: () => import('../components/Admin/ModeratorsModule/ModeratorsModule'),
+  security: () => import('../components/Admin/SecurityModule/SecurityModule'),
   nodes: () => import('../components/Devices/NodeAccessPanel'),
   team: () => import('../components/Team/TeamModule'),
   devices: () => import('../components/Devices/NetworkDevicesModule'),

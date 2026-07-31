@@ -4,6 +4,13 @@
 > Aquí solo se **añaden** entradas por sesión (las más nuevas arriba); no se edita lo viejo.
 > Mantenimiento gobernado por la skill `handoff-keeper` (`.claude/skills/handoff-keeper/`).
 
+> **Sesión 2026-07-31 — Módulo Seguridad VPS implementado localmente.** Pendiente de despliegue. Skills: `process-discovery-interviewer`, `network-engineer`, `handoff-keeper`.
+> - Se añadió al perfil `platform_admin` la vista Seguridad con inventario de jails, bloqueos, fechas, vencimientos, intentos SSH, desbloqueo, bloqueo manual y lista confiable permanente.
+> - Reautenticación por contraseña o Google, token de un solo uso/5 minutos y rate limit; categoría y motivo obligatorios.
+> - Agente root local con HMAC, nonce, ventana temporal, allowlist y operaciones tipadas de Fail2ban; el backend mantiene cero acceso a sudo, firewall o socket.
+> - Protecciones: autobloqueo comprobado en API/agente, máximo /24 IPv4 y /64 IPv6 para confianza, confirmación extra de CIDR/indefinido, compensación DB↔Fail2ban, auditoría 365 días y Telegram.
+> - Validación: backend 556/556, frontend 216/216, build, ESLint, agente Python, contratos e inventario correctos. No desplegado.
+
 > **Sesión 2026-07-31 — Autosync remoto desplegado en producción.** Rama `vps_prod`; producción `69c368f`. Skills: `network-engineer`, `handoff-keeper`.
 > - Preflight en `e465c88`; respaldo verificado `/root/pre-network-sync-20260731T172817Z` y rollback de imagen `gestionvpn-10-backend:pre-69c368f-20260731T172817Z`.
 > - Checkout avanzado con `fetch + reset --hard origin/vps_prod`; se reconstruyó/recreó sólo backend. Frontend y DB permanecieron intactos.

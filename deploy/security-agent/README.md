@@ -1,0 +1,26 @@
+# Agente de seguridad del VPS
+
+Expone únicamente en `127.0.0.1:8788` operaciones tipadas sobre Fail2ban. No
+acepta comandos shell enviados por el backend. Cada solicitud usa timestamp,
+nonce y firma HMAC. El secreto vive fuera de Git y debe coincidir en el agente y
+`server/.env.production`.
+
+Instalación (requiere autorización separada de producción):
+
+```bash
+install -d -m 0755 /usr/local/lib/gestionvpn /etc/gestionvpn
+install -m 0755 deploy/security-agent/security-agent.py /usr/local/lib/gestionvpn/
+install -m 0644 deploy/security-agent/gestionvpn-security-agent.service /etc/systemd/system/
+install -m 0600 deploy/security-agent/gestionvpn-manual-jails.conf /etc/fail2ban/jail.d/
+openssl rand -hex 32 > /etc/gestionvpn/security-agent.secret
+chmod 600 /etc/gestionvpn/security-agent.secret
+# Crear /etc/gestionvpn/security-agent.env con SECURITY_AGENT_SECRET y
+# SECURITY_AGENT_PROTECTED_IPS (IP pública VPS y otras direcciones críticas).
+# Copiar el mismo secreto a SECURITY_AGENT_SECRET en server/.env.production;
+# nunca guardar el valor real en Git.
+fail2ban-client reload
+systemctl daemon-reload
+systemctl enable --now gestionvpn-security-agent
+```
+
+Nunca probar un bloqueo inicialmente con la IP de la sesión SSH administrativa.

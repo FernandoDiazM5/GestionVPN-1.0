@@ -26,6 +26,7 @@ import ScopedQueryProvider from './query/ScopedQueryProvider';
 const RouterAccess              = lazy(() => import('./components/Auth/RouterAccess'));
 const AdminDashboard            = lazy(moduleLoaders.dashboard);
 const ModeratorsModule          = lazy(moduleLoaders.moderators);
+const SecurityModule            = lazy(moduleLoaders.security);
 const NodeAccessPanel           = lazy(moduleLoaders.nodes);
 // UserManagementPanel ya no es un módulo independiente: el TeamModule lo
 // monta como sub-tab "Usuarios VPN" dentro del módulo Workspace.
@@ -188,6 +189,7 @@ function ModuleRouter() {
         <ModuleRenderMetric moduleId={activeModule as ModuleId} />
         {activeModule === 'dashboard'   && <AdminDashboard />}
         {activeModule === 'moderators'  && <ModeratorsModule />}
+        {activeModule === 'security'    && <SecurityModule />}
         {activeModule === 'nodes'       && <NodeAccessPanel />}
         {activeModule === 'team'        && <TeamModule />}
         {activeModule === 'devices'     && <NetworkDevicesModule />}

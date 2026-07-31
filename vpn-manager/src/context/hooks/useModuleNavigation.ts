@@ -3,11 +3,12 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import type { SessionUser } from '../../types/account';
 import { LS_ACTIVE_MODULE } from '../constants';
 
-export type ActiveModule = 'dashboard' | 'moderators' | 'nodes' | 'users' | 'team' | 'devices' | 'monitor' | 'settings';
+export type ActiveModule = 'dashboard' | 'moderators' | 'security' | 'nodes' | 'users' | 'team' | 'devices' | 'monitor' | 'settings';
 
 const MODULE_SEGMENTS: Record<ActiveModule, string> = {
   dashboard: 'dashboard',
   moderators: 'moderators',
+  security: 'security',
   nodes: 'nodes',
   users: 'team',
   team: 'team',
@@ -19,6 +20,7 @@ const MODULE_SEGMENTS: Record<ActiveModule, string> = {
 const SEGMENT_MODULES = new Map<string, ActiveModule>([
   ['dashboard', 'dashboard'],
   ['moderators', 'moderators'],
+  ['security', 'security'],
   ['nodes', 'nodes'],
   ['users', 'team'],
   ['team', 'team'],

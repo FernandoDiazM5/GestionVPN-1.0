@@ -108,6 +108,10 @@ async function withGoogleIdToken<T>(operation: (idToken: string) => Promise<T>):
   }
 }
 
+export async function confirmGoogleIdentity(): Promise<string> {
+  return withGoogleIdToken(async (idToken) => idToken);
+}
+
 export async function signInWithGoogle(): Promise<SessionUser> {
   try {
     return await withGoogleIdToken(async (idToken) => {
