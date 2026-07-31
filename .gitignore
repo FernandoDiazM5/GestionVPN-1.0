@@ -66,3 +66,7 @@ playwright/.cache/
 # Coverage de Vitest
 coverage/
 **/coverage/
+
+# Artefactos compilados de Python
+__pycache__/
+*.py[cod]
