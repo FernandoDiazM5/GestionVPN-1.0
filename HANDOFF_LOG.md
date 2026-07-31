@@ -4,6 +4,13 @@
 > Aquí solo se **añaden** entradas por sesión (las más nuevas arriba); no se edita lo viejo.
 > Mantenimiento gobernado por la skill `handoff-keeper` (`.claude/skills/handoff-keeper/`).
 
+> **Sesión 2026-07-31 — Seguridad VPS desplegada por fases.** Rama `vps_prod`; producción funcional `a5e0358`. Skills: `network-engineer`, `browser`, `handoff-keeper`.
+> - Respaldo `/root/pre-security-admin-20260731T230425Z`: dump gzip/checksum, restauración temporal 47/47 tablas, configuración host y tags de rollback de backend/frontend.
+> - Instalados agente HMAC en localhost y 6 jails manuales; Fail2ban quedó con 7 jails. Canary firmado de estado y rechazo de autobloqueo correctos.
+> - Se detectó que `gestionvpn-sshd.local` sobrescribía el primer archivo de confianza; corregido en `a5e0358` usando `zz-gestionvpn-trusted.local`. La IP administrativa `179.6.169.75` figura en el `ignoreip` efectivo.
+> - Backend/frontend reconstruidos; DB no recreada. Migración completó 50 tablas; 14 nodos, 5 usuarios y 3 workspaces preservados. Backend healthy, frontend/DB activos, 0 reinicios, health `ok` y comunicación backend→agente 7/7.
+> - Bundle Security publicado; endpoint anónimo 401; headers HTTPS correctos. Se limpió exclusivamente build cache: disco 83%→67%. Pendiente: prueba humana autenticada de acciones y Telegram.
+
 > **Sesión 2026-07-31 — Módulo Seguridad VPS implementado localmente.** Pendiente de despliegue. Skills: `process-discovery-interviewer`, `network-engineer`, `handoff-keeper`.
 > - Se añadió al perfil `platform_admin` la vista Seguridad con inventario de jails, bloqueos, fechas, vencimientos, intentos SSH, desbloqueo, bloqueo manual y lista confiable permanente.
 > - Reautenticación por contraseña o Google, token de un solo uso/5 minutos y rate limit; categoría y motivo obligatorios.
