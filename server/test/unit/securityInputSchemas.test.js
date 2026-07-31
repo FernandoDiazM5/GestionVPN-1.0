@@ -103,6 +103,10 @@ describe('security input schemas', () => {
       nodeNumber: 2, nodeName: 'Torre Norte', protocol: 'sstp',
       lanSubnets: ['999.20.0.0/24'],
     }).success).toBe(false);
+    expect(NodeProvisionRequestSchema.safeParse({
+      nodeNumber: 2, nodeName: 'Torre Norte', protocol: 'sstp',
+      lanSubnets: ['0.0.0.0/0'],
+    }).success).toBe(false);
     expect(NodeScanRequestSchema.safeParse({ nodeLan: '10.0.0.0/15' }).success).toBe(false);
   });
 

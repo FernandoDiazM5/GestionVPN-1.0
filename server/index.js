@@ -264,7 +264,9 @@ function startServer(attempt = 1) {
         // §4.27 — re-siembra la intención del wg0 con TODAS las LAN de nodos vivos
         // (recupera las que el hook event-driven pudo perder). Best-effort, no-op
         // fuera del VPS. Así cada deploy/restart re-sincroniza el wg0 sin tocarlo.
-        require('./lib/wg0Reconcile').reconcileOnStartup();
+        const wg0Reconcile = require('./lib/wg0Reconcile');
+        wg0Reconcile.reconcileOnStartup();
+        wg0Reconcile.startPeriodicReconcile();
     });
 
     server.on('error', (err) => {

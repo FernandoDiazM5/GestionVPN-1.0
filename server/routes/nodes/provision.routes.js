@@ -13,7 +13,6 @@ const log = require('../../lib/logger').child({ scope: 'nodes:provision' });
 const {
   connectToMikrotik, safeWrite, getErrorMessage, writeIdempotent,
 } = require('../../routeros.service');
-const { CIDR_REGEX } = require('../../ubiquiti.service');
 const { getDb, encryptPass, saveNode, deleteNode, getAppSetting } = require('../../db.service');
 const { nodeBelongsToRequester, requireOperator } = require('./_shared');
 const { sendOk, AppError, asyncHandler } = require('../../lib/apiResponse');
@@ -27,24 +26,20 @@ const {
 } = require('@gestionvpn/contracts');
 const mgmtNet = require('../../lib/mgmtNet');
 const sse = require('../../lib/sse');
-const { entriesToAdd } = require('../../lib/addressList');
+const { ensureTowerEntries, ensureRoute } = require('../../lib/remoteNetworkSync');
 const scanIpRepo = require('../../db/repos/scanIpRepo');
 const { generateKeyPair } = require('../../lib/wgkeys');
 const { buildCpeWgScript, buildCpeSstpScript } = require('../../lib/cpeScript');
 const { generatePppUser, generatePppPassword } = require('../../lib/sstpCreds');
 const { deprovisionNodeOnRouter } = require('../../lib/nodeDeprovision');
-const fs = require('fs');
-const path = require('path');
-const { appendWg0Intent } = require('../../lib/wg0Sync');
+const { enqueueWg0Intent } = require('../../lib/wg0Intent');
+const { normalizeCidrs } = require('../../lib/ipv4Cidr');
 
 // ── Autosync del wg0 del VPS (event-driven, §4.27 — modelo HARDENED) ──
 // Al provisionar una torre, su LAN debe estar en los AllowedIPs del wg0 del VPS
 // para poder escanearla. El backend (no-root) NO toca el wg0: solo registra la
 // INTENCIÓN en un dir compartido con el host; un watcher del host (root, systemd
 // path) la aplica con `wg syncconf`. Así el backend no gana privilegios.
-const WG0_INTENT_PATH = process.env.WG0_INTENT_PATH || '/wg0sync/allowedips.desired';
-const WG0_AUTOSYNC = process.env.WG0_AUTOSYNC !== 'false';   // on por defecto; off explícito
-
 /**
  * Registra las LAN recién provisionadas en el archivo de intención del wg0.
  * Event-driven y 100% best-effort: corre fuera del ciclo de respuesta
@@ -53,19 +48,7 @@ const WG0_AUTOSYNC = process.env.WG0_AUTOSYNC !== 'false';   // on por defecto; 
  * No-op natural fuera del VPS: si el dir compartido no está montado, no hace nada.
  */
 function autosyncWg0(subnets) {
-  if (!WG0_AUTOSYNC) return;
-  const cidrs = (subnets || []).filter(Boolean);
-  if (cidrs.length === 0) return;
-  setImmediate(() => {
-    try {
-      if (!fs.existsSync(path.dirname(WG0_INTENT_PATH))) return;   // dir no montado (dev)
-      const r = appendWg0Intent(WG0_INTENT_PATH, cidrs);
-      if (r.changed) log.info({ added: r.added }, 'wg0 autosync: intención actualizada (torre nueva) → el watcher del host aplicará');
-      else log.debug({ subnets: cidrs }, 'wg0 autosync: las LAN ya estaban en la intención — sin cambios');
-    } catch (e) {
-      log.warn({ err: e.message }, 'wg0 autosync best-effort falló (no afecta la provisión)');
-    }
-  });
+  enqueueWg0Intent(subnets, 'node-provision');
 }
 
 // Opción C: el /24 del pool de scan-IP del VPS (por defecto 10.11.252.0/24). Cada
@@ -87,18 +70,7 @@ const SCAN_RETURN_SUBNET = (process.env.SCAN_RETURN_SUBNET || scanIpRepo.poolSub
  * @returns {Promise<boolean>} true si la creó, false si ya existía.
  */
 async function addRouteOnce(api, { dst, gateway, routingTable, comment, distance }) {
-  const found = await safeWrite(api, ['/ip/route/print',
-    `?dst-address=${dst}`, `?routing-table=${routingTable}`]).catch(() => []);
-  if ((found || []).some(r =>
-    r['dst-address'] === dst && r['routing-table'] === routingTable && r.dynamic !== 'true'
-  )) return false;
-  const cmd = ['/ip/route/add',
-    `=dst-address=${dst}`, `=gateway=${gateway}`, `=routing-table=${routingTable}`,
-    '=scope=30', '=target-scope=10'];
-  if (distance) cmd.push(`=distance=${distance}`);
-  if (comment) cmd.push(`=comment=${comment}`);
-  await writeIdempotent(api, cmd);
-  return true;
+  return ensureRoute(api, { dst, gateway, routingTable, comment, distance });
 }
 
 /** Añade la ruta de retorno del /24 de scan-IP a un VRF (idempotente, best-effort). */
@@ -135,13 +107,7 @@ async function addMgmtReturnRoutes(api, vrfName, ndComment) {
  * comment). Devuelve las direcciones realmente añadidas.
  */
 async function addTowerEntries(api, addresses, comment) {
-  const existing = await safeWrite(api, ['/ip/firewall/address-list/print']).catch(() => []);
-  const toAdd = entriesToAdd(existing, 'LIST-NET-REMOTE-TOWERS', addresses);
-  for (const addr of toAdd) {
-    await writeIdempotent(api, ['/ip/firewall/address-list/add',
-      '=list=LIST-NET-REMOTE-TOWERS', `=address=${addr}`, `=comment=${comment}`]);
-  }
-  return toAdd;
+  return ensureTowerEntries(api, addresses, comment);
 }
 
 // Calcula la asignación AUTORITATIVA (siguiente ND + IP remota libre) desde el
@@ -178,7 +144,7 @@ async function computeNextAllocation(api) {
 //
 // Seguridad: el VRF y sus rutas SOLO se borran si `vrfCreatedByUs` (no en el
 // merge a un VRF de un nodo SSTP preexistente — ese VRF es ajeno/compartido).
-async function rollbackProvision(creds, { isWG, ifaceName, vrfName, pppUser, allSubnets, vrfCreatedByUs, nameUpper }) {
+async function rollbackProvision(creds, { isWG, ifaceName, vrfName, pppUser, vrfCreatedByUs }) {
   if (!ifaceName || !vrfName) return false;
   let api;
   try {
@@ -210,14 +176,8 @@ async function rollbackProvision(creds, { isWG, ifaceName, vrfName, pppUser, all
       }
     }
 
-    // Address-list: SOLO las entradas que ESTE nodo creó (por comment), NUNCA una
-    // LAN compartida que pertenece a otro nodo. Con el dedup, la entrada de una LAN
-    // compartida la posee quien la añadió primero → borrar por dirección rompería
-    // a ese otro nodo. Por eso se filtra por el comment del nodo en rollback.
-    const ourComments = new Set([`Ruta ${nameUpper}`, `LAN ${nameUpper}`]);
-    for (const a of (await read('/ip/firewall/address-list/print'))
-      .filter(a => a.list === 'LIST-NET-REMOTE-TOWERS' && ourComments.has(a.comment) && a['.id']))
-      await rm('/ip/firewall/address-list/remove', a['.id']);
+    // La lista global es aditiva y puede ser compartida. El rollback nunca la
+    // elimina: una alta concurrente pudo empezar a depender de esa misma red.
 
     // VRF + rutas: SOLO si lo creamos nosotros (nunca en merge a VRF ajeno)
     if (vrfCreatedByUs) {
@@ -255,8 +215,9 @@ router.post('/node/provision', requireOperator, validate({ body: NodeProvisionRe
   const { ip, user, pass } = requireMikrotik(req);
   const { nodeNumber, nodeName, pppUser, pppPassword, lanSubnet, lanSubnets, remoteAddress, protocol, cpePublicKey, wgListenPort, provisionId } = req.body;
   const isWG = protocol === 'wireguard';
-  const allSubnets = Array.isArray(lanSubnets) && lanSubnets.length > 0 ? lanSubnets : [lanSubnet].filter(Boolean);
-  if (allSubnets.length === 0 || !allSubnets.every(s => CIDR_REGEX.test(s)))
+  const requestedSubnets = Array.isArray(lanSubnets) && lanSubnets.length > 0 ? lanSubnets : [lanSubnet].filter(Boolean);
+  const allSubnets = normalizeCidrs(requestedSubnets, { allowHost: false });
+  if (allSubnets.length === 0 || allSubnets.length !== new Set(requestedSubnets.map(String)).size)
     throw new AppError('CIDRs de LAN inválidos', 400, 'VALIDATION_ERROR');
   // La IP remota (SSTP) es server-authoritative: si no llega o es inválida, se
   // recalcula tras conectar. No se exige al cliente (cierra el caso preview obsoleto).

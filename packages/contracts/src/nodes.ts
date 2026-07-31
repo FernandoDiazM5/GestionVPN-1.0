@@ -9,7 +9,10 @@ import {
   boundedText,
 } from './network';
 
-const CidrV4Schema = z.cidrv4({ message: 'CIDR IPv4 inválido' });
+const CidrV4Schema = z.cidrv4({ message: 'CIDR IPv4 inválido' }).refine(
+  (value) => Number(value.split('/')[1]) > 0,
+  'La ruta por defecto 0.0.0.0/0 no está permitida',
+);
 const LanSubnetsSchema = z.array(CidrV4Schema).max(32, 'Máximo 32 subredes');
 const NodeNameSchema = boundedText(100, { allowEmpty: false }).refine(
   (value) => value.toUpperCase().replace(/[^A-Z0-9]/g, '').length >= 2,

@@ -12,7 +12,7 @@ const router = express.Router();
 
 const log = require('../../lib/logger').child({ scope: 'nodes:editing' });
 const {
-  connectToMikrotik, safeWrite, getErrorMessage, writeIdempotent,
+  connectToMikrotik, safeWrite, getErrorMessage,
 } = require('../../routeros.service');
 const { IPV4_REGEX } = require('../../ubiquiti.service');
 const { getDb, saveNode, deleteNode } = require('../../db.service');
@@ -21,6 +21,9 @@ const { sendOk, AppError, asyncHandler } = require('../../lib/apiResponse');
 const { requireMikrotik } = require('../../lib/routeGuards');
 const { validate } = require('../../middleware/validate');
 const { NodeEditRequestSchema, NodeLabelRequestSchema } = require('@gestionvpn/contracts');
+const { normalizeCidrs } = require('../../lib/ipv4Cidr');
+const { ensureTowerEntries, ensureRoute, removeRoutesForVrf } = require('../../lib/remoteNetworkSync');
+const { enqueueWg0Intent } = require('../../lib/wg0Intent');
 
 router.post('/node/edit', requireOperator, validate({ body: NodeEditRequestSchema }), asyncHandler(async (req, res) => {
   const { ip, user, pass } = requireMikrotik(req);
@@ -29,6 +32,20 @@ router.post('/node/edit', requireOperator, validate({ body: NodeEditRequestSchem
   if (!(await nodeBelongsToRequester(req, pppUser))) {
     throw new AppError('Nodo no encontrado en tu workspace', 404, 'NOT_FOUND');
   }
+  const db = await getDb();
+  const nodeRow = await db.get('SELECT * FROM nodes WHERE ppp_user = ?', [pppUser]);
+  if (!nodeRow) throw new AppError('Nodo no encontrado', 404, 'NOT_FOUND');
+  let storedSubnets = [];
+  try {
+    const parsed = JSON.parse(nodeRow.lan_subnets || '[]');
+    if (Array.isArray(parsed)) storedSubnets = parsed;
+  } catch (error) {
+    log.warn({ pppUser, err: error.message }, 'lan_subnets malformado; se usará segmento_lan');
+  }
+  if (storedSubnets.length === 0 && nodeRow.segmento_lan) storedSubnets = [nodeRow.segmento_lan];
+  const currentSubnets = normalizeCidrs(storedSubnets, { allowHost: false });
+  const normalizedAdds = normalizeCidrs(addSubnets, { allowHost: false });
+  const normalizedRemovals = normalizeCidrs(removeSubnets, { allowHost: false });
   const isWG = pppUser.startsWith('WG-ND') || pppUser.startsWith('VPN-WG-');
   const hasVrf = !!vrfName;
   const ifaceName = isWG ? pppUser : (hasVrf ? vrfName.replace(/^VRF-/, 'VPN-SSTP-') : '');
@@ -91,42 +108,29 @@ router.post('/node/edit', requireOperator, validate({ body: NodeEditRequestSchem
     }
 
     // Eliminar subnets
-    if (Array.isArray(removeSubnets) && removeSubnets.length > 0 && hasVrf) {
-      // SECUENCIAL — RouterOS no soporta comandos paralelos en la misma conexión
-      const addrList = await safeWrite(api, ['/ip/firewall/address-list/print']);
-      const routes   = await safeWrite(api, ['/ip/route/print']);
-      for (const subnet of removeSubnets) {
-        const entry = addrList.find(a => a.list === 'LIST-NET-REMOTE-TOWERS' && a.address === subnet);
-        if (entry) await safeWrite(api, ['/ip/firewall/address-list/remove', `=.id=${entry['.id']}`]);
-        const route = routes.find(r => r['routing-table'] === vrfName && r['dst-address'] === subnet);
-        if (route) await safeWrite(api, ['/ip/route/remove', `=.id=${route['.id']}`]);
+    if (normalizedRemovals.length > 0 && hasVrf) {
+      await removeRoutesForVrf(api, vrfName, normalizedRemovals);
+      for (const subnet of normalizedRemovals) {
         steps.push({ step: 'rm', obj: 'Eliminar subred', name: subnet, status: 'ok' });
       }
     }
 
     // Agregar subnets
-    if (Array.isArray(addSubnets) && addSubnets.length > 0 && hasVrf) {
-      for (const subnet of addSubnets) {
-        await writeIdempotent(api, ['/ip/firewall/address-list/add',
-          '=list=LIST-NET-REMOTE-TOWERS', `=address=${subnet}`, `=comment=LAN ${nameUpper}`]);
-        await writeIdempotent(api, ['/ip/route/add',
-          `=dst-address=${subnet}`, `=gateway=${ifaceName}@${vrfName}`,
-          `=routing-table=${vrfName}`, '=scope=30', '=target-scope=10', `=comment=Route-${ndComment}`]);
+    if (normalizedAdds.length > 0 && hasVrf) {
+      await ensureTowerEntries(api, normalizedAdds, `LAN ${nameUpper}`);
+      for (const subnet of normalizedAdds) {
+        await ensureRoute(api, { dst: subnet, gateway: `${ifaceName}@${vrfName}`,
+          routingTable: vrfName, comment: `Route-${ndComment}` });
         steps.push({ step: 'add', obj: 'Agregar subred', name: subnet, status: 'ok' });
       }
     }
 
     // Para WireGuard, si cambiaron las subredes, hay que actualizar el allowed-address del Peer
     let updatedLanSubnets = null;
-    if (hasVrf && ((Array.isArray(removeSubnets) && removeSubnets.length > 0) || (Array.isArray(addSubnets) && addSubnets.length > 0))) {
-      const db = await getDb();
-      const nodeRow = await db.get('SELECT * FROM nodes WHERE ppp_user = ?', [pppUser]);
-      let currentSubnets = [];
+    if (hasVrf && (normalizedRemovals.length > 0 || normalizedAdds.length > 0)) {
       let wgPeerIp = '';
       let wgPubKey = '';
       if (nodeRow) {
-        // segmento_lan stores the primary subnet; for multi-subnet, read routes from MikroTik
-        currentSubnets = nodeRow.segmento_lan ? [nodeRow.segmento_lan] : [];
         if (nodeRow.ip_tunnel) {
           // Modelo unificado: ip_tunnel = IP única del nodo → /32 directo.
           // Compat: legacy /30 en 10.10.251.x → deriva el .X+2 del bloque.
@@ -140,8 +144,8 @@ router.post('/node/edit', requireOperator, validate({ body: NodeEditRequestSchem
 
       // Computar nueva lista de subredes
       const newSubnets = new Set(currentSubnets);
-      (removeSubnets || []).forEach(s => newSubnets.delete(s));
-      (addSubnets || []).forEach(s => newSubnets.add(s));
+      normalizedRemovals.forEach(s => newSubnets.delete(s));
+      normalizedAdds.forEach(s => newSubnets.add(s));
       updatedLanSubnets = Array.from(newSubnets);
 
       // Actualizar el peer de WireGuard si existe en MikroTik
@@ -177,9 +181,14 @@ router.post('/node/edit', requireOperator, validate({ body: NodeEditRequestSchem
         await deleteNode(pppUser);
       }
       await saveNode(updates);
+      if (updatedLanSubnets !== null) enqueueWg0Intent(updatedLanSubnets, 'node-edit');
       log.debug({ pppUser: effectiveUser }, 'DB: nodo actualizado en MySQL');
     } catch (dbErr) {
       log.error({ err: dbErr.message }, 'DB: actualizar nodo en MySQL');
+      throw new AppError(
+        'El router cambió, pero no se pudo guardar el nodo. La reconciliación requiere atención.',
+        500, 'NODE_EDIT_PARTIAL_FAILURE', { steps, retryable: true }
+      );
     }
 
     return sendOk(res, { message: 'Nodo actualizado correctamente', steps });

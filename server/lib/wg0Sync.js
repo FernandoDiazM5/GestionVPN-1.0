@@ -20,14 +20,21 @@
 // ============================================================
 const fs = require('fs');
 const { execFileSync } = require('child_process');
+const path = require('path');
+const { normalizeCidr, normalizeCidrs, isCidr } = require('./ipv4Cidr');
 
-const isCidr = (s) => /^\d{1,3}(\.\d{1,3}){3}\/\d{1,2}$/.test(String(s || '').trim());
 // Normaliza una IP suelta a /32; deja los CIDR como están.
-const toCidr = (s) => {
-  const v = String(s || '').trim();
-  if (!v) return '';
-  return v.includes('/') ? v : `${v}/32`;
-};
+const toCidr = (s) => normalizeCidr(s, { allowHost: true }) || '';
+
+function atomicWrite(filePath, content) {
+  const tmp = path.join(path.dirname(filePath), `.${path.basename(filePath)}.${process.pid}.tmp`);
+  try {
+    fs.writeFileSync(tmp, content, { mode: 0o600 });
+    fs.renameSync(tmp, filePath);
+  } finally {
+    try { fs.unlinkSync(tmp); } catch { /* already renamed or never created */ }
+  }
+}
 
 /**
  * Parsea un wg0.conf en sus secciones. Recoge los CIDR de [Interface].Address y
@@ -102,7 +109,7 @@ function reloadWg(iface, confPath) {
  */
 function ensureAllowedIps(confPath, cidrs, opts = {}) {
   const { iface = 'wg0', apply = true, reload = true } = opts;
-  const want = [...new Set((cidrs || []).map(toCidr).filter(isCidr))];
+  const want = normalizeCidrs(cidrs, { allowHost: true });
   const text = fs.readFileSync(confPath, 'utf8');
   const parsed = parseWg0Conf(text);
   const have = new Set(parsed.peerAllowed);
@@ -137,7 +144,7 @@ function ensureAllowedIps(confPath, cidrs, opts = {}) {
   }
   // Si el [Peer] no tenía línea AllowedIPs, añádela al final (caso borde).
   if (!wrote) out.push(`AllowedIPs = ${finalAllowed.join(', ')}`);
-  fs.writeFileSync(confPath, out.join('\n'));
+  atomicWrite(confPath, out.join('\n'));
 
   const reloaded = reload ? reloadWg(iface, confPath) : false;
   return { changed: true, added: missing, allowed: finalAllowed, applied: true, reloaded };
@@ -157,7 +164,7 @@ function ensureAllowedIps(confPath, cidrs, opts = {}) {
  * @returns {{changed:boolean, added:string[], all:string[]}}
  */
 function appendWg0Intent(intentPath, cidrs) {
-  const want = [...new Set((cidrs || []).map(toCidr).filter(isCidr))];
+  const want = normalizeCidrs(cidrs, { allowHost: true });
   if (want.length === 0) return { changed: false, added: [], all: [] };
   let have = [];
   try {
@@ -167,7 +174,7 @@ function appendWg0Intent(intentPath, cidrs) {
   const missing = want.filter((c) => !haveSet.has(c));
   if (missing.length === 0) return { changed: false, added: [], all: have };   // ← guarda
   const all = [...have, ...missing];
-  fs.writeFileSync(intentPath, all.join('\n') + '\n');
+  atomicWrite(intentPath, all.join('\n') + '\n');
   return { changed: true, added: missing, all };
 }
 

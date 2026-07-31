@@ -4,6 +4,12 @@
 > Aquí solo se **añaden** entradas por sesión (las más nuevas arriba); no se edita lo viejo.
 > Mantenimiento gobernado por la skill `handoff-keeper` (`.claude/skills/handoff-keeper/`).
 
+> **Sesión 2026-07-31 — Autosync remoto endurecido (backend-only, sin despliegue).** Rama `vps_prod`; código y pruebas, producción sin modificar. Skills: `network-engineer`, `handoff-keeper`.
+> - Validación/canonicalización IPv4 CIDR estricta, bloqueo de `0.0.0.0/0` y escritura atómica de la intención wg0.
+> - Provisión/edición comparten servicio idempotente para rutas y `LIST-NET-REMOTE-TOWERS`, serializado contra carreras. Retirar una LAN elimina sólo rutas del VRF y conserva recursos globales.
+> - Edición preserva `lan_subnets` completa, actualiza peer WG y autosync del VPS; reconciliación al arranque y cada 10 minutos.
+> - Los fallos parciales DB/RouterOS ya son visibles. Regresión: backend 542/542; frontend 215/215.
+
 ---
 
 > **Sesión 2026-07-31 — Alcance de redes remotas reducido a autosync backend-only.** Rama `vps_prod`; sólo documentación, sin cambios en producción. Skills: `network-engineer`, `handoff-keeper`.

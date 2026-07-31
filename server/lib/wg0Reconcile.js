@@ -19,12 +19,17 @@
 const fs = require('fs');
 const path = require('path');
 const { getDb } = require('../db.service');
-const { appendWg0Intent, isCidr } = require('./wg0Sync');
+const { appendWg0Intent } = require('./wg0Sync');
+const { normalizeCidr } = require('./ipv4Cidr');
 const log = require('./logger').child({ scope: 'wg0-reconcile' });
 
 // Mismos defaults que el hook event-driven (provision.routes.js) para no divergir.
 const WG0_INTENT_PATH = process.env.WG0_INTENT_PATH || '/wg0sync/allowedips.desired';
 const WG0_AUTOSYNC = process.env.WG0_AUTOSYNC !== 'false';   // on por defecto; off explícito
+const WG0_RECONCILE_INTERVAL_MS = Math.max(60_000,
+  Number(process.env.WG0_RECONCILE_INTERVAL_MS) || 10 * 60_000);
+let reconcileTimer = null;
+let reconcileRunning = false;
 
 /**
  * Lee TODAS las LAN de torre de la tabla `nodes` (segmento_lan + lan_subnets).
@@ -36,10 +41,14 @@ async function allTowerLans() {
   const db = await getDb();
   const rows = await db.all('SELECT segmento_lan, lan_subnets FROM nodes');
   for (const r of rows || []) {
-    if (isCidr(r.segmento_lan)) out.add(String(r.segmento_lan).trim());
+    const primary = normalizeCidr(r.segmento_lan, { allowHost: false });
+    if (primary) out.add(primary);
     try {
       const arr = JSON.parse(r.lan_subnets || '[]');
-      if (Array.isArray(arr)) arr.forEach((c) => { if (isCidr(c)) out.add(String(c).trim()); });
+      if (Array.isArray(arr)) arr.forEach((c) => {
+        const normalized = normalizeCidr(c, { allowHost: false });
+        if (normalized) out.add(normalized);
+      });
     } catch { /* lan_subnets malformado — se ignora */ }
   }
   return [...out];
@@ -50,29 +59,42 @@ async function allTowerLans() {
  * corre en background (`setImmediate`), nunca lanza. No-op si el autosync está
  * apagado (WG0_AUTOSYNC=false) o el dir de intención no existe (fuera del VPS).
  */
-function reconcileOnStartup() {
-  if (!WG0_AUTOSYNC) return;
-  setImmediate(async () => {
-    try {
-      if (!fs.existsSync(path.dirname(WG0_INTENT_PATH))) return; // dir no montado (dev)
-      const lans = await allTowerLans();
-      if (lans.length === 0) { log.debug('sin LAN de nodos que reconciliar'); return; }
-      const r = appendWg0Intent(WG0_INTENT_PATH, lans);
-      if (r.changed) {
-        log.info({ added: r.added }, 'wg0 reconcile: intención re-sembrada al arranque → el watcher del host aplicará');
-      } else {
-        log.debug({ total: lans.length }, 'wg0 reconcile: la intención ya contenía todas las LAN de nodos');
-      }
-    } catch (e) {
-      // EACCES aquí = el dir de intención (bind-mount /opt/wg0-autosync) no es
-      // escribible por el uid del backend (1001). Es la causa SILENCIOSA nº1 de
-      // "el autosync no agrega la LAN de la torre". La elevamos a ERROR visible
-      // (no warn) para que se detecte en los logs: se corrige en el host una vez
-      // con  chown -R 1001:1001 /opt/wg0-autosync.
-      log.error({ err: e.message, intentPath: WG0_INTENT_PATH },
-        'wg0 reconcile falló al escribir la intención — ¿permisos del dir? (chown 1001:1001 /opt/wg0-autosync)');
-    }
-  });
+async function reconcileNow() {
+  if (!WG0_AUTOSYNC || reconcileRunning) return { skipped: true };
+  reconcileRunning = true;
+  try {
+    if (!fs.existsSync(path.dirname(WG0_INTENT_PATH))) return { skipped: true };
+    const lans = await allTowerLans();
+    if (lans.length === 0) return { changed: false, added: [], total: 0 };
+    const result = appendWg0Intent(WG0_INTENT_PATH, lans);
+    if (result.changed) log.info({ added: result.added }, 'wg0 reconcile: intención re-sembrada');
+    else log.debug({ total: lans.length }, 'wg0 reconcile: intención completa');
+    return { ...result, total: lans.length };
+  } catch (e) {
+    log.error({ err: e.message, intentPath: WG0_INTENT_PATH },
+      'wg0 reconcile falló al escribir la intención — revisar permisos/montaje');
+    return { changed: false, error: e.message };
+  } finally {
+    reconcileRunning = false;
+  }
 }
 
-module.exports = { reconcileOnStartup, allTowerLans };
+function reconcileOnStartup() {
+  if (WG0_AUTOSYNC) setImmediate(() => { reconcileNow(); });
+}
+
+function startPeriodicReconcile() {
+  if (!WG0_AUTOSYNC || reconcileTimer) return reconcileTimer;
+  reconcileTimer = setInterval(() => { reconcileNow(); }, WG0_RECONCILE_INTERVAL_MS);
+  reconcileTimer.unref?.();
+  return reconcileTimer;
+}
+
+function stopPeriodicReconcile() {
+  if (reconcileTimer) clearInterval(reconcileTimer);
+  reconcileTimer = null;
+}
+
+module.exports = {
+  reconcileOnStartup, startPeriodicReconcile, stopPeriodicReconcile, reconcileNow, allTowerLans,
+};
