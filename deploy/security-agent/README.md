@@ -24,3 +24,5 @@ systemctl enable --now gestionvpn-security-agent
 ```
 
 Nunca probar un bloqueo inicialmente con la IP de la sesión SSH administrativa.
+La confianza administrada se escribe en `zz-gestionvpn-trusted.local` para que
+se cargue después de cualquier `ignoreip` específico ya existente.
