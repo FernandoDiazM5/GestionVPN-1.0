@@ -1,49 +1,483 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Shield, ShieldCheck, ShieldOff, RefreshCw, Search, Ban, Unlock } from 'lucide-react';
+import {
+  Ban, Clock3, Eye, RefreshCw, Search, Shield, ShieldCheck, ShieldOff,
+  Unlock, X,
+} from 'lucide-react';
 import { confirmGoogleIdentity } from '../../../services/federatedAuth';
 import { securityAdminApi, type SecurityJail, type SecurityMutation } from '../../../services/securityAdminApi';
 
 const categories: Array<[SecurityMutation['category'], string]> = [
-  ['FALSE_POSITIVE','Falso positivo'], ['ADMIN_ACCESS','Acceso administrativo'],
-  ['MAINTENANCE','Mantenimiento'], ['SECURITY_TEST','Prueba de seguridad'], ['OTHER','Otro'],
+  ['FALSE_POSITIVE', 'Falso positivo'],
+  ['ADMIN_ACCESS', 'Acceso administrativo'],
+  ['MAINTENANCE', 'Mantenimiento'],
+  ['SECURITY_TEST', 'Prueba de seguridad'],
+  ['OTHER', 'Otro'],
 ];
 
-export default function SecurityModule() {
-  const [jails,setJails]=useState<SecurityJail[]>([]); const [trusted,setTrusted]=useState<string[]>([]);
-  const [currentIp,setCurrentIp]=useState('');
-  const [history,setHistory]=useState<Array<Record<string,unknown>>>([]);
-  const [loading,setLoading]=useState(true); const [error,setError]=useState(''); const [filter,setFilter]=useState('');
-  const [action,setAction]=useState<'ban'|'unban'|'trust'|'untrust'|null>(null);
-  const [target,setTarget]=useState(''); const [jail,setJail]=useState('sshd');
-  const [duration,setDuration]=useState<SecurityMutation['duration']>('1h');
-  const [category,setCategory]=useState<SecurityMutation['category']>('FALSE_POSITIVE');
-  const [reason,setReason]=useState(''); const [password,setPassword]=useState(''); const [busy,setBusy]=useState(false); const [confirmRisk,setConfirmRisk]=useState(false);
-  const [attempts,setAttempts]=useState<Array<Record<string,unknown>>|null>(null);
-  const load=useCallback(async()=>{setLoading(true);setError('');try{const [s,h]=await Promise.all([securityAdminApi.status(),securityAdminApi.history()]);setJails(s.jails);setTrusted(s.trusted);setCurrentIp(s.currentIp);setHistory(h.history);}catch(e){setError(e instanceof Error?e.message:'No se pudo cargar');}finally{setLoading(false);}},[]);
-  useEffect(()=>{void load();},[load]);
-  const rows=useMemo(()=>jails.flatMap(j=>j.banned.map(ip=>{const d=j.banDetails?.find(x=>x.target===ip);return {ip,jail:j.name,protection:d?.reason||(j.name==='sshd'?'Fallos SSH':'Bloqueo manual'),attempts:d?.attempts??0,blockedSince:d?.blockedSince,expiresAt:d?.expiresAt};}))
-    .filter(r=>!filter||r.ip.includes(filter)||r.jail.includes(filter)),[jails,filter]);
-  const open=(kind:typeof action,ip='',sourceJail='sshd')=>{setAction(kind);setTarget(ip);setJail(sourceJail);setReason('');setPassword('');setConfirmRisk(false);};
-  const showAttempts=async(ip:string)=>{setError('');try{const data=await securityAdminApi.attempts(ip);setAttempts(data.attempts);}catch(e){setError(e instanceof Error?e.message:'No se pudieron consultar los intentos');}};
-  const execute=async(google=false)=>{if(!action||reason.trim().length<10)return;setBusy(true);setError('');try{
-    const proof=google?await securityAdminApi.stepUpGoogle(await confirmGoogleIdentity()):await securityAdminApi.stepUpPassword(password);
-    const data:SecurityMutation={target,jail,duration,category,reason:reason.trim(),stepUpToken:proof.stepUpToken,confirmIndefinite:duration==='indefinite'&&confirmRisk,confirmNetworkTrust:action==='trust'&&target.includes('/')&&confirmRisk};
-    if(action==='ban')await securityAdminApi.ban(data); if(action==='unban')await securityAdminApi.unban(data);
-    if(action==='trust')await securityAdminApi.trust(data); if(action==='untrust')await securityAdminApi.untrust(data);
-    setAction(null);await load();
-  }catch(e){setError(e instanceof Error?e.message:'Operación fallida');}finally{setBusy(false);}};
-  return <div className="space-y-5 p-4 md:p-6">
-    <div className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-2xl font-bold text-slate-900 dark:text-white">Seguridad del VPS</h1><p className="text-sm text-slate-500">Bloqueos Fail2ban, intentos SSH y direcciones confiables.</p></div><button className="btn-secondary" onClick={()=>void load()} disabled={loading}><RefreshCw className="h-4 w-4"/> Actualizar</button></div>
-    {error&&<div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
-    <div className="grid gap-3 sm:grid-cols-3"><Summary icon={Shield} label="Bloqueadas" value={rows.length}/><Summary icon={ShieldCheck} label="Confiables" value={trusted.length}/><Summary icon={ShieldOff} label="Jails activos" value={jails.length}/></div>
-    <div className="card p-4"><div className="mb-4 flex flex-wrap gap-2"><div className="relative min-w-64 flex-1"><Search className="absolute left-3 top-3 h-4 w-4 text-slate-400"/><input className="input-field pl-9" value={filter} onChange={e=>setFilter(e.target.value)} placeholder="Buscar IP o servicio"/></div><button className="btn-primary" onClick={()=>open('ban')}><Ban className="h-4 w-4"/> Bloquear IP</button><button className="btn-secondary" onClick={()=>open('trust')}><ShieldCheck className="h-4 w-4"/> Agregar confiable</button></div>
-      <div className="overflow-x-auto"><table className="min-w-full text-sm"><thead><tr>{['IP','Motivo / protección','Intentos','Bloqueada desde','Expira','Jail','Acción'].map(h=><th key={h} className="th-cell">{h}</th>)}</tr></thead><tbody>{rows.map(r=><tr key={`${r.jail}-${r.ip}`}><td className="data-cell font-mono">{r.ip}</td><td className="data-cell">{r.protection}</td><td className="data-cell">{r.attempts}</td><td className="data-cell">{r.blockedSince?new Date(r.blockedSince).toLocaleString('es-PE'):'—'}</td><td className="data-cell">{r.expiresAt===null?'Indefinido':r.expiresAt?new Date(r.expiresAt).toLocaleString('es-PE'):'—'}</td><td className="data-cell font-mono text-xs">{r.jail}</td><td className="data-cell"><div className="flex flex-wrap gap-2"><button className="btn-secondary" onClick={()=>void showAttempts(r.ip)}>Intentos</button><button className="btn-secondary" onClick={()=>open('trust',r.ip)}><ShieldCheck className="h-4 w-4"/> Confiar</button><button className="btn-secondary" onClick={()=>open('unban',r.ip,r.jail)}><Unlock className="h-4 w-4"/> Desbloquear</button></div></td></tr>)}{!loading&&rows.length===0&&<tr><td colSpan={7} className="p-8 text-center text-slate-500">No hay direcciones bloqueadas.</td></tr>}</tbody></table></div>
-    </div>
-    <div className="card p-4"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 className="font-bold">Lista confiable permanente</h2>{currentIp&&<button className="btn-secondary" onClick={()=>open('trust',currentIp)}>Confiar en mi IP actual</button>}</div><div className="flex flex-wrap gap-2">{trusted.map(ip=><span key={ip} className="badge-success flex items-center gap-2 font-mono">{ip}<button aria-label={`Retirar ${ip}`} onClick={()=>open('untrust',ip)}>×</button></span>)}{trusted.length===0&&<span className="text-sm text-slate-500">Sin excepciones adicionales.</span>}</div></div>
-    <div className="card overflow-hidden"><div className="border-b border-slate-200 p-4 dark:border-slate-700"><h2 className="font-bold">Actividad reciente</h2><p className="text-xs text-slate-500">Quién realizó cada cambio, desde qué IP y con qué motivo.</p></div><div className="overflow-x-auto"><table className="min-w-full text-sm"><thead><tr>{['Fecha','Administrador','Acción','Objetivo','Resultado','Motivo'].map(h=><th key={h} className="th-cell">{h}</th>)}</tr></thead><tbody>{history.slice(0,25).map((row,i)=><tr key={String(row.id||i)}><td className="data-cell whitespace-nowrap">{row.created_at?new Date(Number(row.created_at)).toLocaleString('es-PE'):'—'}</td><td className="data-cell">{String(row.actor_email||'Administrador')}</td><td className="data-cell font-mono text-xs">{String(row.action||'')}</td><td className="data-cell font-mono text-xs">{String(row.target||'—')}</td><td className="data-cell">{row.outcome==='SUCCESS'?'Aplicado':'Falló'}</td><td className="data-cell max-w-sm">{String(row.reason||'')}</td></tr>)}{history.length===0&&<tr><td colSpan={6} className="p-6 text-center text-slate-500">Aún no hay acciones administrativas.</td></tr>}</tbody></table></div></div>
-    {action&&<div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/55 p-4"><div className="card w-full max-w-lg space-y-4 p-5"><h2 className="text-lg font-bold">Confirmar acción de seguridad</h2><label className="block text-sm font-semibold">IP o red<input className="input-field mt-1 font-mono" value={target} onChange={e=>setTarget(e.target.value)} disabled={action==='unban'||action==='untrust'}/></label>{action==='ban'&&<label className="block text-sm font-semibold">Duración<select className="input-field mt-1" value={duration} onChange={e=>{setDuration(e.target.value as SecurityMutation['duration']);setConfirmRisk(false);}}>{['15m','1h','6h','24h','7d','indefinite'].map(v=><option key={v} value={v}>{v==='indefinite'?'Indefinido':v}</option>)}</select></label>}<label className="block text-sm font-semibold">Categoría<select className="input-field mt-1" value={category} onChange={e=>setCategory(e.target.value as SecurityMutation['category'])}>{categories.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label><label className="block text-sm font-semibold">Motivo<input className="input-field mt-1" value={reason} onChange={e=>setReason(e.target.value)} placeholder="Mínimo 10 caracteres"/></label><label className="block text-sm font-semibold">Contraseña actual<input type="password" className="input-field mt-1" value={password} onChange={e=>setPassword(e.target.value)}/></label>{(action==='trust'||duration==='indefinite')&&<div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800"><p>Esta acción permanece hasta retirarla manualmente. Verifica cuidadosamente el objetivo.</p>{(duration==='indefinite'||(action==='trust'&&target.includes('/')))&&<label className="mt-2 flex gap-2 font-semibold"><input type="checkbox" checked={confirmRisk} onChange={e=>setConfirmRisk(e.target.checked)}/> Confirmo el alcance y el riesgo de esta excepción permanente.</label>}</div>}<div className="flex flex-wrap justify-end gap-2"><button className="btn-secondary" onClick={()=>setAction(null)}>Cancelar</button><button className="btn-secondary" disabled={busy||reason.trim().length<10||(duration==='indefinite'&&!confirmRisk)||(action==='trust'&&target.includes('/')&&!confirmRisk)} onClick={()=>void execute(true)}>Confirmar con Google</button><button className="btn-primary" disabled={busy||!password||reason.trim().length<10||(duration==='indefinite'&&!confirmRisk)||(action==='trust'&&target.includes('/')&&!confirmRisk)} onClick={()=>void execute(false)}>{busy?'Aplicando…':'Confirmar'}</button></div></div></div>}
-    {attempts&&<div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/55 p-4"><div className="card max-h-[80vh] w-full max-w-2xl overflow-auto p-5"><div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-bold">Intentos SSH recientes</h2><button className="btn-secondary" onClick={()=>setAttempts(null)}>Cerrar</button></div><div className="space-y-2">{attempts.map((row,i)=><div key={i} className="rounded-lg bg-slate-50 p-3 font-mono text-xs dark:bg-slate-900">{String(row.message||'')}</div>)}{attempts.length===0&&<p className="text-sm text-slate-500">No se encontraron intentos en las últimas 24 horas.</p>}</div></div></div>}
-  </div>;
+type SecurityAction = 'ban' | 'unban' | 'trust' | 'untrust' | null;
+
+interface BlockedRow {
+  ip: string;
+  jail: string;
+  protection: string;
+  attempts: number;
+  blockedSince?: number;
+  expiresAt?: number | null;
 }
 
-function Summary({icon:Icon,label,value}:{icon:typeof Shield;label:string;value:number}){return <div className="card flex items-center gap-3 p-4"><div className="rounded-xl bg-indigo-50 p-2 text-indigo-600"><Icon className="h-5 w-5"/></div><div><div className="text-2xl font-bold">{value}</div><div className="text-xs text-slate-500">{label}</div></div></div>}
+const formatDate = (value?: number | null) => {
+  if (value === null) return 'Sin vencimiento';
+  if (!value) return 'Sin información';
+  return new Intl.DateTimeFormat('es-PE', {
+    dateStyle: 'short', timeStyle: 'short',
+  }).format(new Date(value));
+};
+
+export default function SecurityModule() {
+  const [jails, setJails] = useState<SecurityJail[]>([]);
+  const [trusted, setTrusted] = useState<string[]>([]);
+  const [currentIp, setCurrentIp] = useState('');
+  const [history, setHistory] = useState<Array<Record<string, unknown>>>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [filter, setFilter] = useState('');
+  const [action, setAction] = useState<SecurityAction>(null);
+  const [target, setTarget] = useState('');
+  const [jail, setJail] = useState('sshd');
+  const [duration, setDuration] = useState<SecurityMutation['duration']>('1h');
+  const [category, setCategory] = useState<SecurityMutation['category']>('FALSE_POSITIVE');
+  const [reason, setReason] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [confirmRisk, setConfirmRisk] = useState(false);
+  const [attempts, setAttempts] = useState<Array<Record<string, unknown>> | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [status, recent] = await Promise.all([
+        securityAdminApi.status(), securityAdminApi.history(),
+      ]);
+      setJails(status.jails);
+      setTrusted(status.trusted);
+      setCurrentIp(status.currentIp);
+      setHistory(recent.history);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'No se pudo cargar la seguridad del VPS');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const rows = useMemo<BlockedRow[]>(() => jails.flatMap((item) => item.banned.map((ip) => {
+    const detail = item.banDetails?.find((entry) => entry.target === ip);
+    return {
+      ip,
+      jail: item.name,
+      protection: detail?.reason || (item.name === 'sshd' ? 'Fallos reiterados de autenticación SSH' : 'Bloqueo manual'),
+      attempts: detail?.attempts ?? 0,
+      blockedSince: detail?.blockedSince,
+      expiresAt: detail?.expiresAt,
+    };
+  })).filter((row) => {
+    const query = filter.trim().toLowerCase();
+    return !query || row.ip.toLowerCase().includes(query)
+      || row.jail.toLowerCase().includes(query)
+      || row.protection.toLowerCase().includes(query);
+  }), [jails, filter]);
+
+  const open = (kind: SecurityAction, ip = '', sourceJail = 'sshd') => {
+    setAction(kind);
+    setTarget(ip);
+    setJail(sourceJail);
+    setReason('');
+    setPassword('');
+    setConfirmRisk(false);
+  };
+
+  const showAttempts = async (ip: string) => {
+    setError('');
+    try {
+      const data = await securityAdminApi.attempts(ip);
+      setAttempts(data.attempts);
+    } catch (attemptError) {
+      setError(attemptError instanceof Error ? attemptError.message : 'No se pudieron consultar los intentos');
+    }
+  };
+
+  const execute = async (google = false) => {
+    if (!action || reason.trim().length < 10) return;
+    setBusy(true);
+    setError('');
+    try {
+      const proof = google
+        ? await securityAdminApi.stepUpGoogle(await confirmGoogleIdentity())
+        : await securityAdminApi.stepUpPassword(password);
+      const data: SecurityMutation = {
+        target, jail, duration, category, reason: reason.trim(),
+        stepUpToken: proof.stepUpToken,
+        confirmIndefinite: duration === 'indefinite' && confirmRisk,
+        confirmNetworkTrust: action === 'trust' && target.includes('/') && confirmRisk,
+      };
+      if (action === 'ban') await securityAdminApi.ban(data);
+      if (action === 'unban') await securityAdminApi.unban(data);
+      if (action === 'trust') await securityAdminApi.trust(data);
+      if (action === 'untrust') await securityAdminApi.untrust(data);
+      setAction(null);
+      await load();
+    } catch (executeError) {
+      setError(executeError instanceof Error ? executeError.message : 'No se pudo aplicar la operación');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-5 p-4 md:p-6">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Seguridad del VPS</h1>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+            Controla bloqueos, intentos SSH y direcciones de confianza.
+          </p>
+        </div>
+        <button className="btn-outline self-start" onClick={() => void load()} disabled={loading}>
+          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          {loading ? 'Actualizando' : 'Actualizar'}
+        </button>
+      </header>
+
+      {error && (
+        <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+          {error}
+        </div>
+      )}
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Summary icon={Shield} label="Direcciones bloqueadas" value={rows.length} />
+        <Summary icon={ShieldCheck} label="Direcciones confiables" value={trusted.length} />
+        <Summary icon={ShieldOff} label="Protecciones activas" value={jails.length} />
+      </div>
+
+      <section className="card overflow-hidden">
+        <div className="border-b border-slate-200 p-4 dark:border-slate-700">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+              <h2 className="font-bold text-slate-900 dark:text-white">Direcciones bloqueadas</h2>
+              <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                Los desbloqueos no crean una excepción permanente.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="relative min-w-0 sm:w-72">
+                <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-500" />
+                <input
+                  className="input-field pl-9"
+                  value={filter}
+                  onChange={(event) => setFilter(event.target.value)}
+                  placeholder="Buscar IP, motivo o protección"
+                />
+              </div>
+              <button className="btn-outline" onClick={() => open('trust')}>
+                <ShieldCheck className="h-4 w-4" /> Agregar confiable
+              </button>
+              <button className="btn-primary" onClick={() => open('ban')}>
+                <Ban className="h-4 w-4" /> Bloquear IP
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="hidden overflow-x-auto md:block">
+          <table className="min-w-[900px] w-full table-fixed text-left text-sm">
+            <thead className="bg-slate-50 dark:bg-slate-900/60">
+              <tr>
+                <th className="w-[27%] px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-600">Dirección y motivo</th>
+                <th className="w-[10%] px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-slate-600">Intentos</th>
+                <th className="w-[25%] px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-600">Periodo</th>
+                <th className="w-[15%] px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-600">Protección</th>
+                <th className="w-[23%] px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-slate-600">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+              {rows.map((row) => (
+                <BlockedTableRow key={`${row.jail}-${row.ip}`} row={row} open={open} showAttempts={showAttempts} />
+              ))}
+              {!loading && rows.length === 0 && <EmptyBlockedRows colSpan={5} />}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="divide-y divide-slate-200 md:hidden dark:divide-slate-700">
+          {rows.map((row) => (
+            <BlockedCard key={`${row.jail}-${row.ip}`} row={row} open={open} showAttempts={showAttempts} />
+          ))}
+          {!loading && rows.length === 0 && <div className="p-8 text-center text-sm text-slate-500">No hay direcciones bloqueadas.</div>}
+        </div>
+      </section>
+
+      <section className="card p-4 md:p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="font-bold text-slate-900 dark:text-white">Lista confiable permanente</h2>
+            <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">Estas direcciones no serán bloqueadas por Fail2ban.</p>
+          </div>
+          {currentIp && (
+            <button className="btn-outline self-start" onClick={() => open('trust', currentIp)}>
+              <ShieldCheck className="h-4 w-4" /> Confiar en mi IP actual
+            </button>
+          )}
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {trusted.map((ip) => (
+            <span key={ip} className="badge badge-success gap-2 px-3 py-2 font-mono text-xs">
+              {ip}
+              <button className="rounded p-1 hover:bg-emerald-200/70" aria-label={`Retirar ${ip}`} onClick={() => open('untrust', ip)}>
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </span>
+          ))}
+          {trusted.length === 0 && <span className="text-sm text-slate-500">Sin excepciones adicionales.</span>}
+        </div>
+      </section>
+
+      <RecentActivity history={history} />
+
+      {action && (
+        <ActionDialog
+          action={action} target={target} setTarget={setTarget} duration={duration}
+          setDuration={setDuration} category={category} setCategory={setCategory}
+          reason={reason} setReason={setReason} password={password} setPassword={setPassword}
+          confirmRisk={confirmRisk} setConfirmRisk={setConfirmRisk} busy={busy}
+          close={() => setAction(null)} execute={execute}
+        />
+      )}
+
+      {attempts && <AttemptsDialog attempts={attempts} close={() => setAttempts(null)} />}
+    </div>
+  );
+}
+
+function BlockedTableRow({ row, open, showAttempts }: {
+  row: BlockedRow;
+  open: (kind: SecurityAction, ip?: string, jail?: string) => void;
+  showAttempts: (ip: string) => Promise<void>;
+}) {
+  return (
+    <tr className="align-middle hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
+      <td className="px-4 py-4">
+        <div className="font-mono text-sm font-semibold text-slate-900 dark:text-white">{row.ip}</div>
+        <div className="mt-1 line-clamp-2 text-xs leading-5 text-slate-600 dark:text-slate-300">{row.protection}</div>
+      </td>
+      <td className="px-4 py-4 text-center">
+        <span className="badge badge-neutral min-w-8 justify-center">{row.attempts}</span>
+      </td>
+      <td className="px-4 py-4">
+        <DateLine label="Desde" value={row.blockedSince} />
+        <DateLine label="Hasta" value={row.expiresAt} />
+      </td>
+      <td className="px-4 py-4"><ProtectionBadge jail={row.jail} /></td>
+      <td className="px-4 py-4">
+        <div className="flex items-center justify-end gap-1.5">
+          <IconAction label="Ver intentos" icon={Eye} onClick={() => void showAttempts(row.ip)} />
+          <IconAction label="Hacer confiable" icon={ShieldCheck} onClick={() => open('trust', row.ip)} />
+          <IconAction label="Desbloquear" icon={Unlock} danger onClick={() => open('unban', row.ip, row.jail)} />
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+function BlockedCard({ row, open, showAttempts }: {
+  row: BlockedRow;
+  open: (kind: SecurityAction, ip?: string, jail?: string) => void;
+  showAttempts: (ip: string) => Promise<void>;
+}) {
+  return (
+    <article className="space-y-4 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="break-all font-mono text-sm font-semibold text-slate-900 dark:text-white">{row.ip}</div>
+          <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-300">{row.protection}</p>
+        </div>
+        <ProtectionBadge jail={row.jail} />
+      </div>
+      <div className="grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-900/60">
+        <DateLine label="Bloqueada desde" value={row.blockedSince} />
+        <DateLine label="Expira" value={row.expiresAt} />
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <button className="btn-ghost min-h-11" onClick={() => void showAttempts(row.ip)}><Eye className="h-4 w-4" /> Intentos</button>
+        <button className="btn-outline min-h-11" onClick={() => open('trust', row.ip)}><ShieldCheck className="h-4 w-4" /> Confiar</button>
+        <button className="btn-danger min-h-11" onClick={() => open('unban', row.ip, row.jail)}><Unlock className="h-4 w-4" /> Quitar</button>
+      </div>
+    </article>
+  );
+}
+
+function DateLine({ label, value }: { label: string; value?: number | null }) {
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <Clock3 className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+      <span className="shrink-0 text-slate-500">{label}</span>
+      <span className="truncate font-medium text-slate-700 dark:text-slate-200">{formatDate(value)}</span>
+    </div>
+  );
+}
+
+function ProtectionBadge({ jail }: { jail: string }) {
+  const manual = jail !== 'sshd';
+  return (
+    <span className={`badge ${manual ? 'badge-info' : 'badge-neutral'} whitespace-nowrap`}>
+      {manual ? 'Manual' : 'Fail2ban · SSH'}
+    </span>
+  );
+}
+
+function IconAction({ label, icon: Icon, danger = false, onClick }: {
+  label: string; icon: typeof Eye; danger?: boolean; onClick: () => void;
+}) {
+  return (
+    <button
+      className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${danger ? 'border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-900 dark:hover:bg-rose-950/50' : 'border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'}`}
+      title={label}
+      aria-label={`${label} ${label === 'Ver intentos' ? 'de' : ''}`}
+      onClick={onClick}
+    >
+      <Icon className="h-4 w-4" />
+    </button>
+  );
+}
+
+function EmptyBlockedRows({ colSpan }: { colSpan: number }) {
+  return (
+    <tr><td colSpan={colSpan} className="p-10 text-center text-sm text-slate-500">No hay direcciones bloqueadas.</td></tr>
+  );
+}
+
+function RecentActivity({ history }: { history: Array<Record<string, unknown>> }) {
+  return (
+    <section className="card overflow-hidden">
+      <div className="border-b border-slate-200 p-4 dark:border-slate-700">
+        <h2 className="font-bold text-slate-900 dark:text-white">Actividad reciente</h2>
+        <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">Registro de quién realizó cada cambio y por qué.</p>
+      </div>
+      <div className="hidden overflow-x-auto md:block">
+        <table className="min-w-[780px] w-full text-left text-sm">
+          <thead className="bg-slate-50 dark:bg-slate-900/60"><tr>
+            {['Fecha', 'Administrador', 'Acción', 'Objetivo', 'Resultado', 'Motivo'].map((heading) => (
+              <th key={heading} className="px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-600">{heading}</th>
+            ))}
+          </tr></thead>
+          <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+            {history.slice(0, 25).map((row, index) => (
+              <tr key={String(row.id || index)}>
+                <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-600">{formatDate(Number(row.created_at))}</td>
+                <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">{String(row.actor_email || 'Administrador')}</td>
+                <td className="px-4 py-3"><ActionBadge action={String(row.action || '')} /></td>
+                <td className="px-4 py-3 font-mono text-xs text-slate-700 dark:text-slate-200">{String(row.target || '—')}</td>
+                <td className="px-4 py-3"><OutcomeBadge success={row.outcome === 'SUCCESS'} /></td>
+                <td className="max-w-sm px-4 py-3 text-sm text-slate-600 dark:text-slate-300">{String(row.reason || '')}</td>
+              </tr>
+            ))}
+            {history.length === 0 && <tr><td colSpan={6} className="p-8 text-center text-sm text-slate-500">Aún no hay acciones administrativas.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      <div className="divide-y divide-slate-200 md:hidden dark:divide-slate-700">
+        {history.slice(0, 25).map((row, index) => (
+          <article key={String(row.id || index)} className="space-y-2 p-4">
+            <div className="flex items-center justify-between gap-2"><ActionBadge action={String(row.action || '')} /><OutcomeBadge success={row.outcome === 'SUCCESS'} /></div>
+            <div className="font-mono text-xs text-slate-700 dark:text-slate-200">{String(row.target || '—')}</div>
+            <p className="text-sm text-slate-600 dark:text-slate-300">{String(row.reason || '')}</p>
+            <div className="text-xs text-slate-500">{String(row.actor_email || 'Administrador')} · {formatDate(Number(row.created_at))}</div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ActionBadge({ action }: { action: string }) {
+  const labels: Record<string, string> = { BAN: 'Bloqueó', UNBAN: 'Desbloqueó', TRUST_ADD: 'Confió', TRUST_REMOVE: 'Retiró confianza' };
+  return <span className="badge badge-neutral whitespace-nowrap">{labels[action] || action}</span>;
+}
+
+function OutcomeBadge({ success }: { success: boolean }) {
+  return <span className={`badge ${success ? 'badge-success' : 'badge-danger'}`}>{success ? 'Aplicado' : 'Falló'}</span>;
+}
+
+function ActionDialog(props: {
+  action: Exclude<SecurityAction, null>;
+  target: string; setTarget: (value: string) => void;
+  duration: SecurityMutation['duration']; setDuration: (value: SecurityMutation['duration']) => void;
+  category: SecurityMutation['category']; setCategory: (value: SecurityMutation['category']) => void;
+  reason: string; setReason: (value: string) => void;
+  password: string; setPassword: (value: string) => void;
+  confirmRisk: boolean; setConfirmRisk: (value: boolean) => void;
+  busy: boolean; close: () => void; execute: (google?: boolean) => Promise<void>;
+}) {
+  const needsRisk = props.duration === 'indefinite' || (props.action === 'trust' && props.target.includes('/'));
+  const disabled = props.busy || props.reason.trim().length < 10 || (needsRisk && !props.confirmRisk);
+  return (
+    <div className="modal-overlay" role="presentation">
+      <div className="modal-panel w-full max-w-lg space-y-4 p-5" role="dialog" aria-modal="true" aria-labelledby="security-action-title">
+        <div className="flex items-center justify-between gap-3">
+          <div><h2 id="security-action-title" className="text-lg font-bold">Confirmar acción de seguridad</h2><p className="mt-1 text-xs text-slate-600 dark:text-slate-300">Se registrará en la auditoría del VPS.</p></div>
+          <button className="btn-ghost h-10 w-10 p-0" aria-label="Cerrar" onClick={props.close}><X className="h-5 w-5" /></button>
+        </div>
+        <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200">IP o red
+          <input className="input-field mt-1 font-mono" value={props.target} onChange={(event) => props.setTarget(event.target.value)} disabled={props.action === 'unban' || props.action === 'untrust'} />
+        </label>
+        {props.action === 'ban' && <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200">Duración
+          <select className="input-field mt-1" value={props.duration} onChange={(event) => { props.setDuration(event.target.value as SecurityMutation['duration']); props.setConfirmRisk(false); }}>
+            {['15m', '1h', '6h', '24h', '7d', 'indefinite'].map((value) => <option key={value} value={value}>{value === 'indefinite' ? 'Indefinido' : value}</option>)}
+          </select>
+        </label>}
+        <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200">Categoría
+          <select className="input-field mt-1" value={props.category} onChange={(event) => props.setCategory(event.target.value as SecurityMutation['category'])}>
+            {categories.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+        </label>
+        <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200">Motivo
+          <input className="input-field mt-1" value={props.reason} onChange={(event) => props.setReason(event.target.value)} placeholder="Mínimo 10 caracteres" />
+        </label>
+        <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200">Contraseña actual
+          <input type="password" autoComplete="current-password" className="input-field mt-1" value={props.password} onChange={(event) => props.setPassword(event.target.value)} />
+        </label>
+        {(props.action === 'trust' || props.duration === 'indefinite') && <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+          <p>Esta acción permanece hasta retirarla manualmente. Verifica cuidadosamente el objetivo.</p>
+          {needsRisk && <label className="mt-2 flex items-start gap-2 font-semibold"><input className="mt-0.5" type="checkbox" checked={props.confirmRisk} onChange={(event) => props.setConfirmRisk(event.target.checked)} /> Confirmo el alcance y el riesgo de esta excepción permanente.</label>}
+        </div>}
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button className="btn-ghost" onClick={props.close}>Cancelar</button>
+          <button className="btn-outline" disabled={disabled} onClick={() => void props.execute(true)}>Confirmar con Google</button>
+          <button className="btn-primary" disabled={disabled || !props.password} onClick={() => void props.execute(false)}>{props.busy ? 'Aplicando…' : 'Confirmar'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AttemptsDialog({ attempts, close }: { attempts: Array<Record<string, unknown>>; close: () => void }) {
+  return (
+    <div className="modal-overlay" role="presentation">
+      <div className="modal-panel max-h-[80vh] w-full max-w-2xl overflow-auto p-5" role="dialog" aria-modal="true" aria-labelledby="attempts-title">
+        <div className="mb-4 flex items-center justify-between gap-3"><div><h2 id="attempts-title" className="text-lg font-bold">Intentos SSH recientes</h2><p className="mt-1 text-xs text-slate-600 dark:text-slate-300">Eventos detectados durante las últimas 24 horas.</p></div><button className="btn-ghost h-10 w-10 p-0" aria-label="Cerrar" onClick={close}><X className="h-5 w-5" /></button></div>
+        <div className="space-y-2">{attempts.map((row, index) => <div key={index} className="rounded-xl bg-slate-50 p-3 font-mono text-xs leading-5 text-slate-700 dark:bg-slate-900 dark:text-slate-200">{String(row.message || '')}</div>)}{attempts.length === 0 && <p className="py-8 text-center text-sm text-slate-500">No se encontraron intentos recientes.</p>}</div>
+      </div>
+    </div>
+  );
+}
+
+function Summary({ icon: Icon, label, value }: { icon: typeof Shield; label: string; value: number }) {
+  return (
+    <div className="card flex items-center gap-3 p-4">
+      <div className="rounded-xl bg-indigo-50 p-2.5 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-300"><Icon className="h-5 w-5" /></div>
+      <div><div className="text-2xl font-bold text-slate-900 dark:text-white">{value}</div><div className="text-xs font-medium text-slate-600 dark:text-slate-300">{label}</div></div>
+    </div>
+  );
+}
