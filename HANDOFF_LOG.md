@@ -6,6 +6,11 @@
 
 ---
 
+> **Sesión 2026-07-31 — Alcance de redes remotas reducido a autosync backend-only.** Rama `vps_prod`; sólo documentación, sin cambios en producción. Skills: `network-engineer`, `handoff-keeper`.
+> - Decisión: conservar la experiencia actual totalmente automática; no crear por ahora pantalla ni CRUD de Administración.
+> - El plan prioriza centralizar provisión/edición, validación CIDR real, deduplicación, sync inmediato del VPS al editar, locks, autocuración, observabilidad y reintentos. Añadida matriz de escenarios de error.
+> - Seguridad transitoria: corregir la edición para que retirar una LAN quite sólo la ruta de esa VRF. `LIST-NET-REMOTE-TOWERS` y `AllowedIPs` siguen aditivos; huérfanas/drift se reportan y no se borran hasta contar con referencias migradas, canary y autorización separada.
+
 > **Sesión 2026-07-31 — Plan para administrar redes remotas WireGuard desde el panel.** Rama `vps_prod`; sólo documentación, sin cambios en producción. Skills: `process-discovery-interviewer`, `network-engineer`, `handoff-keeper`.
 > - Creado [`docs/PLAN_ADMIN_WIREGUARD_NETWORKS.md`](docs/PLAN_ADMIN_WIREGUARD_NETWORKS.md): admite CIDR privados o públicos usados internamente, red global única, múltiples bindings por nodo/workspace, ruta por VRF, deduplicación en `LIST-NET-REMOTE-TOWERS` y `AllowedIPs`, inventario/drift, UI, permisos, estados, pruebas, despliegue gradual y rollback.
 > - Auditoría del código: provisión (`addTowerEntries`) y autosync del VPS (`appendWg0Intent` + watcher host) ya agregan sólo si falta; el watcher también asegura rutas Linux. La brecha es que todo es append-only y `editing.routes.js` agrega por un camino distinto y elimina la entrada global sin comprobar referencias.

@@ -1,17 +1,19 @@
-# Plan de implementación — Administración de redes remotas WireGuard
+# Plan de implementación — Autosync robusto y futura Administración de redes WireGuard
 
 **Fecha:** 2026-07-31
 
-**Estado:** propuesta lista para implementar; no modifica todavía producción
+**Estado:** prioridad vigente backend-only; Administración manual diferida; no
+modifica todavía producción
 
-**Alcance inicial:** IPv4, Administrador de plataforma, `wg0` del VPS y
+**Alcance inicial:** IPv4, ciclo automático de nodos, `wg0` del VPS y
 `LIST-NET-REMOTE-TOWERS` del MikroTik Core
 
 ## 1. Objetivo
 
-Permitir que el Administrador gestione desde el panel las redes utilizadas por
-los túneles, incluidas redes RFC1918 y rangos públicos que un cliente usa
-internamente, sin editar manualmente el MikroTik ni `/etc/wireguard/wg0.conf`.
+Endurecer el manejo automático de las redes utilizadas por los túneles,
+incluidas redes RFC1918 y rangos públicos que un cliente usa internamente, sin
+editar manualmente el MikroTik ni `/etc/wireguard/wg0.conf`. La gestión manual
+desde Administración queda como evolución futura, no como alcance inmediato.
 
 Una red debe:
 
@@ -28,9 +30,9 @@ Una red debe:
 
 | Elemento | Definición |
 | --- | --- |
-| Inicio | El Administrador registra, asocia, deshabilita o retira una red |
+| Inicio | Alta, edición o deprovisión de un nodo cambia sus redes declaradas |
 | Fin | DB, rutas por VRF, lista MikroTik, WireGuard y rutas Linux coinciden |
-| Actor principal | Administrador de plataforma |
+| Actor principal | Flujo backend disparado por la operación normal del nodo |
 | Actores técnicos | Backend no-root, reconciliador root del host y MikroTik Core |
 | Evidencia | Diff, checks, operación auditada y estado real por target |
 | Éxito | Red alcanzable por el túnel correcto sin duplicados ni pérdida de servicios |
@@ -38,10 +40,14 @@ Una red debe:
 
 ## 2. Decisiones confirmadas
 
+- **Decisión 2026-07-31:** por el momento no se crearán pantalla, API CRUD ni
+  controles manuales. El alta/edición de túneles seguirá siendo el disparador
+  automático y todo se manejará internamente.
 - Se admiten redes privadas y públicas usadas internamente.
-- El Administrador trabaja con CIDR (`142.152.7.0/24`) o un host (`/32`).
-- Una red manual debe indicar a qué sitio/túnel se dirige; agregarla sólo a
-  `AllowedIPs` no es suficiente porque el Core necesita una ruta en la VRF.
+- El sistema trabaja con CIDR (`142.152.7.0/24`) o un host (`/32`) provenientes
+  del nodo/túnel.
+- En una futura gestión manual, toda red deberá indicar sitio/túnel; agregarla
+  sólo a `AllowedIPs` no es suficiente porque el Core necesita una ruta VRF.
 - Dos o más clientes pueden reutilizar el mismo CIDR.
 - La deduplicación global es por CIDR canónico exacto.
 - Que una red esté cubierta por un supernet se muestra como información, pero no
@@ -53,6 +59,46 @@ Una red debe:
   `AllowedIPs`, una terminal web ni el socket Docker.
 - El backend continúa sin `root`, `NET_ADMIN` ni acceso a la clave privada de
   WireGuard.
+
+### Alcance inmediato — endurecer sin cambiar la experiencia
+
+1. Centralizar la lógica automática de provisión y edición.
+2. Validar y normalizar CIDR antes de tocar DB, MikroTik o el intent del VPS.
+3. Usar el mismo deduplicador en alta, edición y reconciliación.
+4. Sincronizar inmediatamente el VPS cuando una red se agrega al editar un nodo.
+5. Autocurar entradas/rutas faltantes al arrancar y periódicamente.
+6. Serializar altas concurrentes para evitar duplicados o estados parciales.
+7. Registrar operación, pasos, error y reintentos sin exponer secretos.
+8. Corregir la baja desde edición: retirar sólo la ruta de la VRF afectada y
+   preservar por ahora las entradas globales.
+9. Detectar huérfanas y drift en modo informativo; no borrar automáticamente.
+10. Mantener apagadas las bajas globales hasta disponer de referencias internas
+    migradas, canary y autorización separada.
+
+### Escenarios que debe cubrir el autosync vigente
+
+| Escenario | Comportamiento esperado |
+| --- | --- |
+| CIDR inválido, octeto >255 o máscara >32 | Rechazar antes de cualquier escritura |
+| `192.168.1.5/24` | Normalizar/advertir como `192.168.1.0/24` |
+| Misma red repetida en el mismo lote | Una sola operación efectiva |
+| Misma red en dos nodos | Una entrada global, una ruta por cada VRF |
+| Red pública usada internamente | Admitirla tras validación de rutas vitales |
+| Red cubierta por un supernet | Conservar exacta y registrar cobertura informativa |
+| Dos provisiones simultáneas | Lock; sin duplicados en RouterOS ni intent file |
+| MikroTik inaccesible | No informar éxito; estado reintentable y sin DB falsa |
+| DB falla después de escribir RouterOS | Operación degradada y reconciliación posterior |
+| Directorio de intención ausente o sin permisos | Error visible, métrica y reintento |
+| Watcher systemd no dispara | Timer periódico aplica la intención pendiente |
+| `wg syncconf` falla | Restaurar backup y conservar intención pendiente |
+| AllowedIP existe pero falta ruta Linux | `ip route replace` la autocura |
+| Ruta VRF existe pero falta address-list | Reconciliador asegura la lista |
+| Edición agrega una nueva LAN | Core, DB y VPS se sincronizan en el mismo flujo |
+| Edición retira una LAN compartida | Sólo quita la ruta de esa VRF; global se preserva |
+| Deprovisión de un nodo | No rompe CIDR que pueden usar nodos hermanos |
+| Reinicio backend/VPS | Se reconstruye el estado aditivo desde DB/intent |
+| Cambio manual fuera de la aplicación | Se detecta drift; desconocidos se preservan |
+| `0.0.0.0/0` o red que contiene endpoint/VPS | Bloqueo obligatorio |
 
 ## 3. Auditoría del comportamiento actual
 
@@ -318,9 +364,10 @@ Responsabilidades:
 - `mgmtAllowedIps.js`: leer redes públicas del registro por workspace; mantener
   RouterOS como observación/fallback temporal, no como fuente primaria final.
 
-## 10. API propuesta
+## 10. API propuesta — diferida
 
-Todas bajo `/api/admin/managed-networks`, con sesión, CSRF y
+Esta fase no forma parte del endurecimiento backend-only inmediato. Cuando se
+retome, todas irán bajo `/api/admin/managed-networks`, con sesión, CSRF y
 `requirePlatformAdmin`.
 
 | Método y ruta | Uso |
@@ -355,9 +402,10 @@ El contrato de respuesta debe separar:
 }
 ```
 
-## 11. Interfaz de Administración
+## 11. Interfaz de Administración — diferida
 
-Agregar una sección `Redes remotas` en `SettingsModule`, junto a Router Core,
+No se implementará en la etapa vigente. En una fase futura se podrá agregar una
+sección `Redes remotas` en `SettingsModule`, junto a Router Core,
 Servidor VPN y Escaneo.
 
 ### Resumen
@@ -477,15 +525,15 @@ supernets y conflictos vitales.
 
 **Aceptación:** conteos reproducibles y ninguna mutación de RouterOS/VPS.
 
-### Fase 2 — Inventario read-only en API y UI
+### Fase 2 — Inventario y observabilidad interna, sin UI
 
-- Endpoint de estado deseado/real.
-- Nueva sección `Redes remotas`.
-- Filtros, dependencias y drift.
-- Sin botones de mutación.
+- CLI/servicio interno de estado deseado/real.
+- Logs estructurados y health técnico resumido.
+- Comparación de dependencias y drift.
+- Sin API CRUD ni pantalla.
 
-**Aceptación:** la pantalla representa exactamente DB, MikroTik, config/runtime
-de WireGuard y rutas.
+**Aceptación:** el diagnóstico interno representa exactamente DB, MikroTik,
+config/runtime de WireGuard y rutas, sin realizar bajas.
 
 ### Fase 3 — Servicio único y altas idempotentes
 
@@ -497,18 +545,18 @@ de WireGuard y rutas.
 **Aceptación:** agregar el mismo CIDR dos veces no duplica lista/AllowedIPs; al
 asociarlo a otro nodo sí crea la segunda ruta VRF.
 
-### Fase 4 — Reconciliador host v2
+### Fase 4 — Reconciliador host v2 en modo aditivo
 
 - Intent versionado y status.
 - Validación host-side, lock, backup y rollback.
-- Diff de altas y bajas administradas.
+- Diff de altas; cálculo de bajas sólo en dry-run.
 - Pruebas de shell con `wg`, `wg-quick` e `ip` falsos.
 - Timer de reconciliación periódico como red de seguridad.
 
-**Aceptación:** alta/baja en vivo sin reiniciar `wg0`, persistencia tras reboot y
-rollback ante health check fallido.
+**Aceptación:** alta en vivo sin reiniciar `wg0`, persistencia tras reboot,
+autocuración de rutas y rollback ante health check fallido. Ninguna baja global.
 
-### Fase 5 — Deshabilitación y eliminación por referencias
+### Fase 5 — Eliminación por referencias, diferida y apagada
 
 - Saga de retiro.
 - Soft-disable.
@@ -516,8 +564,8 @@ rollback ante health check fallido.
 - Retiro global sólo con cero referencias.
 - Reintentos de estados `DEGRADED`.
 
-**Aceptación:** retirar una de dos asociaciones conserva la red global; retirar
-la última limpia ambos extremos.
+**Aceptación futura:** retirar una de dos asociaciones conserva la red global;
+retirar la última limpia ambos extremos. No se activa sin canary y autorización.
 
 ### Fase 6 — Integración completa de ciclo de nodo
 
@@ -531,15 +579,15 @@ la última limpia ambos extremos.
 
 ### Fase 7 — Canary y activación
 
-1. Producción en read-only.
-2. Canary de alta con una red de laboratorio.
-3. Alta de una red pública interna real.
-4. Misma red asociada a un segundo nodo.
-5. Retiro de una asociación.
-6. Deshabilitar/rehabilitar.
-7. Retirar última asociación.
-8. Reiniciar VPS y confirmar persistencia.
-9. Activar mutaciones globalmente.
+1. Producción en diagnóstico/dry-run interno.
+2. Canary automático de alta con una red de laboratorio.
+3. Alta automática de una red pública interna real.
+4. Misma red asociada automáticamente a un segundo nodo.
+5. Editar un nodo y comprobar sincronización inmediata del VPS.
+6. Simular drift y confirmar autocuración aditiva.
+7. Reiniciar VPS y confirmar persistencia.
+8. Mantener bajas globales apagadas.
+9. Autorizar por separado cualquier fase de retiro automático o UI.
 
 ## 15. Secuencia de commits sugerida
 
