@@ -4,6 +4,13 @@
 > Aquí solo se **añaden** entradas por sesión (las más nuevas arriba); no se edita lo viejo.
 > Mantenimiento gobernado por la skill `handoff-keeper` (`.claude/skills/handoff-keeper/`).
 
+> **Sesión 2026-07-31 — Autosync remoto desplegado en producción.** Rama `vps_prod`; producción `69c368f`. Skills: `network-engineer`, `handoff-keeper`.
+> - Preflight en `e465c88`; respaldo verificado `/root/pre-network-sync-20260731T172817Z` y rollback de imagen `gestionvpn-10-backend:pre-69c368f-20260731T172817Z`.
+> - Checkout avanzado con `fetch + reset --hard origin/vps_prod`; se reconstruyó/recreó sólo backend. Frontend y DB permanecieron intactos.
+> - Migraciones idempotentes OK; backend healthy, cero reinicios/errores, 47 tablas y 14 nodos conservados. HTTPS raíz/workspace 200.
+> - Reconciliador confirmó estado completo; intención escribible; systemd path/timer y `wg0` activos; `142.152.7.1` resuelve por `dev wg0`. Validación productiva bloquea `0.0.0.0/0` y canonicaliza host bits.
+> - `/api/health` puede indicar `degraded` por RouterOS `stale` sin escrituras recientes; MySQL/SMTP están `ok`, no es regresión del deploy.
+
 > **Sesión 2026-07-31 — Autosync remoto endurecido (backend-only, sin despliegue).** Rama `vps_prod`; código y pruebas, producción sin modificar. Skills: `network-engineer`, `handoff-keeper`.
 > - Validación/canonicalización IPv4 CIDR estricta, bloqueo de `0.0.0.0/0` y escritura atómica de la intención wg0.
 > - Provisión/edición comparten servicio idempotente para rutas y `LIST-NET-REMOTE-TOWERS`, serializado contra carreras. Retirar una LAN elimina sólo rutas del VRF y conserva recursos globales.
