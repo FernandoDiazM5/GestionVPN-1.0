@@ -6,6 +6,11 @@
 
 ---
 
+> **Sesión 2026-07-31 — Plan para administrar redes remotas WireGuard desde el panel.** Rama `vps_prod`; sólo documentación, sin cambios en producción. Skills: `process-discovery-interviewer`, `network-engineer`, `handoff-keeper`.
+> - Creado [`docs/PLAN_ADMIN_WIREGUARD_NETWORKS.md`](docs/PLAN_ADMIN_WIREGUARD_NETWORKS.md): admite CIDR privados o públicos usados internamente, red global única, múltiples bindings por nodo/workspace, ruta por VRF, deduplicación en `LIST-NET-REMOTE-TOWERS` y `AllowedIPs`, inventario/drift, UI, permisos, estados, pruebas, despliegue gradual y rollback.
+> - Auditoría del código: provisión (`addTowerEntries`) y autosync del VPS (`appendWg0Intent` + watcher host) ya agregan sólo si falta; el watcher también asegura rutas Linux. La brecha es que todo es append-only y `editing.routes.js` agrega por un camino distinto y elimina la entrada global sin comprobar referencias.
+> - Decisión: MySQL será la fuente del estado deseado mediante redes globales + bindings; el MikroTik tendrá una sola entrada exacta y el VPS un solo AllowedIP administrado, mientras cada nodo conserva su propia ruta VRF. Retirar una asociación no limpia globalmente hasta llegar a cero referencias. Importación inicial sólo preserva/clasifica; no borra desconocidos.
+
 > **Sesión 2026-07-30 — Endurecimiento SSH, Fail2ban, actualizaciones y reinicio verificado.** Producción funcional sin despliegue de código; skills `network-engineer` y `handoff-keeper`.
 > - Respaldo previo root-only `/root/ssh-hardening-20260730T050400Z/system-config.tar.gz`, checksum SHA-256 verificado. Se creó `vpsadmin` con dos llaves públicas independientes, acceso `sudo` no interactivo y pruebas reales de ambas llaves antes y después del reinicio.
 > - SSH admite exclusivamente clave pública para `vpsadmin`; acceso directo de `root`, contraseñas y keyboard-interactive quedaron deshabilitados. `sshd -t` pasó y el rollback temporizado se canceló sólo después de probar la ruta alternativa. El alias local canónico es `ssh gestionvpn-vps`; `.env` guarda únicamente host/usuario/rutas/fingerprint, nunca la llave privada.
