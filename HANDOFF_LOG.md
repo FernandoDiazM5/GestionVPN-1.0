@@ -4,6 +4,12 @@
 > Aquí solo se **añaden** entradas por sesión (las más nuevas arriba); no se edita lo viejo.
 > Mantenimiento gobernado por la skill `handoff-keeper` (`.claude/skills/handoff-keeper/`).
 
+> **Sesión 2026-07-31 — UI de Seguridad VPS corregida y desplegada.** Rama/producción `0f43e85`. Skills: `ui-design-system`, `tailwind-design-system`, `handoff-keeper`.
+> - Las capturas productivas mostraron tabla comprimida, tipografía técnica general y controles sin estilo porque `btn-secondary` no existe. Se reemplazó por clases canónicas y una composición responsive.
+> - Escritorio: cinco columnas, fechas agrupadas, badges y acciones compactas. Móvil: tarjetas y controles táctiles. Lista confiable, actividad y modales también se normalizaron.
+> - Frontend 216/216, build/TypeScript/ESLint/diff correctos. Sólo frontend reconstruido; backend/DB/agente intactos. Asset productivo `SecurityModule-BK8UFFxu.js`, 0 reinicios y rollback `gestionvpn-10-frontend:pre-security-ui-20260731T235658Z`.
+> - Build cache limpiada; disco volvió a 67%. Pendiente: recarga y confirmación visual humana.
+
 > **Sesión 2026-07-31 — Seguridad VPS desplegada por fases.** Rama `vps_prod`; producción funcional `a5e0358`. Skills: `network-engineer`, `browser`, `handoff-keeper`.
 > - Respaldo `/root/pre-security-admin-20260731T230425Z`: dump gzip/checksum, restauración temporal 47/47 tablas, configuración host y tags de rollback de backend/frontend.
 > - Instalados agente HMAC en localhost y 6 jails manuales; Fail2ban quedó con 7 jails. Canary firmado de estado y rechazo de autobloqueo correctos.
