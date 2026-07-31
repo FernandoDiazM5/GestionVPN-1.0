@@ -1,7 +1,9 @@
 # Plan de implementación — Administración de redes remotas WireGuard
 
-**Fecha:** 2026-07-31  
-**Estado:** propuesta lista para implementar; no modifica todavía producción  
+**Fecha:** 2026-07-31
+
+**Estado:** propuesta lista para implementar; no modifica todavía producción
+
 **Alcance inicial:** IPv4, Administrador de plataforma, `wg0` del VPS y
 `LIST-NET-REMOTE-TOWERS` del MikroTik Core
 
