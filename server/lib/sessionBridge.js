@@ -13,6 +13,7 @@ const userRepo = require('../db/repos/userRepo');
 const workspaceRepo = require('../db/repos/workspaceRepo');
 const metrics = require('./metrics');
 const accountSecurity = require('../db/repos/accountLoginSecurityRepo');
+const webObservation = require('./webSecurityObservation');
 
 const DUMMY_USER_ID = '00000000-0000-0000-0000-000000000000';
 
@@ -88,7 +89,9 @@ async function buildSessionForLegacyUser(username) {
  * Devuelve { token, user } si las credenciales son válidas, o null.
  * Permite que Moderadores/Miembros inicien sesión en la app.
  */
-async function authenticateMysqlUser(login, password, { includeFailure = false, requestIp = '' } = {}) {
+async function authenticateMysqlUser(login, password, {
+  includeFailure = false, requestIp = '', routeGroup = '/api/account/login',
+} = {}) {
   // Acepta: email directo · username corto (<username>@local.app) ·
   // o el `name` del usuario (lo que el Administrador ve como "usuario").
   const raw = String(login || '').trim().toLowerCase();
@@ -106,6 +109,7 @@ async function authenticateMysqlUser(login, password, { includeFailure = false, 
   );
   const membership = await workspaceRepo.findMembershipByUser(user?.id || DUMMY_USER_ID);
   const lock = user ? await accountSecurity.status(user.id) : { locked: false };
+  const credentialFailure = !user ? 'UNKNOWN_IDENTITY' : !verification.valid ? 'KNOWN_IDENTITY' : null;
 
   let failureReason = null;
   if (!user) failureReason = 'not_found';
@@ -115,6 +119,10 @@ async function authenticateMysqlUser(login, password, { includeFailure = false, 
   else if (user.disabled_at) failureReason = 'disabled';
   else if (!membership) failureReason = 'no_membership';
   if (failureReason) {
+    if (credentialFailure) void webObservation.record({ eventType: 'AUTH_FAILURE', sourceIp: requestIp,
+      identityHash: webObservation.identityHash(raw), userId: user?.id || null,
+      routeGroup, method: 'POST', statusCode: 401,
+      detail: { identityKind: credentialFailure } });
     let security = lock;
     if (failureReason === 'bad_password') {
       security = await accountSecurity.recordFailure({ userId: user.id, ip: requestIp });

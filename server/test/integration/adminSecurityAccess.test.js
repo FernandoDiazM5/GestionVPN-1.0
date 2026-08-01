@@ -7,9 +7,11 @@ const securityRepo = {
 };
 const agent = { callSecurityAgent: vi.fn() };
 const accountSecurity = { listLocked: vi.fn(), unlock: vi.fn() };
+const webObservation = { observation: vi.fn() };
 stubModule(__dirname, '../../db/repos/platformSecurityRepo', securityRepo);
 stubModule(__dirname, '../../lib/securityAgentClient', agent);
 stubModule(__dirname, '../../db/repos/accountLoginSecurityRepo', accountSecurity);
+stubModule(__dirname, '../../lib/webSecurityObservation', webObservation);
 stubModule(__dirname, '../../lib/passwordHasher', { verifyPassword: vi.fn(async () => true) });
 stubModule(__dirname, '../../db/repos/userRepo', { findById: vi.fn(async id => ({ id, password_hash: 'hash' })) });
 stubModule(__dirname, '../../db/repos/authIdentityRepo', { findByUser: vi.fn() });
@@ -56,6 +58,7 @@ describe('seguridad administrativa del VPS', () => {
     agent.callSecurityAgent.mockResolvedValue({ jails: [], trusted: [] });
     accountSecurity.listLocked.mockResolvedValue([]);
     accountSecurity.unlock.mockResolvedValue(true);
+    webObservation.observation.mockResolvedValue({ mode: 'OBSERVE_ONLY', sources: [], events: [] });
   });
 
   it('niega todo el módulo a usuarios que no son platform_admin', async () => {
@@ -132,5 +135,12 @@ describe('seguridad administrativa del VPS', () => {
     expect(response.status).toBe(200);
     expect(accountSecurity.unlock).toHaveBeenCalledWith(userId);
     expect(securityRepo.audit).toHaveBeenCalledWith(expect.objectContaining({ action: 'ACCOUNT_UNLOCK' }));
+  });
+  it('expone observacion web solo al administrador y no ejecuta bloqueos', async () => {
+    const response = await request(app).get('/api/admin/security/web-observation').set('x-test-role', 'admin');
+    expect(response.status).toBe(200);
+    expect(response.body.mode).toBe('OBSERVE_ONLY');
+    expect(webObservation.observation).toHaveBeenCalledWith({ sourceIp: null });
+    expect(agent.callSecurityAgent).not.toHaveBeenCalled();
   });
 });

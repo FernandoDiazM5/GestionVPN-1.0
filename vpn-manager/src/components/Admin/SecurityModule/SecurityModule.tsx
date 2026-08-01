@@ -4,7 +4,7 @@ import {
   Unlock, UserRoundX, X,
 } from 'lucide-react';
 import { confirmGoogleIdentity } from '../../../services/federatedAuth';
-import { securityAdminApi, type LockedAccount, type SecurityJail, type SecurityMutation } from '../../../services/securityAdminApi';
+import { securityAdminApi, type LockedAccount, type SecurityJail, type SecurityMutation, type WebObservation } from '../../../services/securityAdminApi';
 
 const categories: Array<[SecurityMutation['category'], string]> = [
   ['FALSE_POSITIVE', 'Falso positivo'],
@@ -64,13 +64,15 @@ export default function SecurityModule() {
   const [attempts, setAttempts] = useState<AttemptResult | null>(null);
   const [lockedAccounts, setLockedAccounts] = useState<LockedAccount[]>([]);
   const [unlockAccount, setUnlockAccount] = useState<LockedAccount | null>(null);
+  const [webObservation, setWebObservation] = useState<WebObservation | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const [status, recent, accountLocks] = await Promise.all([
+      const [status, recent, accountLocks, web] = await Promise.all([
         securityAdminApi.status(), securityAdminApi.history(), securityAdminApi.lockedAccounts(),
+        securityAdminApi.webObservation(),
       ]);
       setJails(status.jails);
       setTrusted(status.trusted);
@@ -78,6 +80,7 @@ export default function SecurityModule() {
       setAttemptHistorySince(status.attemptHistory?.since ?? null);
       setHistory(recent.history);
       setLockedAccounts(accountLocks.accounts);
+      setWebObservation(web);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'No se pudo cargar la seguridad del VPS');
     } finally {
@@ -185,7 +188,7 @@ export default function SecurityModule() {
             Controla bloqueos, intentos SSH y direcciones de confianza.
           </p>
         </div>
-        <button className="btn-outline self-start" onClick={() => void load()} disabled={loading}>
+        <button className="btn-outline btn-md self-start" onClick={() => void load()} disabled={loading}>
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           {loading ? 'Actualizando' : 'Actualizar'}
         </button>
@@ -222,7 +225,7 @@ export default function SecurityModule() {
                 <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{account.workspace_name || '—'}</td>
                 <td className="px-4 py-4"><span className="badge badge-neutral">{account.failures_24h} en 24 h</span></td>
                 <td className="whitespace-nowrap px-4 py-4 text-slate-600 dark:text-slate-300">{formatDate(account.locked_until)}</td>
-                <td className="px-4 py-4 text-right"><button className="btn-outline min-h-10 whitespace-nowrap" onClick={() => openAccountUnlock(account)}><Unlock className="h-4 w-4" /> Desbloquear</button></td>
+                <td className="px-4 py-4 text-right"><button className="btn-outline btn-md min-h-10 whitespace-nowrap" onClick={() => openAccountUnlock(account)}><Unlock className="h-4 w-4" /> Desbloquear</button></td>
               </tr>)}
               {!loading && lockedAccounts.length === 0 && <tr><td colSpan={5} className="p-8 text-center text-sm text-slate-500">No hay usuarios bloqueados.</td></tr>}
             </tbody>
@@ -232,11 +235,13 @@ export default function SecurityModule() {
           {lockedAccounts.map((account) => <article key={account.user_id} className="space-y-3 p-4">
             <div className="flex items-start gap-3"><UserRoundX className="mt-0.5 h-5 w-5 text-amber-600" /><div className="min-w-0"><div className="truncate font-semibold">{account.name || account.email}</div><div className="break-all text-xs text-slate-500">{account.email}</div></div></div>
             <div className="rounded-xl bg-slate-50 p-3 text-xs dark:bg-slate-900/60">{account.failures_24h} intentos en 24 h · Hasta {formatDate(account.locked_until)}</div>
-            <button className="btn-outline min-h-11 w-full" onClick={() => openAccountUnlock(account)}><Unlock className="h-4 w-4" /> Desbloquear usuario</button>
+            <button className="btn-outline btn-md min-h-11 w-full" onClick={() => openAccountUnlock(account)}><Unlock className="h-4 w-4" /> Desbloquear usuario</button>
           </article>)}
           {!loading && lockedAccounts.length === 0 && <div className="p-8 text-center text-sm text-slate-500">No hay usuarios bloqueados.</div>}
         </div>
       </section>
+
+      {webObservation && <WebObservationPanel observation={webObservation} />}
 
       <section className="card overflow-hidden">
         <div className="border-b border-slate-200 p-4 dark:border-slate-700">
@@ -302,7 +307,7 @@ export default function SecurityModule() {
             <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">Estas direcciones no serán bloqueadas por Fail2ban.</p>
           </div>
           {currentIp && (
-            <button className="btn-outline self-start" onClick={() => open('trust', currentIp)}>
+            <button className="btn-outline btn-md self-start" onClick={() => open('trust', currentIp)}>
               <ShieldCheck className="h-4 w-4" /> Confiar en mi IP actual
             </button>
           )}
@@ -340,6 +345,35 @@ export default function SecurityModule() {
   );
 }
 
+function WebObservationPanel({ observation }: { observation: WebObservation }) {
+  const recommended = observation.sources.filter((source) => source.recommendations.length > 0).length;
+  const recommendationLabel = (items:string[]) => {
+    if (items.length === 0) return 'Sin umbral superado';
+    if (items.includes('INDEFINITE_AUTH_ABUSE')) return 'Candidato a bloqueo indefinido';
+    return 'Candidato a bloqueo temporal';
+  };
+  return <section className="card overflow-hidden">
+    <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between dark:border-slate-700">
+      <div><div className="flex flex-wrap items-center gap-2"><h2 className="font-bold text-slate-900 dark:text-white">Observación de ataques web</h2><span className="badge badge-info">Solo observación</span></div>
+        <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">Analiza las últimas 24 horas sin bloquear direcciones. Conservación: {observation.retentionDays} días.</p></div>
+      <div className="flex gap-2"><span className="badge badge-neutral">{observation.sources.length} direcciones</span><span className={recommended ? 'badge badge-warning' : 'badge badge-success'}>{recommended} superan umbral</span></div>
+    </div>
+    {observation.truncated && <div className="border-b border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">La vista alcanzó el límite de análisis; los datos no se han eliminado.</div>}
+    <div className="hidden overflow-x-auto md:block"><table className="min-w-[940px] w-full text-left text-sm"><thead className="bg-slate-50 dark:bg-slate-900/60"><tr>
+      {['Dirección', 'Login 24 h', 'Límites 10 min', 'Rutas 5 min', 'Sensibles 10 min', 'Evaluación'].map((heading)=><th key={heading} className="px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-600">{heading}</th>)}
+    </tr></thead><tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+      {observation.sources.slice(0,50).map((source)=><tr key={source.sourceIp}>
+        <td className="px-4 py-4"><div className="font-mono font-semibold">{source.sourceIp}</div><div className="mt-1 text-xs text-slate-500">Último: {formatDate(source.lastSeen)}</div></td>
+        <td className="px-4 py-4"><div className="font-semibold">{source.authFailures24h}</div><div className="text-xs text-slate-500">{source.identities24h} identidades</div></td>
+        <td className="px-4 py-4 text-center">{source.rateLimited10m}</td><td className="px-4 py-4"><div>{source.notFound5m} intentos</div><div className="text-xs text-slate-500">{source.distinctRoutes5m} rutas</div></td>
+        <td className="px-4 py-4 text-center">{source.sensitive10m}</td><td className="px-4 py-4"><span className={source.recommendations.length ? 'badge badge-warning' : 'badge badge-neutral'}>{recommendationLabel(source.recommendations)}</span></td>
+      </tr>)}
+      {observation.sources.length===0&&<tr><td colSpan={6} className="p-8 text-center text-sm text-slate-500">Aún no hay eventos web observados.</td></tr>}
+    </tbody></table></div>
+    <div className="divide-y divide-slate-200 md:hidden dark:divide-slate-700">{observation.sources.slice(0,50).map((source)=><article key={source.sourceIp} className="space-y-3 p-4"><div className="flex items-start justify-between gap-2"><div className="font-mono text-sm font-semibold">{source.sourceIp}</div><span className={source.recommendations.length?'badge badge-warning':'badge badge-neutral'}>{recommendationLabel(source.recommendations)}</span></div><div className="grid grid-cols-2 gap-2 text-xs"><div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900/60">Login 24 h<br/><strong>{source.authFailures24h}</strong></div><div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900/60">429 en 10 min<br/><strong>{source.rateLimited10m}</strong></div><div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900/60">Rutas en 5 min<br/><strong>{source.notFound5m}</strong></div><div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900/60">Sensibles<br/><strong>{source.sensitive10m}</strong></div></div></article>)}</div>
+  </section>;
+}
+
 function AccountUnlockDialog(props: {
   account: LockedAccount; category: SecurityMutation['category']; setCategory:(value:SecurityMutation['category'])=>void;
   reason:string; setReason:(value:string)=>void; password:string; setPassword:(value:string)=>void;
@@ -352,7 +386,7 @@ function AccountUnlockDialog(props: {
     <label className="block text-sm font-semibold">Categoría<select className="input-field mt-1" value={props.category} onChange={(event)=>props.setCategory(event.target.value as SecurityMutation['category'])}>{categories.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
     <label className="block text-sm font-semibold">Motivo<input className="input-field mt-1" value={props.reason} onChange={(event)=>props.setReason(event.target.value)} placeholder="Mínimo 10 caracteres" /></label>
     <label className="block text-sm font-semibold">Contraseña actual<input type="password" autoComplete="current-password" className="input-field mt-1" value={props.password} onChange={(event)=>props.setPassword(event.target.value)} /></label>
-    <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><button className="btn-ghost" onClick={props.close}>Cancelar</button><button className="btn-outline" disabled={disabled} onClick={()=>void props.execute(true)}>Confirmar con Google</button><button className="btn-primary" disabled={disabled || !props.password} onClick={()=>void props.execute(false)}>{props.busy?'Aplicando…':'Desbloquear'}</button></div>
+    <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><button className="btn-ghost" onClick={props.close}>Cancelar</button><button className="btn-outline btn-md" disabled={disabled} onClick={()=>void props.execute(true)}>Confirmar con Google</button><button className="btn-primary btn-md" disabled={disabled || !props.password} onClick={()=>void props.execute(false)}>{props.busy?'Aplicando…':'Desbloquear'}</button></div>
   </div></div>;
 }
 
@@ -407,10 +441,10 @@ function BlockedCard({ row, open, showAttempts }: {
       </div>
       <div className="grid grid-cols-3 gap-2">
         <button className="btn-ghost min-h-11" onClick={() => void showAttempts(row.ip)}><Eye className="h-4 w-4" /> Intentos</button>
-        <button className="btn-outline min-h-11" onClick={() => open('trust', row.ip)}><ShieldCheck className="h-4 w-4" /> Confiar</button>
-        <button className="btn-danger min-h-11" onClick={() => open('unban', row.ip, row.jail)}><Unlock className="h-4 w-4" /> Quitar</button>
+        <button className="btn-outline btn-md min-h-11" onClick={() => open('trust', row.ip)}><ShieldCheck className="h-4 w-4" /> Confiar</button>
+        <button className="btn-danger btn-md min-h-11" onClick={() => open('unban', row.ip, row.jail)}><Unlock className="h-4 w-4" /> Quitar</button>
       </div>
-      {!isIndefiniteJail(row.jail) && <button className="btn-outline min-h-11 w-full" onClick={() => open('promote', row.ip, row.jail)}><InfinityIcon className="h-4 w-4" /> Hacer indefinido</button>}
+      {!isIndefiniteJail(row.jail) && <button className="btn-outline btn-md min-h-11 w-full" onClick={() => open('promote', row.ip, row.jail)}><InfinityIcon className="h-4 w-4" /> Hacer indefinido</button>}
     </article>
   );
 }
@@ -552,8 +586,8 @@ function ActionDialog(props: {
         </div>}
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button className="btn-ghost" onClick={props.close}>Cancelar</button>
-          <button className="btn-outline" disabled={disabled} onClick={() => void props.execute(true)}>Confirmar con Google</button>
-          <button className="btn-primary" disabled={disabled || !props.password} onClick={() => void props.execute(false)}>{props.busy ? 'Aplicando…' : 'Confirmar'}</button>
+          <button className="btn-outline btn-md" disabled={disabled} onClick={() => void props.execute(true)}>Confirmar con Google</button>
+          <button className="btn-primary btn-md" disabled={disabled || !props.password} onClick={() => void props.execute(false)}>{props.busy ? 'Aplicando…' : 'Confirmar'}</button>
         </div>
       </div>
     </div>

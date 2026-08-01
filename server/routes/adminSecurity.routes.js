@@ -18,6 +18,7 @@ const accountSecurityRepo = require('../db/repos/accountLoginSecurityRepo');
 const telegram = require('../lib/telegram');
 const { callSecurityAgent } = require('../lib/securityAgentClient');
 const { clientIp, guardPolicy } = require('../lib/rateLimit');
+const webObservation = require('../lib/webSecurityObservation');
 
 const router = express.Router();
 router.use(requireSession, requirePlatformAdmin);
@@ -121,6 +122,8 @@ router.get('/history', validate({ query: SecurityHistoryQuerySchema }), asyncHan
   sendOk(res, { history: await securityRepo.history(req.query) })));
 router.get('/attempts', validate({ query: SecurityHistoryQuerySchema }), asyncHandler(async (req, res) =>
   sendOk(res, await callSecurityAgent('attempts', req.query))));
+router.get('/web-observation', validate({ query: SecurityHistoryQuerySchema }), asyncHandler(async (req, res) =>
+  sendOk(res, await webObservation.observation({ sourceIp: req.query.target || null }))));
 router.get('/locked-accounts', asyncHandler(async (_req, res) =>
   sendOk(res, { accounts: await accountSecurityRepo.listLocked() })));
 

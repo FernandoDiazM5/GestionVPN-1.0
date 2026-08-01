@@ -107,7 +107,8 @@ router.post('/login', rl.guardPolicy('LOGIN', { identityField: 'username' }), as
         // 2) Usuario multi-tenant (MySQL): Moderador / Miembro por email
         if (!dbError && !row) {
             try {
-                const s = await authenticateMysqlUser(username, password, { includeFailure: true, requestIp: req._clientIp });
+                const s = await authenticateMysqlUser(username, password, { includeFailure: true,
+                    requestIp: req._clientIp, routeGroup: '/api/auth/login' });
                 if (s?.denied === 'locked') {
                     return sendError(res, 423, 'Cuenta bloqueada temporalmente por intentos incorrectos. Restablece tu clave o solicita desbloqueo.', 'ACCOUNT_LOCKED');
                 }

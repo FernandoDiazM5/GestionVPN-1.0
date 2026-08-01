@@ -11,6 +11,16 @@ export interface LockedAccount {
   failures_15m:number; failures_24h:number; locked_until:number; lock_reason:string;
   last_failure_at?:number|null;
 }
+export interface WebObservationSource {
+  sourceIp:string; authFailures24h:number; identities24h:number; unknownIdentities24h:number;
+  rateLimited10m:number; notFound5m:number; distinctRoutes5m:number; sensitive10m:number;
+  firstSeen:number; lastSeen:number; events:number; recommendations:string[];
+}
+export interface WebObservation {
+  success:true; mode:'OBSERVE_ONLY'; retentionDays:number; since:number; until:number; truncated:boolean;
+  sources:WebObservationSource[]; events:Array<{eventType:string;sourceIp:string;userId?:string|null;
+    routeGroup?:string|null;method?:string|null;statusCode?:number|null;occurredAt:number}>;
+}
 export interface SecurityMutation {
   target: string; jail?: string; duration?: '15m'|'1h'|'6h'|'24h'|'7d'|'indefinite';
   category: 'FALSE_POSITIVE'|'ADMIN_ACCESS'|'MAINTENANCE'|'SECURITY_TEST'|'OTHER';
@@ -23,6 +33,8 @@ export const securityAdminApi = {
     `/api/admin/security/history${target ? `?target=${encodeURIComponent(target)}` : ''}`),
   attempts: (target?: string) => get<{ success:true; attempts:Array<Record<string, unknown>>; total:number; historySince:number|null; historyUntil:number|null; truncated:boolean }>(
     `/api/admin/security/attempts${target ? `?target=${encodeURIComponent(target)}` : ''}`),
+  webObservation: (target?:string) => get<WebObservation>(
+    `/api/admin/security/web-observation${target ? `?target=${encodeURIComponent(target)}` : ''}`),
   stepUpPassword: (password: string) => post<{success:true;stepUpToken:string;expiresAt:number}>(
     '/api/admin/security/step-up', { password }),
   stepUpGoogle: (firebaseIdToken: string) => post<{success:true;stepUpToken:string;expiresAt:number}>(

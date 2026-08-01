@@ -159,6 +159,7 @@ app.use(pinoHttp({
         res: (res) => ({ statusCode: res.statusCode }),
     },
 }));
+app.use(require('./lib/webSecurityObservation').observeRequests);
 
 // ── Métricas HTTP (FASE 9) ────────────────────────────────────────
 //  Mide latencia + cuenta requests por método/ruta/status.
@@ -238,6 +239,7 @@ function gracefulShutdown(signal) {
         try { expirationJob.stop(); } catch (_) {}
         try { coreBackupJob.stop(); } catch (_) {}
         try { require('./lib/rateLimit').stopBucketCleanup(); } catch (_) {}
+        try { require('./lib/webSecurityObservation').stopCleanup(); } catch (_) {}
         setTimeout(() => process.exit(0), 500);
     };
 }
@@ -256,6 +258,7 @@ function startServer(attempt = 1) {
         // Inicia monitoreo de salud de MySQL cada 10 segundos
         startMonitor(10000);
         require('./lib/rateLimit').startBucketCleanup();
+        require('./lib/webSecurityObservation').startCleanup();
         expirationJob.start();
         telegramBot.start();
         dashboardMetrics.start();

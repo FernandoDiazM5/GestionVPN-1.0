@@ -34,6 +34,9 @@ const metricsMocks = stubModule(__dirname, '../../lib/metrics', {
 const accountSecurityMocks = stubModule(__dirname, '../../db/repos/accountLoginSecurityRepo', {
   status: vi.fn(), recordFailure: vi.fn(), clearAfterSuccess: vi.fn(),
 });
+const webObservationMocks = stubModule(__dirname, '../../lib/webSecurityObservation', {
+  record: vi.fn(), identityHash: vi.fn(value => `hash:${value}`),
+});
 
 const BRIDGE_PATH = require.resolve(path.join(__dirname, '..', '..', 'lib', 'sessionBridge'));
 const { authenticateMysqlUser } = require('../../lib/sessionBridge');
@@ -62,6 +65,7 @@ beforeEach(() => {
   accountSecurityMocks.status.mockResolvedValue({ locked: false, lockedUntil: null });
   accountSecurityMocks.recordFailure.mockResolvedValue({ locked: false, lockedUntil: null });
   accountSecurityMocks.clearAfterSuccess.mockResolvedValue(undefined);
+  webObservationMocks.record.mockResolvedValue(undefined);
 });
 
 afterAll(() => {
@@ -104,5 +108,15 @@ describe('authenticateMysqlUser anti-enumeración', () => {
     await expect(authenticateMysqlUser('user@example.com', 'password-value', { includeFailure: true }))
       .resolves.toEqual({ denied: 'locked', lockedUntil: 123456 });
     expect(sessionMocks.issueSession).not.toHaveBeenCalled();
+  });
+
+  it('observa una contraseña incorrecta sin guardar la identidad en claro', async () => {
+    passwordMocks.verifyAndUpgrade.mockResolvedValue({ valid: false, upgraded: false, dummy: false });
+    await authenticateMysqlUser('user@example.com', 'incorrecta', { requestIp: '203.0.113.9' });
+    expect(webObservationMocks.record).toHaveBeenCalledWith(expect.objectContaining({
+      eventType: 'AUTH_FAILURE', sourceIp: '203.0.113.9', identityHash: 'hash:user@example.com',
+      userId: baseUser.id,
+    }));
+    expect(JSON.stringify(webObservationMocks.record.mock.calls)).not.toContain('incorrecta');
   });
 });

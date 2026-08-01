@@ -101,6 +101,8 @@ function guardPolicy(flow, { identityField = 'email' } = {}) {
         });
         consumed.push({ ...dimension, status });
         if (!status.allowed) {
+          req._authRateLimitFlow = flow;
+          req._authRateLimitDimension = dimension.kind;
           const retryAfter = Math.max(1, Math.ceil(status.retryAfterMs / 1000));
           res.set('Retry-After', String(retryAfter));
           return res.status(429).json({
@@ -209,6 +211,8 @@ function guardOtpSend() {
       const email = String(req.body?.email || '').trim().toLowerCase();
       const status = await otpSendStatus(ip, email);
       if (status.blocked) {
+        req._authRateLimitFlow = 'OTP_SEND_LEGACY';
+        req._authRateLimitDimension = 'OTP_SEND';
         const retryAfter = Math.max(1, Math.ceil(status.retryAfterMs / 1000));
         res.set('Retry-After', String(retryAfter));
         return res.status(429).json({

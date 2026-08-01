@@ -49,6 +49,23 @@ async function run() {
     INDEX idx_als_locked (locked_until),
     CONSTRAINT fk_als_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  await query(`CREATE TABLE IF NOT EXISTS web_security_events (
+    id CHAR(36) PRIMARY KEY,
+    event_type VARCHAR(32) NOT NULL,
+    source_ip VARCHAR(64) NOT NULL,
+    identity_hash CHAR(64) NULL,
+    user_id CHAR(36) NULL,
+    route_group VARCHAR(160) NULL,
+    method VARCHAR(10) NULL,
+    status_code SMALLINT NULL,
+    detail JSON NULL,
+    occurred_at BIGINT NOT NULL,
+    INDEX idx_wse_time (occurred_at),
+    INDEX idx_wse_ip_time (source_ip, occurred_at),
+    INDEX idx_wse_type_time (event_type, occurred_at),
+    INDEX idx_wse_user_time (user_id, occurred_at),
+    CONSTRAINT fk_wse_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
   console.log('[migrate:platform-security] tablas listas');
 }
 
