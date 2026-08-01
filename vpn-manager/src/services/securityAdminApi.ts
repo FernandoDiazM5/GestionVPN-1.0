@@ -21,7 +21,8 @@ export interface WebObservationSource {
 export interface WebObservation {
   success:true; mode:'OBSERVE_ONLY'; retentionDays:number; since:number; until:number; truncated:boolean;
   enforcement:{configuredMode:string;confirmed:boolean;armed:boolean;active:boolean;rolloutPercent:number;indefiniteConfirmed:boolean;
-    indefiniteActive:boolean;jail:string;indefiniteJail:string;
+    indefiniteActive:boolean;jail:string;authJail?:string;scan6hJail?:string;scan24hJail?:string;
+    sensitiveJail?:string;indefiniteJail:string;
     status:'OBSERVE_ONLY'|'ARMED_NO_ROLLOUT'|'TEMP_ENFORCEMENT'};
   actions:Array<{id:string;source_ip:string;recommendation:string;jail:string;
     status:'PENDING'|'APPLIED'|'FAILED';evidence?:Record<string,number|null>|null;

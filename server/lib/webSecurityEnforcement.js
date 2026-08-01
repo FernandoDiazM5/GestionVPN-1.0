@@ -8,11 +8,15 @@ const { callSecurityAgent } = require('./securityAgentClient');
 const notifier = require('./webSecurityNotifier');
 const log = require('./logger').child({ scope: 'web-security-enforcement' });
 
-const JAIL = 'gestionvpn-web-1h';
-const SCAN_6H_JAIL = 'gestionvpn-web-scan-6h';
+const JAIL = 'gestionvpn-web-rate';
+const AUTH_JAIL = 'gestionvpn-web-auth';
+const SCAN_6H_JAIL = 'gestionvpn-web-scan';
 const SCAN_24H_JAIL = 'gestionvpn-web-scan-24h';
-const TEMP_JAILS = [JAIL, SCAN_6H_JAIL, SCAN_24H_JAIL];
-const INDEFINITE_JAIL = 'gestionvpn-indefinite';
+const SENSITIVE_JAIL = 'gestionvpn-web-sensitive';
+const RECIDIVE_JAIL = 'gestionvpn-web-recidive';
+const LEGACY_JAIL = 'gestionvpn-web-1h';
+const TEMP_JAILS = [JAIL, SCAN_6H_JAIL, SCAN_24H_JAIL, SENSITIVE_JAIL, LEGACY_JAIL];
+const INDEFINITE_JAIL = RECIDIVE_JAIL;
 const ACTIVE_ADMIN_TTL_MS = 30 * 60 * 1000;
 const CONFIRMATION = 'ENABLE_TEMP_WEB_BANS';
 const INDEFINITE_CONFIRMATION = 'ENABLE_INDEFINITE_WEB_BANS';
@@ -43,9 +47,12 @@ function evidenceSummary(source) {
 }
 
 function temporaryPlan(recommendation, priorRouteScans) {
-  if (recommendation !== 'ROUTE_SCAN_DETECTED') {
-    return { recommendation, jail: JAIL, durationMs: 60 * 60 * 1000 };
-  }
+  if (recommendation === 'TEMP_1H_SENSITIVE_SCAN') return {
+    recommendation, jail: SENSITIVE_JAIL, durationMs: 60 * 60 * 1000,
+  };
+  if (recommendation !== 'ROUTE_SCAN_DETECTED') return {
+    recommendation, jail: JAIL, durationMs: 60 * 60 * 1000,
+  };
   if (priorRouteScans >= 1) {
     return { recommendation: 'ROUTE_SCAN_24H', jail: SCAN_24H_JAIL,
       durationMs: 24 * 60 * 60 * 1000 };
@@ -88,8 +95,9 @@ function state() {
   const active = armed && rolloutPercent > 0;
   const indefiniteConfirmed = process.env.WEB_SECURITY_INDEFINITE_CONFIRM === INDEFINITE_CONFIRMATION;
   return { configuredMode, confirmed, armed, active, rolloutPercent, indefiniteConfirmed,
-    indefiniteActive: active && indefiniteConfirmed, jail: JAIL,
-    scan6hJail: SCAN_6H_JAIL, scan24hJail: SCAN_24H_JAIL, indefiniteJail: INDEFINITE_JAIL,
+    indefiniteActive: active && indefiniteConfirmed, jail: JAIL, authJail: AUTH_JAIL,
+    scan6hJail: SCAN_6H_JAIL, scan24hJail: SCAN_24H_JAIL,
+    sensitiveJail: SENSITIVE_JAIL, indefiniteJail: INDEFINITE_JAIL,
     status: active ? 'TEMP_ENFORCEMENT' : armed ? 'ARMED_NO_ROLLOUT' : 'OBSERVE_ONLY' };
 }
 
@@ -149,7 +157,7 @@ async function runOnce({ now = Date.now() } = {}) {
       ? recurrentRouteScan ? 'INDEFINITE_ROUTE_SCAN'
         : recurrent && !directIndefinite ? 'INDEFINITE_WEB_RECIDIVISM' : recommendation
       : temporary.recommendation;
-    const jail = applyIndefinite ? INDEFINITE_JAIL : temporary.jail;
+    const jail = applyIndefinite ? (directIndefinite ? AUTH_JAIL : RECIDIVE_JAIL) : temporary.jail;
     const id = await enforcementRepo.claim({
       idempotencyKey: idempotencyKey(source.sourceIp, actionRecommendation, jail, now),
       sourceIp: source.sourceIp, recommendation: actionRecommendation, jail,
@@ -208,5 +216,5 @@ function stop() { if (timer) clearInterval(timer); timer = null; }
 
 module.exports = { idempotencyKey, runOnce, start, state, stop, touchAdminIp, JAIL, INDEFINITE_JAIL,
   ACTIVE_ADMIN_TTL_MS, CONFIRMATION, INDEFINITE_CONFIRMATION, RECIDIVE_WINDOW_MS, RECIDIVE_BANS,
-  rolloutBucket, evidenceSummary, temporaryPlan, trustedBlockList,
-  SCAN_6H_JAIL, SCAN_24H_JAIL, TEMP_JAILS };
+  rolloutBucket, evidenceSummary, temporaryPlan, trustedBlockList, AUTH_JAIL,
+  SCAN_6H_JAIL, SCAN_24H_JAIL, SENSITIVE_JAIL, RECIDIVE_JAIL, TEMP_JAILS };

@@ -34,15 +34,21 @@ La protección web temporal requiere dos controles simultáneos en el backend:
 `WEB_SECURITY_MODE=enforce_temp` y
 `WEB_SECURITY_ENFORCEMENT_CONFIRM=ENABLE_TEMP_WEB_BANS`. Sin ambos permanece en
 `OBSERVE_ONLY`. El agente acepta para automatización exclusivamente `web_ban`
-hacia los jails fijos `gestionvpn-web-1h`, `gestionvpn-web-scan-6h` y
-`gestionvpn-web-scan-24h`, y vuelve a comprobar IPs críticas, direcciones
+hacia los jails fijos `gestionvpn-web-rate`, `gestionvpn-web-scan`,
+`gestionvpn-web-scan-24h` y `gestionvpn-web-sensitive`; las escaladas usan
+`gestionvpn-web-auth` o `gestionvpn-web-recidive`. Siempre vuelve a comprobar IPs críticas, direcciones
 confiables y sesiones administrativas activas.
+
+Todos estos jails usan la acción `ufw`: el bloqueo se aplica por dirección de
+origen a nivel del VPS y alcanza todos los puertos públicos expuestos, incluidos
+SSH (22), HTTP (80) y HTTPS (443). No se limita a la ruta web que originó el
+incidente.
 
 La escalada indefinida requiere además
 `WEB_SECURITY_INDEFINITE_CONFIRM=ENABLE_INDEFINITE_WEB_BANS`. Con esta tercera
 confirmación, diez fallos distribuidos entre varias identidades en 24 horas o
 el tercer bloqueo web temporal de una IP dentro de 7 días se aplican mediante
-`web_ban_indefinite` en `gestionvpn-indefinite`. El desbloqueo administrativo
+`web_ban_indefinite` en el jail tipado correspondiente. El desbloqueo administrativo
 existente sigue disponible y la operación vuelve a validar todas las exclusiones.
 Los escaneos claros usan una progresión específica de 6 horas, 24 horas y,
 en el tercer episodio dentro de 7 días, bloqueo indefinido.

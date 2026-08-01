@@ -4,6 +4,12 @@
 > Aquí solo se **añaden** entradas por sesión (las más nuevas arriba); no se edita lo viejo.
 > Mantenimiento gobernado por la skill `handoff-keeper` (`.claude/skills/handoff-keeper/`).
 
+> **Sesión 2026-08-01 — Fases originales 7–8 cerradas localmente; sin despliegue.** Rama `vps_prod` (base `0006fce`). Estado: backend 102/612, frontend 64/216, `check:all`, agente 6/6 y Python correctos.
+> - Se habilitó Seguridad para OWNER con alcance estricto a cuentas de su workspace; sólo `platform_admin` puede operar IPs, Fail2ban, UFW, confianza global y políticas.
+> - La UI administrativa se dividió en cinco pestañas accesibles y responsive; actividad reciente combina evidencia manual/automática y filtros por vector.
+> - Los bloqueos web se separaron en auth, rate, scan, sensitive y recidive; UFW cubre globalmente 22/80/443, con auth/recidive indefinidos y compatibilidad temporal del jail anterior.
+> - Se regeneró el inventario de rutas y se añadieron pruebas del alcance por workspace y de cada jail. Pendiente: Fase 9 y autorización de despliegue gradual; producción permanece en `e27184b`.
+
 > **Sesión 2026-08-01 — Fases originales 3–6 cerradas localmente; sin despliegue.**
 > - Autenticación: contraseña olvidada no bloquea una oficina; fuerza bruta multiusuario, identidades inexistentes repetidas y rebloqueo posterior a recuperación se distinguen y escalan con evidencia.
 > - Sólo 429 de autenticación cuentan (20/10 min → 1 h; tercera reincidencia/7 días → indefinido). Health, loopback, administradores activos y confianza IP/CIDR quedan excluidos.

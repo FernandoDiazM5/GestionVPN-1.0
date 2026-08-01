@@ -77,14 +77,14 @@ describe('aplicación temporal de protección web', () => {
     const result = await enforcement.runOnce({ now: 20_000_000 });
     expect(result).toEqual(expect.objectContaining({ applied: 1, failed: 0 }));
     expect(agent.callSecurityAgent).toHaveBeenCalledWith('web_ban', {
-      target: '198.51.100.7', jail: 'gestionvpn-web-1h', sourceJail: 'gestionvpn-web-1h',
+      target: '198.51.100.7', jail: 'gestionvpn-web-sensitive', sourceJail: 'gestionvpn-web-sensitive',
       protectedIps: ['203.0.113.44'],
     });
     expect(repo.complete).toHaveBeenCalledWith(expect.objectContaining({
       id: 'action-1', status: 'APPLIED', expiresAt: 23_600_000,
     }));
     expect(notifier.notifyAutomaticAction).toHaveBeenCalledWith(expect.objectContaining({
-      status: 'APPLIED', sourceIp: '198.51.100.7', jail: 'gestionvpn-web-1h',
+      status: 'APPLIED', sourceIp: '198.51.100.7', jail: 'gestionvpn-web-sensitive',
     }));
     expect(eventRepo.markDecision).toHaveBeenCalledWith(expect.objectContaining({
       sourceIp: '198.51.100.7', eventType: 'SENSITIVE_ENDPOINT',
@@ -114,7 +114,7 @@ describe('aplicación temporal de protección web', () => {
     ] });
     await enforcement.runOnce({ now: 30_000_000 });
     expect(agent.callSecurityAgent).toHaveBeenCalledWith('web_ban', expect.objectContaining({
-      target: '198.51.100.8', jail: 'gestionvpn-web-1h',
+      target: '198.51.100.8', jail: 'gestionvpn-web-rate',
     }));
   });
 
@@ -131,15 +131,15 @@ describe('aplicación temporal de protección web', () => {
     repo.claim.mockResolvedValueOnce('direct').mockResolvedValueOnce('recidive');
     await enforcement.runOnce({ now: 40_000_000 });
     expect(agent.callSecurityAgent).toHaveBeenNthCalledWith(1, 'web_ban_indefinite', {
-      target: '198.51.100.9', jail: 'gestionvpn-indefinite', sourceJail: 'gestionvpn-web-1h',
+      target: '198.51.100.9', jail: 'gestionvpn-web-auth', sourceJail: 'gestionvpn-web-rate',
       protectedIps: [],
     });
     expect(agent.callSecurityAgent).toHaveBeenNthCalledWith(2, 'web_ban_indefinite', {
-      target: '198.51.100.10', jail: 'gestionvpn-indefinite', sourceJail: 'gestionvpn-web-1h',
+      target: '198.51.100.10', jail: 'gestionvpn-web-recidive', sourceJail: 'gestionvpn-web-rate',
       protectedIps: [],
     });
     expect(repo.claim).toHaveBeenNthCalledWith(2, expect.objectContaining({
-      recommendation: 'INDEFINITE_WEB_RECIDIVISM', jail: 'gestionvpn-indefinite',
+      recommendation: 'INDEFINITE_WEB_RECIDIVISM', jail: 'gestionvpn-web-recidive',
     }));
     expect(repo.complete).toHaveBeenNthCalledWith(1, expect.objectContaining({ expiresAt: null }));
   });
@@ -189,7 +189,7 @@ describe('aplicación temporal de protección web', () => {
     repo.countAppliedRecommendationsSince.mockResolvedValueOnce(0);
     await enforcement.runOnce({ now: 60_000_000 });
     expect(agent.callSecurityAgent).toHaveBeenLastCalledWith('web_ban', expect.objectContaining({
-      jail: 'gestionvpn-web-scan-6h', sourceJail: 'gestionvpn-web-scan-6h',
+      jail: 'gestionvpn-web-scan', sourceJail: 'gestionvpn-web-scan',
     }));
     expect(repo.complete).toHaveBeenLastCalledWith(expect.objectContaining({ expiresAt: 81_600_000 }));
 
@@ -204,7 +204,7 @@ describe('aplicación temporal de protección web', () => {
     repo.countAppliedRecommendationsSince.mockResolvedValueOnce(2);
     await enforcement.runOnce({ now: 180_000_000 });
     expect(agent.callSecurityAgent).toHaveBeenLastCalledWith('web_ban_indefinite', expect.objectContaining({
-      jail: 'gestionvpn-indefinite', sourceJail: 'gestionvpn-web-scan-24h',
+      jail: 'gestionvpn-web-recidive', sourceJail: 'gestionvpn-web-scan-24h',
     }));
   });
 

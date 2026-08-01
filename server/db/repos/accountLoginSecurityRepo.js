@@ -71,13 +71,17 @@ async function get(userId) {
   return rows[0] || null;
 }
 
-async function listLocked(now = Date.now()) {
-  return query(`SELECT s.user_id,u.email,u.name,s.failures_15m,s.failures_24h,s.locked_until,
+async function listLocked(now = Date.now(), workspaceId = null) {
+  const params = [now];
+  let sql = `SELECT s.user_id,u.email,u.name,s.failures_15m,s.failures_24h,s.locked_until,
       s.locked_at,s.lock_reason,s.last_failure_at,s.last_failure_ip,s.updated_at,w.name AS workspace_name
     FROM account_login_security s JOIN users u ON u.id=s.user_id AND u.deleted_at IS NULL
     LEFT JOIN workspace_members wm ON wm.user_id=u.id AND wm.deleted_at IS NULL
     LEFT JOIN workspaces w ON w.id=wm.workspace_id AND w.deleted_at IS NULL
-    WHERE s.locked_until > ? ORDER BY s.locked_until DESC`, [now]);
+    WHERE s.locked_until > ?`;
+  if (workspaceId) { sql += ' AND wm.workspace_id=?'; params.push(workspaceId); }
+  sql += ' ORDER BY s.locked_until DESC';
+  return query(sql, params);
 }
 
 module.exports = { status, recordFailure, clearAfterSuccess, unlock, get, listLocked };

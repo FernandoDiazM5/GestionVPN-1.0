@@ -7,12 +7,14 @@ const securityRepo = {
 };
 const agent = { callSecurityAgent: vi.fn() };
 const accountSecurity = { listLocked: vi.fn(), unlock: vi.fn(), get: vi.fn() };
+const memberRepo = { findMembership: vi.fn() };
 const webObservation = { observation: vi.fn(), record: vi.fn() };
 const webEnforcement = { touchAdminIp: vi.fn(), state: vi.fn() };
 const webEnforcementRepo = { recentActions: vi.fn() };
 stubModule(__dirname, '../../db/repos/platformSecurityRepo', securityRepo);
 stubModule(__dirname, '../../lib/securityAgentClient', agent);
 stubModule(__dirname, '../../db/repos/accountLoginSecurityRepo', accountSecurity);
+stubModule(__dirname, '../../db/repos/memberRepo', memberRepo);
 stubModule(__dirname, '../../lib/webSecurityObservation', webObservation);
 stubModule(__dirname, '../../lib/webSecurityEnforcement', webEnforcement);
 stubModule(__dirname, '../../db/repos/webSecurityEnforcementRepo', webEnforcementRepo);
@@ -42,6 +44,8 @@ app.use((req, _res, next) => {
   if (req.headers['x-test-role']) req.account = {
     sub: 'admin-1', jti: '00000000-0000-4000-8000-000000000001',
     platform_admin: req.headers['x-test-role'] === 'admin',
+    role: req.headers['x-test-role'] === 'owner' ? 'OWNER' : 'MEMBER',
+    workspace_id: 'workspace-1',
   };
   next();
 });
@@ -64,6 +68,7 @@ describe('seguridad administrativa del VPS', () => {
     accountSecurity.listLocked.mockResolvedValue([]);
     accountSecurity.unlock.mockResolvedValue(true);
     accountSecurity.get.mockResolvedValue({ last_failure_ip: '198.51.100.9' });
+    memberRepo.findMembership.mockResolvedValue({ role: 'MEMBER' });
     webObservation.observation.mockResolvedValue({ mode: 'OBSERVE_ONLY', sources: [], events: [] });
     webObservation.record.mockResolvedValue(undefined);
     webEnforcement.touchAdminIp.mockResolvedValue(true);
@@ -162,6 +167,36 @@ describe('seguridad administrativa del VPS', () => {
     }));
     expect(securityRepo.audit).toHaveBeenCalledWith(expect.objectContaining({ action: 'ACCOUNT_UNLOCK',
       detail: expect.objectContaining({ clearedRateLimits: 2, ipGloballyBlocked: false }) }));
+  });
+  it('permite al moderador desbloquear sólo una cuenta de su workspace', async () => {
+    const userId = '00000000-0000-4000-8000-000000000098';
+    accountSecurity.listLocked.mockResolvedValue([{ user_id: userId, email: 'miembro@example.com' }]);
+    const list = await request(app).get('/api/admin/security/locked-accounts').set('x-test-role', 'owner');
+    expect(list.status).toBe(200);
+    expect(accountSecurity.listLocked).toHaveBeenCalledWith(expect.any(Number), 'workspace-1');
+    expect(agent.callSecurityAgent).not.toHaveBeenCalled();
+
+    const response = await request(app).post('/api/admin/security/locked-accounts/unlock')
+      .set('x-test-role', 'owner').send({ userId, category: 'FALSE_POSITIVE',
+        reason: 'El miembro olvidó su contraseña', stepUpToken: 'x'.repeat(32) });
+    expect(response.status).toBe(200);
+    expect(memberRepo.findMembership).toHaveBeenCalledWith('workspace-1', userId);
+    expect(agent.callSecurityAgent).not.toHaveBeenCalled();
+  });
+
+  it('impide al moderador desbloquear cuentas ajenas y operar el firewall', async () => {
+    const userId = '00000000-0000-4000-8000-000000000097';
+    memberRepo.findMembership.mockResolvedValue(null);
+    const unlock = await request(app).post('/api/admin/security/locked-accounts/unlock')
+      .set('x-test-role', 'owner').send({ userId, category: 'FALSE_POSITIVE',
+        reason: 'Solicitud fuera del workspace', stepUpToken: 'x'.repeat(32) });
+    expect(unlock.status).toBe(404);
+    expect(accountSecurity.unlock).not.toHaveBeenCalled();
+
+    const ban = await request(app).post('/api/admin/security/ban')
+      .set('x-test-role', 'owner').send(mutation);
+    expect(ban.status).toBe(403);
+    expect(agent.callSecurityAgent).not.toHaveBeenCalled();
   });
   it('expone observacion web solo al administrador y no ejecuta bloqueos', async () => {
     const response = await request(app).get('/api/admin/security/web-observation').set('x-test-role', 'admin');

@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { confirmGoogleIdentity } from '../../../services/federatedAuth';
 import { securityAdminApi, type LockedAccount, type SecurityJail, type SecurityMutation, type WebObservation } from '../../../services/securityAdminApi';
+import { useWorkspaceSession } from '../../../context/WorkspaceSession';
 
 const categories: Array<[SecurityMutation['category'], string]> = [
   ['FALSE_POSITIVE', 'Falso positivo'],
@@ -15,6 +16,7 @@ const categories: Array<[SecurityMutation['category'], string]> = [
 ];
 
 type SecurityAction = 'ban' | 'promote' | 'unban' | 'trust' | 'untrust' | null;
+type SecurityTab = 'blocked' | 'accounts' | 'trusted' | 'activity' | 'policies';
 
 interface BlockedRow {
   ip: string;
@@ -41,9 +43,13 @@ const formatDate = (value?: number | null) => {
   }).format(new Date(value));
 };
 
-const isIndefiniteJail = (jail: string) => ['gestionvpn-indefinite', 'gestionvpn-recidive'].includes(jail);
+const isIndefiniteJail = (jail: string) => ['gestionvpn-indefinite', 'gestionvpn-recidive',
+  'gestionvpn-web-auth', 'gestionvpn-web-recidive'].includes(jail);
 
 export default function SecurityModule() {
+  const { session } = useWorkspaceSession();
+  const platformAdmin = Boolean(session?.platform_admin);
+  const [activeTab, setActiveTab] = useState<SecurityTab>(platformAdmin ? 'blocked' : 'accounts');
   const [jails, setJails] = useState<SecurityJail[]>([]);
   const [trusted, setTrusted] = useState<string[]>([]);
   const [currentIp, setCurrentIp] = useState('');
@@ -70,24 +76,27 @@ export default function SecurityModule() {
     setLoading(true);
     setError('');
     try {
-      const [status, recent, accountLocks, web] = await Promise.all([
-        securityAdminApi.status(), securityAdminApi.history(), securityAdminApi.lockedAccounts(),
-        securityAdminApi.webObservation(),
-      ]);
-      setJails(status.jails);
-      setTrusted(status.trusted);
-      setCurrentIp(status.currentIp);
-      setAttemptHistorySince(status.attemptHistory?.since ?? null);
-      setHistory(recent.history);
+      const accountLocks = await securityAdminApi.lockedAccounts();
       setLockedAccounts(accountLocks.accounts);
-      setWebObservation(web);
+      if (platformAdmin) {
+        const [status, recent, web] = await Promise.all([
+          securityAdminApi.status(), securityAdminApi.history(), securityAdminApi.webObservation(),
+        ]);
+        setJails(status.jails);
+        setTrusted(status.trusted);
+        setCurrentIp(status.currentIp);
+        setAttemptHistorySince(status.attemptHistory?.since ?? null);
+        setHistory(recent.history);
+        setWebObservation(web);
+      }
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'No se pudo cargar la seguridad del VPS');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [platformAdmin]);
 
+  useEffect(() => { setActiveTab(platformAdmin ? 'blocked' : 'accounts'); }, [platformAdmin]);
   useEffect(() => { void load(); }, [load]);
 
   const rows = useMemo<BlockedRow[]>(() => jails.flatMap((item) => item.banned.map((ip) => {
@@ -183,9 +192,9 @@ export default function SecurityModule() {
     <div className="space-y-5 p-4 md:p-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Seguridad del VPS</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{platformAdmin ? 'Seguridad del VPS' : 'Seguridad del workspace'}</h1>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-            Controla bloqueos, intentos SSH y direcciones de confianza.
+            {platformAdmin ? 'Controla bloqueos, intentos y direcciones de confianza.' : 'Gestiona cuentas bloqueadas de tu propio workspace.'}
           </p>
         </div>
         <button className="btn-outline btn-md self-start" onClick={() => void load()} disabled={loading}>
@@ -200,13 +209,15 @@ export default function SecurityModule() {
         </div>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <SecurityTabs active={activeTab} setActive={setActiveTab} platformAdmin={platformAdmin} />
+
+      {platformAdmin && <div className="grid gap-3 sm:grid-cols-3">
         <Summary icon={Shield} label="Direcciones bloqueadas" value={rows.length} />
         <Summary icon={ShieldCheck} label="Direcciones confiables" value={trusted.length} />
         <Summary icon={ShieldOff} label="Protecciones activas" value={jails.length} />
-      </div>
+      </div>}
 
-      <section className="card overflow-hidden">
+      {activeTab === 'accounts' && <section className="card overflow-hidden">
         <div className="flex items-center justify-between gap-3 border-b border-slate-200 p-4 dark:border-slate-700">
           <div>
             <h2 className="font-bold text-slate-900 dark:text-white">Usuarios bloqueados</h2>
@@ -239,11 +250,11 @@ export default function SecurityModule() {
           </article>)}
           {!loading && lockedAccounts.length === 0 && <div className="p-8 text-center text-sm text-slate-500">No hay usuarios bloqueados.</div>}
         </div>
-      </section>
+      </section>}
 
-      {webObservation && <WebObservationPanel observation={webObservation} />}
+      {platformAdmin && activeTab === 'policies' && webObservation && <WebObservationPanel observation={webObservation} />}
 
-      <section className="card overflow-hidden">
+      {platformAdmin && activeTab === 'blocked' && <section className="card overflow-hidden">
         <div className="border-b border-slate-200 p-4 dark:border-slate-700">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div>
@@ -298,9 +309,9 @@ export default function SecurityModule() {
           ))}
           {!loading && rows.length === 0 && <div className="p-8 text-center text-sm text-slate-500">No hay direcciones bloqueadas.</div>}
         </div>
-      </section>
+      </section>}
 
-      <section className="card p-4 md:p-5">
+      {platformAdmin && activeTab === 'trusted' && <section className="card p-4 md:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="font-bold text-slate-900 dark:text-white">Lista confiable permanente</h2>
@@ -323,9 +334,9 @@ export default function SecurityModule() {
           ))}
           {trusted.length === 0 && <span className="text-sm text-slate-500">Sin excepciones adicionales.</span>}
         </div>
-      </section>
+      </section>}
 
-      <RecentActivity history={history} />
+      {platformAdmin && activeTab === 'activity' && <RecentActivity history={history} webActions={webObservation?.actions || []} />}
 
       {action && (
         <ActionDialog
@@ -343,6 +354,25 @@ export default function SecurityModule() {
         close={() => setUnlockAccount(null)} execute={executeAccountUnlock} />}
     </div>
   );
+}
+
+function SecurityTabs({ active, setActive, platformAdmin }: {
+  active: SecurityTab; setActive: (tab: SecurityTab) => void; platformAdmin: boolean;
+}) {
+  const tabs: Array<[SecurityTab, string]> = platformAdmin
+    ? [['blocked', 'IPs bloqueadas'], ['accounts', 'Usuarios bloqueados'],
+      ['trusted', 'Direcciones confiables'], ['activity', 'Actividad reciente'],
+      ['policies', 'Políticas automáticas']]
+    : [['accounts', 'Usuarios bloqueados']];
+  return <nav className="overflow-x-auto" aria-label="Secciones de seguridad">
+    <div className="inline-flex min-w-full gap-1 rounded-2xl border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900" role="tablist">
+      {tabs.map(([id, label]) => <button key={id} type="button" role="tab"
+        aria-selected={active === id} onClick={() => setActive(id)}
+        className={`min-h-11 flex-1 whitespace-nowrap rounded-xl px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${active === id ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}`}>
+        {label}
+      </button>)}
+    </div>
+  </nav>;
 }
 
 function WebObservationPanel({ observation }: { observation: WebObservation }) {
@@ -372,7 +402,7 @@ function WebObservationPanel({ observation }: { observation: WebObservation }) {
       {observation.sources.length===0&&<tr><td colSpan={6} className="p-8 text-center text-sm text-slate-500">Aún no hay eventos web observados.</td></tr>}
     </tbody></table></div>
     <div className="divide-y divide-slate-200 md:hidden dark:divide-slate-700">{observation.sources.slice(0,50).map((source)=><article key={source.sourceIp} className="space-y-3 p-4"><div className="flex items-start justify-between gap-2"><div className="font-mono text-sm font-semibold">{source.sourceIp}</div><span className={source.recommendations.length?'badge badge-warning':'badge badge-neutral'}>{recommendationLabel(source.recommendations)}</span></div><div className="grid grid-cols-2 gap-2 text-xs"><div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900/60">Login 24 h<br/><strong>{source.authFailures24h}</strong></div><div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900/60">429 en 10 min<br/><strong>{source.rateLimited10m}</strong></div><div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900/60">Rutas en 5 min<br/><strong>{source.notFound5m}</strong></div><div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900/60">Sensibles<br/><strong>{source.sensitive10m}</strong></div></div></article>)}</div>
-    {recentActions.length > 0 && <div className="border-t border-slate-200 p-4 dark:border-slate-700"><h3 className="text-sm font-bold text-slate-900 dark:text-white">Actividad automática reciente</h3><div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{recentActions.map((action)=><article key={action.id} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700"><div className="flex items-center justify-between gap-2"><span className="font-mono text-xs font-semibold">{action.source_ip}</span><span className={`badge ${action.status==='APPLIED'?'badge-success':action.status==='FAILED'?'badge-danger':'badge-neutral'}`}>{action.status==='APPLIED'?'Aplicado':action.status==='FAILED'?'Falló':'Pendiente'}</span></div><p className="mt-2 text-xs text-slate-600 dark:text-slate-300">{action.jail==='gestionvpn-indefinite'?'Protección indefinida':action.jail==='gestionvpn-web-scan-24h'?'Protección temporal · 24 h':action.jail==='gestionvpn-web-scan-6h'?'Protección temporal · 6 h':'Protección temporal · 1 h'}</p><p className="mt-1 text-xs text-slate-500">{formatDate(action.created_at)}</p></article>)}</div></div>}
+    {recentActions.length > 0 && <div className="border-t border-slate-200 p-4 dark:border-slate-700"><h3 className="text-sm font-bold text-slate-900 dark:text-white">Actividad automática reciente</h3><div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{recentActions.map((action)=><article key={action.id} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700"><div className="flex items-center justify-between gap-2"><span className="font-mono text-xs font-semibold">{action.source_ip}</span><span className={`badge ${action.status==='APPLIED'?'badge-success':action.status==='FAILED'?'badge-danger':'badge-neutral'}`}>{action.status==='APPLIED'?'Aplicado':action.status==='FAILED'?'Falló':'Pendiente'}</span></div><p className="mt-2 text-xs text-slate-600 dark:text-slate-300">{isIndefiniteJail(action.jail)?'Protección indefinida':action.jail==='gestionvpn-web-scan-24h'?'Protección temporal · 24 h':action.jail==='gestionvpn-web-scan'?'Protección temporal · 6 h':'Protección temporal · 1 h'}</p><p className="mt-1 text-xs text-slate-500">{formatDate(action.created_at)}</p></article>)}</div></div>}
   </section>;
 }
 
@@ -462,16 +492,21 @@ function DateLine({ label, value }: { label: string; value?: number | null }) {
 }
 
 function ProtectionBadge({ jail, reason = '' }: { jail: string; reason?: string }) {
-  const automatic = ['sshd', 'gestionvpn-recidive', 'gestionvpn-web-1h', 'gestionvpn-web-scan-6h', 'gestionvpn-web-scan-24h'].includes(jail);
+  const automatic = ['sshd', 'gestionvpn-recidive', 'gestionvpn-web-1h', 'gestionvpn-web-auth',
+    'gestionvpn-web-rate', 'gestionvpn-web-scan', 'gestionvpn-web-scan-24h',
+    'gestionvpn-web-sensitive', 'gestionvpn-web-recidive'].includes(jail);
   const recidive = jail === 'gestionvpn-recidive';
   const web = jail === 'gestionvpn-web-1h';
-  const webScan6h = jail === 'gestionvpn-web-scan-6h';
+  const webRate = jail === 'gestionvpn-web-rate';
+  const webSensitive = jail === 'gestionvpn-web-sensitive';
+  const webRecidive = jail === 'gestionvpn-web-recidive';
+  const webScan6h = jail === 'gestionvpn-web-scan';
   const webScan24h = jail === 'gestionvpn-web-scan-24h';
-  const webIndefinite = jail === 'gestionvpn-indefinite'
+  const webIndefinite = ['gestionvpn-indefinite', 'gestionvpn-web-auth', 'gestionvpn-web-recidive'].includes(jail)
     && (reason.includes('web') || reason.includes('autenticación'));
   return (
     <span className={`badge ${automatic || webIndefinite ? 'badge-neutral' : 'badge-info'} whitespace-nowrap`}>
-      {recidive ? 'Fail2ban · Reincidente' : webIndefinite ? 'Protección web · Indefinida' : webScan24h ? 'Escaneo web · 24 h' : webScan6h ? 'Escaneo web · 6 h' : web ? 'Protección web · 1 h' : automatic ? 'Fail2ban · SSH' : 'Manual'}
+      {recidive ? 'Fail2ban · Reincidente' : webRecidive ? 'Web · Reincidente' : webIndefinite ? 'Protección web · Indefinida' : webScan24h ? 'Escaneo web · 24 h' : webScan6h ? 'Escaneo web · 6 h' : webSensitive ? 'API sensible · 1 h' : webRate || web ? 'Login web · 1 h' : automatic ? 'Fail2ban · SSH' : 'Manual'}
     </span>
   );
 }
@@ -481,7 +516,7 @@ function IconAction({ label, icon: Icon, danger = false, onClick }: {
 }) {
   return (
     <button
-      className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${danger ? 'border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-900 dark:hover:bg-rose-950/50' : 'border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'}`}
+      className={`inline-flex h-11 w-11 items-center justify-center rounded-xl border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${danger ? 'border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-900 dark:hover:bg-rose-950/50' : 'border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'}`}
       title={label}
       aria-label={`${label} ${label === 'Ver intentos' ? 'de' : ''}`}
       onClick={onClick}
@@ -497,12 +532,39 @@ function EmptyBlockedRows({ colSpan }: { colSpan: number }) {
   );
 }
 
-function RecentActivity({ history }: { history: Array<Record<string, unknown>> }) {
+function RecentActivity({ history, webActions }: {
+  history: Array<Record<string, unknown>>; webActions: WebObservation['actions'];
+}) {
+  const [sourceFilter, setSourceFilter] = useState('all');
+  const rows = useMemo(() => {
+    const automatic = webActions.map((action) => ({ id: action.id, created_at: action.created_at,
+      actor_email: 'Sistema automático', action: 'AUTO_BAN', target: action.source_ip,
+      outcome: action.status === 'APPLIED' ? 'SUCCESS' : action.status,
+      reason: action.recommendation, jail: action.jail }));
+    return [...history, ...automatic].sort((a, b) => Number(b.created_at) - Number(a.created_at));
+  }, [history, webActions]);
+  const sourceOf = (row: Record<string, unknown>) => {
+    const jail = String(row.jail || '');
+    const action = String(row.action || '');
+    if (jail.includes('recidive') || String(row.reason || '').includes('RECIDIV')) return 'recidive';
+    if (jail === 'sshd' || jail === 'gestionvpn-recidive') return 'ssh';
+    if (jail.includes('web-scan')) return 'scan';
+    if (jail.includes('web-sensitive')) return 'api';
+    if (action === 'ACCOUNT_UNLOCK' || jail.includes('web-auth') || jail.includes('web-rate')) return 'login';
+    return 'api';
+  };
+  const filtered = rows.filter((row) => sourceFilter === 'all' || sourceOf(row) === sourceFilter);
   return (
     <section className="card overflow-hidden">
-      <div className="border-b border-slate-200 p-4 dark:border-slate-700">
-        <h2 className="font-bold text-slate-900 dark:text-white">Actividad reciente</h2>
-        <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">Registro de quién realizó cada cambio y por qué.</p>
+      <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-end sm:justify-between dark:border-slate-700">
+        <div><h2 className="font-bold text-slate-900 dark:text-white">Actividad reciente</h2>
+          <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">Cambios administrativos y decisiones automáticas con su evidencia.</p></div>
+        <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">Origen
+          <select className="input-field mt-1 min-h-11 min-w-48" value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)}>
+            <option value="all">Todos</option><option value="login">Login</option><option value="api">API sensible</option>
+            <option value="scan">Escaneo</option><option value="ssh">SSH</option><option value="recidive">Reincidencia</option>
+          </select>
+        </label>
       </div>
       <div className="hidden overflow-x-auto md:block">
         <table className="min-w-[780px] w-full text-left text-sm">
@@ -512,7 +574,7 @@ function RecentActivity({ history }: { history: Array<Record<string, unknown>> }
             ))}
           </tr></thead>
           <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-            {history.slice(0, 25).map((row, index) => (
+            {filtered.slice(0, 50).map((row, index) => (
               <tr key={String(row.id || index)}>
                 <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-600">{formatDate(Number(row.created_at))}</td>
                 <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">{String(row.actor_email || 'Administrador')}</td>
@@ -522,12 +584,12 @@ function RecentActivity({ history }: { history: Array<Record<string, unknown>> }
                 <td className="max-w-sm px-4 py-3 text-sm text-slate-600 dark:text-slate-300">{String(row.reason || '')}</td>
               </tr>
             ))}
-            {history.length === 0 && <tr><td colSpan={6} className="p-8 text-center text-sm text-slate-500">Aún no hay acciones administrativas.</td></tr>}
+            {filtered.length === 0 && <tr><td colSpan={6} className="p-8 text-center text-sm text-slate-500">No hay actividad para este filtro.</td></tr>}
           </tbody>
         </table>
       </div>
       <div className="divide-y divide-slate-200 md:hidden dark:divide-slate-700">
-        {history.slice(0, 25).map((row, index) => (
+        {filtered.slice(0, 50).map((row, index) => (
           <article key={String(row.id || index)} className="space-y-2 p-4">
             <div className="flex items-center justify-between gap-2"><ActionBadge action={String(row.action || '')} /><OutcomeBadge success={row.outcome === 'SUCCESS'} /></div>
             <div className="font-mono text-xs text-slate-700 dark:text-slate-200">{String(row.target || '—')}</div>
@@ -535,6 +597,7 @@ function RecentActivity({ history }: { history: Array<Record<string, unknown>> }
             <div className="text-xs text-slate-500">{String(row.actor_email || 'Administrador')} · {formatDate(Number(row.created_at))}</div>
           </article>
         ))}
+        {filtered.length === 0 && <div className="p-8 text-center text-sm text-slate-500">No hay actividad para este filtro.</div>}
       </div>
     </section>
   );

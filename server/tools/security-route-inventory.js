@@ -16,7 +16,7 @@ const GLOBALLY_AUTHENTICATED_FILES = [
 ];
 
 const GLOBAL_ROLES = [
-  { pattern: /^routes\/(?:admin|adminSecurity|coreServer)\.routes\.js$/, role: 'platform-admin' },
+  { pattern: /^routes\/(?:admin|coreServer)\.routes\.js$/, role: 'platform-admin' },
 ];
 
 const IDENTITY_ENDPOINTS = /\/(?:login|setup|register|verify|resend|password-reset)(?:\/|$)/;
@@ -56,6 +56,7 @@ function globalRole(relativeFile) {
 
 function extractRole(segment) {
   if (/\brequirePlatformAdmin\b/.test(segment)) return 'platform-admin';
+  if (/\brequireSecurityOperator\b/.test(segment)) return 'platform-admin or OWNER';
   const roleMatch = segment.match(/\brequireRole\s*\(\s*([^\n)]*)\)/);
   if (!roleMatch) return '';
   return roleMatch[1]

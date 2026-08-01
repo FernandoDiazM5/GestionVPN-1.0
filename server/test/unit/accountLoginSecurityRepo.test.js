@@ -50,4 +50,11 @@ describe('accountLoginSecurityRepo', () => {
     expect(mysql.query.mock.calls[0][0]).toContain('s.locked_at');
     expect(mysql.query.mock.calls[0][0]).toContain('s.last_failure_ip');
   });
+
+  it('limita la lista al workspace solicitado', async () => {
+    mysql.query.mockResolvedValue([]);
+    await repo.listLocked(10_000, 'workspace-1');
+    expect(mysql.query.mock.calls[0][0]).toContain('wm.workspace_id=?');
+    expect(mysql.query.mock.calls[0][1]).toEqual([10_000, 'workspace-1']);
+  });
 });

@@ -15,6 +15,7 @@ const authIdentityRepo = require('../db/repos/authIdentityRepo');
 const notificationRepo = require('../db/repos/notificationRepo');
 const securityRepo = require('../db/repos/platformSecurityRepo');
 const accountSecurityRepo = require('../db/repos/accountLoginSecurityRepo');
+const memberRepo = require('../db/repos/memberRepo');
 const telegram = require('../lib/telegram');
 const { callSecurityAgent } = require('../lib/securityAgentClient');
 const { clientIp, guardPolicy, clearLoginIdentityBlocks } = require('../lib/rateLimit');
@@ -23,9 +24,11 @@ const webEnforcement = require('../lib/webSecurityEnforcement');
 const webEnforcementRepo = require('../db/repos/webSecurityEnforcementRepo');
 
 const router = express.Router();
-router.use(requireSession, requirePlatformAdmin);
+router.use(requireSession);
 router.use(asyncHandler(async (req, _res, next) => {
-  await webEnforcement.touchAdminIp({ sourceIp: clientIp(req), userId: req.account.sub });
+  if (req.account.platform_admin) {
+    await webEnforcement.touchAdminIp({ sourceIp: clientIp(req), userId: req.account.sub });
+  }
   next();
 }));
 const STEP_UP_MS = 5 * 60 * 1000;
@@ -35,6 +38,12 @@ const DURATION_JAIL = {
 };
 
 const hash = (value) => crypto.createHash('sha256').update(value).digest('hex');
+
+function requireSecurityOperator(req, res, next) {
+  if (req.account.platform_admin || req.account.role === 'OWNER') return next();
+  return res.status(403).json({ success: false, code: 'SECURITY_OPERATOR_REQUIRED',
+    message: 'Permisos insuficientes' });
+}
 
 async function notifyAdmin(userId, action, target, reason) {
   try {
@@ -46,7 +55,7 @@ async function notifyAdmin(userId, action, target, reason) {
   } catch (error) { return { ok: false, error: error.message }; }
 }
 
-router.post('/step-up', guardPolicy('SECURITY_STEP_UP'), validate({ body: SecurityStepUpRequestSchema }), asyncHandler(async (req, res) => {
+router.post('/step-up', requireSecurityOperator, guardPolicy('SECURITY_STEP_UP'), validate({ body: SecurityStepUpRequestSchema }), asyncHandler(async (req, res) => {
   const user = await userRepo.findById(req.account.sub);
   if (!user) throw new AppError('Administrador no encontrado', 404, 'NOT_FOUND');
   let method;
@@ -101,7 +110,7 @@ async function mutate(req, operation, params, afterSuccess) {
   }
 }
 
-router.get('/status', asyncHandler(async (req, res) => {
+router.get('/status', requirePlatformAdmin, asyncHandler(async (req, res) => {
   const [status, trustedMetadata, recent, webActions] = await Promise.all([
     callSecurityAgent('status'), securityRepo.trustList(), securityRepo.history({ limit: 500 }),
     webEnforcementRepo.recentActions(500),
@@ -119,7 +128,7 @@ router.get('/status', asyncHandler(async (req, res) => {
     if (!reasons.has(key)) reasons.set(key, {
       reason: row.recommendation === 'INDEFINITE_WEB_RECIDIVISM'
         ? 'Reincidencia: 3 bloqueos web en 7 días'
-        : row.jail === 'gestionvpn-indefinite'
+        : ['gestionvpn-web-auth', 'gestionvpn-web-recidive', 'gestionvpn-indefinite'].includes(row.jail)
           ? 'Abuso de autenticación web distribuido'
           : 'Protección automática ante abuso web',
       category: 'AUTOMATIC',
@@ -131,22 +140,27 @@ router.get('/status', asyncHandler(async (req, res) => {
       ...(reasons.get(`${jail.name}\0${detail.target}`) || {
         reason: jail.name === 'sshd' ? 'Fallos reiterados de autenticación SSH'
           : jail.name === 'gestionvpn-recidive' ? 'Reincidencia: 3 bloqueos SSH en 7 días'
-            : jail.name === 'gestionvpn-web-1h' ? 'Protección automática ante abuso web'
-              : jail.name === 'gestionvpn-web-scan-6h' ? 'Primera detección de escaneo web'
+            : ['gestionvpn-web-1h', 'gestionvpn-web-rate'].includes(jail.name) ? 'Exceso reiterado de solicitudes de autenticación'
+              : jail.name === 'gestionvpn-web-auth' ? 'Abuso de autenticación web'
+                : jail.name === 'gestionvpn-web-sensitive' ? 'Ataques reiterados a endpoints sensibles'
+                  : jail.name === 'gestionvpn-web-recidive' ? 'Reincidencia web en siete días'
+                    : jail.name === 'gestionvpn-web-scan' ? 'Primera detección de escaneo web'
                 : jail.name === 'gestionvpn-web-scan-24h' ? 'Segunda detección de escaneo web'
                   : 'Bloqueo manual',
         category: ['sshd', 'gestionvpn-recidive', 'gestionvpn-web-1h',
-          'gestionvpn-web-scan-6h', 'gestionvpn-web-scan-24h'].includes(jail.name) ? 'AUTOMATIC' : null,
+          'gestionvpn-web-auth', 'gestionvpn-web-rate', 'gestionvpn-web-scan',
+          'gestionvpn-web-scan-24h', 'gestionvpn-web-sensitive',
+          'gestionvpn-web-recidive'].includes(jail.name) ? 'AUTOMATIC' : null,
       }),
     }));
   }
   return sendOk(res, { ...status, trustedMetadata, currentIp: clientIp(req) });
 }));
-router.get('/history', validate({ query: SecurityHistoryQuerySchema }), asyncHandler(async (req, res) =>
+router.get('/history', requirePlatformAdmin, validate({ query: SecurityHistoryQuerySchema }), asyncHandler(async (req, res) =>
   sendOk(res, { history: await securityRepo.history(req.query) })));
-router.get('/attempts', validate({ query: SecurityHistoryQuerySchema }), asyncHandler(async (req, res) =>
+router.get('/attempts', requirePlatformAdmin, validate({ query: SecurityHistoryQuerySchema }), asyncHandler(async (req, res) =>
   sendOk(res, await callSecurityAgent('attempts', req.query))));
-router.get('/web-observation', validate({ query: SecurityHistoryQuerySchema }), asyncHandler(async (req, res) => {
+router.get('/web-observation', requirePlatformAdmin, validate({ query: SecurityHistoryQuerySchema }), asyncHandler(async (req, res) => {
   const [snapshot, actions] = await Promise.all([
     webObservation.observation({ sourceIp: req.query.target || null }),
     webEnforcementRepo.recentActions(100),
@@ -158,9 +172,11 @@ function blockedTargets(status) {
     (jail.banDetails || []).map((detail) => detail.target).concat(jail.banned || [])));
 }
 
-router.get('/locked-accounts', asyncHandler(async (_req, res) => {
+router.get('/locked-accounts', requireSecurityOperator, asyncHandler(async (req, res) => {
+  const workspaceId = req.account.platform_admin ? null : req.account.workspace_id;
   const [accounts, status] = await Promise.all([
-    accountSecurityRepo.listLocked(), callSecurityAgent('status').catch(() => null),
+    accountSecurityRepo.listLocked(Date.now(), workspaceId),
+    req.account.platform_admin ? callSecurityAgent('status').catch(() => null) : Promise.resolve(null),
   ]);
   const globallyBlocked = status ? blockedTargets(status) : null;
   return sendOk(res, { accounts: accounts.map((account) => ({
@@ -170,11 +186,15 @@ router.get('/locked-accounts', asyncHandler(async (_req, res) => {
   })) });
 }));
 
-router.post('/locked-accounts/unlock', validate({ body: AccountUnlockMutationSchema }), asyncHandler(async (req, res) => {
+router.post('/locked-accounts/unlock', requireSecurityOperator, validate({ body: AccountUnlockMutationSchema }), asyncHandler(async (req, res) => {
   await requireStepUp(req);
   const requestIp = clientIp(req);
   const user = await userRepo.findById(req.body.userId);
   if (!user) throw new AppError('Usuario no encontrado', 404, 'NOT_FOUND');
+  if (!req.account.platform_admin) {
+    const membership = await memberRepo.findMembership(req.account.workspace_id, user.id);
+    if (!membership) throw new AppError('Usuario no encontrado en tu workspace', 404, 'NOT_FOUND');
+  }
   const lock = await accountSecurityRepo.get(user.id);
   const changed = await accountSecurityRepo.unlock(user.id);
   const clearedRateLimits = await clearLoginIdentityBlocks({
@@ -186,7 +206,7 @@ router.post('/locked-accounts/unlock', validate({ body: AccountUnlockMutationSch
       statusCode: 200, decision: 'ADMIN_ACCOUNT_UNLOCK',
       detail: { classification: 'ADMINISTRATIVE_ACCOUNT_UNLOCK' } });
   }
-  const status = await callSecurityAgent('status').catch(() => null);
+  const status = req.account.platform_admin ? await callSecurityAgent('status').catch(() => null) : null;
   const globallyBlocked = status ? blockedTargets(status) : null;
   const ipGloballyBlocked = !lock?.last_failure_ip || !globallyBlocked ? null
     : globallyBlocked.has(lock.last_failure_ip) || globallyBlocked.has(`${lock.last_failure_ip}/32`);
@@ -199,16 +219,16 @@ router.post('/locked-accounts/unlock', validate({ body: AccountUnlockMutationSch
     lastFailureIp: lock?.last_failure_ip || null, ipGloballyBlocked, telegram: telegramResult });
 }));
 
-router.post('/ban', validate({ body: SecurityMutationSchema }), asyncHandler(async (req, res) => {
+router.post('/ban', requirePlatformAdmin, validate({ body: SecurityMutationSchema }), asyncHandler(async (req, res) => {
   if (!req.body.duration) throw new AppError('Duración requerida', 400, 'DURATION_REQUIRED');
   return sendOk(res, await mutate(req, 'ban', { target: req.body.target,
     jail: DURATION_JAIL[req.body.duration], requestIp: clientIp(req) }));
 }));
-router.post('/unban', validate({ body: SecurityMutationSchema }), asyncHandler(async (req, res) => {
+router.post('/unban', requirePlatformAdmin, validate({ body: SecurityMutationSchema }), asyncHandler(async (req, res) => {
   if (!req.body.jail) throw new AppError('Jail requerido', 400, 'JAIL_REQUIRED');
   return sendOk(res, await mutate(req, 'unban', { target: req.body.target, jail: req.body.jail }));
 }));
-router.post('/make-indefinite', validate({ body: SecurityMutationSchema }), asyncHandler(async (req, res) => {
+router.post('/make-indefinite', requirePlatformAdmin, validate({ body: SecurityMutationSchema }), asyncHandler(async (req, res) => {
   if (!req.body.jail || req.body.jail === DURATION_JAIL.indefinite)
     throw new AppError('Jail temporal requerido', 400, 'SOURCE_JAIL_REQUIRED');
   if (req.body.confirmIndefinite !== true)
@@ -218,7 +238,7 @@ router.post('/make-indefinite', validate({ body: SecurityMutationSchema }), asyn
     jail: DURATION_JAIL.indefinite, requestIp: clientIp(req),
   }));
 }));
-router.post('/trust', validate({ body: SecurityMutationSchema }), asyncHandler(async (req, res) => {
+router.post('/trust', requirePlatformAdmin, validate({ body: SecurityMutationSchema }), asyncHandler(async (req, res) => {
   if (req.body.target.includes('/') && req.body.confirmNetworkTrust !== true)
     throw new AppError('Confirma expresamente la red CIDR confiable', 400, 'CONFIRM_NETWORK_TRUST');
   const out = await mutate(req, 'trust_add', { target: req.body.target }, async (result) => {
@@ -232,7 +252,7 @@ router.post('/trust', validate({ body: SecurityMutationSchema }), asyncHandler(a
   });
   return sendOk(res, out);
 }));
-router.delete('/trust', validate({ body: SecurityMutationSchema }), asyncHandler(async (req, res) => {
+router.delete('/trust', requirePlatformAdmin, validate({ body: SecurityMutationSchema }), asyncHandler(async (req, res) => {
   const out = await mutate(req, 'trust_remove', { target: req.body.target }, async (result) => {
     try {
       await securityRepo.trustRemove(result.target);
