@@ -35,6 +35,20 @@ async function run() {
     INDEX idx_pss_expiry (expires_at),
     CONSTRAINT fk_pss_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  await query(`CREATE TABLE IF NOT EXISTS account_login_security (
+    user_id CHAR(36) PRIMARY KEY,
+    failures_15m INT NOT NULL DEFAULT 0,
+    window_15m_started_at BIGINT NOT NULL DEFAULT 0,
+    failures_24h INT NOT NULL DEFAULT 0,
+    window_24h_started_at BIGINT NOT NULL DEFAULT 0,
+    locked_until BIGINT NULL,
+    lock_reason VARCHAR(64) NULL,
+    last_failure_at BIGINT NULL,
+    last_failure_ip VARCHAR(64) NULL,
+    updated_at BIGINT NOT NULL,
+    INDEX idx_als_locked (locked_until),
+    CONSTRAINT fk_als_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
   console.log('[migrate:platform-security] tablas listas');
 }
 

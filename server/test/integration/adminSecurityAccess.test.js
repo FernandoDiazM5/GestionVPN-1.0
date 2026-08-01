@@ -6,8 +6,10 @@ const securityRepo = {
   trustAdd: vi.fn(), trustRemove: vi.fn(), trustList: vi.fn(),
 };
 const agent = { callSecurityAgent: vi.fn() };
+const accountSecurity = { listLocked: vi.fn(), unlock: vi.fn() };
 stubModule(__dirname, '../../db/repos/platformSecurityRepo', securityRepo);
 stubModule(__dirname, '../../lib/securityAgentClient', agent);
+stubModule(__dirname, '../../db/repos/accountLoginSecurityRepo', accountSecurity);
 stubModule(__dirname, '../../lib/passwordHasher', { verifyPassword: vi.fn(async () => true) });
 stubModule(__dirname, '../../db/repos/userRepo', { findById: vi.fn(async id => ({ id, password_hash: 'hash' })) });
 stubModule(__dirname, '../../db/repos/authIdentityRepo', { findByUser: vi.fn() });
@@ -52,6 +54,8 @@ describe('seguridad administrativa del VPS', () => {
     securityRepo.history.mockResolvedValue([]);
     securityRepo.trustList.mockResolvedValue([]);
     agent.callSecurityAgent.mockResolvedValue({ jails: [], trusted: [] });
+    accountSecurity.listLocked.mockResolvedValue([]);
+    accountSecurity.unlock.mockResolvedValue(true);
   });
 
   it('niega todo el módulo a usuarios que no son platform_admin', async () => {
@@ -114,5 +118,19 @@ describe('seguridad administrativa del VPS', () => {
     expect(securityRepo.audit).toHaveBeenCalledWith(expect.objectContaining({
       action: 'PROMOTE_INDEFINITE', outcome: 'SUCCESS', jail: 'gestionvpn-indefinite',
     }));
+  });
+  it('lista y desbloquea cuentas con reautenticacion y auditoria', async () => {
+    const userId = '00000000-0000-4000-8000-000000000099';
+    accountSecurity.listLocked.mockResolvedValue([{ user_id: userId, email: 'cliente@example.com' }]);
+    const list = await request(app).get('/api/admin/security/locked-accounts').set('x-test-role', 'admin');
+    expect(list.status).toBe(200);
+    expect(list.body.accounts).toHaveLength(1);
+
+    const response = await request(app).post('/api/admin/security/locked-accounts/unlock')
+      .set('x-test-role', 'admin').send({ userId, category: 'FALSE_POSITIVE',
+        reason: 'El usuario olvido su contrasena', stepUpToken: 'x'.repeat(32) });
+    expect(response.status).toBe(200);
+    expect(accountSecurity.unlock).toHaveBeenCalledWith(userId);
+    expect(securityRepo.audit).toHaveBeenCalledWith(expect.objectContaining({ action: 'ACCOUNT_UNLOCK' }));
   });
 });

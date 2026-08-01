@@ -6,10 +6,10 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 
 ## Resumen
 
-- Rutas detectadas: 156
-- Rutas de mutación (POST/PUT/PATCH): 102
-- Rutas que consumen `req.body`: 81
-- Rutas con esquema de `req.body` detectable: 81/81
+- Rutas detectadas: 159
+- Rutas de mutación (POST/PUT/PATCH): 104
+- Rutas que consumen `req.body`: 83
+- Rutas con esquema de `req.body` detectable: 83/83
 - Endpoints públicos de identidad sin rate limiting detectable: 0
 
 ## Alertas detectadas
@@ -55,25 +55,25 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `auth.routes.js` | 35 | GET | `/status` | no | — | no | n/a | — | — |
 | `auth.routes.js` | 45 | POST | `/setup` | no | — | sí | sí | — | — |
 | `auth.routes.js` | 75 | POST | `/login` | no | — | sí | sí | — | — |
-| `auth.routes.js` | 143 | GET | `/me` | sí | — | no | n/a | — | — |
-| `auth.routes.js` | 169 | POST | `/password-reset/request` | no | — | sí | sí | — | — |
-| `auth.routes.js` | 199 | POST | `/password-reset/confirm` | no | — | sí | sí | — | — |
+| `auth.routes.js` | 146 | GET | `/me` | sí | — | no | n/a | — | — |
+| `auth.routes.js` | 172 | POST | `/password-reset/request` | no | — | sí | sí | — | — |
+| `auth.routes.js` | 202 | POST | `/password-reset/confirm` | no | — | sí | sí | — | — |
 | `routes/account.routes.js` | 81 | POST | `/register` | no | — | sí | sí | — | — |
 | `routes/account.routes.js` | 108 | POST | `/verify` | no | — | sí | sí | — | — |
 | `routes/account.routes.js` | 149 | POST | `/resend` | no | — | sí | sí | — | — |
 | `routes/account.routes.js` | 163 | POST | `/login` | no | — | sí | sí | — | — |
-| `routes/account.routes.js` | 176 | POST | `/logout` | sí | — | no | n/a | — | — |
-| `routes/account.routes.js` | 183 | POST | `/logout-all` | sí | — | no | n/a | — | — |
-| `routes/account.routes.js` | 190 | GET | `/session-status` | sí | — | no | n/a | — | — |
-| `routes/account.routes.js` | 194 | POST | `/session-renew` | sí | — | no | n/a | — | — |
-| `routes/account.routes.js` | 208 | GET | `/me` | no | — | no | n/a | — | — |
-| `routes/account.routes.js` | 235 | PATCH | `/password` | sí | — | no | sí | — | — |
-| `routes/account.routes.js` | 261 | PATCH | `/email/request` | sí | — | no | sí | — | — |
-| `routes/account.routes.js` | 296 | POST | `/email/confirm` | sí | — | no | sí | — | — |
-| `routes/account.routes.js` | 349 | GET | `/notifications` | sí | — | no | n/a | — | — |
-| `routes/account.routes.js` | 364 | PATCH | `/notifications` | sí | — | no | sí | — | — |
-| `routes/account.routes.js` | 382 | POST | `/telegram/link/start` | sí | — | no | n/a | — | — |
-| `routes/account.routes.js` | 392 | POST | `/telegram/unlink` | sí | — | no | n/a | — | — |
+| `routes/account.routes.js` | 179 | POST | `/logout` | sí | — | no | n/a | — | — |
+| `routes/account.routes.js` | 186 | POST | `/logout-all` | sí | — | no | n/a | — | — |
+| `routes/account.routes.js` | 193 | GET | `/session-status` | sí | — | no | n/a | — | — |
+| `routes/account.routes.js` | 197 | POST | `/session-renew` | sí | — | no | n/a | — | — |
+| `routes/account.routes.js` | 211 | GET | `/me` | no | — | no | n/a | — | — |
+| `routes/account.routes.js` | 238 | PATCH | `/password` | sí | — | no | sí | — | — |
+| `routes/account.routes.js` | 264 | PATCH | `/email/request` | sí | — | no | sí | — | — |
+| `routes/account.routes.js` | 299 | POST | `/email/confirm` | sí | — | no | sí | — | — |
+| `routes/account.routes.js` | 352 | GET | `/notifications` | sí | — | no | n/a | — | — |
+| `routes/account.routes.js` | 367 | PATCH | `/notifications` | sí | — | no | sí | — | — |
+| `routes/account.routes.js` | 385 | POST | `/telegram/link/start` | sí | — | no | n/a | — | — |
+| `routes/account.routes.js` | 395 | POST | `/telegram/unlink` | sí | — | no | n/a | — | — |
 | `routes/admin.routes.js` | 127 | GET | `/summary` | sí | platform-admin | no | n/a | — | — |
 | `routes/admin.routes.js` | 132 | GET | `/moderators` | sí | platform-admin | no | n/a | — | — |
 | `routes/admin.routes.js` | 179 | PATCH | `/moderators/:id/ai-access` | sí | platform-admin | no | sí | — | — |
@@ -83,14 +83,17 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `routes/admin.routes.js` | 416 | POST | `/invite-moderator` | sí | platform-admin | no | sí | — | — |
 | `routes/admin.routes.js` | 483 | GET | `/invitations` | sí | platform-admin | no | n/a | — | — |
 | `routes/admin.routes.js` | 498 | POST | `/invitations/:id/link` | sí | platform-admin | no | n/a | network-admin | — |
-| `routes/adminSecurity.routes.js` | 40 | POST | `/step-up` | sí | platform-admin | no | sí | — | — |
-| `routes/adminSecurity.routes.js` | 95 | GET | `/status` | sí | platform-admin | no | n/a | network-admin | — |
-| `routes/adminSecurity.routes.js` | 117 | GET | `/history` | sí | platform-admin | no | n/a | — | — |
-| `routes/adminSecurity.routes.js` | 119 | GET | `/attempts` | sí | platform-admin | no | n/a | — | — |
-| `routes/adminSecurity.routes.js` | 122 | POST | `/ban` | sí | platform-admin | no | sí | — | — |
-| `routes/adminSecurity.routes.js` | 127 | POST | `/unban` | sí | platform-admin | no | sí | — | — |
-| `routes/adminSecurity.routes.js` | 131 | POST | `/trust` | sí | platform-admin | no | sí | — | — |
-| `routes/adminSecurity.routes.js` | 145 | DELETE | `/trust` | sí | platform-admin | no | sí | — | — |
+| `routes/adminSecurity.routes.js` | 42 | POST | `/step-up` | sí | platform-admin | no | sí | — | — |
+| `routes/adminSecurity.routes.js` | 97 | GET | `/status` | sí | platform-admin | no | n/a | network-admin | — |
+| `routes/adminSecurity.routes.js` | 120 | GET | `/history` | sí | platform-admin | no | n/a | — | — |
+| `routes/adminSecurity.routes.js` | 122 | GET | `/attempts` | sí | platform-admin | no | n/a | — | — |
+| `routes/adminSecurity.routes.js` | 124 | GET | `/locked-accounts` | sí | platform-admin | no | n/a | — | — |
+| `routes/adminSecurity.routes.js` | 127 | POST | `/locked-accounts/unlock` | sí | platform-admin | no | sí | — | — |
+| `routes/adminSecurity.routes.js` | 140 | POST | `/ban` | sí | platform-admin | no | sí | — | — |
+| `routes/adminSecurity.routes.js` | 145 | POST | `/unban` | sí | platform-admin | no | sí | — | — |
+| `routes/adminSecurity.routes.js` | 149 | POST | `/make-indefinite` | sí | platform-admin | no | sí | — | — |
+| `routes/adminSecurity.routes.js` | 159 | POST | `/trust` | sí | platform-admin | no | sí | — | — |
+| `routes/adminSecurity.routes.js` | 173 | DELETE | `/trust` | sí | platform-admin | no | sí | — | — |
 | `routes/ai.routes.js` | 56 | GET | `/status` | sí | — | no | n/a | — | — |
 | `routes/ai.routes.js` | 80 | POST | `/consent` | sí | — | no | sí | — | — |
 | `routes/ai.routes.js` | 86 | POST | `/device-analysis` | sí | — | no | sí | — | — |

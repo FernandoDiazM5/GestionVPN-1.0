@@ -2,6 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const {
   SecurityStepUpRequestSchema, SecurityMutationSchema, SecurityHistoryQuerySchema,
+  AccountUnlockMutationSchema,
 } = require('@gestionvpn/contracts');
 const { requireSession, requirePlatformAdmin } = require('../middleware/authJwt');
 const { validate } = require('../middleware/validate');
@@ -13,6 +14,7 @@ const userRepo = require('../db/repos/userRepo');
 const authIdentityRepo = require('../db/repos/authIdentityRepo');
 const notificationRepo = require('../db/repos/notificationRepo');
 const securityRepo = require('../db/repos/platformSecurityRepo');
+const accountSecurityRepo = require('../db/repos/accountLoginSecurityRepo');
 const telegram = require('../lib/telegram');
 const { callSecurityAgent } = require('../lib/securityAgentClient');
 const { clientIp, guardPolicy } = require('../lib/rateLimit');
@@ -119,6 +121,21 @@ router.get('/history', validate({ query: SecurityHistoryQuerySchema }), asyncHan
   sendOk(res, { history: await securityRepo.history(req.query) })));
 router.get('/attempts', validate({ query: SecurityHistoryQuerySchema }), asyncHandler(async (req, res) =>
   sendOk(res, await callSecurityAgent('attempts', req.query))));
+router.get('/locked-accounts', asyncHandler(async (_req, res) =>
+  sendOk(res, { accounts: await accountSecurityRepo.listLocked() })));
+
+router.post('/locked-accounts/unlock', validate({ body: AccountUnlockMutationSchema }), asyncHandler(async (req, res) => {
+  await requireStepUp(req);
+  const requestIp = clientIp(req);
+  const user = await userRepo.findById(req.body.userId);
+  if (!user) throw new AppError('Usuario no encontrado', 404, 'NOT_FOUND');
+  const changed = await accountSecurityRepo.unlock(user.id);
+  await securityRepo.audit({ actorUserId: req.account.sub, action: 'ACCOUNT_UNLOCK',
+    target: user.id, jail: null, category: req.body.category, reason: req.body.reason,
+    outcome: 'SUCCESS', detail: { email: user.email, changed }, requestIp });
+  const telegramResult = await notifyAdmin(req.account.sub, 'ACCOUNT_UNLOCK', user.email, req.body.reason);
+  return sendOk(res, { unlocked: changed, telegram: telegramResult });
+}));
 
 router.post('/ban', validate({ body: SecurityMutationSchema }), asyncHandler(async (req, res) => {
   if (!req.body.duration) throw new AppError('Duración requerida', 400, 'DURATION_REQUIRED');

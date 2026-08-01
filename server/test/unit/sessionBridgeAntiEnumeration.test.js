@@ -31,6 +31,9 @@ const workspaceRepoMocks = stubModule(__dirname, '../../db/repos/workspaceRepo',
 const metricsMocks = stubModule(__dirname, '../../lib/metrics', {
   authFailsTotal: { inc: vi.fn() },
 });
+const accountSecurityMocks = stubModule(__dirname, '../../db/repos/accountLoginSecurityRepo', {
+  status: vi.fn(), recordFailure: vi.fn(), clearAfterSuccess: vi.fn(),
+});
 
 const BRIDGE_PATH = require.resolve(path.join(__dirname, '..', '..', 'lib', 'sessionBridge'));
 const { authenticateMysqlUser } = require('../../lib/sessionBridge');
@@ -56,6 +59,9 @@ beforeEach(() => {
   userRepoMocks.findByName.mockResolvedValue(null);
   passwordMocks.verifyAndUpgrade.mockResolvedValue({ valid: true, upgraded: false, dummy: false });
   workspaceRepoMocks.findMembershipByUser.mockResolvedValue({ ...membership });
+  accountSecurityMocks.status.mockResolvedValue({ locked: false, lockedUntil: null });
+  accountSecurityMocks.recordFailure.mockResolvedValue({ locked: false, lockedUntil: null });
+  accountSecurityMocks.clearAfterSuccess.mockResolvedValue(undefined);
 });
 
 afterAll(() => {
@@ -91,5 +97,12 @@ describe('authenticateMysqlUser anti-enumeración', () => {
 
     expect(userRepoMocks.findByEmail).toHaveBeenCalledWith('user@local.app');
     expect(userRepoMocks.findByName).toHaveBeenCalledWith('user');
+  });
+
+  it('devuelve el bloqueo solo al flujo que solicita el detalle', async () => {
+    accountSecurityMocks.status.mockResolvedValue({ locked: true, lockedUntil: 123456 });
+    await expect(authenticateMysqlUser('user@example.com', 'password-value', { includeFailure: true }))
+      .resolves.toEqual({ denied: 'locked', lockedUntil: 123456 });
+    expect(sessionMocks.issueSession).not.toHaveBeenCalled();
   });
 });

@@ -107,8 +107,11 @@ router.post('/login', rl.guardPolicy('LOGIN', { identityField: 'username' }), as
         // 2) Usuario multi-tenant (MySQL): Moderador / Miembro por email
         if (!dbError && !row) {
             try {
-                const s = await authenticateMysqlUser(username, password);
-                if (s) {
+                const s = await authenticateMysqlUser(username, password, { includeFailure: true, requestIp: req._clientIp });
+                if (s?.denied === 'locked') {
+                    return sendError(res, 423, 'Cuenta bloqueada temporalmente por intentos incorrectos. Restablece tu clave o solicita desbloqueo.', 'ACCOUNT_LOCKED');
+                }
+                if (s && !s.denied) {
                     await rl.clearSuccessfulIdentity(req);
                     setSessionCookie(res, s.token);
                     const legacyRole = s.user.role === 'MEMBER' ? 'viewer' : 'admin';
@@ -213,6 +216,7 @@ router.post('/password-reset/confirm', rl.guardPolicy('RESET_CONFIRM'), async (r
     await query('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?', [hash, now, found.userId]);
     await passwordResetRepo.markUsed(found.id);
     await passwordResetRepo.invalidateForUser(found.userId);
+    await require('./db/repos/accountLoginSecurityRepo').unlock(found.userId);
 
     // Por seguridad: invalidar inmediatamente todas las sesiones web.
     await revokeAllSessions(found.userId);

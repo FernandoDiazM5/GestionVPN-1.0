@@ -162,8 +162,11 @@ router.post('/resend', rl.guardPolicy('OTP_SEND'), asyncHandler(async (req, res)
 // ── POST /login ──────────────────────────────────────────────
 router.post('/login', rl.guardPolicy('LOGIN'), asyncHandler(async (req, res) => {
   const { email, password } = loginSchema.parse(req.body);
-  const session = await authenticateMysqlUser(email, password);
-  if (!session) throw new AppError(GENERIC_BAD_CREDENTIALS, 401, 'BAD_CREDENTIALS');
+  const session = await authenticateMysqlUser(email, password, { includeFailure: true, requestIp: req._clientIp });
+  if (session?.denied === 'locked') {
+    throw new AppError('Cuenta bloqueada temporalmente por intentos incorrectos. Puedes restablecer tu clave o solicitar desbloqueo.', 423, 'ACCOUNT_LOCKED', { lockedUntil: session.lockedUntil });
+  }
+  if (!session || session.denied) throw new AppError(GENERIC_BAD_CREDENTIALS, 401, 'BAD_CREDENTIALS');
 
   await rl.clearSuccessfulIdentity(req);
   setSessionCookie(res, session.token);

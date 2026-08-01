@@ -1,4 +1,4 @@
-const { SecurityMutationSchema, SecurityStepUpRequestSchema } = require('@gestionvpn/contracts');
+const { AccountUnlockMutationSchema, SecurityMutationSchema, SecurityStepUpRequestSchema } = require('@gestionvpn/contracts');
 
 const base = {
   target: '203.0.113.10', category: 'MAINTENANCE', reason: 'Mantenimiento autorizado',
@@ -23,5 +23,11 @@ describe('contratos de seguridad del VPS', () => {
     expect(SecurityStepUpRequestSchema.safeParse({ firebaseIdToken: 'token' }).success).toBe(true);
     expect(SecurityStepUpRequestSchema.safeParse({}).success).toBe(false);
     expect(SecurityStepUpRequestSchema.safeParse({ password: 'a', firebaseIdToken: 'b' }).success).toBe(false);
+  });
+  it('valida el desbloqueo administrativo de una cuenta', () => {
+    expect(AccountUnlockMutationSchema.safeParse({
+      userId: '00000000-0000-4000-8000-000000000099', category: 'FALSE_POSITIVE',
+      reason: 'El usuario olvido su contrasena', stepUpToken: 'x'.repeat(32),
+    }).success).toBe(true);
   });
 });

@@ -6,6 +6,11 @@ export interface SecurityJail {
   banDetails?: Array<{target:string;blockedSince:number;expiresAt:number|null;attempts?:number;reason?:string;category?:string|null}>;
 }
 export interface SecurityStatus { success: true; jails: SecurityJail[]; trusted: string[]; trustedMetadata: Array<Record<string, unknown>>; currentIp:string; attemptHistory?: { since:number|null; until:number|null } }
+export interface LockedAccount {
+  user_id:string; email:string; name:string; workspace_name?:string|null;
+  failures_15m:number; failures_24h:number; locked_until:number; lock_reason:string;
+  last_failure_at?:number|null;
+}
 export interface SecurityMutation {
   target: string; jail?: string; duration?: '15m'|'1h'|'6h'|'24h'|'7d'|'indefinite';
   category: 'FALSE_POSITIVE'|'ADMIN_ACCESS'|'MAINTENANCE'|'SECURITY_TEST'|'OTHER';
@@ -29,4 +34,7 @@ export const securityAdminApi = {
   untrust: (data: SecurityMutation) => apiJson('/api/admin/security/trust', {
     method: 'DELETE', body: JSON.stringify(data),
   }),
+  lockedAccounts: () => get<{success:true;accounts:LockedAccount[]}>('/api/admin/security/locked-accounts'),
+  unlockAccount: (data: {userId:string;category:SecurityMutation['category'];reason:string;stepUpToken:string}) =>
+    post('/api/admin/security/locked-accounts/unlock', data),
 };

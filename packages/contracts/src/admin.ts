@@ -93,3 +93,11 @@ export const SecurityHistoryQuerySchema = z.object({
   target: SecurityTargetSchema.optional(),
   limit: z.coerce.number().int().min(1).max(500).default(100),
 }).strict();
+
+export const AccountUnlockMutationSchema = z.object({
+  userId: z.string().uuid(),
+  category: SecurityReasonCategorySchema,
+  reason: SecurityReasonSchema,
+  stepUpToken: z.string().trim().min(32).max(256),
+}).strict();
+export type AccountUnlockMutation = z.infer<typeof AccountUnlockMutationSchema>;

@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Ban, Clock3, Eye, Infinity as InfinityIcon, RefreshCw, Search, Shield, ShieldCheck, ShieldOff,
-  Unlock, X,
+  Unlock, UserRoundX, X,
 } from 'lucide-react';
 import { confirmGoogleIdentity } from '../../../services/federatedAuth';
-import { securityAdminApi, type SecurityJail, type SecurityMutation } from '../../../services/securityAdminApi';
+import { securityAdminApi, type LockedAccount, type SecurityJail, type SecurityMutation } from '../../../services/securityAdminApi';
 
 const categories: Array<[SecurityMutation['category'], string]> = [
   ['FALSE_POSITIVE', 'Falso positivo'],
@@ -62,19 +62,22 @@ export default function SecurityModule() {
   const [confirmRisk, setConfirmRisk] = useState(false);
   const [attemptHistorySince, setAttemptHistorySince] = useState<number | null>(null);
   const [attempts, setAttempts] = useState<AttemptResult | null>(null);
+  const [lockedAccounts, setLockedAccounts] = useState<LockedAccount[]>([]);
+  const [unlockAccount, setUnlockAccount] = useState<LockedAccount | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const [status, recent] = await Promise.all([
-        securityAdminApi.status(), securityAdminApi.history(),
+      const [status, recent, accountLocks] = await Promise.all([
+        securityAdminApi.status(), securityAdminApi.history(), securityAdminApi.lockedAccounts(),
       ]);
       setJails(status.jails);
       setTrusted(status.trusted);
       setCurrentIp(status.currentIp);
       setAttemptHistorySince(status.attemptHistory?.since ?? null);
       setHistory(recent.history);
+      setLockedAccounts(accountLocks.accounts);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'No se pudo cargar la seguridad del VPS');
     } finally {
@@ -149,6 +152,30 @@ export default function SecurityModule() {
     }
   };
 
+  const executeAccountUnlock = async (google = false) => {
+    if (!unlockAccount || reason.trim().length < 10) return;
+    setBusy(true);
+    setError('');
+    try {
+      const proof = google
+        ? await securityAdminApi.stepUpGoogle(await confirmGoogleIdentity())
+        : await securityAdminApi.stepUpPassword(password);
+      await securityAdminApi.unlockAccount({ userId: unlockAccount.user_id, category,
+        reason: reason.trim(), stepUpToken: proof.stepUpToken });
+      setUnlockAccount(null);
+      await load();
+    } catch (unlockError) {
+      setError(unlockError instanceof Error ? unlockError.message : 'No se pudo desbloquear la cuenta');
+    } finally { setBusy(false); }
+  };
+
+  const openAccountUnlock = (account: LockedAccount) => {
+    setUnlockAccount(account);
+    setCategory('FALSE_POSITIVE');
+    setReason('');
+    setPassword('');
+  };
+
   return (
     <div className="space-y-5 p-4 md:p-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -175,6 +202,41 @@ export default function SecurityModule() {
         <Summary icon={ShieldCheck} label="Direcciones confiables" value={trusted.length} />
         <Summary icon={ShieldOff} label="Protecciones activas" value={jails.length} />
       </div>
+
+      <section className="card overflow-hidden">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-200 p-4 dark:border-slate-700">
+          <div>
+            <h2 className="font-bold text-slate-900 dark:text-white">Usuarios bloqueados</h2>
+            <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">Bloqueos por contraseñas incorrectas; no afectan a otros usuarios de la misma red.</p>
+          </div>
+          <span className="badge badge-neutral whitespace-nowrap">{lockedAccounts.length} activos</span>
+        </div>
+        <div className="hidden overflow-x-auto md:block">
+          <table className="min-w-[760px] w-full text-left text-sm">
+            <thead className="bg-slate-50 dark:bg-slate-900/60"><tr>
+              {['Usuario', 'Espacio', 'Intentos', 'Bloqueado hasta', 'Acción'].map((heading) => <th key={heading} className="px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-600">{heading}</th>)}
+            </tr></thead>
+            <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+              {lockedAccounts.map((account) => <tr key={account.user_id}>
+                <td className="px-4 py-4"><div className="font-semibold text-slate-900 dark:text-white">{account.name || 'Sin nombre'}</div><div className="text-xs text-slate-500">{account.email}</div></td>
+                <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{account.workspace_name || '—'}</td>
+                <td className="px-4 py-4"><span className="badge badge-neutral">{account.failures_24h} en 24 h</span></td>
+                <td className="whitespace-nowrap px-4 py-4 text-slate-600 dark:text-slate-300">{formatDate(account.locked_until)}</td>
+                <td className="px-4 py-4 text-right"><button className="btn-outline min-h-10 whitespace-nowrap" onClick={() => openAccountUnlock(account)}><Unlock className="h-4 w-4" /> Desbloquear</button></td>
+              </tr>)}
+              {!loading && lockedAccounts.length === 0 && <tr><td colSpan={5} className="p-8 text-center text-sm text-slate-500">No hay usuarios bloqueados.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+        <div className="divide-y divide-slate-200 md:hidden dark:divide-slate-700">
+          {lockedAccounts.map((account) => <article key={account.user_id} className="space-y-3 p-4">
+            <div className="flex items-start gap-3"><UserRoundX className="mt-0.5 h-5 w-5 text-amber-600" /><div className="min-w-0"><div className="truncate font-semibold">{account.name || account.email}</div><div className="break-all text-xs text-slate-500">{account.email}</div></div></div>
+            <div className="rounded-xl bg-slate-50 p-3 text-xs dark:bg-slate-900/60">{account.failures_24h} intentos en 24 h · Hasta {formatDate(account.locked_until)}</div>
+            <button className="btn-outline min-h-11 w-full" onClick={() => openAccountUnlock(account)}><Unlock className="h-4 w-4" /> Desbloquear usuario</button>
+          </article>)}
+          {!loading && lockedAccounts.length === 0 && <div className="p-8 text-center text-sm text-slate-500">No hay usuarios bloqueados.</div>}
+        </div>
+      </section>
 
       <section className="card overflow-hidden">
         <div className="border-b border-slate-200 p-4 dark:border-slate-700">
@@ -271,8 +333,27 @@ export default function SecurityModule() {
       )}
 
       {attempts && <AttemptsDialog result={attempts} close={() => setAttempts(null)} />}
+      {unlockAccount && <AccountUnlockDialog account={unlockAccount} category={category} setCategory={setCategory}
+        reason={reason} setReason={setReason} password={password} setPassword={setPassword} busy={busy}
+        close={() => setUnlockAccount(null)} execute={executeAccountUnlock} />}
     </div>
   );
+}
+
+function AccountUnlockDialog(props: {
+  account: LockedAccount; category: SecurityMutation['category']; setCategory:(value:SecurityMutation['category'])=>void;
+  reason:string; setReason:(value:string)=>void; password:string; setPassword:(value:string)=>void;
+  busy:boolean; close:()=>void; execute:(google?:boolean)=>Promise<void>;
+}) {
+  const disabled = props.busy || props.reason.trim().length < 10;
+  return <div className="modal-overlay" role="presentation"><div className="modal-panel w-full max-w-lg space-y-4 p-5" role="dialog" aria-modal="true" aria-labelledby="account-unlock-title">
+    <div className="flex items-center justify-between gap-3"><div><h2 id="account-unlock-title" className="text-lg font-bold">Desbloquear usuario</h2><p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{props.account.email}</p></div><button className="btn-ghost h-10 w-10 p-0" aria-label="Cerrar" onClick={props.close}><X className="h-5 w-5" /></button></div>
+    <div className="rounded-xl bg-slate-50 p-3 text-sm dark:bg-slate-900/60">Se borrarán los contadores de contraseñas incorrectas. La acción quedará registrada.</div>
+    <label className="block text-sm font-semibold">Categoría<select className="input-field mt-1" value={props.category} onChange={(event)=>props.setCategory(event.target.value as SecurityMutation['category'])}>{categories.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
+    <label className="block text-sm font-semibold">Motivo<input className="input-field mt-1" value={props.reason} onChange={(event)=>props.setReason(event.target.value)} placeholder="Mínimo 10 caracteres" /></label>
+    <label className="block text-sm font-semibold">Contraseña actual<input type="password" autoComplete="current-password" className="input-field mt-1" value={props.password} onChange={(event)=>props.setPassword(event.target.value)} /></label>
+    <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><button className="btn-ghost" onClick={props.close}>Cancelar</button><button className="btn-outline" disabled={disabled} onClick={()=>void props.execute(true)}>Confirmar con Google</button><button className="btn-primary" disabled={disabled || !props.password} onClick={()=>void props.execute(false)}>{props.busy?'Aplicando…':'Desbloquear'}</button></div>
+  </div></div>;
 }
 
 function BlockedTableRow({ row, open, showAttempts }: {
@@ -419,7 +500,7 @@ function RecentActivity({ history }: { history: Array<Record<string, unknown>> }
 }
 
 function ActionBadge({ action }: { action: string }) {
-  const labels: Record<string, string> = { BAN: 'Bloqueó', PROMOTE_INDEFINITE: 'Hizo indefinido', UNBAN: 'Desbloqueó', TRUST_ADD: 'Confió', TRUST_REMOVE: 'Retiró confianza' };
+  const labels: Record<string, string> = { BAN: 'Bloqueó', PROMOTE_INDEFINITE: 'Hizo indefinido', UNBAN: 'Desbloqueó', TRUST_ADD: 'Confió', TRUST_REMOVE: 'Retiró confianza', ACCOUNT_UNLOCK: 'Desbloqueó usuario' };
   return <span className="badge badge-neutral whitespace-nowrap">{labels[action] || action}</span>;
 }
 

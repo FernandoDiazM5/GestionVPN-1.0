@@ -71,7 +71,15 @@ async function updatePasswordHashIfCurrent(id, passwordHash, currentHash) {
   return Number(result.affectedRows || 0) === 1;
 }
 
+async function resolveLogin(login) {
+  const raw = String(login || '').trim().toLowerCase();
+  if (!raw) return null;
+  const byEmail = await findByEmail(raw.includes('@') ? raw : `${raw}@local.app`);
+  const byName = raw.includes('@') ? null : await findByName(raw);
+  return byEmail || byName;
+}
+
 module.exports = {
   findByEmail, findById, findByName, createPending, setOtp, incOtpAttempts, markVerified,
-  updatePasswordHashIfCurrent,
+  updatePasswordHashIfCurrent, resolveLogin,
 };

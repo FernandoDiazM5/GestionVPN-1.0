@@ -12,6 +12,7 @@ const { issueSession } = require('./sessionService');
 const userRepo = require('../db/repos/userRepo');
 const workspaceRepo = require('../db/repos/workspaceRepo');
 const metrics = require('./metrics');
+const accountSecurity = require('../db/repos/accountLoginSecurityRepo');
 
 const DUMMY_USER_ID = '00000000-0000-0000-0000-000000000000';
 
@@ -87,7 +88,7 @@ async function buildSessionForLegacyUser(username) {
  * Devuelve { token, user } si las credenciales son válidas, o null.
  * Permite que Moderadores/Miembros inicien sesión en la app.
  */
-async function authenticateMysqlUser(login, password) {
+async function authenticateMysqlUser(login, password, { includeFailure = false, requestIp = '' } = {}) {
   // Acepta: email directo · username corto (<username>@local.app) ·
   // o el `name` del usuario (lo que el Administrador ve como "usuario").
   const raw = String(login || '').trim().toLowerCase();
@@ -104,17 +105,26 @@ async function authenticateMysqlUser(login, password) {
     user ? (nextHash, currentHash) => userRepo.updatePasswordHashIfCurrent(user.id, nextHash, currentHash) : undefined
   );
   const membership = await workspaceRepo.findMembershipByUser(user?.id || DUMMY_USER_ID);
+  const lock = user ? await accountSecurity.status(user.id) : { locked: false };
 
   let failureReason = null;
   if (!user) failureReason = 'not_found';
+  else if (lock.locked) failureReason = 'locked';
   else if (!verification.valid) failureReason = 'bad_password';
   else if (!user.email_verified) failureReason = 'unverified';
   else if (user.disabled_at) failureReason = 'disabled';
   else if (!membership) failureReason = 'no_membership';
   if (failureReason) {
+    let security = lock;
+    if (failureReason === 'bad_password') {
+      security = await accountSecurity.recordFailure({ userId: user.id, ip: requestIp });
+      if (security.locked) failureReason = 'locked';
+    }
     metrics.authFailsTotal.inc({ reason: failureReason });
-    return null;
+    return includeFailure ? { denied: failureReason, lockedUntil: security.lockedUntil || null } : null;
   }
+
+  await accountSecurity.clearAfterSuccess(user.id);
 
   const platform_admin = Number(user.is_platform_admin) === 1;
   const { token } = await issueSession({
