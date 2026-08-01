@@ -4,6 +4,12 @@
 > Aquí solo se **añaden** entradas por sesión (las más nuevas arriba); no se edita lo viejo.
 > Mantenimiento gobernado por la skill `handoff-keeper` (`.claude/skills/handoff-keeper/`).
 
+> **Sesión 2026-08-01 — Fase 1 de bloqueo y desbloqueo de cuentas preparada.** Rama `vps_prod`, commit remoto `49052fe`. Estado: `check:all`; backend 96/563 y frontend 64/216.
+> - Los umbrales cuentan sólo contraseñas realmente incorrectas: 5/15 min bloquea 15 min; 10/24 h bloquea 24 h. Éxito y restablecimiento de clave limpian el estado.
+> - Seguridad del Administrador lista cuentas bloqueadas y permite desbloquear con reautenticación, motivo, auditoría y Telegram.
+> - Se añadió la migración idempotente `account_login_security`; no se activaron todavía bloqueos web de IP ni nuevos jails.
+> - Pendiente: autorización explícita para respaldar, desplegar `49052fe` con el compose de producción y validar en vivo.
+
 > **Sesión 2026-08-01 — Reincidentes SSH pasan automáticamente a indefinido.** Rama/producción/agente `e27184b`. Skills: `network-engineer`, `handoff-keeper`.
 > - Diagnóstico: `sshd` tenía base 1h, incremento y máximo 1d; el jail 7d era exclusivamente manual. La UI reflejaba correctamente 1/2/4h según reincidencias, pero faltaba una política permanente.
 > - Nuevo `gestionvpn-recidive`: filtro exclusivo `[sshd] Ban`, 3 bans/7d, `bantime=-1`, UFW. No cuenta bloqueos manuales del panel.
