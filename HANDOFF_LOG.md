@@ -4,6 +4,12 @@
 > Aquí solo se **añaden** entradas por sesión (las más nuevas arriba); no se edita lo viejo.
 > Mantenimiento gobernado por la skill `handoff-keeper` (`.claude/skills/handoff-keeper/`).
 
+> **Sesión 2026-08-01 — Protección 100% y auditoría integral.** Producción `ae5fe5e`/imagen funcional `d25dca4`. Estado: 0 reinicios, HTTPS 200, backend/DB healthy, 54 tablas.
+> - Se activaron confirmaciones temporal/indefinida y rollout 100%; sólo se recreó backend. Un escáner real fue bloqueado en `gestionvpn-web-sensitive`, auditado y reflejado en UFW.
+> - Auditoría VPS/backend/frontend/seguridad contrastada con el handoff: 612 backend, 216 frontend, 6 agente, `check:all`; red pública limitada a 22/80/443 y datos intactos.
+> - Pendiente funcional: ningún `platform_admin` tiene Telegram enlazado, por lo que la primera alerta automática no tuvo destinatario. También quedan dependencias, cabeceras, swap/APT y diseño como mejoras planificables.
+> - Semgrep se intentó completo y acotado; el motor excedió 4 y 20 minutos respectivamente. Se detuvieron sólo sus contenedores temporales y el resultado se declaró inconcluso. Informe: `docs/security/VPS_FULL_AUDIT_2026-08-01.md`.
+
 > **Sesión 2026-08-01 — Fase 9 desplegada en observación 0%.** Rama `vps_prod`; producción `d25dca4`. Estado: HTTPS 200, backend/DB healthy, 0 reinicios, 54 tablas y 0 acciones automáticas.
 > - Se creó `/root/pre-phase9-20260801T191019Z`, se verificó gzip/SHA-256 y se restauró el dump en MariaDB aislada; conteos 50/5/3/14 idénticos. Se conservaron imágenes backend/frontend previas con tag `pre-phase9-20260801T191019Z`.
 > - Código, agente y jails avanzaron a `d25dca4`; Fail2ban validó antes de recargar y quedaron 15 jails. Build ejecutado sólo con `docker-compose.prod.yml`.
