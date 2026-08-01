@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import hashlib, hmac, ipaddress, json, os, re, subprocess, time
+import glob, gzip, hashlib, hmac, ipaddress, json, os, re, subprocess, time
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -68,25 +68,49 @@ def write_trusted(values):
     os.chmod(temp, 0o600); os.replace(temp, TRUST_FILE)
     run(['fail2ban-client', 'reload'])
 
-def recent_attempts(ip=None, limit=100):
-    out = run(['journalctl', '-u', 'sshd', '--since', '-24 hours', '--no-pager', '-o', 'cat'], timeout=12)
-    rows = []
-    pattern = re.compile(r'(Failed password|Invalid user|authentication failure).*?(?:from|rhost=)([0-9a-fA-F:.]+)')
-    for line in reversed(out.splitlines()):
-        m = pattern.search(line)
-        if not m or (ip and m.group(2) != ip): continue
-        rows.append({'service': 'sshd', 'target': m.group(2), 'message': line[-500:]})
-        if len(rows) >= limit: break
-    return rows
+ATTEMPT_PATTERN = re.compile(
+    r'^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)(?:,\d+)? .*?\[([^\]]+)\] Found ([0-9a-fA-F:.]+)(?:\s|$)'
+)
+
+def retained_attempt_history(ip=None, limit=100):
+    """Read detections from Fail2ban's retained current and rotated logs."""
+    events = []
+    for path in glob.glob('/var/log/fail2ban.log*'):
+        if not os.path.isfile(path): continue
+        opener = gzip.open if path.endswith('.gz') else open
+        try:
+            with opener(path, 'rt', encoding='utf-8', errors='replace') as fh:
+                for line in fh:
+                    match = ATTEMPT_PATTERN.search(line)
+                    if not match: continue
+                    detected = datetime.strptime(match.group(1), '%Y-%m-%d %H:%M:%S').astimezone()
+                    jail, detected_ip = match.group(2), match.group(3)
+                    if ip and detected_ip != ip: continue
+                    events.append({'service': jail, 'target': detected_ip,
+                        'detectedAt': int(detected.timestamp() * 1000),
+                        'message': f'Fail2ban detectó un intento en {jail} desde {detected_ip}'})
+        except (OSError, EOFError):
+            continue
+    events.sort(key=lambda row: row['detectedAt'], reverse=True)
+    retained = events[:limit]
+    timestamps = [row['detectedAt'] for row in events]
+    return {'attempts': retained, 'total': len(events),
+            'historySince': min(timestamps) if timestamps else None,
+            'historyUntil': max(timestamps) if timestamps else None,
+            'truncated': len(events) > len(retained)}
 
 def execute(op, p):
     if op == 'status':
-        counts = {}
+        history = {'attempts': [], 'historySince': None, 'historyUntil': None}
         try:
-            for row in recent_attempts(limit=500): counts[row['target']] = counts.get(row['target'], 0) + 1
+            history = retained_attempt_history(limit=1000000)
         except Exception: pass
-        return {'jails': [jail_status(j, counts) for j in jail_names()], 'trusted': trusted_values()}
-    if op == 'attempts': return {'attempts': recent_attempts(p.get('target'), min(int(p.get('limit', 100)), 500))}
+        counts = {}
+        for row in history['attempts']: counts[row['target']] = counts.get(row['target'], 0) + 1
+        return {'jails': [jail_status(j, counts) for j in jail_names()], 'trusted': trusted_values(),
+                'attemptHistory': {'since': history['historySince'], 'until': history['historyUntil']}}
+    if op == 'attempts':
+        return retained_attempt_history(p.get('target'), min(int(p.get('limit', 100)), 500))
     value = target(p.get('target'), op in {'trust_add', 'trust_remove'})
     bare = value.split('/')[0]
     if op in {'ban', 'trust_remove'} and bare in PROTECTED: raise ValueError('Dirección protegida')

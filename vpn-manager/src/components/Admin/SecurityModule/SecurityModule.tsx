@@ -25,6 +25,14 @@ interface BlockedRow {
   expiresAt?: number | null;
 }
 
+interface AttemptResult {
+  attempts: Array<Record<string, unknown>>;
+  total: number;
+  historySince: number | null;
+  historyUntil: number | null;
+  truncated: boolean;
+}
+
 const formatDate = (value?: number | null) => {
   if (value === null) return 'Sin vencimiento';
   if (!value) return 'Sin información';
@@ -50,7 +58,8 @@ export default function SecurityModule() {
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [confirmRisk, setConfirmRisk] = useState(false);
-  const [attempts, setAttempts] = useState<Array<Record<string, unknown>> | null>(null);
+  const [attemptHistorySince, setAttemptHistorySince] = useState<number | null>(null);
+  const [attempts, setAttempts] = useState<AttemptResult | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -62,6 +71,7 @@ export default function SecurityModule() {
       setJails(status.jails);
       setTrusted(status.trusted);
       setCurrentIp(status.currentIp);
+      setAttemptHistorySince(status.attemptHistory?.since ?? null);
       setHistory(recent.history);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'No se pudo cargar la seguridad del VPS');
@@ -102,7 +112,7 @@ export default function SecurityModule() {
     setError('');
     try {
       const data = await securityAdminApi.attempts(ip);
-      setAttempts(data.attempts);
+      setAttempts(data);
     } catch (attemptError) {
       setError(attemptError instanceof Error ? attemptError.message : 'No se pudieron consultar los intentos');
     }
@@ -171,8 +181,8 @@ export default function SecurityModule() {
                 Los desbloqueos no crean una excepción permanente.
               </p>
             </div>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <div className="relative min-w-0 sm:w-72">
+            <div className="grid w-full gap-2 sm:grid-cols-2 xl:w-auto xl:grid-cols-[minmax(18rem,22rem)_auto_auto] xl:items-center">
+              <div className="relative min-w-0 sm:col-span-2 xl:col-span-1">
                 <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-500" />
                 <input
                   className="input-field pl-9"
@@ -181,10 +191,10 @@ export default function SecurityModule() {
                   placeholder="Buscar IP, motivo o protección"
                 />
               </div>
-              <button className="btn-outline" onClick={() => open('trust')}>
+              <button className="btn-outline inline-flex min-h-11 min-w-[12rem] shrink-0 items-center justify-center gap-2 whitespace-nowrap px-4 text-sm" onClick={() => open('trust')}>
                 <ShieldCheck className="h-4 w-4" /> Agregar confiable
               </button>
-              <button className="btn-primary" onClick={() => open('ban')}>
+              <button className="btn-primary inline-flex min-h-11 min-w-[10rem] shrink-0 items-center justify-center gap-2 whitespace-nowrap px-4 text-sm" onClick={() => open('ban')}>
                 <Ban className="h-4 w-4" /> Bloquear IP
               </button>
             </div>
@@ -196,7 +206,7 @@ export default function SecurityModule() {
             <thead className="bg-slate-50 dark:bg-slate-900/60">
               <tr>
                 <th className="w-[27%] px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-600">Dirección y motivo</th>
-                <th className="w-[10%] px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-slate-600">Intentos</th>
+                <th className="w-[10%] px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-slate-600" title={attemptHistorySince ? `Contados desde ${formatDate(attemptHistorySince)}` : 'Según el historial disponible de Fail2ban'}>Intentos</th>
                 <th className="w-[25%] px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-600">Periodo</th>
                 <th className="w-[15%] px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-600">Protección</th>
                 <th className="w-[23%] px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-slate-600">Acciones</th>
@@ -256,7 +266,7 @@ export default function SecurityModule() {
         />
       )}
 
-      {attempts && <AttemptsDialog attempts={attempts} close={() => setAttempts(null)} />}
+      {attempts && <AttemptsDialog result={attempts} close={() => setAttempts(null)} />}
     </div>
   );
 }
@@ -462,12 +472,15 @@ function ActionDialog(props: {
   );
 }
 
-function AttemptsDialog({ attempts, close }: { attempts: Array<Record<string, unknown>>; close: () => void }) {
+function AttemptsDialog({ result, close }: { result: AttemptResult; close: () => void }) {
+  const period = result.historySince
+    ? `Historial disponible desde ${formatDate(result.historySince)}.`
+    : 'No hay historial retenido para esta dirección.';
   return (
     <div className="modal-overlay" role="presentation">
       <div className="modal-panel max-h-[80vh] w-full max-w-2xl overflow-auto p-5" role="dialog" aria-modal="true" aria-labelledby="attempts-title">
-        <div className="mb-4 flex items-center justify-between gap-3"><div><h2 id="attempts-title" className="text-lg font-bold">Intentos SSH recientes</h2><p className="mt-1 text-xs text-slate-600 dark:text-slate-300">Eventos detectados durante las últimas 24 horas.</p></div><button className="btn-ghost h-10 w-10 p-0" aria-label="Cerrar" onClick={close}><X className="h-5 w-5" /></button></div>
-        <div className="space-y-2">{attempts.map((row, index) => <div key={index} className="rounded-xl bg-slate-50 p-3 font-mono text-xs leading-5 text-slate-700 dark:bg-slate-900 dark:text-slate-200">{String(row.message || '')}</div>)}{attempts.length === 0 && <p className="py-8 text-center text-sm text-slate-500">No se encontraron intentos recientes.</p>}</div>
+        <div className="mb-4 flex items-center justify-between gap-3"><div><h2 id="attempts-title" className="text-lg font-bold">Intentos detectados por Fail2ban</h2><p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{period} Total: {result.total}.</p></div><button className="btn-ghost h-10 w-10 p-0" aria-label="Cerrar" onClick={close}><X className="h-5 w-5" /></button></div>
+        <div className="space-y-2">{result.attempts.map((row, index) => <div key={index} className="rounded-xl bg-slate-50 p-3 text-xs leading-5 text-slate-700 dark:bg-slate-900 dark:text-slate-200"><div className="font-medium">{String(row.message || '')}</div>{row.detectedAt ? <div className="mt-1 text-slate-500">{formatDate(Number(row.detectedAt))}</div> : null}</div>)}{result.attempts.length === 0 && <p className="py-8 text-center text-sm text-slate-500">No se encontraron detecciones en el historial conservado.</p>}</div>
       </div>
     </div>
   );
