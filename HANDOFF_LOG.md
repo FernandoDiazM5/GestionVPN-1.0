@@ -4,6 +4,12 @@
 > Aquí solo se **añaden** entradas por sesión (las más nuevas arriba); no se edita lo viejo.
 > Mantenimiento gobernado por la skill `handoff-keeper` (`.claude/skills/handoff-keeper/`).
 
+> **Sesión 2026-08-01 — Fase 4 de reincidencia web indefinida preparada.** Rama `vps_prod`, commit `80ef848`. Estado: `check:all`; backend 99/578, frontend 64/216, agente Python 5/5 y compilación Python correcta.
+> - Abuso de autenticación distribuido (10/24 h y al menos 3 identidades o identidad desconocida) puede escalar directamente; una sola cuenta olvidada no bloquea la IP.
+> - Los demás vectores escalan en el tercer episodio temporal separado dentro de 7 días; un ban aún vigente no vuelve a contarse.
+> - La escalada usa una tercera confirmación independiente, revalida confianza/IP administrativas en backend y agente, conserva el desbloqueo y aparece como automática en Seguridad.
+> - Producción no fue modificada. Pendiente: fase 5 de cierre operativo y canary antes del único despliegue autorizado.
+
 > **Sesión 2026-08-01 — Fase 3 de protección web temporal preparada.** Rama `vps_prod`, commit `d3557eb`. Estado: `check:all`; backend 98/571, frontend 64/216, agente Python 3/3 y compilación Python correcta.
 > - Se añadió un jail web fijo de 1 hora, controlado únicamente por el agente root y una cola idempotente; el modo requiere dos variables exactas y queda desactivado.
 > - Las IP/CIDR confiables, loopback, protecciones estáticas y direcciones de administradores activos quedan excluidas en backend y agente; una muestra truncada nunca genera bans.
