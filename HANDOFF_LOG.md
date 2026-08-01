@@ -4,6 +4,13 @@
 > Aquí solo se **añaden** entradas por sesión (las más nuevas arriba); no se edita lo viejo.
 > Mantenimiento gobernado por la skill `handoff-keeper` (`.claude/skills/handoff-keeper/`).
 
+> **Sesión 2026-07-31 — Conteo real de intentos y controles de Seguridad desplegados.** Rama/producción `3c28e17`; agente `d1c3afd`. Skills: `ui-design-system`, `network-engineer`, `handoff-keeper`.
+> - Causa del cero: `journalctl -u sshd` no contiene entradas en este VPS, aunque Fail2ban acumulaba 3269 fallos. El agente ahora analiza `/var/log/fail2ban.log*`, incluidas rotaciones comprimidas, y comunica cobertura temporal, total y eventos fechados.
+> - Validación directa antes del frontend: los tres bloqueos SSH activos devolvieron 35, 10 y 22 detecciones; el historial retenido comienza el 2026-07-30.
+> - Barra de acciones alineada con Moderadores: cuadrícula responsive, 44 px mínimos, ancho reservado, centrado y `nowrap`; se eliminó la ventana fija de 24 horas en el detalle.
+> - Durante el deploy se invocó inicialmente el compose de desarrollo y HTTPS dejó de escuchar brevemente; backend/DB siguieron sanos. Se corrigió de inmediato reconstruyendo con `docker-compose.prod.yml`. Cierre: HTTPS/health 200, Nginx válido, tres contenedores con 0 reinicios, agente/Fail2ban activos.
+> - Se reparó además la receta Docker de desarrollo para resolver el workspace privado. Build Vite/TypeScript, `py_compile`, build productivo y verificaciones externas correctos.
+
 > **Sesión 2026-07-31 — UI de Seguridad VPS corregida y desplegada.** Rama/producción `0f43e85`. Skills: `ui-design-system`, `tailwind-design-system`, `handoff-keeper`.
 > - Las capturas productivas mostraron tabla comprimida, tipografía técnica general y controles sin estilo porque `btn-secondary` no existe. Se reemplazó por clases canónicas y una composición responsive.
 > - Escritorio: cinco columnas, fechas agrupadas, badges y acciones compactas. Móvil: tarjetas y controles táctiles. Lista confiable, actividad y modales también se normalizaron.
