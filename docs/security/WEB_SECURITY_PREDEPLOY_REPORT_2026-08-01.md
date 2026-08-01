@@ -5,10 +5,24 @@ lectura. No se modificó el VPS.
 
 ## Decisión
 
-**NO-GO temporal.** El paquete es apto en código, pero no debe construirse con
-el disco al 87%. Primero debe ejecutarse una limpieza aprobada y un respaldo
-nuevo restaurado/verificado. Después se repite el preflight y se despliega en
-modo observación con rollout 0%.
+**GO técnico condicionado a autorización explícita de despliegue.** El NO-GO
+inicial por disco y respaldo fue resuelto en una fase separada y verificada. El
+despliegue debe comenzar en modo observación con rollout 0%, confirmar que no
+hay una operación de túnel en curso y seguir el runbook sin mezclar updates APT.
+
+## Remediación verificada
+
+- Dump `/root/pre-web-security-20260801T171455Z/vpn_manager.sql.gz`, gzip y
+  SHA-256 válidos; permisos 700/600.
+- Restauración en MariaDB aislada: 50 tablas, 5 usuarios, 3 workspaces y 14
+  nodos, idénticos a la fuente; contenedor y volumen temporales retirados.
+- Eliminados únicamente ocho tags de rollback anteriores; preservados current,
+  `pre-e27184b` y `mariadb:11` con sus IDs originales.
+- Build cache retirado: 2.366 GB. Disco: 87%/3.4 GiB → 43%/14 GiB.
+- `.env.production.save.1` restringido de 644 a 600; ambas copias difieren del
+  entorno activo y se conservaron para no perder información sin revisión.
+- Cierre: tres contenedores activos, 0 reinicios, backend/DB healthy, HTTPS y
+  health 200, cuatro servicios host activos, 8 jails, datos críticos intactos.
 
 ## Estado verificado
 
@@ -31,7 +45,7 @@ modo observación con rollout 0%.
 
 ## Hallazgos
 
-### P0 — espacio insuficiente para un build seguro
+### P0 — espacio insuficiente para un build seguro — RESUELTO
 
 - `/var/lib/containerd` ocupa aproximadamente 15 GB.
 - Docker informa 13 imágenes / 13.28 GB, con 9.738 GB recuperables.
@@ -39,13 +53,13 @@ modo observación con rollout 0%.
 - Deben preservarse imágenes actuales, MariaDB y un rollback reciente probado.
 - No ejecutar el build antes de reducir uso y confirmar espacio final.
 
-### P1 — respaldo de base desactualizado para este cambio
+### P1 — respaldo de base desactualizado para este cambio — RESUELTO
 
 El último dump verificado conservado es anterior a las fases nuevas. Crear un
 dump nuevo, validar gzip/checksum y restaurarlo en una MariaDB temporal; comparar
 50/50 tablas y conteos críticos antes de avanzar.
 
-### P1 — copia de entorno con permisos amplios
+### P1 — copia de entorno con permisos amplios — RESUELTO
 
 `server/.env.production.save.1` tiene modo 644. Está protegido actualmente por
 el directorio `/root`, pero debe compararse sin imprimir secretos y luego

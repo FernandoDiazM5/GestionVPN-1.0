@@ -4,6 +4,12 @@
 > Aquí solo se **añaden** entradas por sesión (las más nuevas arriba); no se edita lo viejo.
 > Mantenimiento gobernado por la skill `handoff-keeper` (`.claude/skills/handoff-keeper/`).
 
+> **Sesión 2026-08-01 — Remediación predeploy completada, GO técnico.** Producción permanece en `e27184b`; aún no se desplegó código.
+> - Dump nuevo gzip/SHA-256 válido y restaurado en MariaDB aislada: 50 tablas, 5 usuarios, 3 workspaces y 14 nodos; temporales eliminados.
+> - Se retiraron ocho tags antiguos y 2.366 GB de cache; current+`pre-e27184b` preservados. Disco 87%→43%, 14 GiB libres.
+> - `.env.production.save.1` pasó 644→600; copias diferentes del activo se conservaron. Servicios/health/datos sanos y 0 reinicios.
+> - Informe pasa a GO técnico. Pendiente autorización explícita para desplegar en `observe`/0%; updates APT quedan fuera.
+
 > **Sesión 2026-08-01 — Informe predespliegue concluye NO-GO temporal.** Rama objetivo `vps_prod` `46c3f9c`; producción `e27184b`. Auditoría remota sólo lectura; VPS sin cambios.
 > - Servicios, HTTPS, TLS, Fail2ban, WireGuard, agente, contenedores y datos críticos están sanos; variables web aún ausentes y tablas nuevas no desplegadas.
 > - Bloqueante: disco 87%/3.4 GiB libre; Containerd ~15 GB y Docker reporta ~12 GB recuperables entre imágenes antiguas y build cache.
