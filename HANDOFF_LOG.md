@@ -4,6 +4,12 @@
 > Aquí solo se **añaden** entradas por sesión (las más nuevas arriba); no se edita lo viejo.
 > Mantenimiento gobernado por la skill `handoff-keeper` (`.claude/skills/handoff-keeper/`).
 
+> **Sesión 2026-08-01 — Fase 9 desplegada en observación 0%.** Rama `vps_prod`; producción `d25dca4`. Estado: HTTPS 200, backend/DB healthy, 0 reinicios, 54 tablas y 0 acciones automáticas.
+> - Se creó `/root/pre-phase9-20260801T191019Z`, se verificó gzip/SHA-256 y se restauró el dump en MariaDB aislada; conteos 50/5/3/14 idénticos. Se conservaron imágenes backend/frontend previas con tag `pre-phase9-20260801T191019Z`.
+> - Código, agente y jails avanzaron a `d25dca4`; Fail2ban validó antes de recargar y quedaron 15 jails. Build ejecutado sólo con `docker-compose.prod.yml`.
+> - Se detectaron dos bans históricos presentes en Fail2ban pero ausentes en UFW; se re-aplicaron dentro de sus jails y Fail2ban/UFW quedaron 9/9 consistentes.
+> - Modo efectivo `OBSERVE_ONLY`, rollout 0%, temporal e indefinido sin confirmar. Pendiente: 48 h de observación, falsos positivos y Telegram antes del canary 10%.
+
 > **Sesión 2026-08-01 — Fases originales 7–8 cerradas localmente; sin despliegue.** Rama `vps_prod` (base `0006fce`). Estado: backend 102/612, frontend 64/216, `check:all`, agente 6/6 y Python correctos.
 > - Se habilitó Seguridad para OWNER con alcance estricto a cuentas de su workspace; sólo `platform_admin` puede operar IPs, Fail2ban, UFW, confianza global y políticas.
 > - La UI administrativa se dividió en cinco pestañas accesibles y responsive; actividad reciente combina evidencia manual/automática y filtros por vector.
