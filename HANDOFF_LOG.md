@@ -4,6 +4,12 @@
 > Aquí solo se **añaden** entradas por sesión (las más nuevas arriba); no se edita lo viejo.
 > Mantenimiento gobernado por la skill `handoff-keeper` (`.claude/skills/handoff-keeper/`).
 
+> **Sesión 2026-08-01 — Fase 2 de observación pasiva web preparada.** Rama `vps_prod`, commit remoto `6050771`. Estado: `check:all`; backend 97/568, frontend 64/216 y auditor visual sin hallazgos en Seguridad.
+> - Se observan fallos reales, 429, rutas API inexistentes y endpoints sensibles; identidades desconocidas quedan seudonimizadas y la retención de IP/eventos es 14 días.
+> - El panel muestra umbrales simulados y candidatos, pero `OBSERVE_ONLY` no llama al agente ni bloquea direcciones.
+> - La guía visual llevó a corregir tamaños de botones y variante oscura del nuevo módulo; los 5 hallazgos restantes son preexistentes y ajenos.
+> - Pendiente: fase 3 de bloqueos temporales; no desplegar hasta completar todas las fases y recibir autorización única.
+
 > **Sesión 2026-08-01 — Fase 1 de bloqueo y desbloqueo de cuentas preparada.** Rama `vps_prod`, commit remoto `49052fe`. Estado: `check:all`; backend 96/563 y frontend 64/216.
 > - Los umbrales cuentan sólo contraseñas realmente incorrectas: 5/15 min bloquea 15 min; 10/24 h bloquea 24 h. Éxito y restablecimiento de clave limpian el estado.
 > - Seguridad del Administrador lista cuentas bloqueadas y permite desbloquear con reautenticación, motivo, auditoría y Telegram.
