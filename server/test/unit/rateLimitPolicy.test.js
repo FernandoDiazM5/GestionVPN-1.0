@@ -65,6 +65,17 @@ describe('atomic auth rate-limit policy', () => {
       .toEqual(['LOGIN_ID', 'LOGIN_PAIR']);
   });
 
+  it('administrative account unlock clears identity and pair but preserves the global IP bucket', async () => {
+    const cleared = await rl.clearLoginIdentityBlocks({
+      identities: ['User@Example.com', 'usuario'], ip: '203.0.113.8',
+    });
+
+    expect(cleared).toBe(4);
+    expect(bucketMocks.clear.mock.calls.map((call) => call[1]).sort())
+      .toEqual(['LOGIN_ID', 'LOGIN_ID', 'LOGIN_PAIR', 'LOGIN_PAIR']);
+    expect(bucketMocks.clear.mock.calls.some((call) => call[1] === 'LOGIN_IP')).toBe(false);
+  });
+
   it('adds a persistent one-minute identity cooldown to OTP sends', async () => {
     const app = express();
     app.use(express.json());

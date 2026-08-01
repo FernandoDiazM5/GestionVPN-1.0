@@ -81,6 +81,7 @@ stubModule(__dirname, '../../lib/rateLimit', {
   guard: () => (req, res, next) => { req._clientIp = '127.0.0.1'; next(); },
   guardPolicy: () => (req, res, next) => { req._clientIp = '127.0.0.1'; next(); },
   clearSuccessfulIdentity: vi.fn(),
+  clearLoginIdentityBlocks: vi.fn().mockResolvedValue(2),
   MAX_FAILS: 5,
   WINDOW_MS: 900_000,
 });
@@ -181,6 +182,7 @@ describe('POST /api/auth/password-reset/request — anti-enumeración', () => {
 describe('POST /api/auth/password-reset/confirm — single-use', () => {
   it('token válido → 200 + UPDATE password + markUsed + invalidate', async () => {
     prMocks.findValid.mockResolvedValue({ id: 'pr1', userId: 'u1' });
+    userRepoMocks.findById.mockResolvedValue({ id: 'u1', email: 'real@test.com', name: 'Real' });
     mysqlMocks.query.mockResolvedValue({});
     const r = await request(app).post('/api/auth/password-reset/confirm')
       .send({ token: 'a'.repeat(64), newPassword: 'NuevaPass123' });
@@ -194,6 +196,10 @@ describe('POST /api/auth/password-reset/confirm — single-use', () => {
     expect(prMocks.markUsed).toHaveBeenCalledWith('pr1');
     expect(prMocks.invalidateForUser).toHaveBeenCalledWith('u1');
     expect(sessionServiceMocks.revokeAllSessions).toHaveBeenCalledWith('u1');
+    const rateLimit = require('../../lib/rateLimit');
+    expect(rateLimit.clearLoginIdentityBlocks).toHaveBeenCalledWith({
+      identities: ['real@test.com', 'Real'],
+    });
   });
 
   it('token INVÁLIDO (no encontrado) → 401 INVALID_TOKEN sin tocar BD', async () => {

@@ -6,7 +6,7 @@ const securityRepo = {
   trustAdd: vi.fn(), trustRemove: vi.fn(), trustList: vi.fn(),
 };
 const agent = { callSecurityAgent: vi.fn() };
-const accountSecurity = { listLocked: vi.fn(), unlock: vi.fn() };
+const accountSecurity = { listLocked: vi.fn(), unlock: vi.fn(), get: vi.fn() };
 const webObservation = { observation: vi.fn() };
 const webEnforcement = { touchAdminIp: vi.fn(), state: vi.fn() };
 const webEnforcementRepo = { recentActions: vi.fn() };
@@ -24,6 +24,7 @@ stubModule(__dirname, '../../lib/telegram', { sendMessage: vi.fn() });
 stubModule(__dirname, '../../lib/rateLimit', {
   clientIp: req => String(req.headers['x-test-ip'] || '203.0.113.10'),
   guardPolicy: () => (_req, _res, next) => next(),
+  clearLoginIdentityBlocks: vi.fn(async () => 2),
 });
 stubModule(__dirname, '../../middleware/authJwt', {
   requireSession: (req, res, next) => req.account ? next() : res.status(401).json({ code: 'NO_SESSION' }),
@@ -62,6 +63,7 @@ describe('seguridad administrativa del VPS', () => {
     agent.callSecurityAgent.mockResolvedValue({ jails: [], trusted: [] });
     accountSecurity.listLocked.mockResolvedValue([]);
     accountSecurity.unlock.mockResolvedValue(true);
+    accountSecurity.get.mockResolvedValue({ last_failure_ip: '198.51.100.9' });
     webObservation.observation.mockResolvedValue({ mode: 'OBSERVE_ONLY', sources: [], events: [] });
     webEnforcement.touchAdminIp.mockResolvedValue(true);
     webEnforcement.state.mockReturnValue({ active: false, status: 'OBSERVE_ONLY' });
@@ -153,7 +155,8 @@ describe('seguridad administrativa del VPS', () => {
         reason: 'El usuario olvido su contrasena', stepUpToken: 'x'.repeat(32) });
     expect(response.status).toBe(200);
     expect(accountSecurity.unlock).toHaveBeenCalledWith(userId);
-    expect(securityRepo.audit).toHaveBeenCalledWith(expect.objectContaining({ action: 'ACCOUNT_UNLOCK' }));
+    expect(securityRepo.audit).toHaveBeenCalledWith(expect.objectContaining({ action: 'ACCOUNT_UNLOCK',
+      detail: expect.objectContaining({ clearedRateLimits: 2, ipGloballyBlocked: false }) }));
   });
   it('expone observacion web solo al administrador y no ejecuta bloqueos', async () => {
     const response = await request(app).get('/api/admin/security/web-observation').set('x-test-role', 'admin');

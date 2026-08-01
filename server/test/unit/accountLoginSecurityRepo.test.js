@@ -23,6 +23,7 @@ describe('accountLoginSecurityRepo', () => {
     expect(result).toMatchObject({ locked: true, failures15m: 5, failures24h: 5,
       lockReason: '5_FAILED_PASSWORDS_15M' });
     expect(result.lockedUntil).toBe(now + 15 * 60 * 1000);
+    expect(tx.query.mock.calls[2][1]).toContain(now);
     expect(tx.query).toHaveBeenCalledTimes(3);
   });
 
@@ -40,5 +41,13 @@ describe('accountLoginSecurityRepo', () => {
     mysql.query.mockResolvedValue({ affectedRows: 1 });
     await expect(repo.unlock('user-1')).resolves.toBe(true);
     expect(mysql.query.mock.calls[0][0]).toContain('failures_15m=0');
+    expect(mysql.query.mock.calls[0][0]).toContain('locked_at=NULL');
+  });
+
+  it('lista la IP reciente y el inicio real del bloqueo', async () => {
+    mysql.query.mockResolvedValue([]);
+    await repo.listLocked(10_000);
+    expect(mysql.query.mock.calls[0][0]).toContain('s.locked_at');
+    expect(mysql.query.mock.calls[0][0]).toContain('s.last_failure_ip');
   });
 });

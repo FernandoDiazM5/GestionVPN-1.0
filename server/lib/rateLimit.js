@@ -125,6 +125,19 @@ async function clearSuccessfulIdentity(req) {
   await Promise.all(resettable.map((bucket) => bucketRepo.clear(bucket.hash, bucket.kind)));
 }
 
+async function clearLoginIdentityBlocks({ identities, ip }) {
+  const normalized = [...new Set((identities || [])
+    .map((value) => String(value || '').trim().toLowerCase()).filter(Boolean))];
+  const sourceIp = String(ip || '').trim();
+  const clears = [];
+  for (const identity of normalized) {
+    clears.push(bucketRepo.clear(bucketHash('identity', identity), 'LOGIN_ID'));
+    if (sourceIp) clears.push(bucketRepo.clear(bucketHash('pair', `${sourceIp}\0${identity}`), 'LOGIN_PAIR'));
+  }
+  const results = await Promise.all(clears);
+  return results.reduce((total, result) => total + Number(result?.affectedRows || 0), 0);
+}
+
 let cleanupTimer = null;
 function startBucketCleanup({ intervalMs = ONE_HOUR, retentionMs = 48 * ONE_HOUR } = {}) {
   if (cleanupTimer) return;
@@ -229,7 +242,7 @@ function guardOtpSend() {
 
 module.exports = {
   clientIp, recordAttempt, isBlocked, guard, guardOtpSend, otpSendStatus,
-  guardPolicy, clearSuccessfulIdentity, bucketHash, assertRateLimitConfig, POLICIES,
+  guardPolicy, clearSuccessfulIdentity, clearLoginIdentityBlocks, bucketHash, assertRateLimitConfig, POLICIES,
   startBucketCleanup, stopBucketCleanup,
   MAX_FAILS, WINDOW_MS, OTP_SEND_MAX, OTP_SEND_WINDOW_MS, OTP_SEND_COOLDOWN_MS,
 };

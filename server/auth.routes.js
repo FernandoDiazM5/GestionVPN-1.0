@@ -218,6 +218,12 @@ router.post('/password-reset/confirm', rl.guardPolicy('RESET_CONFIRM'), async (r
     await passwordResetRepo.markUsed(found.id);
     await passwordResetRepo.invalidateForUser(found.userId);
     await require('./db/repos/accountLoginSecurityRepo').unlock(found.userId);
+    const recoveredUser = await userRepo.findById(found.userId);
+    if (recoveredUser) {
+      await rl.clearLoginIdentityBlocks({
+        identities: [recoveredUser.email, recoveredUser.name],
+      });
+    }
 
     // Por seguridad: invalidar inmediatamente todas las sesiones web.
     await revokeAllSessions(found.userId);

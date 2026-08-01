@@ -9,7 +9,8 @@ export interface SecurityStatus { success: true; jails: SecurityJail[]; trusted:
 export interface LockedAccount {
   user_id:string; email:string; name:string; workspace_name?:string|null;
   failures_15m:number; failures_24h:number; locked_until:number; lock_reason:string;
-  last_failure_at?:number|null;
+  locked_at?:number|null; updated_at?:number|null; last_failure_at?:number|null; last_failure_ip?:string|null;
+  ip_globally_blocked?:boolean|null;
 }
 export interface WebObservationSource {
   sourceIp:string; authFailures24h:number; identities24h:number; unknownIdentities24h:number;

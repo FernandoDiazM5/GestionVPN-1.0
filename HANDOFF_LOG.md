@@ -4,6 +4,12 @@
 > Aquí solo se **añaden** entradas por sesión (las más nuevas arriba); no se edita lo viejo.
 > Mantenimiento gobernado por la skill `handoff-keeper` (`.claude/skills/handoff-keeper/`).
 
+> **Sesión 2026-08-01 — Fases originales 1 y 2 completadas localmente; sin despliegue.**
+> - Se reauditó el plan original de nueve fases y se corrigió el estado: las cinco fases consolidadas previas no equivalían a haber satisfecho íntegramente las nueve originales.
+> - Fase 1 (`9de5b89`): incidentes 401/403/404/429 durante 90 días, clasificación segura, decisiones y evidencia enlazadas, sin secretos.
+> - Fase 2: bloqueo 5/15 min y 10/24 h con inicio/IP reciente; desbloqueo reautenticado limpia cuenta, identidad y combinación usuario/IP, preserva el bloqueo global y lo informa por separado; reset de contraseña libera también la identidad.
+> - Validación: backend 101 archivos/593 pruebas, frontend 64/216, TypeScript, ESLint, inventario de rutas y diff correctos. Producción permanece en `e27184b`; siguen pendientes las Fases originales 3–9 antes del despliegue único.
+
 > **Sesión 2026-08-01 — Remediación predeploy completada, GO técnico.** Producción permanece en `e27184b`; aún no se desplegó código.
 > - Dump nuevo gzip/SHA-256 válido y restaurado en MariaDB aislada: 50 tablas, 5 usuarios, 3 workspaces y 14 nodos; temporales eliminados.
 > - Se retiraron ocho tags antiguos y 2.366 GB de cache; current+`pre-e27184b` preservados. Disco 87%→43%, 14 GiB libres.

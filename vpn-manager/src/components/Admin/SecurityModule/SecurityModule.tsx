@@ -215,16 +215,16 @@ export default function SecurityModule() {
           <span className="badge badge-neutral whitespace-nowrap">{lockedAccounts.length} activos</span>
         </div>
         <div className="hidden overflow-x-auto md:block">
-          <table className="min-w-[760px] w-full text-left text-sm">
+          <table className="min-w-[980px] w-full text-left text-sm">
             <thead className="bg-slate-50 dark:bg-slate-900/60"><tr>
-              {['Usuario', 'Espacio', 'Intentos', 'Bloqueado hasta', 'Acción'].map((heading) => <th key={heading} className="px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-600">{heading}</th>)}
+              {['Usuario', 'Motivo / fallos', 'Periodo', 'IP reciente', 'Acción'].map((heading) => <th key={heading} className="px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-600">{heading}</th>)}
             </tr></thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
               {lockedAccounts.map((account) => <tr key={account.user_id}>
                 <td className="px-4 py-4"><div className="font-semibold text-slate-900 dark:text-white">{account.name || 'Sin nombre'}</div><div className="text-xs text-slate-500">{account.email}</div></td>
-                <td className="px-4 py-4 text-slate-600 dark:text-slate-300">{account.workspace_name || '—'}</td>
-                <td className="px-4 py-4"><span className="badge badge-neutral">{account.failures_24h} en 24 h</span></td>
-                <td className="whitespace-nowrap px-4 py-4 text-slate-600 dark:text-slate-300">{formatDate(account.locked_until)}</td>
+                <td className="px-4 py-4"><div className="text-slate-700 dark:text-slate-200">Contraseñas incorrectas</div><span className="badge badge-neutral mt-1">{account.failures_24h} en 24 h</span></td>
+                <td className="whitespace-nowrap px-4 py-4 text-xs text-slate-600 dark:text-slate-300"><div>Desde {formatDate(account.locked_at || account.updated_at)}</div><div>Hasta {formatDate(account.locked_until)}</div></td>
+                <td className="px-4 py-4"><div className="font-mono text-xs text-slate-700 dark:text-slate-200">{account.last_failure_ip || 'No disponible'}</div>{account.ip_globally_blocked === true && <span className="badge badge-danger mt-1">IP sigue bloqueada</span>}{account.ip_globally_blocked == null && account.last_failure_ip && <span className="badge badge-neutral mt-1">Estado no disponible</span>}</td>
                 <td className="px-4 py-4 text-right"><button className="btn-outline btn-md min-h-10 whitespace-nowrap" onClick={() => openAccountUnlock(account)}><Unlock className="h-4 w-4" /> Desbloquear</button></td>
               </tr>)}
               {!loading && lockedAccounts.length === 0 && <tr><td colSpan={5} className="p-8 text-center text-sm text-slate-500">No hay usuarios bloqueados.</td></tr>}
@@ -234,7 +234,7 @@ export default function SecurityModule() {
         <div className="divide-y divide-slate-200 md:hidden dark:divide-slate-700">
           {lockedAccounts.map((account) => <article key={account.user_id} className="space-y-3 p-4">
             <div className="flex items-start gap-3"><UserRoundX className="mt-0.5 h-5 w-5 text-amber-600" /><div className="min-w-0"><div className="truncate font-semibold">{account.name || account.email}</div><div className="break-all text-xs text-slate-500">{account.email}</div></div></div>
-            <div className="rounded-xl bg-slate-50 p-3 text-xs dark:bg-slate-900/60">{account.failures_24h} intentos en 24 h · Hasta {formatDate(account.locked_until)}</div>
+            <div className="rounded-xl bg-slate-50 p-3 text-xs dark:bg-slate-900/60"><div>{account.failures_24h} intentos en 24 h</div><div className="mt-1">Desde {formatDate(account.locked_at || account.updated_at)} · Hasta {formatDate(account.locked_until)}</div><div className="mt-1 font-mono">IP reciente: {account.last_failure_ip || 'No disponible'}</div>{account.ip_globally_blocked && <div className="mt-2 font-semibold text-rose-600">La IP permanece bloqueada globalmente.</div>}</div>
             <button className="btn-outline btn-md min-h-11 w-full" onClick={() => openAccountUnlock(account)}><Unlock className="h-4 w-4" /> Desbloquear usuario</button>
           </article>)}
           {!loading && lockedAccounts.length === 0 && <div className="p-8 text-center text-sm text-slate-500">No hay usuarios bloqueados.</div>}

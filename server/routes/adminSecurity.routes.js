@@ -17,7 +17,7 @@ const securityRepo = require('../db/repos/platformSecurityRepo');
 const accountSecurityRepo = require('../db/repos/accountLoginSecurityRepo');
 const telegram = require('../lib/telegram');
 const { callSecurityAgent } = require('../lib/securityAgentClient');
-const { clientIp, guardPolicy } = require('../lib/rateLimit');
+const { clientIp, guardPolicy, clearLoginIdentityBlocks } = require('../lib/rateLimit');
 const webObservation = require('../lib/webSecurityObservation');
 const webEnforcement = require('../lib/webSecurityEnforcement');
 const webEnforcementRepo = require('../db/repos/webSecurityEnforcementRepo');
@@ -149,20 +149,44 @@ router.get('/web-observation', validate({ query: SecurityHistoryQuerySchema }), 
   ]);
   return sendOk(res, { ...snapshot, enforcement: webEnforcement.state(), actions });
 }));
-router.get('/locked-accounts', asyncHandler(async (_req, res) =>
-  sendOk(res, { accounts: await accountSecurityRepo.listLocked() })));
+function blockedTargets(status) {
+  return new Set((status.jails || []).flatMap((jail) =>
+    (jail.banDetails || []).map((detail) => detail.target).concat(jail.banned || [])));
+}
+
+router.get('/locked-accounts', asyncHandler(async (_req, res) => {
+  const [accounts, status] = await Promise.all([
+    accountSecurityRepo.listLocked(), callSecurityAgent('status').catch(() => null),
+  ]);
+  const globallyBlocked = status ? blockedTargets(status) : null;
+  return sendOk(res, { accounts: accounts.map((account) => ({
+    ...account,
+    ip_globally_blocked: !account.last_failure_ip || !globallyBlocked ? null
+      : globallyBlocked.has(account.last_failure_ip) || globallyBlocked.has(`${account.last_failure_ip}/32`),
+  })) });
+}));
 
 router.post('/locked-accounts/unlock', validate({ body: AccountUnlockMutationSchema }), asyncHandler(async (req, res) => {
   await requireStepUp(req);
   const requestIp = clientIp(req);
   const user = await userRepo.findById(req.body.userId);
   if (!user) throw new AppError('Usuario no encontrado', 404, 'NOT_FOUND');
+  const lock = await accountSecurityRepo.get(user.id);
   const changed = await accountSecurityRepo.unlock(user.id);
+  const clearedRateLimits = await clearLoginIdentityBlocks({
+    identities: [user.email, user.name], ip: lock?.last_failure_ip,
+  });
+  const status = await callSecurityAgent('status').catch(() => null);
+  const globallyBlocked = status ? blockedTargets(status) : null;
+  const ipGloballyBlocked = !lock?.last_failure_ip || !globallyBlocked ? null
+    : globallyBlocked.has(lock.last_failure_ip) || globallyBlocked.has(`${lock.last_failure_ip}/32`);
   await securityRepo.audit({ actorUserId: req.account.sub, action: 'ACCOUNT_UNLOCK',
     target: user.id, jail: null, category: req.body.category, reason: req.body.reason,
-    outcome: 'SUCCESS', detail: { email: user.email, changed }, requestIp });
+    outcome: 'SUCCESS', detail: { email: user.email, changed, clearedRateLimits,
+      lastFailureIp: lock?.last_failure_ip || null, ipGloballyBlocked }, requestIp });
   const telegramResult = await notifyAdmin(req.account.sub, 'ACCOUNT_UNLOCK', user.email, req.body.reason);
-  return sendOk(res, { unlocked: changed, telegram: telegramResult });
+  return sendOk(res, { unlocked: changed, clearedRateLimits,
+    lastFailureIp: lock?.last_failure_ip || null, ipGloballyBlocked, telegram: telegramResult });
 }));
 
 router.post('/ban', validate({ body: SecurityMutationSchema }), asyncHandler(async (req, res) => {

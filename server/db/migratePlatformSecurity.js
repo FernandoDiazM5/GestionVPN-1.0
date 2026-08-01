@@ -48,6 +48,7 @@ async function run() {
     failures_24h INT NOT NULL DEFAULT 0,
     window_24h_started_at BIGINT NOT NULL DEFAULT 0,
     locked_until BIGINT NULL,
+    locked_at BIGINT NULL,
     lock_reason VARCHAR(64) NULL,
     last_failure_at BIGINT NULL,
     last_failure_ip VARCHAR(64) NULL,
@@ -95,6 +96,7 @@ async function run() {
   await ensureColumn('web_security_events', 'action_id', 'CHAR(36) NULL AFTER decision');
   await ensureColumn('web_security_events', 'decided_at', 'BIGINT NULL AFTER action_id');
   await ensureColumn('web_security_actions', 'evidence', 'JSON NULL AFTER status');
+  await ensureColumn('account_login_security', 'locked_at', 'BIGINT NULL AFTER locked_until');
   await query(`CREATE TABLE IF NOT EXISTS platform_security_active_admin_ips (
     source_ip VARCHAR(64) PRIMARY KEY,
     user_id CHAR(36) NOT NULL,
