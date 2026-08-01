@@ -4,6 +4,12 @@
 > Aquí solo se **añaden** entradas por sesión (las más nuevas arriba); no se edita lo viejo.
 > Mantenimiento gobernado por la skill `handoff-keeper` (`.claude/skills/handoff-keeper/`).
 
+> **Sesión 2026-08-01 — Reincidentes SSH pasan automáticamente a indefinido.** Rama/producción/agente `e27184b`. Skills: `network-engineer`, `handoff-keeper`.
+> - Diagnóstico: `sshd` tenía base 1h, incremento y máximo 1d; el jail 7d era exclusivamente manual. La UI reflejaba correctamente 1/2/4h según reincidencias, pero faltaba una política permanente.
+> - Nuevo `gestionvpn-recidive`: filtro exclusivo `[sshd] Ban`, 3 bans/7d, `bantime=-1`, UFW. No cuenta bloqueos manuales del panel.
+> - El historial produjo seis reincidentes indefinidos; `45.148.10.183` se retiró de sus copias temporal/manual sólo después de confirmar el bloqueo nuevo.
+> - Verificación: filtro 94 coincidencias, Fail2ban config OK, 8 jails, seis bans `-1`, health/HTTPS 200, Nginx válido, agente/Fail2ban activos y contenedores con 0 reinicios. Respaldo `/root/pre-recidive-e27184b`; DB intacta.
+
 > **Sesión 2026-07-31 — Conversión de bloqueos temporales a indefinidos desplegada.** Rama/producción/agente `bcc8472`. Skills: `ui-design-system`, `network-engineer`, `handoff-keeper`.
 > - Se añadió **Hacer indefinido** a filas temporales/automáticas en escritorio y móvil, con reautenticación, motivo, categoría, confirmación de riesgo, auditoría y Telegram.
 > - Operación agente `promote_indefinite`: añade destino antes de retirar origen y compensa si falla el segundo paso. Si el destino ya existía, permite limpiar la fila temporal duplicada.
