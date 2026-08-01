@@ -4,6 +4,12 @@
 > Aquí solo se **añaden** entradas por sesión (las más nuevas arriba); no se edita lo viejo.
 > Mantenimiento gobernado por la skill `handoff-keeper` (`.claude/skills/handoff-keeper/`).
 
+> **Sesión 2026-08-01 — Informe predespliegue concluye NO-GO temporal.** Rama objetivo `vps_prod` `46c3f9c`; producción `e27184b`. Auditoría remota sólo lectura; VPS sin cambios.
+> - Servicios, HTTPS, TLS, Fail2ban, WireGuard, agente, contenedores y datos críticos están sanos; variables web aún ausentes y tablas nuevas no desplegadas.
+> - Bloqueante: disco 87%/3.4 GiB libre; Containerd ~15 GB y Docker reporta ~12 GB recuperables entre imágenes antiguas y build cache.
+> - Antes del build se requiere limpieza aprobada, dump nuevo restaurado/verificado y resolver una copia `.env` modo 644. RouterOS `stale` se revalida; 3 updates APT quedan fuera de esta ventana.
+> - Informe: `docs/security/WEB_SECURITY_PREDEPLOY_REPORT_2026-08-01.md`. Pendiente autorización para la remediación predeploy; aún no autorización de despliegue.
+
 > **Sesión 2026-08-01 — Fase 5 de rollout y cierre operativo preparada.** Rama `vps_prod`, commit `4d20246`. Estado: `check:all`; backend 100/582, frontend 64/216, agente Python 5/5 y compilación Python correcta.
 > - Canary determinista por IP con rollout 0–100%; 0%, valores inválidos y `observe` no ejecutan acciones. Avance documentado 10→25→50→100.
 > - Acciones automáticas aplicadas/fallidas notifican a chats Telegram únicos de administradores activos no pausados y aparecen en tarjetas responsive de actividad reciente.
