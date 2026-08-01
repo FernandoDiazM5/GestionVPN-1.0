@@ -4,6 +4,12 @@
 > Aquí solo se **añaden** entradas por sesión (las más nuevas arriba); no se edita lo viejo.
 > Mantenimiento gobernado por la skill `handoff-keeper` (`.claude/skills/handoff-keeper/`).
 
+> **Sesión 2026-07-31 — Conversión de bloqueos temporales a indefinidos desplegada.** Rama/producción/agente `bcc8472`. Skills: `ui-design-system`, `network-engineer`, `handoff-keeper`.
+> - Se añadió **Hacer indefinido** a filas temporales/automáticas en escritorio y móvil, con reautenticación, motivo, categoría, confirmación de riesgo, auditoría y Telegram.
+> - Operación agente `promote_indefinite`: añade destino antes de retirar origen y compensa si falla el segundo paso. Si el destino ya existía, permite limpiar la fila temporal duplicada.
+> - Validación: backend focalizado 10/10, frontend build/TypeScript, ESLint, `py_compile` y orden del agente correctos. Producción: HTTPS 200, ruta anónima 401, backend healthy, 7 jails, Nginx/agente/Fail2ban correctos y 0 reinicios.
+> - Respaldos: agente `.pre-bcc8472` e imágenes backend/frontend `pre-bcc8472`. DB no recreada.
+
 > **Sesión 2026-07-31 — Conteo real de intentos y controles de Seguridad desplegados.** Rama/producción `3c28e17`; agente `d1c3afd`. Skills: `ui-design-system`, `network-engineer`, `handoff-keeper`.
 > - Causa del cero: `journalctl -u sshd` no contiene entradas en este VPS, aunque Fail2ban acumulaba 3269 fallos. El agente ahora analiza `/var/log/fail2ban.log*`, incluidas rotaciones comprimidas, y comunica cobertura temporal, total y eventos fechados.
 > - Validación directa antes del frontend: los tres bloqueos SSH activos devolvieron 35, 10 y 22 detecciones; el historial retenido comienza el 2026-07-30.
