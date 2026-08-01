@@ -6,7 +6,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 SECRET = os.environ.get('SECURITY_AGENT_SECRET', '')
 HOST = os.environ.get('SECURITY_AGENT_HOST', '127.0.0.1')
 PORT = int(os.environ.get('SECURITY_AGENT_PORT', '8788'))
-ACTIONABLE = {'sshd', 'gestionvpn-15m', 'gestionvpn-1h', 'gestionvpn-6h',
+ACTIONABLE = {'sshd', 'gestionvpn-recidive', 'gestionvpn-15m', 'gestionvpn-1h', 'gestionvpn-6h',
               'gestionvpn-24h', 'gestionvpn-7d', 'gestionvpn-indefinite'}
 PROTECTED = {'127.0.0.1', '::1'} | set(filter(None, os.environ.get('SECURITY_AGENT_PROTECTED_IPS', '').split(',')))
 # Se carga al final para que no sea sobrescrito por jails locales existentes.

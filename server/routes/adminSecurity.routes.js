@@ -107,8 +107,9 @@ router.get('/status', asyncHandler(async (req, res) => {
     jail.banDetails = (jail.banDetails || []).map((detail) => ({
       ...detail,
       ...(reasons.get(`${jail.name}\0${detail.target}`) || {
-        reason: jail.name === 'sshd' ? 'Fallos reiterados de autenticación SSH' : 'Bloqueo manual',
-        category: jail.name === 'sshd' ? 'AUTOMATIC' : null,
+        reason: jail.name === 'sshd' ? 'Fallos reiterados de autenticación SSH'
+          : jail.name === 'gestionvpn-recidive' ? 'Reincidencia: 3 bloqueos SSH en 7 días' : 'Bloqueo manual',
+        category: ['sshd', 'gestionvpn-recidive'].includes(jail.name) ? 'AUTOMATIC' : null,
       }),
     }));
   }

@@ -41,6 +41,8 @@ const formatDate = (value?: number | null) => {
   }).format(new Date(value));
 };
 
+const isIndefiniteJail = (jail: string) => ['gestionvpn-indefinite', 'gestionvpn-recidive'].includes(jail);
+
 export default function SecurityModule() {
   const [jails, setJails] = useState<SecurityJail[]>([]);
   const [trusted, setTrusted] = useState<string[]>([]);
@@ -295,7 +297,7 @@ function BlockedTableRow({ row, open, showAttempts }: {
       <td className="px-4 py-4">
         <div className="flex items-center justify-end gap-1.5">
           <IconAction label="Ver intentos" icon={Eye} onClick={() => void showAttempts(row.ip)} />
-          {row.jail !== 'gestionvpn-indefinite' && <IconAction label="Hacer indefinido" icon={InfinityIcon} onClick={() => open('promote', row.ip, row.jail)} />}
+          {!isIndefiniteJail(row.jail) && <IconAction label="Hacer indefinido" icon={InfinityIcon} onClick={() => open('promote', row.ip, row.jail)} />}
           <IconAction label="Hacer confiable" icon={ShieldCheck} onClick={() => open('trust', row.ip)} />
           <IconAction label="Desbloquear" icon={Unlock} danger onClick={() => open('unban', row.ip, row.jail)} />
         </div>
@@ -327,7 +329,7 @@ function BlockedCard({ row, open, showAttempts }: {
         <button className="btn-outline min-h-11" onClick={() => open('trust', row.ip)}><ShieldCheck className="h-4 w-4" /> Confiar</button>
         <button className="btn-danger min-h-11" onClick={() => open('unban', row.ip, row.jail)}><Unlock className="h-4 w-4" /> Quitar</button>
       </div>
-      {row.jail !== 'gestionvpn-indefinite' && <button className="btn-outline min-h-11 w-full" onClick={() => open('promote', row.ip, row.jail)}><InfinityIcon className="h-4 w-4" /> Hacer indefinido</button>}
+      {!isIndefiniteJail(row.jail) && <button className="btn-outline min-h-11 w-full" onClick={() => open('promote', row.ip, row.jail)}><InfinityIcon className="h-4 w-4" /> Hacer indefinido</button>}
     </article>
   );
 }
@@ -343,10 +345,11 @@ function DateLine({ label, value }: { label: string; value?: number | null }) {
 }
 
 function ProtectionBadge({ jail }: { jail: string }) {
-  const manual = jail !== 'sshd';
+  const automatic = ['sshd', 'gestionvpn-recidive'].includes(jail);
+  const recidive = jail === 'gestionvpn-recidive';
   return (
-    <span className={`badge ${manual ? 'badge-info' : 'badge-neutral'} whitespace-nowrap`}>
-      {manual ? 'Manual' : 'Fail2ban · SSH'}
+    <span className={`badge ${automatic ? 'badge-neutral' : 'badge-info'} whitespace-nowrap`}>
+      {recidive ? 'Fail2ban · Reincidente' : automatic ? 'Fail2ban · SSH' : 'Manual'}
     </span>
   );
 }

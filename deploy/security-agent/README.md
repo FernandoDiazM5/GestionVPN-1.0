@@ -12,6 +12,8 @@ install -d -m 0755 /usr/local/lib/gestionvpn /etc/gestionvpn
 install -m 0755 deploy/security-agent/security-agent.py /usr/local/lib/gestionvpn/
 install -m 0644 deploy/security-agent/gestionvpn-security-agent.service /etc/systemd/system/
 install -m 0600 deploy/security-agent/gestionvpn-manual-jails.conf /etc/fail2ban/jail.d/
+install -m 0644 deploy/security-agent/gestionvpn-sshd-recidive.conf /etc/fail2ban/filter.d/
+install -m 0600 deploy/security-agent/gestionvpn-recidive.local /etc/fail2ban/jail.d/
 openssl rand -hex 32 > /etc/gestionvpn/security-agent.secret
 chmod 600 /etc/gestionvpn/security-agent.secret
 # Crear /etc/gestionvpn/security-agent.env con SECURITY_AGENT_SECRET y
