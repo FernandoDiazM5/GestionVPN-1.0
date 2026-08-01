@@ -3,9 +3,10 @@ const eventRepo = require('../db/repos/webSecurityEventRepo');
 const { bucketHash, clientIp } = require('./rateLimit');
 const log = require('./logger').child({ scope: 'web-security-observation' });
 
-const RETENTION_MS = 14 * 24 * 60 * 60 * 1000;
+const RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
 const MAX_ANALYSIS_EVENTS = 5000;
 const SENSITIVE_PATH = /(?:^|\/)(?:\.env|\.git|wp-admin|wp-login\.php|phpmyadmin|adminer|server-status|actuator|vendor\/phpunit|cgi-bin|config(?:\.json|\.php)?|backup(?:\.zip|\.sql)?)(?:\/|$)/i;
+const EXPLICIT_AUTH_RECORDING_PATHS = new Set(['/api/auth/login', '/api/account/login']);
 
 function safeIp(value) {
   const ip = String(value || '').replace(/^::ffff:/, '').trim();
@@ -38,16 +39,25 @@ function observeRequests(req, res, next) {
     let detail = null;
     if (res.statusCode === 429) {
       eventType = 'RATE_LIMITED';
-      detail = { flow: req._authRateLimitFlow || null, dimension: req._authRateLimitDimension || null };
+      detail = { classification: 'RATE_LIMIT_EXCEEDED', flow: req._authRateLimitFlow || null,
+        dimension: req._authRateLimitDimension || null };
     } else if (sensitive) {
       eventType = 'SENSITIVE_ENDPOINT';
-    } else if (res.statusCode === 404 && !req.route) {
-      eventType = 'API_NOT_FOUND';
+      detail = { classification: 'SENSITIVE_PATH_REQUEST' };
+    } else if (res.statusCode === 404) {
+      eventType = req.route ? 'RESOURCE_NOT_FOUND' : 'API_NOT_FOUND';
+      detail = { classification: req.route ? 'KNOWN_ROUTE_MISSING_RESOURCE' : 'UNKNOWN_API_ROUTE' };
+    } else if (res.statusCode === 401 && !EXPLICIT_AUTH_RECORDING_PATHS.has(path)) {
+      eventType = 'UNAUTHENTICATED';
+      detail = { classification: 'NO_OR_INVALID_SESSION' };
+    } else if (res.statusCode === 403) {
+      eventType = 'FORBIDDEN';
+      detail = { classification: 'INSUFFICIENT_PERMISSION' };
     }
     if (!eventType || req._webSecurityRecorded) return;
     req._webSecurityRecorded = true;
     void record({ eventType, sourceIp: clientIp(req), routeGroup: path,
-      method: req.method, statusCode: res.statusCode, detail });
+      userId: req.account?.sub || null, method: req.method, statusCode: res.statusCode, detail });
   });
   next();
 }
@@ -95,11 +105,13 @@ function summarize(events, now = Date.now()) {
 async function observation({ sourceIp = null, now = Date.now() } = {}) {
   const events = await eventRepo.listRecent({ since: now - 24 * 60 * 60 * 1000,
     sourceIp, limit: MAX_ANALYSIS_EVENTS });
-  return { mode: 'OBSERVE_ONLY', retentionDays: 14, since: now - 24 * 60 * 60 * 1000,
+  return { mode: 'OBSERVE_ONLY', retentionDays: 90, since: now - 24 * 60 * 60 * 1000,
     until: now, truncated: events.length >= MAX_ANALYSIS_EVENTS, sources: summarize(events, now),
     events: events.slice(0, 250).map((event) => ({ eventType: event.event_type,
       sourceIp: event.source_ip, userId: event.user_id || null, routeGroup: event.route_group,
       method: event.method, statusCode: event.status_code, occurredAt: Number(event.occurred_at),
+      decision: event.decision || 'OBSERVE_ONLY', actionId: event.action_id || null,
+      decidedAt: event.decided_at ? Number(event.decided_at) : null,
       detail: typeof event.detail === 'string' ? JSON.parse(event.detail) : event.detail })) };
 }
 
@@ -115,4 +127,4 @@ function startCleanup() {
 function stopCleanup() { if (cleanupTimer) clearInterval(cleanupTimer); cleanupTimer = null; }
 
 module.exports = { identityHash, observeRequests, observation, record, routeGroup, safeIp,
-  summarize, startCleanup, stopCleanup, SENSITIVE_PATH };
+  summarize, startCleanup, stopCleanup, SENSITIVE_PATH, RETENTION_MS };

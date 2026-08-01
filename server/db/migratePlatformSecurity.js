@@ -1,5 +1,11 @@
 const { query } = require('./mysql');
 
+async function ensureColumn(table, column, definition) {
+  const rows = await query(`SELECT 1 FROM information_schema.columns
+    WHERE table_schema=DATABASE() AND table_name=? AND column_name=? LIMIT 1`, [table, column]);
+  if (rows.length === 0) await query(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${definition}`);
+}
+
 async function run() {
   await query(`CREATE TABLE IF NOT EXISTS platform_security_audit (
     id CHAR(36) PRIMARY KEY,
@@ -59,6 +65,9 @@ async function run() {
     method VARCHAR(10) NULL,
     status_code SMALLINT NULL,
     detail JSON NULL,
+    decision VARCHAR(64) NOT NULL DEFAULT 'OBSERVE_ONLY',
+    action_id CHAR(36) NULL,
+    decided_at BIGINT NULL,
     occurred_at BIGINT NOT NULL,
     INDEX idx_wse_time (occurred_at),
     INDEX idx_wse_ip_time (source_ip, occurred_at),
@@ -73,6 +82,7 @@ async function run() {
     recommendation VARCHAR(64) NOT NULL,
     jail VARCHAR(64) NOT NULL,
     status ENUM('PENDING','APPLIED','FAILED') NOT NULL,
+    evidence JSON NULL,
     detail JSON NULL,
     expires_at BIGINT NULL,
     created_at BIGINT NOT NULL,
@@ -81,6 +91,10 @@ async function run() {
     INDEX idx_wsa_ip_created (source_ip, created_at),
     INDEX idx_wsa_status_created (status, created_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  await ensureColumn('web_security_events', 'decision', "VARCHAR(64) NOT NULL DEFAULT 'OBSERVE_ONLY' AFTER detail");
+  await ensureColumn('web_security_events', 'action_id', 'CHAR(36) NULL AFTER decision');
+  await ensureColumn('web_security_events', 'decided_at', 'BIGINT NULL AFTER action_id');
+  await ensureColumn('web_security_actions', 'evidence', 'JSON NULL AFTER status');
   await query(`CREATE TABLE IF NOT EXISTS platform_security_active_admin_ips (
     source_ip VARCHAR(64) PRIMARY KEY,
     user_id CHAR(36) NOT NULL,

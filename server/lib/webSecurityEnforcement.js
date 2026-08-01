@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const net = require('node:net');
 const observation = require('./webSecurityObservation');
 const enforcementRepo = require('../db/repos/webSecurityEnforcementRepo');
+const eventRepo = require('../db/repos/webSecurityEventRepo');
 const { callSecurityAgent } = require('./securityAgentClient');
 const notifier = require('./webSecurityNotifier');
 const log = require('./logger').child({ scope: 'web-security-enforcement' });
@@ -19,6 +20,26 @@ const WINDOW_MS = {
   TEMP_1H_ROUTE_SCAN: 5 * 60 * 1000,
   TEMP_1H_SENSITIVE_SCAN: 10 * 60 * 1000,
 };
+const EVENT_TYPE = {
+  INDEFINITE_AUTH_ABUSE: 'AUTH_FAILURE',
+  TEMP_1H_RATE_LIMIT: 'RATE_LIMITED',
+  TEMP_1H_ROUTE_SCAN: 'API_NOT_FOUND',
+  TEMP_1H_SENSITIVE_SCAN: 'SENSITIVE_ENDPOINT',
+};
+
+function evidenceSummary(source) {
+  return { authFailures24h: source.authFailures24h, identities24h: source.identities24h,
+    unknownIdentities24h: source.unknownIdentities24h, rateLimited10m: source.rateLimited10m,
+    notFound5m: source.notFound5m, distinctRoutes5m: source.distinctRoutes5m,
+    sensitive10m: source.sensitive10m, firstSeen: source.firstSeen, lastSeen: source.lastSeen };
+}
+
+async function markEvidenceDecision({ sourceIp, recommendation, decision, actionId, now }) {
+  const eventType = EVENT_TYPE[recommendation];
+  if (!eventType) return;
+  await eventRepo.markDecision({ sourceIp, eventType, since: now - WINDOW_MS[recommendation],
+    decision, actionId, decidedAt: now });
+}
 
 function state() {
   const configuredMode = String(process.env.WEB_SECURITY_MODE || 'observe').toLowerCase();
@@ -78,7 +99,8 @@ async function runOnce({ now = Date.now() } = {}) {
     const jail = applyIndefinite ? INDEFINITE_JAIL : JAIL;
     const id = await enforcementRepo.claim({
       idempotencyKey: idempotencyKey(source.sourceIp, actionRecommendation, jail, now),
-      sourceIp: source.sourceIp, recommendation: actionRecommendation, jail, now,
+      sourceIp: source.sourceIp, recommendation: actionRecommendation, jail,
+      evidence: evidenceSummary(source), now,
     });
     if (!id) continue;
     try {
@@ -87,6 +109,10 @@ async function runOnce({ now = Date.now() } = {}) {
         sourceJail: JAIL, protectedIps });
       await enforcementRepo.complete({ id, status: 'APPLIED', detail: result,
         expiresAt: applyIndefinite ? null : now + 60 * 60 * 1000, now });
+      await markEvidenceDecision({ sourceIp: source.sourceIp, recommendation,
+        decision: applyIndefinite ? 'INDEFINITE_BAN_APPLIED' : 'TEMPORARY_BAN_APPLIED',
+        actionId: id, now }).catch((error) => log.warn({ code: error?.code },
+        'No se pudo vincular evidencia web aplicada'));
       await notifier.notifyAutomaticAction({ status: 'APPLIED', sourceIp: source.sourceIp,
         recommendation: actionRecommendation, jail, detail: result });
       applied++;
@@ -95,6 +121,9 @@ async function runOnce({ now = Date.now() } = {}) {
         code: error?.code || 'UNKNOWN', message: String(error?.message || '').slice(0, 300),
       };
       await enforcementRepo.complete({ id, status: 'FAILED', detail: failure, now });
+      await markEvidenceDecision({ sourceIp: source.sourceIp, recommendation,
+        decision: 'AUTOMATIC_ACTION_FAILED', actionId: id, now }).catch((markError) =>
+        log.warn({ code: markError?.code }, 'No se pudo vincular evidencia web fallida'));
       await notifier.notifyAutomaticAction({ status: 'FAILED', sourceIp: source.sourceIp,
         recommendation: actionRecommendation, jail, detail: failure });
       failed++;
@@ -126,4 +155,4 @@ function stop() { if (timer) clearInterval(timer); timer = null; }
 
 module.exports = { idempotencyKey, runOnce, start, state, stop, touchAdminIp, JAIL, INDEFINITE_JAIL,
   ACTIVE_ADMIN_TTL_MS, CONFIRMATION, INDEFINITE_CONFIRMATION, RECIDIVE_WINDOW_MS, RECIDIVE_BANS,
-  rolloutBucket };
+  rolloutBucket, evidenceSummary };

@@ -17,13 +17,14 @@ async function purgeAdminIps(before) {
   return Number(result.affectedRows || 0);
 }
 
-async function claim({ idempotencyKey, sourceIp, recommendation, jail, now = Date.now() }) {
+async function claim({ idempotencyKey, sourceIp, recommendation, jail, evidence = null, now = Date.now() }) {
   try {
     const id = crypto.randomUUID();
     await query(`INSERT INTO web_security_actions
-      (id,idempotency_key,source_ip,recommendation,jail,status,created_at,updated_at)
-      VALUES (?,?,?,?,?,'PENDING',?,?)`,
-    [id, idempotencyKey, sourceIp, recommendation, jail, now, now]);
+      (id,idempotency_key,source_ip,recommendation,jail,status,evidence,created_at,updated_at)
+      VALUES (?,?,?,?,?,'PENDING',?,?,?)`,
+    [id, idempotencyKey, sourceIp, recommendation, jail,
+      evidence ? JSON.stringify(evidence) : null, now, now]);
     return id;
   } catch (error) {
     if (error?.code === 'ER_DUP_ENTRY') return null;
@@ -37,7 +38,7 @@ async function complete({ id, status, detail = null, expiresAt = null, now = Dat
 }
 
 async function recentActions(limit = 100) {
-  return query(`SELECT id,source_ip,recommendation,jail,status,detail,expires_at,created_at,updated_at
+  return query(`SELECT id,source_ip,recommendation,jail,status,evidence,detail,expires_at,created_at,updated_at
     FROM web_security_actions ORDER BY created_at DESC LIMIT ?`, [Number(limit)]);
 }
 

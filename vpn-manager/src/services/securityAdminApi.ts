@@ -22,9 +22,11 @@ export interface WebObservation {
     indefiniteActive:boolean;jail:string;indefiniteJail:string;
     status:'OBSERVE_ONLY'|'ARMED_NO_ROLLOUT'|'TEMP_ENFORCEMENT'};
   actions:Array<{id:string;source_ip:string;recommendation:string;jail:string;
-    status:'PENDING'|'APPLIED'|'FAILED';expires_at?:number|null;created_at:number;updated_at:number}>;
+    status:'PENDING'|'APPLIED'|'FAILED';evidence?:Record<string,number|null>|null;
+    expires_at?:number|null;created_at:number;updated_at:number}>;
   sources:WebObservationSource[]; events:Array<{eventType:string;sourceIp:string;userId?:string|null;
-    routeGroup?:string|null;method?:string|null;statusCode?:number|null;occurredAt:number}>;
+    routeGroup?:string|null;method?:string|null;statusCode?:number|null;occurredAt:number;
+    decision:string;actionId?:string|null;decidedAt?:number|null}>;
 }
 export interface SecurityMutation {
   target: string; jail?: string; duration?: '15m'|'1h'|'6h'|'24h'|'7d'|'indefinite';

@@ -7,10 +7,12 @@ const repo = {
 };
 const agent = { callSecurityAgent: vi.fn() };
 const notifier = { notifyAutomaticAction: vi.fn() };
+const eventRepo = { markDecision: vi.fn() };
 stubModule(__dirname, '../../lib/webSecurityObservation', observation);
 stubModule(__dirname, '../../db/repos/webSecurityEnforcementRepo', repo);
 stubModule(__dirname, '../../lib/securityAgentClient', agent);
 stubModule(__dirname, '../../lib/webSecurityNotifier', notifier);
+stubModule(__dirname, '../../db/repos/webSecurityEventRepo', eventRepo);
 
 const enforcement = require('../../lib/webSecurityEnforcement');
 const originalMode = process.env.WEB_SECURITY_MODE;
@@ -34,6 +36,7 @@ describe('aplicación temporal de protección web', () => {
     repo.hasActiveTemporary.mockResolvedValue(false);
     agent.callSecurityAgent.mockResolvedValue({ ok: true });
     notifier.notifyAutomaticAction.mockResolvedValue({ recipients: 1, sent: 1 });
+    eventRepo.markDecision.mockResolvedValue(3);
   });
 
   afterAll(() => {
@@ -74,6 +77,10 @@ describe('aplicación temporal de protección web', () => {
     }));
     expect(notifier.notifyAutomaticAction).toHaveBeenCalledWith(expect.objectContaining({
       status: 'APPLIED', sourceIp: '198.51.100.7', jail: 'gestionvpn-web-1h',
+    }));
+    expect(eventRepo.markDecision).toHaveBeenCalledWith(expect.objectContaining({
+      sourceIp: '198.51.100.7', eventType: 'SENSITIVE_ENDPOINT',
+      decision: 'TEMPORARY_BAN_APPLIED', actionId: 'action-1',
     }));
   });
 
