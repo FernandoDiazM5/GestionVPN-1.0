@@ -43,3 +43,11 @@ confirmación, diez fallos distribuidos entre varias identidades en 24 horas o
 el tercer bloqueo web temporal de una IP dentro de 7 días se aplican mediante
 `web_ban_indefinite` en `gestionvpn-indefinite`. El desbloqueo administrativo
 existente sigue disponible y la operación vuelve a validar todas las exclusiones.
+
+Incluso con los interruptores confirmados, `WEB_SECURITY_ROLLOUT_PERCENT` debe
+estar entre 1 y 100 para aplicar acciones. `0`, un valor inválido o `observe`
+son un kill switch efectivo. La selección es determinista por IP: una misma
+dirección permanece dentro o fuera del canary al reiniciar. El avance recomendado
+es 10 → 25 → 50 → 100, revisando fallos, falsos positivos y desbloqueos entre pasos.
+Cada acción aplicada o fallida se notifica una vez a los administradores activos
+que tengan Telegram enlazado y notificaciones sin pausar.

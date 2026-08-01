@@ -137,6 +137,18 @@ async function unlinkTelegram(userId) {
   );
 }
 
+async function listPlatformAdminsWithTelegram() {
+  try {
+    return await query(`SELECT u.id AS user_id,n.telegram_chat_id
+      FROM users u JOIN notification_subscriptions n ON n.user_id=u.id
+      WHERE u.is_platform_admin=1 AND u.deleted_at IS NULL AND u.disabled_at IS NULL
+        AND n.telegram_chat_id IS NOT NULL AND n.telegram_chat_id<>'' AND n.paused=0`);
+  } catch (err) {
+    if (isNoTableErr(err)) { warnOnceNoTable(); return []; }
+    throw err;
+  }
+}
+
 /** Append al log. Best-effort — no throwa para no romper el flujo. */
 async function log({ userId, event, channel, status, detail }) {
   try {
@@ -158,5 +170,6 @@ module.exports = {
   generateTelegramLinkCode,
   confirmTelegramLink,
   unlinkTelegram,
+  listPlatformAdminsWithTelegram,
   log,
 };

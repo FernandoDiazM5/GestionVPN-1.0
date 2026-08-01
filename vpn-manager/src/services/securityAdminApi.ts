@@ -18,9 +18,9 @@ export interface WebObservationSource {
 }
 export interface WebObservation {
   success:true; mode:'OBSERVE_ONLY'; retentionDays:number; since:number; until:number; truncated:boolean;
-  enforcement:{configuredMode:string;confirmed:boolean;active:boolean;indefiniteConfirmed:boolean;
+  enforcement:{configuredMode:string;confirmed:boolean;armed:boolean;active:boolean;rolloutPercent:number;indefiniteConfirmed:boolean;
     indefiniteActive:boolean;jail:string;indefiniteJail:string;
-    status:'OBSERVE_ONLY'|'TEMP_ENFORCEMENT'};
+    status:'OBSERVE_ONLY'|'ARMED_NO_ROLLOUT'|'TEMP_ENFORCEMENT'};
   actions:Array<{id:string;source_ip:string;recommendation:string;jail:string;
     status:'PENDING'|'APPLIED'|'FAILED';expires_at?:number|null;created_at:number;updated_at:number}>;
   sources:WebObservationSource[]; events:Array<{eventType:string;sourceIp:string;userId?:string|null;

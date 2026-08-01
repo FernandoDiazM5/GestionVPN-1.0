@@ -6,14 +6,17 @@ const repo = {
   claim: vi.fn(), complete: vi.fn(), countAppliedSince: vi.fn(), hasActiveTemporary: vi.fn(),
 };
 const agent = { callSecurityAgent: vi.fn() };
+const notifier = { notifyAutomaticAction: vi.fn() };
 stubModule(__dirname, '../../lib/webSecurityObservation', observation);
 stubModule(__dirname, '../../db/repos/webSecurityEnforcementRepo', repo);
 stubModule(__dirname, '../../lib/securityAgentClient', agent);
+stubModule(__dirname, '../../lib/webSecurityNotifier', notifier);
 
 const enforcement = require('../../lib/webSecurityEnforcement');
 const originalMode = process.env.WEB_SECURITY_MODE;
 const originalConfirm = process.env.WEB_SECURITY_ENFORCEMENT_CONFIRM;
 const originalIndefiniteConfirm = process.env.WEB_SECURITY_INDEFINITE_CONFIRM;
+const originalRollout = process.env.WEB_SECURITY_ROLLOUT_PERCENT;
 
 describe('aplicación temporal de protección web', () => {
   beforeEach(() => {
@@ -21,6 +24,7 @@ describe('aplicación temporal de protección web', () => {
     delete process.env.WEB_SECURITY_MODE;
     delete process.env.WEB_SECURITY_ENFORCEMENT_CONFIRM;
     delete process.env.WEB_SECURITY_INDEFINITE_CONFIRM;
+    delete process.env.WEB_SECURITY_ROLLOUT_PERCENT;
     observation.observation.mockResolvedValue({ truncated: false, sources: [] });
     repo.listActiveAdminIps.mockResolvedValue([]);
     repo.purgeAdminIps.mockResolvedValue(0);
@@ -29,6 +33,7 @@ describe('aplicación temporal de protección web', () => {
     repo.countAppliedSince.mockResolvedValue(0);
     repo.hasActiveTemporary.mockResolvedValue(false);
     agent.callSecurityAgent.mockResolvedValue({ ok: true });
+    notifier.notifyAutomaticAction.mockResolvedValue({ recipients: 1, sent: 1 });
   });
 
   afterAll(() => {
@@ -38,6 +43,8 @@ describe('aplicación temporal de protección web', () => {
     else process.env.WEB_SECURITY_ENFORCEMENT_CONFIRM = originalConfirm;
     if (originalIndefiniteConfirm === undefined) delete process.env.WEB_SECURITY_INDEFINITE_CONFIRM;
     else process.env.WEB_SECURITY_INDEFINITE_CONFIRM = originalIndefiniteConfirm;
+    if (originalRollout === undefined) delete process.env.WEB_SECURITY_ROLLOUT_PERCENT;
+    else process.env.WEB_SECURITY_ROLLOUT_PERCENT = originalRollout;
   });
 
   it('permanece pasivo por defecto y también con una sola confirmación', async () => {
@@ -50,6 +57,7 @@ describe('aplicación temporal de protección web', () => {
   it('aplica una hora sólo con la doble confirmación y protege administradores activos', async () => {
     process.env.WEB_SECURITY_MODE = 'enforce_temp';
     process.env.WEB_SECURITY_ENFORCEMENT_CONFIRM = enforcement.CONFIRMATION;
+    process.env.WEB_SECURITY_ROLLOUT_PERCENT = '100';
     observation.observation.mockResolvedValue({ truncated: false, sources: [
       { sourceIp: '198.51.100.7', recommendations: ['TEMP_1H_SENSITIVE_SCAN'] },
       { sourceIp: '203.0.113.44', recommendations: ['TEMP_1H_RATE_LIMIT'] },
@@ -64,11 +72,15 @@ describe('aplicación temporal de protección web', () => {
     expect(repo.complete).toHaveBeenCalledWith(expect.objectContaining({
       id: 'action-1', status: 'APPLIED', expiresAt: 23_600_000,
     }));
+    expect(notifier.notifyAutomaticAction).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'APPLIED', sourceIp: '198.51.100.7', jail: 'gestionvpn-web-1h',
+    }));
   });
 
   it('mantiene temporal un abuso grave si falta la tercera confirmación', async () => {
     process.env.WEB_SECURITY_MODE = 'enforce_temp';
     process.env.WEB_SECURITY_ENFORCEMENT_CONFIRM = enforcement.CONFIRMATION;
+    process.env.WEB_SECURITY_ROLLOUT_PERCENT = '100';
     observation.observation.mockResolvedValue({ truncated: false, sources: [
       { sourceIp: '198.51.100.8', recommendations: ['INDEFINITE_AUTH_ABUSE'] },
     ] });
@@ -81,6 +93,7 @@ describe('aplicación temporal de protección web', () => {
   it('bloquea indefinidamente abuso distribuido o la tercera reincidencia en siete días', async () => {
     process.env.WEB_SECURITY_MODE = 'enforce_temp';
     process.env.WEB_SECURITY_ENFORCEMENT_CONFIRM = enforcement.CONFIRMATION;
+    process.env.WEB_SECURITY_ROLLOUT_PERCENT = '100';
     process.env.WEB_SECURITY_INDEFINITE_CONFIRM = enforcement.INDEFINITE_CONFIRMATION;
     observation.observation.mockResolvedValue({ truncated: false, sources: [
       { sourceIp: '198.51.100.9', recommendations: ['INDEFINITE_AUTH_ABUSE'] },
@@ -106,6 +119,7 @@ describe('aplicación temporal de protección web', () => {
   it('no actúa con una muestra truncada ni repite una clave ya reclamada', async () => {
     process.env.WEB_SECURITY_MODE = 'enforce_temp';
     process.env.WEB_SECURITY_ENFORCEMENT_CONFIRM = enforcement.CONFIRMATION;
+    process.env.WEB_SECURITY_ROLLOUT_PERCENT = '100';
     observation.observation.mockResolvedValue({ truncated: true, sources: [
       { sourceIp: '198.51.100.7', recommendations: ['TEMP_1H_ROUTE_SCAN'] },
     ] });
@@ -123,6 +137,7 @@ describe('aplicación temporal de protección web', () => {
   it('no cuenta otra reincidencia mientras el bloqueo temporal anterior sigue activo', async () => {
     process.env.WEB_SECURITY_MODE = 'enforce_temp';
     process.env.WEB_SECURITY_ENFORCEMENT_CONFIRM = enforcement.CONFIRMATION;
+    process.env.WEB_SECURITY_ROLLOUT_PERCENT = '100';
     process.env.WEB_SECURITY_INDEFINITE_CONFIRM = enforcement.INDEFINITE_CONFIRMATION;
     observation.observation.mockResolvedValue({ truncated: false, sources: [
       { sourceIp: '198.51.100.13', recommendations: ['TEMP_1H_RATE_LIMIT'] },
@@ -132,5 +147,22 @@ describe('aplicación temporal de protección web', () => {
     expect(repo.countAppliedSince).not.toHaveBeenCalled();
     expect(repo.claim).not.toHaveBeenCalled();
     expect(agent.callSecurityAgent).not.toHaveBeenCalled();
+  });
+
+  it('queda armado pero no ejecuta con rollout cero o inválido', async () => {
+    process.env.WEB_SECURITY_MODE = 'enforce_temp';
+    process.env.WEB_SECURITY_ENFORCEMENT_CONFIRM = enforcement.CONFIRMATION;
+    process.env.WEB_SECURITY_ROLLOUT_PERCENT = '101';
+    expect(await enforcement.runOnce()).toEqual(expect.objectContaining({
+      armed: true, active: false, rolloutPercent: 0, status: 'ARMED_NO_ROLLOUT',
+    }));
+    expect(agent.callSecurityAgent).not.toHaveBeenCalled();
+  });
+
+  it('asigna a cada IP una cohorte estable entre 1 y 100', () => {
+    const first = enforcement.rolloutBucket('198.51.100.99');
+    expect(first).toBeGreaterThanOrEqual(1);
+    expect(first).toBeLessThanOrEqual(100);
+    expect(enforcement.rolloutBucket('198.51.100.99')).toBe(first);
   });
 });

@@ -3,6 +3,7 @@ const net = require('node:net');
 const observation = require('./webSecurityObservation');
 const enforcementRepo = require('../db/repos/webSecurityEnforcementRepo');
 const { callSecurityAgent } = require('./securityAgentClient');
+const notifier = require('./webSecurityNotifier');
 const log = require('./logger').child({ scope: 'web-security-enforcement' });
 
 const JAIL = 'gestionvpn-web-1h';
@@ -22,11 +23,19 @@ const WINDOW_MS = {
 function state() {
   const configuredMode = String(process.env.WEB_SECURITY_MODE || 'observe').toLowerCase();
   const confirmed = process.env.WEB_SECURITY_ENFORCEMENT_CONFIRM === CONFIRMATION;
-  const active = configuredMode === 'enforce_temp' && confirmed;
+  const armed = configuredMode === 'enforce_temp' && confirmed;
+  const requestedRollout = Number(process.env.WEB_SECURITY_ROLLOUT_PERCENT || 0);
+  const rolloutPercent = Number.isInteger(requestedRollout) && requestedRollout >= 0
+    && requestedRollout <= 100 ? requestedRollout : 0;
+  const active = armed && rolloutPercent > 0;
   const indefiniteConfirmed = process.env.WEB_SECURITY_INDEFINITE_CONFIRM === INDEFINITE_CONFIRMATION;
-  return { configuredMode, confirmed, active, indefiniteConfirmed,
+  return { configuredMode, confirmed, armed, active, rolloutPercent, indefiniteConfirmed,
     indefiniteActive: active && indefiniteConfirmed, jail: JAIL, indefiniteJail: INDEFINITE_JAIL,
-    status: active ? 'TEMP_ENFORCEMENT' : 'OBSERVE_ONLY' };
+    status: active ? 'TEMP_ENFORCEMENT' : armed ? 'ARMED_NO_ROLLOUT' : 'OBSERVE_ONLY' };
+}
+
+function rolloutBucket(sourceIp) {
+  return (crypto.createHash('sha256').update(`web-security-rollout\0${sourceIp}`).digest().readUInt32BE(0) % 100) + 1;
 }
 
 function idempotencyKey(sourceIp, recommendation, jail, now) {
@@ -54,6 +63,7 @@ async function runOnce({ now = Date.now() } = {}) {
   let failed = 0;
   for (const source of snapshot.sources) {
     if (!net.isIP(source.sourceIp) || protectedSet.has(source.sourceIp)) continue;
+    if (rolloutBucket(source.sourceIp) > mode.rolloutPercent) continue;
     const recommendation = source.recommendations[0];
     if (!recommendation) continue;
     const directIndefinite = recommendation === 'INDEFINITE_AUTH_ABUSE';
@@ -77,11 +87,16 @@ async function runOnce({ now = Date.now() } = {}) {
         sourceJail: JAIL, protectedIps });
       await enforcementRepo.complete({ id, status: 'APPLIED', detail: result,
         expiresAt: applyIndefinite ? null : now + 60 * 60 * 1000, now });
+      await notifier.notifyAutomaticAction({ status: 'APPLIED', sourceIp: source.sourceIp,
+        recommendation: actionRecommendation, jail, detail: result });
       applied++;
     } catch (error) {
-      await enforcementRepo.complete({ id, status: 'FAILED', detail: {
+      const failure = {
         code: error?.code || 'UNKNOWN', message: String(error?.message || '').slice(0, 300),
-      }, now });
+      };
+      await enforcementRepo.complete({ id, status: 'FAILED', detail: failure, now });
+      await notifier.notifyAutomaticAction({ status: 'FAILED', sourceIp: source.sourceIp,
+        recommendation: actionRecommendation, jail, detail: failure });
       failed++;
       log.warn({ target: source.sourceIp, recommendation: actionRecommendation, jail,
         code: error?.code }, 'Bloqueo web automático falló');
@@ -110,4 +125,5 @@ function start() {
 function stop() { if (timer) clearInterval(timer); timer = null; }
 
 module.exports = { idempotencyKey, runOnce, start, state, stop, touchAdminIp, JAIL, INDEFINITE_JAIL,
-  ACTIVE_ADMIN_TTL_MS, CONFIRMATION, INDEFINITE_CONFIRMATION, RECIDIVE_WINDOW_MS, RECIDIVE_BANS };
+  ACTIVE_ADMIN_TTL_MS, CONFIRMATION, INDEFINITE_CONFIRMATION, RECIDIVE_WINDOW_MS, RECIDIVE_BANS,
+  rolloutBucket };
