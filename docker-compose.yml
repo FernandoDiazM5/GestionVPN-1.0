@@ -20,8 +20,8 @@ services:
   # ── Frontend nginx (sirve el build de React + proxy /api → backend) ─────────
   frontend:
     build:
-      context: ./vpn-manager
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: vpn-manager/Dockerfile
       args:
         VITE_API_URL: ""
     container_name: vpn-frontend

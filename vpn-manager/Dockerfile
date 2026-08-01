@@ -19,20 +19,24 @@ ENV VITE_FEDERATED_AUTH_ENABLED=${VITE_FEDERATED_AUTH_ENABLED} \
     VITE_FIREBASE_APP_ID=${VITE_FIREBASE_APP_ID} \
     VITE_FIREBASE_TENANT_ID=${VITE_FIREBASE_TENANT_ID}
 
-COPY package*.json ./
-RUN npm ci
+COPY package.json package-lock.json ./
+COPY packages/contracts/package.json packages/contracts/package.json
+COPY server/package.json server/package.json
+COPY vpn-manager/package.json vpn-manager/package.json
+RUN npm ci --workspace=@gestionvpn/contracts --workspace=vpn-manager --include-workspace-root
 
-COPY . .
-RUN npm run build
+COPY packages/contracts packages/contracts
+COPY vpn-manager vpn-manager
+RUN npm run build:contracts && npm run build --workspace=vpn-manager
 
 # ── Stage 2: Servir con nginx ────────────────────────────────────────────────
 FROM nginx:1.27-alpine
 
 # Copiar el build de Vite
-COPY --from=builder /app/dist /usr/share/nginx/html/GestionVPN-1.0
+COPY --from=builder /app/vpn-manager/dist /usr/share/nginx/html/GestionVPN-1.0
 
 # Configuración de nginx (proxy /api → backend, SPA fallback)
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY vpn-manager/nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 
