@@ -31,6 +31,28 @@ class WebBanPolicyTests(unittest.TestCase):
                                      'banip', '198.51.100.7'])
         self.assertEqual(result['durationSeconds'], 3600)
 
+    def test_indefinite_web_escalation_is_fixed_and_removes_temporary_copy(self):
+        with patch.object(AGENT, 'trusted_values', return_value=[]), patch.object(AGENT, 'run') as run:
+            result = AGENT.execute('web_ban_indefinite', {
+                'target': '198.51.100.11', 'jail': 'gestionvpn-indefinite',
+                'sourceJail': 'gestionvpn-web-1h', 'protectedIps': [],
+            })
+        self.assertEqual(run.call_args_list[0].args[0],
+                         ['fail2ban-client', 'set', 'gestionvpn-indefinite', 'banip', '198.51.100.11'])
+        self.assertEqual(run.call_args_list[1].args[0],
+                         ['fail2ban-client', 'set', 'gestionvpn-web-1h', 'unbanip', '198.51.100.11'])
+        self.assertIsNone(result['durationSeconds'])
+
+    def test_indefinite_web_escalation_rechecks_trust_and_admin_session(self):
+        params = {'target': '198.51.100.12', 'jail': 'gestionvpn-indefinite',
+                  'sourceJail': 'gestionvpn-web-1h'}
+        with patch.object(AGENT, 'trusted_values', return_value=['198.51.100.0/24']):
+            with self.assertRaisesRegex(ValueError, 'Dirección confiable protegida'):
+                AGENT.execute('web_ban_indefinite', params)
+        with patch.object(AGENT, 'trusted_values', return_value=[]):
+            with self.assertRaisesRegex(ValueError, 'Sesión administrativa protegida'):
+                AGENT.execute('web_ban_indefinite', {**params, 'protectedIps': ['198.51.100.12']})
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -102,8 +102,9 @@ async function mutate(req, operation, params, afterSuccess) {
 }
 
 router.get('/status', asyncHandler(async (req, res) => {
-  const [status, trustedMetadata, recent] = await Promise.all([
+  const [status, trustedMetadata, recent, webActions] = await Promise.all([
     callSecurityAgent('status'), securityRepo.trustList(), securityRepo.history({ limit: 500 }),
+    webEnforcementRepo.recentActions(500),
   ]);
   const reasons = new Map();
   for (const row of recent) {
@@ -111,6 +112,18 @@ router.get('/status', asyncHandler(async (req, res) => {
       const key = `${row.jail || ''}\0${row.target}`;
       if (!reasons.has(key)) reasons.set(key, { reason: row.reason, category: row.category });
     }
+  }
+  for (const row of webActions) {
+    if (row.status !== 'APPLIED') continue;
+    const key = `${row.jail || ''}\0${row.source_ip}`;
+    if (!reasons.has(key)) reasons.set(key, {
+      reason: row.recommendation === 'INDEFINITE_WEB_RECIDIVISM'
+        ? 'Reincidencia: 3 bloqueos web en 7 días'
+        : row.jail === 'gestionvpn-indefinite'
+          ? 'Abuso de autenticación web distribuido'
+          : 'Protección automática ante abuso web',
+      category: 'AUTOMATIC',
+    });
   }
   for (const jail of status.jails || []) {
     jail.banDetails = (jail.banDetails || []).map((detail) => ({

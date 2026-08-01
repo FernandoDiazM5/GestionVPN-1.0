@@ -354,7 +354,7 @@ function WebObservationPanel({ observation }: { observation: WebObservation }) {
   };
   return <section className="card overflow-hidden">
     <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between dark:border-slate-700">
-      <div><div className="flex flex-wrap items-center gap-2"><h2 className="font-bold text-slate-900 dark:text-white">Observación de ataques web</h2><span className={`badge ${observation.enforcement.active ? 'badge-warning' : 'badge-info'}`}>{observation.enforcement.active ? 'Bloqueo temporal activo' : 'Preparado · desactivado'}</span></div>
+      <div><div className="flex flex-wrap items-center gap-2"><h2 className="font-bold text-slate-900 dark:text-white">Observación de ataques web</h2><span className={`badge ${observation.enforcement.active ? 'badge-warning' : 'badge-info'}`}>{observation.enforcement.active ? 'Bloqueo temporal activo' : 'Preparado · desactivado'}</span>{observation.enforcement.active && <span className={`badge ${observation.enforcement.indefiniteActive ? 'badge-danger' : 'badge-neutral'}`}>{observation.enforcement.indefiniteActive ? 'Escalada indefinida activa' : 'Escalada indefinida desactivada'}</span>}</div>
         <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{observation.enforcement.active ? 'Las direcciones que superan los umbrales pueden bloquearse durante 1 hora.' : 'Analiza las últimas 24 horas sin bloquear direcciones.'} Conservación: {observation.retentionDays} días.</p></div>
       <div className="flex gap-2"><span className="badge badge-neutral">{observation.sources.length} direcciones</span><span className={recommended ? 'badge badge-warning' : 'badge badge-success'}>{recommended} superan umbral</span></div>
     </div>
@@ -408,7 +408,7 @@ function BlockedTableRow({ row, open, showAttempts }: {
         <DateLine label="Desde" value={row.blockedSince} />
         <DateLine label="Hasta" value={row.expiresAt} />
       </td>
-      <td className="px-4 py-4"><ProtectionBadge jail={row.jail} /></td>
+      <td className="px-4 py-4"><ProtectionBadge jail={row.jail} reason={row.protection} /></td>
       <td className="px-4 py-4">
         <div className="flex items-center justify-end gap-1.5">
           <IconAction label="Ver intentos" icon={Eye} onClick={() => void showAttempts(row.ip)} />
@@ -433,7 +433,7 @@ function BlockedCard({ row, open, showAttempts }: {
           <div className="break-all font-mono text-sm font-semibold text-slate-900 dark:text-white">{row.ip}</div>
           <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-300">{row.protection}</p>
         </div>
-        <ProtectionBadge jail={row.jail} />
+        <ProtectionBadge jail={row.jail} reason={row.protection} />
       </div>
       <div className="grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-900/60">
         <DateLine label="Bloqueada desde" value={row.blockedSince} />
@@ -459,13 +459,15 @@ function DateLine({ label, value }: { label: string; value?: number | null }) {
   );
 }
 
-function ProtectionBadge({ jail }: { jail: string }) {
+function ProtectionBadge({ jail, reason = '' }: { jail: string; reason?: string }) {
   const automatic = ['sshd', 'gestionvpn-recidive', 'gestionvpn-web-1h'].includes(jail);
   const recidive = jail === 'gestionvpn-recidive';
   const web = jail === 'gestionvpn-web-1h';
+  const webIndefinite = jail === 'gestionvpn-indefinite'
+    && (reason.includes('web') || reason.includes('autenticación'));
   return (
-    <span className={`badge ${automatic ? 'badge-neutral' : 'badge-info'} whitespace-nowrap`}>
-      {recidive ? 'Fail2ban · Reincidente' : web ? 'Protección web · 1 h' : automatic ? 'Fail2ban · SSH' : 'Manual'}
+    <span className={`badge ${automatic || webIndefinite ? 'badge-neutral' : 'badge-info'} whitespace-nowrap`}>
+      {recidive ? 'Fail2ban · Reincidente' : webIndefinite ? 'Protección web · Indefinida' : web ? 'Protección web · 1 h' : automatic ? 'Fail2ban · SSH' : 'Manual'}
     </span>
   );
 }

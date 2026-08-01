@@ -121,8 +121,9 @@ def execute(op, p):
         return retained_attempt_history(p.get('target'), min(int(p.get('limit', 100)), 500))
     value = target(p.get('target'), op in {'trust_add', 'trust_remove'})
     bare = value.split('/')[0]
-    if op in {'ban', 'web_ban', 'promote_indefinite', 'trust_remove'} and bare in PROTECTED: raise ValueError('Dirección protegida')
-    if op in {'ban', 'web_ban', 'promote_indefinite'} and is_trusted_ip(bare): raise ValueError('Dirección confiable protegida')
+    web_ops = {'web_ban', 'web_ban_indefinite'}
+    if op in {'ban', 'promote_indefinite', 'trust_remove'} | web_ops and bare in PROTECTED: raise ValueError('Dirección protegida')
+    if op in {'ban', 'promote_indefinite'} | web_ops and is_trusted_ip(bare): raise ValueError('Dirección confiable protegida')
     if op == 'ban':
         jail = p.get('jail')
         if jail not in ACTIONABLE or jail == 'sshd': raise ValueError('Jail manual no autorizado')
@@ -141,6 +142,21 @@ def execute(op, p):
         if bare in protected_ips: raise ValueError('Sesión administrativa protegida')
         run(['fail2ban-client', 'set', 'gestionvpn-web-1h', 'banip', value])
         return {'target': value, 'jail': 'gestionvpn-web-1h', 'durationSeconds': 3600}
+    if op == 'web_ban_indefinite':
+        if p.get('jail') != 'gestionvpn-indefinite' or p.get('sourceJail') != 'gestionvpn-web-1h':
+            raise ValueError('Escalada web no autorizada')
+        if '/' in value: raise ValueError('El bloqueo web requiere una IP')
+        protected_ips = set()
+        for item in p.get('protectedIps') or []:
+            try: protected_ips.add(str(ipaddress.ip_address(str(item))))
+            except ValueError: raise ValueError('IP protegida inválida')
+        if bare in protected_ips: raise ValueError('Sesión administrativa protegida')
+        run(['fail2ban-client', 'set', 'gestionvpn-indefinite', 'banip', value])
+        source_removed = True
+        try: run(['fail2ban-client', 'set', 'gestionvpn-web-1h', 'unbanip', value])
+        except Exception: source_removed = False
+        return {'target': value, 'jail': 'gestionvpn-indefinite', 'durationSeconds': None,
+                'sourceJail': 'gestionvpn-web-1h', 'sourceRemoved': source_removed}
     if op == 'promote_indefinite':
         source_jail = p.get('sourceJail')
         destination = 'gestionvpn-indefinite'

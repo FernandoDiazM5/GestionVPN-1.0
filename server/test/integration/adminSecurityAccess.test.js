@@ -81,6 +81,18 @@ describe('seguridad administrativa del VPS', () => {
     expect(response.body.currentIp).toBe('203.0.113.44');
   });
 
+  it('identifica un bloqueo indefinido originado por reincidencia web', async () => {
+    agent.callSecurityAgent.mockResolvedValue({ jails: [{ name: 'gestionvpn-indefinite',
+      banDetails: [{ target: '198.51.100.20', blockedSince: 100, expiresAt: null }] }], trusted: [] });
+    webEnforcementRepo.recentActions.mockResolvedValue([{ source_ip: '198.51.100.20',
+      jail: 'gestionvpn-indefinite', recommendation: 'INDEFINITE_WEB_RECIDIVISM', status: 'APPLIED' }]);
+    const response = await request(app).get('/api/admin/security/status').set('x-test-role', 'admin');
+    expect(response.status).toBe(200);
+    expect(response.body.jails[0].banDetails[0]).toEqual(expect.objectContaining({
+      reason: 'Reincidencia: 3 bloqueos web en 7 días', category: 'AUTOMATIC',
+    }));
+  });
+
   it('impide bloquear la IP de la sesión antes de tocar Fail2ban', async () => {
     const response = await request(app).post('/api/admin/security/ban')
       .set('x-test-role', 'admin').set('x-test-ip', mutation.target).send(mutation);

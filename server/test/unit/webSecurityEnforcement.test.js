@@ -3,7 +3,7 @@ const { stubModule } = require('../helpers/moduleMock');
 const observation = { observation: vi.fn() };
 const repo = {
   touchAdminIp: vi.fn(), listActiveAdminIps: vi.fn(), purgeAdminIps: vi.fn(),
-  claim: vi.fn(), complete: vi.fn(),
+  claim: vi.fn(), complete: vi.fn(), countAppliedSince: vi.fn(), hasActiveTemporary: vi.fn(),
 };
 const agent = { callSecurityAgent: vi.fn() };
 stubModule(__dirname, '../../lib/webSecurityObservation', observation);
@@ -13,17 +13,21 @@ stubModule(__dirname, '../../lib/securityAgentClient', agent);
 const enforcement = require('../../lib/webSecurityEnforcement');
 const originalMode = process.env.WEB_SECURITY_MODE;
 const originalConfirm = process.env.WEB_SECURITY_ENFORCEMENT_CONFIRM;
+const originalIndefiniteConfirm = process.env.WEB_SECURITY_INDEFINITE_CONFIRM;
 
 describe('aplicación temporal de protección web', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     delete process.env.WEB_SECURITY_MODE;
     delete process.env.WEB_SECURITY_ENFORCEMENT_CONFIRM;
+    delete process.env.WEB_SECURITY_INDEFINITE_CONFIRM;
     observation.observation.mockResolvedValue({ truncated: false, sources: [] });
     repo.listActiveAdminIps.mockResolvedValue([]);
     repo.purgeAdminIps.mockResolvedValue(0);
     repo.claim.mockResolvedValue('action-1');
     repo.complete.mockResolvedValue(undefined);
+    repo.countAppliedSince.mockResolvedValue(0);
+    repo.hasActiveTemporary.mockResolvedValue(false);
     agent.callSecurityAgent.mockResolvedValue({ ok: true });
   });
 
@@ -32,6 +36,8 @@ describe('aplicación temporal de protección web', () => {
     else process.env.WEB_SECURITY_MODE = originalMode;
     if (originalConfirm === undefined) delete process.env.WEB_SECURITY_ENFORCEMENT_CONFIRM;
     else process.env.WEB_SECURITY_ENFORCEMENT_CONFIRM = originalConfirm;
+    if (originalIndefiniteConfirm === undefined) delete process.env.WEB_SECURITY_INDEFINITE_CONFIRM;
+    else process.env.WEB_SECURITY_INDEFINITE_CONFIRM = originalIndefiniteConfirm;
   });
 
   it('permanece pasivo por defecto y también con una sola confirmación', async () => {
@@ -52,11 +58,49 @@ describe('aplicación temporal de protección web', () => {
     const result = await enforcement.runOnce({ now: 20_000_000 });
     expect(result).toEqual(expect.objectContaining({ applied: 1, failed: 0 }));
     expect(agent.callSecurityAgent).toHaveBeenCalledWith('web_ban', {
-      target: '198.51.100.7', jail: 'gestionvpn-web-1h', protectedIps: ['203.0.113.44'],
+      target: '198.51.100.7', jail: 'gestionvpn-web-1h', sourceJail: 'gestionvpn-web-1h',
+      protectedIps: ['203.0.113.44'],
     });
     expect(repo.complete).toHaveBeenCalledWith(expect.objectContaining({
       id: 'action-1', status: 'APPLIED', expiresAt: 23_600_000,
     }));
+  });
+
+  it('mantiene temporal un abuso grave si falta la tercera confirmación', async () => {
+    process.env.WEB_SECURITY_MODE = 'enforce_temp';
+    process.env.WEB_SECURITY_ENFORCEMENT_CONFIRM = enforcement.CONFIRMATION;
+    observation.observation.mockResolvedValue({ truncated: false, sources: [
+      { sourceIp: '198.51.100.8', recommendations: ['INDEFINITE_AUTH_ABUSE'] },
+    ] });
+    await enforcement.runOnce({ now: 30_000_000 });
+    expect(agent.callSecurityAgent).toHaveBeenCalledWith('web_ban', expect.objectContaining({
+      target: '198.51.100.8', jail: 'gestionvpn-web-1h',
+    }));
+  });
+
+  it('bloquea indefinidamente abuso distribuido o la tercera reincidencia en siete días', async () => {
+    process.env.WEB_SECURITY_MODE = 'enforce_temp';
+    process.env.WEB_SECURITY_ENFORCEMENT_CONFIRM = enforcement.CONFIRMATION;
+    process.env.WEB_SECURITY_INDEFINITE_CONFIRM = enforcement.INDEFINITE_CONFIRMATION;
+    observation.observation.mockResolvedValue({ truncated: false, sources: [
+      { sourceIp: '198.51.100.9', recommendations: ['INDEFINITE_AUTH_ABUSE'] },
+      { sourceIp: '198.51.100.10', recommendations: ['TEMP_1H_ROUTE_SCAN'] },
+    ] });
+    repo.countAppliedSince.mockResolvedValueOnce(0).mockResolvedValueOnce(2);
+    repo.claim.mockResolvedValueOnce('direct').mockResolvedValueOnce('recidive');
+    await enforcement.runOnce({ now: 40_000_000 });
+    expect(agent.callSecurityAgent).toHaveBeenNthCalledWith(1, 'web_ban_indefinite', {
+      target: '198.51.100.9', jail: 'gestionvpn-indefinite', sourceJail: 'gestionvpn-web-1h',
+      protectedIps: [],
+    });
+    expect(agent.callSecurityAgent).toHaveBeenNthCalledWith(2, 'web_ban_indefinite', {
+      target: '198.51.100.10', jail: 'gestionvpn-indefinite', sourceJail: 'gestionvpn-web-1h',
+      protectedIps: [],
+    });
+    expect(repo.claim).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      recommendation: 'INDEFINITE_WEB_RECIDIVISM', jail: 'gestionvpn-indefinite',
+    }));
+    expect(repo.complete).toHaveBeenNthCalledWith(1, expect.objectContaining({ expiresAt: null }));
   });
 
   it('no actúa con una muestra truncada ni repite una clave ya reclamada', async () => {
@@ -73,6 +117,20 @@ describe('aplicación temporal de protección web', () => {
     ] });
     repo.claim.mockResolvedValue(null);
     await enforcement.runOnce();
+    expect(agent.callSecurityAgent).not.toHaveBeenCalled();
+  });
+
+  it('no cuenta otra reincidencia mientras el bloqueo temporal anterior sigue activo', async () => {
+    process.env.WEB_SECURITY_MODE = 'enforce_temp';
+    process.env.WEB_SECURITY_ENFORCEMENT_CONFIRM = enforcement.CONFIRMATION;
+    process.env.WEB_SECURITY_INDEFINITE_CONFIRM = enforcement.INDEFINITE_CONFIRMATION;
+    observation.observation.mockResolvedValue({ truncated: false, sources: [
+      { sourceIp: '198.51.100.13', recommendations: ['TEMP_1H_RATE_LIMIT'] },
+    ] });
+    repo.hasActiveTemporary.mockResolvedValue(true);
+    await enforcement.runOnce({ now: 50_000_000 });
+    expect(repo.countAppliedSince).not.toHaveBeenCalled();
+    expect(repo.claim).not.toHaveBeenCalled();
     expect(agent.callSecurityAgent).not.toHaveBeenCalled();
   });
 });

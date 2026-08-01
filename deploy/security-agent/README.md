@@ -36,3 +36,10 @@ La protección web temporal requiere dos controles simultáneos en el backend:
 `OBSERVE_ONLY`. El agente acepta para automatización exclusivamente `web_ban`
 hacia `gestionvpn-web-1h` y vuelve a comprobar IPs críticas, direcciones
 confiables y sesiones administrativas activas.
+
+La escalada indefinida requiere además
+`WEB_SECURITY_INDEFINITE_CONFIRM=ENABLE_INDEFINITE_WEB_BANS`. Con esta tercera
+confirmación, diez fallos distribuidos entre varias identidades en 24 horas o
+el tercer bloqueo web temporal de una IP dentro de 7 días se aplican mediante
+`web_ban_indefinite` en `gestionvpn-indefinite`. El desbloqueo administrativo
+existente sigue disponible y la operación vuelve a validar todas las exclusiones.

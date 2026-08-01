@@ -41,4 +41,18 @@ async function recentActions(limit = 100) {
     FROM web_security_actions ORDER BY created_at DESC LIMIT ?`, [Number(limit)]);
 }
 
-module.exports = { touchAdminIp, listActiveAdminIps, purgeAdminIps, claim, complete, recentActions };
+async function countAppliedSince({ sourceIp, jail, since }) {
+  const rows = await query(`SELECT COUNT(*) AS total FROM web_security_actions
+    WHERE source_ip=? AND jail=? AND status='APPLIED' AND created_at>=?`, [sourceIp, jail, since]);
+  return Number(rows[0]?.total || 0);
+}
+
+async function hasActiveTemporary({ sourceIp, jail, now = Date.now() }) {
+  const rows = await query(`SELECT 1 AS active FROM web_security_actions
+    WHERE source_ip=? AND jail=? AND status='APPLIED' AND expires_at>? LIMIT 1`,
+  [sourceIp, jail, now]);
+  return rows.length > 0;
+}
+
+module.exports = { touchAdminIp, listActiveAdminIps, purgeAdminIps, claim, complete, recentActions,
+  countAppliedSince, hasActiveTemporary };
