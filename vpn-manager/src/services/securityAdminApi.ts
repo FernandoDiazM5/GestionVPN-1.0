@@ -15,6 +15,7 @@ export interface LockedAccount {
 export interface WebObservationSource {
   sourceIp:string; authFailures24h:number; identities24h:number; unknownIdentities24h:number;
   rateLimited10m:number; notFound5m:number; distinctRoutes5m:number; sensitive10m:number;
+  hostileSensitive10m?:number; distinctSensitiveRoutes10m?:number; authInterpretation?:string;
   firstSeen:number; lastSeen:number; events:number; recommendations:string[];
 }
 export interface WebObservation {

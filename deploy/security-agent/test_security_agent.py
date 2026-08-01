@@ -31,6 +31,16 @@ class WebBanPolicyTests(unittest.TestCase):
                                      'banip', '198.51.100.7'])
         self.assertEqual(result['durationSeconds'], 3600)
 
+    def test_allows_only_fixed_scan_jails_and_durations(self):
+        with patch.object(AGENT, 'trusted_values', return_value=[]), patch.object(AGENT, 'run') as run:
+            six_hours = AGENT.execute('web_ban', {'target': '198.51.100.8',
+                                                  'jail': 'gestionvpn-web-scan-6h'})
+            one_day = AGENT.execute('web_ban', {'target': '198.51.100.9',
+                                                'jail': 'gestionvpn-web-scan-24h'})
+        self.assertEqual(six_hours['durationSeconds'], 21600)
+        self.assertEqual(one_day['durationSeconds'], 86400)
+        self.assertEqual(run.call_count, 2)
+
     def test_indefinite_web_escalation_is_fixed_and_removes_temporary_copy(self):
         with patch.object(AGENT, 'trusted_values', return_value=[]), patch.object(AGENT, 'run') as run:
             result = AGENT.execute('web_ban_indefinite', {

@@ -40,14 +40,65 @@ describe('observacion pasiva de seguridad web', () => {
     const events = [
       ...Array.from({ length: 10 }, (_, index) => event('AUTH_FAILURE', '198.51.100.7', now - index,
         { identity_hash: `identity-${index % 3}` })),
-      ...Array.from({ length: 20 }, (_, index) => event('RATE_LIMITED', '198.51.100.7', now - index)),
+      ...Array.from({ length: 20 }, (_, index) => event('RATE_LIMITED', '198.51.100.7', now - index,
+        { detail: JSON.stringify({ flow: 'LOGIN' }) })),
       ...Array.from({ length: 30 }, (_, index) => event('API_NOT_FOUND', '198.51.100.7', now - index,
         { route_group: `/scan/${index % 10}` })),
-      ...Array.from({ length: 3 }, (_, index) => event('SENSITIVE_ENDPOINT', '198.51.100.7', now - index)),
+      ...Array.from({ length: 3 }, (_, index) => event('SENSITIVE_ENDPOINT', '198.51.100.7', now - index,
+        { detail: { classification: 'SENSITIVE_PATH_REQUEST' }, route_group: `/.env-${index}` })),
     ];
     expect(observation.summarize(events, now)[0].recommendations).toEqual([
-      'INDEFINITE_AUTH_ABUSE', 'TEMP_1H_RATE_LIMIT', 'TEMP_1H_ROUTE_SCAN', 'TEMP_1H_SENSITIVE_SCAN',
+      'INDEFINITE_AUTH_ABUSE', 'TEMP_1H_RATE_LIMIT', 'ROUTE_SCAN_DETECTED', 'TEMP_1H_SENSITIVE_SCAN',
     ]);
+  });
+
+  it('no mezcla un usuario inexistente aislado con fallos de cuentas conocidas', () => {
+    const now = 21_000_000;
+    const events = [
+      ...Array.from({ length: 9 }, (_, index) => event('AUTH_FAILURE', '198.51.100.8', now - index,
+        { identity_hash: 'known', user_id: 'known-user' })),
+      event('AUTH_FAILURE', '198.51.100.8', now - 20, { identity_hash: 'unknown' }),
+    ];
+    const source = observation.summarize(events, now)[0];
+    expect(source.recommendations).not.toContain('INDEFINITE_AUTH_ABUSE');
+    expect(source.authInterpretation).toBe('INSUFFICIENT_EVIDENCE');
+  });
+
+  it('diez intentos con identidades inexistentes se consideran ataque automatizado', () => {
+    const now = 22_000_000;
+    const events = Array.from({ length: 10 }, (_, index) => event('AUTH_FAILURE', '198.51.100.9', now - index,
+      { identity_hash: `unknown-${index}` }));
+    const source = observation.summarize(events, now)[0];
+    expect(source.authInterpretation).toBe('AUTOMATED_UNKNOWN_IDENTITIES');
+    expect(source.recommendations).toContain('INDEFINITE_AUTH_ABUSE');
+  });
+
+  it('detecta una cuenta que vuelve a bloquearse después de ser recuperada', () => {
+    const now = 22_500_000;
+    const events = [
+      event('ACCOUNT_RECOVERY', '198.51.100.15', now - 1000, { user_id: 'user-1' }),
+      event('AUTH_FAILURE', '198.51.100.15', now - 500, { user_id: 'user-1',
+        identity_hash: 'known', detail: { reason: 'locked' } }),
+    ];
+    const source = observation.summarize(events, now)[0];
+    expect(source.authInterpretation).toBe('RELOCKED_AFTER_RECOVERY');
+    expect(source.recommendations).toContain('INDEFINITE_POST_UNLOCK_ATTACK');
+  });
+
+  it('ignora 429 ajenos a autenticación para la escalada de acceso', () => {
+    const now = 23_000_000;
+    const events = Array.from({ length: 30 }, (_, index) => event('RATE_LIMITED', '198.51.100.10', now - index,
+      { detail: { flow: 'AI_ANALYSIS' } }));
+    expect(observation.summarize(events, now)[0].rateLimited10m).toBe(0);
+  });
+
+  it('no bloquea por errores aislados en endpoints sensibles legítimos', () => {
+    const now = 24_000_000;
+    const events = Array.from({ length: 3 }, (_, index) => event('SENSITIVE_ENDPOINT',
+      '198.51.100.12', now - index, { detail: { classification: 'INVALID_RECOVERY_TOKEN' },
+        route_group: '/api/auth/password-reset/confirm' }));
+    expect(observation.summarize(events, now)[0].recommendations)
+      .not.toContain('TEMP_1H_SENSITIVE_SCAN');
   });
 
   it.each([
@@ -92,6 +143,19 @@ describe('observacion pasiva de seguridad web', () => {
       eventType: 'RESOURCE_NOT_FOUND', detail: {
         classification: 'KNOWN_ROUTE_MISSING_RESOURCE',
       },
+    })));
+  });
+
+  it('clasifica un token de recuperación inválido sin registrar su contenido', async () => {
+    let finish;
+    const req = { path: '/api/auth/password-reset/confirm', originalUrl: '/api/auth/password-reset/confirm',
+      method: 'POST', ip: '198.51.100.11' };
+    const res = { statusCode: 401, on: vi.fn((_event, callback) => { finish = callback; }) };
+    const repo = require('../../db/repos/webSecurityEventRepo');
+    observation.observeRequests(req, res, vi.fn());
+    finish();
+    await vi.waitFor(() => expect(repo.record).toHaveBeenCalledWith(expect.objectContaining({
+      eventType: 'SENSITIVE_ENDPOINT', detail: { classification: 'INVALID_RECOVERY_TOKEN' },
     })));
   });
 });

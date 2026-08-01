@@ -4,6 +4,13 @@
 > Aquí solo se **añaden** entradas por sesión (las más nuevas arriba); no se edita lo viejo.
 > Mantenimiento gobernado por la skill `handoff-keeper` (`.claude/skills/handoff-keeper/`).
 
+> **Sesión 2026-08-01 — Fases originales 3–6 cerradas localmente; sin despliegue.**
+> - Autenticación: contraseña olvidada no bloquea una oficina; fuerza bruta multiusuario, identidades inexistentes repetidas y rebloqueo posterior a recuperación se distinguen y escalan con evidencia.
+> - Sólo 429 de autenticación cuentan (20/10 min → 1 h; tercera reincidencia/7 días → indefinido). Health, loopback, administradores activos y confianza IP/CIDR quedan excluidos.
+> - Escaneos: 30 solicitudes/5 min + 10 rutas → 6 h; segundo episodio → 24 h; tercero/7 días → indefinido. Agente limitado a jails fijos y con revalidación de confianza.
+> - Endpoints sensibles clasifican credenciales, tokens, sesión, permisos y frecuencia; errores legítimos aislados no generan bloqueo.
+> - Validación: backend 101/603, frontend 64/216, `check:all`, agente 6/6, compilación Python e inventario correctos. Pendientes Fases 7–9; producción permanece en `e27184b`.
+
 > **Sesión 2026-08-01 — Fases originales 1 y 2 completadas localmente; sin despliegue.**
 > - Se reauditó el plan original de nueve fases y se corrigió el estado: las cinco fases consolidadas previas no equivalían a haber satisfecho íntegramente las nueve originales.
 > - Fase 1 (`9de5b89`): incidentes 401/403/404/429 durante 90 días, clasificación segura, decisiones y evidencia enlazadas, sin secretos.

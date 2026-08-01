@@ -3,11 +3,15 @@ const net = require('node:net');
 const observation = require('./webSecurityObservation');
 const enforcementRepo = require('../db/repos/webSecurityEnforcementRepo');
 const eventRepo = require('../db/repos/webSecurityEventRepo');
+const platformSecurityRepo = require('../db/repos/platformSecurityRepo');
 const { callSecurityAgent } = require('./securityAgentClient');
 const notifier = require('./webSecurityNotifier');
 const log = require('./logger').child({ scope: 'web-security-enforcement' });
 
 const JAIL = 'gestionvpn-web-1h';
+const SCAN_6H_JAIL = 'gestionvpn-web-scan-6h';
+const SCAN_24H_JAIL = 'gestionvpn-web-scan-24h';
+const TEMP_JAILS = [JAIL, SCAN_6H_JAIL, SCAN_24H_JAIL];
 const INDEFINITE_JAIL = 'gestionvpn-indefinite';
 const ACTIVE_ADMIN_TTL_MS = 30 * 60 * 1000;
 const CONFIRMATION = 'ENABLE_TEMP_WEB_BANS';
@@ -16,14 +20,16 @@ const RECIDIVE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const RECIDIVE_BANS = 3;
 const WINDOW_MS = {
   INDEFINITE_AUTH_ABUSE: 24 * 60 * 60 * 1000,
+  INDEFINITE_POST_UNLOCK_ATTACK: 24 * 60 * 60 * 1000,
   TEMP_1H_RATE_LIMIT: 10 * 60 * 1000,
-  TEMP_1H_ROUTE_SCAN: 5 * 60 * 1000,
+  ROUTE_SCAN_DETECTED: 5 * 60 * 1000,
   TEMP_1H_SENSITIVE_SCAN: 10 * 60 * 1000,
 };
 const EVENT_TYPE = {
   INDEFINITE_AUTH_ABUSE: 'AUTH_FAILURE',
+  INDEFINITE_POST_UNLOCK_ATTACK: 'AUTH_FAILURE',
   TEMP_1H_RATE_LIMIT: 'RATE_LIMITED',
-  TEMP_1H_ROUTE_SCAN: 'API_NOT_FOUND',
+  ROUTE_SCAN_DETECTED: 'API_NOT_FOUND',
   TEMP_1H_SENSITIVE_SCAN: 'SENSITIVE_ENDPOINT',
 };
 
@@ -31,7 +37,38 @@ function evidenceSummary(source) {
   return { authFailures24h: source.authFailures24h, identities24h: source.identities24h,
     unknownIdentities24h: source.unknownIdentities24h, rateLimited10m: source.rateLimited10m,
     notFound5m: source.notFound5m, distinctRoutes5m: source.distinctRoutes5m,
-    sensitive10m: source.sensitive10m, firstSeen: source.firstSeen, lastSeen: source.lastSeen };
+    sensitive10m: source.sensitive10m, hostileSensitive10m: source.hostileSensitive10m,
+    distinctSensitiveRoutes10m: source.distinctSensitiveRoutes10m,
+    firstSeen: source.firstSeen, lastSeen: source.lastSeen };
+}
+
+function temporaryPlan(recommendation, priorRouteScans) {
+  if (recommendation !== 'ROUTE_SCAN_DETECTED') {
+    return { recommendation, jail: JAIL, durationMs: 60 * 60 * 1000 };
+  }
+  if (priorRouteScans >= 1) {
+    return { recommendation: 'ROUTE_SCAN_24H', jail: SCAN_24H_JAIL,
+      durationMs: 24 * 60 * 60 * 1000 };
+  }
+  return { recommendation: 'ROUTE_SCAN_6H', jail: SCAN_6H_JAIL,
+    durationMs: 6 * 60 * 60 * 1000 };
+}
+
+function trustedBlockList(rows) {
+  const blockList = new net.BlockList();
+  blockList.addSubnet('127.0.0.0', 8, 'ipv4');
+  blockList.addAddress('::1', 'ipv6');
+  for (const row of rows || []) {
+    const value = String(row.target || row || '').trim();
+    try {
+      const [address, prefixText] = value.split('/');
+      const family = net.isIP(address) === 6 ? 'ipv6' : net.isIP(address) === 4 ? 'ipv4' : null;
+      if (!family) continue;
+      if (prefixText === undefined) blockList.addAddress(address, family);
+      else blockList.addSubnet(address, Number(prefixText), family);
+    } catch { /* una entrada inválida nunca amplía confianza */ }
+  }
+  return blockList;
 }
 
 async function markEvidenceDecision({ sourceIp, recommendation, decision, actionId, now }) {
@@ -51,7 +88,8 @@ function state() {
   const active = armed && rolloutPercent > 0;
   const indefiniteConfirmed = process.env.WEB_SECURITY_INDEFINITE_CONFIRM === INDEFINITE_CONFIRMATION;
   return { configuredMode, confirmed, armed, active, rolloutPercent, indefiniteConfirmed,
-    indefiniteActive: active && indefiniteConfirmed, jail: JAIL, indefiniteJail: INDEFINITE_JAIL,
+    indefiniteActive: active && indefiniteConfirmed, jail: JAIL,
+    scan6hJail: SCAN_6H_JAIL, scan24hJail: SCAN_24H_JAIL, indefiniteJail: INDEFINITE_JAIL,
     status: active ? 'TEMP_ENFORCEMENT' : armed ? 'ARMED_NO_ROLLOUT' : 'OBSERVE_ONLY' };
 }
 
@@ -73,30 +111,45 @@ async function touchAdminIp({ sourceIp, userId }) {
 async function runOnce({ now = Date.now() } = {}) {
   const mode = state();
   if (!mode.active) return { ...mode, skipped: true, applied: 0, failed: 0 };
-  const [snapshot, protectedIps] = await Promise.all([
+  const [snapshot, protectedIps, trustedRows] = await Promise.all([
     observation.observation({ now }),
     enforcementRepo.listActiveAdminIps(now - ACTIVE_ADMIN_TTL_MS),
+    platformSecurityRepo.trustList(),
   ]);
   if (snapshot.truncated) return { ...mode, skipped: true, reason: 'TRUNCATED_OBSERVATION',
     applied: 0, failed: 0 };
   const protectedSet = new Set(protectedIps);
+  const trusted = trustedBlockList(trustedRows);
   let applied = 0;
   let failed = 0;
   for (const source of snapshot.sources) {
-    if (!net.isIP(source.sourceIp) || protectedSet.has(source.sourceIp)) continue;
+    const family = net.isIP(source.sourceIp);
+    if (!family || protectedSet.has(source.sourceIp)
+      || trusted.check(source.sourceIp, family === 6 ? 'ipv6' : 'ipv4')) continue;
     if (rolloutBucket(source.sourceIp) > mode.rolloutPercent) continue;
     const recommendation = source.recommendations[0];
     if (!recommendation) continue;
-    const directIndefinite = recommendation === 'INDEFINITE_AUTH_ABUSE';
-    if (!directIndefinite && await enforcementRepo.hasActiveTemporary({
-      sourceIp: source.sourceIp, jail: JAIL, now,
+    const directIndefinite = ['INDEFINITE_AUTH_ABUSE', 'INDEFINITE_POST_UNLOCK_ATTACK'].includes(recommendation);
+    if (!directIndefinite && await enforcementRepo.hasActiveTemporaryIn({
+      sourceIp: source.sourceIp, jails: TEMP_JAILS, now,
     })) continue;
-    const priorTemporaryBans = await enforcementRepo.countAppliedSince({ sourceIp: source.sourceIp,
-      jail: JAIL, since: now - RECIDIVE_WINDOW_MS });
+    const [priorTemporaryBans, priorRouteScans] = await Promise.all([
+      enforcementRepo.countAppliedTemporarySince({ sourceIp: source.sourceIp,
+        jails: TEMP_JAILS, since: now - RECIDIVE_WINDOW_MS }),
+      recommendation === 'ROUTE_SCAN_DETECTED'
+        ? enforcementRepo.countAppliedRecommendationsSince({ sourceIp: source.sourceIp,
+          recommendations: ['ROUTE_SCAN_6H', 'ROUTE_SCAN_24H'], since: now - RECIDIVE_WINDOW_MS })
+        : Promise.resolve(0),
+    ]);
     const recurrent = priorTemporaryBans >= RECIDIVE_BANS - 1;
-    const applyIndefinite = mode.indefiniteActive && (directIndefinite || recurrent);
-    const actionRecommendation = recurrent && !directIndefinite ? 'INDEFINITE_WEB_RECIDIVISM' : recommendation;
-    const jail = applyIndefinite ? INDEFINITE_JAIL : JAIL;
+    const recurrentRouteScan = recommendation === 'ROUTE_SCAN_DETECTED' && priorRouteScans >= 2;
+    const applyIndefinite = mode.indefiniteActive && (directIndefinite || recurrent || recurrentRouteScan);
+    const temporary = temporaryPlan(recommendation, priorRouteScans);
+    const actionRecommendation = applyIndefinite
+      ? recurrentRouteScan ? 'INDEFINITE_ROUTE_SCAN'
+        : recurrent && !directIndefinite ? 'INDEFINITE_WEB_RECIDIVISM' : recommendation
+      : temporary.recommendation;
+    const jail = applyIndefinite ? INDEFINITE_JAIL : temporary.jail;
     const id = await enforcementRepo.claim({
       idempotencyKey: idempotencyKey(source.sourceIp, actionRecommendation, jail, now),
       sourceIp: source.sourceIp, recommendation: actionRecommendation, jail,
@@ -106,9 +159,9 @@ async function runOnce({ now = Date.now() } = {}) {
     try {
       const operation = applyIndefinite ? 'web_ban_indefinite' : 'web_ban';
       const result = await callSecurityAgent(operation, { target: source.sourceIp, jail,
-        sourceJail: JAIL, protectedIps });
+        sourceJail: temporary.jail, protectedIps });
       await enforcementRepo.complete({ id, status: 'APPLIED', detail: result,
-        expiresAt: applyIndefinite ? null : now + 60 * 60 * 1000, now });
+        expiresAt: applyIndefinite ? null : now + temporary.durationMs, now });
       await markEvidenceDecision({ sourceIp: source.sourceIp, recommendation,
         decision: applyIndefinite ? 'INDEFINITE_BAN_APPLIED' : 'TEMPORARY_BAN_APPLIED',
         actionId: id, now }).catch((error) => log.warn({ code: error?.code },
@@ -155,4 +208,5 @@ function stop() { if (timer) clearInterval(timer); timer = null; }
 
 module.exports = { idempotencyKey, runOnce, start, state, stop, touchAdminIp, JAIL, INDEFINITE_JAIL,
   ACTIVE_ADMIN_TTL_MS, CONFIRMATION, INDEFINITE_CONFIRMATION, RECIDIVE_WINDOW_MS, RECIDIVE_BANS,
-  rolloutBucket, evidenceSummary };
+  rolloutBucket, evidenceSummary, temporaryPlan, trustedBlockList,
+  SCAN_6H_JAIL, SCAN_24H_JAIL, TEMP_JAILS };

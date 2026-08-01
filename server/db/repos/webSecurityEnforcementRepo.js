@@ -48,6 +48,24 @@ async function countAppliedSince({ sourceIp, jail, since }) {
   return Number(rows[0]?.total || 0);
 }
 
+async function countAppliedRecommendationsSince({ sourceIp, recommendations, since }) {
+  if (!recommendations.length) return 0;
+  const placeholders = recommendations.map(() => '?').join(',');
+  const rows = await query(`SELECT COUNT(*) AS total FROM web_security_actions
+    WHERE source_ip=? AND recommendation IN (${placeholders}) AND status='APPLIED' AND created_at>=?`,
+  [sourceIp, ...recommendations, since]);
+  return Number(rows[0]?.total || 0);
+}
+
+async function countAppliedTemporarySince({ sourceIp, jails, since }) {
+  if (!jails.length) return 0;
+  const placeholders = jails.map(() => '?').join(',');
+  const rows = await query(`SELECT COUNT(*) AS total FROM web_security_actions
+    WHERE source_ip=? AND jail IN (${placeholders}) AND status='APPLIED' AND created_at>=?`,
+  [sourceIp, ...jails, since]);
+  return Number(rows[0]?.total || 0);
+}
+
 async function hasActiveTemporary({ sourceIp, jail, now = Date.now() }) {
   const rows = await query(`SELECT 1 AS active FROM web_security_actions
     WHERE source_ip=? AND jail=? AND status='APPLIED' AND expires_at>? LIMIT 1`,
@@ -55,5 +73,15 @@ async function hasActiveTemporary({ sourceIp, jail, now = Date.now() }) {
   return rows.length > 0;
 }
 
+async function hasActiveTemporaryIn({ sourceIp, jails, now = Date.now() }) {
+  if (!jails.length) return false;
+  const placeholders = jails.map(() => '?').join(',');
+  const rows = await query(`SELECT 1 AS active FROM web_security_actions
+    WHERE source_ip=? AND jail IN (${placeholders}) AND status='APPLIED' AND expires_at>? LIMIT 1`,
+  [sourceIp, ...jails, now]);
+  return rows.length > 0;
+}
+
 module.exports = { touchAdminIp, listActiveAdminIps, purgeAdminIps, claim, complete, recentActions,
-  countAppliedSince, hasActiveTemporary };
+  countAppliedSince, countAppliedRecommendationsSince, countAppliedTemporarySince,
+  hasActiveTemporary, hasActiveTemporaryIn };

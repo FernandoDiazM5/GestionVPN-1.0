@@ -119,16 +119,17 @@ async function authenticateMysqlUser(login, password, {
   else if (user.disabled_at) failureReason = 'disabled';
   else if (!membership) failureReason = 'no_membership';
   if (failureReason) {
-    void webObservation.record({ eventType: 'AUTH_FAILURE', sourceIp: requestIp,
-      identityHash: webObservation.identityHash(raw), userId: user?.id || null,
-      routeGroup, method: 'POST', statusCode: 401,
-      detail: { classification: 'AUTHENTICATION_REJECTED',
-        identityKind: credentialFailure || 'KNOWN_IDENTITY', reason: failureReason } });
     let security = lock;
     if (failureReason === 'bad_password') {
       security = await accountSecurity.recordFailure({ userId: user.id, ip: requestIp });
       if (security.locked) failureReason = 'locked';
     }
+    void webObservation.record({ eventType: 'AUTH_FAILURE', sourceIp: requestIp,
+      identityHash: webObservation.identityHash(raw), userId: user?.id || null,
+      routeGroup, method: 'POST', statusCode: 401,
+      detail: { classification: 'AUTHENTICATION_REJECTED',
+        identityKind: credentialFailure || 'KNOWN_IDENTITY', reason: failureReason,
+        lockReason: security.lockReason || null } });
     metrics.authFailsTotal.inc({ reason: failureReason });
     return includeFailure ? { denied: failureReason, lockedUntil: security.lockedUntil || null } : null;
   }

@@ -4,15 +4,19 @@ const observation = { observation: vi.fn() };
 const repo = {
   touchAdminIp: vi.fn(), listActiveAdminIps: vi.fn(), purgeAdminIps: vi.fn(),
   claim: vi.fn(), complete: vi.fn(), countAppliedSince: vi.fn(), hasActiveTemporary: vi.fn(),
+  countAppliedTemporarySince: vi.fn(), countAppliedRecommendationsSince: vi.fn(),
+  hasActiveTemporaryIn: vi.fn(),
 };
 const agent = { callSecurityAgent: vi.fn() };
 const notifier = { notifyAutomaticAction: vi.fn() };
 const eventRepo = { markDecision: vi.fn() };
+const platformSecurityRepo = { trustList: vi.fn() };
 stubModule(__dirname, '../../lib/webSecurityObservation', observation);
 stubModule(__dirname, '../../db/repos/webSecurityEnforcementRepo', repo);
 stubModule(__dirname, '../../lib/securityAgentClient', agent);
 stubModule(__dirname, '../../lib/webSecurityNotifier', notifier);
 stubModule(__dirname, '../../db/repos/webSecurityEventRepo', eventRepo);
+stubModule(__dirname, '../../db/repos/platformSecurityRepo', platformSecurityRepo);
 
 const enforcement = require('../../lib/webSecurityEnforcement');
 const originalMode = process.env.WEB_SECURITY_MODE;
@@ -34,9 +38,13 @@ describe('aplicación temporal de protección web', () => {
     repo.complete.mockResolvedValue(undefined);
     repo.countAppliedSince.mockResolvedValue(0);
     repo.hasActiveTemporary.mockResolvedValue(false);
+    repo.hasActiveTemporaryIn.mockResolvedValue(false);
+    repo.countAppliedTemporarySince.mockResolvedValue(0);
+    repo.countAppliedRecommendationsSince.mockResolvedValue(0);
     agent.callSecurityAgent.mockResolvedValue({ ok: true });
     notifier.notifyAutomaticAction.mockResolvedValue({ recipients: 1, sent: 1 });
     eventRepo.markDecision.mockResolvedValue(3);
+    platformSecurityRepo.trustList.mockResolvedValue([]);
   });
 
   afterAll(() => {
@@ -84,6 +92,19 @@ describe('aplicación temporal de protección web', () => {
     }));
   });
 
+  it('excluye direcciones y redes confiables antes de reclamar una acción', async () => {
+    process.env.WEB_SECURITY_MODE = 'enforce_temp';
+    process.env.WEB_SECURITY_ENFORCEMENT_CONFIRM = enforcement.CONFIRMATION;
+    process.env.WEB_SECURITY_ROLLOUT_PERCENT = '100';
+    observation.observation.mockResolvedValue({ truncated: false, sources: [
+      { sourceIp: '198.51.100.7', recommendations: ['TEMP_1H_RATE_LIMIT'] },
+    ] });
+    platformSecurityRepo.trustList.mockResolvedValue([{ target: '198.51.100.0/24' }]);
+    await enforcement.runOnce({ now: 25_000_000 });
+    expect(repo.claim).not.toHaveBeenCalled();
+    expect(agent.callSecurityAgent).not.toHaveBeenCalled();
+  });
+
   it('mantiene temporal un abuso grave si falta la tercera confirmación', async () => {
     process.env.WEB_SECURITY_MODE = 'enforce_temp';
     process.env.WEB_SECURITY_ENFORCEMENT_CONFIRM = enforcement.CONFIRMATION;
@@ -104,9 +125,9 @@ describe('aplicación temporal de protección web', () => {
     process.env.WEB_SECURITY_INDEFINITE_CONFIRM = enforcement.INDEFINITE_CONFIRMATION;
     observation.observation.mockResolvedValue({ truncated: false, sources: [
       { sourceIp: '198.51.100.9', recommendations: ['INDEFINITE_AUTH_ABUSE'] },
-      { sourceIp: '198.51.100.10', recommendations: ['TEMP_1H_ROUTE_SCAN'] },
+      { sourceIp: '198.51.100.10', recommendations: ['TEMP_1H_RATE_LIMIT'] },
     ] });
-    repo.countAppliedSince.mockResolvedValueOnce(0).mockResolvedValueOnce(2);
+    repo.countAppliedTemporarySince.mockResolvedValueOnce(0).mockResolvedValueOnce(2);
     repo.claim.mockResolvedValueOnce('direct').mockResolvedValueOnce('recidive');
     await enforcement.runOnce({ now: 40_000_000 });
     expect(agent.callSecurityAgent).toHaveBeenNthCalledWith(1, 'web_ban_indefinite', {
@@ -128,13 +149,13 @@ describe('aplicación temporal de protección web', () => {
     process.env.WEB_SECURITY_ENFORCEMENT_CONFIRM = enforcement.CONFIRMATION;
     process.env.WEB_SECURITY_ROLLOUT_PERCENT = '100';
     observation.observation.mockResolvedValue({ truncated: true, sources: [
-      { sourceIp: '198.51.100.7', recommendations: ['TEMP_1H_ROUTE_SCAN'] },
+      { sourceIp: '198.51.100.7', recommendations: ['ROUTE_SCAN_DETECTED'] },
     ] });
     expect(await enforcement.runOnce()).toEqual(expect.objectContaining({
       skipped: true, reason: 'TRUNCATED_OBSERVATION',
     }));
     observation.observation.mockResolvedValue({ truncated: false, sources: [
-      { sourceIp: '198.51.100.7', recommendations: ['TEMP_1H_ROUTE_SCAN'] },
+      { sourceIp: '198.51.100.7', recommendations: ['ROUTE_SCAN_DETECTED'] },
     ] });
     repo.claim.mockResolvedValue(null);
     await enforcement.runOnce();
@@ -149,11 +170,42 @@ describe('aplicación temporal de protección web', () => {
     observation.observation.mockResolvedValue({ truncated: false, sources: [
       { sourceIp: '198.51.100.13', recommendations: ['TEMP_1H_RATE_LIMIT'] },
     ] });
-    repo.hasActiveTemporary.mockResolvedValue(true);
+    repo.hasActiveTemporaryIn.mockResolvedValue(true);
     await enforcement.runOnce({ now: 50_000_000 });
-    expect(repo.countAppliedSince).not.toHaveBeenCalled();
+    expect(repo.countAppliedTemporarySince).not.toHaveBeenCalled();
     expect(repo.claim).not.toHaveBeenCalled();
     expect(agent.callSecurityAgent).not.toHaveBeenCalled();
+  });
+
+  it('escala episodios de escaneo de seis horas a veinticuatro e indefinido', async () => {
+    process.env.WEB_SECURITY_MODE = 'enforce_temp';
+    process.env.WEB_SECURITY_ENFORCEMENT_CONFIRM = enforcement.CONFIRMATION;
+    process.env.WEB_SECURITY_ROLLOUT_PERCENT = '100';
+    process.env.WEB_SECURITY_INDEFINITE_CONFIRM = enforcement.INDEFINITE_CONFIRMATION;
+    observation.observation.mockResolvedValue({ truncated: false, sources: [
+      { sourceIp: '198.51.100.14', recommendations: ['ROUTE_SCAN_DETECTED'] },
+    ] });
+
+    repo.countAppliedRecommendationsSince.mockResolvedValueOnce(0);
+    await enforcement.runOnce({ now: 60_000_000 });
+    expect(agent.callSecurityAgent).toHaveBeenLastCalledWith('web_ban', expect.objectContaining({
+      jail: 'gestionvpn-web-scan-6h', sourceJail: 'gestionvpn-web-scan-6h',
+    }));
+    expect(repo.complete).toHaveBeenLastCalledWith(expect.objectContaining({ expiresAt: 81_600_000 }));
+
+    repo.claim.mockResolvedValue('action-2');
+    repo.countAppliedRecommendationsSince.mockResolvedValueOnce(1);
+    await enforcement.runOnce({ now: 90_000_000 });
+    expect(agent.callSecurityAgent).toHaveBeenLastCalledWith('web_ban', expect.objectContaining({
+      jail: 'gestionvpn-web-scan-24h', sourceJail: 'gestionvpn-web-scan-24h',
+    }));
+
+    repo.claim.mockResolvedValue('action-3');
+    repo.countAppliedRecommendationsSince.mockResolvedValueOnce(2);
+    await enforcement.runOnce({ now: 180_000_000 });
+    expect(agent.callSecurityAgent).toHaveBeenLastCalledWith('web_ban_indefinite', expect.objectContaining({
+      jail: 'gestionvpn-indefinite', sourceJail: 'gestionvpn-web-scan-24h',
+    }));
   });
 
   it('queda armado pero no ejecuta con rollout cero o inválido', async () => {

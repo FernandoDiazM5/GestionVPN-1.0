@@ -131,8 +131,12 @@ router.get('/status', asyncHandler(async (req, res) => {
       ...(reasons.get(`${jail.name}\0${detail.target}`) || {
         reason: jail.name === 'sshd' ? 'Fallos reiterados de autenticación SSH'
           : jail.name === 'gestionvpn-recidive' ? 'Reincidencia: 3 bloqueos SSH en 7 días'
-            : jail.name === 'gestionvpn-web-1h' ? 'Protección automática ante abuso web' : 'Bloqueo manual',
-        category: ['sshd', 'gestionvpn-recidive', 'gestionvpn-web-1h'].includes(jail.name) ? 'AUTOMATIC' : null,
+            : jail.name === 'gestionvpn-web-1h' ? 'Protección automática ante abuso web'
+              : jail.name === 'gestionvpn-web-scan-6h' ? 'Primera detección de escaneo web'
+                : jail.name === 'gestionvpn-web-scan-24h' ? 'Segunda detección de escaneo web'
+                  : 'Bloqueo manual',
+        category: ['sshd', 'gestionvpn-recidive', 'gestionvpn-web-1h',
+          'gestionvpn-web-scan-6h', 'gestionvpn-web-scan-24h'].includes(jail.name) ? 'AUTOMATIC' : null,
       }),
     }));
   }
@@ -176,6 +180,12 @@ router.post('/locked-accounts/unlock', validate({ body: AccountUnlockMutationSch
   const clearedRateLimits = await clearLoginIdentityBlocks({
     identities: [user.email, user.name], ip: lock?.last_failure_ip,
   });
+  if (lock?.last_failure_ip) {
+    await webObservation.record({ eventType: 'ACCOUNT_RECOVERY', sourceIp: lock.last_failure_ip,
+      userId: user.id, routeGroup: '/api/admin/security/locked-accounts/unlock', method: 'POST',
+      statusCode: 200, decision: 'ADMIN_ACCOUNT_UNLOCK',
+      detail: { classification: 'ADMINISTRATIVE_ACCOUNT_UNLOCK' } });
+  }
   const status = await callSecurityAgent('status').catch(() => null);
   const globallyBlocked = status ? blockedTargets(status) : null;
   const ipGloballyBlocked = !lock?.last_failure_ip || !globallyBlocked ? null

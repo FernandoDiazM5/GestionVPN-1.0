@@ -7,7 +7,10 @@ SECRET = os.environ.get('SECURITY_AGENT_SECRET', '')
 HOST = os.environ.get('SECURITY_AGENT_HOST', '127.0.0.1')
 PORT = int(os.environ.get('SECURITY_AGENT_PORT', '8788'))
 ACTIONABLE = {'sshd', 'gestionvpn-recidive', 'gestionvpn-15m', 'gestionvpn-1h', 'gestionvpn-6h',
-              'gestionvpn-24h', 'gestionvpn-7d', 'gestionvpn-indefinite', 'gestionvpn-web-1h'}
+              'gestionvpn-24h', 'gestionvpn-7d', 'gestionvpn-indefinite', 'gestionvpn-web-1h',
+              'gestionvpn-web-scan-6h', 'gestionvpn-web-scan-24h'}
+WEB_TEMP_JAILS = {'gestionvpn-web-1h': 3600, 'gestionvpn-web-scan-6h': 21600,
+                  'gestionvpn-web-scan-24h': 86400}
 PROTECTED = {'127.0.0.1', '::1'} | set(filter(None, os.environ.get('SECURITY_AGENT_PROTECTED_IPS', '').split(',')))
 # Se carga al final para que no sea sobrescrito por jails locales existentes.
 TRUST_FILE = '/etc/fail2ban/jail.d/zz-gestionvpn-trusted.local'
@@ -133,17 +136,19 @@ def execute(op, p):
             raise ValueError('No puedes bloquear la IP de tu sesión actual')
         run(['fail2ban-client', 'set', jail, 'banip', value]); return {'target': value, 'jail': jail}
     if op == 'web_ban':
-        if p.get('jail') != 'gestionvpn-web-1h': raise ValueError('Jail web no autorizado')
+        jail = p.get('jail')
+        if jail not in WEB_TEMP_JAILS: raise ValueError('Jail web no autorizado')
         if '/' in value: raise ValueError('El bloqueo web requiere una IP')
         protected_ips = set()
         for item in p.get('protectedIps') or []:
             try: protected_ips.add(str(ipaddress.ip_address(str(item))))
             except ValueError: raise ValueError('IP protegida inválida')
         if bare in protected_ips: raise ValueError('Sesión administrativa protegida')
-        run(['fail2ban-client', 'set', 'gestionvpn-web-1h', 'banip', value])
-        return {'target': value, 'jail': 'gestionvpn-web-1h', 'durationSeconds': 3600}
+        run(['fail2ban-client', 'set', jail, 'banip', value])
+        return {'target': value, 'jail': jail, 'durationSeconds': WEB_TEMP_JAILS[jail]}
     if op == 'web_ban_indefinite':
-        if p.get('jail') != 'gestionvpn-indefinite' or p.get('sourceJail') != 'gestionvpn-web-1h':
+        source_jail = p.get('sourceJail')
+        if p.get('jail') != 'gestionvpn-indefinite' or source_jail not in WEB_TEMP_JAILS:
             raise ValueError('Escalada web no autorizada')
         if '/' in value: raise ValueError('El bloqueo web requiere una IP')
         protected_ips = set()
@@ -153,10 +158,10 @@ def execute(op, p):
         if bare in protected_ips: raise ValueError('Sesión administrativa protegida')
         run(['fail2ban-client', 'set', 'gestionvpn-indefinite', 'banip', value])
         source_removed = True
-        try: run(['fail2ban-client', 'set', 'gestionvpn-web-1h', 'unbanip', value])
+        try: run(['fail2ban-client', 'set', source_jail, 'unbanip', value])
         except Exception: source_removed = False
         return {'target': value, 'jail': 'gestionvpn-indefinite', 'durationSeconds': None,
-                'sourceJail': 'gestionvpn-web-1h', 'sourceRemoved': source_removed}
+                'sourceJail': source_jail, 'sourceRemoved': source_removed}
     if op == 'promote_indefinite':
         source_jail = p.get('sourceJail')
         destination = 'gestionvpn-indefinite'

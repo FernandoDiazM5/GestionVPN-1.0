@@ -14,6 +14,22 @@ describe('persistencia de aplicación web', () => {
       ['198.51.100.7', 'gestionvpn-web-1h', 1234]);
   });
 
+  it('cuenta reincidencias entre todos los jails web temporales autorizados', async () => {
+    mysql.query.mockResolvedValue([{ total: 3 }]);
+    await expect(repo.countAppliedTemporarySince({ sourceIp: '198.51.100.8',
+      jails: ['gestionvpn-web-1h', 'gestionvpn-web-scan-6h'], since: 2000 })).resolves.toBe(3);
+    expect(mysql.query.mock.calls[0][1]).toEqual([
+      '198.51.100.8', 'gestionvpn-web-1h', 'gestionvpn-web-scan-6h', 2000,
+    ]);
+  });
+
+  it('cuenta episodios de escaneo por recomendación, no por otros vectores', async () => {
+    mysql.query.mockResolvedValue([{ total: 2 }]);
+    await expect(repo.countAppliedRecommendationsSince({ sourceIp: '198.51.100.9',
+      recommendations: ['ROUTE_SCAN_6H', 'ROUTE_SCAN_24H'], since: 3000 })).resolves.toBe(2);
+    expect(mysql.query.mock.calls[0][0]).toContain('recommendation IN (?,?)');
+  });
+
   it('convierte una clave duplicada en una reclamación idempotente omitida', async () => {
     mysql.query.mockRejectedValue(Object.assign(new Error('duplicate'), { code: 'ER_DUP_ENTRY' }));
     await expect(repo.claim({ idempotencyKey: 'a'.repeat(64), sourceIp: '198.51.100.7',

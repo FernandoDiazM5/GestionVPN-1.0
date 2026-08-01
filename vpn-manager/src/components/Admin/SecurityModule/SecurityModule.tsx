@@ -372,7 +372,7 @@ function WebObservationPanel({ observation }: { observation: WebObservation }) {
       {observation.sources.length===0&&<tr><td colSpan={6} className="p-8 text-center text-sm text-slate-500">Aún no hay eventos web observados.</td></tr>}
     </tbody></table></div>
     <div className="divide-y divide-slate-200 md:hidden dark:divide-slate-700">{observation.sources.slice(0,50).map((source)=><article key={source.sourceIp} className="space-y-3 p-4"><div className="flex items-start justify-between gap-2"><div className="font-mono text-sm font-semibold">{source.sourceIp}</div><span className={source.recommendations.length?'badge badge-warning':'badge badge-neutral'}>{recommendationLabel(source.recommendations)}</span></div><div className="grid grid-cols-2 gap-2 text-xs"><div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900/60">Login 24 h<br/><strong>{source.authFailures24h}</strong></div><div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900/60">429 en 10 min<br/><strong>{source.rateLimited10m}</strong></div><div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900/60">Rutas en 5 min<br/><strong>{source.notFound5m}</strong></div><div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900/60">Sensibles<br/><strong>{source.sensitive10m}</strong></div></div></article>)}</div>
-    {recentActions.length > 0 && <div className="border-t border-slate-200 p-4 dark:border-slate-700"><h3 className="text-sm font-bold text-slate-900 dark:text-white">Actividad automática reciente</h3><div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{recentActions.map((action)=><article key={action.id} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700"><div className="flex items-center justify-between gap-2"><span className="font-mono text-xs font-semibold">{action.source_ip}</span><span className={`badge ${action.status==='APPLIED'?'badge-success':action.status==='FAILED'?'badge-danger':'badge-neutral'}`}>{action.status==='APPLIED'?'Aplicado':action.status==='FAILED'?'Falló':'Pendiente'}</span></div><p className="mt-2 text-xs text-slate-600 dark:text-slate-300">{action.jail==='gestionvpn-indefinite'?'Protección indefinida':'Protección temporal · 1 h'}</p><p className="mt-1 text-xs text-slate-500">{formatDate(action.created_at)}</p></article>)}</div></div>}
+    {recentActions.length > 0 && <div className="border-t border-slate-200 p-4 dark:border-slate-700"><h3 className="text-sm font-bold text-slate-900 dark:text-white">Actividad automática reciente</h3><div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{recentActions.map((action)=><article key={action.id} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700"><div className="flex items-center justify-between gap-2"><span className="font-mono text-xs font-semibold">{action.source_ip}</span><span className={`badge ${action.status==='APPLIED'?'badge-success':action.status==='FAILED'?'badge-danger':'badge-neutral'}`}>{action.status==='APPLIED'?'Aplicado':action.status==='FAILED'?'Falló':'Pendiente'}</span></div><p className="mt-2 text-xs text-slate-600 dark:text-slate-300">{action.jail==='gestionvpn-indefinite'?'Protección indefinida':action.jail==='gestionvpn-web-scan-24h'?'Protección temporal · 24 h':action.jail==='gestionvpn-web-scan-6h'?'Protección temporal · 6 h':'Protección temporal · 1 h'}</p><p className="mt-1 text-xs text-slate-500">{formatDate(action.created_at)}</p></article>)}</div></div>}
   </section>;
 }
 
@@ -462,14 +462,16 @@ function DateLine({ label, value }: { label: string; value?: number | null }) {
 }
 
 function ProtectionBadge({ jail, reason = '' }: { jail: string; reason?: string }) {
-  const automatic = ['sshd', 'gestionvpn-recidive', 'gestionvpn-web-1h'].includes(jail);
+  const automatic = ['sshd', 'gestionvpn-recidive', 'gestionvpn-web-1h', 'gestionvpn-web-scan-6h', 'gestionvpn-web-scan-24h'].includes(jail);
   const recidive = jail === 'gestionvpn-recidive';
   const web = jail === 'gestionvpn-web-1h';
+  const webScan6h = jail === 'gestionvpn-web-scan-6h';
+  const webScan24h = jail === 'gestionvpn-web-scan-24h';
   const webIndefinite = jail === 'gestionvpn-indefinite'
     && (reason.includes('web') || reason.includes('autenticación'));
   return (
     <span className={`badge ${automatic || webIndefinite ? 'badge-neutral' : 'badge-info'} whitespace-nowrap`}>
-      {recidive ? 'Fail2ban · Reincidente' : webIndefinite ? 'Protección web · Indefinida' : web ? 'Protección web · 1 h' : automatic ? 'Fail2ban · SSH' : 'Manual'}
+      {recidive ? 'Fail2ban · Reincidente' : webIndefinite ? 'Protección web · Indefinida' : webScan24h ? 'Escaneo web · 24 h' : webScan6h ? 'Escaneo web · 6 h' : web ? 'Protección web · 1 h' : automatic ? 'Fail2ban · SSH' : 'Manual'}
     </span>
   );
 }

@@ -7,7 +7,7 @@ const securityRepo = {
 };
 const agent = { callSecurityAgent: vi.fn() };
 const accountSecurity = { listLocked: vi.fn(), unlock: vi.fn(), get: vi.fn() };
-const webObservation = { observation: vi.fn() };
+const webObservation = { observation: vi.fn(), record: vi.fn() };
 const webEnforcement = { touchAdminIp: vi.fn(), state: vi.fn() };
 const webEnforcementRepo = { recentActions: vi.fn() };
 stubModule(__dirname, '../../db/repos/platformSecurityRepo', securityRepo);
@@ -65,6 +65,7 @@ describe('seguridad administrativa del VPS', () => {
     accountSecurity.unlock.mockResolvedValue(true);
     accountSecurity.get.mockResolvedValue({ last_failure_ip: '198.51.100.9' });
     webObservation.observation.mockResolvedValue({ mode: 'OBSERVE_ONLY', sources: [], events: [] });
+    webObservation.record.mockResolvedValue(undefined);
     webEnforcement.touchAdminIp.mockResolvedValue(true);
     webEnforcement.state.mockReturnValue({ active: false, status: 'OBSERVE_ONLY' });
     webEnforcementRepo.recentActions.mockResolvedValue([]);
@@ -155,6 +156,10 @@ describe('seguridad administrativa del VPS', () => {
         reason: 'El usuario olvido su contrasena', stepUpToken: 'x'.repeat(32) });
     expect(response.status).toBe(200);
     expect(accountSecurity.unlock).toHaveBeenCalledWith(userId);
+    expect(webObservation.record).toHaveBeenCalledWith(expect.objectContaining({
+      eventType: 'ACCOUNT_RECOVERY', sourceIp: '198.51.100.9', userId,
+      decision: 'ADMIN_ACCOUNT_UNLOCK',
+    }));
     expect(securityRepo.audit).toHaveBeenCalledWith(expect.objectContaining({ action: 'ACCOUNT_UNLOCK',
       detail: expect.objectContaining({ clearedRateLimits: 2, ipGloballyBlocked: false }) }));
   });

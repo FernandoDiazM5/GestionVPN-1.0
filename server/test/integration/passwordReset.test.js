@@ -72,6 +72,12 @@ const prMocks = stubModule(__dirname, '../../db/repos/passwordResetRepo', {
   invalidateForUser: vi.fn(),
   countRecent: vi.fn().mockResolvedValue(0),
 });
+const accountSecurityMocks = stubModule(__dirname, '../../db/repos/accountLoginSecurityRepo', {
+  get: vi.fn(), unlock: vi.fn().mockResolvedValue(true),
+});
+const webObservationMocks = stubModule(__dirname, '../../lib/webSecurityObservation', {
+  record: vi.fn().mockResolvedValue(undefined),
+});
 
 // rateLimit stubeado para no usar BD real
 stubModule(__dirname, '../../lib/rateLimit', {
@@ -183,6 +189,7 @@ describe('POST /api/auth/password-reset/confirm — single-use', () => {
   it('token válido → 200 + UPDATE password + markUsed + invalidate', async () => {
     prMocks.findValid.mockResolvedValue({ id: 'pr1', userId: 'u1' });
     userRepoMocks.findById.mockResolvedValue({ id: 'u1', email: 'real@test.com', name: 'Real' });
+    accountSecurityMocks.get.mockResolvedValue({ last_failure_ip: '198.51.100.20' });
     mysqlMocks.query.mockResolvedValue({});
     const r = await request(app).post('/api/auth/password-reset/confirm')
       .send({ token: 'a'.repeat(64), newPassword: 'NuevaPass123' });
@@ -200,6 +207,10 @@ describe('POST /api/auth/password-reset/confirm — single-use', () => {
     expect(rateLimit.clearLoginIdentityBlocks).toHaveBeenCalledWith({
       identities: ['real@test.com', 'Real'],
     });
+    expect(webObservationMocks.record).toHaveBeenCalledWith(expect.objectContaining({
+      eventType: 'ACCOUNT_RECOVERY', sourceIp: '198.51.100.20', userId: 'u1',
+      decision: 'PASSWORD_RECOVERY_COMPLETED',
+    }));
   });
 
   it('token INVÁLIDO (no encontrado) → 401 INVALID_TOKEN sin tocar BD', async () => {

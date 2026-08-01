@@ -217,12 +217,21 @@ router.post('/password-reset/confirm', rl.guardPolicy('RESET_CONFIRM'), async (r
     await query('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?', [hash, now, found.userId]);
     await passwordResetRepo.markUsed(found.id);
     await passwordResetRepo.invalidateForUser(found.userId);
-    await require('./db/repos/accountLoginSecurityRepo').unlock(found.userId);
+    const accountSecurityRepo = require('./db/repos/accountLoginSecurityRepo');
+    const previousLock = await accountSecurityRepo.get(found.userId);
+    await accountSecurityRepo.unlock(found.userId);
     const recoveredUser = await userRepo.findById(found.userId);
     if (recoveredUser) {
       await rl.clearLoginIdentityBlocks({
         identities: [recoveredUser.email, recoveredUser.name],
       });
+      if (previousLock?.last_failure_ip) {
+        await require('./lib/webSecurityObservation').record({ eventType: 'ACCOUNT_RECOVERY',
+          sourceIp: previousLock.last_failure_ip, userId: found.userId,
+          routeGroup: '/api/auth/password-reset/confirm', method: 'POST', statusCode: 200,
+          decision: 'PASSWORD_RECOVERY_COMPLETED',
+          detail: { classification: 'PASSWORD_RECOVERY_COMPLETED' } });
+      }
     }
 
     // Por seguridad: invalidar inmediatamente todas las sesiones web.
