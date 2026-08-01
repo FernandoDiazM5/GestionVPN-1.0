@@ -4,6 +4,12 @@
 > Aquí solo se **añaden** entradas por sesión (las más nuevas arriba); no se edita lo viejo.
 > Mantenimiento gobernado por la skill `handoff-keeper` (`.claude/skills/handoff-keeper/`).
 
+> **Sesión 2026-08-01 — Fase 3 de protección web temporal preparada.** Rama `vps_prod`, commit `d3557eb`. Estado: `check:all`; backend 98/571, frontend 64/216, agente Python 3/3 y compilación Python correcta.
+> - Se añadió un jail web fijo de 1 hora, controlado únicamente por el agente root y una cola idempotente; el modo requiere dos variables exactas y queda desactivado.
+> - Las IP/CIDR confiables, loopback, protecciones estáticas y direcciones de administradores activos quedan excluidas en backend y agente; una muestra truncada nunca genera bans.
+> - Nginx deriva exploraciones de endpoints sensibles al observador/backend para responder 404, y Seguridad muestra si la aplicación temporal está activa o preparada/desactivada.
+> - Producción no fue modificada. Pendiente: fase 4 de reincidencia web indefinida; desplegar sólo al terminar todas las fases y con autorización.
+
 > **Sesión 2026-08-01 — Fase 2 de observación pasiva web preparada.** Rama `vps_prod`, commit remoto `6050771`. Estado: `check:all`; backend 97/568, frontend 64/216 y auditor visual sin hallazgos en Seguridad.
 > - Se observan fallos reales, 429, rutas API inexistentes y endpoints sensibles; identidades desconocidas quedan seudonimizadas y la retención de IP/eventos es 14 días.
 > - El panel muestra umbrales simulados y candidatos, pero `OBSERVE_ONLY` no llama al agente ni bloquea direcciones.
