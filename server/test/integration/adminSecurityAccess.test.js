@@ -99,4 +99,20 @@ describe('seguridad administrativa del VPS', () => {
     expect(agent.callSecurityAgent).toHaveBeenCalledWith('unban', { target: mutation.target, jail: 'sshd' });
     expect(securityRepo.audit).toHaveBeenCalledWith(expect.objectContaining({ action: 'UNBAN', outcome: 'SUCCESS' }));
   });
+
+  it('convierte un bloqueo automático en indefinido con una sola operación auditada', async () => {
+    agent.callSecurityAgent.mockResolvedValue({ target: mutation.target,
+      sourceJail: 'sshd', jail: 'gestionvpn-indefinite' });
+    const response = await request(app).post('/api/admin/security/make-indefinite')
+      .set('x-test-role', 'admin').send({ ...mutation, jail: 'sshd', duration: 'indefinite',
+        confirmIndefinite: true });
+    expect(response.status).toBe(200);
+    expect(agent.callSecurityAgent).toHaveBeenCalledWith('promote_indefinite', {
+      target: mutation.target, sourceJail: 'sshd', jail: 'gestionvpn-indefinite',
+      requestIp: '203.0.113.10',
+    });
+    expect(securityRepo.audit).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'PROMOTE_INDEFINITE', outcome: 'SUCCESS', jail: 'gestionvpn-indefinite',
+    }));
+  });
 });

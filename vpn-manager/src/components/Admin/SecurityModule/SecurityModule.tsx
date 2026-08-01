@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Ban, Clock3, Eye, RefreshCw, Search, Shield, ShieldCheck, ShieldOff,
+  Ban, Clock3, Eye, Infinity as InfinityIcon, RefreshCw, Search, Shield, ShieldCheck, ShieldOff,
   Unlock, X,
 } from 'lucide-react';
 import { confirmGoogleIdentity } from '../../../services/federatedAuth';
@@ -14,7 +14,7 @@ const categories: Array<[SecurityMutation['category'], string]> = [
   ['OTHER', 'Otro'],
 ];
 
-type SecurityAction = 'ban' | 'unban' | 'trust' | 'untrust' | null;
+type SecurityAction = 'ban' | 'promote' | 'unban' | 'trust' | 'untrust' | null;
 
 interface BlockedRow {
   ip: string;
@@ -103,6 +103,7 @@ export default function SecurityModule() {
     setAction(kind);
     setTarget(ip);
     setJail(sourceJail);
+    setDuration(kind === 'promote' ? 'indefinite' : '1h');
     setReason('');
     setPassword('');
     setConfirmRisk(false);
@@ -133,6 +134,7 @@ export default function SecurityModule() {
         confirmNetworkTrust: action === 'trust' && target.includes('/') && confirmRisk,
       };
       if (action === 'ban') await securityAdminApi.ban(data);
+      if (action === 'promote') await securityAdminApi.makeIndefinite({ ...data, jail, duration: 'indefinite', confirmIndefinite: true });
       if (action === 'unban') await securityAdminApi.unban(data);
       if (action === 'trust') await securityAdminApi.trust(data);
       if (action === 'untrust') await securityAdminApi.untrust(data);
@@ -293,6 +295,7 @@ function BlockedTableRow({ row, open, showAttempts }: {
       <td className="px-4 py-4">
         <div className="flex items-center justify-end gap-1.5">
           <IconAction label="Ver intentos" icon={Eye} onClick={() => void showAttempts(row.ip)} />
+          {row.jail !== 'gestionvpn-indefinite' && <IconAction label="Hacer indefinido" icon={InfinityIcon} onClick={() => open('promote', row.ip, row.jail)} />}
           <IconAction label="Hacer confiable" icon={ShieldCheck} onClick={() => open('trust', row.ip)} />
           <IconAction label="Desbloquear" icon={Unlock} danger onClick={() => open('unban', row.ip, row.jail)} />
         </div>
@@ -324,6 +327,7 @@ function BlockedCard({ row, open, showAttempts }: {
         <button className="btn-outline min-h-11" onClick={() => open('trust', row.ip)}><ShieldCheck className="h-4 w-4" /> Confiar</button>
         <button className="btn-danger min-h-11" onClick={() => open('unban', row.ip, row.jail)}><Unlock className="h-4 w-4" /> Quitar</button>
       </div>
+      {row.jail !== 'gestionvpn-indefinite' && <button className="btn-outline min-h-11 w-full" onClick={() => open('promote', row.ip, row.jail)}><InfinityIcon className="h-4 w-4" /> Hacer indefinido</button>}
     </article>
   );
 }
@@ -412,7 +416,7 @@ function RecentActivity({ history }: { history: Array<Record<string, unknown>> }
 }
 
 function ActionBadge({ action }: { action: string }) {
-  const labels: Record<string, string> = { BAN: 'Bloqueó', UNBAN: 'Desbloqueó', TRUST_ADD: 'Confió', TRUST_REMOVE: 'Retiró confianza' };
+  const labels: Record<string, string> = { BAN: 'Bloqueó', PROMOTE_INDEFINITE: 'Hizo indefinido', UNBAN: 'Desbloqueó', TRUST_ADD: 'Confió', TRUST_REMOVE: 'Retiró confianza' };
   return <span className="badge badge-neutral whitespace-nowrap">{labels[action] || action}</span>;
 }
 
@@ -430,7 +434,7 @@ function ActionDialog(props: {
   confirmRisk: boolean; setConfirmRisk: (value: boolean) => void;
   busy: boolean; close: () => void; execute: (google?: boolean) => Promise<void>;
 }) {
-  const needsRisk = props.duration === 'indefinite' || (props.action === 'trust' && props.target.includes('/'));
+  const needsRisk = props.action === 'promote' || props.duration === 'indefinite' || (props.action === 'trust' && props.target.includes('/'));
   const disabled = props.busy || props.reason.trim().length < 10 || (needsRisk && !props.confirmRisk);
   return (
     <div className="modal-overlay" role="presentation">
@@ -440,7 +444,7 @@ function ActionDialog(props: {
           <button className="btn-ghost h-10 w-10 p-0" aria-label="Cerrar" onClick={props.close}><X className="h-5 w-5" /></button>
         </div>
         <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200">IP o red
-          <input className="input-field mt-1 font-mono" value={props.target} onChange={(event) => props.setTarget(event.target.value)} disabled={props.action === 'unban' || props.action === 'untrust'} />
+          <input className="input-field mt-1 font-mono" value={props.target} onChange={(event) => props.setTarget(event.target.value)} disabled={props.action === 'promote' || props.action === 'unban' || props.action === 'untrust'} />
         </label>
         {props.action === 'ban' && <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200">Duración
           <select className="input-field mt-1" value={props.duration} onChange={(event) => { props.setDuration(event.target.value as SecurityMutation['duration']); props.setConfirmRisk(false); }}>
@@ -458,8 +462,8 @@ function ActionDialog(props: {
         <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200">Contraseña actual
           <input type="password" autoComplete="current-password" className="input-field mt-1" value={props.password} onChange={(event) => props.setPassword(event.target.value)} />
         </label>
-        {(props.action === 'trust' || props.duration === 'indefinite') && <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-          <p>Esta acción permanece hasta retirarla manualmente. Verifica cuidadosamente el objetivo.</p>
+        {(props.action === 'trust' || props.action === 'promote' || props.duration === 'indefinite') && <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+          <p>{props.action === 'promote' ? 'El bloqueo temporal se trasladará a la protección indefinida sin dejar la IP desprotegida.' : 'Esta acción permanece hasta retirarla manualmente. Verifica cuidadosamente el objetivo.'}</p>
           {needsRisk && <label className="mt-2 flex items-start gap-2 font-semibold"><input className="mt-0.5" type="checkbox" checked={props.confirmRisk} onChange={(event) => props.setConfirmRisk(event.target.checked)} /> Confirmo el alcance y el riesgo de esta excepción permanente.</label>}
         </div>}
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

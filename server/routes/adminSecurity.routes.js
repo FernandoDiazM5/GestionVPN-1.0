@@ -72,7 +72,7 @@ async function mutate(req, operation, params, afterSuccess) {
   await requireStepUp(req);
   const input = req.body;
   const requestIp = clientIp(req);
-  if (operation === 'ban' && input.target.split('/')[0] === requestIp)
+  if (['ban', 'promote_indefinite'].includes(operation) && input.target.split('/')[0] === requestIp)
     throw new AppError('No puedes bloquear la IP de tu sesión actual', 409, 'SELF_LOCKOUT');
   if (input.duration === 'indefinite' && input.confirmIndefinite !== true)
     throw new AppError('Confirma expresamente el bloqueo indefinido', 400, 'CONFIRM_INDEFINITE');
@@ -98,7 +98,7 @@ router.get('/status', asyncHandler(async (req, res) => {
   ]);
   const reasons = new Map();
   for (const row of recent) {
-    if (row.outcome === 'SUCCESS' && row.action === 'BAN') {
+    if (row.outcome === 'SUCCESS' && ['BAN', 'PROMOTE_INDEFINITE'].includes(row.action)) {
       const key = `${row.jail || ''}\0${row.target}`;
       if (!reasons.has(key)) reasons.set(key, { reason: row.reason, category: row.category });
     }
@@ -127,6 +127,16 @@ router.post('/ban', validate({ body: SecurityMutationSchema }), asyncHandler(asy
 router.post('/unban', validate({ body: SecurityMutationSchema }), asyncHandler(async (req, res) => {
   if (!req.body.jail) throw new AppError('Jail requerido', 400, 'JAIL_REQUIRED');
   return sendOk(res, await mutate(req, 'unban', { target: req.body.target, jail: req.body.jail }));
+}));
+router.post('/make-indefinite', validate({ body: SecurityMutationSchema }), asyncHandler(async (req, res) => {
+  if (!req.body.jail || req.body.jail === DURATION_JAIL.indefinite)
+    throw new AppError('Jail temporal requerido', 400, 'SOURCE_JAIL_REQUIRED');
+  if (req.body.confirmIndefinite !== true)
+    throw new AppError('Confirma expresamente el bloqueo indefinido', 400, 'CONFIRM_INDEFINITE');
+  return sendOk(res, await mutate(req, 'promote_indefinite', {
+    target: req.body.target, sourceJail: req.body.jail,
+    jail: DURATION_JAIL.indefinite, requestIp: clientIp(req),
+  }));
 }));
 router.post('/trust', validate({ body: SecurityMutationSchema }), asyncHandler(async (req, res) => {
   if (req.body.target.includes('/') && req.body.confirmNetworkTrust !== true)

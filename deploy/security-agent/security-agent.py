@@ -113,7 +113,7 @@ def execute(op, p):
         return retained_attempt_history(p.get('target'), min(int(p.get('limit', 100)), 500))
     value = target(p.get('target'), op in {'trust_add', 'trust_remove'})
     bare = value.split('/')[0]
-    if op in {'ban', 'trust_remove'} and bare in PROTECTED: raise ValueError('Dirección protegida')
+    if op in {'ban', 'promote_indefinite', 'trust_remove'} and bare in PROTECTED: raise ValueError('Dirección protegida')
     if op == 'ban':
         jail = p.get('jail')
         if jail not in ACTIONABLE or jail == 'sshd': raise ValueError('Jail manual no autorizado')
@@ -122,6 +122,25 @@ def execute(op, p):
         if request_ip and ipaddress.ip_address(value) == ipaddress.ip_address(str(request_ip)):
             raise ValueError('No puedes bloquear la IP de tu sesión actual')
         run(['fail2ban-client', 'set', jail, 'banip', value]); return {'target': value, 'jail': jail}
+    if op == 'promote_indefinite':
+        source_jail = p.get('sourceJail')
+        destination = 'gestionvpn-indefinite'
+        if source_jail not in ACTIONABLE or source_jail == destination:
+            raise ValueError('Jail de origen no autorizado')
+        if '/' in value: raise ValueError('La conversión requiere una IP, no una red')
+        request_ip = p.get('requestIp')
+        if request_ip and ipaddress.ip_address(value) == ipaddress.ip_address(str(request_ip)):
+            raise ValueError('No puedes bloquear la IP de tu sesión actual')
+        run(['fail2ban-client', 'set', destination, 'banip', value])
+        try:
+            run(['fail2ban-client', 'set', source_jail, 'unbanip', value])
+        except Exception:
+            # Si no se pudo retirar el origen, restablecer el estado previo para
+            # no dejar una duplicación silenciosa entre jails.
+            try: run(['fail2ban-client', 'set', destination, 'unbanip', value])
+            except Exception: pass
+            raise
+        return {'target': value, 'sourceJail': source_jail, 'jail': destination}
     if op == 'unban':
         jail = p.get('jail')
         if jail not in ACTIONABLE: raise ValueError('Jail no autorizado')

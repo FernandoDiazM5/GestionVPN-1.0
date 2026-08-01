@@ -24,6 +24,7 @@ export const securityAdminApi = {
     '/api/admin/security/step-up', { firebaseIdToken }),
   ban: (data: SecurityMutation) => post('/api/admin/security/ban', data),
   unban: (data: SecurityMutation) => post('/api/admin/security/unban', data),
+  makeIndefinite: (data: SecurityMutation) => post('/api/admin/security/make-indefinite', data),
   trust: (data: SecurityMutation) => post('/api/admin/security/trust', data),
   untrust: (data: SecurityMutation) => apiJson('/api/admin/security/trust', {
     method: 'DELETE', body: JSON.stringify(data),
