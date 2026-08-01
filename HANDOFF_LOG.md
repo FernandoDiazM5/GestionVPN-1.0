@@ -4,6 +4,12 @@
 > Aquí solo se **añaden** entradas por sesión (las más nuevas arriba); no se edita lo viejo.
 > Mantenimiento gobernado por la skill `handoff-keeper` (`.claude/skills/handoff-keeper/`).
 
+> **Sesión 2026-08-01 — Fase 5 de rollout y cierre operativo preparada.** Rama `vps_prod`, commit `4d20246`. Estado: `check:all`; backend 100/582, frontend 64/216, agente Python 5/5 y compilación Python correcta.
+> - Canary determinista por IP con rollout 0–100%; 0%, valores inválidos y `observe` no ejecutan acciones. Avance documentado 10→25→50→100.
+> - Acciones automáticas aplicadas/fallidas notifican a chats Telegram únicos de administradores activos no pausados y aparecen en tarjetas responsive de actividad reciente.
+> - Se añadió `docs/security/WEB_SECURITY_ROLLOUT_RUNBOOK.md` con respaldo restaurado, criterios de aborto, kill switch, despliegue exclusivo con compose de producción y rollback.
+> - Producción no fue modificada. Las cinco fases están completas; pendiente informe predespliegue y autorización explícita.
+
 > **Sesión 2026-08-01 — Fase 4 de reincidencia web indefinida preparada.** Rama `vps_prod`, commit `80ef848`. Estado: `check:all`; backend 99/578, frontend 64/216, agente Python 5/5 y compilación Python correcta.
 > - Abuso de autenticación distribuido (10/24 h y al menos 3 identidades o identidad desconocida) puede escalar directamente; una sola cuenta olvidada no bloquea la IP.
 > - Los demás vectores escalan en el tercer episodio temporal separado dentro de 7 días; un ban aún vigente no vuelve a contarse.
