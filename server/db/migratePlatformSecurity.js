@@ -66,6 +66,28 @@ async function run() {
     INDEX idx_wse_user_time (user_id, occurred_at),
     CONSTRAINT fk_wse_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  await query(`CREATE TABLE IF NOT EXISTS web_security_actions (
+    id CHAR(36) PRIMARY KEY,
+    idempotency_key CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    source_ip VARCHAR(64) NOT NULL,
+    recommendation VARCHAR(64) NOT NULL,
+    jail VARCHAR(64) NOT NULL,
+    status ENUM('PENDING','APPLIED','FAILED') NOT NULL,
+    detail JSON NULL,
+    expires_at BIGINT NULL,
+    created_at BIGINT NOT NULL,
+    updated_at BIGINT NOT NULL,
+    UNIQUE KEY uq_wsa_idempotency (idempotency_key),
+    INDEX idx_wsa_ip_created (source_ip, created_at),
+    INDEX idx_wsa_status_created (status, created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  await query(`CREATE TABLE IF NOT EXISTS platform_security_active_admin_ips (
+    source_ip VARCHAR(64) PRIMARY KEY,
+    user_id CHAR(36) NOT NULL,
+    last_seen_at BIGINT NOT NULL,
+    INDEX idx_psaai_seen (last_seen_at),
+    CONSTRAINT fk_psaai_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
   console.log('[migrate:platform-security] tablas listas');
 }
 

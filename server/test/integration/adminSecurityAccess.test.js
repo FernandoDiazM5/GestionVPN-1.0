@@ -8,10 +8,14 @@ const securityRepo = {
 const agent = { callSecurityAgent: vi.fn() };
 const accountSecurity = { listLocked: vi.fn(), unlock: vi.fn() };
 const webObservation = { observation: vi.fn() };
+const webEnforcement = { touchAdminIp: vi.fn(), state: vi.fn() };
+const webEnforcementRepo = { recentActions: vi.fn() };
 stubModule(__dirname, '../../db/repos/platformSecurityRepo', securityRepo);
 stubModule(__dirname, '../../lib/securityAgentClient', agent);
 stubModule(__dirname, '../../db/repos/accountLoginSecurityRepo', accountSecurity);
 stubModule(__dirname, '../../lib/webSecurityObservation', webObservation);
+stubModule(__dirname, '../../lib/webSecurityEnforcement', webEnforcement);
+stubModule(__dirname, '../../db/repos/webSecurityEnforcementRepo', webEnforcementRepo);
 stubModule(__dirname, '../../lib/passwordHasher', { verifyPassword: vi.fn(async () => true) });
 stubModule(__dirname, '../../db/repos/userRepo', { findById: vi.fn(async id => ({ id, password_hash: 'hash' })) });
 stubModule(__dirname, '../../db/repos/authIdentityRepo', { findByUser: vi.fn() });
@@ -59,6 +63,9 @@ describe('seguridad administrativa del VPS', () => {
     accountSecurity.listLocked.mockResolvedValue([]);
     accountSecurity.unlock.mockResolvedValue(true);
     webObservation.observation.mockResolvedValue({ mode: 'OBSERVE_ONLY', sources: [], events: [] });
+    webEnforcement.touchAdminIp.mockResolvedValue(true);
+    webEnforcement.state.mockReturnValue({ active: false, status: 'OBSERVE_ONLY' });
+    webEnforcementRepo.recentActions.mockResolvedValue([]);
   });
 
   it('niega todo el módulo a usuarios que no son platform_admin', async () => {
@@ -140,7 +147,12 @@ describe('seguridad administrativa del VPS', () => {
     const response = await request(app).get('/api/admin/security/web-observation').set('x-test-role', 'admin');
     expect(response.status).toBe(200);
     expect(response.body.mode).toBe('OBSERVE_ONLY');
+    expect(response.body.enforcement).toEqual({ active: false, status: 'OBSERVE_ONLY' });
+    expect(response.body.actions).toEqual([]);
     expect(webObservation.observation).toHaveBeenCalledWith({ sourceIp: null });
+    expect(webEnforcement.touchAdminIp).toHaveBeenCalledWith({
+      sourceIp: '203.0.113.10', userId: 'admin-1',
+    });
     expect(agent.callSecurityAgent).not.toHaveBeenCalled();
   });
 });

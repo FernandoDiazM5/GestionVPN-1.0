@@ -12,6 +12,7 @@ install -d -m 0755 /usr/local/lib/gestionvpn /etc/gestionvpn
 install -m 0755 deploy/security-agent/security-agent.py /usr/local/lib/gestionvpn/
 install -m 0644 deploy/security-agent/gestionvpn-security-agent.service /etc/systemd/system/
 install -m 0600 deploy/security-agent/gestionvpn-manual-jails.conf /etc/fail2ban/jail.d/
+install -m 0600 deploy/security-agent/gestionvpn-web-jails.conf /etc/fail2ban/jail.d/
 install -m 0644 deploy/security-agent/gestionvpn-sshd-recidive.conf /etc/fail2ban/filter.d/
 install -m 0600 deploy/security-agent/gestionvpn-recidive.conf /etc/fail2ban/jail.d/
 openssl rand -hex 32 > /etc/gestionvpn/security-agent.secret
@@ -28,3 +29,10 @@ systemctl enable --now gestionvpn-security-agent
 Nunca probar un bloqueo inicialmente con la IP de la sesión SSH administrativa.
 La confianza administrada se escribe en `zz-gestionvpn-trusted.local` para que
 se cargue después de cualquier `ignoreip` específico ya existente.
+
+La protección web temporal requiere dos controles simultáneos en el backend:
+`WEB_SECURITY_MODE=enforce_temp` y
+`WEB_SECURITY_ENFORCEMENT_CONFIRM=ENABLE_TEMP_WEB_BANS`. Sin ambos permanece en
+`OBSERVE_ONLY`. El agente acepta para automatización exclusivamente `web_ban`
+hacia `gestionvpn-web-1h` y vuelve a comprobar IPs críticas, direcciones
+confiables y sesiones administrativas activas.

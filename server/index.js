@@ -130,6 +130,7 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'X-CSRF-Token'],
     credentials: true,
 }));
+app.use(require('./lib/webSecurityObservation').observeRequests);
 app.use(requireJsonForMutation);
 app.use(strictJsonParser);
 app.use(cookieParser());
@@ -159,8 +160,6 @@ app.use(pinoHttp({
         res: (res) => ({ statusCode: res.statusCode }),
     },
 }));
-app.use(require('./lib/webSecurityObservation').observeRequests);
-
 // ── Métricas HTTP (FASE 9) ────────────────────────────────────────
 //  Mide latencia + cuenta requests por método/ruta/status.
 //  Se evalúa en res.on('finish') para capturar el statusCode real.
@@ -240,6 +239,7 @@ function gracefulShutdown(signal) {
         try { coreBackupJob.stop(); } catch (_) {}
         try { require('./lib/rateLimit').stopBucketCleanup(); } catch (_) {}
         try { require('./lib/webSecurityObservation').stopCleanup(); } catch (_) {}
+        try { require('./lib/webSecurityEnforcement').stop(); } catch (_) {}
         setTimeout(() => process.exit(0), 500);
     };
 }
@@ -259,6 +259,7 @@ function startServer(attempt = 1) {
         startMonitor(10000);
         require('./lib/rateLimit').startBucketCleanup();
         require('./lib/webSecurityObservation').startCleanup();
+        require('./lib/webSecurityEnforcement').start();
         expirationJob.start();
         telegramBot.start();
         dashboardMetrics.start();

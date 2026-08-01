@@ -354,8 +354,8 @@ function WebObservationPanel({ observation }: { observation: WebObservation }) {
   };
   return <section className="card overflow-hidden">
     <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between dark:border-slate-700">
-      <div><div className="flex flex-wrap items-center gap-2"><h2 className="font-bold text-slate-900 dark:text-white">Observación de ataques web</h2><span className="badge badge-info">Solo observación</span></div>
-        <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">Analiza las últimas 24 horas sin bloquear direcciones. Conservación: {observation.retentionDays} días.</p></div>
+      <div><div className="flex flex-wrap items-center gap-2"><h2 className="font-bold text-slate-900 dark:text-white">Observación de ataques web</h2><span className={`badge ${observation.enforcement.active ? 'badge-warning' : 'badge-info'}`}>{observation.enforcement.active ? 'Bloqueo temporal activo' : 'Preparado · desactivado'}</span></div>
+        <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{observation.enforcement.active ? 'Las direcciones que superan los umbrales pueden bloquearse durante 1 hora.' : 'Analiza las últimas 24 horas sin bloquear direcciones.'} Conservación: {observation.retentionDays} días.</p></div>
       <div className="flex gap-2"><span className="badge badge-neutral">{observation.sources.length} direcciones</span><span className={recommended ? 'badge badge-warning' : 'badge badge-success'}>{recommended} superan umbral</span></div>
     </div>
     {observation.truncated && <div className="border-b border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">La vista alcanzó el límite de análisis; los datos no se han eliminado.</div>}
@@ -460,11 +460,12 @@ function DateLine({ label, value }: { label: string; value?: number | null }) {
 }
 
 function ProtectionBadge({ jail }: { jail: string }) {
-  const automatic = ['sshd', 'gestionvpn-recidive'].includes(jail);
+  const automatic = ['sshd', 'gestionvpn-recidive', 'gestionvpn-web-1h'].includes(jail);
   const recidive = jail === 'gestionvpn-recidive';
+  const web = jail === 'gestionvpn-web-1h';
   return (
     <span className={`badge ${automatic ? 'badge-neutral' : 'badge-info'} whitespace-nowrap`}>
-      {recidive ? 'Fail2ban · Reincidente' : automatic ? 'Fail2ban · SSH' : 'Manual'}
+      {recidive ? 'Fail2ban · Reincidente' : web ? 'Protección web · 1 h' : automatic ? 'Fail2ban · SSH' : 'Manual'}
     </span>
   );
 }

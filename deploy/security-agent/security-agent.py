@@ -7,7 +7,7 @@ SECRET = os.environ.get('SECURITY_AGENT_SECRET', '')
 HOST = os.environ.get('SECURITY_AGENT_HOST', '127.0.0.1')
 PORT = int(os.environ.get('SECURITY_AGENT_PORT', '8788'))
 ACTIONABLE = {'sshd', 'gestionvpn-recidive', 'gestionvpn-15m', 'gestionvpn-1h', 'gestionvpn-6h',
-              'gestionvpn-24h', 'gestionvpn-7d', 'gestionvpn-indefinite'}
+              'gestionvpn-24h', 'gestionvpn-7d', 'gestionvpn-indefinite', 'gestionvpn-web-1h'}
 PROTECTED = {'127.0.0.1', '::1'} | set(filter(None, os.environ.get('SECURITY_AGENT_PROTECTED_IPS', '').split(',')))
 # Se carga al final para que no sea sobrescrito por jails locales existentes.
 TRUST_FILE = '/etc/fail2ban/jail.d/zz-gestionvpn-trusted.local'
@@ -68,6 +68,14 @@ def write_trusted(values):
     os.chmod(temp, 0o600); os.replace(temp, TRUST_FILE)
     run(['fail2ban-client', 'reload'])
 
+def is_trusted_ip(value):
+    address = ipaddress.ip_address(value)
+    for item in trusted_values():
+        try:
+            if address in ipaddress.ip_network(item, strict=False): return True
+        except ValueError: continue
+    return False
+
 ATTEMPT_PATTERN = re.compile(
     r'^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)(?:,\d+)? .*?\[([^\]]+)\] Found ([0-9a-fA-F:.]+)(?:\s|$)'
 )
@@ -113,7 +121,8 @@ def execute(op, p):
         return retained_attempt_history(p.get('target'), min(int(p.get('limit', 100)), 500))
     value = target(p.get('target'), op in {'trust_add', 'trust_remove'})
     bare = value.split('/')[0]
-    if op in {'ban', 'promote_indefinite', 'trust_remove'} and bare in PROTECTED: raise ValueError('Dirección protegida')
+    if op in {'ban', 'web_ban', 'promote_indefinite', 'trust_remove'} and bare in PROTECTED: raise ValueError('Dirección protegida')
+    if op in {'ban', 'web_ban', 'promote_indefinite'} and is_trusted_ip(bare): raise ValueError('Dirección confiable protegida')
     if op == 'ban':
         jail = p.get('jail')
         if jail not in ACTIONABLE or jail == 'sshd': raise ValueError('Jail manual no autorizado')
@@ -122,6 +131,16 @@ def execute(op, p):
         if request_ip and ipaddress.ip_address(value) == ipaddress.ip_address(str(request_ip)):
             raise ValueError('No puedes bloquear la IP de tu sesión actual')
         run(['fail2ban-client', 'set', jail, 'banip', value]); return {'target': value, 'jail': jail}
+    if op == 'web_ban':
+        if p.get('jail') != 'gestionvpn-web-1h': raise ValueError('Jail web no autorizado')
+        if '/' in value: raise ValueError('El bloqueo web requiere una IP')
+        protected_ips = set()
+        for item in p.get('protectedIps') or []:
+            try: protected_ips.add(str(ipaddress.ip_address(str(item))))
+            except ValueError: raise ValueError('IP protegida inválida')
+        if bare in protected_ips: raise ValueError('Sesión administrativa protegida')
+        run(['fail2ban-client', 'set', 'gestionvpn-web-1h', 'banip', value])
+        return {'target': value, 'jail': 'gestionvpn-web-1h', 'durationSeconds': 3600}
     if op == 'promote_indefinite':
         source_jail = p.get('sourceJail')
         destination = 'gestionvpn-indefinite'

@@ -19,9 +19,15 @@ const telegram = require('../lib/telegram');
 const { callSecurityAgent } = require('../lib/securityAgentClient');
 const { clientIp, guardPolicy } = require('../lib/rateLimit');
 const webObservation = require('../lib/webSecurityObservation');
+const webEnforcement = require('../lib/webSecurityEnforcement');
+const webEnforcementRepo = require('../db/repos/webSecurityEnforcementRepo');
 
 const router = express.Router();
 router.use(requireSession, requirePlatformAdmin);
+router.use(asyncHandler(async (req, _res, next) => {
+  await webEnforcement.touchAdminIp({ sourceIp: clientIp(req), userId: req.account.sub });
+  next();
+}));
 const STEP_UP_MS = 5 * 60 * 1000;
 const DURATION_JAIL = {
   '15m': 'gestionvpn-15m', '1h': 'gestionvpn-1h', '6h': 'gestionvpn-6h',
@@ -111,8 +117,9 @@ router.get('/status', asyncHandler(async (req, res) => {
       ...detail,
       ...(reasons.get(`${jail.name}\0${detail.target}`) || {
         reason: jail.name === 'sshd' ? 'Fallos reiterados de autenticación SSH'
-          : jail.name === 'gestionvpn-recidive' ? 'Reincidencia: 3 bloqueos SSH en 7 días' : 'Bloqueo manual',
-        category: ['sshd', 'gestionvpn-recidive'].includes(jail.name) ? 'AUTOMATIC' : null,
+          : jail.name === 'gestionvpn-recidive' ? 'Reincidencia: 3 bloqueos SSH en 7 días'
+            : jail.name === 'gestionvpn-web-1h' ? 'Protección automática ante abuso web' : 'Bloqueo manual',
+        category: ['sshd', 'gestionvpn-recidive', 'gestionvpn-web-1h'].includes(jail.name) ? 'AUTOMATIC' : null,
       }),
     }));
   }
@@ -122,8 +129,13 @@ router.get('/history', validate({ query: SecurityHistoryQuerySchema }), asyncHan
   sendOk(res, { history: await securityRepo.history(req.query) })));
 router.get('/attempts', validate({ query: SecurityHistoryQuerySchema }), asyncHandler(async (req, res) =>
   sendOk(res, await callSecurityAgent('attempts', req.query))));
-router.get('/web-observation', validate({ query: SecurityHistoryQuerySchema }), asyncHandler(async (req, res) =>
-  sendOk(res, await webObservation.observation({ sourceIp: req.query.target || null }))));
+router.get('/web-observation', validate({ query: SecurityHistoryQuerySchema }), asyncHandler(async (req, res) => {
+  const [snapshot, actions] = await Promise.all([
+    webObservation.observation({ sourceIp: req.query.target || null }),
+    webEnforcementRepo.recentActions(100),
+  ]);
+  return sendOk(res, { ...snapshot, enforcement: webEnforcement.state(), actions });
+}));
 router.get('/locked-accounts', asyncHandler(async (_req, res) =>
   sendOk(res, { accounts: await accountSecurityRepo.listLocked() })));
 
