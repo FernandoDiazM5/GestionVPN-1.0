@@ -6,6 +6,8 @@
 #  idempotentes (re-ejecutables sin efecto si ya se aplicaron).
 set -e
 
+node scripts/waitForDatabase.js
+
 echo "🔧 [entrypoint] Migraciones de BD..."
 node db/initRbac.js            # esquema RBAC base (users, workspaces, roles)
 node db/initMultiuser.js       # tablas multi-usuario (sessions, mgmt_ips, ...)
