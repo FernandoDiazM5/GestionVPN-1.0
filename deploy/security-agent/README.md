@@ -19,6 +19,7 @@ openssl rand -hex 32 > /etc/gestionvpn/security-agent.secret
 chmod 600 /etc/gestionvpn/security-agent.secret
 # Crear /etc/gestionvpn/security-agent.env con SECURITY_AGENT_SECRET y
 # SECURITY_AGENT_PROTECTED_IPS (IP pública VPS y otras direcciones críticas).
+# Ejemplo de este entorno: SECURITY_AGENT_PROTECTED_IPS=134.199.212.232,213.173.36.232
 # Copiar el mismo secreto a SECURITY_AGENT_SECRET en server/.env.production;
 # nunca guardar el valor real en Git.
 fail2ban-client reload

@@ -83,18 +83,18 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `routes/admin.routes.js` | 416 | POST | `/invite-moderator` | sí | platform-admin | no | sí | — | — |
 | `routes/admin.routes.js` | 483 | GET | `/invitations` | sí | platform-admin | no | n/a | — | — |
 | `routes/admin.routes.js` | 498 | POST | `/invitations/:id/link` | sí | platform-admin | no | n/a | network-admin | — |
-| `routes/adminSecurity.routes.js` | 58 | POST | `/step-up` | sí | platform-admin or OWNER | no | sí | — | — |
-| `routes/adminSecurity.routes.js` | 113 | GET | `/status` | sí | platform-admin | no | n/a | network-admin | — |
-| `routes/adminSecurity.routes.js` | 159 | GET | `/history` | sí | platform-admin | no | n/a | — | — |
-| `routes/adminSecurity.routes.js` | 161 | GET | `/attempts` | sí | platform-admin | no | n/a | — | — |
-| `routes/adminSecurity.routes.js` | 163 | GET | `/web-observation` | sí | platform-admin | no | n/a | — | — |
-| `routes/adminSecurity.routes.js` | 175 | GET | `/locked-accounts` | sí | platform-admin or OWNER | no | n/a | — | — |
-| `routes/adminSecurity.routes.js` | 189 | POST | `/locked-accounts/unlock` | sí | platform-admin or OWNER | no | sí | — | — |
-| `routes/adminSecurity.routes.js` | 222 | POST | `/ban` | sí | platform-admin | no | sí | — | — |
-| `routes/adminSecurity.routes.js` | 227 | POST | `/unban` | sí | platform-admin | no | sí | — | — |
-| `routes/adminSecurity.routes.js` | 231 | POST | `/make-indefinite` | sí | platform-admin | no | sí | — | — |
-| `routes/adminSecurity.routes.js` | 241 | POST | `/trust` | sí | platform-admin | no | sí | — | — |
-| `routes/adminSecurity.routes.js` | 255 | DELETE | `/trust` | sí | platform-admin | no | sí | — | — |
+| `routes/adminSecurity.routes.js` | 59 | POST | `/step-up` | sí | platform-admin or OWNER | no | sí | — | — |
+| `routes/adminSecurity.routes.js` | 114 | GET | `/status` | sí | platform-admin | no | n/a | network-admin | — |
+| `routes/adminSecurity.routes.js` | 161 | GET | `/history` | sí | platform-admin | no | n/a | — | — |
+| `routes/adminSecurity.routes.js` | 163 | GET | `/attempts` | sí | platform-admin | no | n/a | — | — |
+| `routes/adminSecurity.routes.js` | 165 | GET | `/web-observation` | sí | platform-admin | no | n/a | — | — |
+| `routes/adminSecurity.routes.js` | 177 | GET | `/locked-accounts` | sí | platform-admin or OWNER | no | n/a | — | — |
+| `routes/adminSecurity.routes.js` | 191 | POST | `/locked-accounts/unlock` | sí | platform-admin or OWNER | no | sí | — | — |
+| `routes/adminSecurity.routes.js` | 224 | POST | `/ban` | sí | platform-admin | no | sí | — | — |
+| `routes/adminSecurity.routes.js` | 229 | POST | `/unban` | sí | platform-admin | no | sí | — | — |
+| `routes/adminSecurity.routes.js` | 233 | POST | `/make-indefinite` | sí | platform-admin | no | sí | — | — |
+| `routes/adminSecurity.routes.js` | 243 | POST | `/trust` | sí | platform-admin | no | sí | — | — |
+| `routes/adminSecurity.routes.js` | 257 | DELETE | `/trust` | sí | platform-admin | no | sí | — | — |
 | `routes/ai.routes.js` | 56 | GET | `/status` | sí | — | no | n/a | — | — |
 | `routes/ai.routes.js` | 80 | POST | `/consent` | sí | — | no | sí | — | — |
 | `routes/ai.routes.js` | 86 | POST | `/device-analysis` | sí | — | no | sí | — | — |

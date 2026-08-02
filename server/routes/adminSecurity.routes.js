@@ -21,6 +21,7 @@ const { callSecurityAgent } = require('../lib/securityAgentClient');
 const { clientIp, guardPolicy, clearLoginIdentityBlocks } = require('../lib/rateLimit');
 const webObservation = require('../lib/webSecurityObservation');
 const webEnforcement = require('../lib/webSecurityEnforcement');
+const { systemTrustedCidrs } = require('../lib/webSecurityTrustedSources');
 const webEnforcementRepo = require('../db/repos/webSecurityEnforcementRepo');
 
 const router = express.Router();
@@ -154,7 +155,8 @@ router.get('/status', requirePlatformAdmin, asyncHandler(async (req, res) => {
       }),
     }));
   }
-  return sendOk(res, { ...status, trustedMetadata, currentIp: clientIp(req) });
+  return sendOk(res, { ...status, trustedMetadata, currentIp: clientIp(req),
+    systemTrusted: systemTrustedCidrs() });
 }));
 router.get('/history', requirePlatformAdmin, validate({ query: SecurityHistoryQuerySchema }), asyncHandler(async (req, res) =>
   sendOk(res, { history: await securityRepo.history(req.query) })));

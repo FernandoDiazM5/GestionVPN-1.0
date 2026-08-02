@@ -1,6 +1,7 @@
 const net = require('node:net');
 const eventRepo = require('../db/repos/webSecurityEventRepo');
 const { bucketHash, clientIp } = require('./rateLimit');
+const { isSystemTrustedIp, systemTrustedCidrs } = require('./webSecurityTrustedSources');
 const log = require('./logger').child({ scope: 'web-security-observation' });
 
 const RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
@@ -44,7 +45,11 @@ function identityHash(identity) {
 }
 
 function record(event) {
-  return eventRepo.record({ ...event, sourceIp: safeIp(event.sourceIp),
+  const sourceIp = safeIp(event.sourceIp);
+  if (isSystemTrustedIp(sourceIp)) {
+    return Promise.resolve({ skipped: true, reason: 'SYSTEM_TRUSTED_SOURCE' });
+  }
+  return eventRepo.record({ ...event, sourceIp,
     routeGroup: event.routeGroup ? routeGroup(event.routeGroup) : null })
     .catch((error) => log.warn({ code: error?.code }, 'No se pudo registrar evento web'));
 }
@@ -157,9 +162,11 @@ function summarize(events, now = Date.now()) {
 async function observation({ sourceIp = null, now = Date.now() } = {}) {
   const events = await eventRepo.listRecent({ since: now - 24 * 60 * 60 * 1000,
     sourceIp, limit: MAX_ANALYSIS_EVENTS });
+  const visibleEvents = events.filter((event) => !isSystemTrustedIp(event.source_ip));
   return { mode: 'OBSERVE_ONLY', retentionDays: 90, since: now - 24 * 60 * 60 * 1000,
-    until: now, truncated: events.length >= MAX_ANALYSIS_EVENTS, sources: summarize(events, now),
-    events: events.slice(0, 250).map((event) => ({ eventType: event.event_type,
+    until: now, truncated: events.length >= MAX_ANALYSIS_EVENTS,
+    systemTrusted: systemTrustedCidrs(), sources: summarize(visibleEvents, now),
+    events: visibleEvents.slice(0, 250).map((event) => ({ eventType: event.event_type,
       sourceIp: event.source_ip, userId: event.user_id || null, routeGroup: event.route_group,
       method: event.method, statusCode: event.status_code, occurredAt: Number(event.occurred_at),
       decision: event.decision || 'OBSERVE_ONLY', actionId: event.action_id || null,
@@ -180,4 +187,4 @@ function stopCleanup() { if (cleanupTimer) clearInterval(cleanupTimer); cleanupT
 
 module.exports = { identityHash, observeRequests, observation, record, routeGroup, safeIp,
   summarize, startCleanup, stopCleanup, SENSITIVE_PATH, SENSITIVE_API_PATH, AUTH_RATE_FLOWS,
-  sensitiveClassification, RETENTION_MS };
+  sensitiveClassification, systemTrustedCidrs, RETENTION_MS };

@@ -6,6 +6,9 @@ import {
 import { confirmGoogleIdentity } from '../../../services/federatedAuth';
 import { securityAdminApi, type LockedAccount, type SecurityJail, type SecurityMutation, type WebObservation } from '../../../services/securityAdminApi';
 import { useWorkspaceSession } from '../../../context/WorkspaceSession';
+import {
+  isCurrentObservationSource, managedTrustedTargets, protectionStatusLabel, systemTrustedIpSet,
+} from './observationView';
 
 const categories: Array<[SecurityMutation['category'], string]> = [
   ['FALSE_POSITIVE', 'Falso positivo'],
@@ -52,6 +55,7 @@ export default function SecurityModule() {
   const [activeTab, setActiveTab] = useState<SecurityTab>(platformAdmin ? 'blocked' : 'accounts');
   const [jails, setJails] = useState<SecurityJail[]>([]);
   const [trusted, setTrusted] = useState<string[]>([]);
+  const [systemTrusted, setSystemTrusted] = useState<string[]>([]);
   const [currentIp, setCurrentIp] = useState('');
   const [history, setHistory] = useState<Array<Record<string, unknown>>>([]);
   const [loading, setLoading] = useState(true);
@@ -84,6 +88,7 @@ export default function SecurityModule() {
         ]);
         setJails(status.jails);
         setTrusted(status.trusted);
+        setSystemTrusted(status.systemTrusted || web.systemTrusted || []);
         setCurrentIp(status.currentIp);
         setAttemptHistorySince(status.attemptHistory?.since ?? null);
         setHistory(recent.history);
@@ -115,6 +120,10 @@ export default function SecurityModule() {
       || row.jail.toLowerCase().includes(query)
       || row.protection.toLowerCase().includes(query);
   }), [jails, filter]);
+
+  const managedTrusted = useMemo(() => {
+    return managedTrustedTargets(trusted, systemTrusted);
+  }, [systemTrusted, trusted]);
 
   const open = (kind: SecurityAction, ip = '', sourceJail = 'sshd') => {
     setAction(kind);
@@ -323,8 +332,14 @@ export default function SecurityModule() {
             </button>
           )}
         </div>
+        {systemTrusted.length > 0 && <div className="mt-4 rounded-2xl border border-indigo-200 bg-indigo-50/70 p-4 dark:border-indigo-900 dark:bg-indigo-950/30">
+          <h3 className="text-sm font-bold text-indigo-950 dark:text-indigo-100">Protegidas por el sistema</h3>
+          <p className="mt-1 text-xs text-indigo-800 dark:text-indigo-200">IP del VPS y endpoint MikroTik. No generan incidentes web ni pueden retirarse desde esta pantalla.</p>
+          <div className="mt-3 flex flex-wrap gap-2">{systemTrusted.map((ip) => <span key={ip} className="badge badge-info gap-2 px-3 py-2 font-mono text-xs"><ShieldCheck className="h-3.5 w-3.5" />{ip}</span>)}</div>
+        </div>}
+        <h3 className="mt-4 text-sm font-bold text-slate-900 dark:text-white">Excepciones administradas</h3>
         <div className="mt-4 flex flex-wrap gap-2">
-          {trusted.map((ip) => (
+          {managedTrusted.map((ip) => (
             <span key={ip} className="badge badge-success gap-2 px-3 py-2 font-mono text-xs">
               {ip}
               <button className="rounded p-1 hover:bg-emerald-200/70" aria-label={`Retirar ${ip}`} onClick={() => open('untrust', ip)}>
@@ -332,7 +347,7 @@ export default function SecurityModule() {
               </button>
             </span>
           ))}
-          {trusted.length === 0 && <span className="text-sm text-slate-500">Sin excepciones adicionales.</span>}
+          {managedTrusted.length === 0 && <span className="text-sm text-slate-500">Sin excepciones adicionales.</span>}
         </div>
       </section>}
 
@@ -376,8 +391,14 @@ function SecurityTabs({ active, setActive, platformAdmin }: {
 }
 
 function WebObservationPanel({ observation }: { observation: WebObservation }) {
-  const recommended = observation.sources.filter((source) => source.recommendations.length > 0).length;
-  const recentActions = observation.actions.slice(0, 10);
+  const [view, setView] = useState<'current' | 'history'>('current');
+  const currentSources = observation.sources.filter(isCurrentObservationSource);
+  const historySources = observation.sources.filter((source) => !isCurrentObservationSource(source));
+  const displayedSources = view === 'current' ? currentSources : historySources;
+  const recommended = currentSources.filter((source) => source.recommendations.length > 0).length;
+  const systemIps = systemTrustedIpSet(observation.systemTrusted);
+  const recentActions = observation.actions.filter((action) => !systemIps.has(action.source_ip)).slice(0, 10);
+  const enforcementLabel = protectionStatusLabel(observation.enforcement);
   const recommendationLabel = (items:string[]) => {
     if (items.length === 0) return 'Sin umbral superado';
     if (items.includes('INDEFINITE_AUTH_ABUSE')) return 'Candidato a bloqueo indefinido';
@@ -385,23 +406,27 @@ function WebObservationPanel({ observation }: { observation: WebObservation }) {
   };
   return <section className="card overflow-hidden">
     <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between dark:border-slate-700">
-      <div><div className="flex flex-wrap items-center gap-2"><h2 className="font-bold text-slate-900 dark:text-white">Observación de ataques web</h2><span className={`badge ${observation.enforcement.active ? 'badge-warning' : observation.enforcement.armed ? 'badge-neutral' : 'badge-info'}`}>{observation.enforcement.active ? `Canary activo · ${observation.enforcement.rolloutPercent}%` : observation.enforcement.armed ? 'Armado · rollout 0%' : 'Preparado · desactivado'}</span>{observation.enforcement.active && <span className={`badge ${observation.enforcement.indefiniteActive ? 'badge-danger' : 'badge-neutral'}`}>{observation.enforcement.indefiniteActive ? 'Escalada indefinida activa' : 'Escalada indefinida desactivada'}</span>}</div>
-        <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{observation.enforcement.active ? 'Las direcciones incluidas en el porcentaje del canary pueden recibir protección automática.' : 'Analiza las últimas 24 horas sin aplicar nuevos bloqueos.'} Conservación: {observation.retentionDays} días.</p></div>
-      <div className="flex gap-2"><span className="badge badge-neutral">{observation.sources.length} direcciones</span><span className={recommended ? 'badge badge-warning' : 'badge badge-success'}>{recommended} superan umbral</span></div>
+      <div><div className="flex flex-wrap items-center gap-2"><h2 className="font-bold text-slate-900 dark:text-white">Protección y actividad web</h2><span className={`badge ${observation.enforcement.active ? 'badge-warning' : observation.enforcement.armed ? 'badge-neutral' : 'badge-info'}`}>{enforcementLabel}</span>{observation.enforcement.active && <span className={`badge ${observation.enforcement.indefiniteActive ? 'badge-danger' : 'badge-neutral'}`}>{observation.enforcement.indefiniteActive ? 'Escalada indefinida activa' : 'Escalada indefinida desactivada'}</span>}</div>
+        <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{observation.enforcement.active ? 'Evalúa todas las direcciones con actividad y aplica protección cuando superan un umbral.' : 'Analiza las últimas 24 horas sin aplicar nuevos bloqueos.'} Conservación: {observation.retentionDays} días.</p></div>
+      <div className="flex flex-wrap gap-2"><span className="badge badge-neutral">{currentSources.length} activas</span><span className="badge badge-neutral">{historySources.length} históricas</span><span className={recommended ? 'badge badge-warning' : 'badge badge-success'}>{recommended} superan umbral</span></div>
     </div>
     {observation.truncated && <div className="border-b border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">La vista alcanzó el límite de análisis; los datos no se han eliminado.</div>}
+    <div className="flex flex-wrap gap-2 border-b border-slate-200 p-3 dark:border-slate-700" role="group" aria-label="Periodo de actividad web">
+      <button type="button" className={`btn-sm ${view === 'current' ? 'btn-primary' : 'btn-ghost'}`} aria-pressed={view === 'current'} onClick={() => setView('current')}>Actividad actual ({currentSources.length})</button>
+      <button type="button" className={`btn-sm ${view === 'history' ? 'btn-primary' : 'btn-ghost'}`} aria-pressed={view === 'history'} onClick={() => setView('history')}>Historial reciente ({historySources.length})</button>
+    </div>
     <div className="hidden overflow-x-auto md:block"><table className="min-w-[940px] w-full text-left text-sm"><thead className="bg-slate-50 dark:bg-slate-900/60"><tr>
       {['Dirección', 'Login 24 h', 'Límites 10 min', 'Rutas 5 min', 'Sensibles 10 min', 'Evaluación'].map((heading)=><th key={heading} className="px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-600">{heading}</th>)}
     </tr></thead><tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-      {observation.sources.slice(0,50).map((source)=><tr key={source.sourceIp}>
+      {displayedSources.slice(0,50).map((source)=><tr key={source.sourceIp}>
         <td className="px-4 py-4"><div className="font-mono font-semibold">{source.sourceIp}</div><div className="mt-1 text-xs text-slate-500">Último: {formatDate(source.lastSeen)}</div></td>
         <td className="px-4 py-4"><div className="font-semibold">{source.authFailures24h}</div><div className="text-xs text-slate-500">{source.identities24h} identidades</div></td>
         <td className="px-4 py-4 text-center">{source.rateLimited10m}</td><td className="px-4 py-4"><div>{source.notFound5m} intentos</div><div className="text-xs text-slate-500">{source.distinctRoutes5m} rutas</div></td>
         <td className="px-4 py-4 text-center">{source.sensitive10m}</td><td className="px-4 py-4"><span className={source.recommendations.length ? 'badge badge-warning' : 'badge badge-neutral'}>{recommendationLabel(source.recommendations)}</span></td>
       </tr>)}
-      {observation.sources.length===0&&<tr><td colSpan={6} className="p-8 text-center text-sm text-slate-500">Aún no hay eventos web observados.</td></tr>}
+      {displayedSources.length===0&&<tr><td colSpan={6} className="p-8 text-center text-sm text-slate-500">{view === 'current' ? 'No hay direcciones con actividad dentro de las ventanas actuales.' : 'No hay actividad histórica reciente.'}</td></tr>}
     </tbody></table></div>
-    <div className="divide-y divide-slate-200 md:hidden dark:divide-slate-700">{observation.sources.slice(0,50).map((source)=><article key={source.sourceIp} className="space-y-3 p-4"><div className="flex items-start justify-between gap-2"><div className="font-mono text-sm font-semibold">{source.sourceIp}</div><span className={source.recommendations.length?'badge badge-warning':'badge badge-neutral'}>{recommendationLabel(source.recommendations)}</span></div><div className="grid grid-cols-2 gap-2 text-xs"><div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900/60">Login 24 h<br/><strong>{source.authFailures24h}</strong></div><div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900/60">429 en 10 min<br/><strong>{source.rateLimited10m}</strong></div><div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900/60">Rutas en 5 min<br/><strong>{source.notFound5m}</strong></div><div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900/60">Sensibles<br/><strong>{source.sensitive10m}</strong></div></div></article>)}</div>
+    <div className="divide-y divide-slate-200 md:hidden dark:divide-slate-700">{displayedSources.slice(0,50).map((source)=><article key={source.sourceIp} className="space-y-3 p-4"><div className="flex items-start justify-between gap-2"><div><div className="font-mono text-sm font-semibold">{source.sourceIp}</div><div className="mt-1 text-xs text-slate-500">Último: {formatDate(source.lastSeen)}</div></div><span className={source.recommendations.length?'badge badge-warning':'badge badge-neutral'}>{recommendationLabel(source.recommendations)}</span></div><div className="grid grid-cols-2 gap-2 text-xs"><div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900/60">Login 24 h<br/><strong>{source.authFailures24h}</strong></div><div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900/60">429 en 10 min<br/><strong>{source.rateLimited10m}</strong></div><div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900/60">Rutas en 5 min<br/><strong>{source.notFound5m}</strong></div><div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900/60">Sensibles<br/><strong>{source.sensitive10m}</strong></div></div></article>)}{displayedSources.length === 0 && <div className="p-8 text-center text-sm text-slate-500">{view === 'current' ? 'No hay direcciones con actividad dentro de las ventanas actuales.' : 'No hay actividad histórica reciente.'}</div>}</div>
     {recentActions.length > 0 && <div className="border-t border-slate-200 p-4 dark:border-slate-700"><h3 className="text-sm font-bold text-slate-900 dark:text-white">Actividad automática reciente</h3><div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{recentActions.map((action)=><article key={action.id} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700"><div className="flex items-center justify-between gap-2"><span className="font-mono text-xs font-semibold">{action.source_ip}</span><span className={`badge ${action.status==='APPLIED'?'badge-success':action.status==='FAILED'?'badge-danger':'badge-neutral'}`}>{action.status==='APPLIED'?'Aplicado':action.status==='FAILED'?'Falló':'Pendiente'}</span></div><p className="mt-2 text-xs text-slate-600 dark:text-slate-300">{isIndefiniteJail(action.jail)?'Protección indefinida':action.jail==='gestionvpn-web-scan-24h'?'Protección temporal · 24 h':action.jail==='gestionvpn-web-scan'?'Protección temporal · 6 h':'Protección temporal · 1 h'}</p><p className="mt-1 text-xs text-slate-500">{formatDate(action.created_at)}</p></article>)}</div></div>}
   </section>;
 }

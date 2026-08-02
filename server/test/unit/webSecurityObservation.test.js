@@ -9,17 +9,48 @@ stubModule(__dirname, '../../lib/rateLimit', {
 });
 
 const observation = require('../../lib/webSecurityObservation');
+const originalVpsPublicIp = process.env.VPS_PUBLIC_IP;
+const originalWgPublicIp = process.env.WG_PUBLIC_IP;
 
 const event = (type, ip, at, extra = {}) => ({ event_type: type, source_ip: ip,
   occurred_at: at, identity_hash: null, user_id: null, route_group: null, ...extra });
 
 describe('observacion pasiva de seguridad web', () => {
   beforeEach(() => {
+    delete process.env.VPS_PUBLIC_IP;
+    delete process.env.WG_PUBLIC_IP;
     require('../../db/repos/webSecurityEventRepo').record.mockResolvedValue(undefined);
+  });
+
+  afterAll(() => {
+    if (originalVpsPublicIp === undefined) delete process.env.VPS_PUBLIC_IP;
+    else process.env.VPS_PUBLIC_IP = originalVpsPublicIp;
+    if (originalWgPublicIp === undefined) delete process.env.WG_PUBLIC_IP;
+    else process.env.WG_PUBLIC_IP = originalWgPublicIp;
   });
 
   it('conserva incidentes durante 90 días', () => {
     expect(observation.RETENTION_MS).toBe(90 * 24 * 60 * 60 * 1000);
+  });
+
+  it('no registra ni muestra la IP del VPS o del endpoint MikroTik', async () => {
+    process.env.VPS_PUBLIC_IP = '134.199.212.232';
+    process.env.WG_PUBLIC_IP = '213.173.36.232';
+    const repo = require('../../db/repos/webSecurityEventRepo');
+    repo.record.mockClear();
+    await observation.record({ eventType: 'API_NOT_FOUND', sourceIp: '134.199.212.232' });
+    await observation.record({ eventType: 'API_NOT_FOUND', sourceIp: '213.173.36.232' });
+    expect(repo.record).not.toHaveBeenCalled();
+
+    repo.listRecent.mockResolvedValue([
+      event('API_NOT_FOUND', '134.199.212.232', 99),
+      event('API_NOT_FOUND', '213.173.36.232', 98),
+      event('API_NOT_FOUND', '198.51.100.7', 97),
+    ]);
+    const snapshot = await observation.observation({ now: 100 });
+    expect(snapshot.systemTrusted).toEqual(['134.199.212.232/32', '213.173.36.232/32']);
+    expect(snapshot.sources.map((source) => source.sourceIp)).toEqual(['198.51.100.7']);
+    expect(snapshot.events.map((item) => item.sourceIp)).toEqual(['198.51.100.7']);
   });
 
   it('seudonimiza identidades y normaliza rutas sin query ni UUID', () => {

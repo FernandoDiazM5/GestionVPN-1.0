@@ -5,7 +5,7 @@ export interface SecurityJail {
   currentlyBanned: number; totalBanned: number; banned: string[];
   banDetails?: Array<{target:string;blockedSince:number;expiresAt:number|null;attempts?:number;reason?:string;category?:string|null}>;
 }
-export interface SecurityStatus { success: true; jails: SecurityJail[]; trusted: string[]; trustedMetadata: Array<Record<string, unknown>>; currentIp:string; attemptHistory?: { since:number|null; until:number|null } }
+export interface SecurityStatus { success: true; jails: SecurityJail[]; trusted: string[]; systemTrusted:string[]; trustedMetadata: Array<Record<string, unknown>>; currentIp:string; attemptHistory?: { since:number|null; until:number|null } }
 export interface LockedAccount {
   user_id:string; email:string; name:string; workspace_name?:string|null;
   failures_15m:number; failures_24h:number; locked_until:number; lock_reason:string;
@@ -20,6 +20,7 @@ export interface WebObservationSource {
 }
 export interface WebObservation {
   success:true; mode:'OBSERVE_ONLY'; retentionDays:number; since:number; until:number; truncated:boolean;
+  systemTrusted:string[];
   enforcement:{configuredMode:string;confirmed:boolean;armed:boolean;active:boolean;rolloutPercent:number;indefiniteConfirmed:boolean;
     indefiniteActive:boolean;jail:string;authJail?:string;scan6hJail?:string;scan24hJail?:string;
     sensitiveJail?:string;indefiniteJail:string;
