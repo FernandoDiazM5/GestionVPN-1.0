@@ -5845,3 +5845,15 @@ Verificado con `grep` sobre todo `server/`:
 - No versionar secretos (`.jwt_secret`, `.db_secret`, `database.sqlite*`, `.claude/worktrees/`).
 - **Operaciones SSH sobre antenas Ubiquiti airOS:** solo lectura + diagnóstico activo (ping/traceroute) + reinicio con confirmación. **Nunca** actualizar firmware, eliminar archivos, restaurar a fábrica ni modificar configuración persistente. Ver sección dedicada arriba.
 - **Aislamiento multi-usuario en MikroTik — mangle POR-USUARIO (sin colisión):** el acceso de cada moderador se marca con **una regla mangle propia** (`comment=ACCESO-USER-<tag>`, `src-address=<su mgmt_ip>` → `new-routing-mark=<su VRF>`). **Cada usuario marca SOLO su propio tráfico** → N usuarios coexisten enrutados a sus VRFs sin colisión de LANs duplicadas. **PROHIBIDO** crear reglas mangle GLOBALES (`ACCESO-ADMIN`/`ACCESO-DINAMICO`, `src=192.168.21.0/24`): marcan toda la /24 hacia un solo VRF y **rompen el aislamiento** — son legacy single-user y el backend las **elimina** automáticamente. Toda creación/recreación de mangle (activate, keepalive **y reparación**) debe: (a) resolver `mgmt_ip` + VRF **server-side** desde la sesión activa (`sessionRepo.getActiveByUser`), nunca desde un IP enviado por el cliente; (b) usar el provisioner por-usuario (`tunnelProvisioner.addUserMangle`); (c) limpiar cualquier legacy global presente. Ver `server/lib/tunnelProvisioner.js`.
+
+---
+
+## 2026-08-01 — Fuentes web del sistema y MikroTik protegidos
+
+- Se añadió una fuente única de IPs críticas derivada de `VPS_PUBLIC_IP`, `WG_PUBLIC_IP` y `WEB_SECURITY_SYSTEM_TRUSTED_IPS`, con validación IP y deduplicación.
+- `134.199.212.232` y `213.173.36.232` ya no se registran ni evalúan como ataques web; el historial previo se conserva, pero se filtra en la consulta administrativa.
+- La UI separa IPs protegidas por el sistema de la confianza administrada, no permite retirarlas y divide actividad actual de historial; los ceros actuales quedan ocultos por defecto.
+- Producción avanzó a `280924c`. Fail2ban aplica `ignoreip` efectivo a VPS, MikroTik y la IP administrativa existente; el agente protege las tres contra retiro accidental.
+- Validación local: backend 104 archivos/618 pruebas, frontend 66/220, agente 6/6, auditor de diseño 305/0, auditoría npm 0 y builds correctos.
+- Validación de producción: respaldo restaurado y comprobado, ambas fuentes devuelven `SYSTEM_TRUSTED_SOURCE`, ninguna aparece en observación visible, HTTPS 200, 15 jails, UFW/agente activos, contenedores con 0 reinicios y datos críticos intactos.
+- Respaldo: `/root/pre-system-trusted-20260802T042255Z`; rollback inmediato: `gestionvpn-10-{backend,frontend}:pre-system-trusted-20260802T042255Z`; disco final 50% con 13 GiB libres y build cache en cero.
