@@ -4,6 +4,12 @@
 > Aquí solo se **añaden** entradas por sesión (las más nuevas arriba); no se edita lo viejo.
 > Mantenimiento gobernado por la skill `handoff-keeper` (`.claude/skills/handoff-keeper/`).
 
+> **Sesión 2026-08-02 — Login 500 por CORS diagnosticado, recuperado y endurecido.** Producción `2c8fcdb`; rollback backend `pre-cors-hardening-20260802T131102Z`.
+> - Los logs demostraron que `https://joinpoint.cloud` era rechazado antes de autenticación. El último despliegue había combinado Compose local+productivo y el CORS local sobrescribió el `server/.env.production`; por eso login y reporte de errores fallaban juntos con 500.
+> - Se recuperó primero sin rebuild, recreando sólo backend con `docker-compose.prod.yml`; luego se eliminó el override CORS del Compose local, se añadió validación productiva fail-fast/HTTPS y el rechazo pasó a 403 operacional.
+> - Pruebas: 627 backend, 10 focalizadas, `check:all`, build 0 vulnerabilidades. Producción: ambos configs resuelven root/www, preflights 204, inválido 401, hostil 403, health completo `ok`, 0 reinicios. La cuenta `admin@local.app` está activa/no bloqueada; no se tocó contraseña.
+> - Se documentó la regla de despliegue productivo exclusivo, se conservaron current+rollback inmediato, se retiraron rollback/cache superados y el disco cerró en 50%/13 GiB libres.
+
 > **Sesión 2026-08-02 — Estado de Seguridad estable y tabla rediseñada, desplegados.** Producción `f48f3b3`; respaldo restaurado/verificado `/root/pre-security-table-20260802T051227Z` y rollback `pre-security-table-20260802T051227Z`.
 > - Se confirmó que el `500` de `/api/admin/security/status` era un aborto del backend a 5 s: el agente aún recorría 15 jails y el historial retenido, y luego escribía sobre una conexión cerrada. El resumen ahora es streaming; el cliente espera 10 s, comparte una caché de 3 s, consolida solicitudes y controla timeout/indisponibilidad como 503.
 > - Fail2ban repetía el mismo `Found` en jails auxiliares que reutilizan el filtro `sshd`; los intentos ahora cuentan sólo detecciones SSH únicas. Producción midió 3.3 s en frío, 0 ms desde caché, 0 nuevos `BrokenPipeError`, y los conteos inflados se corrigieron (73→10 en un caso observado).
