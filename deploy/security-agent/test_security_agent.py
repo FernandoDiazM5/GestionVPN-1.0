@@ -1,5 +1,6 @@
 import importlib.util
 import pathlib
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -62,6 +63,41 @@ class WebBanPolicyTests(unittest.TestCase):
         with patch.object(AGENT, 'trusted_values', return_value=[]):
             with self.assertRaisesRegex(ValueError, 'Sesión administrativa protegida'):
                 AGENT.execute('web_ban_indefinite', {**params, 'protectedIps': ['198.51.100.12']})
+
+
+class AttemptHistoryTests(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.log_path = pathlib.Path(self.temp_dir.name) / 'fail2ban.log'
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    def test_counts_only_real_sshd_detections(self):
+        self.log_path.write_text(
+            '2026-08-02 03:41:38,534 fail2ban.filter [727]: INFO [sshd] Found 198.51.100.7\n'
+            '2026-08-02 03:41:38,535 fail2ban.filter [727]: INFO [gestionvpn-15m] Found 198.51.100.7\n'
+            '2026-08-02 03:41:38,536 fail2ban.filter [727]: INFO [gestionvpn-web-auth] Found 198.51.100.7\n'
+            '2026-08-02 03:43:51,815 fail2ban.filter [727]: INFO [sshd] Found 198.51.100.7\n',
+            encoding='utf-8',
+        )
+        with patch.object(AGENT.glob, 'glob', return_value=[str(self.log_path)]):
+            history = AGENT.retained_attempt_history('198.51.100.7')
+            summary = AGENT.retained_attempt_summary()
+        self.assertEqual(history['total'], 2)
+        self.assertEqual(len(history['attempts']), 2)
+        self.assertEqual(summary['counts'], {'198.51.100.7': 2})
+
+    def test_summary_keeps_history_bounds_without_building_status_rows(self):
+        self.log_path.write_text(
+            '2026-08-01 10:00:00 fail2ban.filter [1]: INFO [sshd] Found 198.51.100.8\n'
+            '2026-08-02 11:00:00 fail2ban.filter [1]: INFO [sshd] Found 198.51.100.9\n',
+            encoding='utf-8',
+        )
+        with patch.object(AGENT.glob, 'glob', return_value=[str(self.log_path)]):
+            summary = AGENT.retained_attempt_summary()
+        self.assertEqual(summary['counts'], {'198.51.100.8': 1, '198.51.100.9': 1})
+        self.assertLess(summary['historySince'], summary['historyUntil'])
 
 
 if __name__ == '__main__':

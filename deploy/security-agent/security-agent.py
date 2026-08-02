@@ -85,10 +85,16 @@ def is_trusted_ip(value):
 ATTEMPT_PATTERN = re.compile(
     r'^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)(?:,\d+)? .*?\[([^\]]+)\] Found ([0-9a-fA-F:.]+)(?:\s|$)'
 )
+ATTEMPT_SOURCE_JAIL = 'sshd'
 
-def retained_attempt_history(ip=None, limit=100):
-    """Read detections from Fail2ban's retained current and rotated logs."""
-    events = []
+def retained_attempt_events(ip=None):
+    """Yield each real SSH detection once, ignoring passive helper jails.
+
+    Manual and web jails reuse the ``sshd`` filter so the API can move an IP
+    between protections. Fail2ban therefore writes the same ``Found`` event
+    once per helper jail. Only the source ``sshd`` jail represents a distinct
+    authentication failure.
+    """
     for path in glob.glob('/var/log/fail2ban.log*'):
         if not os.path.isfile(path): continue
         opener = gzip.open if path.endswith('.gz') else open
@@ -97,14 +103,18 @@ def retained_attempt_history(ip=None, limit=100):
                 for line in fh:
                     match = ATTEMPT_PATTERN.search(line)
                     if not match: continue
-                    detected = datetime.strptime(match.group(1), '%Y-%m-%d %H:%M:%S').astimezone()
                     jail, detected_ip = match.group(2), match.group(3)
-                    if ip and detected_ip != ip: continue
-                    events.append({'service': jail, 'target': detected_ip,
-                        'detectedAt': int(detected.timestamp() * 1000),
-                        'message': f'Fail2ban detectó un intento en {jail} desde {detected_ip}'})
+                    if jail != ATTEMPT_SOURCE_JAIL or (ip and detected_ip != ip): continue
+                    detected = datetime.strptime(match.group(1), '%Y-%m-%d %H:%M:%S').astimezone()
+                    yield {'service': jail, 'target': detected_ip,
+                           'detectedAt': int(detected.timestamp() * 1000),
+                           'message': f'Fail2ban detectó un intento SSH desde {detected_ip}'}
         except (OSError, EOFError):
             continue
+
+def retained_attempt_history(ip=None, limit=100):
+    """Read detections from Fail2ban's retained current and rotated logs."""
+    events = list(retained_attempt_events(ip))
     events.sort(key=lambda row: row['detectedAt'], reverse=True)
     retained = events[:limit]
     timestamps = [row['detectedAt'] for row in events]
@@ -113,15 +123,26 @@ def retained_attempt_history(ip=None, limit=100):
             'historyUntil': max(timestamps) if timestamps else None,
             'truncated': len(events) > len(retained)}
 
+def retained_attempt_summary():
+    """Stream the SSH history once without materializing every event."""
+    counts = {}
+    history_since = None
+    history_until = None
+    for row in retained_attempt_events():
+        target_ip = row['target']
+        detected_at = row['detectedAt']
+        counts[target_ip] = counts.get(target_ip, 0) + 1
+        history_since = detected_at if history_since is None else min(history_since, detected_at)
+        history_until = detected_at if history_until is None else max(history_until, detected_at)
+    return {'counts': counts, 'historySince': history_since, 'historyUntil': history_until}
+
 def execute(op, p):
     if op == 'status':
-        history = {'attempts': [], 'historySince': None, 'historyUntil': None}
+        history = {'counts': {}, 'historySince': None, 'historyUntil': None}
         try:
-            history = retained_attempt_history(limit=1000000)
+            history = retained_attempt_summary()
         except Exception: pass
-        counts = {}
-        for row in history['attempts']: counts[row['target']] = counts.get(row['target'], 0) + 1
-        return {'jails': [jail_status(j, counts) for j in jail_names()], 'trusted': trusted_values(),
+        return {'jails': [jail_status(j, history['counts']) for j in jail_names()], 'trusted': trusted_values(),
                 'attemptHistory': {'since': history['historySince'], 'until': history['historyUntil']}}
     if op == 'attempts':
         return retained_attempt_history(p.get('target'), min(int(p.get('limit', 100)), 500))
@@ -200,8 +221,14 @@ def execute(op, p):
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args): pass
     def send_json(self, status, data):
-        raw = json.dumps(data).encode(); self.send_response(status); self.send_header('content-type','application/json')
-        self.send_header('content-length', str(len(raw))); self.end_headers(); self.wfile.write(raw)
+        raw = json.dumps(data).encode()
+        try:
+            self.send_response(status); self.send_header('content-type','application/json')
+            self.send_header('content-length', str(len(raw))); self.end_headers(); self.wfile.write(raw)
+        except (BrokenPipeError, ConnectionResetError):
+            # El cliente pudo agotar su timeout; no convertirlo en otro error
+            # ni contaminar el journal con un traceback secundario.
+            return
     def do_POST(self):
         try:
             if self.path != '/v1/action': return self.send_json(404, {'ok':False,'error':'not found'})

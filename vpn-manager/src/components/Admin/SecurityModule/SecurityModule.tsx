@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Ban, Clock3, Eye, Infinity as InfinityIcon, RefreshCw, Search, Shield, ShieldCheck, ShieldOff,
-  Unlock, UserRoundX, X,
+  AlertTriangle, Ban, Clock3, Eye, Infinity as InfinityIcon, RefreshCw, Search, Shield, ShieldCheck,
+  ShieldOff, Unlock, UserRoundX, X,
 } from 'lucide-react';
 import { confirmGoogleIdentity } from '../../../services/federatedAuth';
 import { securityAdminApi, type LockedAccount, type SecurityJail, type SecurityMutation, type WebObservation } from '../../../services/securityAdminApi';
@@ -213,8 +213,12 @@ export default function SecurityModule() {
       </header>
 
       {error && (
-        <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
-          {error}
+        <div role="alert" className="card flex items-start gap-3 border-rose-200 bg-rose-50 p-4 dark:border-rose-900 dark:bg-rose-950/40">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-rose-600 dark:text-rose-300" />
+          <div>
+            <p className="text-sm font-semibold text-rose-700 dark:text-rose-200">{error}</p>
+            <p className="mt-1 text-xs text-rose-600 dark:text-rose-300">Los últimos datos cargados permanecen visibles; puedes volver a intentar sin recargar la página.</p>
+          </div>
         </div>
       )}
 
@@ -267,9 +271,12 @@ export default function SecurityModule() {
         <div className="border-b border-slate-200 p-4 dark:border-slate-700">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <h2 className="font-bold text-slate-900 dark:text-white">Direcciones bloqueadas</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="font-bold text-slate-900 dark:text-white">Direcciones bloqueadas</h2>
+                <span className="badge badge-neutral whitespace-nowrap">{rows.length} activas</span>
+              </div>
               <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                Los desbloqueos no crean una excepción permanente.
+                Los desbloqueos no crean una excepción permanente. Los intentos corresponden únicamente a detecciones SSH reales.
               </p>
             </div>
             <div className="grid w-full gap-2 sm:grid-cols-2 xl:w-auto xl:grid-cols-[minmax(18rem,22rem)_auto_auto] xl:items-center">
@@ -293,17 +300,19 @@ export default function SecurityModule() {
         </div>
 
         <div className="hidden overflow-x-auto md:block">
-          <table className="min-w-[900px] w-full table-fixed text-left text-sm">
-            <thead className="bg-slate-50 dark:bg-slate-900/60">
-              <tr>
-                <th className="w-[27%] px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-600">Dirección y motivo</th>
-                <th className="w-[10%] px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-slate-600" title={attemptHistorySince ? `Contados desde ${formatDate(attemptHistorySince)}` : 'Según el historial disponible de Fail2ban'}>Intentos</th>
-                <th className="w-[25%] px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-600">Periodo</th>
-                <th className="w-[15%] px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-600">Protección</th>
-                <th className="w-[23%] px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-slate-600">Acciones</th>
+          <table className="min-w-[960px] w-full table-fixed text-left text-sm">
+            <caption className="sr-only">Direcciones IP bloqueadas actualmente por Fail2ban o por una acción administrativa</caption>
+            <thead>
+              <tr className="select-none border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/50">
+                <th className="th-cell w-[29%]">Dirección y motivo</th>
+                <th className="th-cell w-[11%] text-center" title={attemptHistorySince ? `Detecciones SSH únicas desde ${formatDate(attemptHistorySince)}` : 'Según el historial SSH disponible de Fail2ban'}>Intentos SSH</th>
+                <th className="th-cell w-[23%]">Periodo</th>
+                <th className="th-cell w-[17%]">Protección</th>
+                <th className="th-cell w-[20%] text-right">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {loading && rows.length === 0 && [...Array(4)].map((_, index) => <BlockedRowSkeleton key={index} />)}
               {rows.map((row) => (
                 <BlockedTableRow key={`${row.jail}-${row.ip}`} row={row} open={open} showAttempts={showAttempts} />
               ))}
@@ -312,11 +321,12 @@ export default function SecurityModule() {
           </table>
         </div>
 
-        <div className="divide-y divide-slate-200 md:hidden dark:divide-slate-700">
+        <div className="divide-y divide-slate-100 md:hidden dark:divide-slate-800">
+          {loading && rows.length === 0 && [...Array(3)].map((_, index) => <BlockedCardSkeleton key={index} />)}
           {rows.map((row) => (
             <BlockedCard key={`${row.jail}-${row.ip}`} row={row} open={open} showAttempts={showAttempts} />
           ))}
-          {!loading && rows.length === 0 && <div className="p-8 text-center text-sm text-slate-500">No hay direcciones bloqueadas.</div>}
+          {!loading && rows.length === 0 && <div className="flex flex-col items-center gap-3 p-8 text-center"><div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400"><ShieldCheck className="h-6 w-6" /></div><div><p className="text-sm font-semibold text-slate-700 dark:text-slate-200">No hay direcciones bloqueadas</p><p className="mt-1 text-xs text-slate-500">Fail2ban no reporta bloqueos activos para este filtro.</p></div></div>}
         </div>
       </section>}
 
@@ -453,21 +463,28 @@ function BlockedTableRow({ row, open, showAttempts }: {
   showAttempts: (ip: string) => Promise<void>;
 }) {
   return (
-    <tr className="align-middle hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
-      <td className="px-4 py-4">
-        <div className="font-mono text-sm font-semibold text-slate-900 dark:text-white">{row.ip}</div>
-        <div className="mt-1 line-clamp-2 text-xs leading-5 text-slate-600 dark:text-slate-300">{row.protection}</div>
+    <tr className="table-row-auto group align-middle transition-colors hover:bg-indigo-50/30 dark:hover:bg-indigo-500/10">
+      <td className="px-4 py-3.5">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+            <ShieldOff className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <div className="data-cell text-sm text-slate-900 dark:text-white">{row.ip}</div>
+            <div className="mt-1 line-clamp-2 text-xs leading-5 text-slate-600 dark:text-slate-300">{row.protection}</div>
+          </div>
+        </div>
       </td>
-      <td className="px-4 py-4 text-center">
-        <span className="badge badge-neutral min-w-8 justify-center">{row.attempts}</span>
+      <td className="px-4 py-3.5 text-center">
+        <span className="badge badge-neutral min-w-9 justify-center" title={`${row.attempts} detecciones SSH únicas`}>{row.attempts}</span>
       </td>
-      <td className="px-4 py-4">
+      <td className="px-4 py-3.5">
         <DateLine label="Desde" value={row.blockedSince} />
         <DateLine label="Hasta" value={row.expiresAt} />
       </td>
-      <td className="px-4 py-4"><ProtectionBadge jail={row.jail} reason={row.protection} /></td>
-      <td className="px-4 py-4">
-        <div className="flex items-center justify-end gap-1.5">
+      <td className="px-4 py-3.5"><ProtectionBadge jail={row.jail} reason={row.protection} /></td>
+      <td className="px-4 py-3.5">
+        <div className="ml-auto flex w-fit items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-800/70">
           <IconAction label="Ver intentos" icon={Eye} onClick={() => void showAttempts(row.ip)} />
           {!isIndefiniteJail(row.jail) && <IconAction label="Hacer indefinido" icon={InfinityIcon} onClick={() => open('promote', row.ip, row.jail)} />}
           <IconAction label="Hacer confiable" icon={ShieldCheck} onClick={() => open('trust', row.ip)} />
@@ -485,23 +502,29 @@ function BlockedCard({ row, open, showAttempts }: {
 }) {
   return (
     <article className="space-y-4 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="break-all font-mono text-sm font-semibold text-slate-900 dark:text-white">{row.ip}</div>
-          <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-300">{row.protection}</p>
+      <div className="flex flex-col items-start gap-3 sm:flex-row sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+            <ShieldOff className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <div className="break-all font-mono text-sm font-semibold text-slate-900 dark:text-white">{row.ip}</div>
+            <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-300">{row.protection}</p>
+          </div>
         </div>
         <ProtectionBadge jail={row.jail} reason={row.protection} />
       </div>
-      <div className="grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-900/60">
-        <DateLine label="Bloqueada desde" value={row.blockedSince} />
-        <DateLine label="Expira" value={row.expiresAt} />
+      <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/60">
+        <div className="flex items-center justify-between gap-3 text-xs"><span className="text-slate-500">Intentos SSH</span><span className="badge badge-neutral">{row.attempts}</span></div>
+        <DateLine label="Desde" value={row.blockedSince} />
+        <DateLine label="Hasta" value={row.expiresAt} />
       </div>
-      <div className="grid grid-cols-3 gap-2">
-        <button className="btn-ghost min-h-11" onClick={() => void showAttempts(row.ip)}><Eye className="h-4 w-4" /> Intentos</button>
+      <div className="grid grid-cols-2 gap-2">
+        <button className="btn-ghost min-h-11" onClick={() => void showAttempts(row.ip)}><Eye className="h-4 w-4" /> Ver intentos</button>
         <button className="btn-outline btn-md min-h-11" onClick={() => open('trust', row.ip)}><ShieldCheck className="h-4 w-4" /> Confiar</button>
-        <button className="btn-danger btn-md min-h-11" onClick={() => open('unban', row.ip, row.jail)}><Unlock className="h-4 w-4" /> Quitar</button>
+        <button className="btn-outline btn-md min-h-11 border-rose-200 text-rose-600 hover:border-rose-300 hover:text-rose-700 dark:border-rose-900 dark:text-rose-300" onClick={() => open('unban', row.ip, row.jail)}><Unlock className="h-4 w-4" /> Desbloquear</button>
+        {!isIndefiniteJail(row.jail) && <button className="btn-outline btn-md min-h-11" onClick={() => open('promote', row.ip, row.jail)}><InfinityIcon className="h-4 w-4" /> Indefinido</button>}
       </div>
-      {!isIndefiniteJail(row.jail) && <button className="btn-outline btn-md min-h-11 w-full" onClick={() => open('promote', row.ip, row.jail)}><InfinityIcon className="h-4 w-4" /> Hacer indefinido</button>}
     </article>
   );
 }
@@ -541,7 +564,7 @@ function IconAction({ label, icon: Icon, danger = false, onClick }: {
 }) {
   return (
     <button
-      className={`inline-flex h-11 w-11 items-center justify-center rounded-xl border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${danger ? 'border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-900 dark:hover:bg-rose-950/50' : 'border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'}`}
+      className={`btn-ghost inline-flex h-11 w-11 items-center justify-center p-0 ${danger ? 'text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:text-rose-300 dark:hover:bg-rose-950/50' : ''}`}
       title={label}
       aria-label={`${label} ${label === 'Ver intentos' ? 'de' : ''}`}
       onClick={onClick}
@@ -553,8 +576,27 @@ function IconAction({ label, icon: Icon, danger = false, onClick }: {
 
 function EmptyBlockedRows({ colSpan }: { colSpan: number }) {
   return (
-    <tr><td colSpan={colSpan} className="p-10 text-center text-sm text-slate-500">No hay direcciones bloqueadas.</td></tr>
+    <tr><td colSpan={colSpan} className="px-4 py-14 text-center">
+      <div className="flex flex-col items-center gap-3">
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400"><ShieldCheck className="h-7 w-7" /></div>
+        <div><p className="font-semibold text-slate-700 dark:text-slate-200">No hay direcciones bloqueadas</p><p className="mt-1 text-xs text-slate-500">Fail2ban no reporta bloqueos activos para este filtro.</p></div>
+      </div>
+    </td></tr>
   );
+}
+
+function BlockedRowSkeleton() {
+  return <tr aria-hidden="true">
+    <td className="px-4 py-3.5"><div className="flex items-center gap-3"><div className="skeleton h-9 w-9 shrink-0 rounded-xl" /><div className="space-y-2"><div className="skeleton h-3 w-32" /><div className="skeleton h-3 w-48" /></div></div></td>
+    <td className="px-4 py-3.5"><div className="skeleton mx-auto h-5 w-9 rounded-md" /></td>
+    <td className="space-y-2 px-4 py-3.5"><div className="skeleton h-3 w-36" /><div className="skeleton h-3 w-32" /></td>
+    <td className="px-4 py-3.5"><div className="skeleton h-5 w-28 rounded-md" /></td>
+    <td className="px-4 py-3.5"><div className="skeleton ml-auto h-11 w-44 rounded-xl" /></td>
+  </tr>;
+}
+
+function BlockedCardSkeleton() {
+  return <div className="space-y-4 p-4" aria-hidden="true"><div className="flex items-center gap-3"><div className="skeleton h-9 w-9 rounded-xl" /><div className="space-y-2"><div className="skeleton h-3 w-32" /><div className="skeleton h-3 w-48" /></div></div><div className="skeleton h-24 w-full rounded-xl" /><div className="grid grid-cols-2 gap-2"><div className="skeleton h-11 rounded-xl" /><div className="skeleton h-11 rounded-xl" /></div></div>;
 }
 
 function RecentActivity({ history, webActions }: {
@@ -696,7 +738,7 @@ function AttemptsDialog({ result, close }: { result: AttemptResult; close: () =>
   return (
     <div className="modal-overlay" role="presentation">
       <div className="modal-panel max-h-[80vh] w-full max-w-2xl overflow-auto p-5" role="dialog" aria-modal="true" aria-labelledby="attempts-title">
-        <div className="mb-4 flex items-center justify-between gap-3"><div><h2 id="attempts-title" className="text-lg font-bold">Intentos detectados por Fail2ban</h2><p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{period} Total: {result.total}.</p></div><button className="btn-ghost h-10 w-10 p-0" aria-label="Cerrar" onClick={close}><X className="h-5 w-5" /></button></div>
+        <div className="mb-4 flex items-center justify-between gap-3"><div><h2 id="attempts-title" className="text-lg font-bold">Intentos SSH detectados</h2><p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{period} Total único: {result.total}.</p></div><button className="btn-ghost h-10 w-10 p-0" aria-label="Cerrar" onClick={close}><X className="h-5 w-5" /></button></div>
         <div className="space-y-2">{result.attempts.map((row, index) => <div key={index} className="rounded-xl bg-slate-50 p-3 text-xs leading-5 text-slate-700 dark:bg-slate-900 dark:text-slate-200"><div className="font-medium">{String(row.message || '')}</div>{row.detectedAt ? <div className="mt-1 text-slate-500">{formatDate(Number(row.detectedAt))}</div> : null}</div>)}{result.attempts.length === 0 && <p className="py-8 text-center text-sm text-slate-500">No se encontraron detecciones en el historial conservado.</p>}</div>
       </div>
     </div>

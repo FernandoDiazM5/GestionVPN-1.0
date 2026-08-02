@@ -17,7 +17,9 @@ const securityRepo = require('../db/repos/platformSecurityRepo');
 const accountSecurityRepo = require('../db/repos/accountLoginSecurityRepo');
 const memberRepo = require('../db/repos/memberRepo');
 const telegram = require('../lib/telegram');
-const { callSecurityAgent } = require('../lib/securityAgentClient');
+const {
+  callSecurityAgent, getSecurityAgentStatus, invalidateSecurityAgentStatus,
+} = require('../lib/securityAgentClient');
 const { clientIp, guardPolicy, clearLoginIdentityBlocks } = require('../lib/rateLimit');
 const webObservation = require('../lib/webSecurityObservation');
 const webEnforcement = require('../lib/webSecurityEnforcement');
@@ -97,6 +99,7 @@ async function mutate(req, operation, params, afterSuccess) {
     throw new AppError('Confirma expresamente el bloqueo indefinido', 400, 'CONFIRM_INDEFINITE');
   try {
     const result = await callSecurityAgent(operation, params);
+    invalidateSecurityAgentStatus();
     if (afterSuccess) await afterSuccess(result);
     await securityRepo.audit({ actorUserId: req.account.sub, action: operation.toUpperCase(),
       target: input.target, jail: params.jail, category: input.category, reason: input.reason,
@@ -111,11 +114,29 @@ async function mutate(req, operation, params, afterSuccess) {
   }
 }
 
+async function readSecurityStatus() {
+  try {
+    return await getSecurityAgentStatus();
+  } catch (error) {
+    const timeout = error?.code === 'SECURITY_AGENT_TIMEOUT';
+    throw new AppError(
+      timeout
+        ? 'La seguridad del VPS está tardando más de lo esperado. Vuelve a intentarlo.'
+        : 'No se pudo consultar temporalmente la seguridad del VPS.',
+      503,
+      timeout ? 'SECURITY_AGENT_TIMEOUT' : 'SECURITY_AGENT_UNAVAILABLE',
+    );
+  }
+}
+
 router.get('/status', requirePlatformAdmin, asyncHandler(async (req, res) => {
-  const [status, trustedMetadata, recent, webActions] = await Promise.all([
-    callSecurityAgent('status'), securityRepo.trustList(), securityRepo.history({ limit: 500 }),
+  const [agentStatus, trustedMetadata, recent, webActions] = await Promise.all([
+    readSecurityStatus(), securityRepo.trustList(), securityRepo.history({ limit: 500 }),
     webEnforcementRepo.recentActions(500),
   ]);
+  // The agent response is shared briefly between requests. Enrich a private copy so
+  // request-specific database metadata never mutates the cached status snapshot.
+  const status = structuredClone(agentStatus);
   const reasons = new Map();
   for (const row of recent) {
     if (row.outcome === 'SUCCESS' && ['BAN', 'PROMOTE_INDEFINITE'].includes(row.action)) {
@@ -178,7 +199,7 @@ router.get('/locked-accounts', requireSecurityOperator, asyncHandler(async (req,
   const workspaceId = req.account.platform_admin ? null : req.account.workspace_id;
   const [accounts, status] = await Promise.all([
     accountSecurityRepo.listLocked(Date.now(), workspaceId),
-    req.account.platform_admin ? callSecurityAgent('status').catch(() => null) : Promise.resolve(null),
+    req.account.platform_admin ? getSecurityAgentStatus().catch(() => null) : Promise.resolve(null),
   ]);
   const globallyBlocked = status ? blockedTargets(status) : null;
   return sendOk(res, { accounts: accounts.map((account) => ({
@@ -208,7 +229,7 @@ router.post('/locked-accounts/unlock', requireSecurityOperator, validate({ body:
       statusCode: 200, decision: 'ADMIN_ACCOUNT_UNLOCK',
       detail: { classification: 'ADMINISTRATIVE_ACCOUNT_UNLOCK' } });
   }
-  const status = req.account.platform_admin ? await callSecurityAgent('status').catch(() => null) : null;
+  const status = req.account.platform_admin ? await getSecurityAgentStatus().catch(() => null) : null;
   const globallyBlocked = status ? blockedTargets(status) : null;
   const ipGloballyBlocked = !lock?.last_failure_ip || !globallyBlocked ? null
     : globallyBlocked.has(lock.last_failure_ip) || globallyBlocked.has(`${lock.last_failure_ip}/32`);

@@ -5,7 +5,10 @@ const securityRepo = {
   createStepUp: vi.fn(), consumeStepUp: vi.fn(), audit: vi.fn(), history: vi.fn(),
   trustAdd: vi.fn(), trustRemove: vi.fn(), trustList: vi.fn(),
 };
-const agent = { callSecurityAgent: vi.fn() };
+const agent = {
+  callSecurityAgent: vi.fn(), getSecurityAgentStatus: vi.fn(),
+  invalidateSecurityAgentStatus: vi.fn(),
+};
 const accountSecurity = { listLocked: vi.fn(), unlock: vi.fn(), get: vi.fn() };
 const memberRepo = { findMembership: vi.fn() };
 const webObservation = { observation: vi.fn(), record: vi.fn() };
@@ -65,6 +68,7 @@ describe('seguridad administrativa del VPS', () => {
     securityRepo.history.mockResolvedValue([]);
     securityRepo.trustList.mockResolvedValue([]);
     agent.callSecurityAgent.mockResolvedValue({ jails: [], trusted: [] });
+    agent.getSecurityAgentStatus.mockImplementation(() => agent.callSecurityAgent('status'));
     accountSecurity.listLocked.mockResolvedValue([]);
     accountSecurity.unlock.mockResolvedValue(true);
     accountSecurity.get.mockResolvedValue({ last_failure_ip: '198.51.100.9' });
@@ -87,6 +91,15 @@ describe('seguridad administrativa del VPS', () => {
       .set('x-test-role', 'admin').set('x-test-ip', '203.0.113.44');
     expect(response.status).toBe(200);
     expect(response.body.currentIp).toBe('203.0.113.44');
+  });
+
+  it('traduce un timeout del agente a indisponibilidad temporal', async () => {
+    agent.getSecurityAgentStatus.mockRejectedValue(Object.assign(new Error('timeout'), {
+      code: 'SECURITY_AGENT_TIMEOUT',
+    }));
+    const response = await request(app).get('/api/admin/security/status').set('x-test-role', 'admin');
+    expect(response.status).toBe(503);
+    expect(response.body.code).toBe('SECURITY_AGENT_TIMEOUT');
   });
 
   it('identifica un bloqueo indefinido originado por reincidencia web', async () => {
