@@ -4,6 +4,12 @@
 > Aquí solo se **añaden** entradas por sesión (las más nuevas arriba); no se edita lo viejo.
 > Mantenimiento gobernado por la skill `handoff-keeper` (`.claude/skills/handoff-keeper/`).
 
+> **Sesión 2026-08-02 — Estado de Seguridad estable y tabla rediseñada, desplegados.** Producción `f48f3b3`; respaldo restaurado/verificado `/root/pre-security-table-20260802T051227Z` y rollback `pre-security-table-20260802T051227Z`.
+> - Se confirmó que el `500` de `/api/admin/security/status` era un aborto del backend a 5 s: el agente aún recorría 15 jails y el historial retenido, y luego escribía sobre una conexión cerrada. El resumen ahora es streaming; el cliente espera 10 s, comparte una caché de 3 s, consolida solicitudes y controla timeout/indisponibilidad como 503.
+> - Fail2ban repetía el mismo `Found` en jails auxiliares que reutilizan el filtro `sshd`; los intentos ahora cuentan sólo detecciones SSH únicas. Producción midió 3.3 s en frío, 0 ms desde caché, 0 nuevos `BrokenPipeError`, y los conteos inflados se corrigieron (73→10 en un caso observado).
+> - La tabla adopta el sistema visual de Moderadores: cabecera y filas neutrales, `Intentos SSH`, badges/ayudas, acciones agrupadas, skeletons, vacío explicativo y tarjetas móviles. Bundle nuevo confirmado en el contenedor.
+> - Validación: backend 622 completo + 19 focalizadas, frontend 220, agente 8, `check:all`, build y auditor visual 305/0. Cierre: HTTPS/ruta 200, backend/DB healthy, frontend/agente activos, 15 jails, 0 reinicios, tres IP confiables preservadas; disco 49% tras retirar rollback superado y 3.26 GiB de caché. RouterOS figura `stale` sólo por ausencia de escritura reciente.
+
 > **Sesión 2026-08-01 — Limpieza conservadora del VPS.** Producción funcional `2c3eb1c`; base documental `40b016a`. Sin indisponibilidad ni recreación de contenedores.
 > - Inventario previo verificó referencias antes de borrar. Se eliminaron siete tags/imágenes superados y se conservaron current, MariaDB y el par `pre-uuid-20260802T022039Z`; 3 contenedores y 2 volúmenes siguen activos. El manifiesto previo quedó root-only junto al respaldo verificado.
 > - Caché APT 583 MiB→12 KiB; journal 592→224 MiB. Se configuró retención permanente de 256 MiB/14 días con 2 GiB mínimos libres. No se ejecutó `autoremove`, porque sólo proponía retirar componentes opcionales de Docker rootless y el ahorro era irrelevante.
