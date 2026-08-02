@@ -13,13 +13,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <script>
-      // Anti-FOUC: aplica dark mode antes del primer render de React.
-      // Claro por defecto; oscuro solo si el usuario lo activó (coincide con useDarkMode).
-      if (localStorage.getItem('vpn_dark_mode') === 'true') {
-        document.documentElement.classList.add('dark');
-      }
-    </script>
+    <script src="%BASE_URL%theme-init.js"></script>
   </head>
   <body>
     <div id="root"></div>

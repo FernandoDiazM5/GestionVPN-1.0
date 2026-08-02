@@ -80,15 +80,15 @@ const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCol
         </div>
         <div className="mt-3 flex gap-2">
           {noSsh ? (
-            <button type="button" onClick={onView} className="btn-outline min-h-11 flex-1 border-amber-200 text-xs text-amber-700">
+            <button type="button" onClick={onView} className="btn-outline btn-md min-h-11 flex-1 border-amber-200 text-xs text-amber-700">
               <WifiOff className="h-4 w-4" /> Credenciales requeridas
             </button>
           ) : (
-            <button type="button" onClick={onToggle} className="btn-primary min-h-11 flex-1 text-xs">
+            <button type="button" onClick={onToggle} className="btn-primary btn-md min-h-11 flex-1 text-xs">
               <Users className="h-4 w-4" /> {expanded ? 'Ocultar clientes' : 'Ver clientes'}
             </button>
           )}
-          <button type="button" onClick={onSync} disabled={isPolling} aria-label="Actualizar esta antena" className="btn-outline flex min-h-11 min-w-11 items-center justify-center">
+          <button type="button" onClick={onSync} disabled={isPolling} aria-label="Actualizar esta antena" className="btn-outline btn-icon min-h-11 min-w-11">
             {isPolling ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
           </button>
         </div>

@@ -18,7 +18,7 @@
 import type { ReactElement, ReactNode } from 'react';
 import { render, type RenderOptions, type RenderResult } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import { VpnProvider } from '../context';
 import { WorkspaceSessionProvider } from '../context/WorkspaceSession';
 

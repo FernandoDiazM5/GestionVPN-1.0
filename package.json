@@ -30,6 +30,11 @@
     "audit:design:json": "node scripts/audit-design.js --json",
     "audit:semgrep": "node scripts/semgrep.js",
     "audit:semgrep:json": "node scripts/semgrep.js --json",
+    "audit:semgrep:javascript": "node scripts/semgrep.js --profile=javascript server",
+    "audit:semgrep:typescript": "node scripts/semgrep.js --profile=typescript vpn-manager/src packages/contracts/src",
+    "audit:semgrep:react": "node scripts/semgrep.js --profile=react vpn-manager/src",
+    "audit:semgrep:secrets": "node scripts/semgrep.js --profile=secrets server vpn-manager/src packages/contracts/src",
+    "audit:semgrep:security": "node scripts/semgrep.js --profile=security server vpn-manager/src packages/contracts/src",
     "test:semgrep-rules": "node scripts/test-semgrep-rules.js"
   },
   "devDependencies": {

@@ -368,7 +368,7 @@ function SecurityTabs({ active, setActive, platformAdmin }: {
     <div className="inline-flex min-w-full gap-1 rounded-2xl border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900" role="tablist">
       {tabs.map(([id, label]) => <button key={id} type="button" role="tab"
         aria-selected={active === id} onClick={() => setActive(id)}
-        className={`min-h-11 flex-1 whitespace-nowrap rounded-xl px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${active === id ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}`}>
+        className={`tab-btn min-h-11 flex-1 justify-center whitespace-nowrap rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${active === id ? 'tab-active' : 'tab-inactive'}`}>
         {label}
       </button>)}
     </div>

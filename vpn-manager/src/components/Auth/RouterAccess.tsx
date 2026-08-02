@@ -285,7 +285,7 @@ export default function RouterAccess() {
                   disabled={isConnecting}
                   className="btn-outline btn-md w-full flex items-center justify-center gap-2"
                 >
-                  <span aria-hidden="true" className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-sm font-bold text-blue-600 shadow-sm">G</span>
+                  <span aria-hidden="true" className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-50 text-sm font-bold text-indigo-600 shadow-sm dark:bg-slate-800 dark:text-indigo-300">G</span>
                   <span>Continuar con Google</span>
                 </button>
                 <p className="text-center text-xs text-slate-600 dark:text-slate-300">

@@ -1,6 +1,6 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { Server, AlertTriangle } from 'lucide-react';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter } from 'react-router';
 import { VpnProvider, useVpn } from './context';
 
 import Sidebar from './components/Layout/Sidebar';

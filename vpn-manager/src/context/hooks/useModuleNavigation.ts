@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router';
 import type { SessionUser } from '../../types/account';
 import { LS_ACTIVE_MODULE } from '../constants';
 

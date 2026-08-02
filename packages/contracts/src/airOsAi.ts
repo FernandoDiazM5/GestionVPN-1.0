@@ -1,4 +1,10 @@
 import { z } from 'zod';
+import type {
+  AirOsNetworkScoreRow,
+  AirOsNetworkScoreSummary,
+  AirOsRiskLevel,
+  AirOsRiskReason,
+} from './airOsAiScoring';
 
 export const AIR_OS_AI_POLICY_VERSION = 'air-os-ai-v1';
 
@@ -142,15 +148,15 @@ export interface AirOsAiAnalysisResult {
 }
 
 export interface AirOsAiNetworkSelection {
-  summary: import('./airOsAiScoring').AirOsNetworkScoreSummary;
+  summary: AirOsNetworkScoreSummary;
   devices: Array<{
     index: number;
     alias: string;
     score: number;
-    level: import('./airOsAiScoring').AirOsRiskLevel;
+    level: AirOsRiskLevel;
     mandatory: boolean;
-    derived: import('./airOsAiScoring').AirOsNetworkScoreRow['derived'];
-    reasons: import('./airOsAiScoring').AirOsRiskReason[];
+    derived: AirOsNetworkScoreRow['derived'];
+    reasons: AirOsRiskReason[];
   }>;
 }
 

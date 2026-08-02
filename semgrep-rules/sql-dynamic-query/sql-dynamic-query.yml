@@ -8,12 +8,22 @@ rules:
     metadata:
       category: security
       cwe: CWE-89
-    pattern-either:
-      - pattern: $DB.query($A + $B, ...)
-      - pattern: $DB.execute($A + $B, ...)
-      - pattern: query($A + $B, ...)
-      - pattern: execute($A + $B, ...)
-      - pattern: $DB.query(`...${$X}...`, ...)
-      - pattern: $DB.execute(`...${$X}...`, ...)
-      - pattern: query(`...${$X}...`, ...)
-      - pattern: execute(`...${$X}...`, ...)
+    mode: taint
+    pattern-sources:
+      - patterns:
+          - pattern: $REQ.$FIELD
+          - metavariable-regex:
+              metavariable: $REQ
+              regex: ^(req|request)$
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: $DB.query($SQL, ...)
+              - pattern: $DB.execute($SQL, ...)
+              - pattern: query($SQL, ...)
+              - pattern: execute($SQL, ...)
+          - focus-metavariable: $SQL
+    pattern-sanitizers:
+      - pattern: $SCHEMA.parse(...)
+      - pattern: $SCHEMA.safeParse(...)
+      - pattern: $VALUES.map(() => '?').join(',')
