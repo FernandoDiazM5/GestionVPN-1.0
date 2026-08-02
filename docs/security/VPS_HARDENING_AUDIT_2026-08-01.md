@@ -28,7 +28,7 @@ timeout. El backend corregido arrancó saludable y con cero reinicios.
 | Cabeceras del shell | Sin CSP ni `Referrer-Policy` | CSP en observación y `Referrer-Policy: no-referrer` |
 | Semgrep | Inconcluso por timeout | Perfiles reproducibles completados, 0 hallazgos en reglas ejecutadas |
 | Paquetes del VPS | 3 actualizaciones Docker pendientes | Docker 29.7.1 y 0 actualizaciones APT pendientes |
-| Disco tras la remediación final | 84% usado | 76% usado; 2.56 GB de caché adicional retirados |
+| Disco tras la limpieza final | 76% usado, 5.9 GiB libres | 49% usado, 13 GiB libres |
 | Arranque backend tras Docker | 4 reintentos transitorios | Espera a MariaDB; despliegue final con 0 reinicios |
 
 ## Cambios desplegados
@@ -65,11 +65,25 @@ timeout. El backend corregido arrancó saludable y con cero reinicios.
 - Rollbacks recientes conservados:
   - `gestionvpn-10-backend:pre-uuid-20260802T022039Z`
   - `gestionvpn-10-frontend:pre-uuid-20260802T022039Z`
-  - `gestionvpn-10-backend:pre-maintenance-20260801T195018`
-  - `gestionvpn-10-frontend:pre-maintenance-20260801T195018`
-  - `gestionvpn-10-backend:pre-db-wait-f9091e9`
 - La caché de construcción fue retirada sin borrar imágenes etiquetadas ni
   volúmenes de datos.
+
+## Limpieza final de almacenamiento
+
+- Se inventariaron referencias de contenedores antes de retirar imágenes.
+- Se eliminaron únicamente siete tags de rollback superados: `pre-e27184b`,
+  `pre-phase9`, `pre-maintenance` y `pre-db-wait`; ninguno estaba asociado a un
+  contenedor. El manifiesto previo quedó protegido junto al respaldo `pre-uuid`.
+- Docker conserva sólo cinco imágenes: backend/frontend actuales, su par de
+  rollback `pre-uuid` y MariaDB. Los tres contenedores y los dos volúmenes activos
+  permanecen intactos; build cache queda en 0 B.
+- La caché APT bajó de 583 MiB a 12 KiB. No se ejecutó `autoremove`, ya que sólo
+  proponía retirar componentes opcionales de Docker rootless y no aportaba ahorro
+  material.
+- El journal bajó de 592 a 224 MiB. La política persistente limita su uso a
+  256 MiB, conserva como máximo 14 días y reserva al menos 2 GiB libres.
+- Los respaldos pequeños de red, SSH, dominio y base de datos se conservaron por
+  su valor de recuperación y su impacto despreciable en disco.
 
 ## Estado del VPS y red
 
@@ -119,10 +133,10 @@ timeout. El backend corregido arrancó saludable y con cero reinicios.
    cuenta `platform_admin` y confirme una alerta real. Esta fue la fase 1 omitida.
 2. **CSP en observación:** revisar el login local/Google y navegación autenticada
    antes de convertir `Report-Only` en una política obligatoria.
-3. **Retención de rollbacks:** las imágenes etiquetadas antiguas ocupan espacio
-   recuperable, pero se conservaron deliberadamente. El disco tiene 5.9 GB libres
-   después de limpiar la caché de construcción; conviene revisar la retención en
-   el siguiente mantenimiento, sin borrar el rollback más reciente.
+3. **Rollback deliberado:** el único par anterior conservado ocupa espacio, pero
+   permite una reversión inmediata del último despliegue. Con 13 GiB libres no
+   representa presión operativa y no debe eliminarse hasta el próximo despliegue
+   verificado.
 
 ## Comparación con el handoff
 

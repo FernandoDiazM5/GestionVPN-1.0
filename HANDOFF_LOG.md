@@ -4,6 +4,11 @@
 > Aquí solo se **añaden** entradas por sesión (las más nuevas arriba); no se edita lo viejo.
 > Mantenimiento gobernado por la skill `handoff-keeper` (`.claude/skills/handoff-keeper/`).
 
+> **Sesión 2026-08-01 — Limpieza conservadora del VPS.** Producción funcional `2c3eb1c`; base documental `40b016a`. Sin indisponibilidad ni recreación de contenedores.
+> - Inventario previo verificó referencias antes de borrar. Se eliminaron siete tags/imágenes superados y se conservaron current, MariaDB y el par `pre-uuid-20260802T022039Z`; 3 contenedores y 2 volúmenes siguen activos. El manifiesto previo quedó root-only junto al respaldo verificado.
+> - Caché APT 583 MiB→12 KiB; journal 592→224 MiB. Se configuró retención permanente de 256 MiB/14 días con 2 GiB mínimos libres. No se ejecutó `autoremove`, porque sólo proponía retirar componentes opcionales de Docker rootless y el ahorro era irrelevante.
+> - Disco 76%/5.9 GiB→49%/13 GiB. Cierre: 54/5/3/14, DB/backend healthy, frontend activo, 0 reinicios, rutas 200, UFW/servicios/agente/WireGuard correctos, 0 unidades fallidas y rollback/dump válidos. RouterOS `stale` sólo por ausencia de escritura; handshake y ping correctos.
+
 > **Sesión 2026-08-01 — Remediación transitiva de `uuid` desplegada.** Producción `2c3eb1c`; auditoría npm completa y de producción en 0 vulnerabilidades.
 > - Se fijó npm 12.0.1 en el monorepo y en ambos Dockerfiles de producción, `uuid` 11.1.1 mediante override y una allowlist exacta de scripts de instalación. El lockfile sólo cambió las resoluciones necesarias; no se ejecutó `npm audit fix --force`.
 > - ExcelJS conserva compatibilidad mediante una prueba real de creación, serialización y recarga XLSX que activa su ruta interna de UUID. Backend 615/615, frontend 217/217, agente 6/6, builds local/VPS y módulos Argon2/SSH/Firebase correctos.
