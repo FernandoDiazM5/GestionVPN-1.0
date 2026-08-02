@@ -8,23 +8,44 @@ const DEV_ORIGINS = [
   'http://127.0.0.1:8080',
 ];
 
-const configuredOrigins = (process.env.CORS_ORIGINS || '')
-  .split(',')
-  .map(value => value.trim())
-  .filter(Boolean);
-
-if (process.env.NODE_ENV === 'production' && configuredOrigins.length === 0) {
-  throw new Error('CORS_ORIGINS es obligatorio en producción');
+function normalizeOrigin(value) {
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch (_) {
+    throw new Error(`CORS_ORIGINS contiene un origen inválido: ${value}`);
+  }
+  if (parsed.pathname !== '/' || parsed.search || parsed.hash || parsed.username || parsed.password) {
+    throw new Error(`CORS_ORIGINS sólo acepta orígenes sin ruta: ${value}`);
+  }
+  return parsed.origin;
 }
 
-const allowedOrigins = Object.freeze([
-  ...new Set(process.env.NODE_ENV === 'production'
+function readAllowedOrigins(env = process.env) {
+  const configuredOrigins = (env.CORS_ORIGINS || '')
+    .split(',')
+    .map(value => value.trim())
+    .filter(Boolean)
+    .map(normalizeOrigin);
+
+  if (env.NODE_ENV === 'production') {
+    if (configuredOrigins.length === 0) {
+      throw new Error('CORS_ORIGINS es obligatorio en producción');
+    }
+    if (configuredOrigins.some(origin => !origin.startsWith('https://'))) {
+      throw new Error('CORS_ORIGINS debe usar exclusivamente HTTPS en producción');
+    }
+  }
+
+  return [...new Set(env.NODE_ENV === 'production'
     ? configuredOrigins
-    : [...configuredOrigins, ...DEV_ORIGINS]),
-]);
+    : [...configuredOrigins, ...DEV_ORIGINS])];
+}
+
+const allowedOrigins = Object.freeze(readAllowedOrigins());
 
 function isAllowedOrigin(origin) {
   return typeof origin === 'string' && allowedOrigins.includes(origin);
 }
 
-module.exports = { allowedOrigins, isAllowedOrigin };
+module.exports = { allowedOrigins, isAllowedOrigin, readAllowedOrigins };

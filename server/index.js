@@ -25,7 +25,7 @@ const eventsRoutes = require('./routes/events.routes');
 const adminRoutes = require('./routes/admin.routes');
 const workspaceRoutes = require('./routes/workspace.routes');
 const errorReportsRoutes = require('./routes/errorReports.routes');
-const { errorMiddleware } = require('./lib/apiResponse');
+const { AppError, errorMiddleware } = require('./lib/apiResponse');
 const coreRoutes = require('./routes/core');
 const nodeRoutes = require('./routes/nodes');
 const deviceRoutes = require('./routes/device.routes');
@@ -124,7 +124,7 @@ app.use(cors({
             return callback(null, true);
         }
         logger.warn({ origin, scope: 'cors' }, 'Origen bloqueado');
-        callback(new Error('Not allowed by CORS'));
+        callback(new AppError('Origen no permitido', 403, 'CORS_ORIGIN_DENIED'));
     },
     methods: ['GET','POST','PUT','PATCH','DELETE'],
     allowedHeaders: ['Content-Type', 'X-CSRF-Token'],

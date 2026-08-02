@@ -13,7 +13,9 @@ services:
     environment:
       PORT: "3001"
       DATA_DIR: "/data"
-      CORS_ORIGINS: "http://localhost:8080,http://127.0.0.1:8080,http://134.199.212.232:8080"
+      # originPolicy ya permite localhost en desarrollo. Para otro origen de
+      # desarrollo, definir CORS_ORIGINS externamente; nunca fijarlo aquí,
+      # porque este archivo podría mezclarse por error con el de producción.
     volumes:
       - vpn-data:/data
 

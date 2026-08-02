@@ -395,6 +395,7 @@ docker run --rm -v gestionvpn-10_backend-data:/data -v "$PWD/secretos":/in alpin
 #  — o copia los reales de desarrollo si vas a importar la BD)
 
 # 4. Build + up (entrypoint corre migraciones)
+# IMPORTANTE: no agregar docker-compose.yml; contiene ajustes de desarrollo.
 docker compose -f docker-compose.prod.yml up -d --build
 
 # 5. Verificar

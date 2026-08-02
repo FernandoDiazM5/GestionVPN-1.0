@@ -1,5 +1,6 @@
 # ── Producción: MariaDB + backend (host-mode) + frontend nginx (HTTPS) ──────
 #  Uso:  docker compose -f docker-compose.prod.yml up -d --build
+#  NO combinar con docker-compose.yml: es el entorno local de desarrollo.
 #  Requiere:  .env (DB_*),  server/.env.production,  ./ssl/{fullchain,privkey}.pem
 services:
 
