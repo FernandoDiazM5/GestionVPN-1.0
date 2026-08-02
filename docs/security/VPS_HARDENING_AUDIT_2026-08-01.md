@@ -2,14 +2,14 @@
 
 Fecha: 2026-08-01 (America/Lima)  
 Dominio: `joinpoint.cloud`  
-Producción: `f9091e9`  
+Producción: `2c3eb1c`
 Alcance: fases 2 a 9. La vinculación de Telegram (fase 1) fue excluida expresamente por el propietario.
 
 ## Dictamen ejecutivo
 
 **Aprobado para operación.** El VPS, el backend, el frontend, la base de datos y
 las protecciones permanecen operativos después del despliegue y del mantenimiento.
-No hay avisos altos o críticos de npm, actualizaciones APT pendientes, unidades
+No hay vulnerabilidades reportadas por npm, actualizaciones APT pendientes, unidades
 fallidas, reinicio del sistema pendiente ni errores recientes de nivel crítico.
 
 Durante la auditoría se detectó que un reinicio completo de Docker podía arrancar
@@ -23,12 +23,12 @@ timeout. El backend corregido arrancó saludable y con cero reinicios.
 | Área | Antes | Cierre |
 |---|---|---|
 | Memoria de respaldo | Sin swap | `/swapfile` persistente de 1 GiB, uso normal de 9 MiB |
-| Dependencias npm | 11 avisos: 3 altos, 7 moderados, 1 bajo | 7 moderados, 0 altos/críticos/bajos |
+| Dependencias npm | 11 avisos: 3 altos, 7 moderados, 1 bajo | 0 vulnerabilidades en auditoría completa y de producción |
 | Auditoría visual | 6 observaciones | 0 observaciones en 304 archivos |
 | Cabeceras del shell | Sin CSP ni `Referrer-Policy` | CSP en observación y `Referrer-Policy: no-referrer` |
 | Semgrep | Inconcluso por timeout | Perfiles reproducibles completados, 0 hallazgos en reglas ejecutadas |
 | Paquetes del VPS | 3 actualizaciones Docker pendientes | Docker 29.7.1 y 0 actualizaciones APT pendientes |
-| Disco tras compilar | 75% usado | 67% usado; 4.27 GB de caché retirados |
+| Disco tras la remediación final | 84% usado | 76% usado; 2.56 GB de caché adicional retirados |
 | Arranque backend tras Docker | 4 reintentos transitorios | Espera a MariaDB; despliegue final con 0 reinicios |
 
 ## Cambios desplegados
@@ -36,9 +36,17 @@ timeout. El backend corregido arrancó saludable y con cero reinicios.
 - `e314638`: actualización segura de dependencias, migración a React Router 8,
   correcciones visuales, cabeceras web y ejecución reproducible de Semgrep.
 - `f9091e9`: espera explícita de MariaDB antes de ejecutar migraciones.
+- `2c3eb1c`: remediación reproducible de dependencias transitivas y prueba de
+  compatibilidad XLSX.
 - React y React DOM quedaron en 19.2.8; React Router en 8.3.0.
 - Se retiró la dependencia directa de `uuid` del backend porque el código usa
   `crypto.randomUUID()`.
+- El monorepo y las dos imágenes de producción fijan npm 12.0.1; un override
+  unifica `uuid` en 11.1.1 para ExcelJS y Google/Firebase. Los scripts de
+  instalación permitidos están enumerados y revisados explícitamente.
+- `js-yaml`, `postcss` y el auxiliar `nanoid` también quedaron en resoluciones
+  corregidas. No se ejecutó `npm audit fix --force` ni se actualizaron paquetes
+  funcionales ajenos a estos avisos.
 - `body-parser` y `brace-expansion` se actualizaron a versiones corregidas.
 - El script anti-parpadeo de tema dejó de ser código inline y se sirve como
   `/theme-init.js`.
@@ -49,11 +57,14 @@ timeout. El backend corregido arrancó saludable y con cero reinicios.
 
 ## Integridad y rollback
 
-- Respaldo: `/root/pre-maintenance-20260801T195018`, modo 700.
+- Respaldo más reciente: `/root/pre-uuid-remediation-20260802T022039Z`, modo 700.
+- Se conserva además el respaldo anterior `/root/pre-maintenance-20260801T195018`.
 - Dump comprimido validado con `gzip -t` y checksum conservado.
 - Restauración aislada verificada: 54 tablas, 5 usuarios, 3 workspaces y 14 nodos.
 - Producción conserva exactamente los mismos conteos después del despliegue.
 - Rollbacks recientes conservados:
+  - `gestionvpn-10-backend:pre-uuid-20260802T022039Z`
+  - `gestionvpn-10-frontend:pre-uuid-20260802T022039Z`
   - `gestionvpn-10-backend:pre-maintenance-20260801T195018`
   - `gestionvpn-10-frontend:pre-maintenance-20260801T195018`
   - `gestionvpn-10-backend:pre-db-wait-f9091e9`
@@ -90,7 +101,8 @@ timeout. El backend corregido arrancó saludable y con cero reinicios.
 ## Validación de código
 
 - Backend: 103 archivos y 615 pruebas aprobadas.
-- Frontend: 64 archivos y 216 pruebas aprobadas.
+- Frontend: 65 archivos y 217 pruebas aprobadas; la prueba adicional crea,
+  serializa y recarga un XLSX real usando la ruta interna de UUID de ExcelJS.
 - Agente de seguridad: 6 pruebas aprobadas.
 - `check:all`, TypeScript, ESLint, inventario de rutas y auditoría visual: correctos.
 - Reglas Semgrep locales: 500 objetivos, 2 reglas, 0 hallazgos.
@@ -105,15 +117,12 @@ timeout. El backend corregido arrancó saludable y con cero reinicios.
 
 1. **Telegram excluido:** todavía se requiere que el propietario vincule una
    cuenta `platform_admin` y confirme una alerta real. Esta fue la fase 1 omitida.
-2. **Siete avisos npm moderados:** todos proceden de `uuid <11.1.1` a través de
-   ExcelJS y dependencias opcionales de Google/Firebase. No existe una remediación
-   no disruptiva en el árbol actual; `npm audit fix --force` propone un cambio
-   incompatible. No quedan avisos altos ni críticos.
-3. **CSP en observación:** revisar el login local/Google y navegación autenticada
+2. **CSP en observación:** revisar el login local/Google y navegación autenticada
    antes de convertir `Report-Only` en una política obligatoria.
-4. **Retención de rollbacks:** las imágenes etiquetadas antiguas ocupan espacio
-   recuperable, pero se conservaron deliberadamente. El disco tiene 8.1 GB libres,
-   por lo que no existe presión inmediata.
+3. **Retención de rollbacks:** las imágenes etiquetadas antiguas ocupan espacio
+   recuperable, pero se conservaron deliberadamente. El disco tiene 5.9 GB libres
+   después de limpiar la caché de construcción; conviene revisar la retención en
+   el siguiente mantenimiento, sin borrar el rollback más reciente.
 
 ## Comparación con el handoff
 
@@ -121,6 +130,7 @@ timeout. El backend corregido arrancó saludable y con cero reinicios.
 |---|---|---|
 | Swap para VPS de 1.9 GiB | 1 GiB persistente y operativo | Cumplido |
 | 3 avisos altos npm | 0 altos/críticos después de actualización probada | Cumplido |
+| 7 avisos moderados de `uuid` | Override 11.1.1, lock reproducible y auditoría 0 | Cumplido |
 | CSP y Referrer-Policy | Cabeceras públicas verificadas | Cumplido por etapas |
 | 3 paquetes APT | 0 paquetes pendientes; Docker 29.7.1 | Cumplido |
 | 6 observaciones visuales | Auditoría de 304 archivos con 0 | Cumplido |
@@ -131,7 +141,7 @@ timeout. El backend corregido arrancó saludable y con cero reinicios.
 ## Conclusión
 
 Las fases 2 a 9 quedaron implementadas, desplegadas y verificadas. Producción
-termina en `f9091e9`, con disponibilidad normal, datos preservados y controles de
+termina en `2c3eb1c`, con disponibilidad normal, datos preservados y controles de
 seguridad activos. No hay un bloqueo técnico pendiente. La única fase omitida es
 la vinculación humana de Telegram; la conversión de CSP a modo obligatorio debe
 hacerse después de validar los flujos autenticados reales.

@@ -4,6 +4,12 @@
 > Aquí solo se **añaden** entradas por sesión (las más nuevas arriba); no se edita lo viejo.
 > Mantenimiento gobernado por la skill `handoff-keeper` (`.claude/skills/handoff-keeper/`).
 
+> **Sesión 2026-08-01 — Remediación transitiva de `uuid` desplegada.** Producción `2c3eb1c`; auditoría npm completa y de producción en 0 vulnerabilidades.
+> - Se fijó npm 12.0.1 en el monorepo y en ambos Dockerfiles de producción, `uuid` 11.1.1 mediante override y una allowlist exacta de scripts de instalación. El lockfile sólo cambió las resoluciones necesarias; no se ejecutó `npm audit fix --force`.
+> - ExcelJS conserva compatibilidad mediante una prueba real de creación, serialización y recarga XLSX que activa su ruta interna de UUID. Backend 615/615, frontend 217/217, agente 6/6, builds local/VPS y módulos Argon2/SSH/Firebase correctos.
+> - Dump `/root/pre-uuid-remediation-20260802T022039Z` validado por gzip/checksum y restaurado con conteos 54/5/3/14 idénticos. Rollback `gestionvpn-10-{backend,frontend}:pre-uuid-20260802T022039Z`.
+> - Cierre: DB/backend healthy, frontend activo, 0 reinicios, health `ok`, Nginx/HTTPS/rutas/cabeceras, 15 jails, UFW, agente y WireGuard correctos; 0 APT pendientes. Se retiraron 2.56 GB de caché de build y quedaron 5.9 GiB libres. Telegram y promoción de CSP siguen siendo tareas humanas separadas.
+
 > **Sesión 2026-08-01 — Fases 2–9 de mantenimiento cerradas y desplegadas.** Producción `f9091e9`; fase 1 Telegram omitida por instrucción del propietario.
 > - Swap 1 GiB; Docker 29.7.1; 0 APT pendientes; caché de build 4.27 GB retirada y disco 67%. Dump root-only restaurado/verificado con 54 tablas, 5 usuarios, 3 workspaces y 14 nodos.
 > - Dependencias: 11 avisos (3 altos) → 7 moderados, 0 altos/críticos. CSP Report-Only y Referrer-Policy públicas; auditor visual 304/0.
