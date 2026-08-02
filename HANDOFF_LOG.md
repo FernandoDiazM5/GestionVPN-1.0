@@ -4,6 +4,12 @@
 > Aquí solo se **añaden** entradas por sesión (las más nuevas arriba); no se edita lo viejo.
 > Mantenimiento gobernado por la skill `handoff-keeper` (`.claude/skills/handoff-keeper/`).
 
+> **Sesión 2026-08-01 — Fases 2–9 de mantenimiento cerradas y desplegadas.** Producción `f9091e9`; fase 1 Telegram omitida por instrucción del propietario.
+> - Swap 1 GiB; Docker 29.7.1; 0 APT pendientes; caché de build 4.27 GB retirada y disco 67%. Dump root-only restaurado/verificado con 54 tablas, 5 usuarios, 3 workspaces y 14 nodos.
+> - Dependencias: 11 avisos (3 altos) → 7 moderados, 0 altos/críticos. CSP Report-Only y Referrer-Policy públicas; auditor visual 304/0.
+> - Semgrep dejó de bloquearse en Windows: staging fuente automático, perfiles local/JS/TS/React/secrets/security completados sin hallazgos en las reglas seleccionadas. Validación: backend 103/615, frontend 64/216, agente 6/6.
+> - La actualización de Docker reveló una carrera de arranque con MariaDB; se añadió espera TCP limitada y probada. Cierre: contenedores 0 reinicios, servicios activos, HTTPS/health 200 y MySQL/RouterOS/SMTP `ok`. Informe: `docs/security/VPS_HARDENING_AUDIT_2026-08-01.md`.
+
 > **Sesión 2026-08-01 — Protección 100% y auditoría integral.** Producción `ae5fe5e`/imagen funcional `d25dca4`. Estado: 0 reinicios, HTTPS 200, backend/DB healthy, 54 tablas.
 > - Se activaron confirmaciones temporal/indefinida y rollout 100%; sólo se recreó backend. Un escáner real fue bloqueado en `gestionvpn-web-sensitive`, auditado y reflejado en UFW.
 > - Auditoría VPS/backend/frontend/seguridad contrastada con el handoff: 612 backend, 216 frontend, 6 agente, `check:all`; red pública limitada a 22/80/443 y datos intactos.
