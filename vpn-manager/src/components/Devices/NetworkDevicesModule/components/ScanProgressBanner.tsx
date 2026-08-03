@@ -45,7 +45,7 @@ function ScanProgressBannerImpl({
               <span>
                 {scanState.phase === 'discovering' ? 'Buscando dispositivos en la red...' :
                   scanState.phase === 'authenticating' ? 'Probando accesos SSH y extrayendo datos...' :
-                    'Escaneo finalizado exitosamente'}
+                    'Búsqueda finalizada'}
               </span>
             </span>
             {scanState.phase === 'discovering' && (
@@ -97,10 +97,10 @@ function ScanProgressBannerImpl({
       {!isScanning && scannedCount > 0 && scanResultsCount === 0 && !scanError && (
         <div className="p-3 bg-amber-50 border border-amber-200 dark:bg-amber-500/10 dark:border-amber-500/30 rounded-xl space-y-1.5">
           <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">
-            Se escanearon {scannedCount} IPs en {effectiveLan} pero ninguna respondió como Ubiquiti airOS
+            Se revisaron {scannedCount} direcciones en {effectiveLan}, pero no se encontraron equipos Ubiquiti airOS
           </p>
           <p className="text-2xs text-amber-500 dark:text-amber-300/80">
-            Verifica que el túnel VRF esté activo en la pestaña "Nodos" y que los equipos tengan HTTP habilitado en puerto 80
+            Verifica la conexión del sitio y confirma que los equipos tengan habilitado el acceso HTTP por el puerto 80
           </p>
         </div>
       )}

@@ -1,10 +1,12 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Search, X, ArrowUpDown, ArrowUp, ArrowDown, Copy, Check, Pencil, Loader2,
   Users, SlidersHorizontal, Mail, Key, Tag, Plus, ChevronLeft, ChevronRight, AlertCircle,
 } from 'lucide-react';
 import type { WgPeer } from '../../../../types/api';
 import { formatLastHandshake } from '../utils';
+import { useKebabMenu } from '../../../VPN/NodeCard/hooks/useKebabMenu';
 
 // ────────────────────────────────────────────────────────────────────
 //  Definición de columnas
@@ -135,41 +137,12 @@ export default function UsersTable({
 
   // ── Columnas visibles (persistido) ────────────────────────────
   const [visibleCols, setVisibleCols] = useState<Set<ColId>>(loadVisibleCols);
-  const [showColPicker, setShowColPicker] = useState(false);
-  const colPickerRef = useRef<HTMLDivElement>(null);
+  const { showKebab: showColPicker, kebabCoords, kebabRef: colPickerRef, dropdownRef, handleKebabClick } = useKebabMenu();
 
   useEffect(() => {
     try { localStorage.setItem(LS_VISIBLE_COLS, JSON.stringify([...visibleCols])); }
     catch { /* quota / privacy mode — sin persistencia */ }
   }, [visibleCols]);
-
-  // Cierra el dropdown al click fuera
-  useEffect(() => {
-    if (!showColPicker) return;
-    const onClick = (e: MouseEvent | TouchEvent) => {
-      if (colPickerRef.current && !colPickerRef.current.contains(e.target as Node)) {
-        setShowColPicker(false);
-      }
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      event.preventDefault();
-      setShowColPicker(false);
-      colPickerRef.current?.querySelector<HTMLButtonElement>('[aria-expanded]')?.focus();
-    };
-    const focusFrame = requestAnimationFrame(() => {
-      colPickerRef.current?.querySelector<HTMLInputElement>('input[type="checkbox"]:not([disabled])')?.focus();
-    });
-    document.addEventListener('mousedown', onClick);
-    document.addEventListener('touchstart', onClick, { passive: true });
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      cancelAnimationFrame(focusFrame);
-      document.removeEventListener('mousedown', onClick);
-      document.removeEventListener('touchstart', onClick);
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, [showColPicker]);
 
   const toggleCol = (id: ColId) => {
     setVisibleCols(prev => {
@@ -275,7 +248,7 @@ export default function UsersTable({
           <div className="relative" ref={colPickerRef}>
             <button
               type="button"
-              onClick={() => setShowColPicker(v => !v)}
+              onClick={handleKebabClick}
               title="Columnas visibles"
               aria-label="Columnas visibles"
               aria-haspopup="true"
@@ -287,8 +260,14 @@ export default function UsersTable({
               <SlidersHorizontal className="w-3.5 h-3.5" />
               <span>Columnas</span>
             </button>
-            {showColPicker && (
-              <div role="group" aria-label="Mostrar columnas" className="absolute right-0 top-full mt-2 w-56 max-w-[calc(100vw-2rem)] z-30 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg shadow-slate-900/10 dark:shadow-black/40 overflow-hidden">
+            {showColPicker && createPortal(
+              <div
+                ref={dropdownRef}
+                role="group"
+                aria-label="Mostrar columnas"
+                style={{ position: 'fixed', top: kebabCoords.top, bottom: kebabCoords.bottom, right: kebabCoords.right, maxHeight: kebabCoords.maxHeight }}
+                className="z-[60] w-56 max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-white shadow-xl shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-800 dark:shadow-black/40"
+              >
                 <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 text-2xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                   Mostrar columnas
                 </div>
@@ -316,7 +295,8 @@ export default function UsersTable({
                     );
                   })}
                 </ul>
-              </div>
+              </div>,
+              document.body,
             )}
           </div>
         </div>

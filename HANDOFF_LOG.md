@@ -1,8 +1,89 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-03 — Menú de opciones de AP reparado.** Rama `vps_prod` (base `64c5e0f`). Estado: corrección frontend focalizada; pendiente despliegue.
+> - En Estado de equipos, el menú de cada AP reutiliza ahora `useKebabMenu`: se renderiza en portal y decide automáticamente si abrir arriba o abajo según el espacio visible, evitando que las opciones de las últimas filas queden fuera de la pantalla.
+> - Conserva cierre por clic exterior, Escape, scroll y resize; si la altura disponible es reducida, el propio menú permite desplazamiento interno.
+
 > **Este es el LOG cronológico append-only.** El contexto durable y vigente vive en [`HANDOFF.md`](./HANDOFF.md) (léelo primero al iniciar sesión).
 > Aquí solo se **añaden** entradas por sesión (las más nuevas arriba); no se edita lo viejo.
 > Mantenimiento gobernado por la skill `handoff-keeper` (`.claude/skills/handoff-keeper/`).
+
+> **Sesión 2026-08-03 — Iconografía de sitios corregida.** Rama `vps_prod` (base `64c5e0f`). Estado: ajuste visual focalizado; pendiente despliegue.
+> - Las filas de Sitios usan un icono de router MikroTik en lugar de símbolos Wi‑Fi. El color del contenedor conserva el estado; durante operaciones pendientes se mantiene el spinner.
+
+> **Sesión 2026-08-03 — Selector de columnas de Usuarios VPN reparado.** Rama `vps_prod` (base `64c5e0f`). Estado: corrección frontend focalizada; pendiente despliegue.
+> - El menú ya no queda recortado por `overflow-hidden/overflow-x-auto`: usa el patrón compartido `useKebabMenu` + portal, posición fija y `z-[60]`, con cierre por click exterior, Escape, scroll y resize.
+
+> **Sesión 2026-08-03 — Terminología de miembros normalizada.** Rama `vps_prod` (base `64c5e0f`). Estado: ajuste de texto visual; pendiente despliegue.
+> - El título de la tabla y la descripción de su pestaña cambian de `Miembros del workspace` a `Miembros del equipo`.
+
+> **Sesión 2026-08-03 — Nombre del equipo restaurado en Mi equipo.** Rama `vps_prod` (base `64c5e0f`). Estado: ajuste visual focalizado; pendiente despliegue.
+> - La cabecera vuelve a usar el nombre real del workspace como título (por ejemplo, `Empresa Fiwis`) y conserva la función en el subtítulo: `Equipo de trabajo · Administra las personas y accesos de tu espacio.` Sin restaurar datos personales duplicados.
+
+> **Sesión 2026-08-03 — Cabecera de Mi equipo simplificada.** Rama `vps_prod` (base `64c5e0f`). Estado: cambio visual focalizado; pendiente despliegue.
+> - Se retiró la duplicación de propietario y usuario actual. La vista muestra sólo `Equipo de trabajo` con la descripción `Administra las personas y accesos de tu espacio de trabajo.`; la identidad permanece disponible en el menú lateral.
+
+> **Sesión 2026-08-03 — Selector de columnas ligado al sitio expandido.** Rama `vps_prod` (base `64c5e0f`). Estado: corrección visual focalizada; pendiente despliegue.
+> - `Datos visibles` sólo se renderiza cuando la tarjeta del sitio está desplegada. Al contraerla, el selector y su menú se desmontan, evitando el panel flotante huérfano sobre tarjetas compactas.
+
+> **Sesión 2026-08-03 — Combobox disponible sin sitio conectado.** Rama `vps_prod` (base `64c5e0f`). Estado: corrección visual/lógica focalizada; pendiente despliegue.
+> - El selector de alcance ya no se deshabilita cuando el filtro `Conectado` devuelve cero sitios; permite acceder siempre a `Otros sitios` y `Todos los sitios`. Búsqueda y actualización sí permanecen inactivas cuando la vista seleccionada no contiene equipos.
+
+> **Sesión 2026-08-03 — Elevación del combobox limitada a interacción.** Rama `vps_prod` (base `64c5e0f`). Estado: cambio CSS visual puntual; pendiente despliegue.
+> - El selector permanece plano en reposo y eleva 2 px con sombra índigo únicamente en hover o focus; disabled permanece plano.
+
+> **Sesión 2026-08-03 — Profundidad visual del combobox unificada.** Rama `vps_prod` (base `64c5e0f`). Estado: prueba focalizada, build y lint correctos en la iteración base; cambio CSS puntual validado con diff; pendiente despliegue.
+> - El selector de sitios usa ahora sombra índigo flotante y refuerzo en hover, coherente con las acciones de la vista; al estar deshabilitado elimina la sombra.
+
+> **Sesión 2026-08-03 — Filtro de sitios convertido en combobox.** Rama `vps_prod` (base `64c5e0f`). Estado: build, lint y prueba focalizada 3/3 correctos; pendiente despliegue.
+> - El control segmentado de Estado de equipos fue reemplazado por un selector compacto con `Conectado` como valor inicial, seguido de `Otros sitios` y `Todos los sitios`; conserva lógica, accesibilidad y estado deshabilitado sin datos.
+
+> **Sesión 2026-08-03 — Cabecera operativa de Estado de equipos refinada.** Rama `vps_prod` (base `64c5e0f`). Estado: build, lint y prueba focalizada 3/3 correctos; pendiente despliegue.
+> - El resumen es ahora una terna de métricas compactas; filtros abreviados y selección índigo separan navegación de estados de salud. La zona de controles reduce espacio, conserva adaptación móvil y usa `Actualización en tiempo real`.
+> - Sin sitios/equipos, filtros, búsqueda y actualización quedan deshabilitados, aparece una explicación y la leyenda se oculta. `SegmentedControl` admite ahora estado `disabled` reutilizable.
+
+> **Sesión 2026-08-03 — Sitios contraídos por defecto en Estado de equipos.** Rama `vps_prod` (base `64c5e0f`). Estado: build, lint y prueba focalizada 2/2 correctos; pendiente despliegue.
+> - Cada entrada a `/monitor` presenta todas las tarjetas de sitio compactas. Se retiró la restauración de expansión desde `sessionStorage`; el usuario puede abrir y cerrar cada sitio durante la visita actual.
+
+> **Sesión 2026-08-03 — Estado de antenas renombrado a Estado de equipos.** Rama `vps_prod` (base `64c5e0f`). Estado: build y lint correctos; pruebas focalizadas actualizadas; pendiente despliegue.
+> - El cambio es exclusivamente visual: menú, encabezado, descripción, métricas, buscador, botón de actualización, estados vacíos y textos accesibles usan “equipos”. La ruta interna continúa siendo `/monitor` y no cambian lógica, API ni datos.
+> - Los términos relacionados con propiedades físicas reales, como “ganancia de antena”, permanecen sin cambios.
+
+> **Sesión 2026-08-03 — Primera fase de normalización visual compartida.** Rama `vps_prod` (base `64c5e0f`). Estado: build, lint y pruebas focalizadas 6/6 correctos; pendiente despliegue.
+> - Se creó una API común para encabezados, estados vacíos, botones, insignias, tarjetas, búsqueda y controles segmentados; la escala canónica quedó documentada.
+> - Buscar equipos, Estado de antenas, Sitios, Mi equipo y Ajustes migraron a los componentes compartidos. Las acciones normales usan 44 px y Estado de antenas dejó de usar `btn-sm` en su estado vacío.
+> - El auditor incorpora DS10–DS13. Sus avisos actuales corresponden a deuda heredada que se abordará progresivamente, no a errores de compilación.
+
+> **Sesión 2026-08-02 — Sombra de acciones del estado vacío unificada.** Rama `vps_prod` (base `64c5e0f`). Estado: prueba focalizada 2/2, TypeScript, lint, auditor visual 305/0 y `git diff --check` correctos; pendiente despliegue.
+> - `Ver guardados` recibió la misma sombra índigo y profundidad hover de `Ir a Sitios`, manteniendo su tratamiento secundario con fondo blanco y borde.
+
+> **Sesión 2026-08-02 — Botones del estado vacío alineados.** Rama `vps_prod` (base `64c5e0f`). Estado: prueba focalizada 2/2, TypeScript, lint, auditor visual 305/0 y `git diff --check` correctos; pendiente despliegue.
+> - `Ir a Sitios` y `Ver guardados` usan ahora alineación horizontal explícita, iconos no encogibles, texto sin salto, 44 px mínimos y el mismo ancho en escritorio; en móvil ocupan el ancho disponible.
+
+> **Sesión 2026-08-02 — Ver guardados redirigido a Estado de antenas.** Rama `vps_prod` (base `64c5e0f`). Estado: prueba focalizada 2/2, TypeScript, lint, auditor visual 305/0 y `git diff --check` correctos; pendiente despliegue.
+> - Por aclaración del propietario, `Ver guardados` ya no despliega tarjetas dentro de Buscar equipos: navega directamente al módulo `monitor` (`Estado de antenas`).
+> - Se retiró el panel intermedio y se confirmó que la tarjeta conectada no presenta `Última búsqueda`, pues no se integra una fecha real en ese contexto.
+
+> **Sesión 2026-08-02 — Acción Ver guardados añadida al estado sin conexión.** Rama `vps_prod` (base `64c5e0f`). Estado: prueba visual focalizada 2/2, TypeScript, lint, build, auditor visual 305/0 y `git diff --check` correctos; pendiente despliegue.
+> - `Ver guardados` alterna una cuadrícula responsive con nombre, modelo, IP y sitio usando exclusivamente la biblioteca ya cargada; contempla también cero registros y no expone credenciales.
+> - Conserva el patrón visual de Ajustes, accesibilidad mediante `aria-expanded`/`aria-controls` y controles táctiles de 44 px.
+
+> **Sesión 2026-08-02 — Buscar equipos alineado visualmente con Ajustes.** Rama `vps_prod` (base `64c5e0f`). Estado: pruebas focalizadas 6/6, TypeScript, lint, build, auditor visual 305/0 y `git diff --check` correctos; pendiente despliegue.
+> - Se unificó el nombre `Buscar equipos` y se reemplazó la terminología visible de escaneo/Nodos por buscar/Sitios, sin cambiar el motor ni sus estados internos.
+> - El estado sin conexión ahora es una tarjeta vacía accionable con `Ir a Sitios`; el estado conectado muestra sitio, red efectiva y conexión activa antes de los controles existentes.
+> - Encabezado, tarjetas, tipografía, espacios, colores, radios y efectos siguen el patrón visual de Ajustes; se agregó un contrato focalizado para preservar lenguaje y estructura.
+> - Archivos funcionales: `NetworkDevicesModule.tsx`, `components/ScanControls.tsx`, `components/ScanProgressBanner.tsx` y `NetworkDevicesModule.visual.test.ts`.
+
+> **Sesión 2026-08-02 — Menú operativo de moderadores y miembros simplificado localmente.** Rama `vps_prod` (base `64c5e0f`). Estado: pruebas focalizadas 4/4, TypeScript, lint, build, auditor visual 305/0 y `git diff --check` correctos; pendiente despliegue.
+> - Se agruparon Sitios, Buscar equipos y Estado de antenas bajo `Operación`; Mi equipo y Configuración bajo `Cuenta`. Plataforma conserva su grupo independiente y sólo aparece según RBAC.
+> - Se retiraron los dos estados verdes redundantes, el selector de tema quedó como icono accesible Sol/Luna y el perfil inferior muestra nombre y rol sin exponer un correo truncado como identidad principal.
+> - La selección activa ganó contraste, borde, sombra, indicador lateral integrado y `aria-current`; los controles táctiles del pie conservan 44 px.
+> - Archivos funcionales: `vpn-manager/src/components/Layout/Sidebar.tsx` y `vpn-manager/src/components/Layout/Sidebar.test.tsx`.
+
+> **Sesión 2026-08-02 — Advertencia CSP Report-Only corregida localmente.** Rama `vps_prod` (base `64c5e0f`). Estado: prueba focalizada 3/3 y `git diff --check` correctos; pendiente despliegue.
+> - Se retiró `upgrade-insecure-requests` únicamente de `Content-Security-Policy-Report-Only`, porque los navegadores la ignoran en modo de observación y generan una advertencia.
+> - Se conservaron HSTS, HTTPS y todas las demás directivas CSP; se añadió una prueba de regresión para evitar que vuelva a incluirse en Report-Only.
+> - Archivos funcionales: `vpn-manager/gestionvpn-security-headers.conf` y `server/test/unit/productionProxySecurity.test.js`.
 
 > **Sesión 2026-08-02 — Base productiva clonada sobre XAMPP local.** Rama `vps_prod` (base `3b13941`). Estado: restauración verificada 54 tablas/5 usuarios/3 workspaces/15 nodos/5 membresías; backend local MySQL `ok`; producción sin cambios funcionales.
 > - Se respaldó primero la base local anterior fuera del repositorio y se exportó producción con `single-transaction`, rutinas, triggers, eventos y blobs hexadecimales; SHA-256 remoto/local coincidente.

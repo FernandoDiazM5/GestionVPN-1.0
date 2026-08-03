@@ -245,6 +245,48 @@ const RULES = [
       return violations;
     },
   },
+  {
+    id: 'DS10-primary-action-small',
+    severity: 'info',
+    title: 'Acción principal usando btn-sm',
+    rationale: 'btn-sm se reserva para tablas, modales y controles densos. Las acciones principales usan Button size="md" (44px).',
+    test: (line) => /\bbtn-primary\b/.test(line) && /\bbtn-sm\b/.test(line)
+      ? ['acción principal en tamaño pequeño; revisar si corresponde size="md"']
+      : [],
+  },
+  {
+    id: 'DS11-page-heading-scale',
+    severity: 'info',
+    title: 'Encabezado de página fuera de PageHeader',
+    rationale: 'Las vistas normalizadas reutilizan PageHeader: 18px en móvil, 20px en escritorio y peso 700.',
+    test: (line, ctx) => {
+      const normalizedView = /NetworkDevicesModule|ApMonitorModule|MonitorHeader|ControlBar|TeamModule|ModeratorSettingsModule|SettingsModule/.test(ctx?.file || '');
+      if (!normalizedView || !/<h[12]\b/.test(line) || /modal-title|text-base/.test(line)) return [];
+      return ['encabezado manual en una vista normalizada; usar PageHeader'];
+    },
+  },
+  {
+    id: 'DS12-button-under-44',
+    severity: 'info',
+    title: 'Botón de acción normal con altura menor a 44px',
+    rationale: 'Las acciones normales usan Button size="md" o btn-md, que garantizan min-height de 44px.',
+    test: (line) => /<button\b|\bbtn-(?:primary|outline)\b/.test(line) && /\b(?:h|min-h)-(?:8|9|10)\b/.test(line)
+      ? ['altura explícita inferior a 44px']
+      : [],
+  },
+  {
+    id: 'DS13-manual-empty-state',
+    severity: 'info',
+    title: 'Estado vacío con medidas manuales',
+    rationale: 'Los estados vacíos reutilizan EmptyState para conservar icono, tipografía y espaciado canónicos.',
+    test: (line, ctx) => {
+      const normalizedView = /NetworkDevicesModule|ApMonitorModule|TeamModule/.test(ctx?.file || '');
+      if (!normalizedView) return [];
+      return /className=["'`][^"'`]*(?:text-center[^"'`]*(?:py-1[246]|p-8)|(?:py-1[246]|p-8)[^"'`]*text-center)/.test(line)
+        ? ['posible estado vacío manual; usar EmptyState']
+        : [];
+    },
+  },
 ];
 
 // ── Walker ───────────────────────────────────────────────────────
@@ -301,7 +343,7 @@ function audit(opts = {}) {
       // Contexto: 3 líneas previas para reglas que necesitan saber si el
       // bloque actual pertenece a un <button> (ver DS06).
       const prev3 = lines.slice(Math.max(0, i - 3), i).join('\n');
-      const ctx = { prev3 };
+      const ctx = { prev3, file: path.relative(SRC_ROOT, file).replace(/\\/g, '/') };
       for (const rule of RULES) {
         if (ruleFilter && rule.id !== ruleFilter && !rule.id.startsWith(ruleFilter)) continue;
         // §54: respetar audit:ignore (file-level o inline).

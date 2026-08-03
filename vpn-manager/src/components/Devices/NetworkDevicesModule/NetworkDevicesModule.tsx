@@ -18,7 +18,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
-  CheckCircle2, Cpu, ShieldCheck, ShieldOff, RefreshCw, Radio, Save, Loader2, RotateCcw, Sparkles, History,
+  ArrowRight, Bookmark, CheckCircle2, Cpu, ShieldCheck, ShieldOff, RefreshCw, Radio, Save, Loader2, MapPin, RotateCcw, Sparkles, History,
 } from 'lucide-react';
 
 import { useVpn } from '../../../context';
@@ -35,6 +35,7 @@ import { DeviceFilters } from './components/DeviceFilters';
 import { DeviceTable } from './components/DeviceTable';
 import M5FullInfoModal from '../../Common/M5FullInfoModal';
 import ConfirmModal from '../../Common/ConfirmModal';
+import { Button, EmptyState, PageHeader } from '../../Common/ui';
 import type { ExportMetadata } from './utils/exportShared';
 
 import { SESSION_SCAN_KEY } from './constants';
@@ -52,7 +53,7 @@ import { AirOsAiDialog } from './components/AirOsAiDialog';
 import { AirOsAiHistoryDialog } from './components/AirOsAiHistoryDialog';
 
 export default function NetworkDevicesModule() {
-  const { credentials, activeNodeVrf, nodes, setNodes } = useVpn();
+  const { credentials, activeNodeVrf, nodes, setNodes, setActiveModule } = useVpn();
   const { session } = useWorkspaceSession();
   const nodeInventory = useNodeInventory(!!credentials);
   const airOsAi = useAirOsAi(session?.role === 'OWNER' && !session.platform_admin);
@@ -347,6 +348,8 @@ export default function NetworkDevicesModule() {
   const activeNodeName = activeNodeVrf
     ? nodes.find(n => n.nombre_vrf === activeNodeVrf)?.nombre_nodo ?? activeNodeVrf
     : null;
+  const goToSites = useCallback(() => setActiveModule('nodes'), [setActiveModule]);
+  const goToSavedDevices = useCallback(() => setActiveModule('monitor'), [setActiveModule]);
 
   return (
     <div className="space-y-5">
@@ -359,43 +362,50 @@ export default function NetworkDevicesModule() {
         </div>
       )}
 
-      <div className="card p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center space-x-2">
-            <Cpu className="w-5 h-5 text-indigo-500" />
-            <span>Dispositivos de Red</span>
-          </h2>
-          <p className="text-slate-500 dark:text-slate-500 text-sm mt-1">Descubre y gestiona equipos Ubiquiti en las LANs remotas</p>
-        </div>
-        <div className="text-sm text-slate-500 dark:text-slate-400">
-          <span className="font-bold text-indigo-600 dark:text-indigo-400">{library.savedDevices.length}</span> guardados
-        </div>
-      </div>
+      <PageHeader
+        title="Buscar equipos"
+        description="Busca y administra equipos conectados a tus sitios remotos"
+        icon={Cpu}
+        titleId="network-devices-title"
+        aside={<div className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-500 ring-1 ring-inset ring-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:ring-slate-700">
+          <span className="font-bold text-indigo-600 dark:text-indigo-400">{library.savedDevices.length}</span> equipo{library.savedDevices.length !== 1 ? 's' : ''} guardado{library.savedDevices.length !== 1 ? 's' : ''}
+        </div>}
+      />
 
       {isTunnelActive ? (
-        <div className="card p-4 border-emerald-200 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/10 flex items-center space-x-3">
-          <div className="w-9 h-9 bg-emerald-500 rounded-xl flex items-center justify-center shadow-md shadow-emerald-500/30 shrink-0">
-            <ShieldCheck className="w-5 h-5 text-white" />
+        <div className="card p-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-11 h-11 bg-indigo-50 dark:bg-indigo-500/10 rounded-xl flex items-center justify-center shrink-0">
+              <MapPin className="w-5 h-5 text-indigo-500" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-2xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Sitio conectado</p>
+              <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate mt-0.5">{activeNodeName}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Red: <span className="font-mono">{effectiveLan || 'Sin configurar'}</span></p>
+            </div>
           </div>
-          <div>
-            <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Túnel activo: <span className="text-emerald-600 dark:text-emerald-400">{activeNodeName}</span></p>
-            <p className="text-xs text-slate-500 dark:text-slate-500 mt-0.5">El escaneo se realiza desde este equipo hacia la LAN remota</p>
+          <div className="inline-flex self-start items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 ring-1 ring-inset ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/30 sm:self-auto">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            Conexión activa
           </div>
         </div>
       ) : (
-        <div className="card p-4 border-amber-200 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10 flex items-center space-x-3">
-          <ShieldOff className="w-5 h-5 text-amber-500 shrink-0" />
-          <div>
-            <p className="text-sm font-bold text-amber-700 dark:text-amber-400">Sin túnel activo</p>
-            <p className="text-xs text-amber-600 dark:text-amber-300/80 mt-0.5">Activa el acceso a un nodo en la pestaña "Nodos" para poder escanear en tiempo real</p>
-          </div>
-        </div>
+        <EmptyState
+          icon={ShieldOff}
+          title="Conéctate a un sitio para comenzar"
+          description="Selecciona un sitio y activa la conexión para buscar equipos en su red. Tus equipos guardados permanecerán disponibles."
+          actions={<>
+            <Button onClick={goToSites} variant="primary" size="md" trailingIcon={ArrowRight} className="w-full sm:w-40">Ir a Sitios</Button>
+            <Button onClick={goToSavedDevices} variant="outline" size="md" leadingIcon={Bookmark} className="w-full shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 sm:w-40">Ver guardados</Button>
+          </>}
+        />
       )}
 
+      {isTunnelActive && (
       <div className="card p-5 space-y-4">
         <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200 flex items-center space-x-2">
           <RefreshCw className="w-4 h-4 text-indigo-500" />
-          <span>Escanear LAN del nodo</span>
+          <span>Buscar equipos en este sitio</span>
         </h3>
 
         <ScanControls
@@ -442,12 +452,10 @@ export default function NetworkDevicesModule() {
               </div>
               <div>
                 <p className="text-slate-600 dark:text-slate-300 font-semibold">
-                  {isTunnelActive ? 'Listo para escanear' : 'Sin túnel activo'}
+                  Todo listo para buscar
                 </p>
                 <p className="text-2xs text-slate-500 dark:text-slate-500 max-w-xs mt-0.5">
-                  {isTunnelActive
-                    ? `Pulsa "Escanear dispositivos" para descubrir equipos Ubiquiti en ${effectiveLan || 'la subred'}.`
-                    : 'Activa el acceso a un nodo en la pestaña "Nodos" para escanear la LAN remota.'}
+                  Pulsa “Buscar equipos” para descubrir dispositivos Ubiquiti en {effectiveLan || 'la red seleccionada'}.
                 </p>
               </div>
             </div>
@@ -577,6 +585,7 @@ export default function NetworkDevicesModule() {
           </div>
         )}
       </div>
+      )}
 
       {/* ── Modales ─────────────────────────────────────────────── */}
       {addingDevice && effectiveNode && (

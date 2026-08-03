@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
   Radio, Cpu, Briefcase, Activity, Settings, LayoutDashboard, UserCog,
-  LogOut, ChevronLeft, Menu, X, Wifi, Server, Sun, Moon, ShieldCheck,
+  LogOut, ChevronLeft, Menu, X, Wifi, Sun, Moon, ShieldCheck,
 } from 'lucide-react';
 import { useVpn } from '../../context';
 import { useWorkspaceSession } from '../../context/WorkspaceSession';
@@ -31,29 +31,19 @@ const NAV: NavGroup[] = [
     ],
   },
   {
-    category: 'Red',
+    category: 'Operación',
     items: [
       { id: 'nodes', label: 'Sitios', icon: Radio },
       { id: 'devices', label: 'Buscar equipos', icon: Cpu },
+      { id: 'monitor', label: 'Estado de equipos', icon: Activity },
     ],
   },
   {
-    category: 'Acceso',
+    category: 'Cuenta',
     items: [
       // 'Workspace' unifica los antiguos "Usuarios" (WG peers) y "Equipo"
       // (miembros del workspace) en una sola vista con sub-tabs.
       { id: 'team', label: 'Mi equipo', icon: Briefcase },
-    ],
-  },
-  {
-    category: 'Monitoreo',
-    items: [
-      { id: 'monitor', label: 'Estado de antenas', icon: Activity },
-    ],
-  },
-  {
-    category: 'Sistema',
-    items: [
       { id: 'settings', label: 'Configuración', icon: Settings },
     ],
   },
@@ -74,6 +64,11 @@ export default function Sidebar() {
 
   // Módulos visibles según la sesión (rol + plataforma)
   const visible = useMemo(() => visibleModules(session), [session]);
+  const profileName = session?.name?.trim()
+    || session?.email?.split('@')[0]
+    || credentials?.user
+    || 'Usuario';
+  const profileEmail = session?.email || credentials?.user || '';
 
   // Si el módulo activo no es visible para este rol, salta al primero permitido
   useEffect(() => {
@@ -139,22 +134,6 @@ export default function Sidebar() {
         )}
       </div>
 
-      {/* ── Router activo ── */}
-      <div className={`px-3 py-3 border-b border-slate-100 dark:border-slate-800 ${mini ? 'flex justify-center' : ''}`}>
-        <div className={`flex items-center gap-2.5 rounded-xl bg-emerald-50 border border-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/30 ${mini ? 'p-2' : 'px-3 py-2.5'}`}>
-          <div className="relative shrink-0">
-            <Server className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-            <span className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          </div>
-          {!mini && (
-            <div className="min-w-0">
-              <p className="text-2xs font-bold uppercase tracking-wide text-emerald-600/70 dark:text-emerald-400/70 leading-none">Servicio disponible</p>
-              <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400 truncate mt-0.5">Conexión principal</p>
-            </div>
-          )}
-        </div>
-      </div>
-
       {/* ── Navegación por categorías ── */}
       <nav className="flex-1 overflow-y-auto py-3 space-y-4">
         {NAV.map(group => {
@@ -183,11 +162,12 @@ export default function Sidebar() {
                       className={`relative w-full flex items-center gap-3 rounded-xl text-sm font-semibold transition-all
                         ${mini ? 'justify-center px-0 py-2.5' : 'px-3 py-2.5'}
                         ${active
-                          ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300'
+                          ? 'bg-indigo-100 text-indigo-800 shadow-sm ring-1 ring-inset ring-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-200 dark:ring-indigo-400/30'
                           : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800'}`}
+                      aria-current={active ? 'page' : undefined}
                     >
                       {active && (
-                        <span className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 rounded-r-full bg-indigo-600 dark:bg-indigo-400" />
+                        <span className="absolute inset-y-1 left-0 w-1 rounded-r-full bg-indigo-600 dark:bg-indigo-300" />
                       )}
                       <Icon className={`w-[18px] h-[18px] shrink-0 ${active ? 'text-indigo-600 dark:text-indigo-400' : ''}`} />
                       {!mini && <span className="truncate">{item.label}</span>}
@@ -200,55 +180,46 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* ── Footer: estado + tema + usuario + salir ── */}
+      {/* ── Footer: usuario + tema + salir ── */}
       <div className="border-t border-slate-100 dark:border-slate-800 p-3 space-y-2">
-        {!mini && (
-          <div className="flex items-center justify-between px-2 py-1.5">
-            <span className="flex items-center gap-2 text-2xs font-semibold text-emerald-600 dark:text-emerald-400">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Todo funciona correctamente
-            </span>
-          </div>
-        )}
-
-        {/* Toggle tema */}
-        <button
-          onClick={toggleDarkMode}
-          title={darkMode ? 'Modo claro' : 'Modo oscuro'}
-          aria-label={darkMode ? 'Activar modo claro' : 'Activar modo oscuro'}
-          className={`w-full flex items-center gap-2.5 rounded-xl text-sm font-semibold text-slate-500
-            hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors
-            dark:text-slate-400 dark:hover:text-slate-100
-            ${mini ? 'justify-center px-0 py-2.5' : 'px-3 py-2.5'}`}
+        <div
+          className={`flex items-center gap-2.5 rounded-xl bg-slate-50 border border-slate-200 dark:bg-slate-800 dark:border-slate-700 ${mini ? 'p-2 justify-center' : 'px-3 py-2.5'}`}
+          title={profileEmail}
         >
-          {darkMode ? <Sun className="w-[18px] h-[18px] shrink-0" /> : <Moon className="w-[18px] h-[18px] shrink-0" />}
-          {!mini && <span>{darkMode ? 'Tema claro' : 'Tema oscuro'}</span>}
-        </button>
-
-        <div className={`flex items-center gap-2.5 rounded-xl bg-slate-50 border border-slate-200 dark:bg-slate-800 dark:border-slate-700 ${mini ? 'p-2 justify-center' : 'px-3 py-2'}`}>
           <div className="w-7 h-7 rounded-lg bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center shrink-0">
             <Wifi className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
           </div>
           {!mini && (
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate leading-none">@{credentials?.user}</p>
-              <p className="text-2xs text-slate-500 dark:text-slate-500 mt-0.5">{roleLabel(session) || credentials?.role}</p>
+              <p className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate leading-none">{profileName}</p>
+              <p className="text-2xs font-medium text-slate-500 dark:text-slate-400 mt-1">{roleLabel(session) || credentials?.role}</p>
             </div>
           )}
         </div>
 
-        <button
-          onClick={handleLogout}
-          title={mini ? 'Cerrar sesión' : undefined}
-          aria-label="Cerrar sesión"
-          className={`w-full flex items-center gap-2.5 rounded-xl text-sm font-semibold text-slate-500
-            hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors
-            dark:text-slate-400 dark:hover:text-rose-400
-            ${mini ? 'justify-center px-0 py-2.5' : 'px-3 py-2.5'}`}
-        >
-          <LogOut className="w-[18px] h-[18px] shrink-0" />
-          {!mini && <span>Cerrar sesión</span>}
-        </button>
+        <div className={`flex items-center gap-2 ${mini ? 'flex-col' : ''}`}>
+          <button
+            onClick={toggleDarkMode}
+            title={darkMode ? 'Activar modo claro' : 'Activar modo oscuro'}
+            aria-label={darkMode ? 'Activar modo claro' : 'Activar modo oscuro'}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800 transition-colors"
+          >
+            {darkMode ? <Sun className="w-[18px] h-[18px]" /> : <Moon className="w-[18px] h-[18px]" />}
+          </button>
+
+          <button
+            onClick={handleLogout}
+            title={mini ? 'Cerrar sesión' : undefined}
+            aria-label="Cerrar sesión"
+            className={`flex h-11 items-center gap-2.5 rounded-xl text-sm font-semibold text-slate-500
+              hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors
+              dark:text-slate-400 dark:hover:text-rose-400
+              ${mini ? 'w-11 justify-center' : 'flex-1 px-3'}`}
+          >
+            <LogOut className="w-[18px] h-[18px] shrink-0" />
+            {!mini && <span>Cerrar sesión</span>}
+          </button>
+        </div>
 
         {/* Expandir (solo visible colapsado) */}
         {mini && (

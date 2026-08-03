@@ -32,6 +32,7 @@ describe('production proxy security', () => {
     expect(headersSource).toContain('add_header Referrer-Policy "no-referrer" always;');
     expect(headersSource).toContain('add_header Content-Security-Policy-Report-Only');
     expect(headersSource).toContain("script-src 'self'");
+    expect(headersSource).not.toContain('upgrade-insecure-requests');
     expect(indexSource).toContain('<script src="%BASE_URL%theme-init.js"></script>');
     expect(indexSource).not.toMatch(/<script>(.|\n)*?<\/script>/);
     expect(dockerfileSource).toContain('gestionvpn-security-headers.conf /etc/nginx/snippets/gestionvpn-security-headers.conf');

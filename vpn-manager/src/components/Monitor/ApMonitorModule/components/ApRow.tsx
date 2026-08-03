@@ -49,7 +49,7 @@ const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCol
     { icon: <ExternalLink className="w-3.5 h-3.5" />, label: 'Abrir equipo', onClick: () => window.open(`http://${dev.ip}`, '_blank', 'noopener,noreferrer') },
     { icon: <KeyRound className="w-3.5 h-3.5" />, label: 'Ver credenciales', onClick: onRevealSsh, disabled: noSsh },
     { icon: <ArrowRightLeft className="w-3.5 h-3.5" />, label: 'Mover a sitio', onClick: onMove },
-    { icon: <Trash2 className="w-3.5 h-3.5" />, label: 'Eliminar antena', onClick: onDelete, danger: true },
+    { icon: <Trash2 className="w-3.5 h-3.5" />, label: 'Eliminar equipo', onClick: onDelete, danger: true },
   ];
 
   return (
@@ -88,7 +88,7 @@ const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCol
               <Users className="h-4 w-4" /> {expanded ? 'Ocultar clientes' : 'Ver clientes'}
             </button>
           )}
-          <button type="button" onClick={onSync} disabled={isPolling} aria-label="Actualizar esta antena" className="btn-outline btn-icon min-h-11 min-w-11">
+          <button type="button" onClick={onSync} disabled={isPolling} aria-label="Actualizar este equipo" className="btn-outline btn-icon min-h-11 min-w-11">
             {isPolling ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
           </button>
         </div>
@@ -207,7 +207,7 @@ const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCol
               <span>Ver clientes</span>
             </button>
           )}
-          <button onClick={onSync} title="Actualizar esta antena" aria-label="Actualizar esta antena" disabled={isPolling}
+          <button onClick={onSync} title="Actualizar este equipo" aria-label="Actualizar este equipo" disabled={isPolling}
             className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-indigo-600 transition-colors hover:bg-indigo-50 disabled:opacity-40 dark:text-indigo-400 dark:hover:bg-indigo-500/10">
             {isPolling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
           </button>

@@ -223,9 +223,9 @@
   /* ── Tamaños de botón (modificadores composables) ──
      Por defecto los .btn-* no traen padding propio (usar inline o estos).
      El default sensato: px-4 py-2.5 text-sm. */
-  .btn-sm   { @apply px-3 py-1.5 text-xs gap-1.5; }
-  .btn-md   { @apply px-4 py-2.5 text-sm gap-2; }
-  .btn-lg   { @apply px-5 py-3 text-base gap-2; }
+  .btn-sm   { @apply min-h-9 px-3 py-1.5 text-xs gap-1.5; }
+  .btn-md   { @apply min-h-11 px-4 py-2.5 text-sm gap-2; }
+  .btn-lg   { @apply min-h-12 px-5 py-3 text-base gap-2; }
   .btn-icon { @apply p-2 inline-flex items-center justify-center rounded-lg; } /* botón icon-only */
 
   /* ── Badges de ESTADO (única fuente para conectado/desconectado/etc) ── */

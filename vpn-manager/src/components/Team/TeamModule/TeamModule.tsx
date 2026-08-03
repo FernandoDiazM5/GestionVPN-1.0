@@ -1,11 +1,10 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
-import { Briefcase, Loader2, ShieldCheck, WifiOff, RefreshCw, Crown, User as UserIcon, UsersRound, Network } from 'lucide-react';
+import { Briefcase, Loader2, WifiOff, RefreshCw, UsersRound, Network } from 'lucide-react';
 import Spinner from '../../Common/Spinner';
 import { useWorkspaceSession } from '../../../context/WorkspaceSession';
 import { useWorkspaceEvents } from '../../../hooks/useWorkspaceEvents';
 import { teamApi } from '../../../services/teamApi';
 import { auditApi } from '../../../services/auditApi';
-import { ROLE_LABEL } from '../../../types/account';
 import type { Member, Invitation, AuditLog, Role } from '../../../types/account';
 import { canInvite, isModerator } from '../../../utils/permissions';
 import MembersTable from './components/MembersTable';
@@ -13,6 +12,7 @@ import InvitePanel from './components/InvitePanel';
 import AuditTimeline from './components/AuditTimeline';
 import MemberProfile from './components/MemberProfile';
 import MyInvitationsInbox from './components/MyInvitationsInbox';
+import { Button, EmptyState, PageHeader } from '../../Common/ui';
 
 // El módulo "Usuarios VPN" se carga en lazy porque su árbol pesa (hooks de
 // WireGuard + tabla + modal de .conf) y la mayoría de visitas al Workspace
@@ -132,57 +132,14 @@ export default function TeamModule() {
   // ── Sin sesión: el puente automático falló (p. ej. MySQL apagado) ──
   if (!session) {
     return (
-      <div className="card border-dashed border-2 border-slate-200 dark:border-slate-700 py-16 flex flex-col items-center text-center space-y-3">
-        <div className="w-14 h-14 bg-amber-50 dark:bg-amber-500/15 rounded-2xl flex items-center justify-center">
-          <WifiOff className="w-7 h-7 text-amber-500" />
-        </div>
-        <p className="text-slate-600 dark:text-slate-300 font-semibold">Workspace no disponible</p>
-        <p className="text-slate-500 dark:text-slate-400 text-sm max-w-sm">
-          No se pudo conectar al servicio multi-usuario. Verifica que la base de datos (MySQL/XAMPP) esté activa.
-        </p>
-        <button onClick={refresh} className="btn-outline px-4 py-2 flex items-center gap-2 text-sm">
-          <RefreshCw className="w-4 h-4" /> Reintentar
-        </button>
-      </div>
+      <EmptyState icon={WifiOff} tone="warning" title="Workspace no disponible" description="No se pudo conectar al servicio multiusuario. Verifica que la base de datos (MySQL/XAMPP) esté activa." actions={<Button onClick={refresh} variant="outline" size="md" leadingIcon={RefreshCw}>Reintentar</Button>} className="border-2 border-dashed border-slate-200 dark:border-slate-700" />
     );
   }
 
   // ── Header común: nombre del workspace + propietario + tú ──
-  const owner = members.find(m => m.role === 'OWNER');
-  const workspaceName = session.workspace_name || 'Mi workspace';
+  const workspaceName = session.workspace_name || 'Mi equipo';
   const header = (
-    <div className="card p-6">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div className="min-w-0">
-          <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-            <Briefcase className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
-            <span className="truncate">{workspaceName}</span>
-          </h2>
-          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Workspace</p>
-        </div>
-      </div>
-
-      {/* Personas del workspace — propietario + tú */}
-      <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <PersonRow
-          icon={<Crown className="w-4 h-4 text-amber-500" />}
-          tag="Propietario"
-          name={owner?.name || (loadingData ? '—' : 'Sin propietario')}
-          email={owner?.email}
-        />
-        <PersonRow
-          icon={<UserIcon className="w-4 h-4 text-indigo-500" />}
-          tag="Tú"
-          name={session.name || session.email.split('@')[0]}
-          email={session.email}
-          badge={
-            <span className="badge badge-info inline-flex items-center gap-1">
-              <ShieldCheck className="w-3 h-3" /> {ROLE_LABEL[session.role]}
-            </span>
-          }
-        />
-      </div>
-    </div>
+    <PageHeader title={workspaceName} description="Equipo de trabajo · Administra las personas y accesos de tu espacio." icon={Briefcase} titleId="workspace-title" />
   );
 
   // ── View (MEMBER): solo tab Usuarios (sin switch) ──
@@ -213,7 +170,7 @@ export default function TeamModule() {
           onClick={() => setTab('members')}
           icon={<UsersRound className="w-4 h-4" />}
           label="Usuarios"
-          desc="Miembros del workspace"
+          desc="Miembros del equipo"
         />
         <TabButton
           active={tab === 'vpn'}
@@ -280,30 +237,6 @@ export default function TeamModule() {
 // ────────────────────────────────────────────────────────────────────
 //  Subcomponentes locales
 // ────────────────────────────────────────────────────────────────────
-
-interface PersonRowProps {
-  icon: React.ReactNode;
-  tag: string;
-  name: string;
-  email?: string;
-  badge?: React.ReactNode;
-}
-
-function PersonRow({ icon, tag, name, email, badge }: PersonRowProps) {
-  return (
-    <div className="flex items-center gap-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/40 p-3">
-      <div className="w-8 h-8 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-center shrink-0">
-        {icon}
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-2xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{tag}</p>
-        <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate">{name}</p>
-        {email && <p className="text-xs font-mono text-slate-500 dark:text-slate-400 truncate">{email}</p>}
-      </div>
-      {badge}
-    </div>
-  );
-}
 
 interface TabButtonProps {
   active: boolean;

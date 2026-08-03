@@ -39,7 +39,7 @@ export default function MembersTable({
   return (
     <div className="card overflow-hidden border border-slate-200 dark:border-slate-800">
       <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40">
-        <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">Miembros del workspace</h3>
+        <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">Miembros del equipo</h3>
         <p className="text-2xs text-slate-400 dark:text-slate-500 mt-0.5">{members.length} miembro{members.length !== 1 ? 's' : ''}</p>
       </div>
 

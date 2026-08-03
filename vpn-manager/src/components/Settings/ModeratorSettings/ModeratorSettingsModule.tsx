@@ -6,6 +6,7 @@ import WorkspaceTab from './tabs/WorkspaceTab';
 import ImportExportTab from './tabs/ImportExportTab';
 import NotificationsTab from './tabs/NotificationsTab';
 import { useWorkspaceSession } from '../../../context/WorkspaceSession';
+import { PageHeader } from '../../Common/ui';
 
 type TabId = 'profile' | 'wireguard' | 'workspace' | 'notifications' | 'import-export';
 
@@ -42,21 +43,7 @@ export default function ModeratorSettingsModule() {
   return (
     <div className="space-y-5">
       {/* ── Cabecera ── */}
-      <div className="card p-6">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-500/15 flex items-center justify-center">
-            <SettingsIcon className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">Ajustes</h2>
-            <p className="text-slate-500 dark:text-slate-500 text-sm">
-              {isMember
-                ? 'Gestiona tu perfil y vincula Telegram para activar túneles desde el bot'
-                : 'Gestiona tu perfil, el workspace y los respaldos'}
-            </p>
-          </div>
-        </div>
-      </div>
+      <PageHeader title="Ajustes" description={isMember ? 'Gestiona tu perfil y vincula Telegram para activar túneles desde el bot' : 'Gestiona tu perfil, el workspace y los respaldos'} icon={SettingsIcon} titleId="moderator-settings-title" />
 
       {/* ── Tabs ── */}
       <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-5">

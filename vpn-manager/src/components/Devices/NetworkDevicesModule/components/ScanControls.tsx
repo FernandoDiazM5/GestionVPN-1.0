@@ -45,7 +45,7 @@ function ScanControlsImpl({
 
           <div>
             <label className="text-2xs font-bold text-slate-500 dark:text-slate-500 uppercase tracking-wider block mb-1.5">
-              Subred LAN a escanear
+              Red donde buscar
               {availableSubnets.length > 1 && (
                 <span className="ml-1.5 normal-case font-normal text-slate-500 dark:text-slate-500">({availableSubnets.length} disponibles)</span>
               )}
@@ -68,7 +68,7 @@ function ScanControlsImpl({
             ) : (
               <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-100 rounded-xl dark:bg-amber-500/10 dark:border-amber-500/30">
                 <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                <span className="text-xs text-amber-600 dark:text-amber-400">No hay subredes configuradas en este nodo</span>
+                <span className="text-xs text-amber-600 dark:text-amber-400">Este sitio no tiene redes configuradas</span>
               </div>
             )}
           </div>
@@ -84,7 +84,7 @@ function ScanControlsImpl({
             placeholder="ej: 10.5.5.0/24"
             className="input-field w-full text-sm font-mono"
           />
-          <p className="text-2xs text-slate-500 dark:text-slate-500 mt-1">Activa un túnel en la pestaña Nodos para autocompletar la subred.</p>
+          <p className="text-2xs text-slate-500 dark:text-slate-500 mt-1">Activa una conexión desde Sitios para completar la red automáticamente.</p>
         </div>
       )}
 
@@ -105,9 +105,9 @@ function ScanControlsImpl({
           // Motivo del disabled — el más restrictivo gana. El orden refleja
           // la secuencia natural que el usuario debe resolver.
           const blockedReason = !isTunnelActive
-            ? 'Activa un túnel en la pestaña Nodos para escanear la LAN remota.'
+            ? 'Activa una conexión desde Sitios para buscar equipos en la red remota.'
             : !effectiveLan
-              ? 'Elige o ingresa una subred LAN antes de escanear.'
+              ? 'Elige o ingresa una red antes de comenzar la búsqueda.'
               : null;
           const isBlocked = blockedReason !== null;
           return (
@@ -115,7 +115,7 @@ function ScanControlsImpl({
               onClick={onScan}
               disabled={!canScan}
               title={isBlocked ? blockedReason! : undefined}
-              aria-label={isBlocked ? `Escanear dispositivos (bloqueado): ${blockedReason}` : 'Escanear dispositivos'}
+              aria-label={isBlocked ? `Buscar equipos (bloqueado): ${blockedReason}` : 'Buscar equipos'}
               className={`flex items-center space-x-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all
                 ${canScan
                   ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-md shadow-indigo-500/25 hover:shadow-lg active:scale-[0.98]'
@@ -126,7 +126,7 @@ function ScanControlsImpl({
                 : isBlocked
                   ? <Lock className="w-4 h-4" />
                   : <RefreshCw className="w-4 h-4" />}
-              <span>{isScanning ? `Escaneando ${effectiveLan}...` : 'Escanear dispositivos'}</span>
+              <span>{isScanning ? `Buscando en ${effectiveLan}...` : 'Buscar equipos'}</span>
             </button>
           );
         })()}

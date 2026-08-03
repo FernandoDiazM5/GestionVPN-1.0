@@ -7,6 +7,7 @@ import {
 import AsyncQueryState from '../../Common/AsyncQueryState';
 import M5FullInfoModal from '../../Common/M5FullInfoModal';
 import ConfirmModal from '../../Common/ConfirmModal';
+import { Button, EmptyState } from '../../Common/ui';
 import { useVpn } from '../../../context';
 
 import ApGroupCard from './components/ApGroupCard';
@@ -182,7 +183,7 @@ export default function ApMonitorModule() {
           loading={logic.loading}
           error={logic.loadError}
           onRetry={() => { void logic.loadDevices(); }}
-          loadingLabel="Cargando antenas..."
+          loadingLabel="Cargando equipos..."
           skeletonRows={4}
         >
           <div />
@@ -190,33 +191,25 @@ export default function ApMonitorModule() {
       )}
 
       {!logic.loading && !logic.loadError && logic.nodeGroups.length === 0 && (
-        <div className="card border-dashed border-2 border-slate-200 dark:border-slate-700 py-16 flex flex-col items-center text-center gap-4">
-          <div className="w-14 h-14 bg-indigo-50 dark:bg-indigo-500/10 rounded-2xl flex items-center justify-center">
-            <Radio className="w-7 h-7 text-indigo-400" />
-          </div>
-          <div>
-            <p className="text-slate-600 dark:text-slate-300 font-semibold">Aún no hay antenas guardadas</p>
-            <p className="text-slate-500 dark:text-slate-500 text-sm mt-1 max-w-sm">
-              Ve a <strong>Buscar equipos</strong>, guarda las antenas encontradas y vuelve aquí para revisar su estado.
-            </p>
-          </div>
-        </div>
+        <EmptyState
+          icon={Radio}
+          title="Aún no hay equipos guardados"
+          description={<>Ve a <strong>Buscar equipos</strong>, guarda los equipos encontrados y vuelve aquí para revisar su estado.</>}
+          className="border-2 border-dashed border-slate-200 dark:border-slate-700"
+        />
       )}
 
       {!logic.loading && !logic.loadError && logic.nodeFilter === 'active' && !tunnelActive && logic.filteredGroups.length === 0 && (
-        <div className="card p-8 text-center text-slate-500 dark:text-slate-400">
-          <WifiOff className="w-8 h-8 mx-auto mb-3 text-amber-400" />
-          <p className="font-semibold text-slate-600 dark:text-slate-300">No hay un sitio conectado</p>
-          <p className="text-sm mt-1">Conéctate a un sitio para actualizar sus antenas en tiempo real.</p>
-          <div className="flex items-center justify-center gap-2 mt-4">
-            <button onClick={() => setActiveModule('nodes')} className="btn-primary btn-sm">
-              Conectar a un sitio
-            </button>
-            <button onClick={() => logic.setNodeFilter('all')} className="btn-outline btn-sm">
-              Ver todos los sitios
-            </button>
-          </div>
-        </div>
+        <EmptyState
+          icon={WifiOff}
+          tone="warning"
+          title="No hay un sitio conectado"
+          description="Conéctate a un sitio para actualizar sus equipos en tiempo real."
+          actions={<>
+            <Button onClick={() => setActiveModule('nodes')} variant="primary" size="md">Conectar a un sitio</Button>
+            <Button onClick={() => logic.setNodeFilter('all')} variant="outline" size="md">Ver todos los sitios</Button>
+          </>}
+        />
       )}
 
       {!logic.loading && !logic.loadError && logic.filteredGroups.map(group => (

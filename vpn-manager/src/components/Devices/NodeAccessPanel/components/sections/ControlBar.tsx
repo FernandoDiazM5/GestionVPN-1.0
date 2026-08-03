@@ -1,6 +1,7 @@
 import { Pencil, Plus, RefreshCw, Globe, Waypoints } from 'lucide-react';
 import { apiFetch } from '../../../../../utils/apiClient';
 import { API_BASE_URL } from '../../../../../config';
+import { Button, PageHeader } from '../../../../Common/ui';
 
 interface ControlBarProps {
   globalServerIP: string;
@@ -32,15 +33,17 @@ export default function ControlBar({
   canCreateNode = true,
 }: ControlBarProps) {
   return (
-    <div className="card flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center">
-      <div>
-        <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center space-x-2">
-          <Waypoints className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
-          <span>Sitios remotos</span>
-        </h2>
-        <p className="text-slate-500 dark:text-slate-500 text-sm mt-1">
-          Conecta de forma segura con las antenas y equipos de cada sitio
-        </p>
+    <PageHeader
+      title="Sitios remotos"
+      description="Conecta de forma segura con las antenas y equipos de cada sitio"
+      icon={Waypoints}
+      titleId="remote-sites-title"
+      aside={<div className="flex flex-wrap items-center gap-2">
+        {canCreateNode && <Button onClick={onNewNode} variant="primary" size="md" leadingIcon={Plus}>Agregar sitio</Button>}
+        <Button onClick={onRefresh} disabled={isLoading} loading={isLoading} loadingLabel="Actualizando..." variant="outline" size="md" leadingIcon={RefreshCw}>{hasLoaded ? 'Actualizar' : 'Cargar sitios'}</Button>
+      </div>}
+    >
+      {(lastUpdatedAt || showServerIP) ? <div className="border-t border-slate-200 px-6 py-3 dark:border-slate-800">
         {lastUpdatedAt && (
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400" aria-live="polite">
             Última actualización: {new Date(lastUpdatedAt).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
@@ -84,28 +87,7 @@ export default function ControlBar({
           )}
         </div>
         )}
-      </div>
-      <div className="flex items-center gap-2 flex-wrap">
-        {/* Acción principal del panel → único botón sólido */}
-        {canCreateNode && (
-          <button
-            onClick={onNewNode}
-            className="btn-primary px-4 py-2.5 flex items-center space-x-2 text-sm"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Agregar sitio</span>
-          </button>
-        )}
-        {/* Secundarios → outline */}
-        <button
-          onClick={onRefresh}
-          disabled={isLoading}
-          className="btn-outline px-4 py-2.5 flex items-center space-x-2 text-sm disabled:opacity-50"
-        >
-          <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-          <span>{isLoading ? 'Actualizando...' : hasLoaded ? 'Actualizar' : 'Cargar sitios'}</span>
-        </button>
-      </div>
-    </div>
+      </div> : null}
+    </PageHeader>
   );
 }

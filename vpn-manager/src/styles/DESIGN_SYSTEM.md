@@ -1,5 +1,28 @@
 # 🎨 Sistema de Diseño — MikroTikVPN Remote Manager
 
+## Escala canónica de interfaz
+
+Las vistas reutilizan los componentes de `components/Common/ui.tsx`; no deben reconstruir estos patrones con tamaños manuales.
+
+| Uso | Tamaño | Peso |
+|---|---:|---:|
+| Título de página (`PageHeader`) | 20 px; 18 px en móvil | 700 |
+| Título de tarjeta o estado vacío | 18 px | 700 |
+| Subtítulo o sección | 16 px | 600–700 |
+| Texto normal | 14 px | 400 |
+| Botón normal | 14 px | 600 |
+| Etiqueta auxiliar | 12 px | 500–600 |
+| Dato técnico | 12–14 px, JetBrains Mono | 400–600 |
+
+### Componentes estructurales
+
+- `PageHeader`: icono de 24 px dentro de 48 × 48 px, separación de 16 px y tarjeta con 24 px de relleno.
+- `EmptyState`: icono de 32 px dentro de 64 × 64 px, descripción de máximo 448 px, acciones separadas 24 px y relleno vertical de 48 px.
+- `Button`: exige variante y tamaño semánticos. `md` es el tamaño normal (mínimo 44 px); `sm` queda reservado para tablas, modales y controles densos.
+- `SectionCard`, `StatusBadge`, `SearchInput` y `SegmentedControl`: concentran superficie, estado, búsqueda y selección.
+
+Las clases manuales pueden definir distribución (`w-full`, anchos responsivos), pero no deben redefinir tipografía, altura, padding o color del componente salvo una excepción documentada.
+
 > Identidad visual única para todo el proyecto. Cualquier componente nuevo o
 > modificación debe seguir estos parámetros. Las reglas operativas resumidas
 > están en [`/CLAUDE.md`](../../CLAUDE.md).

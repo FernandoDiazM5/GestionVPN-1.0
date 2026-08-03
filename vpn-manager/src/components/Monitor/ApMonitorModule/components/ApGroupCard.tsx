@@ -1,4 +1,4 @@
-import { useState, useEffect, type CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { ChevronDown, ChevronRight, FileText, Loader2, Radio, Wifi, Server, Users, Trash2 } from 'lucide-react';
 import type { SavedDevice } from '../../../../types/devices';
 import type { PollResult } from '../../../../types/apMonitor';
@@ -26,16 +26,9 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelAc
   onApMove: (dev: SavedDevice) => void;
   onApRevealSsh: (dev: SavedDevice) => void;
 }) {
-  const [expanded, setExpanded] = useState(() => {
-    try {
-      const saved = sessionStorage.getItem('apMonitor_expanded_' + group.nodeId);
-      if (saved !== null) return saved === 'true';
-    } catch(e) {}
-    return true;
-  });
-  useEffect(() => {
-    sessionStorage.setItem('apMonitor_expanded_' + group.nodeId, String(expanded));
-  }, [expanded, group.nodeId]);
+  // Cada entrada a la vista comienza con los sitios compactos. La expansión
+  // es una decisión temporal del usuario y no se restaura entre visitas.
+  const [expanded, setExpanded] = useState(false);
   const [hiddenApCols, setHiddenApCols] = useState<Set<string>>(loadApColPrefs);
   const handleApColChange = (h: Set<string>) => { setHiddenApCols(h); saveApColPrefs(h); };
 
@@ -45,7 +38,7 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelAc
     : nodeStatus === 'partial' ? 'bg-amber-400'
       : nodeStatus === 'connecting' ? 'bg-sky-400 animate-pulse'
         : 'bg-slate-300';
-  const statusLabel = nodeStatus === 'empty' ? 'Sin antenas'
+  const statusLabel = nodeStatus === 'empty' ? 'Sin equipos'
     : nodeStatus === 'online' ? 'En línea'
       : nodeStatus === 'partial' ? 'Requiere atención'
         : nodeStatus === 'connecting' ? 'Actualizando…'
@@ -77,7 +70,7 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelAc
           </div>
         </div>
         <div className="col-start-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 text-xs text-slate-500 dark:text-slate-400">
-          <span className="flex shrink-0 items-center gap-1"><Server className="w-3 h-3" /> {group.aps.length} {group.aps.length === 1 ? 'antena' : 'antenas'}</span>
+          <span className="flex shrink-0 items-center gap-1"><Server className="w-3 h-3" /> {group.aps.length} {group.aps.length === 1 ? 'equipo' : 'equipos'}</span>
           {totalCpes > 0 && <span className="flex shrink-0 items-center gap-1 text-cyan-600 dark:text-cyan-400"><Users className="w-3 h-3" /> {totalCpes} {totalCpes === 1 ? 'cliente conectado' : 'clientes conectados'}</span>}
           {attentionCount > 0 && <span className="flex shrink-0 items-center gap-1 text-amber-700 dark:text-amber-300">{attentionCount} {attentionCount === 1 ? 'requiere atención' : 'requieren atención'}</span>}
           <button
@@ -92,7 +85,7 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelAc
               : <FileText className="h-3.5 w-3.5" aria-hidden="true" />}
             <span>{reportExporting ? 'Generando…' : 'Descargar informe'}</span>
           </button>
-          <ApColSelector hidden={hiddenApCols} onChange={handleApColChange} />
+          {expanded ? <ApColSelector hidden={hiddenApCols} onChange={handleApColChange} /> : null}
         </div>
       </div>
 
@@ -101,7 +94,7 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelAc
           {group.aps.length === 0 && group.stas.length === 0 && (
             <div className="flex flex-col items-center py-10 gap-3 text-slate-500 dark:text-slate-400">
               <Wifi className="w-8 h-8" />
-              <p className="text-sm">No hay antenas guardadas en este sitio</p>
+              <p className="text-sm">No hay equipos guardados en este sitio</p>
             </div>
           )}
           {group.aps.length > 0 && (

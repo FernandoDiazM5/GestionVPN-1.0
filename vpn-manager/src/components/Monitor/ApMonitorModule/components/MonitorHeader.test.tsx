@@ -22,12 +22,10 @@ describe('MonitorHeader', () => {
   it('presenta la jerarquía, las métricas y el estado de actualización en español', () => {
     render(<MonitorHeader {...baseProps} />);
 
-    expect(screen.getByRole('heading', { name: 'Estado de antenas' })).toBeInTheDocument();
-    expect(screen.getByText('Revisa el estado de las antenas y equipos conectados en cada sitio.')).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent('Actualización automática');
-    expect(screen.getByText('2 sitios')).toBeInTheDocument();
-    expect(screen.getByText('3 antenas')).toBeInTheDocument();
-    expect(screen.getByText('4 clientes conectados')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Estado de equipos' })).toBeInTheDocument();
+    expect(screen.getByText('Revisa el estado de los equipos de red conectados en cada sitio.')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Actualización en tiempo real');
+    expect(screen.getByLabelText('2 sitios, 3 equipos de red, 4 clientes conectados')).toHaveTextContent('2Sitios3Equipos4Clientes');
     expect(screen.queryByText(/CPEs live/i)).not.toBeInTheDocument();
   });
 
@@ -46,16 +44,15 @@ describe('MonitorHeader', () => {
       />,
     );
 
-    expect(screen.getByRole('button', { name: 'Sitio conectado' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'Otros sitios' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('combobox', { name: 'Filtrar equipos por sitio' })).toHaveValue('active');
 
-    await user.click(screen.getByRole('button', { name: 'Otros sitios' }));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Filtrar equipos por sitio' }), 'inactive');
     expect(onFilterChange).toHaveBeenCalledWith('inactive');
 
-    await user.type(screen.getByRole('searchbox', { name: /buscar antena por nombre/i }), 'torre');
+    await user.type(screen.getByRole('searchbox', { name: /buscar equipos por nombre/i }), 'torre');
     expect(onSearchChange).toHaveBeenLastCalledWith('e');
 
-    await user.click(screen.getByRole('button', { name: 'Actualizar información' }));
+    await user.click(screen.getByRole('button', { name: 'Actualizar equipos' }));
     expect(onSync).toHaveBeenCalledOnce();
 
     rerender(
@@ -69,8 +66,18 @@ describe('MonitorHeader', () => {
       />,
     );
 
-    expect(screen.getByRole('button', { name: 'Actualizar información' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Actualizar equipos' })).toBeDisabled();
     await user.click(screen.getByRole('button', { name: 'Limpiar búsqueda' }));
     expect(onSearchChange).toHaveBeenLastCalledWith('');
+  });
+
+  it('mantiene disponible el filtro y deshabilita las acciones sin datos visibles', () => {
+    render(<MonitorHeader {...baseProps} nodeCount={0} apCount={0} cpeCount={0} canSync={false} />);
+
+    expect(screen.getByRole('combobox', { name: 'Filtrar equipos por sitio' })).toBeEnabled();
+    expect(screen.getByRole('searchbox', { name: /buscar equipos por nombre/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Actualizar equipos' })).toBeDisabled();
+    expect(screen.getByText('Selecciona “Otros sitios” o “Todos los sitios” para consultar equipos guardados.')).toBeInTheDocument();
+    expect(screen.queryByText('En línea')).not.toBeInTheDocument();
   });
 });

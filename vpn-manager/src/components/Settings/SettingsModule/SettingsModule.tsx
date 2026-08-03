@@ -11,6 +11,7 @@ import {
 import { useLoadSettings, useSaveSettings } from './hooks';
 import AsyncQueryState from '../../Common/AsyncQueryState';
 import ProfileTab from '../ModeratorSettings/tabs/ProfileTab';
+import { PageHeader } from '../../Common/ui';
 
 type TabId = 'core' | 'server' | 'scan' | 'reports' | 'account';
 
@@ -40,19 +41,7 @@ export default function SettingsModule() {
   // (Administrador) y "Equipo" (Moderador). Aquí solo va la configuración global.
   return (
     <div className="space-y-5">
-      <div className="card p-6">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-500/15 flex items-center justify-center">
-            <SettingsIcon className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">Ajustes del sistema</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Configura la plataforma, los reportes y tu cuenta de Administrador
-            </p>
-          </div>
-        </div>
-      </div>
+      <PageHeader title="Ajustes del sistema" description="Configura la plataforma, los reportes y tu cuenta de Administrador" icon={SettingsIcon} titleId="system-settings-title" />
 
       <div className="grid grid-cols-1 md:grid-cols-[220px_minmax(0,1fr)] gap-5">
         <nav className="space-y-1" aria-label="Secciones de ajustes del Administrador">

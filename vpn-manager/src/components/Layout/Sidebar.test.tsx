@@ -24,12 +24,12 @@ vi.mock('../../context', () => ({
 }));
 
 vi.mock('../../context/WorkspaceSession', () => ({
-  useWorkspaceSession: () => ({ session: { role: 'OWNER' } }),
+  useWorkspaceSession: () => ({ session: { role: 'OWNER', name: 'Fernando Díaz', email: 'fernando@example.com' } }),
 }));
 
 vi.mock('../../utils/permissions', () => ({
-  visibleModules: () => ['dashboard', 'nodes', 'devices', 'team', 'monitor', 'settings'],
-  roleLabel: () => 'Propietario',
+  visibleModules: () => ['nodes', 'devices', 'team', 'monitor', 'settings'],
+  roleLabel: () => 'Moderador',
 }));
 
 describe('<Sidebar /> móvil', () => {
@@ -63,11 +63,31 @@ describe('<Sidebar /> móvil', () => {
   it('mide la navegación antes de cambiar el módulo', async () => {
     const user = userEvent.setup();
     render(<Sidebar />);
+    markNavigationStart.mockClear();
+    setActiveModule.mockClear();
 
     await user.click(screen.getByRole('button', { name: 'Sitios' }));
     expect(markNavigationStart).toHaveBeenCalledWith('nodes');
     expect(setActiveModule).toHaveBeenCalledWith('nodes');
     expect(markNavigationStart.mock.invocationCallOrder[0])
       .toBeLessThan(setActiveModule.mock.invocationCallOrder[0]);
+  });
+
+  it('simplifica categorías, estados y controles del moderador', () => {
+    render(<Sidebar />);
+
+    expect(screen.getByText('Operación')).toBeInTheDocument();
+    expect(screen.getByText('Cuenta')).toBeInTheDocument();
+    expect(screen.queryByText('Red')).not.toBeInTheDocument();
+    expect(screen.queryByText('Acceso')).not.toBeInTheDocument();
+    expect(screen.queryByText('Monitoreo')).not.toBeInTheDocument();
+    expect(screen.queryByText('Sistema')).not.toBeInTheDocument();
+    expect(screen.queryByText('Servicio disponible')).not.toBeInTheDocument();
+    expect(screen.queryByText('Conexión principal')).not.toBeInTheDocument();
+    expect(screen.queryByText('Todo funciona correctamente')).not.toBeInTheDocument();
+    expect(screen.queryByText('Tema oscuro')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Activar modo oscuro' })).toBeInTheDocument();
+    expect(screen.getByText('Fernando Díaz')).toBeInTheDocument();
+    expect(screen.getByText('Moderador')).toBeInTheDocument();
   });
 });

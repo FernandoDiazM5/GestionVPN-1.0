@@ -43,7 +43,7 @@ function ColSelector({ hidden, unavailable, onChange }: {
             return (
               <label
                 key={col.key}
-                title={isUnavailable ? 'Esta antena no entrega esta métrica' : undefined}
+                title={isUnavailable ? 'Este equipo no entrega esta métrica' : undefined}
                 className={`flex items-start gap-2 py-1 ${isUnavailable ? 'cursor-not-allowed opacity-60' : 'cursor-pointer group'}`}
               >
                 <input
@@ -55,7 +55,7 @@ function ColSelector({ hidden, unavailable, onChange }: {
                 />
                 <span className={`text-xs ${isUnavailable ? 'text-slate-500 dark:text-slate-400' : 'text-slate-700 group-hover:text-indigo-600 dark:text-slate-200'}`}>
                   <span className="block">{col.label}</span>
-                  {isUnavailable && <span className="block text-3xs font-normal">Sin datos en esta antena</span>}
+                  {isUnavailable && <span className="block text-3xs font-normal">Sin datos en este equipo</span>}
                 </span>
               </label>
             );

@@ -1,4 +1,4 @@
-import { Radio, Loader2, Wifi, WifiOff } from 'lucide-react';
+import { Loader2, Router } from 'lucide-react';
 import type { NodeInfo } from '../../../../types/api';
 
 interface NodeCardStatusIconProps {
@@ -21,13 +21,13 @@ export function NodeCardStatusIcon({ node, isThisNodeActive, isPending }: NodeCa
                 : 'bg-slate-200 dark:bg-slate-700'}`}
       >
         {isThisNodeActive ? (
-          <Radio className="w-3.5 h-3.5 text-white animate-pulse" />
+          <Router className="w-4 h-4 text-white" />
         ) : isPending ? (
           <Loader2 className="w-3.5 h-3.5 text-white animate-spin" />
         ) : node.running ? (
-          <Wifi className="w-3.5 h-3.5 text-white" />
+          <Router className="w-4 h-4 text-white" />
         ) : (
-          <WifiOff className="w-3.5 h-3.5 text-slate-400" />
+          <Router className="w-4 h-4 text-slate-400" />
         )}
       </div>
     </td>
