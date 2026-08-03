@@ -4,6 +4,12 @@
 > Aquí solo se **añaden** entradas por sesión (las más nuevas arriba); no se edita lo viejo.
 > Mantenimiento gobernado por la skill `handoff-keeper` (`.claude/skills/handoff-keeper/`).
 
+> **Sesión 2026-08-02 — Base productiva clonada sobre XAMPP local.** Rama `vps_prod` (base `3b13941`). Estado: restauración verificada 54 tablas/5 usuarios/3 workspaces/15 nodos/5 membresías; backend local MySQL `ok`; producción sin cambios funcionales.
+> - Se respaldó primero la base local anterior fuera del repositorio y se exportó producción con `single-transaction`, rutinas, triggers, eventos y blobs hexadecimales; SHA-256 remoto/local coincidente.
+> - Como XAMPP usa MariaDB 10.4, una restauración aislada detectó incompatibilidad con la cabecera sandbox y `utf8mb4_uca1400_ai_ci`; se creó una variante local compatible (`utf8mb4_unicode_ci`) y sólo después se reemplazó `vpn_manager`.
+> - No se copiaron secretos de entorno del VPS. Se verificó un `platform_admin` activo, se eliminó la base temporal de prueba y se retiraron ambos archivos temporales del VPS.
+> - Para usar la copia en correcciones visuales sin ruido ni operaciones de fondo, el entorno local desactiva Telegram, monitoreo RouterOS y polling AP; health local confirmado con MySQL/SMTP `ok`.
+
 > **Sesión 2026-08-02 — Seguridad administrativa y columna fija desplegadas.** Producción `c393c78`; rollback `pre-ui-rbac-20260803T025500Z` para backend y frontend.
 > - Se publicó y desplegó conjuntamente la exclusividad administrativa de `/api/admin/security/*` y el panel opaco de Opciones en la tabla de Sitios, usando exclusivamente `docker-compose.prod.yml` y avanzando primero el backend saludable.
 > - Validación local: `check:all`, backend focalizado 13/13, frontend focalizado 16/16 y auditor visual 305/0. Producción: raíz/legacy 200, health MySQL/RouterOS/SMTP `ok`, preflight 204, origen hostil 403, Seguridad anónima 401, tres contenedores con 0 reinicios.
