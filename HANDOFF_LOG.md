@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-03 — Sistema visual y correcciones de menús desplegados.** Rama `vps_prod`; producción funcional `84b4fda`. Estado: despliegue frontend correcto.
+> - Se desplegaron los componentes visuales compartidos, Buscar equipos, Estado de equipos, navegación del moderador, Mi equipo, iconografía de Sitios, selectores/menús flotantes y la corrección CSP Report-Only.
+> - Verificación local: `check:all`, build, lint, 627 pruebas backend y 224 frontend correctas; auditor visual sin errores ni warnings.
+> - Producción: raíz y ruta legacy 200, preflight 204, origen hostil 403, MySQL/RouterOS/SMTP `ok`, backend healthy, frontend activo y cero reinicios. Sin migraciones ni reinicio de backend/DB.
+> - Rollback preservado: `gestionvpn-10-frontend:pre-ui-20260803T013525Z`. Disco al cierre: 70%, 7.4 GiB libres.
+
 > **Sesión 2026-08-03 — Menú de opciones de AP reparado.** Rama `vps_prod` (base `64c5e0f`). Estado: corrección frontend focalizada; pendiente despliegue.
 > - En Estado de equipos, el menú de cada AP reutiliza ahora `useKebabMenu`: se renderiza en portal y decide automáticamente si abrir arriba o abajo según el espacio visible, evitando que las opciones de las últimas filas queden fuera de la pantalla.
 > - Conserva cierre por clic exterior, Escape, scroll y resize; si la altura disponible es reducida, el propio menú permite desplazamiento interno.
