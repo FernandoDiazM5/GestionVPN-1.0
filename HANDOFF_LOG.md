@@ -4,6 +4,16 @@
 > Aquí solo se **añaden** entradas por sesión (las más nuevas arriba); no se edita lo viejo.
 > Mantenimiento gobernado por la skill `handoff-keeper` (`.claude/skills/handoff-keeper/`).
 
+> **Sesión 2026-08-02 — Columna fija de Opciones sin transparencias.** Rama `vps_prod` (base `8ba36d2`). Estado: 16 pruebas frontend focalizadas, TypeScript, lint y auditor visual 305/0 correctos; sin despliegue.
+> - La causa era que la celda sticky heredaba fondos semitransparentes de la fila, permitiendo ver `Dirección de conexión` y otras columnas detrás de `Conectar`.
+> - La celda y el encabezado de Opciones usan ahora fondos opacos, borde izquierdo y una sombra lateral suave; el hover también permanece opaco.
+> - Se añadió una aserción de regresión para el fondo y borde sólidos del encabezado fijo.
+
+> **Sesión 2026-08-02 — Seguridad cerrada exclusivamente al Administrador.** Rama `vps_prod` (base `8ba36d2`). Estado: pruebas focalizadas 15 frontend + 13 backend y `check:all` correctos; sin despliegue.
+> - Se retiró `security` de la matriz visible del moderador OWNER; el guard común redirige cualquier navegación persistida o directa a un módulo autorizado.
+> - Todo `/api/admin/security/*`, incluidas cuentas bloqueadas y reautenticación, exige ahora `platform_admin`; se eliminó el acceso parcial del moderador por workspace.
+> - Se actualizaron las pruebas RBAC y el inventario generado `docs/security/ROUTE_SECURITY_INVENTORY.md`.
+
 > **Sesión 2026-08-02 — Login 500 por CORS diagnosticado, recuperado y endurecido.** Producción `2c8fcdb`; rollback backend `pre-cors-hardening-20260802T131102Z`.
 > - Los logs demostraron que `https://joinpoint.cloud` era rechazado antes de autenticación. El último despliegue había combinado Compose local+productivo y el CORS local sobrescribió el `server/.env.production`; por eso login y reporte de errores fallaban juntos con 500.
 > - Se recuperó primero sin rebuild, recreando sólo backend con `docker-compose.prod.yml`; luego se eliminó el override CORS del Compose local, se añadió validación productiva fail-fast/HTTPS y el rechazo pasó a 403 operacional.

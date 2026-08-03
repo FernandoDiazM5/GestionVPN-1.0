@@ -134,7 +134,7 @@ export default function NodesTable({
             {/* Fija: Acciones — §44 sticky-right (patrón §39 de Escanear).
                 Shadow sutil hacia la izquierda marca que está flotando
                 cuando hay overflow horizontal. */}
-            <th className="px-4 py-3 text-right font-bold text-slate-500 tracking-wide text-2xs sticky right-0 z-10 bg-slate-50 shadow-[-2px_0_6px_-3px_rgba(0,0,0,0.06)] dark:text-slate-400 dark:bg-slate-800/50">
+            <th className="sticky right-0 z-20 border-l border-slate-200 bg-slate-50 px-4 py-3 text-right text-2xs font-bold tracking-wide text-slate-500 shadow-[-8px_0_12px_-10px_rgba(15,23,42,0.45)] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
               Opciones
             </th>
           </tr>

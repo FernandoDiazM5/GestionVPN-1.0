@@ -70,7 +70,7 @@ describe('visibleModules', () => {
     expect(mods).toContain('team');
     expect(mods).toContain('monitor');
     expect(mods).toContain('settings');
-    expect(mods).toContain('security');
+    expect(mods).not.toContain('security');
     // 'users' (Gestión WG) se unificó como tab dentro de 'team' — ya no es módulo navegable.
     expect(mods).not.toContain('users');
     expect(mods).not.toContain('dashboard');
@@ -96,9 +96,9 @@ describe('canSeeModule', () => {
     expect(canSeeModule(u({ platform_admin: true }), 'moderators')).toBe(true);
   });
 
-  it('platform_admin y OWNER ven "security", MEMBER no', () => {
+  it('solo platform_admin ve "security"', () => {
     expect(canSeeModule(u({ platform_admin: true }), 'security')).toBe(true);
-    expect(canSeeModule(u({ role: 'OWNER' }), 'security')).toBe(true);
+    expect(canSeeModule(u({ role: 'OWNER' }), 'security')).toBe(false);
     expect(canSeeModule(u({ role: 'MEMBER' }), 'security')).toBe(false);
   });
 });

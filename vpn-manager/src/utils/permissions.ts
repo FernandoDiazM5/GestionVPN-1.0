@@ -38,7 +38,7 @@ export function visibleModules(s?: SessionUser | null): ModuleId[] {
   // 'users' (Gestión WG) se unificó dentro de 'team' como una tab — el item del
   // sidebar ya no existe. El ModuleId se mantiene como tipo válido por si una
   // URL vieja lo referencia, pero ningún flujo navegable apunta ahí.
-  return ['nodes', 'devices', 'team', 'monitor', 'security', 'settings'];
+  return ['nodes', 'devices', 'team', 'monitor', 'settings'];
 }
 
 export const canSeeModule = (s: SessionUser | null | undefined, m: ModuleId) => visibleModules(s).includes(m);

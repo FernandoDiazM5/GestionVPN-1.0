@@ -33,6 +33,11 @@ describe('NodesTable accessibility', () => {
     expect(screen.getByRole('columnheader', { name: 'Ruta asignada' })).not.toHaveClass('uppercase');
     expect(screen.getByRole('columnheader', { name: 'Dirección de conexión' })).not.toHaveClass('uppercase');
     expect(screen.getByRole('columnheader', { name: 'Red del sitio' })).not.toHaveClass('uppercase');
+    expect(screen.getByRole('columnheader', { name: 'Opciones' })).toHaveClass(
+      'bg-slate-50',
+      'dark:bg-slate-800',
+      'border-l',
+    );
 
     const sortButton = screen.getByRole('button', { name: /ordenar por sitio ascendente/i });
     sortButton.focus();

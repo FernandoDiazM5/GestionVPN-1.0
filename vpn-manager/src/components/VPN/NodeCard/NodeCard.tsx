@@ -120,6 +120,16 @@ export default function NodeCard({
         ? 'bg-white dark:bg-slate-900'
         : 'bg-slate-50/40 dark:bg-slate-800/40';
 
+  // La celda sticky debe ser 100 % opaca: las columnas técnicas se desplazan
+  // por debajo de ella y cualquier color con transparencia deja ver su texto.
+  const actionBg = isThisNodeActive
+    ? 'bg-emerald-50 dark:bg-emerald-950'
+    : isPending
+      ? 'bg-indigo-50 dark:bg-indigo-950'
+      : rowIndex % 2 === 0
+        ? 'bg-white dark:bg-slate-900'
+        : 'bg-slate-50 dark:bg-slate-800';
+
   const borderLeft = isThisNodeActive
     ? 'border-l-2 border-l-emerald-400'
     : isPending
@@ -183,13 +193,11 @@ export default function NodeCard({
 
         <NodeCardStatusRow node={node} visibleCols={visibleCols} tags={tags} />
 
-        {/* Acciones — §44 sticky-right. Lleva su propio bg (mismo rowBg
-            que la fila) para tapar las celdas que pasan por debajo cuando
-            la tabla scrollea horizontalmente. group-hover sincroniza el
-            cambio de fondo con el resto del row. Shadow sutil hacia la
-            izquierda marca el "flotamiento" cuando hay overflow. */}
+        {/* Acciones — §44 sticky-right. El fondo es deliberadamente opaco
+            para ocultar las columnas que pasan por debajo. El borde y la
+            sombra lateral separan visualmente este panel fijo. */}
         <td
-          className={`px-4 py-3 sticky right-0 z-[1] shadow-[-2px_0_6px_-3px_rgba(0,0,0,0.06)] ${rowBg} group-hover:bg-indigo-50/30 dark:group-hover:bg-indigo-500/10`}
+          className={`sticky right-0 z-10 border-l border-slate-200 px-4 py-3 shadow-[-8px_0_12px_-10px_rgba(15,23,42,0.45)] dark:border-slate-700 ${actionBg} group-hover:bg-indigo-50 dark:group-hover:bg-slate-800`}
         >
           <div className="flex items-center justify-end gap-2">
             {/* Acceder — tenue en reposo, sólido al hover de la fila */}

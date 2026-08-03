@@ -15,7 +15,6 @@ const authIdentityRepo = require('../db/repos/authIdentityRepo');
 const notificationRepo = require('../db/repos/notificationRepo');
 const securityRepo = require('../db/repos/platformSecurityRepo');
 const accountSecurityRepo = require('../db/repos/accountLoginSecurityRepo');
-const memberRepo = require('../db/repos/memberRepo');
 const telegram = require('../lib/telegram');
 const {
   callSecurityAgent, getSecurityAgentStatus, invalidateSecurityAgentStatus,
@@ -28,10 +27,9 @@ const webEnforcementRepo = require('../db/repos/webSecurityEnforcementRepo');
 
 const router = express.Router();
 router.use(requireSession);
+router.use(requirePlatformAdmin);
 router.use(asyncHandler(async (req, _res, next) => {
-  if (req.account.platform_admin) {
-    await webEnforcement.touchAdminIp({ sourceIp: clientIp(req), userId: req.account.sub });
-  }
+  await webEnforcement.touchAdminIp({ sourceIp: clientIp(req), userId: req.account.sub });
   next();
 }));
 const STEP_UP_MS = 5 * 60 * 1000;
@@ -41,12 +39,6 @@ const DURATION_JAIL = {
 };
 
 const hash = (value) => crypto.createHash('sha256').update(value).digest('hex');
-
-function requireSecurityOperator(req, res, next) {
-  if (req.account.platform_admin || req.account.role === 'OWNER') return next();
-  return res.status(403).json({ success: false, code: 'SECURITY_OPERATOR_REQUIRED',
-    message: 'Permisos insuficientes' });
-}
 
 async function notifyAdmin(userId, action, target, reason) {
   try {
@@ -58,7 +50,7 @@ async function notifyAdmin(userId, action, target, reason) {
   } catch (error) { return { ok: false, error: error.message }; }
 }
 
-router.post('/step-up', requireSecurityOperator, guardPolicy('SECURITY_STEP_UP'), validate({ body: SecurityStepUpRequestSchema }), asyncHandler(async (req, res) => {
+router.post('/step-up', guardPolicy('SECURITY_STEP_UP'), validate({ body: SecurityStepUpRequestSchema }), asyncHandler(async (req, res) => {
   const user = await userRepo.findById(req.account.sub);
   if (!user) throw new AppError('Administrador no encontrado', 404, 'NOT_FOUND');
   let method;
@@ -129,7 +121,7 @@ async function readSecurityStatus() {
   }
 }
 
-router.get('/status', requirePlatformAdmin, asyncHandler(async (req, res) => {
+router.get('/status', asyncHandler(async (req, res) => {
   const [agentStatus, trustedMetadata, recent, webActions] = await Promise.all([
     readSecurityStatus(), securityRepo.trustList(), securityRepo.history({ limit: 500 }),
     webEnforcementRepo.recentActions(500),
@@ -179,11 +171,11 @@ router.get('/status', requirePlatformAdmin, asyncHandler(async (req, res) => {
   return sendOk(res, { ...status, trustedMetadata, currentIp: clientIp(req),
     systemTrusted: systemTrustedCidrs() });
 }));
-router.get('/history', requirePlatformAdmin, validate({ query: SecurityHistoryQuerySchema }), asyncHandler(async (req, res) =>
+router.get('/history', validate({ query: SecurityHistoryQuerySchema }), asyncHandler(async (req, res) =>
   sendOk(res, { history: await securityRepo.history(req.query) })));
-router.get('/attempts', requirePlatformAdmin, validate({ query: SecurityHistoryQuerySchema }), asyncHandler(async (req, res) =>
+router.get('/attempts', validate({ query: SecurityHistoryQuerySchema }), asyncHandler(async (req, res) =>
   sendOk(res, await callSecurityAgent('attempts', req.query))));
-router.get('/web-observation', requirePlatformAdmin, validate({ query: SecurityHistoryQuerySchema }), asyncHandler(async (req, res) => {
+router.get('/web-observation', validate({ query: SecurityHistoryQuerySchema }), asyncHandler(async (req, res) => {
   const [snapshot, actions] = await Promise.all([
     webObservation.observation({ sourceIp: req.query.target || null }),
     webEnforcementRepo.recentActions(100),
@@ -195,11 +187,10 @@ function blockedTargets(status) {
     (jail.banDetails || []).map((detail) => detail.target).concat(jail.banned || [])));
 }
 
-router.get('/locked-accounts', requireSecurityOperator, asyncHandler(async (req, res) => {
-  const workspaceId = req.account.platform_admin ? null : req.account.workspace_id;
+router.get('/locked-accounts', asyncHandler(async (req, res) => {
   const [accounts, status] = await Promise.all([
-    accountSecurityRepo.listLocked(Date.now(), workspaceId),
-    req.account.platform_admin ? getSecurityAgentStatus().catch(() => null) : Promise.resolve(null),
+    accountSecurityRepo.listLocked(Date.now(), null),
+    getSecurityAgentStatus().catch(() => null),
   ]);
   const globallyBlocked = status ? blockedTargets(status) : null;
   return sendOk(res, { accounts: accounts.map((account) => ({
@@ -209,15 +200,11 @@ router.get('/locked-accounts', requireSecurityOperator, asyncHandler(async (req,
   })) });
 }));
 
-router.post('/locked-accounts/unlock', requireSecurityOperator, validate({ body: AccountUnlockMutationSchema }), asyncHandler(async (req, res) => {
+router.post('/locked-accounts/unlock', validate({ body: AccountUnlockMutationSchema }), asyncHandler(async (req, res) => {
   await requireStepUp(req);
   const requestIp = clientIp(req);
   const user = await userRepo.findById(req.body.userId);
   if (!user) throw new AppError('Usuario no encontrado', 404, 'NOT_FOUND');
-  if (!req.account.platform_admin) {
-    const membership = await memberRepo.findMembership(req.account.workspace_id, user.id);
-    if (!membership) throw new AppError('Usuario no encontrado en tu workspace', 404, 'NOT_FOUND');
-  }
   const lock = await accountSecurityRepo.get(user.id);
   const changed = await accountSecurityRepo.unlock(user.id);
   const clearedRateLimits = await clearLoginIdentityBlocks({
@@ -229,7 +216,7 @@ router.post('/locked-accounts/unlock', requireSecurityOperator, validate({ body:
       statusCode: 200, decision: 'ADMIN_ACCOUNT_UNLOCK',
       detail: { classification: 'ADMINISTRATIVE_ACCOUNT_UNLOCK' } });
   }
-  const status = req.account.platform_admin ? await getSecurityAgentStatus().catch(() => null) : null;
+  const status = await getSecurityAgentStatus().catch(() => null);
   const globallyBlocked = status ? blockedTargets(status) : null;
   const ipGloballyBlocked = !lock?.last_failure_ip || !globallyBlocked ? null
     : globallyBlocked.has(lock.last_failure_ip) || globallyBlocked.has(`${lock.last_failure_ip}/32`);
