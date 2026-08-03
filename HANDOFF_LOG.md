@@ -4,6 +4,11 @@
 > Aquí solo se **añaden** entradas por sesión (las más nuevas arriba); no se edita lo viejo.
 > Mantenimiento gobernado por la skill `handoff-keeper` (`.claude/skills/handoff-keeper/`).
 
+> **Sesión 2026-08-02 — Seguridad administrativa y columna fija desplegadas.** Producción `c393c78`; rollback `pre-ui-rbac-20260803T025500Z` para backend y frontend.
+> - Se publicó y desplegó conjuntamente la exclusividad administrativa de `/api/admin/security/*` y el panel opaco de Opciones en la tabla de Sitios, usando exclusivamente `docker-compose.prod.yml` y avanzando primero el backend saludable.
+> - Validación local: `check:all`, backend focalizado 13/13, frontend focalizado 16/16 y auditor visual 305/0. Producción: raíz/legacy 200, health MySQL/RouterOS/SMTP `ok`, preflight 204, origen hostil 403, Seguridad anónima 401, tres contenedores con 0 reinicios.
+> - La construcción prolongada se ejecutó finalmente como unidad temporal supervisada; se retiraron 870.7 MiB de caché recuperable sin borrar imágenes ni volúmenes. Disco final 67%/8.1 GiB libres.
+
 > **Sesión 2026-08-02 — Columna fija de Opciones sin transparencias.** Rama `vps_prod` (base `8ba36d2`). Estado: 16 pruebas frontend focalizadas, TypeScript, lint y auditor visual 305/0 correctos; sin despliegue.
 > - La causa era que la celda sticky heredaba fondos semitransparentes de la fila, permitiendo ver `Dirección de conexión` y otras columnas detrás de `Conectar`.
 > - La celda y el encabezado de Opciones usan ahora fondos opacos, borde izquierdo y una sombra lateral suave; el hover también permanece opaco.
