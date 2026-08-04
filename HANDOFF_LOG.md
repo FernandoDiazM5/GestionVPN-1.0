@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-03 — Correcciones visuales y workspace inmutable desplegados.** Rama `vps_prod`; producción funcional `2e7f7d0`. Estado: despliegue backend/frontend correcto.
+> - Se desplegaron la tabla IP/MAC mejorada, retiro visible de columnas, buscador de Estado de equipos desbloqueado y nombre/slug del workspace inmutables. Sólo backend/frontend fueron reconstruidos y recreados; DB intacta, sin migraciones nuevas.
+> - Producción: raíz/legacy 200, health 200 con MySQL/RouterOS/SMTP `ok`, preflight 204, origen hostil 403, login inválido 401, bundles nuevos confirmados, datos 54/5/3/15 y cero reinicios.
+> - Rollback: `gestionvpn-10-{backend,frontend}:pre-visual-fixes-20260804T040439Z`. Se retiraron cinco rollbacks antiguos superados; disco 65%/8.5 GiB libres.
+
 > **Sesión 2026-08-03 — IP/MAC y ancho de la tabla de Buscar equipos mejorados.** Rama `vps_prod` (base `4f771fc`). Estado: paquete visual/funcional completo; pendiente despliegue.
 > - Se implementaron las recomendaciones 1–8: orden IPv4 numérico, IP completa con ancho redimensionable persistente, copiar IP, tooltip enriquecido, IP fija durante scroll, acciones compactadas y MAC como columna opcional independiente sin duplicación móvil.
 > - La IP usa 196 px por defecto y mínimo de 180 px; Acciones baja de 180 a 116 px. Direcciones inválidas se ordenan después de IPv4 válidas.
