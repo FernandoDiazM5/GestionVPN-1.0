@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-04 — Snapshot y diagnóstico de AP desplegados.** Rama `vps_prod`; producción funcional `93245c7`. Estado: backend/frontend/schema correctos.
+> - Antes del cambio se creó `/root/pre-ap-status-20260804T122149Z/vpn_manager.sql.gz`, se validó gzip/SHA-256 y se restauró en una base aislada con conteos idénticos 54 tablas/5 usuarios/3 workspaces/15 nodos.
+> - La inicialización idempotente creó `ap_status_snapshots`: 55 tablas y 7 columnas; inicia vacía y se poblará con la primera lectura real. DB no fue recreada y los conteos críticos permanecen 5/3/15.
+> - Producción: raíz/legacy/health 200, CORS 204/403, MySQL/RouterOS/SMTP `ok`, bundle nuevo confirmado, backend/DB healthy, cero reinicios y cero errores de backend/esquema. Rollback `gestionvpn-10-{backend,frontend}:pre-ap-status-20260804T122206Z`; tras podar 1.961 GB de build cache, disco 72%/6.8 GiB libres.
+
 > **Sesión 2026-08-04 — Último estado de AP persistido para operación sin túnel.** Rama `vps_prod` (base `3b676f1`). Estado: frontend/backend/schema validados; pendiente despliegue.
 > - Se añadió `ap_status_snapshots`, relación 1:1 con AP y borrado en cascada, que guarda únicamente señal, CCQ, potencia, tiempo en línea, CPU y fecha de captura. No persiste diagnóstico técnico ni secretos.
 > - Cada diagnóstico exitoso actualiza el snapshot; `/api/db/devices` lo incorpora al inventario y la UI conserva el valor histórico cuando el nodo está inactivo. Con túnel activo, lecturas ausentes o mayores a 60 s se refrescan en lotes de dos.
