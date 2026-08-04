@@ -112,18 +112,34 @@ router.get('/db/devices', asyncHandler(async (req, res) => {
     let rows;
         if (gids === null) {
             rows = await db.all(
-                `SELECT a.*, ag.uuid AS ap_group_uuid
-                 FROM aps a LEFT JOIN ap_groups ag ON ag.id = a.ap_group_id`);
+                `SELECT a.*, ag.uuid AS ap_group_uuid,
+                        apss.signal_dbm AS snapshot_signal_dbm,
+                        apss.ccq_pct AS snapshot_ccq_pct,
+                        apss.tx_power_dbm AS snapshot_tx_power_dbm,
+                        apss.uptime_text AS snapshot_uptime_text,
+                        apss.cpu_pct AS snapshot_cpu_pct,
+                        apss.captured_at AS snapshot_captured_at
+                 FROM aps a
+                 LEFT JOIN ap_groups ag ON ag.id = a.ap_group_id
+                 LEFT JOIN ap_status_snapshots apss ON apss.ap_id = a.id`);
         } else if (gids.length === 0) {
             rows = [];
         } else {
             const ph = gids.map(() => '?').join(',');
             rows = await db.all(
-                `SELECT a.*, ag.uuid AS ap_group_uuid
+                `SELECT a.*, ag.uuid AS ap_group_uuid,
+                        apss.signal_dbm AS snapshot_signal_dbm,
+                        apss.ccq_pct AS snapshot_ccq_pct,
+                        apss.tx_power_dbm AS snapshot_tx_power_dbm,
+                        apss.uptime_text AS snapshot_uptime_text,
+                        apss.cpu_pct AS snapshot_cpu_pct,
+                        apss.captured_at AS snapshot_captured_at
                  FROM aps a JOIN ap_groups ag ON ag.id = a.ap_group_id
+                 LEFT JOIN ap_status_snapshots apss ON apss.ap_id = a.id
                  WHERE a.ap_group_id IN (${ph})`, gids);
         }
         // Convertir estructura relacional v2 a estructura "SavedDevice" esquelética
+        const metric = (value) => value == null ? undefined : Number(value);
         const devices = rows.map(r => ({
             id: r.uuid,
             mac: r.uuid,
@@ -149,7 +165,15 @@ router.get('/db/devices', asyncHandler(async (req, res) => {
             addedAt: r.created_at,
             nodeName: r.nombre_nodo || '',
             routerPort: r.router_port || 8075,
-            lastSeen: r.last_seen || 0
+            lastSeen: r.last_seen || 0,
+            lastStatsAt: r.snapshot_captured_at ? Number(r.snapshot_captured_at) : undefined,
+            cachedStats: r.snapshot_captured_at ? {
+                signal: metric(r.snapshot_signal_dbm),
+                ccq: metric(r.snapshot_ccq_pct),
+                txPower: metric(r.snapshot_tx_power_dbm),
+                uptimeStr: r.snapshot_uptime_text || undefined,
+                cpuLoad: metric(r.snapshot_cpu_pct),
+            } : undefined,
         }));
     return sendOk(res, { devices });
 }));

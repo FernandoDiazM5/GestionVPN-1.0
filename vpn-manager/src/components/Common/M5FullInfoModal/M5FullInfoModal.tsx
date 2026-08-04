@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Database, History, TerminalSquare } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { AlertCircle, Database, History, Loader2, TerminalSquare } from 'lucide-react';
 import type { M5FullInfoModalProps } from './types';
 import { useCopiedIpState } from './hooks/useCopiedIpState';
 import ModalHeader from './components/ModalHeader';
@@ -16,11 +16,47 @@ import { detectFamily } from './utils/deviceFamily';
 import { modalContainerStyles } from './utils/styles';
 import Dialog from '../Dialog';
 
-export default function M5FullInfoModal({ dev, onClose, onAnalyzeWithAi }: M5FullInfoModalProps) {
+export default function M5FullInfoModal({ dev, onClose, onAnalyzeWithAi, loadStats }: M5FullInfoModalProps) {
   const [activeTab, setActiveTab] = useState<'data' | 'technical' | 'history'>('data');
+  const [stats, setStats] = useState(dev.cachedStats);
+  const [loadingStats, setLoadingStats] = useState(!dev.cachedStats && !!loadStats);
+  const [statsError, setStatsError] = useState('');
   const { copiedIp, copyIp } = useCopiedIpState(dev.ip);
-  const s = dev.cachedStats;
+  const s = stats;
   const family = detectFamily(dev);
+
+  useEffect(() => {
+    if (dev.cachedStats) {
+      setStats(dev.cachedStats);
+      setLoadingStats(false);
+      setStatsError('');
+      return;
+    }
+    if (!loadStats || !('id' in dev)) return;
+
+    let active = true;
+    setLoadingStats(true);
+    setStatsError('');
+    void loadStats(dev)
+      .then(freshStats => { if (active) setStats(freshStats); })
+      .catch(cause => {
+        if (active) setStatsError(cause instanceof Error ? cause.message : 'No se pudo consultar el equipo');
+      })
+      .finally(() => { if (active) setLoadingStats(false); });
+    return () => { active = false; };
+  }, [dev, loadStats]);
+
+  const dataContent = loadingStats ? (
+    <div className="flex min-h-48 flex-col items-center justify-center gap-3 text-sm text-slate-500">
+      <Loader2 className="h-6 w-6 animate-spin text-sky-600" />
+      <span>Consultando datos actuales del equipo…</span>
+    </div>
+  ) : statsError ? (
+    <div role="alert" className="mx-auto my-8 flex max-w-xl items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
+      <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+      <span>{statsError}</span>
+    </div>
+  ) : null;
 
   return (
     <Dialog
@@ -65,7 +101,7 @@ export default function M5FullInfoModal({ dev, onClose, onAnalyzeWithAi }: M5Ful
       </div>
       {activeTab === 'data' ? (
         <ModalContent>
-          {!s ? (
+          {dataContent ?? (!s ? (
             <EmptyState />
           ) : (
             <>
@@ -75,10 +111,10 @@ export default function M5FullInfoModal({ dev, onClose, onAnalyzeWithAi }: M5Ful
               <InterfacesSection s={s} />
               <ServicesSection s={s} />
             </>
-          )}
+          ))}
         </ModalContent>
       ) : activeTab === 'technical' ? (
-        <ModalContent>{s ? <TechnicalDataSection stats={s} /> : <EmptyState />}</ModalContent>
+        <ModalContent>{dataContent ?? (s ? <TechnicalDataSection stats={s} /> : <EmptyState />)}</ModalContent>
       ) : (
         <ModalContent><AirOsDeviceHistory device={dev} /></ModalContent>
       )}

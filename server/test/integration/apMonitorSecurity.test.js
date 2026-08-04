@@ -72,6 +72,7 @@ beforeEach(() => {
   db.run.mockResolvedValue(undefined);
   apServiceMocks.pollAp.mockResolvedValue([]);
   apServiceMocks.getDetail.mockResolvedValue({ deviceName: 'CPE-X', deviceModel: 'LBE-5AC' });
+  apServiceMocks.getFullDetail.mockResolvedValue({ deviceName: 'AP-X', signal: -55 });
   tenantMocks.ownsApUuid.mockResolvedValue(true);
   tenantMocks.ipInOwnedSubnet.mockResolvedValue(true);
   tenantMocks.ipsInOwnedSubnets.mockResolvedValue(true);
@@ -79,6 +80,46 @@ beforeEach(() => {
 });
 
 afterAll(() => { delete require.cache[ROUTES_PATH]; });
+
+describe('POST /ap-detail-direct — diagnóstico actual del AP', () => {
+  it('consulta todos los datos usando las credenciales propias del AP', async () => {
+    db.get.mockResolvedValue({
+      ap_int_id: 7, ip: '10.0.0.5', usuario_ssh: 'ubnt', clave_ssh_enc: 'secret',
+      puerto_ssh: 2222, nombre_nodo: 'NODO-A', node_id: 1,
+    });
+
+    const r = await request(app).post('/api/ap-monitor/ap-detail-direct').send({ id: 'ap1' });
+
+    expect(r.status).toBe(200);
+    expect(r.body.stats.signal).toBe(-55);
+    expect(apServiceMocks.getFullDetail).toHaveBeenCalledWith(
+      '10.0.0.5', 2222, 'ubnt', 'secret', null,
+    );
+    expect(db.run).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO ap_status_snapshots'),
+      expect.arrayContaining([7, -55]),
+    );
+  });
+
+  it('hereda las credenciales del nodo dueño cuando el AP no tiene propias', async () => {
+    db.get.mockResolvedValue({
+      ap_int_id: 8, ip: '10.0.50.7', usuario_ssh: '', clave_ssh_enc: '', puerto_ssh: 22,
+      nombre_nodo: 'NODO-B', node_id: 2,
+    });
+    db.all.mockImplementation(async sql => {
+      if (/FROM nodes/.test(sql)) return [{ id: 2, nombre_nodo: 'NODO-B', segmento_lan: '10.0.50.0/24' }];
+      if (/node_ssh_creds/.test(sql)) return [{ ssh_user: 'admin-b', ssh_pass_enc: 'pass-b', ssh_port: 2202 }];
+      return [];
+    });
+
+    const r = await request(app).post('/api/ap-monitor/ap-detail-direct').send({ id: 'ap1' });
+
+    expect(r.status).toBe(200);
+    expect(apServiceMocks.getFullDetail).toHaveBeenCalledWith(
+      '10.0.50.7', 2202, 'admin-b', 'pass-b', null,
+    );
+  });
+});
 
 describe('POST /poll-direct — aislamiento + anti-SSRF (C2/C4)', () => {
   it('sin apId → 400 y NO ejecuta SSH', async () => {

@@ -55,6 +55,7 @@ describe('deviceDb.saveSingle', () => {
       wlanMac: null,
       apMac: null,
       cachedStats: { chains: null, security: null },
+      lastStatsAt: 123456,
     } as unknown as SavedDevice;
 
     const payload = toDevicePersistencePayload(runtimeDevice);
@@ -67,6 +68,7 @@ describe('deviceDb.saveSingle', () => {
     expect(payload).not.toHaveProperty('wlanMac');
     expect(payload).not.toHaveProperty('apMac');
     expect(payload).not.toHaveProperty('cachedStats');
+    expect(payload).not.toHaveProperty('lastStatsAt');
   });
 
   it('propaga HTTP 400 con sus campos y no escribe caché local', async () => {
@@ -156,6 +158,30 @@ describe('deviceDb.saveSingle', () => {
     const inventory = await deviceDb.loadInventory();
     expect(inventory[0]).toMatchObject({ id: baseDevice.id, sshUser: 'ubnt' });
     expect(inventory[0]).not.toHaveProperty('sshPass');
+  });
+
+  it('conserva el último snapshot del servidor cuando no existe caché local', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(
+      JSON.stringify({
+        success: true,
+        devices: [{
+          ...baseDevice,
+          lastStatsAt: 1_722_000_000_000,
+          cachedStats: { signal: -57, ccq: 96, txPower: 24, uptimeStr: '3d 01:02:03', cpuLoad: 18 },
+        }],
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ));
+
+    const inventory = await deviceDb.loadInventory();
+    expect(inventory[0].lastStatsAt).toBe(1_722_000_000_000);
+    expect(inventory[0].cachedStats).toMatchObject({
+      signal: -57,
+      ccq: 96,
+      txPower: 24,
+      uptimeStr: '3d 01:02:03',
+      cpuLoad: 18,
+    });
   });
 
   it('recupera la credencial aunque AirOS cambie entre MAC LAN y WLAN', async () => {

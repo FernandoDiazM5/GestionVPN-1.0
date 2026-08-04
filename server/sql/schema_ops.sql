@@ -163,6 +163,20 @@ CREATE TABLE IF NOT EXISTS aps (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ── 9. CPEs conocidos ──────────────────────────────────────
+-- Último estado operativo resumido de cada AP. Se conserva aunque el túnel
+-- esté inactivo; el diagnóstico técnico completo nunca se persiste aquí.
+CREATE TABLE IF NOT EXISTS ap_status_snapshots (
+    ap_id          INT PRIMARY KEY,
+    signal_dbm     SMALLINT      DEFAULT NULL,
+    ccq_pct        DECIMAL(5,2)  DEFAULT NULL,
+    tx_power_dbm   SMALLINT      DEFAULT NULL,
+    uptime_text    VARCHAR(64)   DEFAULT NULL,
+    cpu_pct        DECIMAL(5,2)  DEFAULT NULL,
+    captured_at    BIGINT NOT NULL,
+    KEY idx_ap_status_captured (captured_at),
+    CONSTRAINT fk_ap_status_ap FOREIGN KEY (ap_id) REFERENCES aps(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS cpes (
     id              INT AUTO_INCREMENT PRIMARY KEY,
     mac             VARCHAR(32) NOT NULL UNIQUE,

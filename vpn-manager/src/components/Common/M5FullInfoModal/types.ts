@@ -4,6 +4,7 @@ export interface M5FullInfoModalProps {
   dev: ScannedDevice | SavedDevice;
   onClose: () => void;
   onAnalyzeWithAi?: () => void;
+  loadStats?: (device: SavedDevice) => Promise<AntennaStats>;
 }
 
 export interface ModalSectionProps {

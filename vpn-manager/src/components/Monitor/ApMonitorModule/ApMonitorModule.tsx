@@ -33,6 +33,7 @@ export default function ApMonitorModule() {
   const activeNodeName = activeNode?.nombre_nodo ?? null;
 
   const logic = useApMonitorLogic(nodes, activeNodeName);
+  const { fetchApStats } = logic;
   const polling = usePolling(logic.devices, activeNodeName, logic.notifyTunnelInactive);
   const { pingWatch, seedFromDb, ingestApPoll, pollApDirect } = polling;
 
@@ -118,6 +119,28 @@ export default function ApMonitorModule() {
     () => logic.filteredGroups.flatMap(g => g.aps).filter(ap => ap.sshUser && (ap.sshPass || ap.hasSshPass)),
     [logic.filteredGroups],
   );
+
+  const apsMissingStats = useMemo(
+    () => logic.filteredGroups.flatMap(group => group.aps).filter(ap => (
+      !ap.cachedStats || !ap.lastStatsAt || Date.now() - ap.lastStatsAt > 60_000
+    )),
+    [logic.filteredGroups],
+  );
+
+  useEffect(() => {
+    if (!tunnelActive || apsMissingStats.length === 0) return;
+    let cancelled = false;
+    const hydrate = async () => {
+      const batchSize = 2;
+      for (let index = 0; index < apsMissingStats.length && !cancelled; index += batchSize) {
+        await Promise.allSettled(
+          apsMissingStats.slice(index, index + batchSize).map(ap => fetchApStats(ap)),
+        );
+      }
+    };
+    void hydrate();
+    return () => { cancelled = true; };
+  }, [apsMissingStats, fetchApStats, tunnelActive]);
   const syncAllVisible = useCallback(async () => {
     if (syncingAll || syncableAps.length === 0) return;
     setSyncingAll(true);
@@ -272,7 +295,11 @@ export default function ApMonitorModule() {
       )}
 
       {logic.m5DetailDevice && (
-        <M5FullInfoModal dev={logic.m5DetailDevice} onClose={() => logic.setM5DetailDevice(null)} />
+        <M5FullInfoModal
+          dev={logic.m5DetailDevice}
+          onClose={() => logic.setM5DetailDevice(null)}
+          loadStats={fetchApStats}
+        />
       )}
 
       {logic.viewingApDevice && (

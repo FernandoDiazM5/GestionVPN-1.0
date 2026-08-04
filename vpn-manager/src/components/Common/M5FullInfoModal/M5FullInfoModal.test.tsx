@@ -29,6 +29,35 @@ const device: ScannedDevice = {
 };
 
 describe('<M5FullInfoModal />', () => {
+  it('consulta y muestra datos actuales cuando el equipo no tiene caché local', async () => {
+    const loadStats = vi.fn().mockResolvedValue({
+      deviceName: 'TORRE OMAR',
+      signal: -54,
+      ccq: 98,
+      cpuLoad: 17,
+    });
+
+    render(
+      <M5FullInfoModal
+        dev={{
+          ...device,
+          id: '00156D3A24C9',
+          nodeId: 'node-1',
+          nodeName: 'OMAR/ND1',
+          addedAt: Date.now(),
+          cachedStats: undefined,
+        }}
+        onClose={vi.fn()}
+        loadStats={loadStats}
+      />,
+    );
+
+    expect(screen.getByText(/consultando datos actuales/i)).toBeInTheDocument();
+    expect(await screen.findAllByText('-54 dBm')).toHaveLength(2);
+    expect(loadStats).toHaveBeenCalledWith(expect.objectContaining({ ip: device.ip }));
+    expect(screen.queryByText(/sin datos disponibles/i)).not.toBeInTheDocument();
+  });
+
   it('separa datos ordenados, bloques técnicos e historial individual en pestañas', async () => {
     const user = userEvent.setup();
     const history = vi.spyOn(airOsAiApi, 'listDeviceAnalyses').mockResolvedValue({

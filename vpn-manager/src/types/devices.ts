@@ -56,6 +56,7 @@ export interface SavedDevice {
   lastSeen?: number;
   lastCpeCount?: number;      // cantidad de CPEs en la última sincronización manual
   lastCpeCountAt?: number;    // timestamp de esa sincronización
+  lastStatsAt?: number;       // fecha del último snapshot resumido persistido
   // Stats completas cacheadas desde la última lectura SSH
   cachedStats?: AntennaStats;
 }

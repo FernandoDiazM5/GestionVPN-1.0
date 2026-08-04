@@ -1,5 +1,15 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-04 — Último estado de AP persistido para operación sin túnel.** Rama `vps_prod` (base `3b676f1`). Estado: frontend/backend/schema validados; pendiente despliegue.
+> - Se añadió `ap_status_snapshots`, relación 1:1 con AP y borrado en cascada, que guarda únicamente señal, CCQ, potencia, tiempo en línea, CPU y fecha de captura. No persiste diagnóstico técnico ni secretos.
+> - Cada diagnóstico exitoso actualiza el snapshot; `/api/db/devices` lo incorpora al inventario y la UI conserva el valor histórico cuando el nodo está inactivo. Con túnel activo, lecturas ausentes o mayores a 60 s se refrescan en lotes de dos.
+> - Verificación completa: frontend 69/234, backend 107/632, lint, build, sintaxis y diff correctos. La creación es automática/idempotente al arrancar backend; MariaDB local estaba apagada y producción no cambió.
+
+> **Sesión 2026-08-04 — Diagnóstico y columnas dinámicas de AP reparados.** Rama `vps_prod` (base `3b676f1`). Estado: frontend/backend validados; pendiente despliegue.
+> - La causa era que el modal y las columnas dependían de estadísticas completas guardadas únicamente en IndexedDB, caché que se limpia por seguridad al cerrar sesión o cambiar de workspace.
+> - Los AP sin caché se hidratan ahora en lotes de dos con deduplicación; el diagnóstico consulta datos actuales, muestra carga/error y comparte el resultado con la tabla.
+> - `ap-detail-direct` admite credenciales propias o heredadas del nodo dueño sin aceptar IP ni secretos desde el navegador. Verificación: frontend 6/6, backend 18/18, sintaxis, lint, build y diff correctos. Sin migraciones; producción no cambió.
+
 > **Sesión 2026-08-04 — Columnas simplificadas desplegadas en producción.** Rama `vps_prod`; producción funcional `20c2851`. Estado: despliegue frontend correcto.
 > - Se reconstruyó y recreó únicamente el frontend con el compose de producción; backend y MariaDB quedaron intactos y no hubo migraciones.
 > - Verificación productiva: raíz, ruta histórica y health 200; MySQL/RouterOS/SMTP `ok`; bundle `NetworkDevicesModule` nuevo confirmado; frontend/backend/DB con 0 reinicios.

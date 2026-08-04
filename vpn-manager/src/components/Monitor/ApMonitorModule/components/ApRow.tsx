@@ -39,6 +39,9 @@ const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCol
   const displayCount = cpeCount ?? lastCount;
   const isHistorical = cpeCount === null && lastCount !== null;
   const hasError = !!pollResult?.error;
+  const statsTimestampTitle = dev.lastStatsAt
+    ? `Última lectura del AP: ${new Date(dev.lastStatsAt).toLocaleString()}`
+    : 'Sin lectura guardada del AP';
 
   const showAp = (key: string) => !hiddenApCols.has(key);
   const visibleApCols = AP_COL_DEFS.filter(c => c.always || showAp(c.key));
@@ -125,19 +128,19 @@ const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCol
         )}
 
         {showAp('signal') && (
-          <div className="text-right pr-2">
+          <div className="text-right pr-2" title={statsTimestampTitle}>
             <span className={`font-mono font-bold text-xs ${sigColor(stats?.signal)}`}>{fmtDbm(stats?.signal)}</span>
           </div>
         )}
 
         {showAp('ccq') && (
-          <div className="text-right pr-2">
+          <div className="text-right pr-2" title={statsTimestampTitle}>
             <span className={`font-mono font-bold text-xs ${ccqColor(stats?.ccq)}`}>{fmtPct(stats?.ccq)}</span>
           </div>
         )}
 
         {showAp('txpwr') && (
-          <div className="text-right pr-2">
+          <div className="text-right pr-2" title={statsTimestampTitle}>
             {txPower != null
               ? <span className="text-xs font-mono font-bold text-indigo-600">{txPower} dBm</span>
               : <span className="text-slate-500 dark:text-slate-500 text-xs">—</span>}
@@ -145,13 +148,13 @@ const ApRow = React.memo(function ApRow({ dev, pollResult, expanded, hiddenApCol
         )}
 
         {showAp('uptime') && (
-          <div className="min-w-0 pr-2 overflow-hidden">
+          <div className="min-w-0 pr-2 overflow-hidden" title={statsTimestampTitle}>
             <span className="font-mono text-2xs text-slate-500 dark:text-slate-400 truncate block">{fmtUptime(stats?.uptimeStr)}</span>
           </div>
         )}
 
         {showAp('cpu') && (
-          <div className="text-right pr-2">
+          <div className="text-right pr-2" title={statsTimestampTitle}>
             <span className="font-mono text-xs text-slate-500">{fmtCpu(stats?.cpuLoad)}</span>
           </div>
         )}

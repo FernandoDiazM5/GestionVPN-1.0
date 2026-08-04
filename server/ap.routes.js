@@ -606,10 +606,11 @@ router.post('/ap-detail-direct', validate({ body: ApDetailRequestSchema }), asyn
         // C4: aislamiento + credenciales/IP resueltas server-side desde la DB (nunca del body).
         if (!(await ownsApUuid(db, req, id))) return res.status(404).json({ success: false, message: 'AP no encontrado' });
         const row = await db.get(
-            `SELECT a.ip, a.usuario_ssh, a.clave_ssh_enc, a.puerto_ssh, n.nombre_vrf AS nombre_vrf
+            `SELECT a.id AS ap_int_id, a.ip, a.usuario_ssh, a.clave_ssh_enc, a.puerto_ssh, a.nombre_nodo, a.node_id,
+                    n.nombre_vrf AS nombre_vrf
                FROM aps a LEFT JOIN nodes n ON n.id = a.node_id WHERE a.uuid = ?`, [id]
         );
-        if (!row || !row.ip || !row.usuario_ssh) return res.status(404).json({ success: false, message: 'AP sin datos o sin credenciales SSH' });
+        if (!row || !row.ip) return res.status(404).json({ success: false, message: 'AP sin datos' });
         if (!(await ipInOwnedSubnet(db, req, row.ip))) {
             return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'La IP guardada no pertenece a ninguna de tus subredes' });
         }
@@ -617,8 +618,39 @@ router.post('/ap-detail-direct', validate({ body: ApDetailRequestSchema }), asyn
         const bind = await resolveTunnelBinding(req, row.nombre_vrf);
         if (!bind.ok) return res.status(409).json({ success: false, code: bind.code, vrf: bind.vrf, message: bind.message });
 
-        const actualPass = row.clave_ssh_enc ? decryptPass(row.clave_ssh_enc) : '';
-        const s = await getFullDetail(row.ip, row.puerto_ssh || 22, row.usuario_ssh, actualPass, bind.localAddress);
+        let sshUser = row.usuario_ssh || '';
+        let actualPass = row.clave_ssh_enc ? decryptPass(row.clave_ssh_enc) : '';
+        let sshPort = row.puerto_ssh || 22;
+        if (!sshUser) {
+            const credentials = await resolveNodeCreds(db, row).catch(() => null);
+            if (credentials) {
+                sshUser = credentials.user;
+                actualPass = credentials.pass;
+                sshPort = credentials.port || sshPort;
+            }
+        }
+        if (!sshUser) {
+            return res.status(400).json({
+                success: false,
+                code: 'AP_NO_SSH',
+                message: 'Este AP no tiene credenciales SSH guardadas ni heredadas de su sitio.',
+            });
+        }
+        const s = await getFullDetail(row.ip, sshPort, sshUser, actualPass, bind.localAddress);
+        await db.run(
+            `INSERT INTO ap_status_snapshots
+                (ap_id, signal_dbm, ccq_pct, tx_power_dbm, uptime_text, cpu_pct, captured_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(ap_id) DO UPDATE SET
+                signal_dbm = excluded.signal_dbm,
+                ccq_pct = excluded.ccq_pct,
+                tx_power_dbm = excluded.tx_power_dbm,
+                uptime_text = excluded.uptime_text,
+                cpu_pct = excluded.cpu_pct,
+                captured_at = excluded.captured_at`,
+            [row.ap_int_id, s.signal ?? null, s.ccq ?? null, s.txPower ?? null,
+             s.uptimeStr ?? null, s.cpuLoad ?? null, Date.now()]
+        );
         res.json({ success: true, stats: s });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });

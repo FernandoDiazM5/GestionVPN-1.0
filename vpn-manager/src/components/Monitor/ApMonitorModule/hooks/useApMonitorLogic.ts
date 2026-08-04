@@ -3,7 +3,7 @@ import type { SavedDevice, AntennaStats } from '../../../../types/devices';
 import type { NodeInfo } from '../../../../types/api';
 import { fetchWithTimeout } from '../../../../utils/fetchWithTimeout';
 import { API_BASE_URL } from '../../../../config';
-import { deviceDb } from '../../../../store/deviceDb';
+import { deviceDb, statsCache } from '../../../../store/deviceDb';
 import type { NodeGroup } from '../utils/types';
 import { useDeviceInventory, useDeviceInventoryCache } from '../../../../query/deviceInventory';
 
@@ -31,6 +31,7 @@ export function useApMonitorLogic(nodes: NodeInfo[], activeNodeName: string | nu
     refetch: refetchInventory,
   } = inventory;
   const inventoryCache = useDeviceInventoryCache();
+  const statsRequestsRef = useRef(new Map<string, Promise<AntennaStats>>());
   // D: revelar la clave SSH guardada del AP (la que autenticó la antena). La
   // clave vive cifrada en el backend; se pide bajo clic explícito a /reveal-ssh.
   const [revealSsh, setRevealSsh] = useState<{ apName: string; user: string; pass: string; port: number } | null>(null);
@@ -243,6 +244,35 @@ export function useApMonitorLogic(nodes: NodeInfo[], activeNodeName: string | nu
     }
   };
 
+  const fetchApStats = useCallback((dev: SavedDevice): Promise<AntennaStats> => {
+    const pending = statsRequestsRef.current.get(dev.id);
+    if (pending) return pending;
+
+    const request = fetchWithTimeout(`${API_BASE_URL}/api/ap-monitor/ap-detail-direct`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: dev.id }),
+    }, 35_000)
+      .then(async response => {
+        const data = await response.json();
+        if (!response.ok || !data.success || !data.stats) {
+          if (data.code === 'TUNNEL_NOT_ACTIVE') notifyTunnelInactive(data.message);
+          throw new Error(data.message || 'No se pudieron consultar los datos del AP');
+        }
+        const freshStats = data.stats as AntennaStats;
+        const latestDevice = devicesRef.current.find(item => item.id === dev.id) ?? dev;
+        const updated = { ...latestDevice, cachedStats: freshStats, lastStatsAt: Date.now() };
+        await statsCache.save(dev.id, freshStats);
+        setDevices(current => current.map(item => item.id === dev.id ? { ...item, cachedStats: freshStats } : item));
+        inventoryCache.upsert(updated);
+        return freshStats;
+      })
+      .finally(() => { statsRequestsRef.current.delete(dev.id); });
+
+    statsRequestsRef.current.set(dev.id, request);
+    return request;
+  }, [inventoryCache, notifyTunnelInactive]);
+
   useEffect(() => () => {
     clearTimeout(toastTimer2.current);
   }, []);
@@ -285,5 +315,6 @@ export function useApMonitorLogic(nodes: NodeInfo[], activeNodeName: string | nu
     handleUpdateApDevice,
     handleMoveConfirm,
     handleSaveApDetail,
+    fetchApStats,
   };
 }

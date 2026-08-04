@@ -130,7 +130,7 @@ export const statsCache = {
 
 // ── Esqueleto SQLite (Backend) ────────────────────────────────────────────
 // Extrae SOLO los campos estáticos relevantes — nunca envía cachedStats al servidor.
-export type DevicePersistencePayload = Omit<SavedDevice, 'cachedStats'>;
+export type DevicePersistencePayload = Omit<SavedDevice, 'cachedStats' | 'lastStatsAt'>;
 
 export interface DevicePersistenceError extends Error {
   status: number;
@@ -151,8 +151,9 @@ interface DeviceApiResponse {
  * evita que una métrica ausente invalide el guardado completo.
  */
 export function toDevicePersistencePayload(device: SavedDevice): DevicePersistencePayload {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { cachedStats, ...skeleton } = device;
+  const { cachedStats, lastStatsAt, ...skeleton } = device;
+  void cachedStats;
+  void lastStatsAt;
   return Object.fromEntries(
     Object.entries(skeleton).filter(([, value]) => value !== null && value !== undefined),
   ) as DevicePersistencePayload;
@@ -224,7 +225,10 @@ export const deviceDb = {
           const { sshPass: _secret, ...safeDevice } = d;
           return {
             ...safeDevice,
-            cachedStats: allStats[d.id]?.stats ?? undefined,
+            lastStatsAt: allStats[d.id]?.savedAt ?? d.lastStatsAt,
+            cachedStats: allStats[d.id]?.stats
+              ? { ...(d.cachedStats ?? {}), ...allStats[d.id]!.stats }
+              : d.cachedStats,
           };
         });
         // Cura APs que el backend tiene "Sin SSH" pero credCache sí conoce (F&F).
