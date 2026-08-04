@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-04 — Recuperación de sesión vencida desplegada.** Rama/producción `vps_prod` en `424c552`. Estado: frontend nuevo activo y verificado.
+> - Se publicó `424c552`, se preservó `gestionvpn-10-frontend:pre-session-resume-20260804T124200Z` y se reconstruyó/recreó exclusivamente `vpn-frontend` con `docker-compose.prod.yml`.
+> - Producción confirmó raíz y `/dm/soporte-fiwis/team` 200, bundles con revalidación/recarga controlada, frontend 0 reinicios, backend/DB healthy y sin recreación, MySQL/SMTP `ok`; RouterOS quedó `stale` transitorio sin error de conexión.
+> - El primer seguimiento remoto expiró durante el build sin generar imagen final; el frontend anterior siguió sirviendo. La compilación se repitió con ventana suficiente y terminó correctamente. Disco: 75%/6.1 GiB libres.
+
 > **Sesión 2026-08-04 — Recuperación de sesión vencida y chunks obsoletos implementada.** Rama `vps_prod` (base `048dd44`). Estado: frontend 71 archivos/238 pruebas, lint, build y diff correctos; pendiente despliegue.
 > - `useSessionExpiry` revalida al volver la pestaña (`visibilitychange`/`pageshow`) y deduplica consultas simultáneas; una sesión vencida usa el evento global vigente para limpiar autenticación y mostrar login.
 > - `ModuleErrorBoundary` identifica fallos de importación dinámica por versiones desplegadas, intenta una recarga automática limitada a una por minuto y muestra una acción explícita de actualizar si el fallo continúa.
