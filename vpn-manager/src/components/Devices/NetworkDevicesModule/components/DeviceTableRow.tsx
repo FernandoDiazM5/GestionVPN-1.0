@@ -9,28 +9,13 @@
 import { memo, Fragment } from 'react';
 import {
   CheckCircle2, X, Loader2, ChevronDown, ChevronRight,
-  Sparkles, RefreshCw, PlusCircle, Save, Check, Copy,
+  Sparkles, RefreshCw, PlusCircle, Save, Check,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { ScannedDevice, SavedDevice, AntennaStats } from '../../../../types/devices';
 import type { NodeInfo } from '../../../../types/api';
 import type { ColumnDef, SshAuthStatus } from '../types';
 import { DeviceStatusPanel } from './DeviceStatusPanel';
-
-async function copyToClipboard(value: string): Promise<void> {
-  if (navigator.clipboard && window.isSecureContext) {
-    await navigator.clipboard.writeText(value);
-    return;
-  }
-  const textarea = document.createElement('textarea');
-  textarea.value = value;
-  textarea.style.position = 'fixed';
-  textarea.style.opacity = '0';
-  document.body.appendChild(textarea);
-  textarea.select();
-  document.execCommand('copy');
-  textarea.remove();
-}
 
 interface DeviceTableRowProps {
   dev: ScannedDevice;
@@ -40,8 +25,6 @@ interface DeviceTableRowProps {
   sshStatus: SshAuthStatus | undefined;
   isExpanded: boolean;
   activeConfigCols: ColumnDef[];
-  /** T5: oculta la celda Nombre/Modelo cuando hay 6+ columnas configurables. */
-  compactNameMode: boolean;
   /**
    * `gridTemplate` ya no llega como prop — se lee como CSS variable
    * `--cols-tpl` del contenedor padre. Durante un drag de resize, solo
@@ -65,7 +48,7 @@ interface DeviceTableRowProps {
 
 function DeviceTableRowImpl({
   dev, isSaved, isSaving, rowIdx, sshStatus, isExpanded,
-  activeConfigCols, compactNameMode, selectedNode, savedDevice,
+  activeConfigCols, selectedNode, savedDevice,
   isSelected, onToggleSelected, stationNamesByMac,
   onToggleExpand, onOpenM5Detail, onSyncToSaved,
   onDirectSave, onOpenAddModal, onRefreshStats,
@@ -157,37 +140,6 @@ function DeviceTableRowImpl({
           )}
         </div>
 
-        {/* SSH status — 4 estados visualmente distintos:
-            • pending  → spinner indigo
-            • success  → check emerald sólido
-            • failed   → X rose (NO slate, que se confundía con "no probado")
-            • undef.   → placeholder vacío
-        */}
-        <div role="cell" className="px-2 py-2.5 flex items-center justify-center">
-          {sshStatus === 'pending' && (
-            <div role="status" aria-label="Probando SSH" title="Probando SSH..."
-              className="w-5 h-5 rounded-md bg-indigo-50 flex items-center justify-center border border-indigo-200 dark:bg-indigo-500/10 dark:border-indigo-500/30">
-              <Loader2 className="w-3 h-3 text-indigo-500 motion-safe:animate-spin" />
-            </div>
-          )}
-          {sshStatus === 'success' && (
-            <div role="status" aria-label={`SSH exitoso con ${dev.sshUser}`} title={`SSH exitoso: ${dev.sshUser}`}
-              className="w-5 h-5 rounded-md bg-emerald-100 flex items-center justify-center border border-emerald-200 dark:bg-emerald-500/15 dark:border-emerald-500/30">
-              <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-            </div>
-          )}
-          {sshStatus === 'failed' && (
-            <div role="status" aria-label="Sin acceso SSH" title="Sin acceso SSH (autenticación falló)"
-              className="w-5 h-5 rounded-md bg-rose-50 flex items-center justify-center border border-rose-200 dark:bg-rose-500/10 dark:border-rose-500/30">
-              <X className="w-3 h-3 text-rose-500 dark:text-rose-400" />
-            </div>
-          )}
-          {!sshStatus && (
-            <div aria-label="No probado" title="No se intentó conexión SSH"
-              className="w-5 h-5 rounded-md border border-dashed border-slate-200 dark:border-slate-700" />
-          )}
-        </div>
-
         {/* Rol + Frecuencia */}
         <div role="cell" className="px-3 py-2.5">
           {(isAp || isSta) ? (
@@ -210,33 +162,21 @@ function DeviceTableRowImpl({
         </div>
 
         {/* IP fija: identidad operativa siempre visible durante scroll horizontal. */}
-        <div role="cell" className={`sticky left-0 z-[2] flex min-w-0 items-center gap-1 px-3 py-3 shadow-[2px_0_6px_-3px_rgba(0,0,0,0.16)] ${fixedStateBg} ${fixedGroupHoverBg}`}>
+        <div role="cell" className={`sticky left-0 z-[2] flex min-w-0 items-center px-3 py-3 shadow-[2px_0_6px_-3px_rgba(0,0,0,0.16)] ${fixedStateBg} ${fixedGroupHoverBg}`}>
           <a href={`http://${dev.ip}`} target="_blank" rel="noopener noreferrer"
             onClick={(event) => event.stopPropagation()}
             title={`IP: ${dev.ip}${displayMac ? ` · MAC: ${displayMac}` : ''}${displayName ? `\nNombre: ${displayName}` : ''}${displayModel ? ` · Modelo: ${displayModel}` : ''}\nAbrir http://${dev.ip}`}
-            className="min-w-0 flex-1 whitespace-nowrap font-mono text-sm font-semibold text-slate-700 hover:text-sky-600 hover:underline dark:text-slate-200 dark:hover:text-sky-400"
+            className="whitespace-nowrap font-mono text-sm font-semibold text-slate-700 hover:text-sky-600 hover:underline dark:text-slate-200 dark:hover:text-sky-400"
           >{dev.ip}</a>
-          <button
-            type="button"
-            onClick={(event) => { event.stopPropagation(); void copyToClipboard(dev.ip); }}
-            aria-label={`Copiar IP ${dev.ip}`}
-            title={`Copiar ${dev.ip}`}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-sky-50 hover:text-sky-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 dark:text-slate-400 dark:hover:bg-sky-500/10 dark:hover:text-sky-300"
-          >
-            <Copy className="h-4 w-4" aria-hidden="true" />
-          </button>
         </div>
 
-        {/* Nombre / Modelo — oculto en modo compacto (T5) */}
-        {!compactNameMode && (
-          <div role="cell" className="px-3 py-3 min-w-0 pr-3">
-            {displayName && displayName !== dev.ip
-              ? <p className="text-sm font-bold text-slate-700 truncate dark:text-slate-200" title={displayName}>{displayName}</p>
-              : <p className="text-sm font-semibold text-slate-500 truncate font-mono dark:text-slate-400" title={dev.ip}>{dev.ip}</p>
-            }
-            <p className="text-2xs text-slate-500 truncate dark:text-slate-400" title={displayModel}>{displayModel || '—'}</p>
-          </div>
-        )}
+        <div role="cell" className="min-w-0 px-3 py-3 pr-3">
+          {displayName && displayName !== dev.ip
+            ? <p className="break-words text-sm font-bold leading-5 text-slate-700 dark:text-slate-200" title={displayName}>{displayName}</p>
+            : <p className="break-words font-mono text-sm font-semibold leading-5 text-slate-500 dark:text-slate-400" title={dev.ip}>{dev.ip}</p>
+          }
+          <p className="break-words text-2xs leading-4 text-slate-500 dark:text-slate-400" title={displayModel}>{displayModel || '—'}</p>
+        </div>
 
         {/* Columnas configurables */}
         {activeConfigCols.map(col => (
@@ -314,7 +254,6 @@ export const DeviceTableRow = memo(DeviceTableRowImpl, (prev, next) =>
   prev.savedDevice === next.savedDevice &&
   prev.selectedNode === next.selectedNode &&
   prev.activeConfigCols === next.activeConfigCols &&
-  prev.compactNameMode === next.compactNameMode &&
   prev.rowIdx === next.rowIdx &&
   prev.isSelected === next.isSelected &&
   // stationNamesByMac solo afecta el panel expandido; comparamos referencia.
@@ -327,7 +266,7 @@ function DeviceMobileRowImpl({
   isSelected, onToggleSelected, stationNamesByMac,
   onToggleExpand, onOpenM5Detail, onSyncToSaved,
   onDirectSave, onOpenAddModal, onRefreshStats,
-}: Omit<DeviceTableRowProps, 'compactNameMode'>) {
+}: DeviceTableRowProps) {
   const hasStats = !!dev.cachedStats;
   const rawMode = dev.cachedStats?.mode || dev.role;
   const isAp = rawMode === 'ap' || rawMode === 'master';

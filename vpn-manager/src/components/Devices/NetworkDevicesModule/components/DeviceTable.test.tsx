@@ -17,9 +17,8 @@ function renderTable(overrides: Partial<React.ComponentProps<typeof DeviceTable>
   const props: React.ComponentProps<typeof DeviceTable> = {
     sortedRows: [],
     activeConfigCols: [signalColumn],
-    gridTemplate: '44px 40px 54px 196px 120px 80px 44px 116px',
-    minTableWidth: 702,
-    compactNameMode: false,
+    gridTemplate: '44px 54px 180px minmax(220px,1fr) 80px 44px 116px',
+    minTableWidth: 738,
     sortConfig: { key: 'ip', dir: 'asc' },
     toggleSort: vi.fn(),
     startResize: vi.fn(),
@@ -68,7 +67,7 @@ describe('DeviceTable accessibility', () => {
     expect(props.startResize).toHaveBeenCalledWith('ip', 0, -10);
   });
 
-  it('mantiene la IP completa, copiable y fija durante el desplazamiento horizontal', () => {
+  it('mantiene la IP completa y fija sin mostrar un control de copia', () => {
     renderTable({
       sortedRows: [{
         devId: '1C6A1BCE9A8B',
@@ -87,8 +86,30 @@ describe('DeviceTable accessibility', () => {
     const ipLink = screen.getByRole('link', { name: '192.168.30.200' });
     expect(ipLink).toHaveClass('whitespace-nowrap');
     expect(ipLink.getAttribute('title')).toContain('MAC: 1C:6A:1B:CE:9A:8B');
-    expect(screen.getByRole('button', { name: /copiar ip 192\.168\.30\.200/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /copiar ip 192\.168\.30\.200/i })).not.toBeInTheDocument();
     expect(ipLink.closest('[role="cell"]')).toHaveClass('sticky', 'left-0');
+  });
+
+  it('omite la columna SSH y muestra Nombre / Modelo sin truncarlo', () => {
+    renderTable({
+      sortedRows: [{
+        devId: '1C6A1BCE9A8B',
+        isSaved: false,
+        dev: {
+          ip: '192.168.30.200',
+          mac: '1C:6A:1B:CE:9A:8B',
+          name: 'INTERNET CLIENTE TORRE OMAR',
+          model: 'LiteBeam 5AC Generation 2',
+          firmware: 'v8.7.19',
+          role: 'sta',
+        },
+      }],
+    });
+
+    expect(screen.queryByRole('columnheader', { name: /^ssh$/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /nombre \/ modelo/i })).toBeInTheDocument();
+    expect(screen.getByText('INTERNET CLIENTE TORRE OMAR')).toHaveClass('break-words');
+    expect(screen.getByText('LiteBeam 5AC Generation 2')).toHaveClass('break-words');
   });
 
   it('usa tarjetas legibles en móvil sin montar la cuadrícula horizontal', () => {

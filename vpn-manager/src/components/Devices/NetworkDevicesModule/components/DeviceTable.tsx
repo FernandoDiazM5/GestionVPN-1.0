@@ -32,8 +32,6 @@ interface DeviceTableProps {
   activeConfigCols: ColumnDef[];
   gridTemplate: string;
   minTableWidth: number;
-  /** T5: oculta la columna fija Nombre/Modelo cuando hay 6+ columnas configurables visibles. */
-  compactNameMode: boolean;
   sortConfig: { key: string; dir: 'asc' | 'desc' } | null;
   toggleSort: (key: string) => void;
   startResize: (key: string, startX: number, keyboardDelta?: number) => void;
@@ -66,7 +64,7 @@ interface DeviceTableProps {
 
 function DeviceTableImpl(props: DeviceTableProps) {
   const {
-    sortedRows, activeConfigCols, gridTemplate, minTableWidth, compactNameMode,
+    sortedRows, activeConfigCols, gridTemplate, minTableWidth,
     sortConfig, toggleSort, startResize, sshStatus, expandedRows, toggleExpand,
     savedDevices, savingIds, selectedNode,
     selectedIds, onToggleSelected, onSelectAllVisibleCandidates, onClearSelection,
@@ -230,7 +228,6 @@ function DeviceTableImpl(props: DeviceTableProps) {
               </span>
             </button>
           </div>
-          <div role="columnheader" className="px-3 py-3 text-center">SSH</div>
           <div role="columnheader" className="px-3 py-3">Rol</div>
           <div
             role="columnheader"
@@ -266,23 +263,21 @@ function DeviceTableImpl(props: DeviceTableProps) {
               <GripVertical className="h-3 w-3" />
             </button>
           </div>
-          {!compactNameMode && (
-            <div
-              role="columnheader"
-              aria-sort={sortConfig?.key === 'name' ? (sortConfig.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
-              className="min-w-0"
+          <div
+            role="columnheader"
+            aria-sort={sortConfig?.key === 'name' ? (sortConfig.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+            className="min-w-0"
+          >
+            <button
+              type="button"
+              onClick={() => toggleSort('name')}
+              aria-label={`Ordenar por Nombre / Modelo ${sortConfig?.key === 'name' && sortConfig.dir === 'asc' ? 'descendente' : 'ascendente'}`}
+              className="flex min-h-11 w-full items-center gap-1 px-3 text-left hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 dark:hover:text-slate-100"
             >
-              <button
-                type="button"
-                onClick={() => toggleSort('name')}
-                aria-label={`Ordenar por Nombre / Modelo ${sortConfig?.key === 'name' && sortConfig.dir === 'asc' ? 'descendente' : 'ascendente'}`}
-                className="flex min-h-11 w-full items-center gap-1 px-3 text-left hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 dark:hover:text-slate-100"
-              >
-                Nombre / Modelo
-                {sortConfig?.key === 'name' && <span aria-hidden="true" className="text-indigo-600">{sortConfig.dir === 'asc' ? '↑' : '↓'}</span>}
-              </button>
-            </div>
-          )}
+              Nombre / Modelo
+              {sortConfig?.key === 'name' && <span aria-hidden="true" className="text-indigo-600">{sortConfig.dir === 'asc' ? '↑' : '↓'}</span>}
+            </button>
+          </div>
           {activeConfigCols.map(col => (
             <div
               key={col.key}
@@ -342,7 +337,6 @@ function DeviceTableImpl(props: DeviceTableProps) {
             sshStatus={sshStatus[dev.ip]}
             isExpanded={expandedRows.has(dev.ip)}
             activeConfigCols={activeConfigCols}
-            compactNameMode={compactNameMode}
             selectedNode={selectedNode}
             savedDevice={savedDevice}
             isSelected={selectedIds.has(devId)}

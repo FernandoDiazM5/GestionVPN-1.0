@@ -20,6 +20,8 @@ describe('useColumnPrefs', () => {
 
     expect(result.current.gridTemplate).toContain(`${DEFAULT_IP_COLUMN_WIDTH}px`);
     expect(result.current.gridTemplate).toContain(`${ACTION_COLUMN_WIDTH}px`);
+    expect(result.current.gridTemplate).toContain('minmax(220px,1fr)');
+    expect(result.current.gridTemplate).not.toContain('40px');
   });
 
   it('redimensiona IP y respeta su ancho mínimo legible', () => {

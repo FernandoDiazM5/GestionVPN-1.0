@@ -6,7 +6,6 @@
 //    • activeConfigCols (en el orden de visibleCols, no de COLUMN_DEFS).
 //    • gridTemplate string para CSS grid.
 //    • minTableWidth (suma de anchos para el scroll horizontal).
-//    • compactNameMode (T5: oculta "Nombre" cuando hay 6+ cols técnicas).
 //    • startResize: registra listeners on-demand de mousemove/up, ajusta
 //      el ancho EN VIVO via setColWidths (proveniente del store).
 //
@@ -18,8 +17,8 @@ import { useEffect, useRef, useMemo, useCallback } from 'react';
 import { COLUMN_DEFS } from '../utils/columns';
 import type { ColumnDef } from '../types';
 
-export const DEFAULT_IP_COLUMN_WIDTH = 196;
-export const MIN_IP_COLUMN_WIDTH = 180;
+export const DEFAULT_IP_COLUMN_WIDTH = 180;
+export const MIN_IP_COLUMN_WIDTH = 160;
 export const ACTION_COLUMN_WIDTH = 116;
 
 export interface UseColumnPrefsInput {
@@ -85,32 +84,26 @@ export function useColumnPrefs({ visibleCols, colWidths, setColWidths }: UseColu
     [visibleCols]
   );
 
-  // Modo lectura (T5): a partir de COMPACT_NAME_THRESHOLD columnas
-  // configurables, "Nombre / Modelo" (4ta) se oculta del template para
-  // ganar ancho. El nombre sigue en title del IP y en panel expandido.
-  const COMPACT_NAME_THRESHOLD = 6;
-  const compactNameMode = activeConfigCols.length >= COMPACT_NAME_THRESHOLD;
   const ipColumnWidth = colWidths.ip ?? DEFAULT_IP_COLUMN_WIDTH;
 
   // gridTemplateColumns para CSS grid. La 1ra columna (36px) es el checkbox
-  // de selección (§42-2). En compactNameMode se omite la columna
-  // 'minmax(100px,1fr)' = Nombre/Modelo para alinear filas.
+  // de selección (§42-2). Nombre/Modelo conserva el mismo ancho flexible
+  // base que SSID/AP y nunca se oculta por cantidad de columnas.
   const gridTemplate = useMemo(() => [
     '44px',       // checkbox selección (bulk save)
-    '40px',       // SSH status
     '54px',       // Rol + Freq
     `${ipColumnWidth}px`, // IP
-    ...(compactNameMode ? [] : ['minmax(100px,1fr)']),
+    'minmax(220px,1fr)', // Nombre / Modelo
     ...activeConfigCols.map(c => colWidths[c.key] != null ? `${colWidths[c.key]}px` : c.width),
     '44px',       // Toggle expand
     `${ACTION_COLUMN_WIDTH}px`, // Acción
-  ].join(' '), [activeConfigCols, colWidths, compactNameMode, ipColumnWidth]);
+  ].join(' '), [activeConfigCols, colWidths, ipColumnWidth]);
 
   const minTableWidth = useMemo(() => {
-    const base = compactNameMode ? [44, 40, 54, ipColumnWidth] : [44, 40, 54, ipColumnWidth, 120];
+    const base = [44, 54, ipColumnWidth, 220];
     return [...base, ...activeConfigCols.map(c => colWidths[c.key] ?? (parseInt(c.width.match(/\d+/)?.[0] || '80') || 80)), 44, ACTION_COLUMN_WIDTH]
       .reduce((a, b) => a + b, 0);
-  }, [activeConfigCols, colWidths, compactNameMode, ipColumnWidth]);
+  }, [activeConfigCols, colWidths, ipColumnWidth]);
 
   // Quitamos un ancho persistido (acción del header / context menu).
   const clearColWidth = useCallback((key: string) => {
@@ -124,7 +117,6 @@ export function useColumnPrefs({ visibleCols, colWidths, setColWidths }: UseColu
 
   return {
     activeConfigCols,
-    compactNameMode,
     gridTemplate,
     minTableWidth,
     startResize,

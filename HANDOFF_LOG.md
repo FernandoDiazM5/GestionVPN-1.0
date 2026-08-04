@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-04 — Tabla de Buscar equipos despejada y ampliada.** Rama `vps_prod` (base `524b600`). Estado: frontend validado; pendiente despliegue.
+> - Se retiraron la columna fija SSH que no mostraba datos y el icono de copiar IP. La IP sigue completa, fija, enlazada, ordenable y redimensionable.
+> - Nombre/Modelo y SSID/AP comparten ancho flexible mínimo de 220 px y muestran el texto completo en varias líneas; se eliminó el modo que ocultaba Nombre/Modelo cuando había muchas columnas.
+> - Verificación: pruebas focalizadas 6/6, ESLint, TypeScript/Vite build y `git diff --check` correctos. Producción no cambió.
+
 > **Sesión 2026-08-03 — Correcciones visuales y workspace inmutable desplegados.** Rama `vps_prod`; producción funcional `2e7f7d0`. Estado: despliegue backend/frontend correcto.
 > - Se desplegaron la tabla IP/MAC mejorada, retiro visible de columnas, buscador de Estado de equipos desbloqueado y nombre/slug del workspace inmutables. Sólo backend/frontend fueron reconstruidos y recreados; DB intacta, sin migraciones nuevas.
 > - Producción: raíz/legacy 200, health 200 con MySQL/RouterOS/SMTP `ok`, preflight 204, origen hostil 403, login inválido 401, bundles nuevos confirmados, datos 54/5/3/15 y cero reinicios.
