@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-04 — Columnas simplificadas desplegadas en producción.** Rama `vps_prod`; producción funcional `20c2851`. Estado: despliegue frontend correcto.
+> - Se reconstruyó y recreó únicamente el frontend con el compose de producción; backend y MariaDB quedaron intactos y no hubo migraciones.
+> - Verificación productiva: raíz, ruta histórica y health 200; MySQL/RouterOS/SMTP `ok`; bundle `NetworkDevicesModule` nuevo confirmado; frontend/backend/DB con 0 reinicios.
+> - Rollback preservado: `gestionvpn-10-frontend:pre-equipment-columns-20260804T050233Z`. Disco al cierre: 68%, 7.9 GiB libres.
+
 > **Sesión 2026-08-04 — Tabla de Buscar equipos despejada y ampliada.** Rama `vps_prod` (base `524b600`). Estado: frontend validado; pendiente despliegue.
 > - Se retiraron la columna fija SSH que no mostraba datos y el icono de copiar IP. La IP sigue completa, fija, enlazada, ordenable y redimensionable.
 > - Nombre/Modelo y SSID/AP comparten ancho flexible mínimo de 220 px y muestran el texto completo en varias líneas; se eliminó el modo que ocultaba Nombre/Modelo cuando había muchas columnas.
