@@ -1,7 +1,7 @@
 // ============================================================
-//  Servicio de workspace — renombrar + import/export (Fase C)
+//  Servicio de workspace — import/export (Fase C)
 // ============================================================
-import { post, patch } from './sessionClient';
+import { post } from './sessionClient';
 import { API_BASE_URL } from '../config';
 
 export interface ImportPlan {
@@ -11,12 +11,6 @@ export interface ImportPlan {
 }
 
 export const workspaceApi = {
-  /** Renombrar el workspace (solo OWNER). */
-  rename: (name: string) =>
-    patch<{ success: true; message: string; name: string }>(
-      '/api/workspace/name', { name }
-    ),
-
   /** Descarga el JSON del workspace. Devuelve un Blob para disparar el download. */
   export: async (): Promise<{ blob: Blob; filename: string }> => {
     const res = await fetch(`${API_BASE_URL}/api/workspace/export`, {

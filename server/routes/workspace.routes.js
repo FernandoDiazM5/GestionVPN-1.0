@@ -2,7 +2,6 @@
 //  Rutas del workspace propio (Fase C) — base /api/workspace
 //
 //  Endpoints:
-//   • PATCH /name        — renombra el workspace (OWNER)
 //   • GET   /export      — descarga JSON versionado (OWNER)
 //   • POST  /import      — importa workspace con dryRun/apply (OWNER)
 //
@@ -18,7 +17,6 @@
 // ============================================================
 const express = require('express');
 const {
-  WorkspaceRenameRequestSchema,
   ImportRequestSchema,
   EXPORT_VERSION,
 } = require('@gestionvpn/contracts');
@@ -30,21 +28,8 @@ const { requireSession, requireRole } = require('../middleware/authJwt');
 const router = express.Router();
 
 // ──────────────────────────────────────────────────────────────
-//  PATCH /name — renombrar el workspace
+//  El nombre del workspace es inmutable después de su creación.
 // ──────────────────────────────────────────────────────────────
-const renameSchema = WorkspaceRenameRequestSchema;
-
-router.patch('/name', requireSession, requireRole('OWNER'),
-  asyncHandler(async (req, res) => {
-    const { name } = renameSchema.parse(req.body);
-    const wsId = req.account.workspace_id;
-    await query(
-      'UPDATE workspaces SET name = ?, updated_at = ? WHERE id = ?',
-      [name.trim(), Date.now(), wsId]
-    );
-    return sendOk(res, { message: 'Workspace actualizado', name: name.trim() });
-  }));
-
 // ──────────────────────────────────────────────────────────────
 //  GET /export — descarga JSON del workspace
 // ──────────────────────────────────────────────────────────────

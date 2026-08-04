@@ -9,13 +9,28 @@
 import { memo, Fragment } from 'react';
 import {
   CheckCircle2, X, Loader2, ChevronDown, ChevronRight,
-  Sparkles, RefreshCw, PlusCircle, Save, Check,
+  Sparkles, RefreshCw, PlusCircle, Save, Check, Copy,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { ScannedDevice, SavedDevice, AntennaStats } from '../../../../types/devices';
 import type { NodeInfo } from '../../../../types/api';
 import type { ColumnDef, SshAuthStatus } from '../types';
 import { DeviceStatusPanel } from './DeviceStatusPanel';
+
+async function copyToClipboard(value: string): Promise<void> {
+  if (navigator.clipboard && window.isSecureContext) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+  const textarea = document.createElement('textarea');
+  textarea.value = value;
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand('copy');
+  textarea.remove();
+}
 
 interface DeviceTableRowProps {
   dev: ScannedDevice;
@@ -100,6 +115,12 @@ function DeviceTableRowImpl({
     : hasStats
       ? 'group-hover:bg-emerald-50/40 dark:group-hover:bg-emerald-500/10'
       : 'group-hover:bg-slate-50 dark:group-hover:bg-slate-800/60';
+  const fixedStateBg = rowIdx % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50 dark:bg-slate-800';
+  const fixedGroupHoverBg = isSaved
+    ? 'group-hover:bg-indigo-50 dark:group-hover:bg-slate-800'
+    : hasStats
+      ? 'group-hover:bg-emerald-50 dark:group-hover:bg-slate-800'
+      : 'group-hover:bg-slate-100 dark:group-hover:bg-slate-800';
 
   return (
     <Fragment>
@@ -188,20 +209,22 @@ function DeviceTableRowImpl({
           )}
         </div>
 
-        {/* IP / MAC — en modo compacto enriquecemos el title con nombre+modelo
-            porque la columna Nombre/Modelo se oculta a partir de 6 configurables */}
-        <div role="cell" className="px-3 py-3 min-w-0 pr-3">
+        {/* IP fija: identidad operativa siempre visible durante scroll horizontal. */}
+        <div role="cell" className={`sticky left-0 z-[2] flex min-w-0 items-center gap-1 px-3 py-3 shadow-[2px_0_6px_-3px_rgba(0,0,0,0.16)] ${fixedStateBg} ${fixedGroupHoverBg}`}>
           <a href={`http://${dev.ip}`} target="_blank" rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            title={compactNameMode && (displayName || displayModel)
-              ? `${displayName || dev.ip}${displayModel ? ` · ${displayModel}` : ''}\nAbrir http://${dev.ip}`
-              : `Abrir http://${dev.ip}`}
-            className="font-mono text-sm font-semibold text-slate-700 hover:text-sky-600 hover:underline truncate block dark:text-slate-200 dark:hover:text-sky-400"
+            onClick={(event) => event.stopPropagation()}
+            title={`IP: ${dev.ip}${displayMac ? ` · MAC: ${displayMac}` : ''}${displayName ? `\nNombre: ${displayName}` : ''}${displayModel ? ` · Modelo: ${displayModel}` : ''}\nAbrir http://${dev.ip}`}
+            className="min-w-0 flex-1 whitespace-nowrap font-mono text-sm font-semibold text-slate-700 hover:text-sky-600 hover:underline dark:text-slate-200 dark:hover:text-sky-400"
           >{dev.ip}</a>
-          {displayMac
-            ? <p className="font-mono text-2xs text-slate-500 truncate dark:text-slate-400">{displayMac}</p>
-            : <p className="text-2xs text-amber-600 dark:text-amber-400 font-semibold">SSH-only</p>
-          }
+          <button
+            type="button"
+            onClick={(event) => { event.stopPropagation(); void copyToClipboard(dev.ip); }}
+            aria-label={`Copiar IP ${dev.ip}`}
+            title={`Copiar ${dev.ip}`}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-sky-50 hover:text-sky-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 dark:text-slate-400 dark:hover:bg-sky-500/10 dark:hover:text-sky-300"
+          >
+            <Copy className="h-4 w-4" aria-hidden="true" />
+          </button>
         </div>
 
         {/* Nombre / Modelo — oculto en modo compacto (T5) */}
@@ -388,7 +411,7 @@ function DeviceMobileRowImpl({
 
         {activeConfigCols.length > 0 && (
           <dl className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
-            {activeConfigCols.map(col => (
+            {activeConfigCols.filter(col => col.key !== 'mac').map(col => (
               <div key={col.key} className="min-w-0 rounded-lg bg-slate-50 px-2.5 py-2 dark:bg-slate-800/60">
                 <dt className="truncate text-2xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400" title={col.label}>{col.label}</dt>
                 <dd className="mt-0.5 min-w-0 overflow-hidden text-sm text-slate-700 dark:text-slate-200">{col.render(dev)}</dd>

@@ -16,6 +16,7 @@ describe('ColumnPicker', () => {
 
     expect(menu).toHaveClass('overscroll-contain');
     expect(menu.style.maxHeight).not.toBe('');
+    expect(screen.getByRole('menuitem', { name: /^mac$/i })).toBeInTheDocument();
 
     fireEvent.scroll(menu);
     expect(menu).toBeInTheDocument();
@@ -23,6 +24,16 @@ describe('ColumnPicker', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: /^señal ssh$/i }));
     expect(screen.getByRole('menu', { name: /mostrar\/ocultar columnas/i })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /mover señal hacia arriba/i })).toBeInTheDocument();
+  });
+
+  it('muestra permanentemente la acción para ocultar una columna visible', () => {
+    render(<ControlledColumnPicker />);
+
+    fireEvent.click(screen.getByRole('button', { name: /columnas/i }));
+    const hideButton = screen.getByRole('menuitem', { name: /ocultar ssid \/ ap/i });
+
+    expect(hideButton).toHaveClass('text-rose-600');
+    expect(hideButton).not.toHaveClass('opacity-0');
   });
 
   it('continua cerrandose cuando el desplazamiento ocurre fuera del menu', () => {

@@ -37,6 +37,7 @@ describe('useScanPreferences', () => {
     expect(result.current.manualLan).toBe('');
     expect(result.current.colWidths).toEqual({});
     expect(result.current.visibleCols.length).toBeGreaterThan(0);
+    expect(result.current.visibleCols).not.toContain('mac');
   });
 
   it('persiste cambios en localStorage tras el debounce', () => {
@@ -64,7 +65,7 @@ describe('useScanPreferences', () => {
     localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify({
       schemaVersion: 1,
       visibleCols: ['signal', 'ccq'],
-      colWidths: { signal: 120 },
+      colWidths: { signal: 120, ip: 220 },
       sortConfig: { key: 'ccq', dir: 'asc' },
       filterRole: 'sta',
       filterSSID: 'TORRENET',
@@ -74,7 +75,7 @@ describe('useScanPreferences', () => {
 
     const { result } = renderHook(() => useScanPreferences());
     expect(result.current.visibleCols).toEqual(['signal', 'ccq']);
-    expect(result.current.colWidths).toEqual({ signal: 120 });
+    expect(result.current.colWidths).toEqual({ signal: 120, ip: 220 });
     expect(result.current.sortConfig).toEqual({ key: 'ccq', dir: 'asc' });
     expect(result.current.filterRole).toBe('sta');
     expect(result.current.searchQuery).toBe('192.168.10');

@@ -1,5 +1,22 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-03 — IP/MAC y ancho de la tabla de Buscar equipos mejorados.** Rama `vps_prod` (base `4f771fc`). Estado: paquete visual/funcional completo; pendiente despliegue.
+> - Se implementaron las recomendaciones 1–8: orden IPv4 numérico, IP completa con ancho redimensionable persistente, copiar IP, tooltip enriquecido, IP fija durante scroll, acciones compactadas y MAC como columna opcional independiente sin duplicación móvil.
+> - La IP usa 196 px por defecto y mínimo de 180 px; Acciones baja de 180 a 116 px. Direcciones inválidas se ordenan después de IPv4 válidas.
+> - Verificación: pruebas focalizadas 18/18, lint, build, auditor visual 306 archivos con 0 errores/0 warnings y `git diff --check` correctos.
+
+> **Sesión 2026-08-03 — Retiro de columnas siempre visible.** Rama `vps_prod` (base `4f771fc`). Estado: mejora visual focalizada; pendiente despliegue.
+> - La `X` para ocultar columnas en Buscar equipos ya no usa opacidad cero ni depende de pasar el mouse. Se muestra siempre en rojo, con fondo suave, icono mayor, tooltip y control táctil de 44 px.
+> - Verificación: prueba focalizada 3/3, lint, build y `git diff --check` correctos.
+
+> **Sesión 2026-08-03 — Nombre del workspace fijado al crearlo.** Rama `vps_prod` (base `4f771fc`). Estado: regla frontend/backend implementada; pendiente despliegue.
+> - Se retiraron las dos vías de renombrado posteriores a la creación: la edición administrativa del moderador y `PATCH /api/workspace/name` para propietarios. Ambas interfaces muestran ahora el nombre como sólo lectura.
+> - El contrato administrativo rechaza `workspaceName`; no queda ninguna escritura `UPDATE workspaces SET name` en el código vigente. Verificación: contratos compilados, pruebas focalizadas 3/3, sintaxis backend, lint, build y diff correctos.
+
+> **Sesión 2026-08-03 — Buscador de Estado de equipos desbloqueado.** Rama `vps_prod` (base `4f771fc`). Estado: corrección frontend focalizada; pendiente despliegue.
+> - La causa era que el campo dependía del conteo ya filtrado: al llegar a cero coincidencias se deshabilitaba a sí mismo. Ahora permanece editable mientras exista texto y permite corregir o limpiar búsquedas sin resultados.
+> - Verificación: prueba focalizada 4/4, lint, build y `git diff --check` correctos.
+
 > **Sesión 2026-08-03 — Sistema visual y correcciones de menús desplegados.** Rama `vps_prod`; producción funcional `84b4fda`. Estado: despliegue frontend correcto.
 > - Se desplegaron los componentes visuales compartidos, Buscar equipos, Estado de equipos, navegación del moderador, Mi equipo, iconografía de Sitios, selectores/menús flotantes y la corrección CSP Report-Only.
 > - Verificación local: `check:all`, build, lint, 627 pruebas backend y 224 frontend correctas; auditor visual sin errores ni warnings.

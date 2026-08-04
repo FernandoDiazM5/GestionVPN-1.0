@@ -205,21 +205,18 @@ router.patch('/moderators/:id/ai-access', validate({ params: IdParamsSchema }), 
   });
 }));
 
-// ── PATCH /api/admin/moderators/:id — editar nombre / workspace / clave / estado ──
+// ── PATCH /api/admin/moderators/:id — editar nombre / clave / estado ──
 const patchSchema = ModeratorPatchRequestSchema;
 
 router.patch('/moderators/:id', validate({ params: IdParamsSchema }), asyncHandler(async (req, res) => {
   const mod = await findModeratorOr404(req.params.id);
-  const { name, workspaceName, password, disabled } = patchSchema.parse(req.body);
+  const { name, password, disabled } = patchSchema.parse(req.body);
   const now = Date.now();
   let routerSync = null;
   let mangleCleanup = null;
 
   if (name !== undefined) {
     await query('UPDATE users SET name = ?, updated_at = ? WHERE id = ?', [name, now, mod.id]);
-  }
-  if (workspaceName !== undefined) {
-    await query('UPDATE workspaces SET name = ?, updated_at = ? WHERE id = ?', [workspaceName, now, mod.workspace_id]);
   }
   if (password !== undefined) {
     await query('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?', [await hashPassword(password), now, mod.id]);

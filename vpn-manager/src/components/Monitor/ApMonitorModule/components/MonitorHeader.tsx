@@ -52,6 +52,7 @@ export default function MonitorHeader({
 }: MonitorHeaderProps) {
   const hasSites = nodeCount > 0;
   const hasEquipment = apCount > 0;
+  const canSearch = hasEquipment || search.length > 0;
 
   return (
     <PageHeader
@@ -94,7 +95,7 @@ export default function MonitorHeader({
               </svg>
             </label>
 
-            <SearchInput value={search} onChange={event => onSearchChange(event.target.value)} onClear={() => onSearchChange('')} disabled={!hasEquipment} placeholder="Buscar equipos…" aria-label="Buscar equipos por nombre, IP, modelo o red" />
+            <SearchInput value={search} onChange={event => onSearchChange(event.target.value)} onClear={() => onSearchChange('')} disabled={!canSearch} placeholder="Buscar equipos…" aria-label="Buscar equipos por nombre, IP, modelo o red" />
 
             <Button
               onClick={onSync}

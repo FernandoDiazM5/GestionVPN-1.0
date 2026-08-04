@@ -18,10 +18,10 @@ export type CreateModeratorRequest = z.infer<typeof CreateModeratorRequestSchema
 export const ModeratorPatchRequestSchema = z
   .object({
     name: z.string().max(120).optional(),
-    workspaceName: z.string().min(1).max(160).optional(),
     password: PasswordSchema.optional(),
     disabled: z.boolean().optional(),
   })
+  .strict()
   .refine((d) => Object.keys(d).length > 0, { message: 'Nada que actualizar' });
 export type ModeratorPatchRequest = z.infer<typeof ModeratorPatchRequestSchema>;
 

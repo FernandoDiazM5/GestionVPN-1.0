@@ -235,16 +235,35 @@ function DeviceTableImpl(props: DeviceTableProps) {
           <div
             role="columnheader"
             aria-sort={sortConfig?.key === 'ip' ? (sortConfig.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
-            className="min-w-0"
+            className="sticky left-0 z-20 flex min-w-0 items-center overflow-hidden bg-slate-100 shadow-[2px_0_6px_-3px_rgba(0,0,0,0.16)] dark:bg-slate-800"
           >
             <button
               type="button"
               onClick={() => toggleSort('ip')}
-              aria-label={`Ordenar por IP / MAC ${sortConfig?.key === 'ip' && sortConfig.dir === 'asc' ? 'descendente' : 'ascendente'}`}
-              className="flex min-h-11 w-full items-center gap-1 px-3 text-left hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 dark:hover:text-slate-100"
+              aria-label={`Ordenar por IP ${sortConfig?.key === 'ip' && sortConfig.dir === 'asc' ? 'descendente' : 'ascendente'}`}
+              title={sortConfig?.key === 'ip' ? `IP: ${sortConfig.dir === 'asc' ? 'menor a mayor' : 'mayor a menor'}` : 'Ordenar IP numéricamente'}
+              className="flex min-h-11 min-w-0 flex-1 items-center gap-1 px-3 pr-11 text-left hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 dark:hover:text-slate-100"
             >
-              IP / MAC
+              IP
               {sortConfig?.key === 'ip' && <span aria-hidden="true" className="text-indigo-600">{sortConfig.dir === 'asc' ? '↑' : '↓'}</span>}
+            </button>
+            <button
+              type="button"
+              title="Redimensionar columna IP. Usa Flecha izquierda o Flecha derecha."
+              aria-label="Redimensionar columna IP"
+              aria-keyshortcuts="ArrowLeft ArrowRight"
+              className="absolute right-0 top-0 flex h-11 w-11 cursor-col-resize items-center justify-center text-slate-500 opacity-60 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 dark:text-slate-400"
+              onMouseDown={event => {
+                event.preventDefault();
+                startResize('ip', event.clientX);
+              }}
+              onKeyDown={event => {
+                if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+                event.preventDefault();
+                startResize('ip', 0, event.key === 'ArrowLeft' ? -10 : 10);
+              }}
+            >
+              <GripVertical className="h-3 w-3" />
             </button>
           </div>
           {!compactNameMode && (

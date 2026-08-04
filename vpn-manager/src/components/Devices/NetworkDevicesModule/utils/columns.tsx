@@ -2,6 +2,19 @@ import type { ColumnDef } from '../types';
 
 export const COLUMN_DEFS: ColumnDef[] = [
   {
+    key: 'mac',
+    label: 'MAC',
+    width: '146px',
+    defaultVisible: false,
+    requiresStats: false,
+    render: (dev) => {
+      const mac = dev.cachedStats?.wlanMac ?? dev.mac;
+      return mac
+        ? <span className="block truncate font-mono text-2xs text-slate-600 dark:text-slate-300" title={mac}>{mac}</span>
+        : <span className="data-empty">—</span>;
+    },
+  },
+  {
     key: 'essid',
     label: 'SSID / AP',
     width: 'minmax(120px, 1fr)',

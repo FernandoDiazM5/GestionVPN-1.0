@@ -80,4 +80,30 @@ describe('MonitorHeader', () => {
     expect(screen.getByText('Selecciona “Otros sitios” o “Todos los sitios” para consultar equipos guardados.')).toBeInTheDocument();
     expect(screen.queryByText('En línea')).not.toBeInTheDocument();
   });
+
+  it('mantiene editable una búsqueda aunque no produzca resultados visibles', async () => {
+    const user = userEvent.setup();
+    const onSearchChange = vi.fn();
+
+    render(
+      <MonitorHeader
+        {...baseProps}
+        nodeCount={0}
+        apCount={0}
+        cpeCount={0}
+        search="omars"
+        canSync={false}
+        onSearchChange={onSearchChange}
+      />,
+    );
+
+    const searchbox = screen.getByRole('searchbox', { name: /buscar equipos por nombre/i });
+    expect(searchbox).toBeEnabled();
+
+    await user.type(searchbox, '2');
+    expect(onSearchChange).toHaveBeenLastCalledWith('omars2');
+
+    await user.click(screen.getByRole('button', { name: 'Limpiar búsqueda' }));
+    expect(onSearchChange).toHaveBeenLastCalledWith('');
+  });
 });

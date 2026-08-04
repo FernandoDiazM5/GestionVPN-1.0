@@ -422,17 +422,16 @@ function CreateModeratorModal({ onClose, onCreated }: { onClose: () => void; onC
   );
 }
 
-// ── Editar nombre / workspace ───────────────────────────────────────────────
+// ── Editar nombre ───────────────────────────────────────────────────────────
 function EditModeratorModal({ mod, onClose, onSaved }: { mod: Moderator; onClose: () => void; onSaved: () => void }) {
   const [name, setName] = useState(mod.name || '');
-  const [workspaceName, setWorkspaceName] = useState(mod.workspace_name || '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const submit = async () => {
     setBusy(true); setError(null);
     try {
-      await adminApi.updateModerator(mod.user_id, { name: name.trim(), workspaceName: workspaceName.trim() || mod.workspace_name });
+      await adminApi.updateModerator(mod.user_id, { name: name.trim() });
       onSaved();
     } catch (e) { setError(e instanceof Error ? e.message : 'Error'); }
     finally { setBusy(false); }
@@ -443,11 +442,12 @@ function EditModeratorModal({ mod, onClose, onSaved }: { mod: Moderator; onClose
       <p className="font-mono text-2xs text-slate-400 dark:text-slate-500 -mt-1">{mod.email}</p>
       <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">Nombre</label>
       <input className={inputCls} placeholder="Nombre del moderador" value={name} onChange={e => setName(e.target.value)} />
-      <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">Workspace</label>
-      <div className="relative">
-        <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
-        <input className={inputCls + ' pl-10'} placeholder="Nombre del workspace" value={workspaceName} onChange={e => setWorkspaceName(e.target.value)} />
+      <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">Espacio de trabajo</label>
+      <div className="flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
+        <Briefcase className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden="true" />
+        <span className="truncate font-medium">{mod.workspace_name}</span>
       </div>
+      <p className="-mt-1 text-2xs text-slate-500 dark:text-slate-400">El nombre queda fijo al crear el espacio para conservar rutas y enlaces estables.</p>
       {error && <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">{error}</p>}
       <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
         <button onClick={onClose} className="btn-ghost btn-md">Cancelar</button>

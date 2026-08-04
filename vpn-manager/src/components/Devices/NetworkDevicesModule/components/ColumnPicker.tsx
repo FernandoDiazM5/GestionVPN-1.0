@@ -76,9 +76,9 @@ export function ColumnPicker({ visibleCols, onChange }: ColumnPickerProps) {
                       </div>
                       <span className="text-xs text-slate-700 flex-1 leading-tight">{col.label}</span>
                       {col.requiresStats && <span className="text-3xs font-bold text-slate-500 dark:text-slate-500 uppercase">SSH</span>}
-                      <button type="button" role="menuitem" aria-label={`Ocultar ${col.label}`} onClick={() => remove(key)}
-                        className="flex h-11 w-11 shrink-0 items-center justify-center text-slate-500 opacity-0 transition-colors hover:text-rose-500 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 group-hover:opacity-100">
-                        <X className="w-3 h-3" />
+                      <button type="button" role="menuitem" aria-label={`Ocultar ${col.label}`} title={`Ocultar ${col.label}`} onClick={() => remove(key)}
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-rose-50 text-rose-600 transition-colors hover:bg-rose-100 hover:text-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-rose-500 dark:bg-rose-500/10 dark:text-rose-400 dark:hover:bg-rose-500/20 dark:hover:text-rose-300">
+                        <X className="h-4 w-4" />
                       </button>
                     </div>
                   );

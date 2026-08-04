@@ -17,7 +17,7 @@ function renderTable(overrides: Partial<React.ComponentProps<typeof DeviceTable>
   const props: React.ComponentProps<typeof DeviceTable> = {
     sortedRows: [],
     activeConfigCols: [signalColumn],
-    gridTemplate: '44px 40px 54px 140px 120px 80px 44px 180px',
+    gridTemplate: '44px 40px 54px 196px 120px 80px 44px 116px',
     minTableWidth: 702,
     compactNameMode: false,
     sortConfig: { key: 'ip', dir: 'asc' },
@@ -52,9 +52,9 @@ describe('DeviceTable accessibility', () => {
     const props = renderTable();
 
     expect(screen.getByRole('region', { name: /dispositivos escaneados/i })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: /ip \/ mac/i })).toHaveAttribute('aria-sort', 'ascending');
+    expect(screen.getByRole('columnheader', { name: /^ip/i })).toHaveAttribute('aria-sort', 'ascending');
 
-    const sortButton = screen.getByRole('button', { name: /ordenar por ip \/ mac descendente/i });
+    const sortButton = screen.getByRole('button', { name: /ordenar por ip descendente/i });
     sortButton.focus();
     await user.keyboard('{Enter}');
     expect(props.toggleSort).toHaveBeenCalledWith('ip');
@@ -62,6 +62,33 @@ describe('DeviceTable accessibility', () => {
     const resizeButton = screen.getByRole('button', { name: /redimensionar columna señal/i });
     fireEvent.keyDown(resizeButton, { key: 'ArrowRight' });
     expect(props.startResize).toHaveBeenCalledWith('signal', 0, 10);
+
+    const ipResizeButton = screen.getByRole('button', { name: /redimensionar columna ip/i });
+    fireEvent.keyDown(ipResizeButton, { key: 'ArrowLeft' });
+    expect(props.startResize).toHaveBeenCalledWith('ip', 0, -10);
+  });
+
+  it('mantiene la IP completa, copiable y fija durante el desplazamiento horizontal', () => {
+    renderTable({
+      sortedRows: [{
+        devId: '1C6A1BCE9A8B',
+        isSaved: false,
+        dev: {
+          ip: '192.168.30.200',
+          mac: '1C:6A:1B:CE:9A:8B',
+          name: 'Torre Omar',
+          model: 'LiteAP GPS',
+          firmware: 'v8.7.19',
+          role: 'ap',
+        },
+      }],
+    });
+
+    const ipLink = screen.getByRole('link', { name: '192.168.30.200' });
+    expect(ipLink).toHaveClass('whitespace-nowrap');
+    expect(ipLink.getAttribute('title')).toContain('MAC: 1C:6A:1B:CE:9A:8B');
+    expect(screen.getByRole('button', { name: /copiar ip 192\.168\.30\.200/i })).toBeInTheDocument();
+    expect(ipLink.closest('[role="cell"]')).toHaveClass('sticky', 'left-0');
   });
 
   it('usa tarjetas legibles en móvil sin montar la cuadrícula horizontal', () => {

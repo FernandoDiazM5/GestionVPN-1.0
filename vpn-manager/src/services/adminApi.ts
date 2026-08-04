@@ -46,7 +46,7 @@ export const adminApi = {
 
   updateModerator: (
     id: string,
-    data: { name?: string; workspaceName?: string; password?: string; disabled?: boolean }
+    data: { name?: string; password?: string; disabled?: boolean }
   ) => patch<{ success: true; message: string }>(`/api/admin/moderators/${id}`, data),
 
   setModeratorAiAccess: (id: string, enabled: boolean) =>

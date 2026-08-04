@@ -39,6 +39,28 @@ function normalizeRole(dev: ScannedDevice): 'ap' | 'sta' | 'unknown' {
   return 'unknown';
 }
 
+function ipv4ToNumber(value: string): number | null {
+  const octets = value.split('.');
+  if (octets.length !== 4) return null;
+  let result = 0;
+  for (const octet of octets) {
+    if (!/^\d{1,3}$/.test(octet)) return null;
+    const numeric = Number(octet);
+    if (numeric > 255) return null;
+    result = result * 256 + numeric;
+  }
+  return result;
+}
+
+export function compareIpAddresses(a: string, b: string): number {
+  const numericA = ipv4ToNumber(a);
+  const numericB = ipv4ToNumber(b);
+  if (numericA != null && numericB != null) return numericA - numericB;
+  if (numericA != null) return -1;
+  if (numericB != null) return 1;
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+}
+
 interface UseDeviceListInput {
   scanResults: ScannedDevice[];
   savedIds: Set<string>;
@@ -102,10 +124,17 @@ export function useDeviceList({
   const sortedRows = useMemo(() => {
     if (!sortConfig) return filteredRows;
     return [...filteredRows].sort((a, b) => {
+      if (sortConfig.key === 'ip') {
+        const comparison = compareIpAddresses(a.dev.ip, b.dev.ip);
+        return sortConfig.dir === 'asc' ? comparison : -comparison;
+      }
       let va: string | number = '';
       let vb: string | number = '';
       switch (sortConfig.key) {
-        case 'ip': va = a.dev.ip; vb = b.dev.ip; break;
+        case 'mac':
+          va = a.dev.cachedStats?.wlanMac ?? a.dev.mac ?? '';
+          vb = b.dev.cachedStats?.wlanMac ?? b.dev.mac ?? '';
+          break;
         case 'name':
           va = a.dev.cachedStats?.deviceName ?? a.dev.name ?? '';
           vb = b.dev.cachedStats?.deviceName ?? b.dev.name ?? ''; break;

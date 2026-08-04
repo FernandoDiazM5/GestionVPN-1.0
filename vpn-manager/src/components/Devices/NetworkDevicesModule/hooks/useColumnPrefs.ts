@@ -18,6 +18,10 @@ import { useEffect, useRef, useMemo, useCallback } from 'react';
 import { COLUMN_DEFS } from '../utils/columns';
 import type { ColumnDef } from '../types';
 
+export const DEFAULT_IP_COLUMN_WIDTH = 196;
+export const MIN_IP_COLUMN_WIDTH = 180;
+export const ACTION_COLUMN_WIDTH = 116;
+
 export interface UseColumnPrefsInput {
   visibleCols: string[];
   colWidths: Record<string, number>;
@@ -41,10 +45,14 @@ export function useColumnPrefs({ visibleCols, colWidths, setColWidths }: UseColu
   }, []);
 
   const startResize = useCallback((key: string, startX: number, keyboardDelta?: number) => {
-    const currentW = colWidths[key] ?? (parseInt(COLUMN_DEFS.find(c => c.key === key)?.width || '80') || 80);
+    const defaultWidth = key === 'ip'
+      ? DEFAULT_IP_COLUMN_WIDTH
+      : (parseInt(COLUMN_DEFS.find(c => c.key === key)?.width || '80') || 80);
+    const minimumWidth = key === 'ip' ? MIN_IP_COLUMN_WIDTH : 50;
+    const currentW = colWidths[key] ?? defaultWidth;
 
     if (keyboardDelta != null) {
-      setColWidths(prev => ({ ...prev, [key]: Math.max(50, currentW + keyboardDelta) }));
+      setColWidths(prev => ({ ...prev, [key]: Math.max(minimumWidth, currentW + keyboardDelta) }));
       return;
     }
 
@@ -52,7 +60,8 @@ export function useColumnPrefs({ visibleCols, colWidths, setColWidths }: UseColu
       const r = resizingRef.current;
       if (!r) return;
       const delta = e.clientX - r.startX;
-      setColWidths(prev => ({ ...prev, [r.key]: Math.max(50, r.startW + delta) }));
+      const minWidth = r.key === 'ip' ? MIN_IP_COLUMN_WIDTH : 50;
+      setColWidths(prev => ({ ...prev, [r.key]: Math.max(minWidth, r.startW + delta) }));
     };
     const onUp = () => {
       const r = resizingRef.current;
@@ -81,6 +90,7 @@ export function useColumnPrefs({ visibleCols, colWidths, setColWidths }: UseColu
   // ganar ancho. El nombre sigue en title del IP y en panel expandido.
   const COMPACT_NAME_THRESHOLD = 6;
   const compactNameMode = activeConfigCols.length >= COMPACT_NAME_THRESHOLD;
+  const ipColumnWidth = colWidths.ip ?? DEFAULT_IP_COLUMN_WIDTH;
 
   // gridTemplateColumns para CSS grid. La 1ra columna (36px) es el checkbox
   // de selección (§42-2). En compactNameMode se omite la columna
@@ -89,18 +99,18 @@ export function useColumnPrefs({ visibleCols, colWidths, setColWidths }: UseColu
     '44px',       // checkbox selección (bulk save)
     '40px',       // SSH status
     '54px',       // Rol + Freq
-    '140px',      // IP / MAC
+    `${ipColumnWidth}px`, // IP
     ...(compactNameMode ? [] : ['minmax(100px,1fr)']),
     ...activeConfigCols.map(c => colWidths[c.key] != null ? `${colWidths[c.key]}px` : c.width),
     '44px',       // Toggle expand
-    '180px',      // Acción
-  ].join(' '), [activeConfigCols, colWidths, compactNameMode]);
+    `${ACTION_COLUMN_WIDTH}px`, // Acción
+  ].join(' '), [activeConfigCols, colWidths, compactNameMode, ipColumnWidth]);
 
   const minTableWidth = useMemo(() => {
-    const base = compactNameMode ? [44, 40, 54, 148] : [44, 40, 54, 148, 120];
-    return [...base, ...activeConfigCols.map(c => parseInt(c.width.match(/\d+/)?.[0] || '80') || 80), 44, 180]
+    const base = compactNameMode ? [44, 40, 54, ipColumnWidth] : [44, 40, 54, ipColumnWidth, 120];
+    return [...base, ...activeConfigCols.map(c => colWidths[c.key] ?? (parseInt(c.width.match(/\d+/)?.[0] || '80') || 80)), 44, ACTION_COLUMN_WIDTH]
       .reduce((a, b) => a + b, 0);
-  }, [activeConfigCols, compactNameMode]);
+  }, [activeConfigCols, colWidths, compactNameMode, ipColumnWidth]);
 
   // Quitamos un ancho persistido (acción del header / context menu).
   const clearColWidth = useCallback((key: string) => {

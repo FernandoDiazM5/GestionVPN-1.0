@@ -2,14 +2,8 @@ import { z } from 'zod';
 import { RoleSchema } from './common';
 
 // ────────────────────────────────────────────────────────────────────
-//  /api/workspace  (renombrar, export, import)
+//  /api/workspace  (export, import)
 // ────────────────────────────────────────────────────────────────────
-
-/** PATCH /api/workspace/name (sólo OWNER) */
-export const WorkspaceRenameRequestSchema = z.object({
-  name: z.string().min(1).max(160),
-});
-export type WorkspaceRenameRequest = z.infer<typeof WorkspaceRenameRequestSchema>;
 
 // ────────────────────────────────────────────────────────────────────
 //  GET /api/workspace/export — payload JSON
