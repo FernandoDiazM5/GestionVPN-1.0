@@ -1,5 +1,15 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-04 — Recuperación de sesión vencida y chunks obsoletos implementada.** Rama `vps_prod` (base `048dd44`). Estado: frontend 71 archivos/238 pruebas, lint, build y diff correctos; pendiente despliegue.
+> - `useSessionExpiry` revalida al volver la pestaña (`visibilitychange`/`pageshow`) y deduplica consultas simultáneas; una sesión vencida usa el evento global vigente para limpiar autenticación y mostrar login.
+> - `ModuleErrorBoundary` identifica fallos de importación dinámica por versiones desplegadas, intenta una recarga automática limitada a una por minuto y muestra una acción explícita de actualizar si el fallo continúa.
+> - Se añadieron cinco pruebas focalizadas para reanudación, visibilidad, clasificación del error y protección contra bucles de recarga. Producción no fue modificada.
+
+> **Sesión 2026-08-04 — Diagnóstico de sesión vencida en pestaña reanudada.** Rama `vps_prod` (base `048dd44`). Estado: análisis estático y consulta de producción de solo lectura; sin tests ni cambios funcionales.
+> - El arranque normal restaura la sesión mediante `/api/account/me`; las respuestas `SESSION_EXPIRED`, `SESSION_REVOKED` y `NO_SESSION` ya disparan `auth_expired`, por lo que una recarga completa debe terminar en login.
+> - La brecha está en una SPA que queda montada durante horas: no hay revalidación al recuperar visibilidad y el fallo del sondeo de expiración se absorbe. El límite de errores del módulo oculta tanto errores derivados como chunks obsoletos bajo el mismo mensaje y "Reintentar" no recarga los assets.
+> - Pendiente de autorización para implementar: revalidación en `visibilitychange/pageshow`, logout atómico ante 401 y recuperación diferenciada de chunks; pruebas del ciclo dormir/reanudar y de una versión desplegada mientras la pestaña permanece abierta.
+
 > **Sesión 2026-08-04 — Snapshot y diagnóstico de AP desplegados.** Rama `vps_prod`; producción funcional `93245c7`. Estado: backend/frontend/schema correctos.
 > - Antes del cambio se creó `/root/pre-ap-status-20260804T122149Z/vpn_manager.sql.gz`, se validó gzip/SHA-256 y se restauró en una base aislada con conteos idénticos 54 tablas/5 usuarios/3 workspaces/15 nodos.
 > - La inicialización idempotente creó `ap_status_snapshots`: 55 tablas y 7 columnas; inicia vacía y se poblará con la primera lectura real. DB no fue recreada y los conteos críticos permanecen 5/3/15.

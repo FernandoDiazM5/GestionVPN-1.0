@@ -8,11 +8,21 @@ export function useSessionExpiry(authenticated: boolean, logout: () => Promise<v
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const expiresAtRef = useRef<number | null>(null);
   const renewingRef = useRef(false);
+  const statusRequestRef = useRef<Promise<void> | null>(null);
 
   const syncStatus = useCallback(async () => {
     if (!authenticated) return;
-    const result = await accountApi.sessionStatus();
-    expiresAtRef.current = result.expiresAt;
+    if (statusRequestRef.current) return statusRequestRef.current;
+
+    const request = accountApi.sessionStatus()
+      .then(result => {
+        expiresAtRef.current = result.expiresAt;
+      })
+      .finally(() => {
+        statusRequestRef.current = null;
+      });
+    statusRequestRef.current = request;
+    return request;
   }, [authenticated]);
 
   useEffect(() => {
@@ -23,6 +33,14 @@ export function useSessionExpiry(authenticated: boolean, logout: () => Promise<v
     }
     void syncStatus().catch(() => undefined);
     const poll = window.setInterval(() => { void syncStatus().catch(() => undefined); }, STATUS_POLL_MS);
+    const revalidateOnResume = () => {
+      if (document.visibilityState === 'visible') {
+        void syncStatus().catch(() => undefined);
+      }
+    };
+    const revalidateOnPageShow = () => { void syncStatus().catch(() => undefined); };
+    document.addEventListener('visibilitychange', revalidateOnResume);
+    window.addEventListener('pageshow', revalidateOnPageShow);
     const clock = window.setInterval(() => {
       const expiresAt = expiresAtRef.current;
       if (!expiresAt) return;
@@ -39,6 +57,8 @@ export function useSessionExpiry(authenticated: boolean, logout: () => Promise<v
     return () => {
       window.clearInterval(poll);
       window.clearInterval(clock);
+      document.removeEventListener('visibilitychange', revalidateOnResume);
+      window.removeEventListener('pageshow', revalidateOnPageShow);
     };
   }, [authenticated, logout, syncStatus]);
 

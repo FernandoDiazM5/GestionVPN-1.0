@@ -1,6 +1,7 @@
 import { Component, Fragment, type ErrorInfo, type ReactNode } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { reportFrontendError } from '../../services/errorReporting';
+import { isStaleChunkError, reloadOnceForStaleChunk } from '../../utils/moduleRecovery';
 
 interface Props {
   children: ReactNode;
@@ -22,6 +23,7 @@ export default class ModuleErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('[ui] module render failed', error.name, info.componentStack);
     reportFrontendError(error, { source: 'render', componentStack: info.componentStack ?? undefined });
+    reloadOnceForStaleChunk(error);
   }
 
   componentDidUpdate(previous: Props) {
@@ -36,6 +38,7 @@ export default class ModuleErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.error) {
+      const staleChunk = isStaleChunkError(this.state.error);
       return (
         <section className="card border-rose-200 p-8 text-center dark:border-rose-500/30" role="alert">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-300">
@@ -43,10 +46,16 @@ export default class ModuleErrorBoundary extends Component<Props, State> {
           </div>
           <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">No se pudo abrir este modulo</h2>
           <p className="mx-auto mt-2 max-w-md text-sm text-slate-600 dark:text-slate-300">
-            La vista encontro un error inesperado. Puedes reintentar sin cerrar tu sesion.
+            {staleChunk
+              ? 'Hay una version nueva disponible. Actualiza la pagina para continuar.'
+              : 'La vista encontro un error inesperado. Puedes reintentar sin cerrar tu sesion.'}
           </p>
-          <button type="button" onClick={this.retry} className="btn-primary mt-5 inline-flex min-h-11 items-center gap-2 px-4 py-2">
-            <RefreshCw className="h-4 w-4" /> Reintentar
+          <button
+            type="button"
+            onClick={staleChunk ? () => window.location.reload() : this.retry}
+            className="btn-primary mt-5 inline-flex min-h-11 items-center gap-2 px-4 py-2"
+          >
+            <RefreshCw className="h-4 w-4" /> {staleChunk ? 'Actualizar pagina' : 'Reintentar'}
           </button>
         </section>
       );
