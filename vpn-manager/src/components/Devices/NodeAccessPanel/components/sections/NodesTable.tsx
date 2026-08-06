@@ -1,9 +1,23 @@
+import { useSyncExternalStore } from 'react';
 import { Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import NodeCard from '../../../../VPN/NodeCard';
 import type { NodeInfo } from '../../../../../types/api';
 
 export type SortKey = 'default' | 'nombre_nodo' | 'nombre_vrf' | 'ip_tunnel' | 'running';
 export type SortDir = 'asc' | 'desc';
+
+const MOBILE_SITES_QUERY = '(max-width: 639px)';
+
+function subscribeToMobileSites(callback: () => void) {
+  if (typeof window === 'undefined' || !window.matchMedia) return () => undefined;
+  const media = window.matchMedia(MOBILE_SITES_QUERY);
+  media.addEventListener('change', callback);
+  return () => media.removeEventListener('change', callback);
+}
+
+function getMobileSitesSnapshot() {
+  return typeof window !== 'undefined' && !!window.matchMedia?.(MOBILE_SITES_QUERY).matches;
+}
 
 interface NodesTableProps {
   nodes: NodeInfo[];
@@ -92,6 +106,35 @@ export default function NodesTable({
   const orderedCols = visibleCols.filter(k => COL_HEADER_META[k]);
   // colspan para "Sin resultados": fixed cols (status + nombre + acciones) + opcionales visibles.
   const totalCols = 3 + orderedCols.length;
+  const isMobile = useSyncExternalStore(subscribeToMobileSites, getMobileSitesSnapshot, () => false);
+
+  if (isMobile) {
+    return (
+      <section className="space-y-2 px-3 pb-3" aria-label="Sitios remotos en vista móvil">
+        {nodes.length > 0 && (
+          <div className="flex min-h-11 items-center rounded-xl border border-slate-200 bg-slate-100 px-3 text-xs font-bold uppercase tracking-wider text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+            {nodes.length} {nodes.length === 1 ? 'sitio' : 'sitios'}
+          </div>
+        )}
+        {nodes.map((node, idx) => (
+          <NodeCard key={node.id} node={node} rowIndex={idx} mobile
+            onEdit={() => onEditNode(node)} onDelete={() => onDeleteNode(node)} onScript={() => onScriptNode(node)}
+            onRename={(newName) => onRenameNode(node, newName)} onHistory={() => onHistoryNode(node)}
+            onTagClick={() => onTagClick(node)} onDiagnose={() => onDiagnoseNode(node)}
+            tags={nodeTags[node.ppp_user] || []} canManage={canManage} visibleCols={orderedCols} />
+        ))}
+        {nodes.length === 0 && (
+          <div className="flex flex-col items-center gap-2 rounded-xl border border-slate-200 px-4 py-12 text-center dark:border-slate-700">
+            <Search className="h-8 w-8 text-slate-500" />
+            <p className="font-semibold text-slate-600 dark:text-slate-300">No encontramos sitios con esos filtros</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {searchQuery ? `Prueba con otro nombre o ubicación en lugar de "${searchQuery}"` : 'Cambia o limpia los filtros para ver más resultados'}
+            </p>
+          </div>
+        )}
+      </section>
+    );
+  }
 
   return (
     <div

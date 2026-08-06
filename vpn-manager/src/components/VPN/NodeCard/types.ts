@@ -19,6 +19,8 @@ export interface NodeCardProps {
    *  Se pasa desde NodesTable, derivado de useNodesPreferences.visibleCols.
    *  Si no se pasa → fallback al set histórico para no romper otros consumidores. */
   visibleCols?: string[];
+  /** Presentación en tarjeta para pantallas menores de 640 px. */
+  mobile?: boolean;
 }
 
 export interface SshCred {

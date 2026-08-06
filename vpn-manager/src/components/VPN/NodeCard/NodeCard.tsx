@@ -1,5 +1,5 @@
 import { Fragment } from 'react';
-import { Play, ShieldOff, Loader2 } from 'lucide-react';
+import { Play, ShieldOff, Loader2, Router, Clock } from 'lucide-react';
 import {
   useNodeActivation,
   useNodeNameEdit,
@@ -33,6 +33,7 @@ export default function NodeCard({
   onDiagnose,
   canManage = true,
   visibleCols,
+  mobile = false,
 }: NodeCardProps) {
   const {
     isActivating,
@@ -168,6 +169,120 @@ export default function NodeCard({
   const handleTagClick = () => { onTagClick?.(); setShowKebab(false); };
   const handleHistoryClick = () => { onHistory?.(); setShowKebab(false); };
   const handleDeleteClick = () => { onDelete?.(); setShowKebab(false); };
+
+  if (mobile) {
+    const mobileCols = visibleCols ?? ['vrf', 'lan', 'ip_tunnel', 'ppp_user'];
+    const detailLabel: Record<string, string> = {
+      vrf: 'Ruta asignada', lan: 'Red del sitio', ip_tunnel: 'Dirección de conexión',
+      ppp_user: 'Identificador', tags: 'Etiquetas', service: 'Conexión',
+      disabled: 'Disponibilidad', uptime: 'Tiempo en línea',
+    };
+    const detailValue = (key: string) => {
+      switch (key) {
+        case 'vrf': return node.nombre_vrf || '—';
+        case 'lan': return node.lan_subnets?.length ? [...new Set(node.lan_subnets)].join(', ') : node.segmento_lan || '—';
+        case 'ip_tunnel': return node.ip_tunnel || '—';
+        case 'ppp_user': return node.ppp_user || '—';
+        case 'tags': return tags.length ? tags.join(', ') : '—';
+        case 'service': return node.service === 'wireguard' ? 'WireGuard' : node.service?.toUpperCase() || '—';
+        case 'disabled': return node.disabled ? 'No disponible' : 'Habilitado';
+        case 'uptime': return node.uptime || '—';
+        default: return '—';
+      }
+    };
+
+    return (
+      <article className={`overflow-hidden rounded-xl border border-slate-200 shadow-sm dark:border-slate-700 ${rowBg} ${borderLeft}`}>
+        <div className="p-3">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl
+              ${isThisNodeActive ? 'bg-emerald-600 ring-2 ring-emerald-300' : isPending ? 'bg-indigo-500' : node.running ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-700'}`}>
+              {isPending
+                ? <Loader2 className="h-5 w-5 animate-spin text-white" />
+                : <Router className={`h-5 w-5 ${node.running || isThisNodeActive ? 'text-white' : 'text-slate-400'}`} />}
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <p className="break-words text-sm font-bold leading-5 text-slate-800 dark:text-slate-100">{node.nombre_nodo}</p>
+              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                {node.running && !node.disabled ? (
+                  <span className="inline-flex items-center gap-1 text-2xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> En línea
+                  </span>
+                ) : (
+                  <span className={`badge ${node.disabled ? 'badge-danger' : 'badge-warning'}`}>
+                    {node.disabled ? 'No disponible' : 'Fuera de línea'}
+                  </span>
+                )}
+                {isThisNodeActive && countdown && <span className="badge badge-warning"><Clock className="h-2.5 w-2.5" />{countdown}</span>}
+                {node.active_by_other && !isThisNodeActive && <span className="badge badge-info">{node.active_by_other}</span>}
+              </div>
+            </div>
+
+            {canManage && (
+              <NodeCardKebabMenu
+                node={node} showKebab={showKebab} kebabCoords={kebabCoords} kebabRef={kebabRef}
+                dropdownRef={dropdownRef} logs={logs} isRepairing={isRepairing} isPending={isPending}
+                onHandleKebabClick={handleKebabClick} onToggleWgPeerForm={handleWgPeerClick}
+                onHandleRepair={handleRepairClick} onOpenSshForm={handleOpenSshForm} onEdit={handleEditClick}
+                onScript={handleScriptClick} onTagClick={handleTagClick} onHistory={handleHistoryClick}
+                onDelete={handleDeleteClick} onDiagnose={onDiagnose ? handleDiagnoseClick : undefined}
+              />
+            )}
+          </div>
+
+          {tags.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {tags.map(tag => <span key={tag} className="rounded-full bg-violet-100 px-2 py-0.5 text-2xs font-bold text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">{tag}</span>)}
+            </div>
+          )}
+
+          {mobileCols.length > 0 && (
+            <dl className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+              {mobileCols.map(key => (
+                <div key={key} className="min-w-0 rounded-lg bg-white/80 px-2.5 py-2 dark:bg-slate-900/60">
+                  <dt className="truncate text-2xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{detailLabel[key]}</dt>
+                  <dd className="mt-0.5 break-words text-xs font-semibold text-slate-700 dark:text-slate-200">{detailValue(key)}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+
+          <div className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-800">
+            {!isThisNodeActive ? (
+              <button disabled={!canActivate} onClick={handleActivate} title={accessBlockReason ?? undefined}
+                className={`flex min-h-11 w-full items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500
+                  ${canActivate ? 'btn-primary' : 'cursor-not-allowed bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-600'}`}>
+                {isActivating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                {isActivating ? 'Conectando...' : 'Conectar al sitio'}
+              </button>
+            ) : (
+              <button disabled={isPending} onClick={handleDeactivate} className="btn-danger flex min-h-11 w-full items-center justify-center gap-2 px-4 text-sm disabled:opacity-50">
+                {isDeactivating ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldOff className="h-4 w-4" />}
+                {isDeactivating ? 'Desconectando...' : 'Desconectar del sitio'}
+              </button>
+            )}
+          </div>
+        </div>
+
+        <table className="w-full"><tbody>
+          <NodeCardLogsSection showLogs={showLogs} logs={logs} logsEndRef={logsEndRef} rowIndex={rowIndex}
+            isPending={isPending} isThisNodeActive={isThisNodeActive} onClose={clearLogs} />
+          <NodeCardWgPeerForm showWgPeerForm={showWgPeerForm} rowIndex={rowIndex} isPending={isPending}
+            isThisNodeActive={isThisNodeActive} wgPeerKey={wgPeerKey} isSettingPeer={isSettingPeer}
+            onSetWgPeerKey={setWgPeerKey} onHandleSetWgPeer={handleSetWgPeer}
+            onClosePeerForm={() => { setShowWgPeerForm(false); setWgPeerKey(''); }} />
+        </tbody></table>
+
+        <NodeCardSshForm showSshForm={showSshForm} node={node} sshCredsArr={sshCredsArr}
+          showPasswords={showPasswords} sshLoading={sshLoading} sshSaved={sshSaved}
+          onSetShowPasswords={setShowPasswords} onCloseSshForm={closeSshForm} onUpdateCred={updateCred}
+          onRemoveCred={removeCred} onMoveCred={moveCred}
+          onAddCred={() => { if (sshCredsArr.length < 5) setSshCredsArr([...sshCredsArr, { user: '', pass: '' }]); }}
+          onSaveSshCreds={saveSshCreds} />
+      </article>
+    );
+  }
 
   return (
     <Fragment>

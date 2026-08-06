@@ -18,7 +18,7 @@ Las vistas reutilizan los componentes de `components/Common/ui.tsx`; no deben re
 
 - `PageHeader`: icono de 24 px dentro de 48 × 48 px, separación de 16 px y tarjeta con 24 px de relleno.
 - `EmptyState`: icono de 32 px dentro de 64 × 64 px, descripción de máximo 448 px, acciones separadas 24 px y relleno vertical de 48 px.
-- `Button`: exige variante y tamaño semánticos. `md` es el tamaño normal (mínimo 44 px); `sm` queda reservado para tablas, modales y controles densos.
+- `Button`: exige variante y tamaño semánticos. Toda variante conserva objetivo táctil mínimo de 44 px; `sm` reduce sólo el relleno y la tipografía para tablas, modales y controles densos.
 - `SectionCard`, `StatusBadge`, `SearchInput` y `SegmentedControl`: concentran superficie, estado, búsqueda y selección.
 
 Las clases manuales pueden definir distribución (`w-full`, anchos responsivos), pero no deben redefinir tipografía, altura, padding o color del componente salvo una excepción documentada.
@@ -107,13 +107,19 @@ Cargadas vía Google Fonts en `index.html`. Declaradas en `tailwind.config.js`.
 
 ### Botones
 ```tsx
-<button className="btn-primary px-6 py-3">Actualizar</button>   {/* acción principal */}
-<button className="btn-success px-4 py-2.5">Nuevo Nodo</button>  {/* crear */}
-<button className="btn-danger px-4 py-2.5">Revocar</button>      {/* destructivo */}
-<button className="btn-outline px-3 py-2">CSV</button>           {/* secundario */}
-<button className="btn-ghost px-3 py-2">Cancelar</button>        {/* terciario */}
+<Button variant="primary" size="md">Actualizar</Button>  {/* acción principal */}
+<Button variant="success" size="md">Nuevo sitio</Button> {/* crear o confirmar */}
+<Button variant="danger" size="md">Revocar</Button>      {/* destructivo */}
+<Button variant="outline" size="md">Descargar</Button>   {/* secundario */}
+<Button variant="ghost" size="md">Cancelar</Button>      {/* terciario */}
 ```
-Regla: **un solo botón de color sólido por zona**; el resto `.btn-outline`/`.btn-ghost`.
+Base visual común: Inter semibold, radio de 12 px, transición de 200 ms,
+reducción a 98 % al pulsar, foco de 2 px y objetivo táctil mínimo de 44 px.
+Las acciones elevadas usan sombra semántica al 25 % y la refuerzan al 40 %
+en hover. El color cambia por intención, no por componente. Regla: **un solo
+botón de color sólido por zona**; el resto `.btn-outline`/`.btn-ghost`.
+Tabs, menús, selectores y botones exclusivamente de icono comparten foco,
+tipografía y respuesta al toque, pero no reciben sombra elevada.
 
 ### Badges de estado
 ```tsx

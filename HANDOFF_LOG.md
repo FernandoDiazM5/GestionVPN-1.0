@@ -1,5 +1,15 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-05 — Botones de acción unificados globalmente.** Rama `vps_prod` (base `6d98029`). Estado: frontend 71 archivos/239 pruebas, lint, build, auditor visual 307/0 y diff correctos; pendiente despliegue.
+> - Se inventariaron 379 botones nativos, 185 usos de variantes semánticas y 8 usos de `Button`; las acciones comparten ahora geometría, tipografía, sombra, hover, pulsación, foco y altura táctil del patrón aprobado en Buscar equipos.
+> - Los colores semánticos se conservan para confirmar, eliminar y advertir. Los controles no elevados (tabs, menús, selectores e icon-only) comparten la base interactiva sin convertirse en botones con sombra.
+> - Cambio central en `vpn-manager/src/index.css` y contrato documentado en `vpn-manager/src/styles/DESIGN_SYSTEM.md`. Producción no fue modificada.
+
+> **Sesión 2026-08-05 — Sitios adaptados a tarjetas en móvil.** Rama `vps_prod` (base `6d98029`). Estado: frontend 71 archivos/239 pruebas, lint, build, auditor visual 307/0 y diff correctos; pendiente despliegue.
+> - La tabla de Sitios dejó de forzar 760 px en pantallas menores de 640 px y usa tarjetas con identidad, estado, datos configurables, menú y acción principal de ancho completo.
+> - Tablet/escritorio conservan la tabla actual. La barra de filtros usa el ancho completo para buscar y distribuye los selectores sin desbordar en celulares.
+> - Archivos principales: `NodesTable.tsx`, `NodeCard.tsx`, `NodesFilterBar.tsx` y prueba responsive de regresión. Producción no fue modificada.
+
 > **Sesión 2026-08-04 — Recuperación de sesión vencida desplegada.** Rama/producción `vps_prod` en `424c552`. Estado: frontend nuevo activo y verificado.
 > - Se publicó `424c552`, se preservó `gestionvpn-10-frontend:pre-session-resume-20260804T124200Z` y se reconstruyó/recreó exclusivamente `vpn-frontend` con `docker-compose.prod.yml`.
 > - Producción confirmó raíz y `/dm/soporte-fiwis/team` 200, bundles con revalidación/recarga controlada, frontend 0 reinicios, backend/DB healthy y sin recreación, MySQL/SMTP `ok`; RouterOS quedó `stale` transitorio sin error de conexión.

@@ -51,10 +51,10 @@ function NodesFilterBarImpl({
   const hasActiveFilter = !!(search || filterProtocol || filterStatus);
 
   return (
-    <div className="space-y-2 border-b border-slate-100 bg-gradient-to-r from-slate-50/50 to-white px-5 py-3 dark:border-slate-800 dark:from-slate-800/30 dark:to-slate-900">
+    <div className="space-y-2 border-b border-slate-100 bg-gradient-to-r from-slate-50/50 to-white px-3 py-3 sm:px-5 dark:border-slate-800 dark:from-slate-800/30 dark:to-slate-900">
       {/* Línea 1 — controles */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[240px] flex-[1_1_300px]">
+        <div className="relative min-w-0 basis-full sm:min-w-[240px] sm:flex-[1_1_300px]">
           {/* Dummy inputs para evitar autofill agresivo de Chrome */}
           <input type="text" name="dummy-user" style={{ display: 'none' }} />
           <input type="password" name="dummy-pass" style={{ display: 'none' }} />
@@ -88,7 +88,7 @@ function NodesFilterBarImpl({
           onChange={e => setFilterProtocol(e.target.value as ProtocolFilter)}
           aria-label="Filtrar por tipo de conexión"
           title="Filtrar por tipo de conexión"
-          className="min-h-11 w-[170px] rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+          className="min-h-11 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-300 sm:w-[170px] sm:flex-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
         >
           <option value="">Conexión: todas</option>
           <option value="sstp">Conexión SSTP</option>
@@ -100,7 +100,7 @@ function NodesFilterBarImpl({
           onChange={e => setFilterStatus(e.target.value as StatusFilter)}
           aria-label="Filtrar por disponibilidad"
           title="Filtrar por disponibilidad"
-          className="min-h-11 w-[160px] rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+          className="min-h-11 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-300 sm:w-[160px] sm:flex-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
         >
           <option value="">Estado: todos</option>
           <option value="connected">En línea</option>

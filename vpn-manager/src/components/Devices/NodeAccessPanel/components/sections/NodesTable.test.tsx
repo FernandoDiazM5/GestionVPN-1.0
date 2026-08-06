@@ -44,4 +44,45 @@ describe('NodesTable accessibility', () => {
     await user.keyboard('{Enter}');
     expect(onSort).toHaveBeenCalledWith('nombre_nodo');
   });
+
+  it('reemplaza la tabla ancha por una región móvil sin desplazamiento horizontal', () => {
+    const originalMatchMedia = window.matchMedia;
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: query === '(max-width: 639px)',
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+
+    try {
+      render(
+        <NodesTable
+          nodes={[]}
+          nodeTags={{}}
+          searchQuery="torre"
+          sortKey="default"
+          sortDir="asc"
+          onSort={vi.fn()}
+          onEditNode={vi.fn()}
+          onDeleteNode={vi.fn()}
+          onScriptNode={vi.fn()}
+          onRenameNode={vi.fn()}
+          onHistoryNode={vi.fn()}
+          onTagClick={vi.fn()}
+          onDiagnoseNode={vi.fn()}
+          visibleCols={['vrf', 'lan']}
+        />,
+      );
+
+      expect(screen.getByRole('region', { name: /sitios remotos en vista móvil/i })).toBeInTheDocument();
+      expect(screen.queryByRole('table')).not.toBeInTheDocument();
+      expect(screen.getByText(/otro nombre o ubicación/i)).toBeInTheDocument();
+    } finally {
+      window.matchMedia = originalMatchMedia;
+    }
+  });
 });
