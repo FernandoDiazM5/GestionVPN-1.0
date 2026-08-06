@@ -23,7 +23,7 @@ vi.mock('../../../../utils/fetchWithTimeout', () => ({
 }));
 
 vi.mock('../../../../context', () => ({
-  TUNNEL_TIMEOUT_MS: 30 * 60 * 1000,
+  TUNNEL_TIMEOUT_MS: 5 * 60 * 1000,
   useVpn: () => ({
     ...mocks.vpn,
     setActiveNodeVrf: mocks.setActiveNodeVrf,

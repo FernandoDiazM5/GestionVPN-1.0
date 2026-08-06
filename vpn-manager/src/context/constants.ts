@@ -1,5 +1,7 @@
 // Tunnel timeouts
-export const TUNNEL_TIMEOUT_MS = 30 * 60 * 1000;      // 30 minutos
+// Debe coincidir con el lease productivo por defecto de sessionRepo (5 min).
+// El backend sigue siendo la fuente de verdad y devuelve el timestamp exacto.
+export const TUNNEL_TIMEOUT_MS = 5 * 60 * 1000;       // lease de 5 minutos
 export const TUNNEL_KEEPALIVE_MS = 60 * 1000;          // lease: cada minuto
 export const TUNNEL_KEEPALIVE_CHECK_MS = 5000;        // 5 segundos (polling)
 export const DEBOUNCE_SAVE_MS = 500;                  // 500 ms

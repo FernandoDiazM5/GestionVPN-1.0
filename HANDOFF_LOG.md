@@ -1,5 +1,9 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-06 — Reloj visual sincronizado con el lease de cinco minutos.** Rama `vps_prod` (base publicada `dd50933`). Estado: pruebas focalizadas 7/7, lint, build y diff correctos; pendiente despliegue.
+> - El backend ya operaba con un lease renovable de 5 minutos, pero el anillo calculaba porcentaje y colores contra 30 minutos; por eso nacía rojo y mostraba `Expira pronto`.
+> - La referencia visual/fallback pasa a 5 minutos: verde al inicio, ámbar bajo 50 % y rojo únicamente en el último 25 %. El aviso ya no promete una extensión de 30 minutos. Sin cambios en backend, keepalive, RouterOS o BD.
+
 > **Sesión 2026-08-05 — Nombres completos en encabezados ordenables.** Rama `vps_prod` (base `97a547c`). Estado: prueba focalizada 6/6, lint, build y diff correctos; pendiente despliegue.
 > - La captura productiva mostró `Clientes` y `Estado` recortados porque sus anchos originales no contemplaban el icono de orden y el texto aplicaba elipsis.
 > - Se reservaron anchos legibles para todas las columnas ordenables y se prohibió truncar sus etiquetas; el desborde conserva el scroll horizontal de la tabla. Sin cambios en datos, lógica de orden, backend o BD.
