@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CPE_COL_DEFS, getUnavailableCpeMetricColumns } from './columnDefs';
+import { AP_COL_DEFS, CPE_COL_DEFS, getUnavailableCpeMetricColumns } from './columnDefs';
 
 function widthOf(key: string) {
   const width = CPE_COL_DEFS.find(column => column.key === key)?.width;
@@ -38,5 +38,20 @@ describe('CPE metric availability', () => {
   it('considera cero como un valor disponible y no oculta antes de recibir estaciones', () => {
     expect(getUnavailableCpeMetricColumns([{ ccq: 0 }]).has('ccq')).toBe(false);
     expect(getUnavailableCpeMetricColumns([]).size).toBe(0);
+  });
+});
+
+describe('AP column geometry', () => {
+  it('reserva el ancho del nombre completo y el icono de orden', () => {
+    const widthOfAp = (key: string) => {
+      const width = AP_COL_DEFS.find(column => column.key === key)?.width ?? '';
+      return Number.parseInt(width.match(/\d+/)?.[0] ?? '', 10);
+    };
+
+    expect(widthOfAp('modo')).toBeGreaterThanOrEqual(82);
+    expect(widthOfAp('nombre')).toBeGreaterThanOrEqual(140);
+    expect(widthOfAp('uptime')).toBeGreaterThanOrEqual(130);
+    expect(widthOfAp('cpes')).toBeGreaterThanOrEqual(94);
+    expect(widthOfAp('estado')).toBeGreaterThanOrEqual(86);
   });
 });

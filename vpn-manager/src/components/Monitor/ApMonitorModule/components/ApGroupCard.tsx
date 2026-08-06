@@ -168,7 +168,7 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelAc
                               <button type="button" onClick={() => cycleSort(col.key as ApSortKey)}
                                 aria-label={`Ordenar por ${col.label}${active ? sortConfig.direction === 'asc' ? ' descendente' : ' en orden original' : ' ascendente'}`}
                                 className={`inline-flex min-h-11 w-full items-center gap-1 rounded-lg px-1 uppercase tracking-wider hover:bg-indigo-50 hover:text-indigo-700 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-300 ${col.right ? 'justify-end' : col.key === 'cpes' || col.key === 'estado' ? 'justify-center' : 'justify-start'}`}>
-                                <span className="truncate">{col.label}</span>
+                                <span className="whitespace-nowrap">{col.label}</span>
                                 {active
                                   ? sortConfig.direction === 'asc' ? <ArrowUp className="h-3 w-3 shrink-0 text-indigo-500" /> : <ArrowDown className="h-3 w-3 shrink-0 text-indigo-500" />
                                   : <ArrowUpDown className="h-3 w-3 shrink-0 opacity-50" />}

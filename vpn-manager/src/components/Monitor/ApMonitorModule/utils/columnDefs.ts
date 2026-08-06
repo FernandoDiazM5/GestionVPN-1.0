@@ -64,17 +64,19 @@ function saveColPrefs(hidden: Set<string>) {
 
 interface ApColDef { key: string; label: string; always?: boolean; width: string; right?: boolean; }
 const AP_COL_DEFS: ApColDef[] = [
-  { key: 'modo', label: 'Tipo', always: true, width: '72px' },
-  { key: 'nombre', label: 'Antena', always: true, width: 'minmax(120px,1fr)' },
-  { key: 'modelo', label: 'Modelo', width: '130px' },
-  { key: 'ssid', label: 'SSID / Canal', width: '140px' },
-  { key: 'signal', label: 'Señal', width: '72px', right: true },
-  { key: 'ccq', label: 'CCQ', width: '60px', right: true },
-  { key: 'txpwr', label: 'Potencia', width: '72px', right: true },
-  { key: 'uptime', label: 'Tiempo en línea', width: '96px' },
-  { key: 'cpu', label: 'CPU', width: '56px', right: true },
-  { key: 'cpes', label: 'Clientes', always: true, width: '70px' },
-  { key: 'estado', label: 'Estado', always: true, width: '56px' },
+  // El ancho incluye el texto completo y el icono de orden. Si una columna no
+  // cabe, la tabla hace scroll horizontal en lugar de recortar el encabezado.
+  { key: 'modo', label: 'Tipo', always: true, width: '82px' },
+  { key: 'nombre', label: 'Antena', always: true, width: 'minmax(140px,1fr)' },
+  { key: 'modelo', label: 'Modelo', width: '140px' },
+  { key: 'ssid', label: 'SSID / Canal', width: '150px' },
+  { key: 'signal', label: 'Señal', width: '82px', right: true },
+  { key: 'ccq', label: 'CCQ', width: '70px', right: true },
+  { key: 'txpwr', label: 'Potencia', width: '92px', right: true },
+  { key: 'uptime', label: 'Tiempo en línea', width: '130px' },
+  { key: 'cpu', label: 'CPU', width: '66px', right: true },
+  { key: 'cpes', label: 'Clientes', always: true, width: '94px' },
+  { key: 'estado', label: 'Estado', always: true, width: '86px' },
   { key: 'actions', label: 'Opciones', always: true, width: '190px' },
 ];
 const AP_DEFAULT_HIDDEN = new Set<string>(['signal', 'ccq', 'uptime', 'cpu']);

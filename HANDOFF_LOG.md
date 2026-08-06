@@ -1,5 +1,9 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-05 — Nombres completos en encabezados ordenables.** Rama `vps_prod` (base `97a547c`). Estado: prueba focalizada 6/6, lint, build y diff correctos; pendiente despliegue.
+> - La captura productiva mostró `Clientes` y `Estado` recortados porque sus anchos originales no contemplaban el icono de orden y el texto aplicaba elipsis.
+> - Se reservaron anchos legibles para todas las columnas ordenables y se prohibió truncar sus etiquetas; el desborde conserva el scroll horizontal de la tabla. Sin cambios en datos, lógica de orden, backend o BD.
+
 > **Sesión 2026-08-05 — Mejoras visuales y ordenación desplegadas en producción.** Rama `vps_prod` (producción funcional `8eafba1`). Estado: frontend reconstruido y recreado; validación productiva completa.
 > - Se desplegaron juntas la vista móvil de Sitios, el sistema global de botones y secundarios blancos, y la ordenación por once columnas de Estado de equipos. No hubo cambios de backend, base de datos ni migraciones.
 > - Producción respondió 200 en raíz, workspace y health; preflight 204, origen hostil 403 y login inválido 401. MySQL, RouterOS y SMTP quedaron `ok`; frontend, backend y DB registraron cero reinicios y no hubo errores recientes relevantes.
