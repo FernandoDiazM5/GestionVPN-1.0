@@ -78,7 +78,7 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelAc
             onClick={() => onExportReport(group)}
             disabled={reportExporting || group.aps.length === 0}
             title="Descargar el informe de este sitio"
-            className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border border-indigo-200 bg-white px-2.5 text-2xs font-bold text-indigo-700 transition-colors hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-indigo-500/30 dark:bg-slate-900 dark:text-indigo-300 dark:hover:bg-indigo-500/10"
+            className="btn-outline btn-sm shrink-0"
           >
             {reportExporting
               ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />

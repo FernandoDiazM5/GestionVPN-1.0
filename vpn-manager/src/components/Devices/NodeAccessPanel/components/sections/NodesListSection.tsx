@@ -199,7 +199,7 @@ export default function NodesListSection({
                 <button
                   disabled={currentPage === 1}
                   onClick={() => setCurrentPage(p => p - 1)}
-                  className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed font-medium dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700"
+                  className="btn-outline btn-sm"
                 >
                   Anterior
                 </button>
@@ -207,7 +207,7 @@ export default function NodesListSection({
                 <button
                   disabled={currentPage === totalPages}
                   onClick={() => setCurrentPage(p => p + 1)}
-                  className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed font-medium dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700"
+                  className="btn-outline btn-sm"
                 >
                   Siguiente
                 </button>

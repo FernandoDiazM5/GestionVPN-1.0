@@ -6,6 +6,7 @@ const sourceRoot = path.resolve(process.cwd(), 'src/components/Devices/NetworkDe
 const moduleSource = readFileSync(path.join(sourceRoot, 'NetworkDevicesModule.tsx'), 'utf8');
 const controlsSource = readFileSync(path.join(sourceRoot, 'components/ScanControls.tsx'), 'utf8');
 const progressSource = readFileSync(path.join(sourceRoot, 'components/ScanProgressBanner.tsx'), 'utf8');
+const globalStyles = readFileSync(path.resolve(process.cwd(), 'src/index.css'), 'utf8');
 
 describe('presentación de Buscar equipos', () => {
   it('ofrece un estado vacío accionable con el lenguaje de Sitios', () => {
@@ -15,7 +16,8 @@ describe('presentación de Buscar equipos', () => {
     expect(moduleSource).toContain('<EmptyState');
     expect(moduleSource).toContain('variant="primary" size="md"');
     expect(moduleSource).toContain('variant="outline" size="md"');
-    expect(moduleSource).toContain('shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 sm:w-40');
+    expect(moduleSource).not.toContain('shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 sm:w-40');
+    expect(globalStyles).toContain('shadow-lg shadow-indigo-500/25 hover:border-slate-300');
     expect(moduleSource).toContain("setActiveModule('nodes')");
     expect(moduleSource).toContain("setActiveModule('monitor')");
     expect(moduleSource).not.toContain('Última búsqueda');

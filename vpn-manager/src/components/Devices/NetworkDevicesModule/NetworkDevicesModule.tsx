@@ -396,7 +396,7 @@ export default function NetworkDevicesModule() {
           description="Selecciona un sitio y activa la conexión para buscar equipos en su red. Tus equipos guardados permanecerán disponibles."
           actions={<>
             <Button onClick={goToSites} variant="primary" size="md" trailingIcon={ArrowRight} className="w-full sm:w-40">Ir a Sitios</Button>
-            <Button onClick={goToSavedDevices} variant="outline" size="md" leadingIcon={Bookmark} className="w-full shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 sm:w-40">Ver guardados</Button>
+            <Button onClick={goToSavedDevices} variant="outline" size="md" leadingIcon={Bookmark} className="w-full sm:w-40">Ver guardados</Button>
           </>}
         />
       )}

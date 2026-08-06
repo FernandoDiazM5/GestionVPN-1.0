@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-05 — Secundarios blancos normalizados antes del despliegue.** Rama `vps_prod` (base publicada `577fc76`). Estado: frontend 71 archivos/239 pruebas, lint, build, auditor visual 307/0 y diff correctos; pendiente nuevo commit/despliegue.
+> - La observación visual detectó que `Ver guardados` tenía sombra local mientras `Ver todos los sitios` dependía correctamente del estilo global todavía no desplegado. Se retiró la excepción y la prueba ahora exige que la sombra viva en `index.css`.
+> - Paginación de Sitios, descarga de informe por sitio y CSV de CPE dejaron sus clases blancas manuales y usan `btn-outline`; los controles compactos que no son acciones elevadas permanecen sin sombra.
+> - `577fc76` fue publicado pero no se desplegó. Producción permaneció intacta mientras se preparó la corrección complementaria.
+
 > **Sesión 2026-08-05 — Botones de acción unificados globalmente.** Rama `vps_prod` (base `6d98029`). Estado: frontend 71 archivos/239 pruebas, lint, build, auditor visual 307/0 y diff correctos; pendiente despliegue.
 > - Se inventariaron 379 botones nativos, 185 usos de variantes semánticas y 8 usos de `Button`; las acciones comparten ahora geometría, tipografía, sombra, hover, pulsación, foco y altura táctil del patrón aprobado en Buscar equipos.
 > - Los colores semánticos se conservan para confirmar, eliminar y advertir. Los controles no elevados (tabs, menús, selectores e icon-only) comparten la base interactiva sin convertirse en botones con sombra.

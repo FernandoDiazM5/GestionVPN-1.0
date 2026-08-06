@@ -155,7 +155,7 @@ function StationTable({ poll, onCpeDetail, dev }: {
             disabled={filtered.length === 0}
             title="Exportar la lista visible a CSV"
             aria-label="Exportar CPEs a CSV"
-            className="flex items-center gap-1 px-2 py-1 rounded-lg text-2xs font-bold bg-white text-slate-500 border border-slate-200 hover:bg-slate-50 transition-colors disabled:opacity-40 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-700 dark:hover:bg-slate-800">
+            className="btn-outline btn-sm">
             <Download className="w-3 h-3" />
             CSV
           </button>
