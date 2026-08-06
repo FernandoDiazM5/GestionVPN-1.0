@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-05 — Mejoras visuales y ordenación desplegadas en producción.** Rama `vps_prod` (producción funcional `8eafba1`). Estado: frontend reconstruido y recreado; validación productiva completa.
+> - Se desplegaron juntas la vista móvil de Sitios, el sistema global de botones y secundarios blancos, y la ordenación por once columnas de Estado de equipos. No hubo cambios de backend, base de datos ni migraciones.
+> - Producción respondió 200 en raíz, workspace y health; preflight 204, origen hostil 403 y login inválido 401. MySQL, RouterOS y SMTP quedaron `ok`; frontend, backend y DB registraron cero reinicios y no hubo errores recientes relevantes.
+> - El checkout quedó exactamente en `8eafba18dfd8115c9ff3e11fc7362cbc31d4760f` y el bundle servido contiene la nueva interfaz. Rollback: `gestionvpn-10-frontend:pre-ui-sort-20260806T025351Z`; disco 78%/5.4 GiB libres.
+
 > **Sesión 2026-08-05 — Estado de equipos ordenable por once columnas.** Rama `vps_prod` (base publicada `8087f47`). Estado: frontend 72 archivos/245 pruebas, lint, build, auditor visual 308/0 y diff correctos; pendiente commit/despliegue.
 > - Cada sitio conserva su propio orden persistente y los encabezados ciclan ascendente, descendente y original. Se cubren Tipo, Antena, Modelo, SSID/Canal, Señal, CCQ, Potencia, uptime real, CPU, Clientes y Estado.
 > - Los comparadores tratan texto natural, valores numéricos negativos, conteo actual/histórico, prioridad operativa y ausentes siempre al final. Se agregaron seis pruebas focalizadas.
