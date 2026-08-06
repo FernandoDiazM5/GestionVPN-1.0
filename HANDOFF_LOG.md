@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-05 — Estado de equipos ordenable por once columnas.** Rama `vps_prod` (base publicada `8087f47`). Estado: frontend 72 archivos/245 pruebas, lint, build, auditor visual 308/0 y diff correctos; pendiente commit/despliegue.
+> - Cada sitio conserva su propio orden persistente y los encabezados ciclan ascendente, descendente y original. Se cubren Tipo, Antena, Modelo, SSID/Canal, Señal, CCQ, Potencia, uptime real, CPU, Clientes y Estado.
+> - Los comparadores tratan texto natural, valores numéricos negativos, conteo actual/histórico, prioridad operativa y ausentes siempre al final. Se agregaron seis pruebas focalizadas.
+> - Móvil recibe selector y dirección equivalentes; sin cambios en backend, BD, polling o equipos. Producción no fue modificada.
+
 > **Sesión 2026-08-05 — Secundarios blancos normalizados antes del despliegue.** Rama `vps_prod` (base publicada `577fc76`). Estado: frontend 71 archivos/239 pruebas, lint, build, auditor visual 307/0 y diff correctos; pendiente nuevo commit/despliegue.
 > - La observación visual detectó que `Ver guardados` tenía sombra local mientras `Ver todos los sitios` dependía correctamente del estilo global todavía no desplegado. Se retiró la excepción y la prueba ahora exige que la sombra viva en `index.css`.
 > - Paginación de Sitios, descarga de informe por sitio y CSV de CPE dejaron sus clases blancas manuales y usan `btn-outline`; los controles compactos que no son acciones elevadas permanecen sin sombra.

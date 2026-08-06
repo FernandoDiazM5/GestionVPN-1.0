@@ -1,5 +1,5 @@
-import { useState, type CSSProperties } from 'react';
-import { ChevronDown, ChevronRight, FileText, Loader2, Radio, Wifi, Server, Users, Trash2 } from 'lucide-react';
+import { useMemo, useState, type CSSProperties } from 'react';
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronRight, FileText, Loader2, Radio, Wifi, Server, Users, Trash2 } from 'lucide-react';
 import type { SavedDevice } from '../../../../types/devices';
 import type { PollResult } from '../../../../types/apMonitor';
 import ApRow from './ApRow';
@@ -7,6 +7,7 @@ import ApColSelector from './selectors/ApColSelector';
 import { AP_COL_DEFS, loadApColPrefs, saveApColPrefs } from '../utils/columnDefs';
 import { getApStatus, getNodeApStatus } from '../utils/statusHelpers';
 import type { NodeGroup } from '../utils/types';
+import { AP_SORT_KEYS, loadApSort, saveApSort, sortAps, type ApSortConfig, type ApSortKey } from '../utils/apSort';
 
 function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelActive, reportExporting, onExportReport, onToggleAp, onCpeDetail, onApDetail: _onApDetail, onM5Detail, onApView, onApSync, onApDelete, onApMove, onApRevealSsh }: {
   group: NodeGroup;
@@ -30,9 +31,27 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelAc
   // es una decisión temporal del usuario y no se restaura entre visitas.
   const [expanded, setExpanded] = useState(false);
   const [hiddenApCols, setHiddenApCols] = useState<Set<string>>(loadApColPrefs);
+  const [sortConfig, setSortConfig] = useState<ApSortConfig | null>(() => loadApSort(group.nodeId));
   const handleApColChange = (h: Set<string>) => { setHiddenApCols(h); saveApColPrefs(h); };
 
   const apStatuses = group.aps.map(ap => getApStatus(ap, pollResults, activeNodeName, tunnelActive));
+  const apStatusById = useMemo(
+    () => Object.fromEntries(group.aps.map(ap => [ap.id, getApStatus(ap, pollResults, activeNodeName, tunnelActive)])),
+    [group.aps, pollResults, activeNodeName, tunnelActive],
+  );
+  const sortedAps = useMemo(
+    () => sortAps(group.aps, sortConfig, pollResults, apStatusById),
+    [group.aps, sortConfig, pollResults, apStatusById],
+  );
+  const setAndSaveSort = (next: ApSortConfig | null) => {
+    setSortConfig(next);
+    saveApSort(group.nodeId, next);
+  };
+  const cycleSort = (key: ApSortKey) => {
+    if (sortConfig?.key !== key) setAndSaveSort({ key, direction: 'asc' });
+    else if (sortConfig.direction === 'asc') setAndSaveSort({ key, direction: 'desc' });
+    else setAndSaveSort(null);
+  };
   const nodeStatus = getNodeApStatus(apStatuses);
   const statusColor = nodeStatus === 'online' ? 'bg-emerald-500'
     : nodeStatus === 'partial' ? 'bg-amber-400'
@@ -98,7 +117,32 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelAc
             </div>
           )}
           {group.aps.length > 0 && (
-            <div className="overflow-x-auto">
+            <div>
+              <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/60 px-3 py-2 sm:hidden dark:border-slate-800 dark:bg-slate-800/30">
+                <label htmlFor={`ap-sort-${group.nodeId}`} className="sr-only">Ordenar equipos del sitio</label>
+                <select
+                  id={`ap-sort-${group.nodeId}`}
+                  value={sortConfig?.key ?? ''}
+                  onChange={event => {
+                    const key = event.target.value as ApSortKey | '';
+                    setAndSaveSort(key ? { key, direction: 'asc' } : null);
+                  }}
+                  className="min-h-11 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                >
+                  <option value="">Orden original</option>
+                  {AP_COL_DEFS.filter(col => AP_SORT_KEYS.has(col.key as ApSortKey)).map(col => <option key={col.key} value={col.key}>{col.label}</option>)}
+                </select>
+                <button
+                  type="button"
+                  disabled={!sortConfig}
+                  onClick={() => sortConfig && setAndSaveSort({ ...sortConfig, direction: sortConfig.direction === 'asc' ? 'desc' : 'asc' })}
+                  aria-label={sortConfig?.direction === 'desc' ? 'Cambiar a orden ascendente' : 'Cambiar a orden descendente'}
+                  className="btn-outline btn-icon min-h-11 min-w-11"
+                >
+                  {sortConfig?.direction === 'desc' ? <ArrowDown className="h-4 w-4" /> : <ArrowUp className="h-4 w-4" />}
+                </button>
+              </div>
+              <div className="overflow-x-auto">
               {(() => {
                 const visibleCols = AP_COL_DEFS.filter(c => c.always || !hiddenApCols.has(c.key));
                 const gridCols = visibleCols.map(c => c.width).join(' ');
@@ -113,13 +157,28 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelAc
                   >
                     <div className="hidden bg-slate-50 border-b border-slate-200 text-3xs font-bold text-slate-400 uppercase tracking-wider px-4 py-2 sm:grid dark:bg-slate-800/60 dark:border-slate-800"
                       style={{ gridTemplateColumns: gridCols }}>
-                      {visibleCols.map(col => (
-                        <span key={col.key} className={`truncate ${col.right ? 'text-right pr-2' : col.key === 'cpes' || col.key === 'estado' ? 'text-center' : col.key === 'actions' ? 'text-right' : ''}`}>
-                          {col.label}
-                        </span>
-                      ))}
+                      {visibleCols.map(col => {
+                        const sortable = AP_SORT_KEYS.has(col.key as ApSortKey);
+                        const active = sortConfig?.key === col.key;
+                        const ariaSort = active ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : 'none';
+                        return (
+                          <div key={col.key} role="columnheader" aria-sort={sortable ? ariaSort : undefined}
+                            className={`${col.right ? 'text-right pr-2' : col.key === 'cpes' || col.key === 'estado' ? 'text-center' : col.key === 'actions' ? 'text-right' : ''}`}>
+                            {sortable ? (
+                              <button type="button" onClick={() => cycleSort(col.key as ApSortKey)}
+                                aria-label={`Ordenar por ${col.label}${active ? sortConfig.direction === 'asc' ? ' descendente' : ' en orden original' : ' ascendente'}`}
+                                className={`inline-flex min-h-11 w-full items-center gap-1 rounded-lg px-1 uppercase tracking-wider hover:bg-indigo-50 hover:text-indigo-700 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-300 ${col.right ? 'justify-end' : col.key === 'cpes' || col.key === 'estado' ? 'justify-center' : 'justify-start'}`}>
+                                <span className="truncate">{col.label}</span>
+                                {active
+                                  ? sortConfig.direction === 'asc' ? <ArrowUp className="h-3 w-3 shrink-0 text-indigo-500" /> : <ArrowDown className="h-3 w-3 shrink-0 text-indigo-500" />
+                                  : <ArrowUpDown className="h-3 w-3 shrink-0 opacity-50" />}
+                              </button>
+                            ) : <span className="inline-flex min-h-11 items-center">{col.label}</span>}
+                          </div>
+                        );
+                      })}
                     </div>
-                    {group.aps.map(dev => (
+                    {sortedAps.map(dev => (
                       <ApRow
                         key={dev.id}
                         dev={dev}
@@ -139,6 +198,7 @@ function ApGroupCard({ group, expandedAps, pollResults, activeNodeName, tunnelAc
                   </div>
                 );
               })()}
+              </div>
             </div>
           )}
 
