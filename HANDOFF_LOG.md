@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-06 — Encabezados y reloj desplegados en producción.** Rama `vps_prod` (producción funcional `356ddb0`). Estado: frontend reconstruido y recreado; validación productiva completa.
+> - Se desplegaron juntos los nombres completos de las columnas ordenables y el reloj alineado al lease renovable de 5 minutos. Telegram conserva su activación de 5 minutos sin extensión adicional; no hubo cambios de backend, base de datos ni migraciones.
+> - Producción respondió 200 en raíz, workspace y health; preflight 204, origen hostil 403 y login inválido 401. MySQL, RouterOS y SMTP quedaron `ok`; frontend, backend y DB registraron cero reinicios y el bundle nuevo fue confirmado.
+> - Checkout exacto `356ddb097f469577c8a27de2fe73aa65b12a19b5`. Rollback `gestionvpn-10-frontend:pre-header-clock-20260806T052521Z`; disco 81%/4.7 GiB libres.
+
 > **Sesión 2026-08-06 — Reloj visual sincronizado con el lease de cinco minutos.** Rama `vps_prod` (base publicada `dd50933`). Estado: pruebas focalizadas 7/7, lint, build y diff correctos; pendiente despliegue.
 > - El backend ya operaba con un lease renovable de 5 minutos, pero el anillo calculaba porcentaje y colores contra 30 minutos; por eso nacía rojo y mostraba `Expira pronto`.
 > - La referencia visual/fallback pasa a 5 minutos: verde al inicio, ámbar bajo 50 % y rojo únicamente en el último 25 %. El aviso ya no promete una extensión de 30 minutos. Sin cambios en backend, keepalive, RouterOS o BD.
