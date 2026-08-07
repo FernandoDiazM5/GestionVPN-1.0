@@ -15,16 +15,16 @@
 // ============================================================
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ShieldAlert, RefreshCw, Download, Wifi, Loader2, AlertCircle } from 'lucide-react';
+import { RefreshCw, Download, Wifi, Loader2, AlertCircle } from 'lucide-react';
 import { apiFetch } from '../../utils/apiClient';
 import { API_BASE_URL } from '../../config';
+import JoinpointLogo from './JoinpointLogo';
 
 export default function RouterMaintenanceOverlay() {
   const [visible, setVisible] = useState(false);
   const [detail, setDetail] = useState('');
   const [checking, setChecking] = useState(false);
   const [notYet, setNotYet] = useState(false);
-  const [logoFailed, setLogoFailed] = useState(false);
 
   useEffect(() => {
     const onDown = (e: Event) => {
@@ -90,24 +90,15 @@ export default function RouterMaintenanceOverlay() {
         <div className="h-1.5 w-full bg-rose-600" />
 
         <div className="p-8 sm:p-12 text-center">
-          {/* Logo WireGuard (asset local en /public; cae al icono si falta) */}
+          {/* Marca Joinpoint; WireGuard se mantiene como tecnología requerida. */}
           <div className="mx-auto mb-8 flex items-center justify-center">
-            {logoFailed ? (
-              <div className="relative w-24 h-24">
-                <span className="absolute inset-0 rounded-full bg-rose-500/30 animate-ping" />
-                <div className="absolute inset-0 rounded-full bg-rose-50 dark:bg-rose-500/10 ring-1 ring-rose-200 dark:ring-rose-500/30 flex items-center justify-center">
-                  <ShieldAlert className="w-11 h-11 text-rose-600 dark:text-rose-400" />
-                </div>
-              </div>
-            ) : (
-              <img
-                src={`${import.meta.env.BASE_URL}logo_wg.png`}
-                alt="WireGuard"
-                onError={() => setLogoFailed(true)}
-                className="w-44 h-auto select-none drop-shadow-sm anim-zoom-in"
-              />
-            )}
+            <div className="relative">
+              <span className="absolute inset-0 rounded-3xl bg-indigo-500/20 animate-ping" />
+              <JoinpointLogo className="relative h-24 w-24 drop-shadow-sm anim-zoom-in" />
+            </div>
           </div>
+
+          <p className="mb-3 text-xs font-extrabold tracking-[0.2em] text-indigo-600 dark:text-indigo-300">JOINPOINT NOC</p>
 
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-slate-50 tracking-tight">
             Acceso Restringido

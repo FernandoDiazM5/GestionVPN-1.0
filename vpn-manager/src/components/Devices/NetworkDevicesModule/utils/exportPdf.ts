@@ -6,7 +6,7 @@
 //  • Resumen: 3 KPIs (Total / Con stats / Guardados).
 //  • Tabla principal con subset PDF_COLUMNS (11 columnas legibles
 //    en A4 landscape). Auto-paginado, header repetido por página.
-//  • Footer en cada página: "Página N de M · GestionVPN · <fecha>".
+//  • Footer en cada página: "Página N de M · Joinpoint NOC · <fecha>".
 //
 //  jspdf + jspdf-autotable se cargan vía dynamic import — el chunk
 //  queda separado del bundle inicial.
@@ -123,7 +123,7 @@ export async function exportScanToPdf(
       fillColor: [248, 250, 252],  // slate-50
     },
     didDrawPage: (data: { pageNumber: number }) => {
-      // Footer: Página N · GestionVPN · fecha
+      // Footer: Página N · Joinpoint NOC · fecha
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(7.5);
       doc.setTextColor(...SLATE_500);
@@ -131,7 +131,7 @@ export async function exportScanToPdf(
         (doc as unknown as { internal: { getNumberOfPages: () => number } })
           .internal.getNumberOfPages();
       doc.text(
-        `Página ${data.pageNumber} de ${totalPages}  ·  GestionVPN  ·  ${fechaStr}`,
+        `Página ${data.pageNumber} de ${totalPages}  ·  Joinpoint NOC  ·  ${fechaStr}`,
         marginX,
         pageHeight - 18,
       );

@@ -30,7 +30,7 @@ export async function exportScanToXlsx(rows: DeviceRow[], meta: ExportMetadata):
   const ExcelJS = (await import('exceljs')).default;
 
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'GestionVPN';
+  wb.creator = 'Joinpoint NOC';
   wb.created = meta.scannedAt ?? new Date();
 
   const sheet = wb.addWorksheet('Escaneo', {

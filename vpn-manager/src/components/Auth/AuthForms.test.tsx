@@ -87,7 +87,7 @@ describe('formularios de acceso', () => {
 
     await user.type(username, 'moderador@example.com');
     await user.type(password, 'password-seguro');
-    await user.click(screen.getByRole('button', { name: 'Iniciar Sesión' }));
+    await user.click(screen.getByRole('button', { name: 'Ingresar a Joinpoint' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Credenciales inválidas');
   });
@@ -111,7 +111,7 @@ describe('formularios de acceso', () => {
     render(<RouterAccess />);
 
     await screen.findByLabelText('Usuario o correo');
-    expect(screen.getByRole('button', { name: 'Iniciar Sesión' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Ingresar a Joinpoint' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Continuar con Google' })).toBeEnabled();
     await user.click(screen.getByRole('button', { name: 'Continuar con Google' }));
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Radio, Lock, User, Server, ShieldCheck, CheckCircle, AlertCircle, Loader2, Mail } from 'lucide-react';
+import { Lock, User, Server, ShieldCheck, CheckCircle, AlertCircle, Loader2, Mail } from 'lucide-react';
 import Spinner from '../Common/Spinner';
 import { useVpn } from '../../context';
 import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
@@ -8,6 +8,7 @@ import PasswordResetRequest from './PasswordResetRequest';
 import PasswordResetConfirm from './PasswordResetConfirm';
 import { federatedAuthAvailable } from '../../config/federatedAuth';
 import { signInWithGoogle } from '../../services/federatedAuth';
+import JoinpointLogo from '../Common/JoinpointLogo';
 
 import { API_BASE_URL } from '../../config';
 
@@ -171,15 +172,15 @@ export default function RouterAccess() {
             <div className="relative z-10">
               <div className="flex items-center space-x-3 mb-4">
                 <div className="bg-white/20 p-2.5 rounded-xl backdrop-blur-sm">
-                  {needsSetup ? <ShieldCheck className="w-6 h-6 text-white" /> : <Radio className="w-6 h-6 text-white" />}
+                  {needsSetup ? <ShieldCheck className="w-6 h-6 text-white" /> : <JoinpointLogo inverted className="h-9 w-9" />}
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-white">MikroTikVPN</h1>
-                  <p className="text-indigo-200 text-sm">{needsSetup ? 'Configuración Inicial' : 'Remote Core Manager'}</p>
+                  <h1 className="text-2xl font-extrabold tracking-wide text-white">JOINPOINT</h1>
+                  <p className="text-cyan-100 text-sm font-semibold">{needsSetup ? 'Configuración inicial' : 'Joinpoint NOC'}</p>
                 </div>
               </div>
               <p className="text-indigo-100 text-sm mt-2">
-                {needsSetup ? 'Cree la cuenta administrativa maestra para acceder al sistema de gestión.' : 'Inicie sesión con su cuenta para acceder al panel.'}
+                {needsSetup ? 'Crea la cuenta administrativa maestra para acceder a la plataforma.' : 'Gestiona sitios, accesos y equipos desde un solo lugar.'}
               </p>
             </div>
           </div>
@@ -267,7 +268,7 @@ export default function RouterAccess() {
                 <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
                 <Server className="w-4 h-4 relative z-10" />
                 <span className="relative z-10">
-                    {needsSetup ? 'Crear Cuenta Administrador' : 'Iniciar Sesión'}
+                    {needsSetup ? 'Crear cuenta de administrador' : 'Ingresar a Joinpoint'}
                 </span>
               </button>
             </form>
@@ -310,7 +311,7 @@ export default function RouterAccess() {
         </div>
 
         <p className="text-center text-xs text-slate-500 dark:text-slate-400 font-medium mt-6">
-          Microservicios encriptados AES-256-GCM.
+          Operación segura · Monitoreo centralizado · AES-256-GCM
         </p>
       </div>
     </div>

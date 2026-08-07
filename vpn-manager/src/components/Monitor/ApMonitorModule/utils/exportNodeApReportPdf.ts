@@ -262,7 +262,7 @@ export async function createNodeApReportPdf(report: NodeApReport): Promise<Blob>
     doc.setFontSize(7.3);
     doc.setTextColor(...SLATE_500);
     doc.text(
-      `Página ${page} de ${pageCount}  |  GestionVPN  |  Snapshot consultivo, sin credenciales`,
+      `Página ${page} de ${pageCount}  |  Joinpoint NOC  |  Snapshot consultivo, sin credenciales`,
       marginX,
       pageHeight - 16,
     );

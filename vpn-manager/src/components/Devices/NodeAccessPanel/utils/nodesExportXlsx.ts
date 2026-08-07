@@ -22,7 +22,7 @@ export async function exportNodesToXlsx(rows: NodeExportRow[], meta: NodesExport
   const ExcelJS = (await import('exceljs')).default;
 
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'GestionVPN';
+  wb.creator = 'Joinpoint NOC';
   wb.created = meta.scannedAt ?? new Date();
 
   const sheet = wb.addWorksheet('Nodos', {

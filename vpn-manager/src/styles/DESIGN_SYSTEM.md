@@ -1,4 +1,4 @@
-# 🎨 Sistema de Diseño — MikroTikVPN Remote Manager
+# 🎨 Sistema de Diseño — Joinpoint NOC
 
 ## Escala canónica de interfaz
 

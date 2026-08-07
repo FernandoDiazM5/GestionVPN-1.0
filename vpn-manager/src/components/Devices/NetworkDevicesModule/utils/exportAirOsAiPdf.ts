@@ -295,7 +295,7 @@ export async function createAirOsNetworkAnalysisPdf(report: AirOsNetworkReportDa
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
     doc.setTextColor(...MUTED);
-    doc.text(`Página ${page} de ${pageCount}  |  GestionVPN  |  Informe consultivo, sin acciones ejecutadas`, margin, pageHeight - 16);
+    doc.text(`Página ${page} de ${pageCount}  |  Joinpoint NOC  |  Informe consultivo, sin acciones ejecutadas`, margin, pageHeight - 16);
   }
 
   return doc.output('blob');

@@ -9,6 +9,7 @@ import { visibleModules, roleLabel, type ModuleId } from '../../utils/permission
 import Drawer from '../Common/Drawer';
 import { preloadModule } from '../../performance/moduleLoaders';
 import { markNavigationStart } from '../../performance/navigationMetrics';
+import JoinpointLogo from '../Common/JoinpointLogo';
 
 interface NavItem {
   id: ModuleId;
@@ -111,15 +112,13 @@ export default function Sidebar() {
       {/* ── Cabecera: logo + colapsar ── */}
       <div className={`flex items-center gap-3 px-4 py-4 border-b border-slate-100 dark:border-slate-800 ${mini ? 'justify-center' : 'justify-between'}`}>
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="bg-gradient-to-br from-indigo-500 to-indigo-700 p-2 rounded-xl shadow-md shadow-indigo-500/25 shrink-0">
-            <Radio className="w-5 h-5 text-white" />
-          </div>
+          <JoinpointLogo className="h-9 w-9 shrink-0 drop-shadow-sm" />
           {!mini && (
             <div className="min-w-0">
               <h1 className="text-sm font-bold text-slate-800 dark:text-slate-100 leading-none truncate">
-                MikroTik<span className="text-indigo-600 dark:text-indigo-400">VPN</span>
+                JOINPOINT <span className="text-indigo-600 dark:text-indigo-400">NOC</span>
               </h1>
-              <p className="text-2xs text-slate-500 dark:text-slate-500 font-medium mt-0.5">Remote Manager</p>
+              <p className="text-2xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">Tu red, bajo control</p>
             </div>
           )}
         </div>
@@ -240,11 +239,9 @@ export default function Sidebar() {
       {/* ── Barra superior móvil ── */}
       <div className="lg:hidden sticky top-0 z-40 flex items-center justify-between px-4 py-3 bg-white/95 backdrop-blur-xl border-b border-slate-200 dark:bg-slate-900/95 dark:border-slate-800">
         <div className="flex items-center gap-2.5">
-          <div className="bg-gradient-to-br from-indigo-500 to-indigo-700 p-2 rounded-xl shadow-md shadow-indigo-500/25">
-            <Radio className="w-4 h-4 text-white" />
-          </div>
+          <JoinpointLogo className="h-9 w-9 drop-shadow-sm" />
           <h1 className="text-sm font-bold text-slate-800 dark:text-slate-100">
-            MikroTik<span className="text-indigo-600 dark:text-indigo-400">VPN</span>
+            JOINPOINT <span className="text-indigo-600 dark:text-indigo-400">NOC</span>
           </h1>
         </div>
         <button

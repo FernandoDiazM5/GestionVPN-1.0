@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-06 — Primera fase de marca Joinpoint NOC.** Rama `vps_prod` (base `029c420`). Estado: frontend 73 archivos/248 pruebas, lint, build, auditor visual 309/0 y diff correctos; pendiente commit/despliegue.
+> - Se creó una identidad SVG nativa con una J y tres nodos conectados, usando azul `#3157D5` y cian `#16B8C4`; no se generó bitmap porque favicon y navegación requieren escalado vectorial nítido.
+> - Login, sidebar móvil/escritorio, favicon, título/metadatos, pantalla WireGuard restringida y exportaciones PDF/XLSX muestran ahora `Joinpoint NOC`; el lema es `Tu red, bajo control`.
+> - Se conservaron `/GestionVPN-1.0/`, nombres de almacenamiento/esquemas y menciones técnicas reales a MikroTik/WireGuard para evitar una migración incompatible. Producción no fue modificada.
+
 > **Sesión 2026-08-06 — Encabezados y reloj desplegados en producción.** Rama `vps_prod` (producción funcional `356ddb0`). Estado: frontend reconstruido y recreado; validación productiva completa.
 > - Se desplegaron juntos los nombres completos de las columnas ordenables y el reloj alineado al lease renovable de 5 minutos. Telegram conserva su activación de 5 minutos sin extensión adicional; no hubo cambios de backend, base de datos ni migraciones.
 > - Producción respondió 200 en raíz, workspace y health; preflight 204, origen hostil 403 y login inválido 401. MySQL, RouterOS y SMTP quedaron `ok`; frontend, backend y DB registraron cero reinicios y el bundle nuevo fue confirmado.

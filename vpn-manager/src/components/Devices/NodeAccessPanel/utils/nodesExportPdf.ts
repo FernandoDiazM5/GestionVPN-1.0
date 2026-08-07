@@ -4,7 +4,7 @@
 //  • Header con título + fecha + filtros activos.
 //  • Resumen: 2 KPIs (Total / Conectados).
 //  • Tabla principal con NODES_PDF_COLUMNS (7 cols legibles A4 landscape).
-//  • Footer "Página N de M · GestionVPN · fecha".
+//  • Footer "Página N de M · Joinpoint NOC · fecha".
 //  • jspdf + jspdf-autotable se cargan vía dynamic import.
 // ============================================================
 
@@ -112,7 +112,7 @@ export async function exportNodesToPdf(rows: NodeExportRow[], meta: NodesExportM
         (doc as unknown as { internal: { getNumberOfPages: () => number } })
           .internal.getNumberOfPages();
       doc.text(
-        `Página ${data.pageNumber} de ${totalPages}  ·  GestionVPN  ·  ${fechaStr}`,
+        `Página ${data.pageNumber} de ${totalPages}  ·  Joinpoint NOC  ·  ${fechaStr}`,
         marginX,
         pageHeight - 18,
       );
