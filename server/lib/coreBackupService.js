@@ -279,8 +279,8 @@ async function runCoreBackup(triggerType = 'manual') {
     const [backupHash, rscHash] = await Promise.all([fileSha256(backupPath), fileSha256(rscPath)]);
     const delivery = await sendGeneric({
       to: recipient,
-      subject: `[VPN Manager] Respaldo diario ${sanitizeIdentity(identity)} - ${run.localDate}`,
-      text: `Respaldo dual del servidor ${identity}. Se adjuntan el .backup cifrado AES-SHA256 y el export .rsc legible. La contraseña no se incluye en este correo.`,
+      subject: `[Joinpoint NOC] Respaldo diario ${sanitizeIdentity(identity)} - ${run.localDate}`,
+      text: `Joinpoint NOC · Respaldo del servidor\n\nRespaldo dual del servidor ${identity}. Se adjuntan el .backup cifrado AES-SHA256 y el export .rsc legible. La contraseña no se incluye en este correo.\n\nOperación segura · Monitoreo centralizado`,
       kind: 'core_backup',
       attachments: [
         { filename: names[0], path: backupPath, contentType: 'application/octet-stream' },

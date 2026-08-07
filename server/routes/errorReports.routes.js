@@ -92,7 +92,7 @@ function createErrorReportsRouter(options = {}) {
 
     const occurredAt = new Date(report.occurredAt).toISOString();
     const text = [
-      'Error de frontend detectado',
+      'Joinpoint NOC · Error de frontend detectado',
       `Origen: ${report.source}`,
       `Tipo: ${report.name}`,
       `Mensaje: ${report.message}`,
@@ -107,7 +107,7 @@ function createErrorReportsRouter(options = {}) {
     try {
       delivery = await sendGeneric({
         to: errorReportEmail,
-        subject: `[VPN Manager] Error frontend: ${report.name}`,
+        subject: `[Joinpoint NOC] Error frontend: ${report.name}`,
         text,
         kind: 'error_report',
       });

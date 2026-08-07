@@ -68,6 +68,7 @@ describe('handleMessage — sin auth', () => {
     mysqlMocks.query.mockResolvedValue([]);
     await bot.handleMessage({ chat: { id: 1 }, text: '/start' });
     const text = getReplyText();
+    expect(text).toContain('Joinpoint NOC');
     expect(text).toContain('Para vincular');
     expect(text).toContain('/link');
   });
@@ -76,6 +77,7 @@ describe('handleMessage — sin auth', () => {
     mysqlMocks.query.mockResolvedValue([]);
     await bot.handleMessage({ chat: { id: 1 }, text: '/help' });
     const text = getReplyText();
+    expect(text).toContain('Joinpoint NOC');
     expect(text).toContain('/start');
     expect(text).toContain('/link');
     expect(text).not.toContain('/status'); // requiere user

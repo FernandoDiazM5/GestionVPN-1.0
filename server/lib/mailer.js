@@ -39,7 +39,13 @@ function getTransporter() {
   return transporter;
 }
 
-const FROM_DEFAULT = 'MikroTik VPN <no-reply@vpn.local>';
+// El nombre visible sí forma parte de la marca; la dirección real sigue
+// viniendo de SMTP_FROM para respetar SPF/DKIM del proveedor configurado.
+const FROM_DEFAULT = 'Joinpoint NOC <no-reply@vpn.local>';
+const BRAND_NAME = 'Joinpoint NOC';
+const BRAND_PRIMARY = '#3157D5';
+const BRAND_DARK = '#243B8F';
+const BRAND_ACCENT = '#16B8C4';
 
 /**
  * Envía un código OTP al email. Devuelve { delivered, dev }.
@@ -57,9 +63,16 @@ async function sendOtp(email, code, purpose = 'verificación') {
   await sendAndCount(tx, 'otp', {
     from: process.env.SMTP_FROM || FROM_DEFAULT,
     to: email,
-    subject: `Tu código de ${purpose}: ${code}`,
-    text: `Tu código de ${purpose} es: ${code}\nExpira en 10 minutos.`,
-    html: `<p>Tu código de <b>${purpose}</b> es:</p><h2 style="letter-spacing:4px">${code}</h2><p>Expira en 10 minutos.</p>`,
+    subject: `[${BRAND_NAME}] Tu código de ${purpose}: ${code}`,
+    text: `${BRAND_NAME}\n\nTu código de ${purpose} es: ${code}\nExpira en 10 minutos.\n\nOperación segura · Monitoreo centralizado`,
+    html: `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#172033;">
+<table width="100%" cellpadding="0" cellspacing="0" style="padding:32px 16px;"><tr><td align="center">
+<table width="520" cellpadding="0" cellspacing="0" style="max-width:520px;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(23,32,51,.08);">
+<tr><td style="background:${BRAND_PRIMARY};padding:26px 32px;color:#fff;"><div style="font-size:13px;font-weight:800;letter-spacing:2px;">JOINPOINT NOC</div><div style="margin-top:6px;color:#d9fbfd;font-size:13px;">Tu red, bajo control</div></td></tr>
+<tr><td style="padding:32px;text-align:center;"><p style="margin:0 0 18px;font-size:15px;">Tu código de <strong>${escapeHtml(purpose)}</strong> es:</p><div style="display:inline-block;background:#eef2ff;border:1px solid #c7d2fe;border-radius:12px;padding:14px 20px;color:${BRAND_DARK};font-size:30px;font-weight:800;letter-spacing:7px;">${code}</div><p style="margin:18px 0 0;color:#64748b;font-size:13px;">Expira en 10 minutos.</p></td></tr>
+<tr><td style="border-top:1px solid #e5e7eb;padding:15px 24px;text-align:center;color:#64748b;font-size:11px;">${BRAND_NAME} · Operación segura · Monitoreo centralizado</td></tr>
+</table></td></tr></table></body></html>`,
   });
   return { delivered: true, dev: false };
 }
@@ -90,7 +103,7 @@ async function sendInvitation({ email, code, inviterName, workspaceName, tunnelI
     return { delivered: false, dev: true };
   }
 
-  const subject = `${inviterName} te invitó a ${workspaceName} — MikroTik VPN`;
+  const subject = `[${BRAND_NAME}] ${inviterName} te invitó a ${workspaceName}`;
 
   const text =
     `Hola,\n\n` +
@@ -99,7 +112,7 @@ async function sendInvitation({ email, code, inviterName, workspaceName, tunnelI
     `\nTu código de invitación es: ${code}\n\n` +
     `Para registrarte y configurar tu acceso, abre este enlace (válido por 24 horas):\n${acceptUrl}\n\n` +
     `Si no esperabas este correo, simplemente ignóralo.\n` +
-    `— MikroTik VPN Manager`;
+    `— ${BRAND_NAME}\nTu red, bajo control`;
 
   const html = `<!DOCTYPE html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -108,8 +121,8 @@ async function sendInvitation({ email, code, inviterName, workspaceName, tunnelI
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:32px 16px;">
     <tr><td align="center">
       <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);">
-        <tr><td style="background:linear-gradient(135deg,#6366f1 0%,#4f46e5 100%);padding:32px 32px 28px;color:#fff;">
-          <div style="font-size:13px;letter-spacing:2px;text-transform:uppercase;opacity:0.85;margin-bottom:8px;">MikroTik VPN Manager</div>
+        <tr><td style="background:linear-gradient(135deg,${BRAND_PRIMARY} 0%,${BRAND_DARK} 100%);padding:32px 32px 28px;color:#fff;">
+          <div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">JOINPOINT NOC</div>
           <div style="font-size:24px;font-weight:700;line-height:1.3;">Te invitaron a un workspace</div>
         </td></tr>
         <tr><td style="padding:32px;">
@@ -129,7 +142,7 @@ async function sendInvitation({ email, code, inviterName, workspaceName, tunnelI
             Haz clic en el botón para crear tu cuenta y configurar tu acceso WireGuard:
           </p>
           <table cellpadding="0" cellspacing="0" style="margin:0 auto;"><tr><td>
-            <a href="${acceptUrl}" style="display:inline-block;background:#4f46e5;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:14px 32px;border-radius:12px;">
+            <a href="${acceptUrl}" style="display:inline-block;background:${BRAND_PRIMARY};color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:14px 32px;border-radius:12px;">
               Aceptar invitación
             </a>
           </td></tr></table>
@@ -145,7 +158,7 @@ async function sendInvitation({ email, code, inviterName, workspaceName, tunnelI
           </p>
         </td></tr>
         <tr><td style="background:#f9fafb;padding:16px 32px;text-align:center;font-size:11px;color:#9ca3af;border-top:1px solid #e5e7eb;">
-          MikroTik VPN Manager · Gestión de túneles SSTP/WireGuard
+          ${BRAND_NAME} · Tu red, bajo control · <span style="color:${BRAND_ACCENT};">joinpoint.cloud</span>
         </td></tr>
       </table>
     </td></tr>
@@ -191,7 +204,7 @@ async function sendPasswordReset({ email, token, name }) {
     return { delivered: false, dev: true };
   }
 
-  const subject = 'Restablece tu contraseña — MikroTik VPN Manager';
+  const subject = `[${BRAND_NAME}] Restablece tu contraseña`;
   const greeting = name ? `Hola ${name}` : 'Hola';
 
   const text =
@@ -200,7 +213,7 @@ async function sendPasswordReset({ email, token, name }) {
     `Abre el siguiente enlace en tu navegador (válido por 15 minutos):\n\n` +
     `${resetUrl}\n\n` +
     `Si no solicitaste este cambio, puedes ignorar este correo — tu contraseña actual sigue siendo válida.\n` +
-    `— MikroTik VPN Manager`;
+    `— ${BRAND_NAME}\nTu red, bajo control`;
 
   const html = `<!DOCTYPE html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -209,8 +222,8 @@ async function sendPasswordReset({ email, token, name }) {
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:32px 16px;">
     <tr><td align="center">
       <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);">
-        <tr><td style="background:linear-gradient(135deg,#6366f1 0%,#4f46e5 100%);padding:32px 32px 28px;color:#fff;">
-          <div style="font-size:13px;letter-spacing:2px;text-transform:uppercase;opacity:0.85;margin-bottom:8px;">MikroTik VPN Manager</div>
+        <tr><td style="background:linear-gradient(135deg,${BRAND_PRIMARY} 0%,${BRAND_DARK} 100%);padding:32px 32px 28px;color:#fff;">
+          <div style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">JOINPOINT NOC</div>
           <div style="font-size:24px;font-weight:700;line-height:1.3;">Restablecer contraseña</div>
         </td></tr>
         <tr><td style="padding:32px;">
@@ -220,7 +233,7 @@ async function sendPasswordReset({ email, token, name }) {
             El enlace es válido por <strong>15 minutos</strong> y solo puede usarse una vez.
           </p>
           <table cellpadding="0" cellspacing="0" style="margin:0 auto;"><tr><td>
-            <a href="${resetUrl}" style="display:inline-block;background:#4f46e5;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:14px 32px;border-radius:12px;">
+            <a href="${resetUrl}" style="display:inline-block;background:${BRAND_PRIMARY};color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:14px 32px;border-radius:12px;">
               Restablecer contraseña
             </a>
           </td></tr></table>
@@ -234,7 +247,7 @@ async function sendPasswordReset({ email, token, name }) {
           </p>
         </td></tr>
         <tr><td style="background:#f9fafb;padding:16px 32px;text-align:center;font-size:11px;color:#9ca3af;border-top:1px solid #e5e7eb;">
-          MikroTik VPN Manager · Gestión de túneles SSTP/WireGuard
+          ${BRAND_NAME} · Tu red, bajo control · <span style="color:${BRAND_ACCENT};">joinpoint.cloud</span>
         </td></tr>
       </table>
     </td></tr>

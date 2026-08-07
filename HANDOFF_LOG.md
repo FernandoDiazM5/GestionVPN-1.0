@@ -1,5 +1,20 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-07 — Refinamiento responsive del login Joinpoint.** Rama `vps_prod` (base publicada `4829e06`). Estado: pruebas focalizadas 7/7, lint, build y diff correctos; pendiente commit/despliegue.
+> - Se aisló el fondo decorativo en una capa fija recortada para evitar el desplazamiento vertical artificial en escritorio.
+> - En móvil se retiró la segunda presentación de marca, se compactaron panel y espacios verticales, y se mantuvieron recuperación e invitación.
+> - El botón principal deshabilitado ganó contraste; Google conserva su renderizado condicional y un espaciado adaptable. No cambió autenticación, API, backend, datos ni producción.
+
+> **Sesión 2026-08-07 — Correos y Telegram adoptan Joinpoint NOC.** Rama `vps_prod` (base publicada `4829e06`). Estado: sintaxis correcta, pruebas focalizadas 38/38, backend 107 archivos/632 pruebas, inventario de rutas y `check:all` correctos; pendiente commit/despliegue.
+> - OTP, invitaciones, recuperación, eventos de túnel/nodo, respaldos y reportes usan asuntos, cabeceras, colores y firmas Joinpoint; la dirección real conserva `SMTP_FROM` para no afectar SPF/DKIM.
+> - El bot y las alertas Telegram muestran Joinpoint NOC en bienvenida, ayuda, enlace, estado, inventario y seguridad sin cambiar comandos, chats, preferencias ni eventos.
+> - El nombre, foto y descripción pública del bot requieren BotFather y no pueden cambiarse desde este código. Producción no fue modificada.
+
+> **Sesión 2026-08-06 — Login Joinpoint adaptado a composición dividida.** Rama `vps_prod` (base publicada `4829e06`). Estado: frontend 73 archivos/248 pruebas, lint, build, auditor visual 309/0 y diff correctos; pendiente commit/despliegue.
+> - El formulario vive en una superficie clara y el panel índigo de bienvenida ocupa la derecha en escritorio, siguiendo la referencia proporcionada sin copiar redes sociales ni registro ajenos al producto.
+> - Se conservaron inicio local, Google, recuperación, invitaciones, setup inicial, errores, carga, accesibilidad y modo oscuro; móvil apila la marca y mantiene todas las acciones.
+> - No hubo cambios en autenticación, API, backend, base de datos ni producción.
+
 > **Sesión 2026-08-06 — Joinpoint NOC desplegado en producción.** Rama `vps_prod`; producción funcional `6376197`. Estado: frontend reconstruido y recreado; validación productiva completa.
 > - Se publicó `6376197`, se preservó `gestionvpn-10-frontend:pre-joinpoint-6376197` y se reconstruyó exclusivamente `vpn-frontend`; backend y MariaDB conservaron sus contenedores y datos, sin migraciones.
 > - Raíz, ruta histórica y workspace respondieron 200; preflight 204, origen hostil 403 y login inválido 401. MySQL/SMTP quedaron `ok`; RouterOS apareció `stale` por 83 s sin escritura, no por fallo de conexión.

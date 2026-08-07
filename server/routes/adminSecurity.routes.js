@@ -46,7 +46,7 @@ async function notifyAdmin(userId, action, target, reason) {
     if (!sub?.telegram_chat_id) return { skipped: true };
     const escape = (value) => String(value).replace(/[&<>]/g, (char) => ({ '&':'&amp;','<':'&lt;','>':'&gt;' })[char]);
     return telegram.sendMessage({ chatId: sub.telegram_chat_id,
-      text: `<b>Seguridad VPS</b>\nAcción: <code>${escape(action)}</code>\nObjetivo: <code>${escape(target)}</code>\nMotivo: ${escape(reason)}` });
+      text: `<b>🛡️ Joinpoint NOC · Seguridad VPS</b>\nAcción: <code>${escape(action)}</code>\nObjetivo: <code>${escape(target)}</code>\nMotivo: ${escape(reason)}` });
   } catch (error) { return { ok: false, error: error.message }; }
 }
 

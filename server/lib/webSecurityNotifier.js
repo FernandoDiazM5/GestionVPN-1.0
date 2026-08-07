@@ -9,7 +9,7 @@ async function notifyAutomaticAction({ status, sourceIp, recommendation, jail, d
   try {
     const admins = await notificationRepo.listPlatformAdminsWithTelegram();
     const unique = [...new Map(admins.map((row) => [String(row.telegram_chat_id), row])).values()];
-    const text = `<b>Protección web automática</b>\nEstado: <code>${escapeHtml(status)}</code>`
+    const text = `<b>🛡️ Joinpoint NOC · Protección web automática</b>\nEstado: <code>${escapeHtml(status)}</code>`
       + `\nIP: <code>${escapeHtml(sourceIp)}</code>\nProtección: <code>${escapeHtml(jail)}</code>`
       + `\nSeñal: <code>${escapeHtml(recommendation)}</code>`;
     const results = await Promise.all(unique.map(async (admin) => {

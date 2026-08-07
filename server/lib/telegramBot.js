@@ -165,12 +165,12 @@ function formatNumberedList(tunnels) {
 async function cmdStart(chatId, user) {
   if (user) {
     return reply(chatId,
-      `👋 Hola <b>${user.name || user.email}</b>\n\n` +
+      `<b>🔵 Joinpoint NOC</b>\n👋 Hola <b>${user.name || user.email}</b>\n\n` +
       `Tu chat ya está vinculado. Usa /help para ver los comandos.`
     );
   }
   return reply(chatId,
-    '👋 <b>VPN Manager Bot</b>\n\n' +
+    '👋 <b>Joinpoint NOC</b>\n<i>Tu red, bajo control</i>\n\n' +
     'Para vincular tu chat:\n' +
     '1) Abre el panel → <i>Ajustes → Notificaciones</i>\n' +
     '2) Toca <b>Vincular</b> — recibirás un código de 6 chars\n' +
@@ -180,7 +180,7 @@ async function cmdStart(chatId, user) {
 
 async function cmdHelp(chatId, user) {
   const lines = [
-    '<b>Comandos</b>',
+    '<b>🔵 Joinpoint NOC · Comandos</b>',
     '/start — bienvenida',
     '/link CODE — vincular este chat con tu cuenta',
     '/unlink — desvincular',
@@ -208,7 +208,7 @@ async function cmdLink(chatId, args) {
   if (!r.ok) return reply(chatId, `❌ ${r.error}`);
   const user = await userRepo.findById(r.userId).catch(() => null);
   return reply(chatId,
-    `✅ Chat vinculado a <b>${user?.email || r.userId}</b>.\n\n` +
+    `<b>🔵 Joinpoint NOC</b>\n✅ Chat vinculado a <b>${user?.email || r.userId}</b>.\n\n` +
     `Habilita el canal Telegram en el panel para recibir notificaciones.\n` +
     `Usa /help para ver comandos.`
   );
@@ -233,7 +233,7 @@ async function cmdStatus(chatId, user) {
   if (!sess) return reply(chatId, '🔒 Sin túnel activo.');
   const remaining = sess.expires_at ? Math.max(0, Math.round((sess.expires_at - Date.now()) / 60000)) : null;
   return reply(chatId,
-    `🔓 <b>Túnel activo</b>\n` +
+    `<b>🔵 Joinpoint NOC · Estado</b>\n🔓 <b>Túnel activo</b>\n` +
     `Túnel: <code>${sess.tunnel_id}</code>\n` +
     `VRF: <code>${sess.vrf_name}</code>\n` +
     (remaining != null ? `Expira en: ${remaining} min` : '')
@@ -245,7 +245,7 @@ async function cmdTuneles(chatId, user) {
   const r = await fetchUserTunnels(user.id);
   if (r.error) return reply(chatId, r.error);
   return reply(chatId,
-    `<b>Túneles disponibles</b> (${r.tunnels.length})\n\n` +
+    `<b>🔵 Joinpoint NOC · Túneles disponibles</b> (${r.tunnels.length})\n\n` +
     formatNumberedList(r.tunnels) + '\n\n' +
     `Para activar uno: <code>/activar</code> y responde con el número.`
   );

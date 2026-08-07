@@ -22,6 +22,16 @@ const notificationRepo = require('../db/repos/notificationRepo');
 const userRepo = require('../db/repos/userRepo');
 const mailer = require('./mailer');
 const telegram = require('./telegram');
+const BRAND_SUBJECT = '[Joinpoint NOC]';
+
+function emailShell(content) {
+  return `<!DOCTYPE html><html lang="es"><body style="margin:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#172033;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="padding:28px 16px;"><tr><td align="center"><table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(23,32,51,.08);">
+  <tr><td style="background:#3157D5;padding:22px 28px;color:#fff;"><strong style="letter-spacing:2px;">JOINPOINT NOC</strong><div style="margin-top:5px;color:#d9fbfd;font-size:12px;">Tu red, bajo control</div></td></tr>
+  <tr><td style="padding:28px;font-size:14px;line-height:1.65;">${content}</td></tr>
+  <tr><td style="border-top:1px solid #e5e7eb;padding:14px 24px;text-align:center;color:#64748b;font-size:11px;">Joinpoint NOC · Operación segura · Monitoreo centralizado</td></tr>
+  </table></td></tr></table></body></html>`;
+}
 
 const EVENT_LABEL = {
   TUNNEL_ACTIVATED: 'Túnel activado',
@@ -43,7 +53,7 @@ function buildMessage(event, payload = {}) {
   switch (event) {
     case 'TUNNEL_ACTIVATED':
       return {
-        subject: `[VPN] ${label} · ${tunnelId || vrf}`,
+        subject: `${BRAND_SUBJECT} ${label} · ${tunnelId || vrf}`,
         html: `<b>🔓 ${label}</b><br>Túnel: <code>${tunnelId || vrf}</code><br>` +
               `${by ? `Por: <code>${by}</code><br>` : ''}` +
               `${ip ? `Desde IP: <code>${ip}</code><br>` : ''}` +
@@ -57,7 +67,7 @@ function buildMessage(event, payload = {}) {
       };
     case 'TUNNEL_DEACTIVATED':
       return {
-        subject: `[VPN] ${label} · ${tunnelId || vrf}`,
+        subject: `${BRAND_SUBJECT} ${label} · ${tunnelId || vrf}`,
         html: `<b>🔒 ${label}</b><br>Túnel: <code>${tunnelId || vrf}</code><br>` +
               `${by ? `Por: <code>${by}</code><br>` : ''}Fecha: ${when}`,
         text: `${label}\nTúnel: ${tunnelId || vrf}\n` +
@@ -65,7 +75,7 @@ function buildMessage(event, payload = {}) {
       };
     case 'SESSION_EXPIRED':
       return {
-        subject: `[VPN] ${label} · ${tunnelId || vrf}`,
+        subject: `${BRAND_SUBJECT} ${label} · ${tunnelId || vrf}`,
         html: `<b>⏰ ${label}</b><br>El túnel <code>${tunnelId || vrf}</code> caducó por TTL.<br>` +
               `Reactívalo desde el panel si lo necesitas.<br>Fecha: ${when}`,
         text: `${label}\nEl túnel ${tunnelId || vrf} caducó por TTL.\n` +
@@ -75,7 +85,7 @@ function buildMessage(event, payload = {}) {
       const nodeName = payload.nodeName || tunnelId || vrf || '—';
       const fails = payload.failCount != null ? `${payload.failCount} polls fallidos` : '';
       return {
-        subject: `[VPN] 🔴 ${label} · ${nodeName}`,
+        subject: `${BRAND_SUBJECT} 🔴 ${label} · ${nodeName}`,
         html: `<b>🔴 ${label}</b><br>El nodo <code>${nodeName}</code> dejó de responder.<br>` +
               `${fails ? `Estado: ${fails}<br>` : ''}` +
               `Revisa el panel para diagnosticar.<br>Fecha: ${when}`,
@@ -92,7 +102,7 @@ function buildMessage(event, payload = {}) {
         downSecs < 3600 ? `${Math.floor(downSecs / 60)}m ${downSecs % 60}s` :
         `${Math.floor(downSecs / 3600)}h ${Math.floor((downSecs % 3600) / 60)}m`;
       return {
-        subject: `[VPN] ✅ ${label} · ${nodeName}`,
+        subject: `${BRAND_SUBJECT} ✅ ${label} · ${nodeName}`,
         html: `<b>✅ ${label}</b><br>El nodo <code>${nodeName}</code> volvió a responder.<br>` +
               `${downStr ? `Estuvo caído: ${downStr}<br>` : ''}` +
               `Fecha: ${when}`,
@@ -103,7 +113,7 @@ function buildMessage(event, payload = {}) {
     }
     default:
       return {
-        subject: `[VPN] ${label}`,
+        subject: `${BRAND_SUBJECT} ${label}`,
         html: `<b>${label}</b><br>Fecha: ${when}`,
         text: `${label}\nFecha: ${when}`,
       };
@@ -116,7 +126,7 @@ async function dispatchEmail(user, msg) {
     const out = await mailer.sendGeneric({
       to: user.email,
       subject: msg.subject,
-      html: msg.html,
+      html: emailShell(msg.html),
       text: msg.text,
     });
     return { ok: out?.delivered !== false, error: out?.error };
@@ -129,7 +139,7 @@ async function dispatchTelegram(sub, msg) {
   if (!sub.telegram_chat_id) return { ok: false, reason: 'sin chat_id vinculado' };
   const out = await telegram.sendMessage({
     chatId: sub.telegram_chat_id,
-    text: msg.html,   // Telegram acepta HTML; usamos el mismo render
+    text: `<b>🔵 Joinpoint NOC</b>\n${msg.html}`,   // Telegram acepta HTML
     html: true,
   });
   return { ok: out.ok, error: out.error, skipped: out.skipped };

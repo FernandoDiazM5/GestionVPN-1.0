@@ -24,6 +24,7 @@ describe('notificaciones de protección web automática', () => {
       sourceIp: '198.51.100.7', recommendation: 'TEMP_1H_ROUTE_SCAN', jail: 'gestionvpn-web-1h' });
     expect(result).toEqual({ recipients: 2, sent: 2 });
     expect(telegram.sendMessage).toHaveBeenCalledTimes(2);
+    expect(telegram.sendMessage.mock.calls[0][0].text).toContain('Joinpoint NOC');
     expect(repo.log).toHaveBeenCalledTimes(2);
   });
 

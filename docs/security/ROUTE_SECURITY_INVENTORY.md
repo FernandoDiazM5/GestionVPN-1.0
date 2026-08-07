@@ -6,10 +6,10 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 
 ## Resumen
 
-- Rutas detectadas: 160
-- Rutas de mutación (POST/PUT/PATCH): 104
-- Rutas que consumen `req.body`: 83
-- Rutas con esquema de `req.body` detectable: 83/83
+- Rutas detectadas: 159
+- Rutas de mutación (POST/PUT/PATCH): 103
+- Rutas que consumen `req.body`: 82
+- Rutas con esquema de `req.body` detectable: 82/82
 - Endpoints públicos de identidad sin rate limiting detectable: 0
 
 ## Alertas detectadas
@@ -45,13 +45,13 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `ap.routes.js` | 458 | POST | `/poll-direct` | sí | — | no | sí | sql, network-admin | — |
 | `ap.routes.js` | 582 | POST | `/reveal-ssh` | sí | — | no | sí | sql, network-admin | — |
 | `ap.routes.js` | 600 | POST | `/ap-detail-direct` | sí | — | no | sí | sql, network-admin | — |
-| `ap.routes.js` | 627 | POST | `/cpes/enrich-batch` | sí | — | no | sí | sql, network-admin | — |
-| `ap.routes.js` | 686 | POST | `/cpes/:mac/detail-direct` | sí | — | no | sí | sql, network-admin | — |
-| `ap.routes.js` | 813 | PUT | `/cpes/:mac/credentials` | sí | — | no | sí | sql | — |
-| `ap.routes.js` | 837 | POST | `/poll-all-monitor` | sí | — | no | n/a | sql | — |
-| `ap.routes.js` | 894 | GET | `/topology-cpes` | sí | — | no | n/a | sql, network-admin | — |
-| `ap.routes.js` | 991 | POST | `/watch` | sí | — | no | n/a | — | — |
-| `ap.routes.js` | 1000 | GET | `/stations` | sí | — | no | n/a | sql | — |
+| `ap.routes.js` | 659 | POST | `/cpes/enrich-batch` | sí | — | no | sí | sql, network-admin | — |
+| `ap.routes.js` | 718 | POST | `/cpes/:mac/detail-direct` | sí | — | no | sí | sql, network-admin | — |
+| `ap.routes.js` | 845 | PUT | `/cpes/:mac/credentials` | sí | — | no | sí | sql | — |
+| `ap.routes.js` | 869 | POST | `/poll-all-monitor` | sí | — | no | n/a | sql | — |
+| `ap.routes.js` | 926 | GET | `/topology-cpes` | sí | — | no | n/a | sql, network-admin | — |
+| `ap.routes.js` | 1023 | POST | `/watch` | sí | — | no | n/a | — | — |
+| `ap.routes.js` | 1032 | GET | `/stations` | sí | — | no | n/a | sql | — |
 | `auth.routes.js` | 35 | GET | `/status` | no | — | no | n/a | — | — |
 | `auth.routes.js` | 45 | POST | `/setup` | no | — | sí | sí | — | — |
 | `auth.routes.js` | 75 | POST | `/login` | no | — | sí | sí | — | — |
@@ -78,11 +78,11 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `routes/admin.routes.js` | 132 | GET | `/moderators` | sí | platform-admin | no | n/a | — | — |
 | `routes/admin.routes.js` | 179 | PATCH | `/moderators/:id/ai-access` | sí | platform-admin | no | sí | — | — |
 | `routes/admin.routes.js` | 211 | PATCH | `/moderators/:id` | sí | platform-admin | no | sí | — | — |
-| `routes/admin.routes.js` | 282 | DELETE | `/moderators/:id` | sí | platform-admin | no | n/a | network-admin | — |
-| `routes/admin.routes.js` | 384 | POST | `/moderators` | sí | platform-admin | no | sí | — | — |
-| `routes/admin.routes.js` | 416 | POST | `/invite-moderator` | sí | platform-admin | no | sí | — | — |
-| `routes/admin.routes.js` | 483 | GET | `/invitations` | sí | platform-admin | no | n/a | — | — |
-| `routes/admin.routes.js` | 498 | POST | `/invitations/:id/link` | sí | platform-admin | no | n/a | network-admin | — |
+| `routes/admin.routes.js` | 279 | DELETE | `/moderators/:id` | sí | platform-admin | no | n/a | network-admin | — |
+| `routes/admin.routes.js` | 381 | POST | `/moderators` | sí | platform-admin | no | sí | — | — |
+| `routes/admin.routes.js` | 413 | POST | `/invite-moderator` | sí | platform-admin | no | sí | — | — |
+| `routes/admin.routes.js` | 480 | GET | `/invitations` | sí | platform-admin | no | n/a | — | — |
+| `routes/admin.routes.js` | 495 | POST | `/invitations/:id/link` | sí | platform-admin | no | n/a | network-admin | — |
 | `routes/adminSecurity.routes.js` | 53 | POST | `/step-up` | sí | — | no | sí | — | — |
 | `routes/adminSecurity.routes.js` | 124 | GET | `/status` | sí | — | no | n/a | network-admin | — |
 | `routes/adminSecurity.routes.js` | 174 | GET | `/history` | sí | — | no | n/a | — | — |
@@ -126,10 +126,10 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `routes/device.routes.js` | 26 | POST | `/device/auto-login` | sí | — | no | sí | network-admin | — |
 | `routes/device.routes.js` | 48 | POST | `/device/antenna` | sí | — | no | sí | sql, network-admin | — |
 | `routes/device.routes.js` | 109 | GET | `/db/devices` | sí | — | no | n/a | sql | — |
-| `routes/device.routes.js` | 157 | POST | `/db/devices` | sí | — | no | sí | sql | — |
-| `routes/device.routes.js` | 263 | PUT | `/db/devices/:id` | sí | — | no | sí | sql | — |
-| `routes/device.routes.js` | 330 | DELETE | `/db/devices/:id` | sí | — | no | n/a | sql | — |
-| `routes/device.routes.js` | 339 | POST | `/db/cleanup-orphan-devices` | sí | — | no | n/a | sql | — |
+| `routes/device.routes.js` | 181 | POST | `/db/devices` | sí | — | no | sí | sql | — |
+| `routes/device.routes.js` | 287 | PUT | `/db/devices/:id` | sí | — | no | sí | sql | — |
+| `routes/device.routes.js` | 354 | DELETE | `/db/devices/:id` | sí | — | no | n/a | sql | — |
+| `routes/device.routes.js` | 363 | POST | `/db/cleanup-orphan-devices` | sí | — | no | n/a | sql | — |
 | `routes/diagnostics.routes.js` | 76 | POST | `/diagnostics/ping` | sí | — | sí | sí | network-admin | — |
 | `routes/diagnostics.routes.js` | 127 | POST | `/diagnostics/traceroute` | sí | — | sí | sí | network-admin | — |
 | `routes/errorReports.routes.js` | 49 | POST | `/` | no | — | no | sí | — | `PUBLIC_MUTATION_REVIEW` |
@@ -186,6 +186,5 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `routes/wireguard.routes.js` | 205 | POST | `/wireguard/peer/color/save` | sí | — | no | sí | sql, network-admin | — |
 | `routes/wireguard.routes.js` | 215 | GET | `/wireguard/peer/colors` | sí | — | no | n/a | sql, network-admin | — |
 | `routes/wireguard.routes.js` | 228 | POST | `/wireguard/peer/alias/save` | sí | — | no | sí | sql, network-admin | — |
-| `routes/workspace.routes.js` | 37 | PATCH | `/name` | sí | OWNER | no | sí | — | — |
-| `routes/workspace.routes.js` | 51 | GET | `/export` | sí | OWNER | no | n/a | network-admin | — |
-| `routes/workspace.routes.js` | 150 | POST | `/import` | sí | OWNER | no | sí | network-admin | — |
+| `routes/workspace.routes.js` | 36 | GET | `/export` | sí | OWNER | no | n/a | network-admin | — |
+| `routes/workspace.routes.js` | 135 | POST | `/import` | sí | OWNER | no | sí | network-admin | — |

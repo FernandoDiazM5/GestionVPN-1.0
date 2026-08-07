@@ -78,8 +78,11 @@ describe('notifier.notify — routing', () => {
 
     expect(mailerMocks.sendGeneric).toHaveBeenCalledTimes(1);
     expect(mailerMocks.sendGeneric.mock.calls[0][0].to).toBe('alice@example.com');
+    expect(mailerMocks.sendGeneric.mock.calls[0][0].subject).toContain('[Joinpoint NOC]');
+    expect(mailerMocks.sendGeneric.mock.calls[0][0].html).toContain('JOINPOINT NOC');
     expect(telegramMocks.sendMessage).toHaveBeenCalledTimes(1);
     expect(telegramMocks.sendMessage.mock.calls[0][0].chatId).toBe('chat1');
+    expect(telegramMocks.sendMessage.mock.calls[0][0].text).toContain('Joinpoint NOC');
     expect(out.results.email.ok).toBe(true);
     expect(out.results.telegram.ok).toBe(true);
   });
@@ -138,6 +141,7 @@ describe('notifier.buildMessage — templates', () => {
     const exp = Date.now() + 60000;
     const m = notifier.buildMessage('TUNNEL_ACTIVATED', { tunnelId: 'VRF-A', expiresAt: exp, ip: '1.2.3.4' });
     expect(m.subject).toContain('VRF-A');
+    expect(m.subject).toContain('[Joinpoint NOC]');
     expect(m.html).toContain('VRF-A');
     expect(m.html).toContain('1.2.3.4');
   });

@@ -158,34 +158,46 @@ export default function RouterAccess() {
   }
 
   return (
-    <div className="relative min-h-[100svh] overflow-x-clip bg-slate-50 flex items-center justify-center p-4 dark:bg-slate-950">
+    <div className="relative flex min-h-[100svh] items-center justify-center bg-slate-100 p-4 sm:p-6 dark:bg-slate-950">
+      <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
+        <div className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-indigo-200/70 blur-3xl dark:bg-indigo-500/15" />
+        <div className="absolute -bottom-32 -right-32 h-96 w-96 rounded-full bg-cyan-200/60 blur-3xl dark:bg-cyan-500/10" />
+      </div>
 
-      <div className="absolute top-0 left-0 w-96 h-96 bg-indigo-100 rounded-full -translate-x-1/2 -translate-y-1/2 opacity-60 blur-3xl pointer-events-none dark:bg-indigo-500/20 dark:opacity-30" />
-      <div className="absolute bottom-0 right-0 w-96 h-96 bg-sky-100 rounded-full translate-x-1/2 translate-y-1/2 opacity-60 blur-3xl pointer-events-none dark:bg-sky-500/20 dark:opacity-30" />
-
-      <div className="w-full max-w-md relative z-10">
-        <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/80 border border-slate-200 overflow-hidden dark:bg-slate-900 dark:border-slate-800 dark:shadow-black/40">
-
-          <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 px-8 pt-10 pb-12 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
-            <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
-            <div className="relative z-10">
-              <div className="flex items-center space-x-3 mb-4">
-                <div className="bg-white/20 p-2.5 rounded-xl backdrop-blur-sm">
-                  {needsSetup ? <ShieldCheck className="w-6 h-6 text-white" /> : <JoinpointLogo inverted className="h-9 w-9" />}
-                </div>
-                <div>
-                  <h1 className="text-2xl font-extrabold tracking-wide text-white">JOINPOINT</h1>
-                  <p className="text-cyan-100 text-sm font-semibold">{needsSetup ? 'Configuración inicial' : 'Joinpoint NOC'}</p>
-                </div>
-              </div>
-              <p className="text-indigo-100 text-sm mt-2">
-                {needsSetup ? 'Crea la cuenta administrativa maestra para acceder a la plataforma.' : 'Gestiona sitios, accesos y equipos desde un solo lugar.'}
+      <main className="relative z-10 grid w-full max-w-5xl overflow-hidden rounded-[2rem] border border-white/70 bg-white shadow-2xl shadow-slate-400/25 lg:min-h-[650px] lg:grid-cols-[3fr_2fr] dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/50">
+        <section className="flex flex-col justify-center px-6 py-9 sm:px-12 sm:py-12 lg:px-16" aria-labelledby="login-heading">
+          <div className="mx-auto w-full max-w-md">
+            <div className="mb-6 text-center sm:mb-8 lg:text-left">
+              <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-300">
+                {needsSetup ? 'Primer acceso' : 'Bienvenido de nuevo'}
+              </p>
+              <h1 id="login-heading" className="mt-2 text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl dark:text-white">
+                {needsSetup ? 'Configura tu cuenta' : 'Inicia sesión'}
+              </h1>
+              <p className="mt-3 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+                {needsSetup ? 'Crea la cuenta administrativa maestra para acceder a la plataforma.' : 'Usa tus credenciales para entrar a tu centro de operaciones.'}
               </p>
             </div>
-          </div>
 
-          <div className="px-8 py-8 -mt-4 relative">
+            {!needsSetup && federatedAuthAvailable && (
+              <div className="mb-5 sm:mb-6">
+                <button
+                  type="button"
+                  onClick={handleGoogleLogin}
+                  disabled={isConnecting}
+                  className="btn-outline btn-md w-full flex items-center justify-center gap-2"
+                >
+                  <span aria-hidden="true" className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-sm font-bold text-indigo-600 shadow-sm dark:bg-slate-800 dark:text-indigo-300">G</span>
+                  <span>Continuar con Google</span>
+                </button>
+                <div className="mt-5 flex items-center gap-3" aria-hidden="true">
+                  <span className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+                  <span className="text-xs font-medium text-slate-400">o usa tu cuenta</span>
+                  <span className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+                </div>
+              </div>
+            )}
+
             {syncStatus !== 'idle' && (
               <div className="mb-6">
                 {syncStatus === 'loading' && (
@@ -216,7 +228,7 @@ export default function RouterAccess() {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label htmlFor="login-username" className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
                   {needsSetup ? 'Usuario Administrador' : 'Usuario o correo'}
@@ -233,7 +245,7 @@ export default function RouterAccess() {
                     placeholder={needsSetup ? "admin" : "admin o correo@ejemplo.com"}
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    className="input-field pl-10 font-mono"
+                    className="input-field min-h-12 bg-slate-50 pl-10 font-mono dark:bg-slate-950/60"
                   />
                 </div>
               </div>
@@ -255,7 +267,7 @@ export default function RouterAccess() {
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="input-field pl-10"
+                    className="input-field min-h-12 bg-slate-50 pl-10 dark:bg-slate-950/60"
                   />
                 </div>
               </div>
@@ -263,7 +275,7 @@ export default function RouterAccess() {
               <button
                 type="submit"
                 disabled={isConnecting || !username || !password}
-                className="btn-primary btn-md w-full relative flex items-center justify-center space-x-2 group overflow-hidden mt-6"
+                className="btn-primary btn-md mt-6 w-full relative flex items-center justify-center space-x-2 group overflow-hidden disabled:bg-indigo-300 disabled:text-white disabled:opacity-80 disabled:shadow-none dark:disabled:bg-indigo-800 dark:disabled:text-indigo-200"
               >
                 <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
                 <Server className="w-4 h-4 relative z-10" />
@@ -273,47 +285,50 @@ export default function RouterAccess() {
               </button>
             </form>
 
-            {!needsSetup && federatedAuthAvailable && (
-              <div className="mt-5 space-y-4">
-                <div className="flex items-center gap-3" aria-hidden="true">
-                  <span className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
-                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">o</span>
-                  <span className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
-                </div>
-                <button
-                  type="button"
-                  onClick={handleGoogleLogin}
-                  disabled={isConnecting}
-                  className="btn-outline btn-md w-full flex items-center justify-center gap-2"
-                >
-                  <span aria-hidden="true" className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-50 text-sm font-bold text-indigo-600 shadow-sm dark:bg-slate-800 dark:text-indigo-300">G</span>
-                  <span>Continuar con Google</span>
-                </button>
-                <p className="text-center text-xs text-slate-600 dark:text-slate-300">
-                  Disponible después de enlazar Google desde Perfil y seguridad.
-                </p>
-              </div>
-            )}
-
             {!needsSetup && (
-              <div className="space-y-2 mt-4">
+              <div className="mt-5 flex flex-col items-center gap-3 sm:flex-row sm:justify-between">
                 <button onClick={() => setMode('reset-request')}
-                  className="w-full text-xs font-semibold text-slate-500 hover:text-indigo-600 flex items-center justify-center gap-1.5">
+                  className="flex min-h-11 items-center justify-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-300">
                   <Lock className="w-3.5 h-3.5" /> ¿Olvidaste tu contraseña?
                 </button>
                 <button onClick={() => setMode('accept')}
-                  className="w-full text-xs font-semibold text-slate-500 hover:text-indigo-600 flex items-center justify-center gap-1.5">
-                  <Mail className="w-3.5 h-3.5" /> ¿Tienes una invitación? Acéptala aquí
+                  className="flex min-h-11 items-center justify-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-indigo-600 lg:hidden dark:text-slate-400 dark:hover:text-indigo-300">
+                  <Mail className="w-3.5 h-3.5" /> Aceptar invitación
                 </button>
               </div>
             )}
+            <p className="mt-6 text-center text-xs font-medium text-slate-500 sm:mt-8 lg:text-left dark:text-slate-400">
+              Operación segura · Monitoreo centralizado · AES-256-GCM
+            </p>
           </div>
-        </div>
+        </section>
 
-        <p className="text-center text-xs text-slate-500 dark:text-slate-400 font-medium mt-6">
-          Operación segura · Monitoreo centralizado · AES-256-GCM
-        </p>
-      </div>
+        <aside className="relative order-first flex min-h-44 flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-indigo-600 via-indigo-700 to-indigo-900 px-8 py-7 text-center sm:min-h-52 sm:py-10 lg:order-last lg:min-h-full lg:rounded-l-[7rem] lg:px-12" aria-label="Joinpoint NOC">
+          <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full border border-white/10" />
+          <div className="absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-cyan-300/10" />
+          <div className="relative z-10 max-w-sm">
+            <div className="mx-auto mb-6 hidden w-fit rounded-2xl bg-white/10 p-2 ring-1 ring-white/15 backdrop-blur-sm lg:block">
+              {needsSetup ? <ShieldCheck className="h-10 w-10 text-white" /> : <JoinpointLogo inverted className="h-14 w-14" />}
+            </div>
+            <p className="text-xs font-extrabold tracking-[0.24em] text-cyan-100">JOINPOINT NOC</p>
+            <h2 className="mt-2 text-2xl font-extrabold text-white sm:mt-3 sm:text-3xl lg:text-4xl">
+              {needsSetup ? 'Tu red comienza aquí' : '¡Hola de nuevo!'}
+            </h2>
+            <p className="mx-auto mt-3 max-w-xs text-sm leading-relaxed text-indigo-100 sm:mt-4 sm:text-base">
+              {needsSetup ? 'Configura el acceso principal y prepara tu centro de operaciones.' : 'Controla sitios, accesos y equipos desde una plataforma segura.'}
+            </p>
+            {!needsSetup && (
+              <button
+                type="button"
+                onClick={() => setMode('accept')}
+                className="btn-md mt-7 hidden w-full items-center justify-center gap-2 border border-white/70 bg-transparent text-white shadow-none hover:bg-white/10 lg:inline-flex"
+              >
+                <Mail className="h-4 w-4" /> Aceptar invitación
+              </button>
+            )}
+          </div>
+        </aside>
+      </main>
     </div>
   );
 }

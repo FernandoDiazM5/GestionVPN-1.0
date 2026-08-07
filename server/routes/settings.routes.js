@@ -131,8 +131,8 @@ router.post('/settings/test-error-email', requireAdmin, asyncHandler(async (_req
 
   const delivery = await sendGeneric({
     to: recipient,
-    subject: '[VPN Manager] Prueba de reportes tecnicos',
-    text: 'La entrega de reportes tecnicos esta configurada correctamente.',
+    subject: '[Joinpoint NOC] Prueba de reportes técnicos',
+    text: 'Joinpoint NOC\n\nLa entrega de reportes técnicos está configurada correctamente.\n\nOperación segura · Monitoreo centralizado',
     kind: 'error_report_test',
   });
   if (!delivery.delivered) {
