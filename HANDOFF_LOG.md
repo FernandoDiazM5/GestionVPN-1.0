@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-06 — Joinpoint NOC desplegado en producción.** Rama `vps_prod`; producción funcional `6376197`. Estado: frontend reconstruido y recreado; validación productiva completa.
+> - Se publicó `6376197`, se preservó `gestionvpn-10-frontend:pre-joinpoint-6376197` y se reconstruyó exclusivamente `vpn-frontend`; backend y MariaDB conservaron sus contenedores y datos, sin migraciones.
+> - Raíz, ruta histórica y workspace respondieron 200; preflight 204, origen hostil 403 y login inválido 401. MySQL/SMTP quedaron `ok`; RouterOS apareció `stale` por 83 s sin escritura, no por fallo de conexión.
+> - El HTML y el bundle lazy confirmaron `Joinpoint NOC`, `JOINPOINT` e `Ingresar a Joinpoint`; los tres contenedores quedaron con 0 reinicios. Disco: 79%/5.3 GiB libres.
+
 > **Sesión 2026-08-06 — Primera fase de marca Joinpoint NOC.** Rama `vps_prod` (base `029c420`). Estado: frontend 73 archivos/248 pruebas, lint, build, auditor visual 309/0 y diff correctos; pendiente commit/despliegue.
 > - Se creó una identidad SVG nativa con una J y tres nodos conectados, usando azul `#3157D5` y cian `#16B8C4`; no se generó bitmap porque favicon y navegación requieren escalado vectorial nítido.
 > - Login, sidebar móvil/escritorio, favicon, título/metadatos, pantalla WireGuard restringida y exportaciones PDF/XLSX muestran ahora `Joinpoint NOC`; el lema es `Tu red, bajo control`.
