@@ -1,5 +1,20 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-08 — Codificación del título de pestaña corregida.** Rama `vps_prod` (base publicada `ac6117a`; cambios locales acumulados, sin deploy). Estado: build y diff correctos.
+> - El título queda `Joinpoint NOC | Gestión de redes` y la descripción usa `Gestión y monitoreo...` con UTF-8 real; fuente y HTML generado fueron verificados sin `GestiÃ`.
+
+> **Sesión 2026-08-08 — Refinamiento visual de Agregar sitio remoto.** Rama `vps_prod` (base publicada `ac6117a`; cambios locales acumulados, sin deploy). Estado: frontend 73 archivos/248 pruebas, lint, build, `check:all`, auditor visual 309/0 y diff correctos.
+> - SSTP y WireGuard comparten selector activo accesible; la opción disponible no seleccionada ya no parece deshabilitada. La vista previa automática usa jerarquía neutra y estados `Pendiente`.
+> - Avisos, opciones avanzadas, redes LAN, resumen plegable de pasos y pie fijo se simplificaron; la terminología visible usa `sitio`. No se alteró la lógica de provisión ni sus contratos.
+
+> **Sesión 2026-08-08 — Acciones de columnas visibles en Sitios.** Rama `vps_prod` (base publicada `ac6117a`; cambios locales acumulados, sin deploy). Estado: prueba focalizada 2/2, lint, build y diff correctos.
+> - El control para ocultar dejó de depender del hover: usa una `X` roja permanente con 44 px de área táctil. Las columnas ocultas muestran una acción `+` índigo también permanente y táctil.
+> - `Vista simple` se renombró a `Ocultar opcionales`; no cambian orden, persistencia ni las columnas fijas Estado/Sitio/Opciones.
+
+> **Sesión 2026-08-08 — Retención estricta de siete días para Actividad reciente.** Rama `vps_prod` (base publicada `ac6117a`). Estado: cambios locales, pendientes de commit/publicación/despliegue; backend 107 archivos/633 pruebas, focalizadas 12/12, módulo 1/1, contratos, lint, build, `check:all` y diff correctos.
+> - La API filtra siempre los eventos a los últimos siete días y recorta cualquier exportación que solicite un rango anterior; la UI ya no ofrece 30/90 días ni historial completo.
+> - La purga física horaria conserva el borrado en `tunnel_session_logs` y `tunnel_logs`; el límite es fijo y ya no puede ampliarse por variable de entorno. Sin cambios de esquema ni migraciones.
+
 > **Sesión 2026-08-08 — Login y comunicaciones Joinpoint desplegados.** Rama `vps_prod`; producción funcional `ca23dae`. Estado: backend/DB healthy, frontend activo, validación productiva completa.
 > - Se reconstruyeron y recrearon exclusivamente backend y frontend con `docker-compose.prod.yml`; MariaDB mantuvo contenedor, volumen y datos. Las migraciones idempotentes terminaron correctamente.
 > - Raíz y ruta histórica respondieron 200; preflight 204, origen hostil 403 y login inválido 401. MySQL, RouterOS y SMTP quedaron `ok`; el bundle confirmó el login nuevo y el backend confirmó `Joinpoint NOC` en correo y Telegram. Los tres contenedores registran 0 reinicios.

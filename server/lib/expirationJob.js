@@ -23,11 +23,10 @@ const authSessionRepo = require('../db/repos/authSessionRepo');
 const tunnelService = require('./tunnelService');
 const platformSecurityRepo = require('../db/repos/platformSecurityRepo');
 
-// Retención de la "Actividad reciente": guarda como MÁXIMO los últimos N días
-// (default 7) → purga rodante que va quitando el día más viejo. Se ejecuta como
+// Retención de la "Actividad reciente": guarda como MÁXIMO los últimos 7 días
+// → purga rodante que va quitando el día más viejo. Se ejecuta como
 // mucho 1×/hora (throttle) dentro del mismo tick del job de expiración, para no
 // añadir otro interval. No es información crítica; solo sirve para ver la semana.
-const RETENTION_DAYS = Math.max(1, Number(process.env.AUDIT_RETENTION_DAYS || 7));
 const PURGE_THROTTLE_MS = Number(process.env.AUDIT_PURGE_THROTTLE_MS || 60 * 60 * 1000); // 1h
 let _lastPurge = 0;
 let _lastAiPurge = 0;
@@ -45,9 +44,9 @@ async function purgeOldAudit() {
   if (Date.now() - _lastPurge < PURGE_THROTTLE_MS) return;
   _lastPurge = Date.now();
   try {
-    const cutoff = Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000;
+    const cutoff = auditRepo.retentionCutoff();
     const removed = await auditRepo.purgeOlderThan(cutoff);
-    if (removed) log.info({ removed, retentionDays: RETENTION_DAYS }, 'auditoría: purga de retención');
+    if (removed) log.info({ removed, retentionDays: auditRepo.AUDIT_RETENTION_DAYS }, 'auditoría: purga de retención');
   } catch (err) {
     log.warn({ err: err.message }, 'auditoría: purga de retención falló (best-effort)');
   }

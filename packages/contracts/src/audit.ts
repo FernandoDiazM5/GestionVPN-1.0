@@ -6,7 +6,8 @@
 //  reportes mensuales / SLA / análisis ad-hoc.
 //
 //  Filtros aceptados:
-//   • from / to — epoch ms inclusivos. Defaults: ahora-30d / ahora.
+//   • from / to — epoch ms inclusivos. El servidor limita `from` a los
+//     últimos 7 días, que es la retención máxima de esta bitácora.
 //   • tunnelId — string del VRF (ya existía en la query individual).
 //   • action — opcional, sólo eventos de ese tipo
 //     (ACTIVATE/DEACTIVATE/SCAN/EXPIRE/ERROR/...).
@@ -24,7 +25,7 @@ export const AuditExportFormatSchema = z.enum(['csv', 'json']);
 export type AuditExportFormat = z.infer<typeof AuditExportFormatSchema>;
 
 export const AuditExportRequestSchema = z.object({
-  /** epoch ms — default ahora-30d. */
+  /** epoch ms; el servidor lo limita a un máximo de 7 días hacia atrás. */
   from: z.number().int().nonnegative().optional(),
   /** epoch ms — default ahora. */
   to: z.number().int().nonnegative().optional(),

@@ -5,6 +5,13 @@
 const crypto = require('crypto');
 const { query } = require('../mysql');
 
+const AUDIT_RETENTION_DAYS = 7;
+const AUDIT_RETENTION_MS = AUDIT_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+
+function retentionCutoff(now = Date.now()) {
+  return now - AUDIT_RETENTION_MS;
+}
+
 async function log({ workspaceId, tunnelId, userId, action, ip, detail }) {
   await query(
     `INSERT INTO tunnel_logs (id, workspace_id, tunnel_id, user_id, action, ip_address, detail, created_at)
@@ -26,12 +33,13 @@ const SESSION_LOG_COLS =
 
 /** Línea de tiempo de auditoría del workspace (con joins de email). */
 async function list(workspaceId, { limit = 100, tunnelId = null } = {}) {
-  const params = [workspaceId];
+  const params = [workspaceId, retentionCutoff()];
   let sql =
     `SELECT ${SESSION_LOG_COLS}
        FROM tunnel_session_logs sl
        LEFT JOIN users u ON u.id = sl.user_id
-      WHERE sl.workspace_id = ?`;
+      WHERE sl.workspace_id = ?
+        AND sl.created_at >= ?`;
   if (tunnelId) { sql += ' AND sl.tunnel_id = ?'; params.push(tunnelId); }
   sql += ' ORDER BY sl.created_at DESC LIMIT ?';
   params.push(Number(limit));
@@ -47,13 +55,14 @@ async function list(workspaceId, { limit = 100, tunnelId = null } = {}) {
  * incluso con miles de filas.
  */
 async function listForExport(workspaceId, { from, to, tunnelId = null, action = null, maxRows = 10000 } = {}) {
-  const params = [workspaceId];
+  const effectiveFrom = Math.max(Number(from) || 0, retentionCutoff());
+  const params = [workspaceId, effectiveFrom];
   let sql =
     `SELECT ${SESSION_LOG_COLS}
        FROM tunnel_session_logs sl
        LEFT JOIN users u ON u.id = sl.user_id
-      WHERE sl.workspace_id = ?`;
-  if (from != null) { sql += ' AND sl.created_at >= ?'; params.push(Number(from)); }
+      WHERE sl.workspace_id = ?
+        AND sl.created_at >= ?`;
   if (to != null)   { sql += ' AND sl.created_at <= ?'; params.push(Number(to)); }
   if (tunnelId)     { sql += ' AND sl.tunnel_id = ?'; params.push(tunnelId); }
   if (action)       { sql += ' AND sl.action = ?'; params.push(action); }
@@ -80,4 +89,4 @@ async function purgeOlderThan(cutoffMs) {
   return removed;
 }
 
-module.exports = { log, list, listForExport, purgeOlderThan };
+module.exports = { AUDIT_RETENTION_DAYS, retentionCutoff, log, list, listForExport, purgeOlderThan };

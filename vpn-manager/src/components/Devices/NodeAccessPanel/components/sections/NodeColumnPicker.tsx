@@ -73,7 +73,7 @@ export function NodeColumnPicker({ visibleCols, onChange }: NodeColumnPickerProp
                   const col = NODE_COLUMN_DEFS.find(c => c.key === key);
                   if (!col) return null;
                   return (
-                    <div key={key} className="flex items-center gap-1 py-0.5 px-1 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60 group">
+                    <div key={key} className="flex min-h-11 items-center gap-1 rounded-lg px-1 hover:bg-slate-50 dark:hover:bg-slate-800/60">
                       <div className="flex flex-col shrink-0">
                         <button onClick={() => moveUp(idx)} disabled={idx === 0}
                           aria-label={`Subir columna ${col.label}`}
@@ -89,8 +89,9 @@ export function NodeColumnPicker({ visibleCols, onChange }: NodeColumnPickerProp
                       <span className="text-xs text-slate-700 dark:text-slate-200 flex-1 leading-tight">{col.label}</span>
                       <button onClick={() => remove(key)}
                         aria-label={`Ocultar columna ${col.label}`}
-                        className="p-0.5 text-slate-200 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100 shrink-0">
-                        <X className="w-3 h-3" />
+                        title={`Ocultar ${col.label}`}
+                        className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg bg-rose-50 text-rose-600 transition-colors hover:bg-rose-100 hover:text-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 dark:bg-rose-500/15 dark:text-rose-300 dark:hover:bg-rose-500/25">
+                        <X className="h-4 w-4" />
                       </button>
                     </div>
                   );
@@ -107,9 +108,12 @@ export function NodeColumnPicker({ visibleCols, onChange }: NodeColumnPickerProp
                 {hiddenCols.map(col => (
                   <button key={col.key} onClick={() => addCol(col.key)}
                     aria-label={`Mostrar columna ${col.label}`}
-                    className="w-full flex items-center gap-2 py-1 px-1.5 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-500/15 text-left group">
-                    <span className="text-xs text-slate-400 dark:text-slate-500 flex-1 group-hover:text-indigo-600 dark:group-hover:text-indigo-300 transition-colors">{col.label}</span>
-                    <PlusCircle className="w-3 h-3 text-slate-200 group-hover:text-indigo-500 transition-colors shrink-0" />
+                    title={`Mostrar ${col.label}`}
+                    className="group flex min-h-11 w-full items-center gap-2 rounded-lg px-2 text-left transition-colors hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 dark:hover:bg-indigo-500/15">
+                    <span className="flex-1 text-xs font-medium text-slate-600 transition-colors group-hover:text-indigo-600 dark:text-slate-300 dark:group-hover:text-indigo-300">{col.label}</span>
+                    <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 transition-colors group-hover:bg-indigo-100 dark:bg-indigo-500/15 dark:text-indigo-300 dark:group-hover:bg-indigo-500/25">
+                      <PlusCircle className="h-4 w-4" />
+                    </span>
                   </button>
                 ))}
               </div>
@@ -124,7 +128,7 @@ export function NodeColumnPicker({ visibleCols, onChange }: NodeColumnPickerProp
             <span className="text-slate-200">|</span>
             <button onClick={() => onChange(NODE_COLUMN_DEFS.filter(c => c.defaultVisible).map(c => c.key))}
               className="flex-1 text-2xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-600 transition-colors">
-              Vista simple
+              Ocultar opcionales
             </button>
           </div>
         </div>,

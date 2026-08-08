@@ -53,7 +53,8 @@ router.post('/export', requireSession, asyncHandler(async (req, res) => {
 
   const parsed = AuditExportRequestSchema.parse(req.body || {});
   const now = Date.now();
-  const from = parsed.from ?? (now - 30 * 24 * 60 * 60 * 1000);   // 30 días
+  const retentionFrom = auditRepo.retentionCutoff(now);
+  const from = Math.max(parsed.from ?? retentionFrom, retentionFrom);
   const to   = parsed.to   ?? now;
   if (to < from) throw new AppError('Rango inválido: to < from', 422, 'BAD_RANGE');
 

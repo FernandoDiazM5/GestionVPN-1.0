@@ -7,6 +7,8 @@
 const { stubModule } = require('../helpers/moduleMock');
 
 const repoMocks = stubModule(__dirname, '../../db/repos/auditRepo', {
+  AUDIT_RETENTION_DAYS: 7,
+  retentionCutoff: vi.fn(() => 1000),
   log: vi.fn(),
   list: vi.fn(),
   listForExport: vi.fn(),

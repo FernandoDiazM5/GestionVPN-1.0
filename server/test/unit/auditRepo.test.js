@@ -20,7 +20,9 @@ describe('auditRepo.list', () => {
     expect(sql).not.toMatch(/FROM tunnel_logs/);
     expect(sql).toMatch(/message AS detail/);
     expect(sql).toMatch(/sl\.workspace_id = \?/);
+    expect(sql).toMatch(/sl\.created_at >= \?/);
     expect(params[0]).toBe('ws-1');
+    expect(params[1]).toBeGreaterThan(Date.now() - 8 * 86400000);
     expect(params).toContain(50);
   });
 
@@ -51,12 +53,22 @@ describe('auditRepo.purgeOlderThan', () => {
 
 describe('auditRepo.listForExport', () => {
   it('consulta tunnel_session_logs con filtros de rango/acción', async () => {
-    await auditRepo.listForExport('ws-1', { from: 1000, to: 2000, action: 'ACTIVATE' });
+    const from = Date.now() - 86400000;
+    const to = Date.now();
+    await auditRepo.listForExport('ws-1', { from, to, action: 'ACTIVATE' });
     const [sql, params] = query.mock.calls[0];
     expect(sql).toMatch(/FROM tunnel_session_logs/);
     expect(sql).toMatch(/sl\.created_at >= \?/);
     expect(sql).toMatch(/sl\.action = \?/);
-    expect(params).toContain(1000);
+    expect(params).toContain(from);
     expect(params).toContain('ACTIVATE');
+  });
+
+  it('limita la exportación solicitada al periodo máximo de 7 días', async () => {
+    const before = Date.now() - 7 * 86400000;
+    await auditRepo.listForExport('ws-1', { from: 0, to: Date.now() });
+    const [, params] = query.mock.calls[0];
+    expect(params[1]).toBeGreaterThanOrEqual(before);
+    expect(params[1]).toBeLessThanOrEqual(Date.now() - 7 * 86400000 + 100);
   });
 });

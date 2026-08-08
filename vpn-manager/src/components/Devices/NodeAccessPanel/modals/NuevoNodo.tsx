@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Plus, CheckCircle2, Loader2, Eye, EyeOff, AlertCircle, RefreshCw,
-  Copy, Check, Info, Minus, Globe, ShieldCheck, X,
+  Copy, Check, Info, Minus, Globe, ShieldCheck, X, ChevronDown,
 } from 'lucide-react';
 import { useVpn } from '../../../../context';
 import { fetchWithTimeout } from '../../../../utils/fetchWithTimeout';
@@ -39,6 +39,7 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
   // SSTP: usuario + contraseña se generan server-side por defecto. El operador solo
   // puede sobreescribirlos desde "Opciones avanzadas" (modo experto).
   const [showAdvancedSstp, setShowAdvancedSstp] = useState(false);
+  const [showPlannedSteps, setShowPlannedSteps] = useState(false);
   // IP pública del servidor = dato GLOBAL del sistema (un solo router core).
   // Fuente de verdad única: setting `server_public_ip` en BD. La llave legacy
   // `wg_wan_ip` (solo-localStorage, por-navegador) queda como fallback de migración.
@@ -210,7 +211,7 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
 
   return (
     <Dialog
-      title="Crear nuevo nodo"
+      title="Agregar sitio remoto"
       onClose={onClose}
       closeOnBackdrop={!provisioning && !result}
       closeOnEscape={!provisioning && !result}
@@ -227,7 +228,7 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
             </div>
             <div>
               <p className="text-sm font-bold text-white">Agregar sitio remoto</p>
-              <p className="text-2xs text-indigo-200 mt-0.5">Provisionado completo en MikroTik — 7 pasos</p>
+              <p className="text-2xs text-indigo-200 mt-0.5">Configuración guiada en MikroTik · 7 pasos</p>
             </div>
           </div>
           {!provisioning && !result && (
@@ -420,10 +421,13 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
 
           {!provisioning && !result && (
             <div className="p-5 space-y-5">
-              <div className="bg-indigo-50 dark:bg-indigo-500/10 rounded-xl p-4 border border-indigo-100">
+              <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-800/50">
                 <div className="flex items-center gap-2 mb-3">
                   <Info className="w-3.5 h-3.5 text-indigo-500" />
-                  <p className="text-2xs font-bold text-indigo-600 uppercase tracking-wider">Auto-generado por el sistema</p>
+                  <div>
+                    <p className="text-xs font-bold text-slate-700 dark:text-slate-200">Configuración generada</p>
+                    <p className="text-2xs text-slate-500 dark:text-slate-400">Se completa automáticamente con los datos del sitio.</p>
+                  </div>
                   {loadingNext && <Loader2 className="w-3 h-3 animate-spin text-indigo-400 ml-auto" />}
                   {loadNextErr && <span className="text-2xs text-rose-500 ml-auto">{loadNextErr}</span>}
                 </div>
@@ -431,43 +435,43 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                   {[
                     { l: 'Número Nodo', v: nextNode != null ? `ND${nextNode}` : '—' },
                     { l: 'IP Túnel (remota)', v: nextRemote || '—' },
-                    { l: `Interfaz ${protocol === 'wireguard' ? 'WG' : 'SSTP'}`, v: ifaceName || '(ingresar nombre)' },
-                    { l: 'VRF', v: vrfName || '(ingresar nombre)' },
+                    { l: `Interfaz ${protocol === 'wireguard' ? 'WG' : 'SSTP'}`, v: ifaceName || 'Pendiente' },
+                    { l: 'VRF', v: vrfName || 'Pendiente' },
                   ].map(row => (
-                    <div key={row.l} className="bg-white rounded-lg px-3 py-2 border border-indigo-100 dark:bg-slate-800 dark:border-indigo-500/30">
+                    <div key={row.l} className="rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900/60">
                       <p className="text-3xs font-bold text-slate-400 uppercase tracking-wider mb-0.5">{row.l}</p>
-                      <p className="text-2xs font-mono font-bold text-indigo-700 truncate">{row.v}</p>
+                      <p className={`truncate font-mono text-2xs font-bold ${row.v === 'Pendiente' ? 'text-slate-400' : 'text-indigo-700 dark:text-indigo-300'}`}>{row.v}</p>
                     </div>
                   ))}
                 </div>
               </div>
 
               <div className="space-y-3">
-                <p className="text-2xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Datos del nodo</p>
+                <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Datos del sitio</p>
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                    Nombre del nodo <span className="text-rose-500">*</span>
-                    <span className="text-2xs font-normal text-slate-500 dark:text-slate-400 ml-1">(cualquier nombre)</span>
+                    Nombre del sitio <span className="text-rose-500">*</span>
                   </label>
                   <input value={nombre} onChange={e => setNombre(e.target.value)}
-                    placeholder="Ej: ROSMERY, FIWIS, MILAGROS"
-                    className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                    placeholder="Ejemplo: Torre Rosmery"
+                    className="min-h-11 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 dark:border-slate-700" />
+                  {!nameClean && <p className="mt-1 text-2xs text-slate-500 dark:text-slate-400">Usa el nombre comercial o la ubicación del sitio.</p>}
                   {nameClean && <p className="text-2xs text-slate-500 dark:text-slate-400 mt-0.5">Se usará: <span className="font-mono font-bold text-indigo-600">{nameClean}</span></p>}
                 </div>
 
                 <div>
-                  <label className="text-2xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1 block">Protocolo</label>
+                  <label className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-300">Protocolo</label>
                   <div className="flex gap-2">
-                    <button type="button" onClick={() => setProtocol('sstp')}
-                      className={`flex-1 py-2 px-3 rounded-lg text-xs font-semibold border transition-colors ${protocol === 'sstp' ? 'bg-sky-50 dark:bg-sky-500/10 border-sky-400 text-sky-700' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:border-slate-300'
+                    <button type="button" onClick={() => setProtocol('sstp')} aria-pressed={protocol === 'sstp'}
+                      className={`min-h-11 flex-1 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${protocol === 'sstp' ? 'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-400 text-indigo-700 dark:text-indigo-300' : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:border-indigo-300 hover:bg-indigo-50/60'
                         }`}>
-                      SSTP
+                      <span className="inline-flex items-center gap-1.5">{protocol === 'sstp' && <Check className="h-3.5 w-3.5" />} SSTP</span>
                     </button>
-                    <button type="button" onClick={() => setProtocol('wireguard')}
-                      className={`flex-1 py-2 px-3 rounded-lg text-xs font-semibold border transition-colors ${protocol === 'wireguard' ? 'bg-violet-50 dark:bg-violet-500/10 border-violet-400 text-violet-700' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:border-slate-300'
+                    <button type="button" onClick={() => setProtocol('wireguard')} aria-pressed={protocol === 'wireguard'}
+                      className={`min-h-11 flex-1 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${protocol === 'wireguard' ? 'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-400 text-indigo-700 dark:text-indigo-300' : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:border-indigo-300 hover:bg-indigo-50/60'
                         }`}>
-                      WireGuard
+                      <span className="inline-flex items-center gap-1.5">{protocol === 'wireguard' && <Check className="h-3.5 w-3.5" />} WireGuard</span>
                     </button>
                   </div>
                 </div>
@@ -479,14 +483,16 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                       <div>
                         <p className="text-2xs font-bold text-emerald-700">Credenciales PPP automáticas</p>
                         <p className="text-2xs text-emerald-600 mt-0.5">
-                          El sistema genera el usuario y la contraseña del túnel. Al crear el nodo recibirás un script completo (con las credenciales embebidas) para pegar tal cual en el router torre — sin escribir nada.
+                          El usuario y la contraseña se incluirán en el script generado.
                         </p>
                       </div>
                     </div>
                     {/* Modo experto OCULTO: definir usuario/contraseña propios */}
                     <button type="button" onClick={() => setShowAdvancedSstp(v => !v)}
-                      className="mt-2 text-2xs font-semibold text-slate-500 dark:text-slate-400 hover:text-indigo-600 transition-colors">
-                      {showAdvancedSstp ? '− Ocultar opciones avanzadas' : '+ Opciones avanzadas (definir usuario/contraseña propios)'}
+                      aria-expanded={showAdvancedSstp}
+                      className="mt-2 flex min-h-11 w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 text-left transition-colors hover:border-indigo-200 hover:bg-indigo-50/60 dark:border-slate-700 dark:bg-slate-800/50 dark:hover:bg-indigo-500/10">
+                      <span><span className="block text-xs font-semibold text-slate-700 dark:text-slate-200">Opciones avanzadas</span><span className="block text-2xs text-slate-500 dark:text-slate-400">Usar credenciales PPP propias</span></span>
+                      <ChevronDown className={`h-4 w-4 text-slate-500 transition-transform ${showAdvancedSstp ? 'rotate-180' : ''}`} />
                     </button>
                     {showAdvancedSstp && (
                       <div className="mt-2 space-y-3">
@@ -526,7 +532,7 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
 
                 {protocol === 'wireguard' && (
                   <div>
-                    <label className="text-2xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1 block">IP Pública WAN del Servidor</label>
+                    <label className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-300">IP pública WAN del servidor</label>
                     {wgIpValid ? (
                       <>
                         <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
@@ -555,14 +561,16 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                       <div>
                         <p className="text-2xs font-bold text-emerald-700">Llaves WireGuard automáticas</p>
                         <p className="text-2xs text-emerald-600 mt-0.5">
-                          El sistema genera el par de llaves del nodo. Al crearlo recibirás un script completo (con la llave privada y las rutas de retorno) para pegar tal cual en el router torre — sin buscar ni copiar claves a mano.
+                          Las llaves y rutas necesarias se incluirán en el script generado.
                         </p>
                       </div>
                     </div>
                     {/* Modo experto OCULTO: pegar una clave pública propia del CPE */}
                     <button type="button" onClick={() => setShowAdvancedKey(v => !v)}
-                      className="mt-2 text-2xs font-semibold text-slate-500 dark:text-slate-400 hover:text-indigo-600 transition-colors">
-                      {showAdvancedKey ? '− Ocultar opciones avanzadas' : '+ Opciones avanzadas (usar mi propia clave del CPE)'}
+                      aria-expanded={showAdvancedKey}
+                      className="mt-2 flex min-h-11 w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 text-left transition-colors hover:border-indigo-200 hover:bg-indigo-50/60 dark:border-slate-700 dark:bg-slate-800/50 dark:hover:bg-indigo-500/10">
+                      <span><span className="block text-xs font-semibold text-slate-700 dark:text-slate-200">Opciones avanzadas</span><span className="block text-2xs text-slate-500 dark:text-slate-400">Usar una llave propia del CPE</span></span>
+                      <ChevronDown className={`h-4 w-4 text-slate-500 transition-transform ${showAdvancedKey ? 'rotate-180' : ''}`} />
                     </button>
                     {showAdvancedKey && (
                       <div className="mt-2">
@@ -587,11 +595,11 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                      Segmento(s) LAN remoto <span className="text-rose-500">*</span>
+                      {lanSubnets.length > 1 ? 'Redes LAN remotas' : 'Red LAN remota'} <span className="text-rose-500">*</span>
                     </label>
                     <button onClick={() => setLanSubnets(p => [...p, ''])}
                       className="flex items-center gap-1 text-2xs font-bold text-indigo-600 hover:text-indigo-800">
-                      <Plus className="w-3 h-3" /> Agregar red
+                      <Plus className="w-3 h-3" /> Agregar otra red
                     </button>
                   </div>
                   <div className="space-y-1.5">
@@ -600,19 +608,21 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                       return (
                         <div key={i} className="flex items-center gap-2">
                           <input value={s} onChange={e => setLanSubnets(p => p.map((x, j) => j === i ? e.target.value : x))}
-                            placeholder="10.3.0.0/24"
+                            placeholder="Ingresa una red en formato CIDR"
                             className={`flex-1 px-3 py-2 text-sm border rounded-xl focus:outline-none focus:ring-2 font-mono
                               ${s && !valid ? 'border-rose-300 focus:ring-rose-300' : 'border-slate-200 dark:border-slate-700 focus:ring-indigo-300'}`} />
                           {lanSubnets.length > 1 && (
                             <button onClick={() => setLanSubnets(p => p.filter((_, j) => j !== i))}
-                              className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:bg-rose-500/10 rounded-lg">
-                              <Minus className="w-3.5 h-3.5" />
+                              aria-label={`Eliminar red ${i + 1}`} title={`Eliminar red ${i + 1}`}
+                              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-500 dark:hover:bg-rose-500/10">
+                              <Minus className="w-4 h-4" />
                             </button>
                           )}
                         </div>
                       );
                     })}
                   </div>
+                  <p className="mt-1 text-2xs text-slate-500 dark:text-slate-400">Ejemplo: <span className="font-mono">10.3.0.0/24</span></p>
                   {validSubnets.length > 0 && <p className="text-2xs text-slate-500 dark:text-slate-400 mt-1">{validSubnets.length} subred(es) válida(s)</p>}
                   {subnetConflicts.length > 0 && (
                     <div className="mt-2 space-y-1">
@@ -631,9 +641,13 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                 </div>
               </div>
 
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-100 dark:border-slate-800">
-                <p className="text-2xs font-bold text-slate-400 uppercase tracking-wider mb-3">Pasos que se ejecutarán en MikroTik</p>
-                <div className="space-y-1.5">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/50">
+                <button type="button" onClick={() => setShowPlannedSteps(v => !v)} aria-expanded={showPlannedSteps}
+                  className="flex min-h-11 w-full items-center justify-between gap-3 px-4 text-left">
+                  <span><span className="block text-xs font-bold text-slate-700 dark:text-slate-200">Configuración en MikroTik · 7 pasos</span><span className="block text-2xs text-slate-500 dark:text-slate-400">Credenciales, interfaz, listas, VRF y rutas</span></span>
+                  <ChevronDown className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${showPlannedSteps ? 'rotate-180' : ''}`} />
+                </button>
+                {showPlannedSteps && <div className="space-y-1.5 border-t border-slate-200 px-4 py-3 dark:border-slate-700">
                   {PASOS_LABELS.map((label, idx) => (
                     <div key={idx} className="flex items-center gap-2.5 text-xs">
                       <span className="w-6 h-6 rounded-full bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300 flex items-center justify-center text-2xs font-bold shrink-0">{idx + 1}</span>
@@ -645,7 +659,7 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
                     <span className="font-semibold text-sky-600">Mangle + vpn-activa</span>
                     <span className="text-slate-400 text-2xs">→ Al activar el nodo</span>
                   </div>
-                </div>
+                </div>}
               </div>
             </div>
           )}
@@ -653,12 +667,13 @@ export default function NuevoNodo({ onClose, onSuccess }: NuevoNodoProps) {
 
         {!provisioning && !result && (
           <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-slate-100 dark:border-slate-800 shrink-0 bg-slate-50 dark:bg-slate-800/50 rounded-b-2xl">
-            <button onClick={onClose} className="btn-ghost btn-md">
+            {!canSubmit && <span className="mr-auto hidden text-2xs text-slate-500 sm:inline">Completa el nombre y una red LAN válida.</span>}
+            <button onClick={onClose} className="btn-outline btn-md">
               Cancelar
             </button>
             <button onClick={handleSubmit} disabled={!canSubmit}
               className="btn-primary btn-md flex items-center gap-2">
-              <Plus className="w-4 h-4" /><span>Crear Nodo</span>
+              <Plus className="w-4 h-4" /><span>Crear sitio</span>
             </button>
           </div>
         )}

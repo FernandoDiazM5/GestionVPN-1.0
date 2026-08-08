@@ -1,9 +1,10 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import NodesFilterBar from './NodesFilterBar';
 
 describe('<NodesFilterBar />', () => {
   it('compacta controles y conserva la personalización de columnas', () => {
+    const setVisibleCols = vi.fn();
     render(
       <NodesFilterBar
         search=""
@@ -13,7 +14,7 @@ describe('<NodesFilterBar />', () => {
         filterStatus=""
         setFilterStatus={vi.fn()}
         visibleCols={['disabled']}
-        setVisibleCols={vi.fn()}
+        setVisibleCols={setVisibleCols}
         exportSlot={<button>Descargar</button>}
         resultCount={1}
         totalCount={1}
@@ -24,6 +25,12 @@ describe('<NodesFilterBar />', () => {
     expect(screen.getByRole('option', { name: 'Conexión: todas' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Estado: todos' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Columnas 1/ })).toHaveAttribute('aria-haspopup', 'menu');
+    fireEvent.click(screen.getByRole('button', { name: /Columnas 1/ }));
+    expect(screen.getByRole('button', { name: 'Ocultar columna Disponibilidad' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Mostrar columna Ruta asignada' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Ocultar opcionales' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Ocultar columna Disponibilidad' }));
+    expect(setVisibleCols).toHaveBeenCalledWith([]);
     expect(screen.getByText('1 sitio')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Descargar' })).toBeInTheDocument();
   });

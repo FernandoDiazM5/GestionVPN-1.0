@@ -8,16 +8,7 @@ interface AuditTimelineProps {
   live?: boolean;
 }
 
-type ExportRange = '7d' | '30d' | '90d' | 'all';
-const RANGE_MS: Record<ExportRange, number | null> = {
-  '7d': 7 * 24 * 60 * 60 * 1000,
-  '30d': 30 * 24 * 60 * 60 * 1000,
-  '90d': 90 * 24 * 60 * 60 * 1000,
-  'all': null,
-};
-const RANGE_LABEL: Record<ExportRange, string> = {
-  '7d': 'Últimos 7 días', '30d': 'Últimos 30 días', '90d': 'Últimos 90 días', 'all': 'Todo el historial',
-};
+const RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 const PER_PAGE = 8; // entradas por página — mantiene el panel compacto
 
@@ -40,7 +31,6 @@ function timeAgo(ts: number): string {
 
 export default function AuditTimeline({ logs, live }: AuditTimelineProps) {
   const [showExport, setShowExport] = useState(false);
-  const [range, setRange] = useState<ExportRange>('30d');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [page, setPage] = useState(0);
@@ -56,9 +46,8 @@ export default function AuditTimeline({ logs, live }: AuditTimelineProps) {
     setBusy(true); setErr(null);
     try {
       const now = Date.now();
-      const window = RANGE_MS[range];
       const result = await auditApi.exportLogs({
-        from: window != null ? now - window : 0,
+        from: now - RETENTION_MS,
         to: now,
         format,
       });
@@ -94,19 +83,9 @@ export default function AuditTimeline({ logs, live }: AuditTimelineProps) {
             className="absolute top-full right-6 mt-2 z-20 w-72 card p-4 shadow-xl border border-slate-200 dark:border-slate-700 space-y-3"
           >
             <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Exportar bitácora</p>
-            <div>
-              <label className="block text-2xs font-semibold text-slate-500 mb-1 uppercase tracking-wide">Rango</label>
-              <select
-                value={range}
-                onChange={e => setRange(e.target.value as ExportRange)}
-                disabled={busy}
-                className="input-field text-xs w-full"
-              >
-                {(['7d', '30d', '90d', 'all'] as ExportRange[]).map(r => (
-                  <option key={r} value={r}>{RANGE_LABEL[r]}</option>
-                ))}
-              </select>
-            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Incluye únicamente la actividad de los últimos 7 días.
+            </p>
             {err && (
               <p className="text-xs text-rose-600 flex items-start gap-1"><AlertCircle className="w-3 h-3 mt-0.5 shrink-0" /> {err}</p>
             )}
@@ -120,7 +99,7 @@ export default function AuditTimeline({ logs, live }: AuditTimelineProps) {
               </button>
             </div>
             <p className="text-2xs text-slate-500 dark:text-slate-400 leading-snug">
-              El CSV abre directo en Excel (BOM UTF-8). Máx 10 000 filas por export.
+              Los registros anteriores a 7 días se eliminan automáticamente. Máx. 10 000 filas por exportación.
             </p>
           </div>
         )}
