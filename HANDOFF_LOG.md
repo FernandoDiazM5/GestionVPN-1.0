@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-08 — Retención y mejoras de Sitios desplegadas.** Rama/producción `vps_prod` en `c9f3131`. Estado: backend/DB healthy, frontend activo y validación productiva completa.
+> - Se desplegaron juntos la retención estricta de actividad a siete días, acciones visibles de columnas, refinamiento SSTP/WireGuard de Agregar sitio remoto y título UTF-8 correcto. Backend y frontend fueron reconstruidos/recreados; MariaDB mantuvo contenedor, volumen y datos.
+> - Raíz/legacy 200, preflight 204, origen hostil 403, login inválido 401, MySQL/RouterOS/SMTP `ok`, título y bundles nuevos confirmados, migraciones idempotentes correctas y cero reinicios.
+> - Rollback `gestionvpn-10-{backend,frontend}:pre-c9f3131`; disco 80%/5.1 GiB libres.
+
 > **Sesión 2026-08-08 — Codificación del título de pestaña corregida.** Rama `vps_prod` (base publicada `ac6117a`; cambios locales acumulados, sin deploy). Estado: build y diff correctos.
 > - El título queda `Joinpoint NOC | Gestión de redes` y la descripción usa `Gestión y monitoreo...` con UTF-8 real; fuente y HTML generado fueron verificados sin `GestiÃ`.
 
