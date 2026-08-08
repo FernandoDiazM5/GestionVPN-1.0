@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-08 — Login y comunicaciones Joinpoint desplegados.** Rama `vps_prod`; producción funcional `ca23dae`. Estado: backend/DB healthy, frontend activo, validación productiva completa.
+> - Se reconstruyeron y recrearon exclusivamente backend y frontend con `docker-compose.prod.yml`; MariaDB mantuvo contenedor, volumen y datos. Las migraciones idempotentes terminaron correctamente.
+> - Raíz y ruta histórica respondieron 200; preflight 204, origen hostil 403 y login inválido 401. MySQL, RouterOS y SMTP quedaron `ok`; el bundle confirmó el login nuevo y el backend confirmó `Joinpoint NOC` en correo y Telegram. Los tres contenedores registran 0 reinicios.
+> - La poda de imágenes recuperó 4.3 GB y dejó el disco en 71%/7.1 GiB libres, pero Docker retiró también las imágenes históricas etiquetadas, incluidas las preparadas como rollback. Un rollback requiere reconstruir `6376197`; no se tocaron volúmenes ni datos.
+
 > **Sesión 2026-08-07 — Refinamiento responsive del login Joinpoint.** Rama `vps_prod` (base publicada `4829e06`). Estado: pruebas focalizadas 7/7, lint, build y diff correctos; pendiente commit/despliegue.
 > - Se aisló el fondo decorativo en una capa fija recortada para evitar el desplazamiento vertical artificial en escritorio.
 > - En móvil se retiró la segunda presentación de marca, se compactaron panel y espacios verticales, y se mantuvieron recuperación e invitación.
