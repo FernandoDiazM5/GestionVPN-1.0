@@ -15,15 +15,18 @@ const {
   connectToMikrotik, safeWrite, getErrorMessage,
 } = require('../../routeros.service');
 const { IPV4_REGEX } = require('../../ubiquiti.service');
-const { getDb, saveNode, deleteNode } = require('../../db.service');
+const { getDb, updateNodeFields } = require('../../db.service');
 const { nodeBelongsToRequester, requireOperator } = require('./_shared');
 const { sendOk, AppError, asyncHandler } = require('../../lib/apiResponse');
 const { requireMikrotik } = require('../../lib/routeGuards');
 const { validate } = require('../../middleware/validate');
 const { NodeEditRequestSchema, NodeLabelRequestSchema } = require('@gestionvpn/contracts');
-const { normalizeCidrs } = require('../../lib/ipv4Cidr');
+const { cidrOverlaps, normalizeCidrs } = require('../../lib/ipv4Cidr');
+const mgmtNet = require('../../lib/mgmtNet');
+const scanIpRepo = require('../../db/repos/scanIpRepo');
 const { ensureTowerEntries, ensureRoute, removeRoutesForVrf } = require('../../lib/remoteNetworkSync');
 const { enqueueWg0Intent } = require('../../lib/wg0Intent');
+const { syncPeerLanAddresses } = require('../../lib/wireguardPeerLanSync');
 
 router.post('/node/edit', requireOperator, validate({ body: NodeEditRequestSchema }), asyncHandler(async (req, res) => {
   const { ip, user, pass } = requireMikrotik(req);
@@ -46,6 +49,10 @@ router.post('/node/edit', requireOperator, validate({ body: NodeEditRequestSchem
   const currentSubnets = normalizeCidrs(storedSubnets, { allowHost: false });
   const normalizedAdds = normalizeCidrs(addSubnets, { allowHost: false });
   const normalizedRemovals = normalizeCidrs(removeSubnets, { allowHost: false });
+  const protectedNets = [...mgmtNet.allNets, scanIpRepo.poolSubnet(), '10.10.250.0/24', '10.10.251.0/24'];
+  const protectedConflict = normalizedAdds.find((subnet) => protectedNets.some((network) => cidrOverlaps(subnet, network)));
+  if (protectedConflict)
+    throw new AppError(`La red ${protectedConflict} se solapa con una red reservada de gestión`, 400, 'VALIDATION_ERROR');
   const isWG = pppUser.startsWith('WG-ND') || pppUser.startsWith('VPN-WG-');
   const hasVrf = !!vrfName;
   const ifaceName = isWG ? pppUser : (hasVrf ? vrfName.replace(/^VRF-/, 'VPN-SSTP-') : '');
@@ -54,7 +61,7 @@ router.post('/node/edit', requireOperator, validate({ body: NodeEditRequestSchem
   const nameMatch = vrfName?.match(/VRF-ND\d+-(.+)/);
   const nameUpper = nameMatch ? nameMatch[1] : '';
 
-  const steps = []; let api;
+  const steps = []; let api; let resolvedWgPublicKey = '';
   try {
     api = await connectToMikrotik(ip, user, pass);
 
@@ -148,15 +155,21 @@ router.post('/node/edit', requireOperator, validate({ body: NodeEditRequestSchem
       normalizedAdds.forEach(s => newSubnets.add(s));
       updatedLanSubnets = Array.from(newSubnets);
 
-      // Actualizar el peer de WireGuard si existe en MikroTik
-      if (isWG && wgPubKey) {
-        const wgPeers = await safeWrite(api, ['/interface/wireguard/peers/print']);
-        const peer = wgPeers.find(p => p.interface === ifaceName && p['public-key'] === wgPubKey);
-        if (peer) {
-          const allowedIps = wgPeerIp ? `${wgPeerIp},${updatedLanSubnets.join(',')}` : updatedLanSubnets.join(',');
-          await safeWrite(api, ['/interface/wireguard/peers/set', `=.id=${peer['.id']}`, `=allowed-address=${allowedIps}`]);
-          steps.push({ step: 'wg-peer', obj: 'WG Peer', name: 'allowed-address actualizado', status: 'ok' });
-        }
+      // Los nodos históricos pueden no tener wg_public_key persistida. Solo se
+      // usa el fallback por interfaz cuando allí existe exactamente un peer.
+      if (isWG) {
+        const peerSync = await syncPeerLanAddresses(api, {
+          interfaceName: ifaceName,
+          publicKey: wgPubKey,
+          peerAddress: wgPeerIp,
+          lanSubnets: updatedLanSubnets,
+        });
+        resolvedWgPublicKey = peerSync.publicKey;
+        steps.push({
+          step: 'wg-peer', obj: 'WG Peer',
+          name: peerSync.changed ? 'allowed-address actualizado y verificado' : 'allowed-address ya sincronizado',
+          status: 'ok',
+        });
       }
     }
 
@@ -176,11 +189,9 @@ router.post('/node/edit', requireOperator, validate({ body: NodeEditRequestSchem
         updates.lan_subnets = updatedLanSubnets;
         updates.segmento_lan = updatedLanSubnets[0] || '';
       }
-      if (newPppUser && newPppUser !== pppUser) {
-        // Usuario cambió: eliminar registro viejo y crear uno nuevo
-        await deleteNode(pppUser);
-      }
-      await saveNode(updates);
+      if (!nodeRow.wg_public_key && resolvedWgPublicKey) updates.wg_public_key = resolvedWgPublicKey;
+      // También al renombrar se actualiza la misma fila para conservar AP/CPE.
+      await updateNodeFields(pppUser, updates);
       if (updatedLanSubnets !== null) enqueueWg0Intent(updatedLanSubnets, 'node-edit');
       log.debug({ pppUser: effectiveUser }, 'DB: nodo actualizado en MySQL');
     } catch (dbErr) {

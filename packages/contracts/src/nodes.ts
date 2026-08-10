@@ -13,7 +13,54 @@ const CidrV4Schema = z.cidrv4({ message: 'CIDR IPv4 inválido' }).refine(
   (value) => Number(value.split('/')[1]) > 0,
   'La ruta por defecto 0.0.0.0/0 no está permitida',
 );
-const LanSubnetsSchema = z.array(CidrV4Schema).max(32, 'Máximo 32 subredes');
+const ipv4ToInt = (ip: string) => ip.split('.').reduce((value, octet) => ((value << 8) | Number(octet)) >>> 0, 0);
+const intToIpv4 = (value: number) => [24, 16, 8, 0].map((shift) => (value >>> shift) & 255).join('.');
+const parseCidr = (cidr: string) => {
+  const [ip, rawPrefix] = cidr.split('/');
+  const prefix = Number(rawPrefix);
+  const address = ipv4ToInt(ip);
+  const mask = prefix === 0 ? 0 : (0xffffffff << (32 - prefix)) >>> 0;
+  const network = (address & mask) >>> 0;
+  const broadcast = (network | (~mask >>> 0)) >>> 0;
+  return { prefix, network, broadcast, canonical: `${intToIpv4(network)}/${prefix}` };
+};
+const SPECIAL_LAN_RANGES = ['0.0.0.0/8', '127.0.0.0/8', '169.254.0.0/16', '224.0.0.0/4']
+  .map(parseCidr);
+const LanCidrV4Schema = z.cidrv4({ message: 'CIDR IPv4 inválido' }).superRefine((value, ctx) => {
+  const cidr = parseCidr(value);
+  if (cidr.prefix < 24) {
+    ctx.addIssue({ code: 'custom', message: 'La red LAN debe usar un prefijo entre /24 y /32' });
+  }
+  if (value !== cidr.canonical) {
+    ctx.addIssue({ code: 'custom', message: `Usa la dirección de red ${cidr.canonical}` });
+  }
+  if (SPECIAL_LAN_RANGES.some((range) => cidr.network <= range.broadcast && cidr.broadcast >= range.network)) {
+    ctx.addIssue({ code: 'custom', message: 'Esta red IPv4 está reservada y no puede usarse como LAN remota' });
+  }
+});
+const LanSubnetsSchema = z.array(LanCidrV4Schema).max(32, 'Máximo 32 subredes').superRefine((values, ctx) => {
+  const validCidrs = values.flatMap((value, index) => {
+    const result = LanCidrV4Schema.safeParse(value);
+    return result.success ? [{ index, ...parseCidr(value) }] : [];
+  });
+  for (let left = 0; left < validCidrs.length; left += 1) {
+    for (let right = left + 1; right < validCidrs.length; right += 1) {
+      const a = validCidrs[left];
+      const b = validCidrs[right];
+      if (a.network <= b.broadcast && a.broadcast >= b.network) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [b.index],
+          message: a.canonical === b.canonical
+            ? `La red ${b.canonical} está duplicada`
+            : `La red ${b.canonical} se solapa con ${a.canonical}`,
+        });
+      }
+    }
+  }
+});
+// Las bajas permiten seleccionar redes históricas más amplias sin obligar a migrarlas.
+const LegacyLanSubnetsSchema = z.array(CidrV4Schema).max(32, 'Máximo 32 subredes');
 const NodeNameSchema = boundedText(100, { allowEmpty: false }).refine(
   (value) => value.toUpperCase().replace(/[^A-Z0-9]/g, '').length >= 2,
   'Nombre de nodo inválido',
@@ -44,7 +91,7 @@ export const NodeProvisionRequestSchema = z.object({
   nodeName: NodeNameSchema,
   pppUser: EntityIdSchema.optional(),
   pppPassword: SecretTextSchema.optional(),
-  lanSubnet: CidrV4Schema.optional(),
+  lanSubnet: LanCidrV4Schema.optional(),
   lanSubnets: LanSubnetsSchema.optional(),
   remoteAddress: Ipv4Schema.optional(),
   protocol: z.enum(['sstp', 'wireguard']),
@@ -73,7 +120,7 @@ export const NodeEditRequestSchema = z.object({
   newComment: boundedText(200).nullable().optional(),
   vrfName: EntityIdSchema.optional(),
   addSubnets: LanSubnetsSchema.optional(),
-  removeSubnets: LanSubnetsSchema.optional(),
+  removeSubnets: LegacyLanSubnetsSchema.optional(),
 }).strict();
 export type NodeEditRequest = z.infer<typeof NodeEditRequestSchema>;
 

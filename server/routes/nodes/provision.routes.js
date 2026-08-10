@@ -33,7 +33,7 @@ const { buildCpeWgScript, buildCpeSstpScript } = require('../../lib/cpeScript');
 const { generatePppUser, generatePppPassword } = require('../../lib/sstpCreds');
 const { deprovisionNodeOnRouter } = require('../../lib/nodeDeprovision');
 const { enqueueWg0Intent } = require('../../lib/wg0Intent');
-const { normalizeCidrs } = require('../../lib/ipv4Cidr');
+const { cidrOverlaps, normalizeCidrs } = require('../../lib/ipv4Cidr');
 
 // ── Autosync del wg0 del VPS (event-driven, §4.27 — modelo HARDENED) ──
 // Al provisionar una torre, su LAN debe estar en los AllowedIPs del wg0 del VPS
@@ -219,6 +219,10 @@ router.post('/node/provision', requireOperator, validate({ body: NodeProvisionRe
   const allSubnets = normalizeCidrs(requestedSubnets, { allowHost: false });
   if (allSubnets.length === 0 || allSubnets.length !== new Set(requestedSubnets.map(String)).size)
     throw new AppError('CIDRs de LAN inválidos', 400, 'VALIDATION_ERROR');
+  const protectedNets = [...mgmtNet.allNets, scanIpRepo.poolSubnet(), '10.10.250.0/24', '10.10.251.0/24'];
+  const protectedConflict = allSubnets.find((subnet) => protectedNets.some((network) => cidrOverlaps(subnet, network)));
+  if (protectedConflict)
+    throw new AppError(`La red ${protectedConflict} se solapa con una red reservada de gestión`, 400, 'VALIDATION_ERROR');
   // La IP remota (SSTP) es server-authoritative: si no llega o es inválida, se
   // recalcula tras conectar. No se exige al cliente (cierra el caso preview obsoleto).
   // SSTP auto-gen: usuario y contraseña son OPCIONALES — si no llegan, el servidor

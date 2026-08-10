@@ -110,6 +110,29 @@ describe('security input schemas', () => {
     expect(NodeScanRequestSchema.safeParse({ nodeLan: '10.0.0.0/15' }).success).toBe(false);
   });
 
+  it('aplica la política LAN /24–/32 sin romper redes históricas', () => {
+    const provision = (lanSubnets) => NodeProvisionRequestSchema.safeParse({
+      nodeNumber: 2, nodeName: 'Torre Norte', protocol: 'sstp', lanSubnets,
+    }).success;
+
+    expect(provision(['10.20.0.0/24', '10.20.1.0/31', '10.20.2.7/32'])).toBe(true);
+    expect(provision(['10.20.0.0/23'])).toBe(false);
+    expect(provision(['10.20.0.7/24'])).toBe(false);
+    expect(provision(['127.0.0.1/32'])).toBe(false);
+    expect(provision(['169.254.10.0/24'])).toBe(false);
+    expect(provision(['224.0.0.0/24'])).toBe(false);
+    expect(provision(['10.20.0.0/24', '10.20.0.0/25'])).toBe(false);
+    expect(provision(['10.20.0.0/24', '10.20.0.0/24'])).toBe(false);
+
+    expect(NodeEditRequestSchema.safeParse({
+      pppUser: 'ppp-ok', addSubnets: ['10.20.0.0/16'],
+    }).success).toBe(false);
+    expect(NodeEditRequestSchema.safeParse({
+      pppUser: 'ppp-ok', removeSubnets: ['10.20.0.0/16'],
+    }).success).toBe(true);
+    expect(NodeScanRequestSchema.safeParse({ nodeLan: '10.20.0.0/16' }).success).toBe(true);
+  });
+
   it('bloquea campos heredados y metacaracteres antes de formar comandos RouterOS', () => {
     expect(NodeEditRequestSchema.safeParse({
       pppUser: 'ppp-ok',

@@ -51,4 +51,19 @@ function isCidr(value, options = {}) {
   return normalizeCidr(value, { ...options, allowHost: false }) !== null;
 }
 
-module.exports = { parseIpv4, normalizeCidr, normalizeCidrs, isCidr };
+function cidrOverlaps(left, right) {
+  const normalizedLeft = normalizeCidr(left, { allowHost: false, allowDefaultRoute: true });
+  const normalizedRight = normalizeCidr(right, { allowHost: false, allowDefaultRoute: true });
+  if (!normalizedLeft || !normalizedRight) return false;
+  const [leftIp, leftPrefixText] = normalizedLeft.split('/');
+  const [rightIp, rightPrefixText] = normalizedRight.split('/');
+  const leftPrefix = Number(leftPrefixText);
+  const rightPrefix = Number(rightPrefixText);
+  const leftMask = leftPrefix === 0 ? 0 : (0xffffffff << (32 - leftPrefix)) >>> 0;
+  const rightMask = rightPrefix === 0 ? 0 : (0xffffffff << (32 - rightPrefix)) >>> 0;
+  const leftNet = ipv4ToUint(parseIpv4(leftIp));
+  const rightNet = ipv4ToUint(parseIpv4(rightIp));
+  return ((leftNet & rightMask) >>> 0) === rightNet || ((rightNet & leftMask) >>> 0) === leftNet;
+}
+
+module.exports = { parseIpv4, normalizeCidr, normalizeCidrs, isCidr, cidrOverlaps };

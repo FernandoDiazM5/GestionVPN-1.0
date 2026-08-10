@@ -145,8 +145,8 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `routes/nodes/credentials.routes.js` | 39 | POST | `/node/creds/get` | sí | — | no | sí | sql | — |
 | `routes/nodes/credentials.routes.js` | 54 | POST | `/node/ssh-creds/save` | sí | — | no | sí | sql, network-admin | — |
 | `routes/nodes/credentials.routes.js` | 78 | POST | `/node/ssh-creds/get` | sí | — | no | sí | sql, network-admin | — |
-| `routes/nodes/editing.routes.js` | 28 | POST | `/node/edit` | sí | — | no | sí | sql, network-admin | — |
-| `routes/nodes/editing.routes.js` | 206 | POST | `/node/label/save` | sí | — | no | sí | sql | — |
+| `routes/nodes/editing.routes.js` | 31 | POST | `/node/edit` | sí | — | no | sí | sql, network-admin | — |
+| `routes/nodes/editing.routes.js` | 217 | POST | `/node/label/save` | sí | — | no | sí | sql | — |
 | `routes/nodes/history.routes.js` | 21 | POST | `/node/history/add` | sí | — | no | sí | sql | — |
 | `routes/nodes/history.routes.js` | 35 | POST | `/node/history/get` | sí | — | no | sí | sql | — |
 | `routes/nodes/listing.routes.js` | 47 | POST | `/nodes` | sí | — | no | n/a | sql, network-admin | — |
@@ -155,7 +155,7 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `routes/nodes/listing.routes.js` | 303 | POST | `/node/wg/set-peer` | sí | — | no | sí | sql, network-admin | — |
 | `routes/nodes/provision.routes.js` | 199 | POST | `/node/next` | sí | — | no | n/a | — | — |
 | `routes/nodes/provision.routes.js` | 214 | POST | `/node/provision` | sí | — | no | sí | sql, network-admin | — |
-| `routes/nodes/provision.routes.js` | 575 | POST | `/node/deprovision` | sí | — | no | sí | — | — |
+| `routes/nodes/provision.routes.js` | 579 | POST | `/node/deprovision` | sí | — | no | sí | — | — |
 | `routes/nodes/scan.routes.js` | 51 | POST | `/node/scan-stream` | sí | — | no | sí | network-admin | — |
 | `routes/nodes/tags.routes.js` | 16 | GET | `/node/tags` | sí | — | no | n/a | sql | — |
 | `routes/nodes/tags.routes.js` | 41 | POST | `/node/tag/save` | sí | — | no | sí | sql | — |

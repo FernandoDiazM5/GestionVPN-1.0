@@ -1,4 +1,4 @@
-const { normalizeCidr, normalizeCidrs, isCidr } = require('../../lib/ipv4Cidr');
+const { cidrOverlaps, normalizeCidr, normalizeCidrs, isCidr } = require('../../lib/ipv4Cidr');
 
 describe('lib/ipv4Cidr', () => {
   it('valida octetos y prefijos estrictamente', () => {
@@ -16,5 +16,11 @@ describe('lib/ipv4Cidr', () => {
     expect(normalizeCidr('0.0.0.0/0')).toBeNull();
     expect(normalizeCidrs(['10.0.0.1/24', '10.0.0.2/24'])).toEqual(['10.0.0.0/24']);
     expect(isCidr('10.0.0.1')).toBe(false);
+  });
+
+  it('detecta solapamientos entre redes IPv4', () => {
+    expect(cidrOverlaps('10.11.250.0/25', '10.11.250.0/24')).toBe(true);
+    expect(cidrOverlaps('192.168.10.0/24', '192.168.11.0/24')).toBe(false);
+    expect(cidrOverlaps('red-invalida', '10.0.0.0/24')).toBe(false);
   });
 });

@@ -427,6 +427,48 @@ async function createUser(username, password_hash, role = 'viewer') {
     );
 }
 
+const NODE_UPDATE_COLUMNS = new Set([
+    'ppp_user', 'nombre_nodo', 'nombre_vrf', 'iface_name', 'segmento_lan',
+    'ip_tunnel', 'server_ip', 'wg_public_key', 'wg_cpe_public',
+    'wg_cpe_private_enc', 'label', 'lan_subnets', 'protocol', 'node_number',
+    'workspace_id',
+]);
+
+// Edición parcial de un nodo existente. A diferencia de saveNode(), nunca
+// rellena con '' los campos que el caller no envió y conserva el id para no
+// disparar cascadas sobre AP/CPE asociados cuando cambia ppp_user.
+async function updateNodeFields(currentPppUser, fields) {
+    if (!currentPppUser) throw new Error('updateNodeFields: ppp_user actual requerido');
+    const { assignments, params: fieldParams } = buildNodeUpdate(fields);
+    if (assignments.length === 0) return getNodeByPppUser(currentPppUser);
+    const d = await getDb();
+    const params = [...fieldParams];
+    assignments.push('updated_at = ?');
+    params.push(Date.now(), currentPppUser);
+    const result = await d.run(
+        `UPDATE nodes SET ${assignments.join(', ')} WHERE ppp_user = ?`,
+        params,
+    );
+    if (!result || result.changes !== 1) throw new Error(`Nodo ${currentPppUser} no encontrado al actualizar`);
+    const effectivePppUser = fields.ppp_user || currentPppUser;
+    return getNodeByPppUser(effectivePppUser);
+}
+
+function buildNodeUpdate(fields) {
+    const entries = Object.entries(fields || {}).filter(([key, value]) =>
+        NODE_UPDATE_COLUMNS.has(key) && value !== undefined);
+    const assignments = [];
+    const params = [];
+    for (const [key, rawValue] of entries) {
+        const value = key === 'lan_subnets' && Array.isArray(rawValue)
+            ? JSON.stringify(rawValue)
+            : rawValue;
+        assignments.push(`${key} = ?`);
+        params.push(value);
+    }
+    return { assignments, params };
+}
+
 async function updateLegacyPasswordHashIfCurrent(username, passwordHash, currentHash) {
     const d = await getDb();
     const result = await d.run(
@@ -616,7 +658,7 @@ async function getApGroupIntId(uuid) {
 module.exports = {
     initDb, getDb,
     encryptPass, decryptPass, encryptDevice, decryptDevice,
-    saveNode, getNodes, getNodeByPppUser, getNodeId, deleteNode,
+    saveNode, updateNodeFields, buildNodeUpdate, getNodes, getNodeByPppUser, getNodeId, deleteNode,
     hasUsers, getUserByUsername, createUser, createInitialUser, updateLegacyPasswordHashIfCurrent,
     setAppSetting, getAppSetting,
     getTorres, saveTorre, deleteTorre,

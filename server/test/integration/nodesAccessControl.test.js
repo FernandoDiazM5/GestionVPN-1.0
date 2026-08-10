@@ -27,6 +27,7 @@ stubModule(__dirname, '../../db.service', {
   getNodes: vi.fn().mockResolvedValue([]),
   getNodeByPppUser: vi.fn().mockResolvedValue(null),
   saveNode: vi.fn().mockResolvedValue(undefined),
+  updateNodeFields: vi.fn().mockResolvedValue(undefined),
   deleteNode: vi.fn().mockResolvedValue({ deviceIds: [] }),
   encryptPass: (s) => s,
   decryptPass: (s) => s,
