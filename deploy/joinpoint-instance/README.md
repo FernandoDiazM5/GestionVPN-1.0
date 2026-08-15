@@ -18,7 +18,9 @@ Para el primer cliente se asume un VPS nuevo y una distribucion oficial completa
 
 Tras validar DNS, el instalador usa la imagen oficial fijada `certbot/certbot:v5.7.0` en modo standalone para el primer certificado. Exige correo ACME y aceptacion explicita de terminos, valida el certificado y conserva el material renovable fuera del codigo. Luego construye el agente, verifica la licencia inicial y elimina la respuesta temporal de activacion. El estado `READY_FOR_PLATFORM_BOOTSTRAP` todavia no inicia la aplicacion: falta preconfigurar el `/22` recomendado y superar los health gates.
 
-La configuracion Nginx de la instancia se genera con el FQDN exacto y rechaza otros encabezados Host. Expone solamente el directorio ACME durante el desafio HTTP. `renew-tls.sh` renueva por webroot sin detener el panel, valida el nuevo certificado y recarga Nginx solo despues de que `nginx -t` tenga exito. El siguiente incremento instalara su timer de systemd junto con el arranque controlado.
+La configuracion Nginx de la instancia se genera con el FQDN exacto y rechaza otros encabezados Host. Expone solamente el directorio ACME durante el desafio HTTP. `renew-tls.sh` renueva por webroot sin detener el panel, valida el nuevo certificado y recarga Nginx solo despues de que `nginx -t` tenga exito.
+
+El arranque greenfield ejecuta primero MariaDB y backend. Las migraciones preconfiguran transaccionalmente el `/22` recomendado por Central, pero el Administrador todavia puede cambiarlo durante el primer asistente mientras no existan sitios ni se haya preparado el Core. Solo tras salud MySQL se inician frontend y agente. Si falla backend, HTTPS o agente, se detienen esos tres servicios y se preserva MariaDB con todos sus volumenes. Al completar los gates se habilita un timer systemd de renovacion TLS cada 12 horas con demora aleatoria.
 
 ## Agente de instancia
 

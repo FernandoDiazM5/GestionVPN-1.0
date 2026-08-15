@@ -22,7 +22,7 @@ write_status() { printf '%s\n' "$1" > "$INSTALL_ROOT/install-status"; chmod 600 
 
 preflight() {
   [[ "$(id -u)" -eq 0 ]] || fail 'Ejecuta el instalador como root.'
-  for tool in curl jq openssl docker getent install; do need "$tool"; done
+  for tool in curl jq openssl docker getent install systemctl; do need "$tool"; done
   docker compose version >/dev/null 2>&1 || fail 'Docker Compose v2 no esta disponible.'
   [[ -n "${JOINPOINT_CENTRAL_URL:-}" ]] || fail 'Falta JOINPOINT_CENTRAL_URL.'
   require_https "$JOINPOINT_CENTRAL_URL"
@@ -30,6 +30,7 @@ preflight() {
   valid_ipv4 "$JOINPOINT_PUBLIC_IP" || fail 'JOINPOINT_PUBLIC_IP no es una IPv4 valida.'
   [[ "$SOURCE_DIR" = /* && -f "$SOURCE_DIR/package.json" && -f "$SOURCE_DIR/deploy/joinpoint-instance/compose.yaml" ]] \
     || fail 'JOINPOINT_SOURCE_DIR debe apuntar a una distribucion oficial completa.'
+  [[ ! "$SOURCE_DIR$INSTALL_ROOT" =~ [[:space:]] ]] || fail 'Las rutas de instalacion no pueden contener espacios.'
   curl --fail --silent --show-error --connect-timeout 5 --max-time 15 "${JOINPOINT_CENTRAL_URL%/}/health" >/dev/null \
     || fail 'La Plataforma Central no responde por HTTPS.'
 }
@@ -61,9 +62,10 @@ activate() {
 random_hex() { openssl rand -hex "$1"; }
 
 generate_config() {
-  local fqdn instance_id db_root db_app jwt_secret auth_hmac security_secret ai_key
+  local fqdn instance_id management_cidr db_root db_app jwt_secret auth_hmac security_secret ai_key
   fqdn="$(jq -r '.fqdn' "$INSTALL_ROOT/instance.json")"
   instance_id="$(jq -r '.instanceId' "$INSTALL_ROOT/instance.json")"
+  management_cidr="$(jq -r '.managementCidr' "$INSTALL_ROOT/instance.json")"
   db_root="$(random_hex 32)"; db_app="$(random_hex 32)"; jwt_secret="$(random_hex 64)"
   auth_hmac="$(random_hex 32)"; security_secret="$(random_hex 32)"; ai_key="$(random_hex 32)"
   printf '%s\n' \
@@ -84,6 +86,7 @@ generate_config() {
     'PORT=3001' 'NODE_ENV=production' 'DATA_DIR=/data' \
     'MYSQL_HOST=127.0.0.1' 'MYSQL_PORT=3307' 'MYSQL_USER=vpn_app' "MYSQL_PASSWORD=$db_app" 'MYSQL_DATABASE=vpn_manager' 'MYSQL_POOL=10' \
     "CORS_ORIGINS=https://$fqdn" "APP_BASE_URL=https://$fqdn/" "VPS_PUBLIC_IP=$JOINPOINT_PUBLIC_IP" \
+    "INITIAL_MANAGEMENT_SUPERNET=$management_cidr" \
     'JWT_EXPIRES=8h' 'JWT_ACTIVE_KID=initial' "JWT_ACTIVE_SECRET=$jwt_secret" \
     "AUTH_RATE_HMAC_KEY=$auth_hmac" 'WEB_SECURITY_MODE=observe' 'WEB_SECURITY_ROLLOUT_PERCENT=0' \
     'EXPIRATION_JOB_ENABLED=true' 'MONITORING_ENABLED=true' 'AP_POLL_ENABLED=true' \
@@ -135,6 +138,60 @@ bootstrap_agent() {
   write_status AGENT_BOOTSTRAPPED
 }
 
+compose() {
+  docker compose --env-file "$INSTALL_ROOT/config/compose.env" \
+    -f "$SOURCE_DIR/deploy/joinpoint-instance/compose.yaml" "$@"
+}
+
+rollback_start() {
+  compose stop frontend backend instance-agent >/dev/null 2>&1 || true
+  write_status START_FAILED_DB_PRESERVED
+}
+
+wait_backend() {
+  local body
+  for _ in $(seq 1 60); do
+    body="$(curl --noproxy '*' --silent --show-error --max-time 5 http://127.0.0.1:3001/api/health 2>/dev/null || true)"
+    if jq -e '.checks.mysql.status == "ok"' <<< "$body" >/dev/null 2>&1; then return 0; fi
+    sleep 5
+  done
+  return 1
+}
+
+wait_https() {
+  local body fqdn
+  fqdn="$(jq -r '.fqdn' "$INSTALL_ROOT/instance.json")"
+  for _ in $(seq 1 36); do
+    body="$(curl --noproxy '*' --fail --silent --show-error --max-time 8 --resolve "$fqdn:443:127.0.0.1" "https://$fqdn/api/health" 2>/dev/null || true)"
+    if jq -e '.checks.mysql.status == "ok"' <<< "$body" >/dev/null 2>&1; then return 0; fi
+    sleep 5
+  done
+  return 1
+}
+
+start_platform() {
+  compose up -d --build db backend
+  wait_backend || { rollback_start; fail 'Backend/MySQL no superaron el health gate.'; }
+  compose up -d --build frontend instance-agent
+  wait_https || { rollback_start; fail 'HTTPS no supero el health gate; MariaDB fue preservada.'; }
+  compose ps --status running --services | grep -Fxq 'instance-agent' \
+    || { rollback_start; fail 'El agente no quedo en ejecucion; MariaDB fue preservada.'; }
+  write_status PLATFORM_HEALTHY
+}
+
+install_tls_timer() {
+  printf '%s\n' '[Unit]' 'Description=Renovacion TLS de Joinpoint' 'After=docker.service network-online.target' '' \
+    '[Service]' 'Type=oneshot' "Environment=JOINPOINT_INSTALL_ROOT=$INSTALL_ROOT" \
+    "ExecStart=/bin/bash $SOURCE_DIR/deploy/joinpoint-instance/renew-tls.sh" \
+    > /etc/systemd/system/joinpoint-tls-renew.service
+  printf '%s\n' '[Unit]' 'Description=Comprobar renovacion TLS de Joinpoint' '' '[Timer]' \
+    'OnBootSec=12h' 'OnUnitActiveSec=12h' 'RandomizedDelaySec=1h' 'Persistent=true' '' \
+    '[Install]' 'WantedBy=timers.target' > /etc/systemd/system/joinpoint-tls-renew.timer
+  chmod 644 /etc/systemd/system/joinpoint-tls-renew.service /etc/systemd/system/joinpoint-tls-renew.timer
+  systemctl daemon-reload
+  systemctl enable --now joinpoint-tls-renew.timer
+}
+
 check_dns() {
   local fqdn resolved
   fqdn="$(jq -r '.fqdn' "$INSTALL_ROOT/instance.json")"
@@ -161,8 +218,10 @@ case "$MODE" in
     generate_config
     issue_tls
     bootstrap_agent
-    write_status READY_FOR_PLATFORM_BOOTSTRAP
-    info 'READY_FOR_PLATFORM_BOOTSTRAP: TLS e identidad listos; los servicios aun no fueron iniciados.'
+    start_platform
+    install_tls_timer
+    write_status RUNNING
+    info 'RUNNING: plataforma greenfield saludable y renovacion TLS programada.'
     ;;
   --resume)
     preflight
@@ -171,8 +230,10 @@ case "$MODE" in
     [[ -f "$INSTALL_ROOT/config/compose.env" ]] || generate_config
     [[ -f "$INSTALL_ROOT/tls/fullchain.pem" && -f "$INSTALL_ROOT/tls/privkey.pem" ]] || issue_tls
     [[ -f "$INSTALL_ROOT/agent-state/agent-state.json" ]] || bootstrap_agent
-    write_status READY_FOR_PLATFORM_BOOTSTRAP
-    info 'READY_FOR_PLATFORM_BOOTSTRAP: TLS e identidad listos; los servicios aun no fueron iniciados.'
+    start_platform
+    install_tls_timer
+    write_status RUNNING
+    info 'RUNNING: plataforma greenfield saludable y renovacion TLS programada.'
     ;;
   *) fail 'Uso: install.sh --check | --apply | --resume' ;;
 esac

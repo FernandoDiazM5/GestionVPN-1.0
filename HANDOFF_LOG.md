@@ -6,6 +6,13 @@
 > - El wrapper Semgrep de Windows ahora incluye las fuentes del agente; se cerró el escaneo pendiente de fases anteriores.
 > - Pendiente: empaquetar el agente dentro del instalador/imagen oficial y reportar salud resumida de VPS/Core.
 
+> **Sesion 2026-08-15 - Arranque greenfield con health gates.** Rama `vps_prod`; sin despliegue.
+> - El /22 Central se preconfigura transaccionalmente solo en base vacia y luego respeta la eleccion del Administrador.
+> - Arranque escalonado DB/backend -> HTTPS/agente con gates; rollback conserva MariaDB y volumenes.
+> - Tras salud completa se instala timer TLS systemd persistente con jitter y estado RUNNING.
+> - Backend 117/674, preseed 3/3, instalador 8/8, Bash/ShellCheck y Semgrep correctos.
+> - Pendiente: E2E temporal del instalador, runbook del primer VPS y updates/rollback versionados.
+
 > **Sesion 2026-08-15 - Nginx dinamico y renovacion TLS.** Rama `vps_prod`; sin despliegue.
 > - Cada cliente recibe Nginx renderizado con su FQDN; Host ajenos se rechazan y HTTP queda limitado a ACME+redirect.
 > - Renovacion Certbot webroot valida certificado y nginx antes de recargar, sin stop/down.

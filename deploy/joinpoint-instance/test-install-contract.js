@@ -53,8 +53,18 @@ test('TLS y agente se preparan antes de permitir el arranque',()=>{
   assert.match(installer,/openssl x509[\s\S]*?-checkend 86400/);
   assert.match(installer,/JOINPOINT_ACTIVATION_RESPONSE_FILE/);
   assert.match(installer,/rm -f "\$INSTALL_ROOT\/secrets\/activation-response\.json"/);
-  assert.match(installer,/READY_FOR_PLATFORM_BOOTSTRAP/);
-  assert.doesNotMatch(installer,/docker compose[\s\S]*? up /);
+  assert.match(installer,/bootstrap_agent[\s\S]*?start_platform/);
+});
+
+test('arranca por health gates y preserva la base ante rollback',()=>{
+  assert.match(installer,/compose up -d --build db backend/);
+  assert.match(installer,/wait_backend/);
+  assert.match(installer,/compose up -d --build frontend instance-agent/);
+  assert.match(installer,/wait_https/);
+  assert.match(installer,/compose stop frontend backend instance-agent/);
+  assert.doesNotMatch(installer,/compose down|volume rm/);
+  assert.match(installer,/START_FAILED_DB_PRESERVED/);
+  assert.match(installer,/joinpoint-tls-renew\.timer/);
 });
 
 test('nginx limita el host y permite renovacion ACME sin apagar el panel',()=>{

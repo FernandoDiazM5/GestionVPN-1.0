@@ -33,6 +33,8 @@ node db/migratePlatformSecurity.js  # auditoría, confianza y step-up del Admini
 # Siembra de usuarios demo (admin/admin + moderador fernando) SOLO si se pide.
 # En producción se deja apagada → BD sin usuarios → el panel muestra el
 # "Setup Inicial" para que el operador cree el Administrador con su propia clave.
+node db/preseedGreenfield.js         # /22 recomendado; mutable hasta preparar Core o crear sitios
+
 if [ "$SEED_DEMO_USERS" = "true" ]; then
   echo "🌱 [entrypoint] SEED_DEMO_USERS=true → sembrando usuarios demo..."
   node db/seedRoles.js
