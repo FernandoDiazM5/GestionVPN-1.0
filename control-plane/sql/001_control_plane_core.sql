@@ -139,3 +139,36 @@ CREATE TABLE IF NOT EXISTS control_plane_audit_events (
   INDEX idx_cp_audit_instance (instance_id, created_at),
   INDEX idx_cp_audit_customer (customer_id, created_at)
 );
+
+CREATE TABLE IF NOT EXISTS license_signing_keys (
+  key_id VARCHAR(80) PRIMARY KEY,
+  algorithm VARCHAR(20) NOT NULL DEFAULT 'Ed25519',
+  public_key_pem TEXT NOT NULL,
+  public_key_fingerprint CHAR(64) NOT NULL UNIQUE,
+  status ENUM('ACTIVE','VERIFY_ONLY','REVOKED') NOT NULL DEFAULT 'ACTIVE',
+  activated_at DATETIME(3) NOT NULL,
+  retired_at DATETIME(3) NULL
+);
+
+CREATE TABLE IF NOT EXISTS instance_licenses (
+  id CHAR(36) PRIMARY KEY,
+  instance_id CHAR(36) NOT NULL,
+  subscription_id CHAR(36) NULL,
+  key_id VARCHAR(80) NOT NULL,
+  payload_sha256 CHAR(64) NOT NULL,
+  not_before DATETIME(3) NOT NULL,
+  expires_at DATETIME(3) NOT NULL,
+  grace_until DATETIME(3) NOT NULL,
+  status ENUM('ISSUED','SUPERSEDED','REVOKED') NOT NULL DEFAULT 'ISSUED',
+  issued_at DATETIME(3) NOT NULL,
+  revoked_at DATETIME(3) NULL,
+  revoke_reason VARCHAR(500) NULL,
+  CONSTRAINT fk_license_instance FOREIGN KEY (instance_id)
+    REFERENCES product_instances(id) ON DELETE RESTRICT,
+  CONSTRAINT fk_license_subscription FOREIGN KEY (subscription_id)
+    REFERENCES subscriptions(id) ON DELETE SET NULL,
+  CONSTRAINT fk_license_key FOREIGN KEY (key_id)
+    REFERENCES license_signing_keys(key_id) ON DELETE RESTRICT,
+  CONSTRAINT chk_license_dates CHECK (expires_at > not_before AND grace_until >= expires_at),
+  INDEX idx_license_instance (instance_id, status, expires_at)
+);

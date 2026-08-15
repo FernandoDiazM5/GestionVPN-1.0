@@ -29,3 +29,7 @@ El código en claro sólo aparece al emitirlo. Los listados exponen estado y fec
 - Sin endpoint público de activación hasta añadir rate limiting durable y licencias firmadas.
 - Sin DNS, TLS, facturación, heartbeat o comandos remotos.
 - Sin despliegue de producción.
+
+## Licencias firmadas
+
+El formato `jpl1` usa Ed25519, incluye `instanceId`, plan, entitlements, vigencia y `graceUntil`, y se verifica con la clave pública central. La llave privada de firma debe permanecer fuera de Git y fuera de la base de datos. Una licencia vencida puede entrar en `OFFLINE_GRACE`; este estado limita el software, pero nunca desmonta WireGuard ni modifica el Core.

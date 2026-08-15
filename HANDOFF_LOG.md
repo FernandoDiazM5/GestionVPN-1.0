@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-15 — Licencias firmadas y gracia offline.** Rama `vps_prod` (base `435acac`). Estado: 18/18 pruebas, esquema MariaDB 11 de 12 tablas y Semgrep security/secrets 0 hallazgos; sin despliegue.
+> - Se creó el formato canónico `jpl1` con firma Ed25519, selección de clave por `kid`, vínculo obligatorio a instancia y detección de manipulación.
+> - La evaluación distingue activo, aún no válido, gracia offline y vencido; ningún estado comercial ejecuta cambios de red.
+> - La BD guarda claves públicas y metadatos de licencias; la llave privada permanece fuera del repositorio y de la BD.
+> - Pendiente: emisión transaccional, rotación de claves, rate limiting durable, endpoint de activación y sesiones administrativas con MFA.
+
 > **Sesión 2026-08-15 — API administrativa central MVP.** Rama `vps_prod` (base `d4e9713`). Estado: 15/15 pruebas, esquema MariaDB 11 válido y Semgrep security/secrets 0 hallazgos; sin despliegue.
 > - Se añadió API local fail-closed para clientes, planes, instancias y activaciones; todas las rutas administrativas exigen Bearer de mínimo 32 caracteres y validación estricta.
 > - Las instancias derivan FQDN desde el label + dominio raíz y reservan transaccionalmente el `/22` libre más bajo del pool central `10.64.0.0/12`.
