@@ -8,6 +8,12 @@ Este directorio contiene componentes reproducibles para instalar una instancia a
 
 El estado `READY_FOR_TLS` no significa que la instancia ya este publicada: deliberadamente no inicia contenedores hasta que el siguiente incremento emita o monte un certificado valido. El directorio `/opt/joinpoint` nunca se sobrescribe automaticamente.
 
+## Composicion de servicios
+
+`compose.yaml` declara MariaDB, backend, frontend y agente. La base de datos solo publica su puerto en loopback; el backend conserva red de host para alcanzar WireGuard/MikroTik, pero elimina capacidades Linux y aplica `no-new-privileges`; el agente usa filesystem de solo lectura, `tmpfs`, cero capacidades y una clave privada montada en solo lectura. Las integraciones del moderador permanecen desactivadas hasta que este ingrese sus propias credenciales.
+
+La plantilla `.env.compose.example` documenta referencias, no credenciales utilizables. El instalador generara los secretos reales fuera del codigo y nunca reutilizara valores entre clientes.
+
 ## Agente de instancia
 
 `Dockerfile.agent` construye solamente el agente y el protocolo criptografico compartido. Se ejecuta sin privilegios y no contiene claves, licencias ni datos de un cliente.

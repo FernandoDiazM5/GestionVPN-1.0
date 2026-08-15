@@ -6,6 +6,13 @@
 > - El wrapper Semgrep de Windows ahora incluye las fuentes del agente; se cerró el escaneo pendiente de fases anteriores.
 > - Pendiente: empaquetar el agente dentro del instalador/imagen oficial y reportar salud resumida de VPS/Core.
 
+> **Sesion 2026-08-15 - Compose endurecido de instancia.** Rama `vps_prod`; sin despliegue.
+> - Se declaro MariaDB, backend, frontend y agente sin credenciales de integraciones embebidas.
+> - DB solo loopback; backend host-mode sin capabilities; agente read-only, tmpfs, clave read-only y cero capabilities.
+> - Se corrigio el Dockerfile productivo del backend para los nuevos workspaces y la imagen construye correctamente.
+> - Compose valido, backend npm productivo 0 vulnerabilidades, contrato 4/4, agente 6/6 y Semgrep 0 hallazgos.
+> - Pendiente: secretos/configuracion por cliente, TLS y bootstrap previo al arranque.
+
 > **Sesion 2026-08-15 - Instalador reanudable hasta DNS/TLS.** Rama `vps_prod`; sin despliegue.
 > - Se implementaron `--check`, `--apply` con confirmacion literal y `--resume` sin segundo codigo.
 > - La identidad Ed25519 nace en el VPS; solo la publica viaja a Central y todos los artefactos quedan con permisos restrictivos.

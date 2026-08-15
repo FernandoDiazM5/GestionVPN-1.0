@@ -4,6 +4,7 @@ const path=require('path');
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const installer=fs.readFileSync(path.join(__dirname,'install.sh'),'utf8');
+const compose=fs.readFileSync(path.join(__dirname,'compose.yaml'),'utf8');
 
 test('el instalador es fail-closed y reanudable',()=>{
   assert.match(installer,/set -Eeuo pipefail/);
@@ -25,4 +26,12 @@ test('la activacion no envia la clave privada ni imprime el codigo',()=>{
 test('no inicia servicios antes de DNS y TLS',()=>{
   assert.doesNotMatch(installer,/docker compose (up|start)/);
   assert.match(installer,/check_dns/);
+});
+
+test('compose aisla base de datos y endurece el agente',()=>{
+  assert.match(compose,/127\.0\.0\.1:\$\{DB_HOST_PORT:-3307\}:3306/);
+  assert.match(compose,/instance-agent:[\s\S]*?read_only: true/);
+  assert.match(compose,/instance-agent:[\s\S]*?cap_drop:\s*\n\s*- ALL/);
+  assert.match(compose,/instance-private\.pem:ro/);
+  assert.doesNotMatch(compose,/TELEGRAM_BOT_TOKEN|GEMINI_API_KEY|SMTP_PASS/);
 });

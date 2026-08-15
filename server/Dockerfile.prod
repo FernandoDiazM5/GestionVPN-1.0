@@ -17,6 +17,8 @@ WORKDIR /repo
 #    completo; si falta uno declarado, falla). Solo manifiestos → cachea bien.
 COPY package*.json ./
 COPY packages/contracts/package*.json ./packages/contracts/
+COPY packages/joinpoint-protocol/package*.json ./packages/joinpoint-protocol/
+COPY packages/joinpoint-instance-agent/package*.json ./packages/joinpoint-instance-agent/
 COPY server/package*.json ./server/
 COPY vpn-manager/package*.json ./vpn-manager/
 
