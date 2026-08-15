@@ -11,6 +11,7 @@ const { sendOk, AppError, asyncHandler } = require('../lib/apiResponse');
 const { SaveSettingRequestSchema, CORE_ROUTER_KEYS } = require('@gestionvpn/contracts');
 const { sendGeneric } = require('../lib/mailer');
 const wgDetect = require('../lib/wgDetect');
+const { previewManagementSupernet, saveManagementSupernet } = require('../lib/managementNetworkService');
 
 const ERROR_REPORT_EMAIL_KEY = 'error_report_email';
 const CORE_SERVER_SETTING_KEYS = [
@@ -18,6 +19,7 @@ const CORE_SERVER_SETTING_KEYS = [
   'core_backup_time', 'core_backup_timezone', 'core_backup_password',
 ];
 const PLATFORM_ONLY_SETTING_KEYS = [...CORE_ROUTER_KEYS, ERROR_REPORT_EMAIL_KEY, ...CORE_SERVER_SETTING_KEYS];
+PLATFORM_ONLY_SETTING_KEYS.push('management_supernet');
 const errorReportEmailSchema = z.union([
   z.literal(''),
   z.string().trim().email('Correo de reportes no valido').max(254),
@@ -49,7 +51,7 @@ router.get('/settings/get', asyncHandler(async (req, res) => {
 // a OWNER → un moderador podía mutar settings GLOBALES del sistema
 // (scan_mode, server_public_ip, local_scan_ip) por API, fuera de su tenant.
 // Estos settings son plataforma-global: el gate correcto es `platform_admin`.
-const requireAdmin = (req, _res, next) => {
+const requirePlatformAdmin = (req, _res, next) => {
   if (!req.account?.platform_admin) {
     return next(new AppError('Acceso denegado — solo el Administrador de plataforma.', 403, 'FORBIDDEN'));
   }
@@ -59,7 +61,7 @@ const requireAdmin = (req, _res, next) => {
 // Chequeo READ-ONLY (solo admin): ¿la local_scan_ip configurada está viva en
 // este equipo? Solo relevante en modo 'local'. Alimenta la alerta de la UI sin
 // modificar nada. `ok=true` cuando no aplica (modo VPS) o la IP sí está activa.
-router.get('/settings/scan-local-check', requireAdmin, asyncHandler(async (req, res) => {
+router.get('/settings/scan-local-check', requirePlatformAdmin, asyncHandler(async (req, res) => {
   const db = await getDb();
   const modeRow = await db.get("SELECT value FROM app_settings WHERE `key` = 'scan_mode'");
   const ipRow = await db.get("SELECT value FROM app_settings WHERE `key` = 'local_scan_ip'");
@@ -70,7 +72,12 @@ router.get('/settings/scan-local-check', requireAdmin, asyncHandler(async (req, 
   return sendOk(res, { mode, configured, ok, candidates });
 }));
 
-router.post('/settings/save', requireAdmin, asyncHandler(async (req, res) => {
+router.get('/settings/management-supernet-preview', requirePlatformAdmin, asyncHandler(async (req, res) => {
+  const { cidr } = z.object({ cidr: z.string().trim().min(1).max(18) }).parse(req.query);
+  return sendOk(res, { preview: await previewManagementSupernet(cidr) });
+}));
+
+router.post('/settings/save', requirePlatformAdmin, asyncHandler(async (req, res) => {
   const { key, value } = SaveSettingRequestSchema.parse(req.body);
 
   if (CORE_ROUTER_KEYS.includes(key) && !req.account?.platform_admin) {
@@ -113,6 +120,15 @@ router.post('/settings/save', requireAdmin, asyncHandler(async (req, res) => {
     }
   } else if (key === ERROR_REPORT_EMAIL_KEY) {
     finalValue = errorReportEmailSchema.parse(String(finalValue).trim().toLowerCase());
+  } else if (key === 'management_supernet') {
+    try {
+      const network = await saveManagementSupernet({
+        cidr: String(finalValue || '').trim(), actorUserId: req.account.sub, requestIp: req.ip,
+      });
+      return sendOk(res, { network });
+    } catch (error) {
+      throw new AppError(error.message, error.status || 500, error.code || 'MGMT_SUPERNET_SAVE_FAILED', error.preview ? { preview: error.preview } : null);
+    }
   }
 
   await db.run(
@@ -122,7 +138,7 @@ router.post('/settings/save', requireAdmin, asyncHandler(async (req, res) => {
   return sendOk(res);
 }));
 
-router.post('/settings/test-error-email', requireAdmin, asyncHandler(async (_req, res) => {
+router.post('/settings/test-error-email', requirePlatformAdmin, asyncHandler(async (_req, res) => {
   const savedEmail = String(await getAppSetting(ERROR_REPORT_EMAIL_KEY).catch(() => '') || '').trim();
   const recipient = savedEmail || process.env.ERROR_REPORT_EMAIL || process.env.SMTP_USER;
   if (!recipient) {

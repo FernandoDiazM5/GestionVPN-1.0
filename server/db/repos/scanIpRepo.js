@@ -10,10 +10,11 @@
 // ============================================================
 const crypto = require('crypto');
 const { query } = require('../mysql');
+const mgmtNet = require('../../lib/mgmtNet');
 
-const POOL_BASE  = process.env.SCAN_IP_POOL_BASE  || '10.11.252.';
 const POOL_START = Number(process.env.SCAN_IP_POOL_START || 2);
 const POOL_END   = Number(process.env.SCAN_IP_POOL_END   || 254);
+function poolBase() { return mgmtNet.scan.base; }
 
 /**
  * Devuelve la scan-IP (ej. "10.11.252.5") del workspace, o null si no tiene
@@ -59,10 +60,10 @@ async function upsert({ workspaceId, scanIp }) {
 /** Elige la siguiente scan-IP libre del pool a partir de un set de IPs usadas. */
 function nextFree(used) {
   for (let i = POOL_START; i <= POOL_END; i++) {
-    const candidate = `${POOL_BASE}${i}`;
+    const candidate = `${poolBase()}${i}`;
     if (!used.has(candidate)) return candidate;
   }
-  throw new Error(`Pool de scan-IPs agotado (${POOL_BASE}${POOL_START}-${POOL_END})`);
+  throw new Error(`Pool de scan-IPs agotado (${poolBase()}${POOL_START}-${POOL_END})`);
 }
 
 /**
@@ -159,7 +160,11 @@ async function resolveForWorkspace(workspaceId) {
  * driftear). El env SCAN_RETURN_SUBNET queda como override opcional.
  */
 function poolSubnet() {
-  return POOL_BASE ? `${POOL_BASE}0/24` : '';
+  return mgmtNet.scan.net;
 }
 
-module.exports = { getScanIpForWorkspace, getByWorkspace, upsert, allocate, allocateInTx, list, resolveForWorkspace, getSetting, poolSubnet, POOL_BASE, POOL_START, POOL_END };
+module.exports = {
+  getScanIpForWorkspace, getByWorkspace, upsert, allocate, allocateInTx, list,
+  resolveForWorkspace, getSetting, poolSubnet, POOL_START, POOL_END,
+  get POOL_BASE() { return poolBase(); },
+};

@@ -1,4 +1,5 @@
 import { get, post } from './sessionClient';
+import type { ManagementSupernetPreview } from '@gestionvpn/contracts';
 
 export type CoreHealthStatus = 'HEALTHY' | 'DEGRADED' | 'UNREACHABLE' | 'INVALID_CREDENTIALS' | 'NOT_CONFIGURED';
 
@@ -62,4 +63,7 @@ export const coreServerApi = {
   preview: () => get<{ success: true; preview: ProvisionPreview; confirmation: string }>('/api/admin/core-server/provision-preview'),
   provision: (confirmation: string) => post<{ success: true; result: { health: CoreHealth } }>('/api/admin/core-server/provision', { confirmation }),
   backupNow: () => post<{ success: true; result: { sent?: boolean; filenames?: string[]; skipped?: boolean } }>('/api/admin/core-server/backup-now'),
+  managementSupernetPreview: (cidr: string) => get<{ success: true; preview: ManagementSupernetPreview }>(
+    `/api/settings/management-supernet-preview?cidr=${encodeURIComponent(cidr)}`,
+  ),
 };

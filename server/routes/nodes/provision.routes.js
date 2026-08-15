@@ -13,7 +13,7 @@ const log = require('../../lib/logger').child({ scope: 'nodes:provision' });
 const {
   connectToMikrotik, safeWrite, getErrorMessage, writeIdempotent,
 } = require('../../routeros.service');
-const { getDb, encryptPass, saveNode, deleteNode, getAppSetting } = require('../../db.service');
+const { getDb, encryptPass, saveNode, getAppSetting } = require('../../db.service');
 const { nodeBelongsToRequester, requireOperator } = require('./_shared');
 const { sendOk, AppError, asyncHandler } = require('../../lib/apiResponse');
 const { mikrotikAppError } = require('../../lib/mikrotikError');
@@ -32,6 +32,7 @@ const { generateKeyPair } = require('../../lib/wgkeys');
 const { buildCpeWgScript, buildCpeSstpScript } = require('../../lib/cpeScript');
 const { generatePppUser, generatePppPassword } = require('../../lib/sstpCreds');
 const { deprovisionNodeOnRouter } = require('../../lib/nodeDeprovision');
+const { loadImpact, publicImpact, deleteSiteData } = require('../../lib/siteDeletionService');
 const { enqueueWg0Intent } = require('../../lib/wg0Intent');
 const { cidrOverlaps, normalizeCidrs } = require('../../lib/ipv4Cidr');
 
@@ -56,7 +57,7 @@ function autosyncWg0(subnets) {
 // origen del escaneo). Se DERIVA del pool (única fuente) para que se cree SOLA al
 // provisionar sin depender de un env que pueda estar sin setear; el env queda
 // como override opcional.
-const SCAN_RETURN_SUBNET = (process.env.SCAN_RETURN_SUBNET || scanIpRepo.poolSubnet() || '').trim();
+const scanReturnSubnet = () => (scanIpRepo.poolSubnet() || '').trim();
 
 /**
  * Añade una ruta SOLO si no existe ya (mismo dst + routing-table).
@@ -75,13 +76,14 @@ async function addRouteOnce(api, { dst, gateway, routingTable, comment, distance
 
 /** Añade la ruta de retorno del /24 de scan-IP a un VRF (idempotente, best-effort). */
 async function addScanReturnRoute(api, vrfName, ndComment) {
-  if (!SCAN_RETURN_SUBNET) return;
+  const subnet = scanReturnSubnet();
+  if (!subnet) return;
   // Best-effort: si la interfaz VPN-WG-VPS no existe en este router, NO debe
   // tumbar la provisión del túnel (la ruta de scan no es crítica para el túnel;
   // se rellena luego con "Verificar y reparar").
   try {
     await addRouteOnce(api, {
-      dst: SCAN_RETURN_SUBNET, gateway: mgmtNet.vps.iface,
+      dst: subnet, gateway: mgmtNet.vps.iface,
       routingTable: vrfName, distance: 2, comment: `Route-${ndComment}-SCAN`,
     });
   } catch (e) {
@@ -406,8 +408,7 @@ router.post('/node/provision', requireOperator, validate({ body: NodeProvisionRe
       let cpeScript = null, cpeSteps = null;
       try {
         const serverPublicIP = (await getAppSetting('server_public_ip').catch(() => '')) || ip;
-        const scanSubnet = (process.env.SCAN_RETURN_SUBNET || scanIpRepo.poolSubnet() || '').trim();
-        const returnNets = [...mgmtNet.returnRoutes().map(r => r.subnet), ...(scanSubnet ? [scanSubnet] : [])];
+        const returnNets = mgmtNet.remoteReturnNets();
         ({ script: cpeScript, cpeSteps } = buildCpeWgScript({
           nodeNum: ndNum, nodeMgmt: wgPeerIP, serverPublicKey, serverPublicIP, wgPort, returnNets,
           cpePrivateKey: cpeKeys ? cpeKeys.privateKey : '',
@@ -576,12 +577,51 @@ router.post('/node/provision', requireOperator, validate({ body: NodeProvisionRe
   }
 }));
 
+async function deletionWorkspaceId(req, pppUser, vrfName) {
+  if (!req.account?.platform_admin) return req.account?.workspace_id || null;
+  const db = await getDb();
+  const rows = await db.all(
+    `SELECT DISTINCT workspace_id FROM nodes
+      WHERE workspace_id IS NOT NULL AND (ppp_user = ? OR (? IS NOT NULL AND nombre_vrf = ?))`,
+    [pppUser, vrfName || null, vrfName || null],
+  );
+  return rows.length === 1 ? rows[0].workspace_id : null;
+}
+
+router.post('/node/deprovision-impact', requireOperator, validate({ body: NodeDeprovisionRequestSchema }), asyncHandler(async (req, res) => {
+  const { vrfName, pppUser } = req.body;
+  if (!(await nodeBelongsToRequester(req, pppUser, vrfName))) {
+    throw new AppError('Nodo no encontrado en tu workspace', 404, 'NOT_FOUND');
+  }
+  const workspaceId = await deletionWorkspaceId(req, pppUser, vrfName);
+  if (!workspaceId) throw new AppError('No se pudo determinar el workspace del sitio', 409, 'SITE_SCOPE_AMBIGUOUS');
+  const impact = await loadImpact({ workspaceId, pppUser, vrfName });
+  if (!impact.node) throw new AppError('Nodo no encontrado en tu workspace', 404, 'NOT_FOUND');
+  return sendOk(res, { impact: publicImpact(impact) });
+}));
+
 router.post('/node/deprovision', requireOperator, validate({ body: NodeDeprovisionRequestSchema }), asyncHandler(async (req, res) => {
   const { ip, user, pass } = requireMikrotik(req);
-  const { vrfName, pppUser, protocol } = req.body;
+  const { vrfName, pppUser, protocol, confirmationName, impactFingerprint } = req.body;
   if (!pppUser) throw new AppError('pppUser es requerido', 400, 'VALIDATION_ERROR');
   if (!(await nodeBelongsToRequester(req, pppUser, vrfName))) {
     throw new AppError('Nodo no encontrado en tu workspace', 404, 'NOT_FOUND');
+  }
+  const workspaceId = await deletionWorkspaceId(req, pppUser, vrfName);
+  if (!workspaceId) throw new AppError('No se pudo determinar el workspace del sitio', 409, 'SITE_SCOPE_AMBIGUOUS');
+  const impact = await loadImpact({ workspaceId, pppUser, vrfName });
+  if (!impact.node) throw new AppError('Nodo no encontrado en tu workspace', 404, 'NOT_FOUND');
+  if (impact.ambiguousDevices > 0) {
+    throw new AppError(
+      'Hay equipos guardados sin relación exacta con el sitio. Reconcílialos antes de eliminar.',
+      409, 'SITE_HAS_AMBIGUOUS_DEVICES', { ambiguousDevices: impact.ambiguousDevices },
+    );
+  }
+  if (!confirmationName || confirmationName !== impact.node.nombre_nodo) {
+    throw new AppError('Escribe el nombre exacto del sitio para confirmar', 400, 'SITE_CONFIRMATION_MISMATCH');
+  }
+  if (!impactFingerprint || impactFingerprint !== impact.fingerprint) {
+    throw new AppError('El contenido del sitio cambió. Revisa nuevamente lo que se eliminará.', 409, 'DELETION_IMPACT_CHANGED');
   }
 
   // Limpieza en el router delegada al helper compartido (misma lógica que usa la
@@ -591,9 +631,10 @@ router.post('/node/deprovision', requireOperator, validate({ body: NodeDeprovisi
     ({ steps } = await deprovisionNodeOnRouter({ ip, user, pass }, { pppUser, vrfName, protocol }));
   } catch (error) {
     if (error instanceof AppError) throw error;
+    if (Array.isArray(error?.steps)) steps = error.steps;
     throw new AppError(
       getErrorMessage(error, ip, user),
-      500, 'MIKROTIK_ERROR',
+      500, error?.code === 'ROUTER_CLEANUP_PARTIAL' ? 'ROUTER_CLEANUP_PARTIAL' : 'MIKROTIK_ERROR',
       { steps, failedAt: steps.length + 1 }
     );
   }
@@ -601,12 +642,29 @@ router.post('/node/deprovision', requireOperator, validate({ body: NodeDeprovisi
   // Paso 8: cascade en BD (nodes, aps, cpes, signal_history, node_*)
   let deletedDeviceIds = [];
   try {
-    const result = await deleteNode(pppUser, vrfName);
+    const result = await deleteSiteData({
+      workspaceId,
+      pppUser,
+      vrfName,
+      expectedFingerprint: impactFingerprint,
+      actorUserId: req.account?.sub,
+    });
+    if (!result) throw new AppError('Nodo no encontrado en tu workspace', 404, 'NOT_FOUND');
     deletedDeviceIds = result?.deviceIds || [];
-    steps.push({ step: 8, obj: 'Base de datos', name: `${deletedDeviceIds.length} APs + cascadas eliminados`, status: 'ok' });
+    steps.push({ step: 8, obj: 'Base de datos', name: `${deletedDeviceIds.length} equipo(s) y ${result.cpes} CPE eliminados`, status: 'ok' });
   } catch (dbErr) {
     log.error({ err: dbErr.message }, 'DB: eliminar nodo de la BD');
-    steps.push({ step: 8, obj: 'Base de datos', name: `Error: ${dbErr.message}`, status: 'warn' });
+    steps.push({ step: 8, obj: 'Base de datos', name: `Error: ${dbErr.message}`, status: 'error' });
+    if (dbErr.code === 'SITE_HAS_AMBIGUOUS_DEVICES') {
+      throw new AppError(dbErr.message, 409, dbErr.code, dbErr.details);
+    }
+    if (dbErr.code === 'DELETION_IMPACT_CHANGED') {
+      throw new AppError(dbErr.message, 409, dbErr.code);
+    }
+    throw new AppError(
+      'RouterOS fue limpiado, pero la base de datos no pudo completar el borrado. No reintentes el alta; contacta al Administrador para reconciliar.',
+      500, 'SITE_DB_CLEANUP_FAILED', { steps },
+    );
   }
 
   return sendOk(res, { message: `Nodo eliminado correctamente`, steps, deletedDeviceIds });

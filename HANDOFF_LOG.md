@@ -1,5 +1,87 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-15 — Limpieza de huérfanos y cierre productivo `/22`.** Rama local `vps_prod` (base `cba6c54`). Estado: cero dependencias de sitios, Core accesible, WireGuard/backend/DB sanos; backend 115/669, `check:all` y Semgrep 516/0.
+> - Se creó un dump y se restauró en una BD temporal antes de eliminar 80 AP, 14 grupos, 450 CPE, 1 asignación y 31 estados de monitoreo; usuarios, 3 workspaces, Administración y auditorías se preservaron.
+> - Dos scan-IP migraron a `10.12.248.x`; se retiraron pool, rutas e intención autosync antiguos. `wg0` conserva únicamente `10.12.248.0/22`.
+> - Producción quedó protegida con tres FKs CASCADE y dos triggers; el código local añade migración idempotente y limpieza de grupos vacíos.
+
+> **Sesión 2026-08-15 — Verificación posterior al borrado de sitios.** Estado: consulta productiva de sólo lectura; no se eliminaron dependencias ni se retiró la red anterior.
+> - La BD confirma cero nodos, torres ligadas y sesiones activas, con un Administrador activo.
+> - Persisten 80 AP, 14 grupos, 450 CPE, 1 asignación y 31 estados de monitoreo sin nodo; 2 scan-IP siguen en el pool anterior.
+> - El retiro de `10.11.252.0/24` queda bloqueado hasta limpiar/migrar esos datos con respaldo y autorización explícita.
+
+> **Sesión 2026-08-15 — Preparación aditiva de WireGuard VPS para `/22`.** Rama local `vps_prod` (base `cba6c54`). Estado productivo: WireGuard activo, handshake reciente, Core 3/3, HTTPS y contenedores sanos.
+> - Se respaldó `wg0.conf` y se añadieron sin downtime el nuevo pool `10.12.248.2–50/32`, la ruta y `AllowedIPs 10.12.248.0/22`; `10.12.250.60/32` ya era correcta.
+> - Se conservó temporalmente `10.11.252.0/24` para no interrumpir el software y sitios actuales.
+> - Pendiente: desplegar código `/22`, actualizar el peer del VPS en el Core, migrar scan-IP, ejecutar canary y recién entonces retirar redes históricas.
+
+> **Sesión 2026-08-15 — Preview global de reinicio operativo.** Rama `vps_prod` (base `cba6c54`). Estado: pruebas focalizadas 2/2 y `check:all` correctos; sin borrado ni producción.
+> - Se añadió un endpoint administrativo de sólo lectura que cuenta datos operativos, ambiguos, preservados y sujetos a decisión.
+> - El preview nunca habilita el borrado y bloquea ante huérfanos, cantidad inválida de administradores o falta de decisión sobre workspaces/usuarios.
+> - Se actualizó el inventario de rutas de seguridad y el runbook técnico.
+
+> **Sesión 2026-08-15 — Inventario de reinicio operativo.** Rama `vps_prod` (base `cba6c54`). Estado: matriz técnica creada; sin consultas ni cambios en producción y sin borrado.
+> - Se separaron dependencias eliminables por sitio, datos administrativos/auditorías a conservar y registros huérfanos o ambiguos que deben bloquearse o revisarse.
+> - Se definieron conteos de aceptación para declarar cero sitios sin exigir tablas administrativas vacías.
+> - Siguiente trabajo: preview global de sólo lectura y verificación automatizada; falta decisión explícita sobre workspaces/usuarios no administradores.
+
+> **Sesión 2026-08-15 — Hardening local de supernet `/22`.** Rama `vps_prod` (base `cba6c54`). Estado: backend 113/664, frontend 73/263, `check:all`, build, inventario de seguridad, Semgrep 514/0 y diff correctos; sin borrado ni despliegue.
+> - Se implementó guardado atómico de `management_supernet` y scan-IP preliminares, con rollback, bloqueo de filas, auditoría del actor e idempotencia del valor activo.
+> - El backend entrega el preview autoritativo tipado y detecta solapamientos con interfaces del host, LAN de sitios, redes reservadas de nodos y direcciones existentes del Core; Administración consume ese resultado antes de habilitar el guardado.
+> - Permanecen pendientes el inventario exacto conservar/eliminar, el laboratorio/canary RouterOS 7.x, la validación integral de reinicio/rollback y la documentación operativa de despliegue.
+
+> **Sesión 2026-08-15 — Reinicio operativo asumido para `/22`.** Rama `vps_prod` (HEAD `cba6c54`). Estado: contexto y plan actualizados; ningún borrado ejecutado.
+> - El usuario decidió eliminar todos los sitios y sus dependencias y asumir un arranque sin datos operativos.
+> - Deben conservarse el Administrador de plataforma y toda la información/configuración de Administración; lo ambiguo se conserva hasta clasificarlo.
+> - El plan incorpora matriz conservar/eliminar, respaldo, preview, conteos cero y canary posterior.
+
+> **Sesión 2026-08-15 — Plan ejecutable de supernet `/22`.** Rama `vps_prod` (HEAD `cba6c54`). Estado: documentación ampliada; implementación local previa conservada; sin producción.
+> - El plan ahora cubre proceso inicial, arquitectura, reglas, modelo de datos, fases, criterios de aceptación, matriz de pruebas, riesgos, rollback y Definition of Done.
+> - Pendientes antes del despliegue: transacción setting+scan-IP, preview backend autoritativo, auditoría, solapamientos y canary RouterOS 7.x.
+
+> **Sesión 2026-08-12 — Supernet `/22` de gestión en primera instalación.** Rama `vps_prod` (base `cba6c54`). Estado: backend 112/658, frontend 73/262, build, checks, lint y diff correctos; sin despliegue.
+> - Añadido selector inicial de `/22` con preview de escaneo/clientes/VPS/admin, validación privada y alineada, persistencia y bloqueo irreversible tras preparar el Core o crear nodos.
+> - Los scripts de sitios remotos resumen los cuatro retornos en una ruta `/22`; el Core mantiene sus `/24` separados por gateway.
+> - Las instalaciones históricas no se migran automáticamente y las scan-IP iniciales se trasladan conservando el host antes del primer aprovisionamiento.
+
+> **Sesión 2026-08-10 — Cascada sitio/equipos implementada localmente.** Rama `vps_prod` (HEAD `cba6c54`). Estado: backend 111/653, frontend 73/262, nuevas 2/8, `check:all`, build, inventario y Semgrep 513/0 correctos; sin despliegue.
+> - Añadidos preview/huella, confirmación por nombre, cascada transaccional aislada, bloqueo de ambiguos, limpieza de sesiones/asignaciones/invitaciones/monitoreo/equipos/métricas/torres, auditoría y cachés.
+> - RouterOS ya reporta fallos parciales y el backend no declara éxito si MySQL falla. Corregido `wsUserIds` fuera de alcance en borrado de moderador.
+> - Pendiente: respaldo, dry-run de relaciones productivas y canary antes de desplegar; job durable automático queda como hardening posterior.
+
+> **Sesión 2026-08-10 — Plan de cascada segura al eliminar sitio.** Rama `vps_prod` (HEAD `cba6c54`). Estado: diagnóstico y diseño completados; sin implementación ni producción.
+> - Confirmado que el borrado actual deja AP/CPE/torres desvinculados, retorna cero IDs y no coordina de forma recuperable RouterOS con MySQL. También se detectó `wsUserIds` usado fuera de su alcance en el borrado de moderador.
+> - Se diseñó preview de impacto, reconciliación legacy, FKs/cascada, cierre de sesiones y asignaciones, job durable, verificación RouterOS, confirmación escrita, veinte escenarios y rollout canary. Documento: `docs/implementation/PLAN_BORRADO_CASCADA_SITIO_EQUIPOS_2026-08-10.md`.
+
+> **Sesión 2026-08-10 — Guardado habilitado en plan Intermedio.** Rama `vps_prod` (HEAD `cba6c54`). Estado: matriz comercial corregida; sin implementación ni cambios en producción.
+> - Intermedio permite escanear, guardar y consultar inventario de equipos. Monitor AP/CPE, diagnóstico técnico y exportaciones completas permanecen como diferenciadores de Avanzado.
+
+> **Sesión 2026-08-10 — Segmentación final propuesta de planes.** Rama `vps_prod` (HEAD `cba6c54`). Estado: matriz funcional actualizada; sin implementación ni producción.
+> - Básico: 5 sitios y 2 miembros, exclusivamente gestión remota. Intermedio: 10/5 y escaneo en vivo sin persistencia. Avanzado: sitios/miembros ilimitados bajo uso razonable y funciones completas de inventario/monitor/diagnóstico/exportación.
+> - IA AirOS queda fuera del contrato de los tres niveles como piloto temporal. Se definieron entitlements backend, errores de límite/función y downgrade no destructivo.
+
+> **Sesión 2026-08-10 — Propuesta de planes y cobro interno.** Rama `vps_prod` (HEAD `cba6c54`). Estado: plan comercial ampliado; sin implementación ni cambios en producción.
+> - Propuestos niveles por sitios, miembros, monitor, diagnóstico, exportaciones, avisos e historial; precios de lanzamiento S/149, S/299 y S/549 mensuales con anualidad por 10 meses.
+> - Confirmados factura interna, anticipación parametrizable, módulo OWNER para comprobantes, recordatorios app+correo, pagos parciales/completos e identidad comercial completa. Pendiente aprobación y reglas finas de facturación/pagos.
+
+> **Sesión 2026-08-10 — Decisiones comerciales de suscripciones.** Rama `vps_prod` (HEAD `cba6c54`). Estado: plan refinado; sin implementación ni cambios en producción.
+> - Confirmados planes Básico/Intermedio/Avanzado, ciclos mensual/anual, cierre diario en hora Perú, gracia manual con acceso completo, activación por factura pagada y verificada, configuración de identidad/medios de pago, retención indefinida y cierre inmediato de túneles de todo el workspace al vencer.
+> - Se incorporó modelo separado de facturas, pagos, aplicación de pagos e identidad/canales de cobro. Pendientes: capacidades/precios, alcance fiscal, emisión, comprobantes, avisos y pagos parciales.
+
+> **Sesión 2026-08-10 — Diseño del proceso de suscripciones.** Rama `vps_prod` (HEAD `cba6c54`). Estado: análisis y plan completados; sin implementación ni cambios en producción.
+> - Se definió suscripción por workspace, control exclusivo del Administrador, estados y transiciones, bloqueo backend/frontend, cierre de sesiones operativas, auditoría, notificaciones, modelo de datos y matriz de permisos.
+> - Se recomienda comenzar con operación manual y conectar pagos automáticos solo después de estabilizar renovaciones y vencimientos. Documento: `docs/implementation/PLAN_SUSCRIPCIONES_WORKSPACES_2026-08-10.md`.
+> - Pendiente: resolver ocho decisiones de negocio antes de convertir el plan en backlog ejecutable.
+
+> **Sesión 2026-08-10 — Cierre de riesgos prioritarios de seguridad.** Rama `vps_prod` (HEAD `cba6c54`). Estado: confirmaciones operativas del usuario registradas; producción no modificada.
+> - El usuario confirmó que la clave privada WireGuard ya fue rotada, el aislamiento entre sitios fue validado, las operaciones de alta/edición/baja de LAN fueron probadas y los secretos activos están controlados.
+> - La auditoría queda sin riesgos altos confirmados pendientes; continúan únicamente recomendaciones graduales de hardening. Se corrigieron `HANDOFF.md` y `docs/security/SECURITY_AUDIT_2026-08-10.md`.
+
+> **Sesión 2026-08-10 — Auditoría integral de seguridad.** Rama `vps_prod` (HEAD `cba6c54`). Estado: auditoría de solo lectura completada; producción no modificada.
+> - Semgrep security/secrets sin hallazgos; auditoría npm con 0 críticas, 0 altas y 1 moderada transitiva opcional. Se revisaron autenticación, CSRF, CORS, RBAC/workspace, rutas sensibles y aislamiento de sitios.
+> - VPS verificado con TLS moderno, UFW, Fail2ban, SSH por clave, DB/agente en loopback y backend 3001 no accesible desde Internet. Se identificaron parches pendientes y oportunidades de hardening en SSH, CSP y contenedores.
+> - Riesgo prioritario: la clave privada WireGuard expuesta históricamente no tiene rotación registrada. Informe completo: `docs/security/SECURITY_AUDIT_2026-08-10.md`.
+
 > **Sesión 2026-08-09 — Sincronización LAN/peer desplegada.** Rama `vps_prod`, producción `922b1c6`. Estado: backend healthy; frontend y DB preservados.
 > - Publicado el commit acotado y reconstruido únicamente `vpn-backend`. Migraciones idempotentes, raíz 200, preflight 204, login inválido 401, MySQL/SMTP `ok`, 55 tablas/3 workspaces/17 nodos y 0 reinicios.
 > - El peer de `WG-ND13-ROSMERYND2` conserva IP WG más `192.168.100.0/24` y `192.168.30.0/24`. Redes iguales en otros sitios permanecen en tablas VRF distintas. Pendiente inmediato: el usuario reactiva el sitio después del recreate y valida tráfico desde su sesión.

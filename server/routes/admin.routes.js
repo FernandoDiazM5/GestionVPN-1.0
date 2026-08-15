@@ -30,6 +30,7 @@ const { setPeersEnabled, removeUserMangles } = require('../lib/routerPeerState')
 const { deprovisionNodeOnRouter } = require('../lib/nodeDeprovision');
 const { getAppSetting, decryptPass } = require('../db.service');
 const { validate } = require('../middleware/validate');
+const { loadOperationalResetPreview } = require('../lib/operationalResetPreviewService');
 
 // Credenciales del router core desde app_settings (las rutas admin no pasan por
 // el middleware legacy que inyecta req.mikrotik). null si no hay config.
@@ -79,6 +80,11 @@ function buildAcceptUrl(email, otp) {
 
 const router = express.Router();
 router.use(requireSession, requirePlatformAdmin);
+
+// Inventario global de sólo lectura. Nunca ejecuta borrados ni toca RouterOS.
+router.get('/operational-reset-preview', asyncHandler(async (_req, res) => {
+  return sendOk(res, { preview: await loadOperationalResetPreview() });
+}));
 
 async function loadAdminSummary(runQuery = query, now = Date.now()) {
   const roles = (await runQuery(
@@ -304,13 +310,14 @@ router.delete('/moderators/:id', validate({ params: IdParamsSchema }), asyncHand
     [wsId]
   );
 
+  let wsUserIds = [];
   await withTransaction(async (tx) => {
     // 1) Usuarios del workspace (OWNER + MEMBERs) — se usarán al final
     const memberRows = await tx.query(
       'SELECT user_id FROM workspace_members WHERE workspace_id = ?',
       [wsId]
     );
-    const wsUserIds = memberRows.map(r => r.user_id);
+    wsUserIds = memberRows.map(r => r.user_id);
 
     // 2) Auditoría / sesiones (FK NOT NULL a workspaces → borrar primero)
     await tx.query('DELETE FROM tunnel_session_logs WHERE workspace_id = ?', [wsId]);

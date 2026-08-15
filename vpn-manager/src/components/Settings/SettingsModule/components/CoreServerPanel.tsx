@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { coreServerApi, type CoreStatusResponse, type ProvisionPreview } from '../../../../services/coreServerApi';
 import type { AppSettings } from '../types';
+import type { ManagementSupernetPreview } from '@gestionvpn/contracts';
 
 interface Props {
   settings: AppSettings;
@@ -36,6 +37,8 @@ export function CoreServerPanel({
   const [error, setError] = useState('');
   const [preview, setPreview] = useState<ProvisionPreview | null>(null);
   const [confirmation, setConfirmation] = useState('');
+  const [networkPreview, setNetworkPreview] = useState<ManagementSupernetPreview | null>(null);
+  const [networkPreviewError, setNetworkPreviewError] = useState('');
 
   const patch = (values: Partial<AppSettings>) => onSettingsChange({ ...settings, ...values });
 
@@ -47,6 +50,17 @@ export function CoreServerPanel({
   }, []);
 
   useEffect(() => { void loadStatus(); }, [loadStatus]);
+
+  useEffect(() => {
+    const cidr = settings.management_supernet ?? '';
+    if (!cidr && settings.core_provisioned_at) return;
+    const timer = window.setTimeout(() => {
+      void coreServerApi.managementSupernetPreview(cidr)
+        .then(response => { setNetworkPreview(response.preview); setNetworkPreviewError(''); })
+        .catch(e => { setNetworkPreview(null); setNetworkPreviewError(e instanceof Error ? e.message : 'No se pudo validar la red.'); });
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [settings.management_supernet, settings.core_provisioned_at]);
 
   const run = async (kind: NonNullable<typeof action>, task: () => Promise<void>) => {
     setAction(kind); setMessage(''); setError('');
@@ -83,6 +97,12 @@ export function CoreServerPanel({
   const health = status?.health;
   const healthy = health?.status === 'HEALTHY';
   const last = status?.backup.last;
+  const networkPlan = networkPreview?.plan;
+  const networkLocked = Boolean(settings.core_provisioned_at || health?.vpnReady || networkPreview?.locked);
+  const derivedNetworks = networkPlan ? [
+    ['Escaneo', networkPlan.scanNet], ['Clientes', networkPlan.clientsNet],
+    ['VPS', networkPlan.vpsNet], ['Administración', networkPlan.adminNet],
+  ] : [];
 
   return (
     <div className="space-y-5">
@@ -151,12 +171,25 @@ export function CoreServerPanel({
 
       <section className="card p-6 space-y-5">
         <div className="flex gap-3"><ShieldCheck className="w-5 h-5 text-indigo-600" /><div><h3 className="font-bold">Preparar un servidor nuevo desde cero</h3><p className="text-sm text-slate-500">No importa ni migra torres, nodos, usuarios, peers ni VRF. Si detecta objetos operativos, el proceso se bloquea.</p></div></div>
+        <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-4 dark:border-indigo-800 dark:bg-indigo-950/20 space-y-3">
+          <div>
+            <label htmlFor="management-supernet" className="block text-xs font-bold text-slate-500 uppercase mb-2">Bloque privado de gestión /22</label>
+            <input id="management-supernet" className="input-field h-11 font-mono" value={settings.management_supernet ?? ''} disabled={networkLocked} onChange={e => patch({ management_supernet: e.target.value })} placeholder={networkLocked ? 'Instalación histórica: segmentos separados' : '10.12.248.0/22'} />
+            <p className="mt-2 text-xs text-slate-500">Se elige una sola vez. Después de preparar el Core queda bloqueado para evitar cortar túneles existentes.</p>
+          </div>
+          {networkPlan ? (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+              {derivedNetworks.map(([label, net]) => <div key={label} className="rounded-lg bg-white/80 p-2 dark:bg-slate-900/60"><span className="block text-2xs text-slate-500">{label}</span><code className="text-xs font-semibold">{net}</code></div>)}
+            </div>
+          ) : networkLocked ? <p className="text-sm font-semibold text-amber-700 dark:text-amber-300">Esta instalación conserva sus segmentos históricos; no se modifican automáticamente.</p> : <p className="text-sm font-semibold text-rose-600">{networkPreviewError || networkPreview?.blockers[0] || 'Validando la red…'}</p>}
+          {networkPreview?.overlaps.length ? <ul className="list-disc pl-5 text-xs text-rose-600">{networkPreview.overlaps.map(item => <li key={`${item.source}-${item.name}-${item.cidr}`}>{item.name}: {item.cidr}</li>)}</ul> : null}
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <label><span className="block text-xs font-bold text-slate-500 uppercase mb-2">Interfaz WAN (opcional)</span><div className="relative"><Network className="absolute left-3 top-3.5 w-4 h-4 text-slate-500" /><input className="input-field h-11 pl-10" value={settings.core_wan_interface ?? ''} onChange={e => patch({ core_wan_interface: e.target.value })} placeholder="Se detecta desde la ruta default" /></div></label>
           <label><span className="block text-xs font-bold text-slate-500 uppercase mb-2">Clave pública WireGuard del VPS</span><input className="input-field h-11 font-mono text-xs" value={settings.core_vps_public_key ?? ''} onChange={e => patch({ core_vps_public_key: e.target.value })} placeholder="Base64 de 44 caracteres" /></label>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button type="button" className="btn-primary px-4 py-2" disabled={isSaving} onClick={() => void onSave()}><Save className="w-4 h-4" /> Guardar preparación</button>
+          <button type="button" className="btn-primary px-4 py-2" disabled={isSaving || !networkPreview?.canSave} onClick={() => void onSave()}><Save className="w-4 h-4" /> Guardar preparación</button>
           <button type="button" className="btn-ghost px-4 py-2" disabled={action !== null} onClick={() => void createPreview()}>{action === 'preview' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Activity className="w-4 h-4" />} Revisar antes de preparar</button>
         </div>
         {preview && (

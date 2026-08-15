@@ -35,10 +35,8 @@ const scanIpRepo = require('../../db/repos/scanIpRepo');
 // El scan-pool (10.11.252.0/24) es una RUTA DE RETORNO que se añade a cada VRF
 // (addScanReturnRoute), no una LAN de la torre → si no se excluye aparece como
 // "RED LAN" del nodo y se cachea como tal (saveNode).
-const MGMT_NETS = new Set(mgmtNet.allNets);
-{
-  const scanNet = (process.env.SCAN_RETURN_SUBNET || scanIpRepo.poolSubnet() || '').trim();
-  if (scanNet) MGMT_NETS.add(scanNet);
+function managementNets() {
+  return new Set([...mgmtNet.allNets, scanIpRepo.poolSubnet()].filter(Boolean));
 }
 
 // NOTA: el endpoint /nodes históricamente responde con un ARRAY plano (no shape
@@ -62,7 +60,8 @@ router.post('/nodes', validate({ body: NodeEmptyBodySchema }), asyncHandler(asyn
     const vrfByInterface = {}; vrfs.forEach(vrf => (vrf.interfaces || '').split(',').forEach(i => { if (i.trim()) vrfByInterface[i.trim()] = vrf.name; }));
     const sstpIfaceByUser = {}; sstpIfaces.forEach(i => { if (i.user && i.name) sstpIfaceByUser[i.user] = i.name; });
     const activeByName = {}; active.forEach(s => { if (s.name) activeByName[s.name] = { address: s.address, uptime: s.uptime }; });
-    const sysRoutesByVrf = {}; (routes || []).forEach(r => { if (r['routing-table'] && r['routing-table'] !== 'main' && !r['dst-address']?.endsWith('/32') && !MGMT_NETS.has(r['dst-address']) && r.dynamic !== 'true') { if (!sysRoutesByVrf[r['routing-table']]) sysRoutesByVrf[r['routing-table']] = []; sysRoutesByVrf[r['routing-table']].push(r['dst-address']); } });
+    const mgmtNets = managementNets();
+    const sysRoutesByVrf = {}; (routes || []).forEach(r => { if (r['routing-table'] && r['routing-table'] !== 'main' && !r['dst-address']?.endsWith('/32') && !mgmtNets.has(r['dst-address']) && r.dynamic !== 'true') { if (!sysRoutesByVrf[r['routing-table']]) sysRoutesByVrf[r['routing-table']] = []; sysRoutesByVrf[r['routing-table']].push(r['dst-address']); } });
 
     // ── Nodos SSTP (PPP secrets con service=sstp) ───────────────────────────
     const sstpNodes = secrets.filter(s => s.service === 'sstp').map(secret => {
@@ -86,7 +85,7 @@ router.post('/nodes', validate({ body: NodeEmptyBodySchema }), asyncHandler(asyn
       const vrfRoutes = (routes || []).filter(r =>
         r['routing-table'] === vrfName &&
         !r['dst-address']?.endsWith('/32') &&
-        !MGMT_NETS.has(r['dst-address']) &&
+        !mgmtNets.has(r['dst-address']) &&
         r.dynamic !== 'true'
       );
       const lanSubnets = vrfRoutes.map(r => r['dst-address']).filter(Boolean);
@@ -199,7 +198,7 @@ router.post('/node/details', requireOperator, validate({ body: NodeDetailsReques
     const addrList = vrfName ? await safeWrite(api, ['/ip/firewall/address-list/print']) : [];
     const secrets  = pppUser ? await safeWrite(api, ['/ppp/secret/print']) : [];
     const vrfSubnets = routes
-      .filter(r => r['routing-table'] === vrfName && !MGMT_NETS.has(r['dst-address']))
+      .filter(r => r['routing-table'] === vrfName && !managementNets().has(r['dst-address']))
       .map(r => r['dst-address']);
     const lanSubnets = addrList
       .filter(a => a.list === 'LIST-NET-REMOTE-TOWERS' && vrfSubnets.includes(a.address))
@@ -276,9 +275,7 @@ router.post('/node/script', requireOperator, validate({ body: NodeScriptRequestS
 
     // Redes de gestión que el CPE debe alcanzar de vuelta (CLIENTES/ADMIN/VPS)
     // + el /24 del scan-pool del VPS (derivado del pool, igual que en provisión).
-    const scanSubnet = (process.env.SCAN_RETURN_SUBNET || scanIpRepo.poolSubnet() || '').trim();
-    const mgmtNets = mgmtNet.returnRoutes().map(r => r.subnet);
-    const returnNets = [...mgmtNets, ...(scanSubnet ? [scanSubnet] : [])];
+    const returnNets = mgmtNet.remoteReturnNets();
 
     const { script, cpeSteps } = buildCpeWgScript({
       nodeNum: wgNodeNum, nodeMgmt, serverPublicKey, serverPublicIP, wgPort, returnNets, cpePrivateKey,
@@ -375,8 +372,7 @@ router.post('/node/wg/set-peer', requireOperator, validate({ body: NodeSetPeerRe
     let cpeScript = null, cpeSteps = null;
     try {
       const serverPublicIP = (await getAppSetting('server_public_ip').catch(() => '')) || ip;
-      const scanSubnet = (process.env.SCAN_RETURN_SUBNET || scanIpRepo.poolSubnet() || '').trim();
-      const returnNets = [...mgmtNet.returnRoutes().map(r => r.subnet), ...(scanSubnet ? [scanSubnet] : [])];
+      const returnNets = mgmtNet.remoteReturnNets();
       ({ script: cpeScript, cpeSteps } = buildCpeWgScript({
         nodeNum: wgNodeNum, nodeMgmt, serverPublicKey, serverPublicIP, wgPort, returnNets,
         cpePrivateKey: cpeKeys ? cpeKeys.privateKey : '',

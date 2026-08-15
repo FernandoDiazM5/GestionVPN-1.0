@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CoreServerPanel } from './CoreServerPanel';
 
-const mocks = vi.hoisted(() => ({ status: vi.fn(), health: vi.fn(), preview: vi.fn(), provision: vi.fn(), backupNow: vi.fn() }));
+const mocks = vi.hoisted(() => ({ status: vi.fn(), health: vi.fn(), preview: vi.fn(), provision: vi.fn(), backupNow: vi.fn(), managementSupernetPreview: vi.fn() }));
 
 vi.mock('../../../../services/coreServerApi', () => ({
   coreServerApi: mocks,
@@ -31,6 +31,14 @@ describe('CoreServerPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.status.mockResolvedValue(status);
+    mocks.managementSupernetPreview.mockResolvedValue({
+      success: true,
+      preview: { valid: true, canSave: true, locked: false, blockers: [], overlaps: [], plan: {
+        net: '10.12.248.0/22', scanNet: '10.12.248.0/24', scanBase: '10.12.248.',
+        clientsNet: '10.12.249.0/24', clientsBase: '10.12.249.', vpsNet: '10.12.250.0/24',
+        vpsBase: '10.12.250.', adminNet: '10.12.251.0/24', adminBase: '10.12.251.',
+      } },
+    });
   });
 
   it('muestra el estado del servidor existente y la política de respaldo', async () => {
@@ -62,5 +70,12 @@ describe('CoreServerPanel', () => {
     await user.click(screen.getByRole('button', { name: 'Generar y enviar ahora' }));
     await waitFor(() => expect(mocks.backupNow).toHaveBeenCalledOnce());
     expect(await screen.findByText(/uno.backup y uno.rsc/)).toBeInTheDocument();
+  });
+
+  it('muestra la división autoritativa devuelta por el backend', async () => {
+    render(<CoreServerPanel {...baseProps} settings={{ ...baseProps.settings, management_supernet: '10.12.248.0/22' }} />);
+    expect(await screen.findByText('10.12.248.0/24')).toBeInTheDocument();
+    expect(screen.getByText('10.12.251.0/24')).toBeInTheDocument();
+    expect(mocks.managementSupernetPreview).toHaveBeenCalledWith('10.12.248.0/22');
   });
 });

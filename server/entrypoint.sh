@@ -18,6 +18,7 @@ node db/migratePerf.js         # índices compuestos (F11)
 node db/migrateNotifications.js
 node db/migrateMonitoring.js
 node db/migrateApNode.js        # FK aps.node_id
+node db/migrateSiteEquipmentCascade.js # cascada nodo/AP/equipos
 node db/migrateScanIp.js        # tabla workspace_scan_ip (Opción C)
 node db/migrateDropCoModerator.js  # retiro del rol CO_MODERATOR (degrada→MEMBER + estrecha enum)
 node db/migrateMgmtIpSource.js     # ensancha enum source de user_mgmt_ips (+auto-provision/auto-heal) + backfill mapeos faltantes

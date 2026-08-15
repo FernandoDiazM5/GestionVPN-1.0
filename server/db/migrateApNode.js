@@ -46,7 +46,7 @@ async function main() {
             await conn.query('ALTER TABLE aps ADD COLUMN node_id INT DEFAULT NULL');
             console.log('  + columna aps.node_id creada');
             await conn.query('ALTER TABLE aps ADD KEY idx_aps_node (node_id)').catch(e => console.log('  · índice:', e.message));
-            await conn.query('ALTER TABLE aps ADD CONSTRAINT fk_ap_node FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE SET NULL')
+            await conn.query('ALTER TABLE aps ADD CONSTRAINT fk_ap_node FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE')
                 .catch(e => console.log('  · FK:', e.message));
         }
 

@@ -96,7 +96,7 @@ CREATE TABLE IF NOT EXISTS torres (
     created_at BIGINT NOT NULL DEFAULT 0,
     updated_at BIGINT NOT NULL DEFAULT 0,
     KEY idx_torres_node (node_id),
-    CONSTRAINT fk_torre_node FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE SET NULL
+    CONSTRAINT fk_torre_node FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ── 6. Enlaces PTP por torre ───────────────────────────────
@@ -159,7 +159,7 @@ CREATE TABLE IF NOT EXISTS aps (
     KEY idx_aps_ip (ip),
     KEY idx_aps_node (node_id),
     CONSTRAINT fk_ap_group FOREIGN KEY (ap_group_id) REFERENCES ap_groups(id) ON DELETE CASCADE,
-    CONSTRAINT fk_ap_node  FOREIGN KEY (node_id)      REFERENCES nodes(id)     ON DELETE SET NULL
+    CONSTRAINT fk_ap_node  FOREIGN KEY (node_id)      REFERENCES nodes(id)     ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ── 9. CPEs conocidos ──────────────────────────────────────
@@ -204,7 +204,7 @@ CREATE TABLE IF NOT EXISTS cpes (
     updated_at      BIGINT NOT NULL DEFAULT 0,
     KEY idx_cpes_ap (ap_id),
     KEY idx_cpes_last_seen (last_seen),
-    CONSTRAINT fk_cpe_ap FOREIGN KEY (ap_id) REFERENCES aps(id) ON DELETE SET NULL
+    CONSTRAINT fk_cpe_ap FOREIGN KEY (ap_id) REFERENCES aps(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ── 10. Historial de señal RF ──────────────────────────────

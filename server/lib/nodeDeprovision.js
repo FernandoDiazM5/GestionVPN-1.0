@@ -29,6 +29,7 @@ async function deprovisionNodeOnRouter(creds, { pppUser, vrfName, protocol }) {
   const ifaceName = isWireGuard ? pppUser : (hasVrf ? vrfName.replace(/^VRF-/, 'VPN-SSTP-') : '');
 
   const steps = [];
+  const failures = [];
   const pushStep = (s) => { steps[steps.length] = s; };
   let api;
   try {
@@ -52,7 +53,10 @@ async function deprovisionNodeOnRouter(creds, { pppUser, vrfName, protocol }) {
     // ── CONEXIÓN 2: removes en conexión limpia ──
     api = await connectToMikrotik(ip, user, pass);
     const silentRemove = (cmd, id) =>
-      safeWrite(api, [cmd, `=.id=${id}`], 10000).catch(e => log.warn({ cmd, id, err: e?.message }, 'DEPROVISION ignorado'));
+      safeWrite(api, [cmd, `=.id=${id}`], 10000).catch(e => {
+        failures.push({ cmd, id, code: e?.code || 'ROUTER_WRITE_FAILED' });
+        log.warn({ cmd, id, err: e?.message }, 'DEPROVISION remove falló');
+      });
 
     // Paso 1: Mangle (new-routing-mark === vrfName)
     if (hasVrf) {
@@ -126,6 +130,13 @@ async function deprovisionNodeOnRouter(creds, { pppUser, vrfName, protocol }) {
     }
 
     await api.close();
+    if (failures.length) {
+      const error = new Error(`RouterOS no confirmó ${failures.length} eliminación(es)`);
+      error.code = 'ROUTER_CLEANUP_PARTIAL';
+      error.steps = steps;
+      error.failures = failures;
+      throw error;
+    }
     return { steps };
   } catch (error) {
     if (api) try { await api.close(); } catch (_) { /* ignore */ }

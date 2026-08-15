@@ -109,6 +109,8 @@ export const NodeDeprovisionRequestSchema = z.object({
   vrfName: EntityIdSchema.optional(),
   pppUser: EntityIdSchema,
   protocol: z.enum(['sstp', 'wireguard']).optional(),
+  confirmationName: boundedText(160).optional(),
+  impactFingerprint: z.string().regex(/^[a-f0-9]{64}$/).optional(),
 }).strict();
 export type NodeDeprovisionRequest = z.infer<typeof NodeDeprovisionRequestSchema>;
 

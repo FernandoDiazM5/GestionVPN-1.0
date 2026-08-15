@@ -15,6 +15,30 @@ export const SaveSettingRequestSchema = z.object({
 });
 export type SaveSettingRequest = z.infer<typeof SaveSettingRequestSchema>;
 
+export const ManagementNetworkPlanSchema = z.object({
+  net: z.string(),
+  scanNet: z.string(),
+  scanBase: z.string(),
+  clientsNet: z.string(),
+  clientsBase: z.string(),
+  vpsNet: z.string(),
+  vpsBase: z.string(),
+  adminNet: z.string(),
+  adminBase: z.string(),
+});
+export type ManagementNetworkPlan = z.infer<typeof ManagementNetworkPlanSchema>;
+
+export const ManagementSupernetPreviewSchema = z.object({
+  valid: z.boolean(),
+  canSave: z.boolean(),
+  locked: z.boolean(),
+  sameValue: z.boolean().optional(),
+  blockers: z.array(z.string()),
+  overlaps: z.array(z.object({ source: z.string(), name: z.string(), cidr: z.string() })),
+  plan: ManagementNetworkPlanSchema.nullable(),
+});
+export type ManagementSupernetPreview = z.infer<typeof ManagementSupernetPreviewSchema>;
+
 export const InterfaceActionRequestSchema = z.object({
   vpnName: z.string().min(1, 'vpnName requerido'),
   vpnService: z.enum(['sstp', 'pptp', 'l2tp', 'ovpn']),

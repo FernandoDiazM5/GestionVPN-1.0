@@ -6,10 +6,10 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 
 ## Resumen
 
-- Rutas detectadas: 159
-- Rutas de mutación (POST/PUT/PATCH): 103
-- Rutas que consumen `req.body`: 82
-- Rutas con esquema de `req.body` detectable: 82/82
+- Rutas detectadas: 162
+- Rutas de mutación (POST/PUT/PATCH): 104
+- Rutas que consumen `req.body`: 83
+- Rutas con esquema de `req.body` detectable: 83/83
 - Endpoints públicos de identidad sin rate limiting detectable: 0
 
 ## Alertas detectadas
@@ -74,15 +74,16 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `routes/account.routes.js` | 367 | PATCH | `/notifications` | sí | — | no | sí | — | — |
 | `routes/account.routes.js` | 385 | POST | `/telegram/link/start` | sí | — | no | n/a | — | — |
 | `routes/account.routes.js` | 395 | POST | `/telegram/unlink` | sí | — | no | n/a | — | — |
-| `routes/admin.routes.js` | 127 | GET | `/summary` | sí | platform-admin | no | n/a | — | — |
-| `routes/admin.routes.js` | 132 | GET | `/moderators` | sí | platform-admin | no | n/a | — | — |
-| `routes/admin.routes.js` | 179 | PATCH | `/moderators/:id/ai-access` | sí | platform-admin | no | sí | — | — |
-| `routes/admin.routes.js` | 211 | PATCH | `/moderators/:id` | sí | platform-admin | no | sí | — | — |
-| `routes/admin.routes.js` | 279 | DELETE | `/moderators/:id` | sí | platform-admin | no | n/a | network-admin | — |
-| `routes/admin.routes.js` | 381 | POST | `/moderators` | sí | platform-admin | no | sí | — | — |
-| `routes/admin.routes.js` | 413 | POST | `/invite-moderator` | sí | platform-admin | no | sí | — | — |
-| `routes/admin.routes.js` | 480 | GET | `/invitations` | sí | platform-admin | no | n/a | — | — |
-| `routes/admin.routes.js` | 495 | POST | `/invitations/:id/link` | sí | platform-admin | no | n/a | network-admin | — |
+| `routes/admin.routes.js` | 85 | GET | `/operational-reset-preview` | sí | platform-admin | no | n/a | — | — |
+| `routes/admin.routes.js` | 133 | GET | `/summary` | sí | platform-admin | no | n/a | — | — |
+| `routes/admin.routes.js` | 138 | GET | `/moderators` | sí | platform-admin | no | n/a | — | — |
+| `routes/admin.routes.js` | 185 | PATCH | `/moderators/:id/ai-access` | sí | platform-admin | no | sí | — | — |
+| `routes/admin.routes.js` | 217 | PATCH | `/moderators/:id` | sí | platform-admin | no | sí | — | — |
+| `routes/admin.routes.js` | 285 | DELETE | `/moderators/:id` | sí | platform-admin | no | n/a | network-admin | — |
+| `routes/admin.routes.js` | 388 | POST | `/moderators` | sí | platform-admin | no | sí | — | — |
+| `routes/admin.routes.js` | 420 | POST | `/invite-moderator` | sí | platform-admin | no | sí | — | — |
+| `routes/admin.routes.js` | 487 | GET | `/invitations` | sí | platform-admin | no | n/a | — | — |
+| `routes/admin.routes.js` | 502 | POST | `/invitations/:id/link` | sí | platform-admin | no | n/a | network-admin | — |
 | `routes/adminSecurity.routes.js` | 53 | POST | `/step-up` | sí | — | no | sí | — | — |
 | `routes/adminSecurity.routes.js` | 124 | GET | `/status` | sí | — | no | n/a | network-admin | — |
 | `routes/adminSecurity.routes.js` | 174 | GET | `/history` | sí | — | no | n/a | — | — |
@@ -149,20 +150,22 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `routes/nodes/editing.routes.js` | 217 | POST | `/node/label/save` | sí | — | no | sí | sql | — |
 | `routes/nodes/history.routes.js` | 21 | POST | `/node/history/add` | sí | — | no | sí | sql | — |
 | `routes/nodes/history.routes.js` | 35 | POST | `/node/history/get` | sí | — | no | sí | sql | — |
-| `routes/nodes/listing.routes.js` | 47 | POST | `/nodes` | sí | — | no | n/a | sql, network-admin | — |
-| `routes/nodes/listing.routes.js` | 188 | POST | `/node/details` | sí | — | no | sí | sql, network-admin | — |
-| `routes/nodes/listing.routes.js` | 231 | POST | `/node/script` | sí | — | no | sí | sql, network-admin | — |
-| `routes/nodes/listing.routes.js` | 303 | POST | `/node/wg/set-peer` | sí | — | no | sí | sql, network-admin | — |
-| `routes/nodes/provision.routes.js` | 199 | POST | `/node/next` | sí | — | no | n/a | — | — |
-| `routes/nodes/provision.routes.js` | 214 | POST | `/node/provision` | sí | — | no | sí | sql, network-admin | — |
-| `routes/nodes/provision.routes.js` | 579 | POST | `/node/deprovision` | sí | — | no | sí | — | — |
+| `routes/nodes/listing.routes.js` | 45 | POST | `/nodes` | sí | — | no | n/a | sql, network-admin | — |
+| `routes/nodes/listing.routes.js` | 187 | POST | `/node/details` | sí | — | no | sí | sql, network-admin | — |
+| `routes/nodes/listing.routes.js` | 230 | POST | `/node/script` | sí | — | no | sí | sql, network-admin | — |
+| `routes/nodes/listing.routes.js` | 300 | POST | `/node/wg/set-peer` | sí | — | no | sí | sql, network-admin | — |
+| `routes/nodes/provision.routes.js` | 201 | POST | `/node/next` | sí | — | no | n/a | — | — |
+| `routes/nodes/provision.routes.js` | 216 | POST | `/node/provision` | sí | — | no | sí | sql, network-admin | — |
+| `routes/nodes/provision.routes.js` | 591 | POST | `/node/deprovision-impact` | sí | — | no | sí | — | — |
+| `routes/nodes/provision.routes.js` | 603 | POST | `/node/deprovision` | sí | — | no | sí | network-admin | — |
 | `routes/nodes/scan.routes.js` | 51 | POST | `/node/scan-stream` | sí | — | no | sí | network-admin | — |
 | `routes/nodes/tags.routes.js` | 16 | GET | `/node/tags` | sí | — | no | n/a | sql | — |
 | `routes/nodes/tags.routes.js` | 41 | POST | `/node/tag/save` | sí | — | no | sí | sql | — |
-| `routes/settings.routes.js` | 31 | GET | `/settings/get` | sí | — | no | n/a | sql | — |
-| `routes/settings.routes.js` | 62 | GET | `/settings/scan-local-check` | sí | — | no | n/a | sql | — |
-| `routes/settings.routes.js` | 73 | POST | `/settings/save` | sí | — | no | sí | sql, network-admin | — |
-| `routes/settings.routes.js` | 125 | POST | `/settings/test-error-email` | sí | — | no | n/a | — | — |
+| `routes/settings.routes.js` | 33 | GET | `/settings/get` | sí | platform-admin | no | n/a | sql | — |
+| `routes/settings.routes.js` | 64 | GET | `/settings/scan-local-check` | sí | platform-admin | no | n/a | sql | — |
+| `routes/settings.routes.js` | 75 | GET | `/settings/management-supernet-preview` | sí | platform-admin | no | n/a | — | — |
+| `routes/settings.routes.js` | 80 | POST | `/settings/save` | sí | platform-admin | no | sí | sql, network-admin | — |
+| `routes/settings.routes.js` | 141 | POST | `/settings/test-error-email` | sí | platform-admin | no | n/a | — | — |
 | `routes/team.routes.js` | 218 | POST | `/invite` | sí | OWNER | no | sí | — | — |
 | `routes/team.routes.js` | 277 | POST | `/accept` | no | — | sí | sí | network-admin | `PUBLIC_MUTATION_REVIEW` |
 | `routes/team.routes.js` | 384 | GET | `/my-invitations` | sí | — | no | n/a | — | — |

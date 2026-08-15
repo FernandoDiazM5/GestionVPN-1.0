@@ -2,6 +2,7 @@ const { connectToMikrotik, safeWrite, writeIdempotent, classifyError } = require
 const { getAppSetting, setAppSetting, decryptPass } = require('../db.service');
 const mgmtNet = require('./mgmtNet');
 const scanIpRepo = require('../db/repos/scanIpRepo');
+const { cidrOverlaps, normalizeCidr } = require('./ipv4Cidr');
 const log = require('./logger').child({ scope: 'core-server' });
 
 const OWNED = 'GVPN:';
@@ -41,9 +42,10 @@ async function readInventory(api) {
   const vrfs = await safeWrite(api, ['/ip/vrf/print']).catch(() => []);
   const filters = await safeWrite(api, ['/ip/firewall/filter/print']).catch(() => []);
   const services = await safeWrite(api, ['/ip/service/print']).catch(() => []);
+  const ipAddresses = await safeWrite(api, ['/ip/address/print']).catch(() => []);
   return {
     identity, resource, routes, dhcpClients, interfaces, wireguard, peers,
-    sstpServer, sstpInterfaces, pppSecrets, vrfs, filters, services,
+    sstpServer, sstpInterfaces, pppSecrets, vrfs, filters, services, ipAddresses,
     wanInterface: deriveWanInterface(routes, dhcpClients),
   };
 }
@@ -114,8 +116,9 @@ async function previewProvision() {
     api = await connectToMikrotik(creds.ip, creds.user, creds.pass);
     const inv = await readInventory(api);
     const summary = summarizeInventory(inv);
-    const [wanOverride, vpsPublicKey, sstpPort] = await Promise.all([
+    const [wanOverride, vpsPublicKey, sstpPort, managementSupernet] = await Promise.all([
       getAppSetting('core_wan_interface'), getAppSetting('core_vps_public_key'), getAppSetting('sstp_port'),
+      getAppSetting('management_supernet'),
     ]);
     const wanInterface = String(wanOverride || inv.wanInterface || '').trim();
     const blockers = [];
@@ -123,6 +126,17 @@ async function previewProvision() {
     if (!summary.internetOk) blockers.push('No se detectó una ruta default activa a Internet.');
     if (!wanInterface) blockers.push('No se pudo detectar la interfaz WAN; configúrala manualmente.');
     if (!/^[A-Za-z0-9+/]{43}=$/.test(String(vpsPublicKey || '').trim())) blockers.push('Falta una clave pública WireGuard válida del VPS.');
+    const networkPlan = mgmtNet.deriveSupernet(managementSupernet);
+    if (!networkPlan) blockers.push('Define y guarda el bloque privado /22 de gestión antes de preparar el servidor.');
+    else {
+      const coreOverlaps = (inv.ipAddresses || [])
+        .map(row => ({ interface: row.interface || '', cidr: normalizeCidr(row.address, { allowHost: false }) }))
+        .filter(row => row.cidr && cidrOverlaps(networkPlan.net, row.cidr));
+      if (coreOverlaps.length) {
+        blockers.push(`El /22 se solapa con direcciones existentes del Core: ${coreOverlaps.map(row => `${row.interface} ${row.cidr}`).join(', ')}.`);
+      }
+      mgmtNet.configureSupernet(networkPlan.net);
+    }
     const actions = [
       'Crear listas LIST-WAN/LIST-VPN-TOWERS/LIST-VPN-WG/LIST-VPN-SSTP si faltan',
       `Asociar ${wanInterface || 'WAN pendiente'} a LIST-WAN`,
@@ -132,6 +146,7 @@ async function previewProvision() {
       `Preparar SSTP en puerto ${Number(sstpPort || 443)}`,
       'Crear address-lists y reglas GVPN de gestión/aislamiento',
       'Ampliar allowlist de API/Winbox sin retirar orígenes existentes',
+      ...(networkPlan ? [`Fijar ${networkPlan.net}: escaneo ${networkPlan.scanNet}, clientes ${networkPlan.clientsNet}, VPS ${networkPlan.vpsNet}, administración ${networkPlan.adminNet}`] : []),
     ];
     return { canProvision: blockers.length === 0, blockers, actions, summary, wanInterface };
   } finally {

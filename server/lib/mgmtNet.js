@@ -41,6 +41,30 @@ const envNum = (k, d) => {
   return Number.isFinite(n) && n > 0 ? n : d;
 };
 
+const DEFAULT_SUPERNET = '10.12.248.0/22';
+
+function parseSupernet(cidr) {
+  const match = /^(10)\.(\d{1,3})\.(\d{1,3})\.0\/22$/.exec(String(cidr || '').trim());
+  if (!match) return null;
+  const second = Number(match[2]);
+  const third = Number(match[3]);
+  if (second > 255 || third > 252 || third % 4 !== 0) return null;
+  return { cidr: `10.${second}.${third}.0/22`, second, third };
+}
+
+function deriveSupernet(cidr) {
+  const parsed = parseSupernet(cidr);
+  if (!parsed) return null;
+  const prefix = `10.${parsed.second}.`;
+  return {
+    net: parsed.cidr,
+    scanNet: `${prefix}${parsed.third}.0/24`, scanBase: `${prefix}${parsed.third}.`,
+    clientsNet: `${prefix}${parsed.third + 1}.0/24`, clientsBase: `${prefix}${parsed.third + 1}.`,
+    vpsNet: `${prefix}${parsed.third + 2}.0/24`, vpsBase: `${prefix}${parsed.third + 2}.`,
+    adminNet: `${prefix}${parsed.third + 3}.0/24`, adminBase: `${prefix}${parsed.third + 3}.`,
+  };
+}
+
 // ── VPS — peer único del servidor (escaneo/Monitor AP/hooks) ──
 const vps = {
   iface: env('MGMT_VPS_IFACE', 'VPN-WG-VPS'),
@@ -67,6 +91,25 @@ const admin = {
   port:  envNum('MGMT_ADMIN_PORT', 13234),
   start: envNum('MGMT_ADMIN_START', 20),
 };
+
+const scan = {
+  net: env('SCAN_RETURN_SUBNET', '10.11.252.0/24'),
+  base: env('SCAN_IP_POOL_BASE', '10.11.252.'),
+};
+const supernet = { net: '' };
+
+function configureSupernet(cidr) {
+  const plan = deriveSupernet(cidr);
+  if (!plan) throw new Error('El bloque de gestión debe ser una red privada 10.x.x.0/22 alineada');
+  supernet.net = plan.net;
+  scan.net = plan.scanNet; scan.base = plan.scanBase;
+  clients.net = plan.clientsNet; clients.base = plan.clientsBase;
+  vps.net = plan.vpsNet; vps.base = plan.vpsBase; vps.ip = `${plan.vpsBase}60`;
+  admin.net = plan.adminNet; admin.base = plan.adminBase;
+  mgmtIpBases.splice(0, mgmtIpBases.length, clients.base, admin.base);
+  allNets.splice(0, allNets.length, nodes.wgNet, nodes.sstpNet, vps.net, clients.net, admin.net, scan.net);
+  return plan;
+}
 
 // ── IP de gestión POR NODO (se materializa en cada CPE, no aquí) ──
 const nodes = {
@@ -134,12 +177,19 @@ function returnRoutes() {
   ];
 }
 
+// En el Core las rutas siguen separadas (gateways WG distintos). En el sitio
+// remoto todas regresan por WG-CORE-ISP y se resumen de forma segura en /22.
+function remoteReturnNets() {
+  return supernet.net ? [supernet.net] : [...returnRoutes().map(r => r.subnet), scan.net];
+}
+
 // Todos los /24 del espacio de gestión (para excluirlos del listado de
 // "LANs de nodo" y de la validación de subred del alta de nodo).
 const allNets = [nodes.wgNet, nodes.sstpNet, vps.net, clients.net, admin.net];
 
 module.exports = {
-  vps, clients, admin, nodes,
+  vps, clients, admin, nodes, scan, supernet,
   ifaces, userIfaces, mgmtIpBases, allNets, mgmtAllowedIps,
-  isMgmtIp, nodeMgmtIp, returnRoutes,
+  isMgmtIp, nodeMgmtIp, returnRoutes, remoteReturnNets,
+  DEFAULT_SUPERNET, parseSupernet, deriveSupernet, configureSupernet,
 };

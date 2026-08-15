@@ -297,6 +297,10 @@ async function bootstrap() {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
             await initDb();
+            // El bloque /22 sólo se configura antes del primer aprovisionamiento.
+            // Si no existe (instalaciones históricas), conservamos los segmentos legacy.
+            const configuredSupernet = await require('./db.service').getAppSetting('management_supernet');
+            if (configuredSupernet) require('./lib/mgmtNet').configureSupernet(configuredSupernet);
             return startServer();
         } catch (err) {
             const msg = err.code || err.message || '';

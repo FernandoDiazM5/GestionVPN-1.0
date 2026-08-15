@@ -24,7 +24,7 @@ export function useSaveSettings() {
     setErrorMsg('');
 
     try {
-      await Promise.all([
+      const writes = [
         saveSetting('MT_IP', settings.MT_IP || ''),
         saveSetting('MT_USER', settings.MT_USER || ''),
         saveSetting('MT_PASS', settings.MT_PASS || ''),
@@ -36,7 +36,9 @@ export function useSaveSettings() {
         saveSetting('core_backup_time', settings.core_backup_time || '02:00'),
         saveSetting('core_backup_timezone', settings.core_backup_timezone || 'America/Lima'),
         saveSetting('core_backup_password', settings.core_backup_password || ''),
-      ]);
+      ];
+      if (settings.management_supernet) writes.push(saveSetting('management_supernet', settings.management_supernet));
+      await Promise.all(writes);
       setSuccessMsg(SETTINGS_MESSAGES.SAVE_SUCCESS);
     } catch (e: unknown) {
       setErrorMsg(e instanceof Error ? e.message : SETTINGS_MESSAGES.SAVE_ERROR);

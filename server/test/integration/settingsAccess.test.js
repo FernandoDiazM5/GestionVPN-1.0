@@ -9,12 +9,15 @@ const { stubModule } = require('../helpers/moduleMock');
 const db = { get: vi.fn(), all: vi.fn(), run: vi.fn() };
 const getAppSetting = vi.fn();
 const sendGeneric = vi.fn();
+const previewManagementSupernet = vi.fn();
+const saveManagementSupernet = vi.fn();
 stubModule(__dirname, '../../db.service', {
   getDb: vi.fn().mockResolvedValue(db),
   encryptPass: vi.fn((v) => `enc:${v}`),
   getAppSetting,
 });
 stubModule(__dirname, '../../lib/mailer', { sendGeneric });
+stubModule(__dirname, '../../lib/managementNetworkService', { previewManagementSupernet, saveManagementSupernet });
 stubModule(__dirname, '../../lib/logger', {
   child: () => ({ warn: vi.fn(), info: vi.fn(), error: vi.fn(), debug: vi.fn() }),
 });
@@ -49,6 +52,8 @@ beforeEach(() => {
   db.run.mockResolvedValue(undefined);
   getAppSetting.mockResolvedValue('');
   sendGeneric.mockResolvedValue({ delivered: true });
+  previewManagementSupernet.mockResolvedValue({ valid: true, canSave: true, plan: { net: '10.12.248.0/22' } });
+  saveManagementSupernet.mockResolvedValue({ plan: { net: '10.12.248.0/22' }, migratedScanAssignments: 0 });
 });
 
 describe('A2 — escritura de settings solo para platform_admin', () => {
@@ -86,6 +91,37 @@ describe('A2 — escritura de settings solo para platform_admin', () => {
     expect(r.body.settings.server_public_ip).toBe('1.2.3.4');
     expect(r.body.settings.MT_PASS).toBeUndefined(); // claves core ocultas a no-admin
     expect(r.body.settings.error_report_email).toBeUndefined();
+  });
+
+  it('permite fijar un /22 alineado antes del primer aprovisionamiento', async () => {
+    const r = await request(app).post('/api/settings/save')
+      .set('x-test-identity', 'platformAdmin')
+      .send({ key: 'management_supernet', value: '10.12.248.0/22' });
+    expect(r.status).toBe(200);
+    expect(saveManagementSupernet).toHaveBeenCalledWith(expect.objectContaining({
+      cidr: '10.12.248.0/22', actorUserId: 'u-a',
+    }));
+  });
+
+  it('bloquea cambiar el /22 después de preparar el Core', async () => {
+    saveManagementSupernet.mockRejectedValue(Object.assign(new Error('bloque fijado'), { code: 'MGMT_SUPERNET_LOCKED', status: 409 }));
+    const r = await request(app).post('/api/settings/save')
+      .set('x-test-identity', 'platformAdmin')
+      .send({ key: 'management_supernet', value: '10.20.0.0/22' });
+    expect(r.status).toBe(409);
+    expect(r.body.code).toBe('MGMT_SUPERNET_LOCKED');
+    expect(db.run).not.toHaveBeenCalled();
+  });
+
+  it('expone un preview autoritativo sólo al Administrador', async () => {
+    const ok = await request(app).get('/api/settings/management-supernet-preview?cidr=10.12.248.0%2F22')
+      .set('x-test-identity', 'platformAdmin');
+    expect(ok.status).toBe(200);
+    expect(previewManagementSupernet).toHaveBeenCalledWith('10.12.248.0/22');
+
+    const denied = await request(app).get('/api/settings/management-supernet-preview?cidr=10.12.248.0%2F22')
+      .set('x-test-identity', 'owner');
+    expect(denied.status).toBe(403);
   });
 
   it('valida y normaliza el correo de reportes', async () => {

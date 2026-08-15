@@ -1,6 +1,9 @@
 export type ScanMode = 'local' | 'vps';
 
 export interface AppSettings {
+  /** Bloque privado /22 elegido una sola vez antes de preparar el Core. */
+  management_supernet?: string;
+  core_provisioned_at?: string;
   MT_IP?: string;
   MT_USER?: string;
   MT_PASS?: string;
