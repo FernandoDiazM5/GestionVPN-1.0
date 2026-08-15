@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-15 — Decisiones base de distribución comercial.** Rama `vps_prod` (base `1fbd7f2`). Estado: arquitectura acordada; sin cambios funcionales ni despliegue.
+> - Se aprobó una Plataforma Central Joinpoint para activaciones, membresías, facturación, licencias, versiones y monitoreo, con una instancia aislada por cliente en su propio VPS y MikroTik Core.
+> - `joinpoint.cloud` será el dominio raíz inicial y cada cliente recibirá automáticamente un subdominio; el label se almacenará separado para poder migrar el dominio raíz de forma coordinada sin editar cliente por cliente.
+> - Se aprobó el código de activación temporal de un solo uso y la creación de una imagen/instalador oficial reproducible. Pendiente: cerrar contrato de licencia, estados comerciales, migración de dominio y pipeline de aprovisionamiento antes de modificar producción.
+
 > **Sesión 2026-08-15 — Aprovisionamiento productivo del Core `/22`.** Rama `vps_prod` (base `c7bc79e`). Estado: Core/VPS/aplicación saludables; HTTPS 200; MySQL, RouterOS y SMTP `ok`; cero datos operativos huérfanos.
 > - Se creó dentro del VPS una contraseña aleatoria de backup, se persistió cifrada y no se expuso. El primer intento agotó el handshake sin modificar el Core; tras confirmar ping y preview saludable, el segundo generó, validó y envió el par `.backup` cifrado + `.rsc` al Administrador.
 > - Con preview `canProvision=true` y sin bloqueos se ejecutó el aprovisionamiento idempotente: gateways `/24`, listas, SSTP, allowlist y siete reglas GVPN. `core_provisioned_at` quedó registrado y la supernet inicial ya no puede modificarse.
