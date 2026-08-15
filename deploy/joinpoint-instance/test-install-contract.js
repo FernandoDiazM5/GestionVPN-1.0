@@ -13,7 +13,7 @@ test('el instalador es fail-closed y reanudable',()=>{
   assert.match(installer,/--apply\)/);
   assert.match(installer,/--resume\)/);
   assert.match(installer,/PENDING_DNS_TLS/);
-  assert.match(installer,/READY_FOR_TLS/);
+  assert.match(installer,/TLS_READY/);
 });
 
 test('la activacion no envia la clave privada ni imprime el codigo',()=>{
@@ -43,4 +43,14 @@ test('genera secretos unicos y deja integraciones personales apagadas',()=>{
   assert.match(installer,/FEDERATED_AUTH_ENABLED=false/);
   assert.match(installer,/WG0_AUTOSYNC=false/);
   assert.doesNotMatch(installer,/gmail\.com|AIza|bot[0-9]+:/);
+});
+
+test('TLS y agente se preparan antes de permitir el arranque',()=>{
+  assert.match(installer,/certbot\/certbot:v5\.7\.0/);
+  assert.match(installer,/certonly --standalone --non-interactive --agree-tos/);
+  assert.match(installer,/openssl x509[\s\S]*?-checkend 86400/);
+  assert.match(installer,/JOINPOINT_ACTIVATION_RESPONSE_FILE/);
+  assert.match(installer,/rm -f "\$INSTALL_ROOT\/secrets\/activation-response\.json"/);
+  assert.match(installer,/READY_FOR_PLATFORM_BOOTSTRAP/);
+  assert.doesNotMatch(installer,/docker compose[\s\S]*? up /);
 });

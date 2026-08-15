@@ -6,6 +6,13 @@
 > - El wrapper Semgrep de Windows ahora incluye las fuentes del agente; se cerró el escaneo pendiente de fases anteriores.
 > - Pendiente: empaquetar el agente dentro del instalador/imagen oficial y reportar salud resumida de VPS/Core.
 
+> **Sesion 2026-08-15 - TLS inicial y bootstrap del agente.** Rama `vps_prod`; sin despliegue.
+> - Certbot oficial v5.7.0 standalone emite el primer certificado solo tras DNS, correo y TOS explicitos.
+> - El certificado se valida y persiste fuera del codigo con permisos restrictivos.
+> - El agente verifica licencia/clave Central, guarda estado atomico y elimina la respuesta temporal sensible.
+> - Bash, ShellCheck, instalador 6/6, agente 6/6 y Semgrep sin hallazgos; servicios no iniciados.
+> - Pendiente: nginx dinamico, renovacion webroot, preseed /22 y health gates.
+
 > **Sesion 2026-08-15 - Configuracion greenfield del primer cliente.** Rama `vps_prod`; sin despliegue.
 > - El usuario confirmo que el primer cliente se levantara en un VPS nuevo y limpio.
 > - El instalador genera secretos unicos y archivos 0600; URLs/CORS derivan del FQDN activado.

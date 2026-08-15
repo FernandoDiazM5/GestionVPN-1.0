@@ -16,6 +16,8 @@ La plantilla `.env.compose.example` documenta referencias, no credenciales utili
 
 Para el primer cliente se asume un VPS nuevo y una distribucion oficial completa indicada mediante `JOINPOINT_SOURCE_DIR`. La configuracion generada deja Telegram, Gemini, Firebase y el autosync de WireGuard apagados. El moderador incorporara sus propias credenciales y conectara su MikroTik local despues del primer acceso; ninguna integracion personal bloquea el arranque base.
 
+Tras validar DNS, el instalador usa la imagen oficial fijada `certbot/certbot:v5.7.0` en modo standalone para el primer certificado. Exige correo ACME y aceptacion explicita de terminos, valida el certificado y conserva el material renovable fuera del codigo. Luego construye el agente, verifica la licencia inicial y elimina la respuesta temporal de activacion. El estado `READY_FOR_PLATFORM_BOOTSTRAP` todavia no inicia la aplicacion: falta preconfigurar el `/22` recomendado y superar los health gates.
+
 ## Agente de instancia
 
 `Dockerfile.agent` construye solamente el agente y el protocolo criptografico compartido. Se ejecuta sin privilegios y no contiene claves, licencias ni datos de un cliente.

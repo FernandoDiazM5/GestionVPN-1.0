@@ -5,6 +5,7 @@ umask 077
 readonly INSTALL_ROOT="${JOINPOINT_INSTALL_ROOT:-/opt/joinpoint}"
 readonly SOURCE_DIR="${JOINPOINT_SOURCE_DIR:-}"
 readonly CONFIRM_PHRASE='INSTALAR JOINPOINT'
+readonly CERTBOT_IMAGE='certbot/certbot:v5.7.0'
 MODE="${1:---check}"
 
 fail() { printf 'ERROR: %s\n' "$1" >&2; exit 1; }
@@ -94,6 +95,41 @@ generate_config() {
   write_status CONFIGURED
 }
 
+issue_tls() {
+  local fqdn live
+  fqdn="$(jq -r '.fqdn' "$INSTALL_ROOT/instance.json")"
+  [[ "${JOINPOINT_ACME_AGREE_TOS:-}" == 'yes' ]] || fail "Define JOINPOINT_ACME_AGREE_TOS=yes para aceptar los terminos ACME."
+  [[ "${JOINPOINT_TLS_EMAIL:-}" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]] || fail 'JOINPOINT_TLS_EMAIL no es valido.'
+  install -d -m 0700 "$INSTALL_ROOT/acme" "$INSTALL_ROOT/acme-work" "$INSTALL_ROOT/acme-logs"
+  docker run --rm -p 80:80 \
+    -v "$INSTALL_ROOT/acme:/etc/letsencrypt" \
+    -v "$INSTALL_ROOT/acme-work:/var/lib/letsencrypt" \
+    -v "$INSTALL_ROOT/acme-logs:/var/log/letsencrypt" \
+    "$CERTBOT_IMAGE" certonly --standalone --non-interactive --agree-tos --no-eff-email \
+    --email "$JOINPOINT_TLS_EMAIL" --domain "$fqdn"
+  live="$INSTALL_ROOT/acme/live/$fqdn"
+  [[ -f "$live/fullchain.pem" && -f "$live/privkey.pem" ]] || fail 'Certbot no genero el par TLS esperado.'
+  install -m 0644 "$live/fullchain.pem" "$INSTALL_ROOT/tls/fullchain.pem"
+  install -m 0600 "$live/privkey.pem" "$INSTALL_ROOT/tls/privkey.pem"
+  openssl x509 -in "$INSTALL_ROOT/tls/fullchain.pem" -noout -checkend 86400 >/dev/null \
+    || fail 'El certificado emitido no supera la validacion local.'
+  write_status TLS_READY
+}
+
+bootstrap_agent() {
+  local compose_file env_file
+  compose_file="$SOURCE_DIR/deploy/joinpoint-instance/compose.yaml"
+  env_file="$INSTALL_ROOT/config/compose.env"
+  docker compose --env-file "$env_file" -f "$compose_file" build instance-agent
+  docker compose --env-file "$env_file" -f "$compose_file" run --rm --no-deps \
+    -e JOINPOINT_ACTIVATION_RESPONSE_FILE=/run/secrets/activation-response.json \
+    -v "$INSTALL_ROOT/secrets/activation-response.json:/run/secrets/activation-response.json:ro" \
+    instance-agent packages/joinpoint-instance-agent/src/bootstrap.js
+  [[ -s "$INSTALL_ROOT/agent-state/agent-state.json" ]] || fail 'El bootstrap no persistio el estado del agente.'
+  rm -f "$INSTALL_ROOT/secrets/activation-response.json"
+  write_status AGENT_BOOTSTRAPPED
+}
+
 check_dns() {
   local fqdn resolved
   fqdn="$(jq -r '.fqdn' "$INSTALL_ROOT/instance.json")"
@@ -118,16 +154,20 @@ case "$MODE" in
     activate
     check_dns || exit $?
     generate_config
-    write_status READY_FOR_TLS
-    info 'READY_FOR_TLS: activacion y configuracion greenfield completadas; falta emitir el certificado.'
+    issue_tls
+    bootstrap_agent
+    write_status READY_FOR_PLATFORM_BOOTSTRAP
+    info 'READY_FOR_PLATFORM_BOOTSTRAP: TLS e identidad listos; los servicios aun no fueron iniciados.'
     ;;
   --resume)
     preflight
     [[ -f "$INSTALL_ROOT/install-status" && -f "$INSTALL_ROOT/instance.json" ]] || fail 'No existe una instalacion reanudable.'
     check_dns || exit $?
     [[ -f "$INSTALL_ROOT/config/compose.env" ]] || generate_config
-    write_status READY_FOR_TLS
-    info 'READY_FOR_TLS: DNS y configuracion greenfield validados; falta emitir el certificado.'
+    [[ -f "$INSTALL_ROOT/tls/fullchain.pem" && -f "$INSTALL_ROOT/tls/privkey.pem" ]] || issue_tls
+    [[ -f "$INSTALL_ROOT/agent-state/agent-state.json" ]] || bootstrap_agent
+    write_status READY_FOR_PLATFORM_BOOTSTRAP
+    info 'READY_FOR_PLATFORM_BOOTSTRAP: TLS e identidad listos; los servicios aun no fueron iniciados.'
     ;;
   *) fail 'Uso: install.sh --check | --apply | --resume' ;;
 esac
