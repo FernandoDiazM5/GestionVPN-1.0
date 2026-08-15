@@ -140,6 +140,38 @@ CREATE TABLE IF NOT EXISTS control_plane_audit_events (
   INDEX idx_cp_audit_customer (customer_id, created_at)
 );
 
+CREATE TABLE IF NOT EXISTS control_plane_admins (
+  id CHAR(36) PRIMARY KEY,
+  email VARCHAR(254) NOT NULL UNIQUE,
+  display_name VARCHAR(120) NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  totp_secret_encrypted TEXT NOT NULL,
+  status ENUM('ACTIVE','SUSPENDED') NOT NULL DEFAULT 'ACTIVE',
+  failed_login_count TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  locked_until DATETIME(3) NULL,
+  last_login_at DATETIME(3) NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+    ON UPDATE CURRENT_TIMESTAMP(3)
+);
+
+CREATE TABLE IF NOT EXISTS control_plane_admin_sessions (
+  id CHAR(36) PRIMARY KEY,
+  admin_id CHAR(36) NOT NULL,
+  token_digest CHAR(64) NOT NULL UNIQUE,
+  csrf_digest CHAR(64) NOT NULL,
+  source_ip_digest CHAR(64) NOT NULL,
+  user_agent_hash CHAR(64) NOT NULL,
+  expires_at DATETIME(3) NOT NULL,
+  idle_expires_at DATETIME(3) NOT NULL,
+  last_seen_at DATETIME(3) NOT NULL,
+  revoked_at DATETIME(3) NULL,
+  created_at DATETIME(3) NOT NULL,
+  CONSTRAINT fk_admin_session_admin FOREIGN KEY (admin_id)
+    REFERENCES control_plane_admins(id) ON DELETE CASCADE,
+  INDEX idx_admin_session_expiry (expires_at, idle_expires_at)
+);
+
 CREATE TABLE IF NOT EXISTS license_signing_keys (
   key_id VARCHAR(80) PRIMARY KEY,
   algorithm VARCHAR(20) NOT NULL DEFAULT 'Ed25519',

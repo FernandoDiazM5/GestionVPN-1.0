@@ -7,6 +7,7 @@ const mysql = require('mysql2/promise');
 const request = require('supertest');
 const { createApp } = require('../../src/app');
 const { publicKeyFingerprint, verifyLicense } = require('../../src/domain/licenses');
+const { digest } = require('../../src/domain/adminSecurity');
 
 const enabled = process.env.CONTROL_INTEGRATION_TEST === 'true';
 
@@ -18,13 +19,22 @@ test('flujo HTTP completo contra MariaDB real', { skip: !enabled }, async () => 
   const instance = crypto.generateKeyPairSync('ed25519');
   const instancePublic = instance.publicKey.export({ type: 'spki', format: 'pem' });
   const keyId = 'integration-key';
-  const adminToken = 'integration-admin-token-joinpoint-32-characters';
+  const adminSessionToken = 'integration-admin-session-token';
+  const csrfToken = 'integration-admin-csrf-token';
+  const userAgent = 'joinpoint-integration-test';
   const activationPepper = 'integration-activation-pepper-joinpoint-32';
   const rateLimitPepper = 'integration-rate-limit-pepper-joinpoint-32';
   const now = new Date('2026-08-15T12:00:00Z');
   await pool.query('INSERT INTO license_signing_keys (key_id,public_key_pem,public_key_fingerprint,activated_at) VALUES (?,?,?,?)', [keyId, centralPublic, publicKeyFingerprint(centralPublic), now]);
-  const app = createApp({ pool, adminToken, activationPepper, rateLimitPepper, signingKeyId:keyId, signingPrivateKey:centralPrivate, now:()=>now });
-  const auth = { Authorization:`Bearer ${adminToken}` };
+  const adminId = crypto.randomUUID();
+  await pool.query(`INSERT INTO control_plane_admins (id,email,display_name,password_hash,totp_secret_encrypted)
+    VALUES (?,?,?,'integration-only','integration-only')`, [adminId, 'admin@integration.test', 'Administrador']);
+  await pool.query(`INSERT INTO control_plane_admin_sessions
+    (id,admin_id,token_digest,csrf_digest,source_ip_digest,user_agent_hash,expires_at,idle_expires_at,last_seen_at,created_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?)`, [crypto.randomUUID(), adminId, digest(adminSessionToken), digest(csrfToken), digest('ip'), digest(userAgent),
+    new Date('2026-08-16T12:00:00Z'), new Date('2026-08-16T12:00:00Z'), now, now]);
+  const app = createApp({ pool, activationPepper, rateLimitPepper, signingKeyId:keyId, signingPrivateKey:centralPrivate, now:()=>now });
+  const auth = { Cookie:`__Host-joinpoint_admin=${adminSessionToken}`, 'x-csrf-token':csrfToken, 'User-Agent':userAgent };
   try {
     const customer = (await request(app).post('/api/admin/customers').set(auth).send({ legalName:'Cliente Integración SAC', displayName:'Cliente Integración' }).expect(201)).body.customer;
     const plan = (await request(app).post('/api/admin/plans').set(auth).send({ code:'BASIC', name:'Básico', entitlements:[{key:'sites.max',enabled:true,limit:5}] }).expect(201)).body.plan;

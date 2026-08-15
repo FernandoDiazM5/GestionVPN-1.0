@@ -5,17 +5,18 @@ Servicio aislado para clientes, planes, instancias, pools y activaciones. No con
 ## Configuración mínima
 
 - `CONTROL_PLANE_PORT` (default `3100`)
-- `CONTROL_PLANE_ADMIN_TOKEN` (mínimo 32 caracteres; secreto fuera del repositorio)
+- `CONTROL_ADMIN_MFA_ENCRYPTION_KEY` (32 bytes en Base64; cifra secretos TOTP y permanece fuera del repositorio)
+- `CONTROL_ADMIN_SESSION_PEPPER` (mínimo 32 caracteres; seudonimiza el origen de sesión)
 - `ACTIVATION_CODE_PEPPER` (mínimo 32 caracteres; secreto distinto al token)
 - `ACTIVATION_RATE_LIMIT_PEPPER` (mínimo 32 caracteres; distinto de los anteriores)
 - `LICENSE_SIGNING_KEY_ID` y `LICENSE_SIGNING_PRIVATE_KEY_FILE` (PEM Ed25519 fuera del repositorio)
 - `CONTROL_DB_HOST`, `CONTROL_DB_PORT`, `CONTROL_DB_USER`, `CONTROL_DB_PASSWORD`, `CONTROL_DB_NAME`
 
-El servidor escucha exclusivamente en `127.0.0.1`. La publicación futura debe pasar por HTTPS y un proxy con rate limiting. El Bearer actual es una protección administrativa provisional; debe sustituirse por sesiones fuertes con MFA antes de construir la interfaz central.
+El servidor escucha exclusivamente en `127.0.0.1`. La publicación futura debe pasar por HTTPS y un proxy con rate limiting adicional. La autenticación administrativa ya usa sesiones y MFA; todavía no debe exponerse hasta completar el proxy TLS, recuperación de cuenta y canary operativo.
 
 ## API administrativa MVP
 
-Todas las rutas bajo `/api/admin` exigen `Authorization: Bearer <token>`.
+`POST /api/admin-auth/login` recibe correo, contraseña y código TOTP. Todas las rutas bajo `/api/admin` exigen la cookie opaca `__Host-joinpoint_admin`; las operaciones que modifican datos requieren además el valor entregado como `csrfToken` en `X-CSRF-Token`. La cookie es `HttpOnly`, `Secure`, `SameSite=Strict`, dura como máximo ocho horas y vence tras 30 minutos de inactividad.
 
 - `GET|POST /api/admin/customers`
 - `GET|POST /api/admin/plans`
@@ -28,6 +29,14 @@ Todas las rutas bajo `/api/admin` exigen `Authorization: Bearer <token>`.
 - `POST /api/admin/license-keys/:keyId/revoke`
 - `GET /api/admin/instances/:id/licenses`
 - `POST /api/admin/licenses/:id/revoke`
+- `GET /api/admin/me`
+- `POST /api/admin/logout`
+
+## Primer administrador
+
+Después de aplicar el esquema y antes de publicar el servicio, definir temporalmente `CONTROL_ADMIN_BOOTSTRAP_EMAIL`, `CONTROL_ADMIN_BOOTSTRAP_NAME` y `CONTROL_ADMIN_BOOTSTRAP_PASSWORD`, además de las variables de base y cifrado, y ejecutar `npm run bootstrap:admin`. Sólo funciona cuando no existe ningún administrador y muestra una URI TOTP una única vez. Registrar esa URI en la aplicación autenticadora, retirar inmediatamente las tres variables de bootstrap y conservar fuera del VPS los procedimientos de recuperación.
+
+Las contraseñas se derivan con `scrypt`; los secretos TOTP se cifran con AES-256-GCM. Cinco fallos consecutivos bloquean la cuenta durante 15 minutos. La base conserva únicamente hashes de tokens de sesión y CSRF, nunca sus valores en claro.
 
 El instalador usa `POST /api/activate`. El endpoint aplica primero rate limiting durable y después ejecuta atómicamente: consumir código, registrar identidad Ed25519, activar instancia y emitir la primera licencia. Devuelve FQDN, `/22`, licencia y clave pública de verificación; los errores de código/suscripción se unifican como `ACTIVATION_FAILED` para evitar enumeración.
 
@@ -38,7 +47,6 @@ El código en claro sólo aparece al emitirlo. Los listados exponen estado y fec
 ## Límites deliberados
 
 - Sin interfaz web central.
-- Sin endpoint público de activación hasta añadir rate limiting durable y licencias firmadas.
 - Sin DNS, TLS, facturación, heartbeat o comandos remotos.
 - Sin despliegue de producción.
 

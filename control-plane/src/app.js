@@ -2,7 +2,8 @@
 
 const express = require('express');
 const { z } = require('zod');
-const { createAdminAuth } = require('./middleware/adminAuth');
+const { COOKIE_NAME, createAdminAuth } = require('./middleware/adminAuth');
+const { createAdminSessionService } = require('./services/adminSessions');
 const { createAdminService } = require('./services/adminService');
 const { activateInstance } = require('./services/activateInstance');
 const { createLicenseLifecycleService } = require('./services/licenseLifecycle');
@@ -46,6 +47,9 @@ const signingKeySchema = z.object({
 }).strict();
 const revokeSchema = z.object({ reason: z.string().trim().min(8).max(500) }).strict();
 const signingKeyIdSchema = z.string().regex(/^[a-zA-Z0-9._-]{3,80}$/);
+const loginSchema = z.object({
+  email: z.email().max(254), password: z.string().min(12).max(200), totp: z.string().regex(/^\d{6}$/),
+}).strict();
 
 function validate(schema, value) {
   const parsed = schema.safeParse(value);
@@ -62,14 +66,23 @@ function asyncRoute(handler) {
   return (req, res, next) => Promise.resolve(handler(req, res)).catch(next);
 }
 
-function createApp({ pool, adminToken, activationPepper, rateLimitPepper, signingKeyId, signingPrivateKey, now }) {
+function createApp({ pool, activationPepper, rateLimitPepper, signingKeyId, signingPrivateKey,
+  adminMfaEncryptionKey, adminSessionPepper, now }) {
   const app = express();
   const service = createAdminService({ pool, activationPepper, now });
   const licenseLifecycle = createLicenseLifecycleService({ pool, now });
+  const sessions = createAdminSessionService({ pool, mfaEncryptionKey: adminMfaEncryptionKey,
+    sessionPepper: adminSessionPepper, now });
   app.disable('x-powered-by');
   app.set('trust proxy', 'loopback');
   app.use(express.json({ limit: '64kb' }));
   app.get('/health', (_req, res) => res.json({ success: true, status: 'ok' }));
+  app.post('/api/admin-auth/login', asyncRoute(async (req, res) => {
+    const input = validate(loginSchema, req.body);
+    const session = await sessions.login({ ...input, sourceIp: req.ip, userAgent: req.get('user-agent') || '' });
+    res.cookie(COOKIE_NAME, session.token, { httpOnly: true, secure: true, sameSite: 'strict', path: '/', expires: session.expiresAt });
+    res.json({ success: true, csrfToken: session.csrf, admin: session.admin, expiresAt: session.expiresAt });
+  }));
   if (rateLimitPepper && signingKeyId && signingPrivateKey) app.post('/api/activate', asyncRoute(async (req, res) => {
     const input = validate(publicActivationSchema, req.body);
     const activation = await activateInstance({ pool, ...input, activationPepper, rateLimitPepper,
@@ -78,7 +91,13 @@ function createApp({ pool, adminToken, activationPepper, rateLimitPepper, signin
   }));
 
   const admin = express.Router();
-  admin.use(createAdminAuth(adminToken));
+  admin.use(createAdminAuth({ pool, now }));
+  admin.get('/me', (req, res) => res.json({ success: true, admin: req.admin }));
+  admin.post('/logout', asyncRoute(async (req, res) => {
+    await sessions.logout(req.adminSessionId);
+    res.clearCookie(COOKIE_NAME, { httpOnly: true, secure: true, sameSite: 'strict', path: '/' });
+    res.json({ success: true });
+  }));
   admin.get('/customers', asyncRoute(async (_req, res) => res.json({ success: true, customers: await service.listCustomers() })));
   admin.post('/customers', asyncRoute(async (req, res) => res.status(201).json({ success: true, customer: await service.createCustomer(validate(customerSchema, req.body)) })));
   admin.get('/plans', asyncRoute(async (_req, res) => res.json({ success: true, plans: await service.listPlans() })));
@@ -88,7 +107,7 @@ function createApp({ pool, adminToken, activationPepper, rateLimitPepper, signin
   admin.get('/instances/:id/activation-codes', asyncRoute(async (req, res) => res.json({ success: true, activations: await service.listActivations(validate(uuid, req.params.id)) })));
   admin.post('/instances/:id/activation-codes', asyncRoute(async (req, res) => {
     const input = validate(activationSchema, req.body || {});
-    const activation = await service.issueActivation(validate(uuid, req.params.id), '00000000-0000-4000-8000-000000000000', input.ttlHours);
+    const activation = await service.issueActivation(validate(uuid, req.params.id), req.admin.id, input.ttlHours);
     res.status(201).json({ success: true, activation, warning: 'El código sólo se mostrará en esta respuesta.' });
   }));
   admin.post('/instances/:id/subscriptions', asyncRoute(async (req, res) => res.status(201).json({
@@ -120,7 +139,8 @@ function createApp({ pool, adminToken, activationPepper, rateLimitPepper, signin
   app.use((error, _req, res, _next) => {
     const duplicate = error?.code === 'ER_DUP_ENTRY';
     const publicActivationFailure = /^(ACTIVATION_CODE_|INSTANCE_ALREADY_ACTIVATED|SUBSCRIPTION_NOT_ACTIVE)/.test(error?.code || '');
-    const status = error?.code === 'ACTIVATION_RATE_LIMITED' ? 429 : publicActivationFailure ? 400 : error?.code === 'VALIDATION_ERROR' ? 400
+    const status = error?.code === 'ACTIVATION_RATE_LIMITED' ? 429 : error?.code === 'ADMIN_LOGIN_FAILED' ? 401
+      : publicActivationFailure ? 400 : error?.code === 'VALIDATION_ERROR' ? 400
       : duplicate || /(_NOT_FOUND|_ALREADY_|_NOT_REVOCABLE|_NOT_ACTIVATABLE|_INCOMPLETE|_EXHAUSTED)$/.test(error?.code || '') ? 409
         : 500;
     const code = duplicate ? 'RESOURCE_CONFLICT' : publicActivationFailure ? 'ACTIVATION_FAILED' : status === 500 ? 'INTERNAL_ERROR' : error.code;

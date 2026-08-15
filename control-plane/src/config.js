@@ -9,7 +9,8 @@ function required(value, name, minLength = 1) {
 function loadConfig(env = process.env) {
   return {
     port: Number(env.CONTROL_PLANE_PORT || 3100),
-    adminToken: required(env.CONTROL_PLANE_ADMIN_TOKEN, 'CONTROL_PLANE_ADMIN_TOKEN', 32),
+    adminMfaEncryptionKey: required(env.CONTROL_ADMIN_MFA_ENCRYPTION_KEY, 'CONTROL_ADMIN_MFA_ENCRYPTION_KEY', 44),
+    adminSessionPepper: required(env.CONTROL_ADMIN_SESSION_PEPPER, 'CONTROL_ADMIN_SESSION_PEPPER', 32),
     activationPepper: required(env.ACTIVATION_CODE_PEPPER, 'ACTIVATION_CODE_PEPPER', 32),
     rateLimitPepper: required(env.ACTIVATION_RATE_LIMIT_PEPPER, 'ACTIVATION_RATE_LIMIT_PEPPER', 32),
     signingKeyId: required(env.LICENSE_SIGNING_KEY_ID, 'LICENSE_SIGNING_KEY_ID', 3),

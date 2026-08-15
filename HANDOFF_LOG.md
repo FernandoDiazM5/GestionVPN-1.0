@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-15 — Sesiones administrativas y MFA.** Rama `vps_prod` (base `86aad22`). Estado: unitarias 32/32, integración HTTP/MariaDB 1/1 y esquema real 15 tablas; sin despliegue.
+> - El Bearer provisional fue sustituido por contraseña `scrypt`, TOTP cifrado, cookie opaca segura y CSRF en escrituras.
+> - Se añadió bootstrap único del primer administrador, expiración absoluta/inactiva, vínculo al navegador y bloqueo temporal por fallos.
+> - MariaDB temporal y el flujo completo fueron validados y eliminados al terminar.
+> - Semgrep no concluyó porque el registro remoto de reglas agotó el tiempo; repetir antes del despliegue.
+
 > **Sesión 2026-08-15 — Integración HTTP/MariaDB completa.** Rama `vps_prod` (base `a1d6b68`). Estado: unitarias 23/23 e integración real 1/1; sin despliegue.
 > - Un harness condicionado por entorno levanta el flujo completo contra MariaDB real sin tocar producción.
 > - Confirmó FQDN `cliente-integracion.joinpoint.cloud`, primer `/22` `10.64.0.0/22`, licencia verificable y rechazo del segundo uso del código.
