@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-15 — Aprovisionamiento productivo del Core `/22`.** Rama `vps_prod` (base `c7bc79e`). Estado: Core/VPS/aplicación saludables; HTTPS 200; MySQL, RouterOS y SMTP `ok`; cero datos operativos huérfanos.
+> - Se creó dentro del VPS una contraseña aleatoria de backup, se persistió cifrada y no se expuso. El primer intento agotó el handshake sin modificar el Core; tras confirmar ping y preview saludable, el segundo generó, validó y envió el par `.backup` cifrado + `.rsc` al Administrador.
+> - Con preview `canProvision=true` y sin bloqueos se ejecutó el aprovisionamiento idempotente: gateways `/24`, listas, SSTP, allowlist y siete reglas GVPN. `core_provisioned_at` quedó registrado y la supernet inicial ya no puede modificarse.
+> - Verificación: `wg0` usa exclusivamente `10.12.248.0/22`, handshake reciente, ping al Core 0 % pérdida, Core `HEALTHY`, cero nodos/AP/CPE/grupos/asignaciones/monitoring y FKs/triggers de cascada vigentes.
+> - Pendiente: canary con el primer sitio/CPE real; no crear un sitio ficticio.
+
 > **Sesión 2026-08-15 — Limpieza de huérfanos y cierre productivo `/22`.** Rama local `vps_prod` (base `cba6c54`). Estado: cero dependencias de sitios, Core accesible, WireGuard/backend/DB sanos; backend 115/669, `check:all` y Semgrep 516/0.
 > - Se creó un dump y se restauró en una BD temporal antes de eliminar 80 AP, 14 grupos, 450 CPE, 1 asignación y 31 estados de monitoreo; usuarios, 3 workspaces, Administración y auditorías se preservaron.
 > - Dos scan-IP migraron a `10.12.248.x`; se retiraron pool, rutas e intención autosync antiguos. `wg0` conserva únicamente `10.12.248.0/22`.
