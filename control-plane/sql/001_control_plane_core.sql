@@ -14,6 +14,10 @@ INSERT INTO platform_settings (setting_key, setting_value)
 VALUES ('root_domain', 'joinpoint.cloud')
 ON DUPLICATE KEY UPDATE setting_value = setting_value;
 
+INSERT INTO platform_settings (setting_key, setting_value)
+VALUES ('network_pool', '10.64.0.0/12')
+ON DUPLICATE KEY UPDATE setting_value = setting_value;
+
 CREATE TABLE IF NOT EXISTS customers (
   id CHAR(36) PRIMARY KEY,
   legal_name VARCHAR(180) NOT NULL,

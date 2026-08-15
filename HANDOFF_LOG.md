@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-15 — API administrativa central MVP.** Rama `vps_prod` (base `d4e9713`). Estado: 15/15 pruebas, esquema MariaDB 11 válido y Semgrep security/secrets 0 hallazgos; sin despliegue.
+> - Se añadió API local fail-closed para clientes, planes, instancias y activaciones; todas las rutas administrativas exigen Bearer de mínimo 32 caracteres y validación estricta.
+> - Las instancias derivan FQDN desde el label + dominio raíz y reservan transaccionalmente el `/22` libre más bajo del pool central `10.64.0.0/12`.
+> - Emitir un código revoca cualquier código pendiente anterior; listados y revocaciones nunca exponen código ni digest. El consumo público continúa cerrado hasta tener rate limiting durable y licencia firmada.
+> - Pendiente inmediato: reemplazar Bearer por sesión administrativa+MFA y añadir firma/verificación de licencias antes de publicar UI o conectar producción.
+
 > **Sesión 2026-08-15 — Inicio de Plataforma Central Joinpoint.** Rama `vps_prod` (base `4a2fb30`). Estado: incremento aislado, 9/9 pruebas, esquema MariaDB 11 válido y Semgrep JavaScript/secrets 0 hallazgos; sin despliegue.
 > - Se creó `control-plane` como workspace separado para evitar acoplar licencias con la operación de red existente.
 > - Se implementaron dominio raíz configurable + label estable, códigos de activación HMAC de un solo uso e identidad Ed25519 del VPS con consumo transaccional y auditoría.

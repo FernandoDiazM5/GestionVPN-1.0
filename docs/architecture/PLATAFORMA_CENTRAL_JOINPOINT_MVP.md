@@ -38,4 +38,6 @@ Un cambio de `joinpoint.cloud` a otro dominio es una migración, no una edición
 
 ## Límite de este incremento
 
-Este bloque define el modelo y funciones puras. No crea clientes reales, no emite licencias productivas, no modifica DNS, no despliega VPS y no conecta la instancia actual con el control plane.
+La segunda fase añade una API administrativa local protegida por Bearer obligatorio para CRUD inicial de clientes/planes, creación y listado de instancias, reserva automática del `/22` libre más bajo y emisión/listado/revocación de activaciones. El servidor sólo escucha en `127.0.0.1`; el token es provisional y debe reemplazarse por sesiones administrativas con MFA antes de publicar una UI.
+
+Todavía no crea clientes reales, no emite licencias productivas, no expone el consumo público de activaciones, no modifica DNS, no despliega VPS y no conecta la instancia actual con el control plane.
