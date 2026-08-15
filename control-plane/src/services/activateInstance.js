@@ -38,6 +38,12 @@ async function activateInstance({ pool, code, activationPepper, rateLimitPepper,
     if (record.instance_status !== 'PENDING_ACTIVATION') throw coded('INSTANCE_ALREADY_ACTIVATED');
     if (!['TRIAL', 'ACTIVE'].includes(record.subscription_status) || new Date(record.ends_at) <= now) throw coded('SUBSCRIPTION_NOT_ACTIVE');
     if (publicKeyFingerprint(record.public_key_pem) !== record.public_key_fingerprint) throw coded('SIGNING_KEY_FINGERPRINT_MISMATCH');
+    let configuredFingerprint;
+    try {
+      const configuredPublicKey = crypto.createPublicKey(signingPrivateKey).export({ type: 'spki', format: 'pem' });
+      configuredFingerprint = publicKeyFingerprint(configuredPublicKey);
+    } catch (_) { throw coded('SIGNING_PRIVATE_KEY_INVALID'); }
+    if (configuredFingerprint !== record.public_key_fingerprint) throw coded('SIGNING_PRIVATE_KEY_MISMATCH');
     const [features] = await connection.query('SELECT feature_key,enabled,numeric_limit FROM plan_entitlements WHERE plan_id=(SELECT plan_id FROM subscriptions WHERE id=?) ORDER BY feature_key', [record.subscription_id]);
     const entitlements = Object.fromEntries(features.map(item => [item.feature_key, item.numeric_limit == null ? Boolean(item.enabled) : Number(item.numeric_limit)]));
     const expiresAt = new Date(Math.min(new Date(record.ends_at).getTime(), now.getTime() + 7 * 86400000));

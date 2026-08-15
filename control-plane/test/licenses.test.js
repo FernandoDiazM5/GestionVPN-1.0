@@ -40,3 +40,12 @@ test('distingue vigencia, gracia offline y expiración sin apagar la red', () =>
   assert.equal(expired.valid, false);
   assert.equal(expired.state, 'EXPIRED');
 });
+
+test('rechaza inmediatamente las licencias firmadas por una clave revocada', () => {
+  const token = signLicense(base, { keyId: 'key-2026-01', privateKey });
+  assert.throws(() => verifyLicense(token, {
+    publicKeys: { 'key-2026-01': publicKey },
+    revokedKeyIds: ['key-2026-01'],
+    expectedInstanceId: 'instance-1',
+  }), /LICENSE_KEY_REVOKED/);
+});

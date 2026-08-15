@@ -7,6 +7,11 @@ function coded(code) { const error = new Error(code); error.code = code; return 
 function seconds(date) { return Math.floor(date.getTime() / 1000); }
 
 async function issueLicense({ pool, instanceId, keyId, privateKey, now = new Date(), leaseDays = 7, offlineGraceHours = 72 }) {
+  let configuredPublicFingerprint;
+  try {
+    const configuredPublicKey = crypto.createPublicKey(privateKey).export({ type: 'spki', format: 'pem' });
+    configuredPublicFingerprint = publicKeyFingerprint(configuredPublicKey);
+  } catch (_) { throw coded('SIGNING_PRIVATE_KEY_INVALID'); }
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
@@ -28,6 +33,7 @@ async function issueLicense({ pool, instanceId, keyId, privateKey, now = new Dat
     if (!record) throw coded('LICENSE_CONTEXT_NOT_FOUND');
     if (!['TRIAL', 'ACTIVE', 'PAST_DUE', 'GRACE_PERIOD'].includes(record.subscription_status)) throw coded('SUBSCRIPTION_NOT_LICENSABLE');
     if (publicKeyFingerprint(record.public_key_pem) !== record.public_key_fingerprint) throw coded('SIGNING_KEY_FINGERPRINT_MISMATCH');
+    if (configuredPublicFingerprint !== record.public_key_fingerprint) throw coded('SIGNING_PRIVATE_KEY_MISMATCH');
 
     const [features] = await connection.query(
       `SELECT pe.feature_key, pe.enabled, pe.numeric_limit

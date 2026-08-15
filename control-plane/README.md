@@ -23,6 +23,11 @@ Todas las rutas bajo `/api/admin` exigen `Authorization: Bearer <token>`.
 - `GET|POST /api/admin/instances/:id/activation-codes`
 - `POST /api/admin/activation-codes/:id/revoke`
 - `POST /api/admin/instances/:id/subscriptions`
+- `GET|POST /api/admin/license-keys`
+- `POST /api/admin/license-keys/:keyId/activate`
+- `POST /api/admin/license-keys/:keyId/revoke`
+- `GET /api/admin/instances/:id/licenses`
+- `POST /api/admin/licenses/:id/revoke`
 
 El instalador usa `POST /api/activate`. El endpoint aplica primero rate limiting durable y después ejecuta atómicamente: consumir código, registrar identidad Ed25519, activar instancia y emitir la primera licencia. Devuelve FQDN, `/22`, licencia y clave pública de verificación; los errores de código/suscripción se unifican como `ACTIVATION_FAILED` para evitar enumeración.
 
@@ -38,6 +43,10 @@ El código en claro sólo aparece al emitirlo. Los listados exponen estado y fec
 - Sin despliegue de producción.
 
 El limitador durable permite 5 intentos por IP seudonimizada en 15 minutos y bloquea 60 minutos al excederlos. La tabla sólo conserva HMAC, ventana, contador y vencimiento del bloqueo.
+
+## Ciclo de claves y licencias
+
+La rotación conserva las claves anteriores como `VERIFY_ONLY`; una revocación de emergencia las marca `REVOKED` y el verificador las rechaza aunque la firma sea correcta. Activar una clave en la base no instala su clave privada: el archivo externo y `LICENSE_SIGNING_KEY_ID` deben corresponder exactamente o la emisión falla de forma cerrada. Las licencias se revocan con motivo administrativo, sin almacenar ni volver a exponer su token.
 
 ## Licencias firmadas
 

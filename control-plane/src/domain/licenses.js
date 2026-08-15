@@ -42,7 +42,7 @@ function signLicense(payload, { keyId, privateKey }) {
   return `${signingInput}.${signature.toString('base64url')}`;
 }
 
-function verifyLicense(token, { publicKeys, expectedInstanceId, now = new Date() }) {
+function verifyLicense(token, { publicKeys, revokedKeyIds = [], expectedInstanceId, now = new Date() }) {
   const parts = String(token || '').split('.');
   if (parts.length !== 4 || parts[0] !== TOKEN_PREFIX) throw new Error('LICENSE_FORMAT_INVALID');
   let header;
@@ -52,6 +52,7 @@ function verifyLicense(token, { publicKeys, expectedInstanceId, now = new Date()
     payload = JSON.parse(fromBase64url(parts[2]).toString('utf8'));
   } catch (_) { throw new Error('LICENSE_FORMAT_INVALID'); }
   if (header.alg !== 'EdDSA' || header.typ !== 'JPL' || !header.kid) throw new Error('LICENSE_HEADER_INVALID');
+  if (new Set(revokedKeyIds).has(header.kid)) throw new Error('LICENSE_KEY_REVOKED');
   const publicKey = publicKeys?.[header.kid];
   if (!publicKey) throw new Error('LICENSE_KEY_UNKNOWN');
   const valid = crypto.verify(null, Buffer.from(parts.slice(0, 3).join('.')), normalizeEd25519Key(publicKey, 'public'), fromBase64url(parts[3]));

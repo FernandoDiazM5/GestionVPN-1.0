@@ -5,6 +5,7 @@ const { z } = require('zod');
 const { createAdminAuth } = require('./middleware/adminAuth');
 const { createAdminService } = require('./services/adminService');
 const { activateInstance } = require('./services/activateInstance');
+const { createLicenseLifecycleService } = require('./services/licenseLifecycle');
 
 const uuid = z.string().uuid();
 const customerSchema = z.object({
@@ -38,6 +39,13 @@ const publicActivationSchema = z.object({
   code: z.string().trim().min(20).max(100),
   instancePublicKeyPem: z.string().trim().min(80).max(1000),
 }).strict();
+const signingKeySchema = z.object({
+  keyId: z.string().trim().regex(/^[a-zA-Z0-9._-]{3,80}$/),
+  publicKeyPem: z.string().trim().min(80).max(1000),
+  activate: z.boolean().default(false),
+}).strict();
+const revokeSchema = z.object({ reason: z.string().trim().min(8).max(500) }).strict();
+const signingKeyIdSchema = z.string().regex(/^[a-zA-Z0-9._-]{3,80}$/);
 
 function validate(schema, value) {
   const parsed = schema.safeParse(value);
@@ -57,6 +65,7 @@ function asyncRoute(handler) {
 function createApp({ pool, adminToken, activationPepper, rateLimitPepper, signingKeyId, signingPrivateKey, now }) {
   const app = express();
   const service = createAdminService({ pool, activationPepper, now });
+  const licenseLifecycle = createLicenseLifecycleService({ pool, now });
   app.disable('x-powered-by');
   app.set('trust proxy', 'loopback');
   app.use(express.json({ limit: '64kb' }));
@@ -87,13 +96,32 @@ function createApp({ pool, adminToken, activationPepper, rateLimitPepper, signin
     subscription: await service.assignSubscription(validate(uuid, req.params.id), validate(subscriptionSchema, req.body)),
   })));
   admin.post('/activation-codes/:id/revoke', asyncRoute(async (req, res) => res.json({ success: true, activation: await service.revokeActivation(validate(uuid, req.params.id)) })));
+  admin.get('/license-keys', asyncRoute(async (_req, res) => res.json({ success: true, keys: await licenseLifecycle.listSigningKeys() })));
+  admin.post('/license-keys', asyncRoute(async (req, res) => res.status(201).json({
+    success: true, key: await licenseLifecycle.registerSigningKey(validate(signingKeySchema, req.body)),
+  })));
+  admin.post('/license-keys/:keyId/activate', asyncRoute(async (req, res) => res.json({
+    success: true, key: await licenseLifecycle.activateSigningKey(validate(signingKeyIdSchema, req.params.keyId)),
+    warning: 'La emisión requiere instalar fuera de la API el archivo privado correspondiente y configurar su keyId.',
+  })));
+  admin.post('/license-keys/:keyId/revoke', asyncRoute(async (req, res) => {
+    validate(revokeSchema, req.body);
+    res.json({ success: true, key: await licenseLifecycle.revokeSigningKey(validate(signingKeyIdSchema, req.params.keyId)) });
+  }));
+  admin.get('/instances/:id/licenses', asyncRoute(async (req, res) => res.json({
+    success: true, licenses: await licenseLifecycle.listLicenses(validate(uuid, req.params.id)),
+  })));
+  admin.post('/licenses/:id/revoke', asyncRoute(async (req, res) => {
+    const input = validate(revokeSchema, req.body);
+    res.json({ success: true, license: await licenseLifecycle.revokeLicense(validate(uuid, req.params.id), input.reason) });
+  }));
   app.use('/api/admin', admin);
 
   app.use((error, _req, res, _next) => {
     const duplicate = error?.code === 'ER_DUP_ENTRY';
     const publicActivationFailure = /^(ACTIVATION_CODE_|INSTANCE_ALREADY_ACTIVATED|SUBSCRIPTION_NOT_ACTIVE)/.test(error?.code || '');
     const status = error?.code === 'ACTIVATION_RATE_LIMITED' ? 429 : publicActivationFailure ? 400 : error?.code === 'VALIDATION_ERROR' ? 400
-      : duplicate || /(_NOT_FOUND|_ALREADY_|_NOT_REVOCABLE|_INCOMPLETE|_EXHAUSTED)$/.test(error?.code || '') ? 409
+      : duplicate || /(_NOT_FOUND|_ALREADY_|_NOT_REVOCABLE|_NOT_ACTIVATABLE|_INCOMPLETE|_EXHAUSTED)$/.test(error?.code || '') ? 409
         : 500;
     const code = duplicate ? 'RESOURCE_CONFLICT' : publicActivationFailure ? 'ACTIVATION_FAILED' : status === 500 ? 'INTERNAL_ERROR' : error.code;
     if (error?.retryAfterSeconds) res.set('Retry-After', String(error.retryAfterSeconds));

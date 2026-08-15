@@ -6285,3 +6285,9 @@ Verificado con `grep` sobre todo `server/`:
 - Validación local: backend 104 archivos/618 pruebas, frontend 66/220, agente 6/6, auditor de diseño 305/0, auditoría npm 0 y builds correctos.
 - Validación de producción: respaldo restaurado y comprobado, ambas fuentes devuelven `SYSTEM_TRUSTED_SOURCE`, ninguna aparece en observación visible, HTTPS 200, 15 jails, UFW/agente activos, contenedores con 0 reinicios y datos críticos intactos.
 - Respaldo: `/root/pre-system-trusted-20260802T042255Z`; rollback inmediato: `gestionvpn-10-{backend,frontend}:pre-system-trusted-20260802T042255Z`; disco final 50% con 13 GiB libres y build cache en cero.
+
+> **Sesión 2026-08-15 — Rotación y revocación criptográfica.** Rama `vps_prod` (base `c7b09ac`). Estado: 27/27 pruebas y sintaxis/diff correctos; sin despliegue.
+> - La API administra sólo claves públicas y metadatos: registro, promoción atómica, conservación `VERIFY_ONLY` y revocación de emergencia.
+> - Las licencias emitidas pueden listarse y revocarse con motivo; el verificador rechaza claves revocadas.
+> - La emisión y activación comparan la privada externa con la pública activa y fallan cerradas ante desajuste.
+> - Semgrep no concluyó: CLI ausente y descarga del contenedor agotó dos tiempos acotados. Repetir antes del despliegue.
