@@ -1,0 +1,14 @@
+{
+  "name": "@joinpoint/control-plane",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Plataforma central de clientes, activaciones y licencias Joinpoint.",
+  "main": "src/index.js",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "check": "node --check src/index.js && node --check src/domain/subdomains.js && node --check src/domain/activationCodes.js && node --check src/services/consumeActivation.js",
+    "test": "node --test test/*.test.js"
+  }
+}

@@ -57,7 +57,7 @@ function stageWindowsSources() {
     cwd: root,
     encoding: 'utf8',
   }).split(/\r?\n/).filter(Boolean);
-  const sourceRoots = ['server/', 'vpn-manager/src/', 'packages/contracts/src/', 'semgrep-rules/'];
+  const sourceRoots = ['control-plane/', 'server/', 'vpn-manager/src/', 'packages/contracts/src/', 'semgrep-rules/'];
   const ignored = /(^|\/)(node_modules|dist|build|coverage|test|tests)(\/|$)|\.(test|spec)\.(js|jsx|ts|tsx)$/;
   const sourceExtension = /\.(js|jsx|ts|tsx|json|ya?ml)$/;
   for (const relative of listed) {

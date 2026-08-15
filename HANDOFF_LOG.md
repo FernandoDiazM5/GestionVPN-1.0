@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-15 — Inicio de Plataforma Central Joinpoint.** Rama `vps_prod` (base `4a2fb30`). Estado: incremento aislado, 9/9 pruebas, esquema MariaDB 11 válido y Semgrep JavaScript/secrets 0 hallazgos; sin despliegue.
+> - Se creó `control-plane` como workspace separado para evitar acoplar licencias con la operación de red existente.
+> - Se implementaron dominio raíz configurable + label estable, códigos de activación HMAC de un solo uso e identidad Ed25519 del VPS con consumo transaccional y auditoría.
+> - El esquema inicial creó 10 tablas para clientes, planes/entitlements, instancias, activaciones, suscripciones, pools `/22` y auditoría. La prueba se realizó en un contenedor temporal eliminado al finalizar.
+> - Pendiente: API/UI central, licencias firmadas, heartbeat/gracia offline, facturación, DNS/TLS y el instalador oficial; producción permanece desacoplada.
+
 > **Sesión 2026-08-15 — Decisiones base de distribución comercial.** Rama `vps_prod` (base `1fbd7f2`). Estado: arquitectura acordada; sin cambios funcionales ni despliegue.
 > - Se aprobó una Plataforma Central Joinpoint para activaciones, membresías, facturación, licencias, versiones y monitoreo, con una instancia aislada por cliente en su propio VPS y MikroTik Core.
 > - `joinpoint.cloud` será el dominio raíz inicial y cada cliente recibirá automáticamente un subdominio; el label se almacenará separado para poder migrar el dominio raíz de forma coordinada sin editar cliente por cliente.
