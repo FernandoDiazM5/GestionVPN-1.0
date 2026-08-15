@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-15 — Canal firmado Central↔instancia.** Rama `vps_prod` (base `f39e73a`). Estado: unitarias 39/39, integración HTTP/MariaDB 1/1 y esquema real 18 tablas; sin despliegue.
+> - Se añadió autenticación Ed25519 de instancias con tiempo, nonce durable y cuerpo canónico; replays devuelven 401 genérico.
+> - El sync distribuye claves/revocaciones y renovación limitada; el paquete completo lleva firma central independiente.
+> - La rotación queda definida en dos tiempos para encadenar confianza desde la clave anterior.
+> - MariaDB temporal y contenedor fueron eliminados. Semgrep remoto continúa pendiente por timeout de reglas.
+
 > **Sesión 2026-08-15 — Recuperación administrativa y rate limit.** Rama `vps_prod` (base `dac480d`). Estado: unitarias 36/36, integración HTTP/MariaDB 1/1, esquema real 17 tablas y bootstrap real 1/10; sin despliegue.
 > - El bootstrap entrega una sola vez diez códigos de recuperación y sólo almacena sus HMAC.
 > - Cada código se consume atómicamente; regenerar exige contraseña+TOTP e invalida todo el conjunto anterior.

@@ -7,6 +7,8 @@ const { createAdminSessionService } = require('./services/adminSessions');
 const { createAdminService } = require('./services/adminService');
 const { activateInstance } = require('./services/activateInstance');
 const { createLicenseLifecycleService } = require('./services/licenseLifecycle');
+const { createInstanceAuth } = require('./middleware/instanceAuth');
+const { syncInstance } = require('./services/instanceSync');
 
 const uuid = z.string().uuid();
 const customerSchema = z.object({
@@ -53,6 +55,13 @@ const loginSchema = z.union([
   z.object({ ...loginBase, recoveryCode: z.string().trim().min(20).max(40) }).strict(),
 ]);
 const reauthSchema = z.object({ password: z.string().min(12).max(200), totp: z.string().regex(/^\d{6}$/) }).strict();
+const instanceSyncSchema = z.object({
+  softwareVersion: z.string().trim().min(1).max(50).optional(),
+  requestLicense: z.boolean().default(false),
+  licenseReason: z.enum(['RENEWAL', 'MISSING']).optional(),
+}).strict().superRefine((value, context) => {
+  if (value.requestLicense !== Boolean(value.licenseReason)) context.addIssue({ code:'custom', path:['licenseReason'], message:'Debe acompañar exactamente a requestLicense.' });
+});
 
 function validate(schema, value) {
   const parsed = schema.safeParse(value);
@@ -91,6 +100,11 @@ function createApp({ pool, activationPepper, rateLimitPepper, signingKeyId, sign
     const activation = await activateInstance({ pool, ...input, activationPepper, rateLimitPepper,
       sourceIp: req.ip, signingKeyId, signingPrivateKey, now: now?.() || new Date() });
     res.status(201).json({ success: true, activation });
+  }));
+  if (signingKeyId && signingPrivateKey) app.post('/api/instance/sync', createInstanceAuth({ pool, now }), asyncRoute(async (req, res) => {
+    const input = validate(instanceSyncSchema, req.body || {});
+    const sync = await syncInstance({ pool, instanceId:req.instance.id, ...input, signingKeyId, signingPrivateKey, now:now?.() || new Date() });
+    res.json({ success:true, sync });
   }));
 
   const admin = express.Router();
@@ -147,9 +161,9 @@ function createApp({ pool, activationPepper, rateLimitPepper, signingKeyId, sign
     const duplicate = error?.code === 'ER_DUP_ENTRY';
     const publicActivationFailure = /^(ACTIVATION_CODE_|INSTANCE_ALREADY_ACTIVATED|SUBSCRIPTION_NOT_ACTIVE)/.test(error?.code || '');
     const status = ['ACTIVATION_RATE_LIMITED', 'ADMIN_LOGIN_RATE_LIMITED'].includes(error?.code) ? 429
-      : ['ADMIN_LOGIN_FAILED', 'ADMIN_REAUTH_FAILED'].includes(error?.code) ? 401
+      : ['ADMIN_LOGIN_FAILED', 'ADMIN_REAUTH_FAILED', 'INSTANCE_AUTH_FAILED'].includes(error?.code) ? 401
       : publicActivationFailure ? 400 : error?.code === 'VALIDATION_ERROR' ? 400
-      : duplicate || /(_NOT_FOUND|_ALREADY_|_NOT_REVOCABLE|_NOT_ACTIVATABLE|_INCOMPLETE|_EXHAUSTED)$/.test(error?.code || '') ? 409
+      : duplicate || /(_NOT_FOUND|_ALREADY_|_NOT_REVOCABLE|_NOT_ACTIVATABLE|_TOO_EARLY|_INCOMPLETE|_EXHAUSTED)$/.test(error?.code || '') ? 409
         : 500;
     const code = duplicate ? 'RESOURCE_CONFLICT' : publicActivationFailure ? 'ACTIVATION_FAILED' : status === 500 ? 'INTERNAL_ERROR' : error.code;
     if (error?.retryAfterSeconds) res.set('Retry-After', String(error.retryAfterSeconds));

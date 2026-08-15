@@ -6,7 +6,7 @@ const { publicKeyFingerprint, signLicense, stableJson } = require('../domain/lic
 function coded(code) { const error = new Error(code); error.code = code; return error; }
 function seconds(date) { return Math.floor(date.getTime() / 1000); }
 
-async function issueLicense({ pool, instanceId, keyId, privateKey, now = new Date(), leaseDays = 7, offlineGraceHours = 72 }) {
+async function issueLicense({ pool, instanceId, keyId, privateKey, now = new Date(), leaseDays = 7, offlineGraceHours = 72, reason }) {
   let configuredPublicFingerprint;
   try {
     const configuredPublicKey = crypto.createPublicKey(privateKey).export({ type: 'spki', format: 'pem' });
@@ -34,6 +34,15 @@ async function issueLicense({ pool, instanceId, keyId, privateKey, now = new Dat
     if (!['TRIAL', 'ACTIVE', 'PAST_DUE', 'GRACE_PERIOD'].includes(record.subscription_status)) throw coded('SUBSCRIPTION_NOT_LICENSABLE');
     if (publicKeyFingerprint(record.public_key_pem) !== record.public_key_fingerprint) throw coded('SIGNING_KEY_FINGERPRINT_MISMATCH');
     if (configuredPublicFingerprint !== record.public_key_fingerprint) throw coded('SIGNING_PRIVATE_KEY_MISMATCH');
+    if (reason) {
+      const [latestRows] = await connection.query(
+        `SELECT issued_at,expires_at FROM instance_licenses
+          WHERE instance_id=? AND status='ISSUED' ORDER BY issued_at DESC LIMIT 1 FOR UPDATE`, [instanceId],
+      );
+      const latest = latestRows[0];
+      if (reason === 'RENEWAL' && latest && new Date(latest.expires_at) > new Date(now.getTime() + 48 * 3600000)) throw coded('LICENSE_RENEWAL_TOO_EARLY');
+      if (reason === 'MISSING' && latest && new Date(latest.issued_at) > new Date(now.getTime() - 3600000)) throw coded('LICENSE_RECOVERY_TOO_EARLY');
+    }
 
     const [features] = await connection.query(
       `SELECT pe.feature_key, pe.enabled, pe.numeric_limit

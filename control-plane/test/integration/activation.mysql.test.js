@@ -8,6 +8,7 @@ const request = require('supertest');
 const { createApp } = require('../../src/app');
 const { publicKeyFingerprint, verifyLicense } = require('../../src/domain/licenses');
 const { digest } = require('../../src/domain/adminSecurity');
+const { signInstanceRequest, verifyTrustBundle } = require('../../src/domain/instanceRequests');
 
 const enabled = process.env.CONTROL_INTEGRATION_TEST === 'true';
 
@@ -46,6 +47,18 @@ test('flujo HTTP completo contra MariaDB real', { skip: !enabled }, async () => 
     const activated = (await request(app).post('/api/activate').send({ code:activationCode, instancePublicKeyPem:instancePublic }).expect(201)).body.activation;
     assert.equal(activated.instanceId, instanceRecord.id);
     assert.equal(verifyLicense(activated.license, { publicKeys:{[keyId]:centralPublic}, expectedInstanceId:instanceRecord.id, now }).valid, true);
+    const syncBody = { softwareVersion:'1.0.0', requestLicense:false };
+    const syncTimestamp = Math.floor(now.getTime() / 1000);
+    const syncNonce = crypto.randomBytes(16).toString('base64url');
+    const signatureInput = { method:'POST', path:'/api/instance/sync', instanceId:instanceRecord.id,
+      timestamp:syncTimestamp, nonce:syncNonce, body:syncBody };
+    const instanceHeaders = { 'x-joinpoint-instance':instanceRecord.id, 'x-joinpoint-timestamp':String(syncTimestamp),
+      'x-joinpoint-nonce':syncNonce, 'x-joinpoint-signature':signInstanceRequest(signatureInput, instance.privateKey) };
+    const synced = (await request(app).post('/api/instance/sync').set(instanceHeaders).send(syncBody).expect(200)).body.sync;
+    assert.equal(synced.trustBundle.payload.keys[0].keyId, keyId);
+    assert.equal(verifyTrustBundle(synced.trustBundle, centralPublic), true);
+    assert.equal(synced.currentLicense.id, activated.licenseId);
+    await request(app).post('/api/instance/sync').set(instanceHeaders).send(syncBody).expect(401, { success:false, code:'INSTANCE_AUTH_FAILED' });
     await request(app).post('/api/activate').send({ code:activationCode, instancePublicKeyPem:instancePublic }).expect(400, { success:false, code:'ACTIVATION_FAILED' });
     const [counts] = await pool.query(`SELECT
       (SELECT COUNT(*) FROM instance_identities) identities,

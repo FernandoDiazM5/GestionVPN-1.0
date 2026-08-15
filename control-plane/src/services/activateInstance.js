@@ -57,7 +57,8 @@ async function activateInstance({ pool, code, activationPepper, rateLimitPepper,
     await connection.query("UPDATE product_instances SET status='ACTIVE',activated_at=?,last_seen_at=? WHERE id=? AND status='PENDING_ACTIVATION'", [now, now, record.instance_id]);
     await connection.query('INSERT INTO instance_licenses (id,instance_id,subscription_id,key_id,payload_sha256,not_before,expires_at,grace_until,issued_at) VALUES (?,?,?,?,?,?,?,?,?)', [licenseId, record.instance_id, record.subscription_id, signingKeyId, crypto.createHash('sha256').update(stableJson(payload)).digest('hex'), now, expiresAt, graceUntil, now]);
     await connection.commit();
-    return { instanceId: record.instance_id, fqdn: deriveFqdn(record.root_domain, record.subdomain_label), managementCidr: record.management_cidr, license: token, licensePublicKey: record.public_key_pem, expiresAt, graceUntil };
+    return { instanceId: record.instance_id, fqdn: deriveFqdn(record.root_domain, record.subdomain_label), managementCidr: record.management_cidr,
+      licenseId, license: token, licensePublicKey: record.public_key_pem, expiresAt, graceUntil };
   } catch (error) { await connection.rollback().catch(() => {}); throw error; } finally { connection.release(); }
 }
 

@@ -41,6 +41,12 @@ Las contraseñas se derivan con `scrypt`; los secretos TOTP se cifran con AES-25
 
 El instalador usa `POST /api/activate`. El endpoint aplica primero rate limiting durable y después ejecuta atómicamente: consumir código, registrar identidad Ed25519, activar instancia y emitir la primera licencia. Devuelve FQDN, `/22`, licencia y clave pública de verificación; los errores de código/suscripción se unifican como `ACTIVATION_FAILED` para evitar enumeración.
 
+## Sincronización de instancias
+
+`POST /api/instance/sync` distribuye el paquete de claves públicas, revocaciones de la instancia, metadatos de la licencia vigente y, cuando corresponde, una licencia renovada. La petición se autentica con la identidad Ed25519 creada en la activación mediante `X-Joinpoint-Instance`, `X-Joinpoint-Timestamp`, `X-Joinpoint-Nonce` y `X-Joinpoint-Signature`. Se firma `JP-INSTANCE-V1`, método, ruta, instancia, tiempo Unix, nonce y SHA-256 del JSON canónico. El reloj admite ±5 minutos y cada nonce se persiste y acepta una sola vez.
+
+El paquete de confianza completo se firma como `JP-TRUST-BUNDLE-V1` con la clave central activa. Para rotar sin romper confianza: registrar la nueva pública como `VERIFY_ONLY`, distribuirla mientras el paquete aún lo firma la clave anterior y sólo después promoverla a `ACTIVE` e instalar su privada externa. Una renovación normal sólo se admite dentro de las últimas 48 horas; recuperar una licencia perdida no puede repetirse antes de una hora. Suspender comercialmente una instancia no bloquea esta sincronización ni altera WireGuard.
+
 La prueba `test:integration` sólo se activa con `CONTROL_INTEGRATION_TEST=true` y una MariaDB temporal indicada por `CONTROL_TEST_DB_PORT`. Recorre el ciclo HTTP completo y confirma que el código no puede reutilizarse.
 
 El código en claro sólo aparece al emitirlo. Los listados exponen estado y fechas, pero nunca el código ni su huella HMAC.

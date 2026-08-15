@@ -40,4 +40,6 @@ Un cambio de `joinpoint.cloud` a otro dominio es una migración, no una edición
 
 La API administrativa local permite el CRUD inicial de clientes/planes, creación y listado de instancias, reserva automática del `/22` libre más bajo y emisión/listado/revocación de activaciones. El Bearer provisional fue retirado: el acceso usa contraseña derivada con `scrypt`, TOTP cifrado, sesión opaca en cookie segura y CSRF en escrituras. El servidor continúa escuchando sólo en `127.0.0.1`; no se publicará una UI hasta completar TLS, recuperación de cuenta y canary operativo.
 
+Cada instancia activada sincroniza confianza y licencias mediante solicitudes Ed25519 canónicas con tiempo y nonce durable anti-replay. La respuesta contiene claves públicas y revocaciones firmadas por la clave central activa; la licencia conserva su firma independiente. La rotación se ejecuta en dos tiempos (`VERIFY_ONLY` distribuida y luego `ACTIVE`) para que una clave nueva nunca aparezca como raíz de confianza sin estar avalada previamente por la anterior.
+
 Todavía no crea clientes reales, no emite licencias productivas, no expone el consumo público de activaciones, no modifica DNS, no despliega VPS y no conecta la instancia actual con el control plane.

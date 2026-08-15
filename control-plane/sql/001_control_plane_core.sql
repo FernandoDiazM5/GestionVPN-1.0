@@ -226,6 +226,17 @@ CREATE TABLE IF NOT EXISTS instance_licenses (
   INDEX idx_license_instance (instance_id, status, expires_at)
 );
 
+CREATE TABLE IF NOT EXISTS instance_request_nonces (
+  instance_id CHAR(36) NOT NULL,
+  nonce_digest CHAR(64) NOT NULL,
+  expires_at DATETIME(3) NOT NULL,
+  created_at DATETIME(3) NOT NULL,
+  PRIMARY KEY (instance_id, nonce_digest),
+  CONSTRAINT fk_instance_nonce_identity FOREIGN KEY (instance_id)
+    REFERENCES instance_identities(instance_id) ON DELETE CASCADE,
+  INDEX idx_instance_nonce_cleanup (expires_at)
+);
+
 CREATE TABLE IF NOT EXISTS activation_rate_buckets (
   bucket_digest CHAR(64) PRIMARY KEY,
   window_started_at DATETIME(3) NOT NULL,
