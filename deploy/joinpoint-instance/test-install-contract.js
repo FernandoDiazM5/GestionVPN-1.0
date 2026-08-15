@@ -5,6 +5,8 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const installer=fs.readFileSync(path.join(__dirname,'install.sh'),'utf8');
 const compose=fs.readFileSync(path.join(__dirname,'compose.yaml'),'utf8');
+const nginx=fs.readFileSync(path.join(__dirname,'nginx.instance.conf.template'),'utf8');
+const renewal=fs.readFileSync(path.join(__dirname,'renew-tls.sh'),'utf8');
 
 test('el instalador es fail-closed y reanudable',()=>{
   assert.match(installer,/set -Eeuo pipefail/);
@@ -53,4 +55,15 @@ test('TLS y agente se preparan antes de permitir el arranque',()=>{
   assert.match(installer,/rm -f "\$INSTALL_ROOT\/secrets\/activation-response\.json"/);
   assert.match(installer,/READY_FOR_PLATFORM_BOOTSTRAP/);
   assert.doesNotMatch(installer,/docker compose[\s\S]*? up /);
+});
+
+test('nginx limita el host y permite renovacion ACME sin apagar el panel',()=>{
+  assert.match(nginx,/server_name __JOINPOINT_FQDN__/);
+  assert.match(nginx,/if \(\$host != __JOINPOINT_FQDN__\) \{ return 444; \}/);
+  assert.match(nginx,/\.well-known\/acme-challenge/);
+  assert.match(compose,/JOINPOINT_NGINX_CONFIG/);
+  assert.match(renewal,/renew --webroot --webroot-path \/var\/www\/certbot/);
+  assert.match(renewal,/nginx -t/);
+  assert.match(renewal,/nginx -s reload/);
+  assert.doesNotMatch(renewal,/compose (stop|down)/);
 });

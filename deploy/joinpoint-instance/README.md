@@ -18,6 +18,8 @@ Para el primer cliente se asume un VPS nuevo y una distribucion oficial completa
 
 Tras validar DNS, el instalador usa la imagen oficial fijada `certbot/certbot:v5.7.0` en modo standalone para el primer certificado. Exige correo ACME y aceptacion explicita de terminos, valida el certificado y conserva el material renovable fuera del codigo. Luego construye el agente, verifica la licencia inicial y elimina la respuesta temporal de activacion. El estado `READY_FOR_PLATFORM_BOOTSTRAP` todavia no inicia la aplicacion: falta preconfigurar el `/22` recomendado y superar los health gates.
 
+La configuracion Nginx de la instancia se genera con el FQDN exacto y rechaza otros encabezados Host. Expone solamente el directorio ACME durante el desafio HTTP. `renew-tls.sh` renueva por webroot sin detener el panel, valida el nuevo certificado y recarga Nginx solo despues de que `nginx -t` tenga exito. El siguiente incremento instalara su timer de systemd junto con el arranque controlado.
+
 ## Agente de instancia
 
 `Dockerfile.agent` construye solamente el agente y el protocolo criptografico compartido. Se ejecuta sin privilegios y no contiene claves, licencias ni datos de un cliente.

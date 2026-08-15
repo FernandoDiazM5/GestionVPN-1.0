@@ -36,7 +36,7 @@ preflight() {
 
 activate() {
   [[ -n "${JOINPOINT_ACTIVATION_CODE:-}" ]] || fail 'Falta JOINPOINT_ACTIVATION_CODE.'
-  install -d -m 0700 "$INSTALL_ROOT" "$INSTALL_ROOT/secrets" "$INSTALL_ROOT/agent-state" "$INSTALL_ROOT/config" "$INSTALL_ROOT/tls"
+  install -d -m 0700 "$INSTALL_ROOT" "$INSTALL_ROOT/secrets" "$INSTALL_ROOT/agent-state" "$INSTALL_ROOT/config" "$INSTALL_ROOT/tls" "$INSTALL_ROOT/acme-challenge"
   write_status PRECHECK
   openssl genpkey -algorithm ED25519 -out "$INSTALL_ROOT/secrets/instance-private.pem"
   openssl pkey -in "$INSTALL_ROOT/secrets/instance-private.pem" -pubout -out "$INSTALL_ROOT/secrets/instance-public.pem"
@@ -70,6 +70,8 @@ generate_config() {
     "JOINPOINT_SOURCE_DIR=$SOURCE_DIR" \
     "JOINPOINT_SERVER_ENV_FILE=$INSTALL_ROOT/config/server.env" \
     "JOINPOINT_TLS_DIR=$INSTALL_ROOT/tls" \
+    "JOINPOINT_NGINX_CONFIG=$INSTALL_ROOT/config/nginx.conf" \
+    "JOINPOINT_ACME_CHALLENGE_DIR=$INSTALL_ROOT/acme-challenge" \
     "JOINPOINT_INSTANCE_PRIVATE_KEY_FILE=$INSTALL_ROOT/secrets/instance-private.pem" \
     "JOINPOINT_AGENT_STATE_DIR=$INSTALL_ROOT/agent-state" \
     "JOINPOINT_INSTANCE_ID=$instance_id" \
@@ -90,6 +92,9 @@ generate_config() {
     'SECURITY_AGENT_URL=http://127.0.0.1:8788' "SECURITY_AGENT_SECRET=$security_secret" \
     'WG0_AUTOSYNC=false' > "$INSTALL_ROOT/config/server.env"
   chmod 600 "$INSTALL_ROOT/config/compose.env" "$INSTALL_ROOT/config/server.env"
+  sed "s/__JOINPOINT_FQDN__/$fqdn/g" "$SOURCE_DIR/deploy/joinpoint-instance/nginx.instance.conf.template" \
+    > "$INSTALL_ROOT/config/nginx.conf"
+  chmod 644 "$INSTALL_ROOT/config/nginx.conf"
   chown -R 1000:1000 "$INSTALL_ROOT/agent-state"
   chown 1000:1000 "$INSTALL_ROOT/secrets/instance-private.pem"
   write_status CONFIGURED

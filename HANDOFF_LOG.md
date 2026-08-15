@@ -6,6 +6,12 @@
 > - El wrapper Semgrep de Windows ahora incluye las fuentes del agente; se cerró el escaneo pendiente de fases anteriores.
 > - Pendiente: empaquetar el agente dentro del instalador/imagen oficial y reportar salud resumida de VPS/Core.
 
+> **Sesion 2026-08-15 - Nginx dinamico y renovacion TLS.** Rama `vps_prod`; sin despliegue.
+> - Cada cliente recibe Nginx renderizado con su FQDN; Host ajenos se rechazan y HTTP queda limitado a ACME+redirect.
+> - Renovacion Certbot webroot valida certificado y nginx antes de recargar, sin stop/down.
+> - Compose monta config y challenge externos; Nginx real, Bash, ShellCheck, Compose, contrato 7/7 y Semgrep correctos.
+> - Pendiente: timer systemd, preseed /22 y arranque/rollback con health gates.
+
 > **Sesion 2026-08-15 - TLS inicial y bootstrap del agente.** Rama `vps_prod`; sin despliegue.
 > - Certbot oficial v5.7.0 standalone emite el primer certificado solo tras DNS, correo y TOS explicitos.
 > - El certificado se valida y persiste fuera del codigo con permisos restrictivos.
