@@ -26,6 +26,8 @@ Todas las rutas bajo `/api/admin` exigen `Authorization: Bearer <token>`.
 
 El instalador usa `POST /api/activate`. El endpoint aplica primero rate limiting durable y después ejecuta atómicamente: consumir código, registrar identidad Ed25519, activar instancia y emitir la primera licencia. Devuelve FQDN, `/22`, licencia y clave pública de verificación; los errores de código/suscripción se unifican como `ACTIVATION_FAILED` para evitar enumeración.
 
+La prueba `test:integration` sólo se activa con `CONTROL_INTEGRATION_TEST=true` y una MariaDB temporal indicada por `CONTROL_TEST_DB_PORT`. Recorre el ciclo HTTP completo y confirma que el código no puede reutilizarse.
+
 El código en claro sólo aparece al emitirlo. Los listados exponen estado y fechas, pero nunca el código ni su huella HMAC.
 
 ## Límites deliberados

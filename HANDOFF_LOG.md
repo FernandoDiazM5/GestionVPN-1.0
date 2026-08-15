@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-15 — Integración HTTP/MariaDB completa.** Rama `vps_prod` (base `a1d6b68`). Estado: unitarias 23/23 e integración real 1/1; sin despliegue.
+> - Un harness condicionado por entorno levanta el flujo completo contra MariaDB real sin tocar producción.
+> - Confirmó FQDN `cliente-integracion.joinpoint.cloud`, primer `/22` `10.64.0.0/22`, licencia verificable y rechazo del segundo uso del código.
+> - El contenedor y datos temporales fueron eliminados al terminar.
+
 > **Sesión 2026-08-15 — Flujo atómico del instalador.** Rama `vps_prod` (base `3bb3945`). Estado: 23/23 pruebas y Semgrep security/secrets 0 hallazgos; sin despliegue.
 > - Se añadió asignación administrativa de suscripción y `POST /api/activate` con rate limit persistente previo.
 > - Código, identidad, instancia y primera licencia se confirman juntos o se revierten; la respuesta bootstrap incluye FQDN y `/22` sin secretos centrales.
