@@ -7,7 +7,7 @@ const crypto = require('crypto');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { InstanceAgent } = require('../src');
-const { signLicense, signTrustBundle, publicKeyFingerprint } = require('@joinpoint/control-plane');
+const { signLicense, signTrustBundle, publicKeyFingerprint } = require('@joinpoint/protocol');
 
 const instanceId = '550e8400-e29b-41d4-a716-446655440000';
 const baseNow = new Date('2026-08-15T12:00:00Z');

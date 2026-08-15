@@ -18,6 +18,7 @@
   "scripts": {
     "prepare": "husky || true",
     "build:contracts": "npm run build --workspace=@gestionvpn/contracts",
+    "check:protocol": "npm run check --workspace=@joinpoint/protocol",
     "check:control-plane": "npm run check --workspace=@joinpoint/control-plane",
     "test:control-plane": "npm test --workspace=@joinpoint/control-plane",
     "check:instance-agent": "npm run check --workspace=@joinpoint/instance-agent",

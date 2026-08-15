@@ -1,0 +1,12 @@
+{
+  "name": "@joinpoint/protocol",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Protocolo criptografico compartido entre Joinpoint Central y sus instancias.",
+  "main": "src/index.js",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "check": "node --check src/index.js && node --check src/licenses.js && node --check src/instanceRequests.js",
+    "test": "node --test test/*.test.js"
+  }
+}

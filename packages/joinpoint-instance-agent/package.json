@@ -7,10 +7,11 @@
   "engines": { "node": ">=22" },
   "scripts": {
     "start": "node src/runner.js",
-    "check": "node --check src/index.js && node --check src/atomicStateStore.js && node --check src/instanceAgent.js && node --check src/runner.js",
+    "bootstrap": "node src/bootstrap.js",
+    "check": "node --check src/index.js && node --check src/atomicStateStore.js && node --check src/instanceAgent.js && node --check src/runner.js && node --check src/bootstrap.js",
     "test": "node --test test/*.test.js"
   },
   "dependencies": {
-    "@joinpoint/control-plane": "0.1.0"
+    "@joinpoint/protocol": "0.1.0"
   }
 }

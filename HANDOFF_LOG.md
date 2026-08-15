@@ -6,6 +6,13 @@
 > - El wrapper Semgrep de Windows ahora incluye las fuentes del agente; se cerró el escaneo pendiente de fases anteriores.
 > - Pendiente: empaquetar el agente dentro del instalador/imagen oficial y reportar salud resumida de VPS/Core.
 
+> **Sesion 2026-08-15 - Base de la imagen oficial Joinpoint.** Rama `vps_prod`; sin despliegue.
+> - Se creo `@joinpoint/protocol` para compartir criptografia sin acoplar el agente al backend central.
+> - El agente incorpora bootstrap seguro desde archivo `0600` y mantiene secretos fuera de la imagen.
+> - Se creo y construyo `deploy/joinpoint-instance/Dockerfile.agent` como usuario no privilegiado.
+> - Central 39/39, agente 6/6, npm productivo 0 vulnerabilidades y Semgrep security/secrets 0 hallazgos.
+> - Siguiente: instalador integral con preflight, identidad/secretos locales y estados explicitos para DNS/TLS.
+
 > **Sesión 2026-08-15 — Canal firmado Central↔instancia.** Rama `vps_prod` (base `f39e73a`). Estado: unitarias 39/39, integración HTTP/MariaDB 1/1 y esquema real 18 tablas; sin despliegue.
 > - Se añadió autenticación Ed25519 de instancias con tiempo, nonce durable y cuerpo canónico; replays devuelven 401 genérico.
 > - El sync distribuye claves/revocaciones y renovación limitada; el paquete completo lleva firma central independiente.

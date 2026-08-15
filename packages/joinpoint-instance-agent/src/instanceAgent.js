@@ -3,7 +3,7 @@
 const fs = require('fs/promises');
 const crypto = require('crypto');
 const { AtomicStateStore } = require('./atomicStateStore');
-const { signInstanceRequest, verifyTrustBundle, verifyLicense, publicKeyFingerprint } = require('@joinpoint/control-plane');
+const { signInstanceRequest, verifyTrustBundle, verifyLicense, publicKeyFingerprint } = require('@joinpoint/protocol');
 
 function coded(code) { const error = new Error(code); error.code = code; return error; }
 function decodeLicense(token) {
