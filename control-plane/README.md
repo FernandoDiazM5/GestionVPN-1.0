@@ -7,6 +7,7 @@ Servicio aislado para clientes, planes, instancias, pools y activaciones. No con
 - `CONTROL_PLANE_PORT` (default `3100`)
 - `CONTROL_PLANE_ADMIN_TOKEN` (mínimo 32 caracteres; secreto fuera del repositorio)
 - `ACTIVATION_CODE_PEPPER` (mínimo 32 caracteres; secreto distinto al token)
+- `ACTIVATION_RATE_LIMIT_PEPPER` (mínimo 32 caracteres; distinto de los anteriores)
 - `CONTROL_DB_HOST`, `CONTROL_DB_PORT`, `CONTROL_DB_USER`, `CONTROL_DB_PASSWORD`, `CONTROL_DB_NAME`
 
 El servidor escucha exclusivamente en `127.0.0.1`. La publicación futura debe pasar por HTTPS y un proxy con rate limiting. El Bearer actual es una protección administrativa provisional; debe sustituirse por sesiones fuertes con MFA antes de construir la interfaz central.
@@ -29,6 +30,8 @@ El código en claro sólo aparece al emitirlo. Los listados exponen estado y fec
 - Sin endpoint público de activación hasta añadir rate limiting durable y licencias firmadas.
 - Sin DNS, TLS, facturación, heartbeat o comandos remotos.
 - Sin despliegue de producción.
+
+El limitador durable permite 5 intentos por IP seudonimizada en 15 minutos y bloquea 60 minutos al excederlos. La tabla sólo conserva HMAC, ventana, contador y vencimiento del bloqueo.
 
 ## Licencias firmadas
 

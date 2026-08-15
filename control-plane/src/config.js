@@ -11,6 +11,7 @@ function loadConfig(env = process.env) {
     port: Number(env.CONTROL_PLANE_PORT || 3100),
     adminToken: required(env.CONTROL_PLANE_ADMIN_TOKEN, 'CONTROL_PLANE_ADMIN_TOKEN', 32),
     activationPepper: required(env.ACTIVATION_CODE_PEPPER, 'ACTIVATION_CODE_PEPPER', 32),
+    rateLimitPepper: required(env.ACTIVATION_RATE_LIMIT_PEPPER, 'ACTIVATION_RATE_LIMIT_PEPPER', 32),
     db: {
       host: required(env.CONTROL_DB_HOST, 'CONTROL_DB_HOST'),
       port: Number(env.CONTROL_DB_PORT || 3306),

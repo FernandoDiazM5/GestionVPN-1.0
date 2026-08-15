@@ -172,3 +172,13 @@ CREATE TABLE IF NOT EXISTS instance_licenses (
   CONSTRAINT chk_license_dates CHECK (expires_at > not_before AND grace_until >= expires_at),
   INDEX idx_license_instance (instance_id, status, expires_at)
 );
+
+CREATE TABLE IF NOT EXISTS activation_rate_buckets (
+  bucket_digest CHAR(64) PRIMARY KEY,
+  window_started_at DATETIME(3) NOT NULL,
+  attempts INT UNSIGNED NOT NULL DEFAULT 0,
+  blocked_until DATETIME(3) NULL,
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+    ON UPDATE CURRENT_TIMESTAMP(3),
+  INDEX idx_activation_rate_cleanup (updated_at)
+);

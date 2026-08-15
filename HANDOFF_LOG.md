@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-15 — Rate limiting durable de activación.** Rama `vps_prod` (base `6c687ac`). Estado: 22/22 pruebas y Semgrep security/secrets 0 hallazgos; sin despliegue.
+> - Los intentos se cuentan en MariaDB por HMAC de IP con pepper independiente; la IP no queda guardada en claro en el bucket.
+> - Política inicial: 5 intentos por 15 minutos y bloqueo de 60 minutos al excederlos, persistente entre reinicios.
+> - Pendiente: endpoint atómico del instalador; permanece cerrado para no exponer un flujo parcial.
+
 > **Sesión 2026-08-15 — Emisión transaccional de licencias.** Rama `vps_prod` (base `06428fc`). Estado: 20/20 pruebas y Semgrep security 0 hallazgos; sin despliegue.
 > - La licencia se construye exclusivamente desde identidad, suscripción, plan, entitlements y clave central validados bajo transacción.
 > - El lease dura como máximo 7 días y nunca supera el fin pagado; incorpora 72 h de gracia offline y supersede el anterior sin borrarlo.

@@ -6,4 +6,5 @@ module.exports = {
   ...require('./domain/licenses'),
   ...require('./services/consumeActivation'),
   ...require('./services/issueLicense'),
+  ...require('./services/activationRateLimit'),
 };
