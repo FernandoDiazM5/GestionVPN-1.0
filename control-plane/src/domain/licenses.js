@@ -23,7 +23,8 @@ function stableJson(value) { return JSON.stringify(stable(value)); }
 
 function normalizeEd25519Key(value, kind) {
   try {
-    const key = kind === 'private' ? crypto.createPrivateKey(value) : crypto.createPublicKey(value);
+    const alreadyNormalized = value?.type === kind;
+    const key = alreadyNormalized ? value : kind === 'private' ? crypto.createPrivateKey(value) : crypto.createPublicKey(value);
     if (key.asymmetricKeyType !== 'ed25519') throw new Error('LICENSE_KEY_TYPE_INVALID');
     return key;
   } catch (error) {

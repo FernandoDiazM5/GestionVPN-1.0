@@ -42,4 +42,6 @@ La API administrativa local permite el CRUD inicial de clientes/planes, creació
 
 Cada instancia activada sincroniza confianza y licencias mediante solicitudes Ed25519 canónicas con tiempo y nonce durable anti-replay. La respuesta contiene claves públicas y revocaciones firmadas por la clave central activa; la licencia conserva su firma independiente. La rotación se ejecuta en dos tiempos (`VERIFY_ONLY` distribuida y luego `ACTIVE`) para que una clave nueva nunca aparezca como raíz de confianza sin estar avalada previamente por la anterior.
 
+El paquete `@joinpoint/instance-agent` es el consumidor local de ese canal. Fija la primera clave desde la activación, verifica la cadena de confianza posterior, persiste licencia+confianza en un único archivo atómico `0600`, emite heartbeat con retroceso y reevalúa capacidades durante desconexiones. Su contrato siempre entrega `networkContinuity: true` y no contiene dependencias ni comandos de WireGuard o RouterOS; las restricciones comerciales sólo vacían o habilitan entitlements de aplicación.
+
 Todavía no crea clientes reales, no emite licencias productivas, no expone el consumo público de activaciones, no modifica DNS, no despliega VPS y no conecta la instancia actual con el control plane.

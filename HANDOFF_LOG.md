@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-15 — Agente local de instancia.** Rama `vps_prod` (base `77b81d9`). Estado: Central 39/39, agente 5/5, npm productivo 0 vulnerabilidades y Semgrep security/secrets 0 hallazgos; sin despliegue.
+> - Se creó un workspace independiente con bootstrap de confianza, sync firmado, verificación local y almacenamiento atómico restrictivo.
+> - Heartbeat con renovación automática, jitter/backoff y degradación offline sin desmontar ni invocar la red.
+> - El wrapper Semgrep de Windows ahora incluye las fuentes del agente; se cerró el escaneo pendiente de fases anteriores.
+> - Pendiente: empaquetar el agente dentro del instalador/imagen oficial y reportar salud resumida de VPS/Core.
+
 > **Sesión 2026-08-15 — Canal firmado Central↔instancia.** Rama `vps_prod` (base `f39e73a`). Estado: unitarias 39/39, integración HTTP/MariaDB 1/1 y esquema real 18 tablas; sin despliegue.
 > - Se añadió autenticación Ed25519 de instancias con tiempo, nonce durable y cuerpo canónico; replays devuelven 401 genérico.
 > - El sync distribuye claves/revocaciones y renovación limitada; el paquete completo lleva firma central independiente.

@@ -20,6 +20,8 @@
     "build:contracts": "npm run build --workspace=@gestionvpn/contracts",
     "check:control-plane": "npm run check --workspace=@joinpoint/control-plane",
     "test:control-plane": "npm test --workspace=@joinpoint/control-plane",
+    "check:instance-agent": "npm run check --workspace=@joinpoint/instance-agent",
+    "test:instance-agent": "npm test --workspace=@joinpoint/instance-agent",
     "check:backend": "cd server && node --check index.js && node -e \"['./auth.routes.js','./routes/account.routes.js','./routes/federatedAuth.routes.js','./routes/admin.routes.js','./routes/team.routes.js','./routes/workspace.routes.js','./routes/errorReports.routes.js','./routes/ai.routes.js','./routes/core/index.js','./routes/core/_shared.js','./routes/core/connection.routes.js','./routes/core/tunnel.routes.js','./routes/core/tunnel-repair.routes.js','./routes/nodes/index.js','./routes/nodes/_shared.js','./routes/nodes/listing.routes.js','./routes/nodes/provision.routes.js','./routes/nodes/editing.routes.js','./routes/nodes/tags.routes.js','./routes/nodes/credentials.routes.js','./routes/nodes/history.routes.js','./routes/nodes/scan.routes.js','./routes/wireguard.routes.js','./routes/settings.routes.js','./routes/device.routes.js','./routes/events.routes.js','./routes/audit.routes.js','./routes/health.routes.js'].forEach(f=>require('child_process').execSync('node --check '+f,{stdio:'inherit'}));\"",
     "check:frontend": "cd vpn-manager && npx tsc --noEmit",
     "check:security-routes": "npm run security:routes:check --prefix server",

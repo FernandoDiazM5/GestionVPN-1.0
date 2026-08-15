@@ -1,0 +1,16 @@
+{
+  "name": "@joinpoint/instance-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Agente local de licencia y confianza para cada VPS Joinpoint.",
+  "main": "src/index.js",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node src/runner.js",
+    "check": "node --check src/index.js && node --check src/atomicStateStore.js && node --check src/instanceAgent.js && node --check src/runner.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@joinpoint/control-plane": "0.1.0"
+  }
+}
