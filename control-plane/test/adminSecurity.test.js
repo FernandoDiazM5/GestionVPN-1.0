@@ -2,7 +2,8 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { hashPassword, verifyPassword, generateTotpSecret, verifyTotp, encryptSecret, decryptSecret } = require('../src/domain/adminSecurity');
+const { hashPassword, verifyPassword, generateTotpSecret, verifyTotp, encryptSecret, decryptSecret,
+  generateRecoveryCodes, recoveryCodeDigest } = require('../src/domain/adminSecurity');
 
 const encryptionKey = Buffer.alloc(32, 7).toString('base64');
 
@@ -27,4 +28,15 @@ test('verifica TOTP con una ventana temporal acotada', () => {
   assert.equal(verifyTotp(rfcSecret, '287082', new Date(59_000), 0), true);
   assert.equal(verifyTotp(rfcSecret, '287082', new Date(120_000), 0), false);
   assert.equal(verifyTotp(rfcSecret, 'abcdef', new Date(59_000), 0), false);
+});
+
+test('genera códigos de recuperación aleatorios y conserva sólo HMAC', () => {
+  const codes = generateRecoveryCodes();
+  assert.equal(codes.length, 10);
+  assert.equal(new Set(codes).size, 10);
+  assert.match(codes[0], /^JPR-[A-F0-9]{5}-[A-F0-9]{5}-[A-F0-9]{5}-[A-F0-9]{5}$/);
+  const stored = recoveryCodeDigest(codes[0], 'pepper-de-recuperacion-seguro-32-caracteres');
+  assert.match(stored, /^[a-f0-9]{64}$/);
+  assert.equal(stored.includes(codes[0]), false);
+  assert.equal(recoveryCodeDigest(codes[0].toLowerCase().replaceAll('-', ''), 'pepper-de-recuperacion-seguro-32-caracteres'), stored);
 });

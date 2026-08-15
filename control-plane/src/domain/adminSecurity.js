@@ -8,6 +8,16 @@ const BASE32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 
 function coded(code) { const error = new Error(code); error.code = code; return error; }
 function digest(value) { return crypto.createHash('sha256').update(String(value || ''), 'utf8').digest('hex'); }
+function normalizeRecoveryCode(value) { return String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+function recoveryCodeDigest(value, pepper) {
+  return crypto.createHmac('sha256', String(pepper || '')).update(normalizeRecoveryCode(value)).digest('hex');
+}
+function generateRecoveryCodes(count = 10) {
+  return Array.from({ length: count }, () => {
+    const raw = crypto.randomBytes(10).toString('hex').toUpperCase();
+    return `JPR-${raw.slice(0, 5)}-${raw.slice(5, 10)}-${raw.slice(10, 15)}-${raw.slice(15)}`;
+  });
+}
 
 async function hashPassword(password, salt = crypto.randomBytes(16)) {
   if (Buffer.byteLength(String(password || '')) < 12) throw coded('PASSWORD_TOO_SHORT');
@@ -86,4 +96,5 @@ function decryptSecret(value, keyValue) {
   } catch (_) { throw coded('ADMIN_MFA_SECRET_INVALID'); }
 }
 
-module.exports = { digest, hashPassword, verifyPassword, generateTotpSecret, verifyTotp, encryptSecret, decryptSecret };
+module.exports = { digest, normalizeRecoveryCode, recoveryCodeDigest, generateRecoveryCodes,
+  hashPassword, verifyPassword, generateTotpSecret, verifyTotp, encryptSecret, decryptSecret };

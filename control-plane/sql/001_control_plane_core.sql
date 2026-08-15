@@ -172,6 +172,27 @@ CREATE TABLE IF NOT EXISTS control_plane_admin_sessions (
   INDEX idx_admin_session_expiry (expires_at, idle_expires_at)
 );
 
+CREATE TABLE IF NOT EXISTS control_plane_admin_recovery_codes (
+  id CHAR(36) PRIMARY KEY,
+  admin_id CHAR(36) NOT NULL,
+  code_digest CHAR(64) NOT NULL UNIQUE,
+  consumed_at DATETIME(3) NULL,
+  created_at DATETIME(3) NOT NULL,
+  CONSTRAINT fk_admin_recovery_admin FOREIGN KEY (admin_id)
+    REFERENCES control_plane_admins(id) ON DELETE CASCADE,
+  INDEX idx_admin_recovery_available (admin_id, consumed_at)
+);
+
+CREATE TABLE IF NOT EXISTS admin_login_rate_buckets (
+  bucket_digest CHAR(64) PRIMARY KEY,
+  window_started_at DATETIME(3) NOT NULL,
+  attempts INT UNSIGNED NOT NULL DEFAULT 0,
+  blocked_until DATETIME(3) NULL,
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+    ON UPDATE CURRENT_TIMESTAMP(3),
+  INDEX idx_admin_login_rate_cleanup (updated_at)
+);
+
 CREATE TABLE IF NOT EXISTS license_signing_keys (
   key_id VARCHAR(80) PRIMARY KEY,
   algorithm VARCHAR(20) NOT NULL DEFAULT 'Ed25519',

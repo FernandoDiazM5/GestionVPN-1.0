@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-15 — Recuperación administrativa y rate limit.** Rama `vps_prod` (base `dac480d`). Estado: unitarias 36/36, integración HTTP/MariaDB 1/1, esquema real 17 tablas y bootstrap real 1/10; sin despliegue.
+> - El bootstrap entrega una sola vez diez códigos de recuperación y sólo almacena sus HMAC.
+> - Cada código se consume atómicamente; regenerar exige contraseña+TOTP e invalida todo el conjunto anterior.
+> - El login limita durablemente cada origen seudonimizado y entrega `Retry-After` al bloquear.
+> - Los contenedores temporales fueron eliminados. Semgrep remoto continúa pendiente por timeout del registro de reglas.
+
 > **Sesión 2026-08-15 — Sesiones administrativas y MFA.** Rama `vps_prod` (base `86aad22`). Estado: unitarias 32/32, integración HTTP/MariaDB 1/1 y esquema real 15 tablas; sin despliegue.
 > - El Bearer provisional fue sustituido por contraseña `scrypt`, TOTP cifrado, cookie opaca segura y CSRF en escrituras.
 > - Se añadió bootstrap único del primer administrador, expiración absoluta/inactiva, vínculo al navegador y bloqueo temporal por fallos.

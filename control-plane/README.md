@@ -31,12 +31,13 @@ El servidor escucha exclusivamente en `127.0.0.1`. La publicación futura debe p
 - `POST /api/admin/licenses/:id/revoke`
 - `GET /api/admin/me`
 - `POST /api/admin/logout`
+- `POST /api/admin/recovery-codes/regenerate`
 
 ## Primer administrador
 
-Después de aplicar el esquema y antes de publicar el servicio, definir temporalmente `CONTROL_ADMIN_BOOTSTRAP_EMAIL`, `CONTROL_ADMIN_BOOTSTRAP_NAME` y `CONTROL_ADMIN_BOOTSTRAP_PASSWORD`, además de las variables de base y cifrado, y ejecutar `npm run bootstrap:admin`. Sólo funciona cuando no existe ningún administrador y muestra una URI TOTP una única vez. Registrar esa URI en la aplicación autenticadora, retirar inmediatamente las tres variables de bootstrap y conservar fuera del VPS los procedimientos de recuperación.
+Después de aplicar el esquema y antes de publicar el servicio, definir temporalmente `CONTROL_ADMIN_BOOTSTRAP_EMAIL`, `CONTROL_ADMIN_BOOTSTRAP_NAME` y `CONTROL_ADMIN_BOOTSTRAP_PASSWORD`, además de las variables de base y cifrado, y ejecutar `npm run bootstrap:admin`. Sólo funciona cuando no existe ningún administrador y muestra una URI TOTP y diez códigos de recuperación una única vez. Registrar la URI, guardar los códigos fuera del VPS y retirar inmediatamente las tres variables de bootstrap.
 
-Las contraseñas se derivan con `scrypt`; los secretos TOTP se cifran con AES-256-GCM. Cinco fallos consecutivos bloquean la cuenta durante 15 minutos. La base conserva únicamente hashes de tokens de sesión y CSRF, nunca sus valores en claro.
+Las contraseñas se derivan con `scrypt`; los secretos TOTP se cifran con AES-256-GCM. Cada código de recuperación es de un solo uso y la base conserva únicamente su HMAC. El administrador puede regenerar todo el conjunto reingresando contraseña y TOTP; los anteriores se invalidan atómicamente. Cinco fallos consecutivos bloquean la cuenta durante 15 minutos. Además, cada origen seudonimizado admite diez intentos en 15 minutos y se bloquea 30 minutos al excederlos, incluso tras reiniciar el servicio. La base conserva únicamente hashes de tokens de sesión y CSRF, nunca sus valores en claro.
 
 El instalador usa `POST /api/activate`. El endpoint aplica primero rate limiting durable y después ejecuta atómicamente: consumir código, registrar identidad Ed25519, activar instancia y emitir la primera licencia. Devuelve FQDN, `/22`, licencia y clave pública de verificación; los errores de código/suscripción se unifican como `ACTIVATION_FAILED` para evitar enumeración.
 

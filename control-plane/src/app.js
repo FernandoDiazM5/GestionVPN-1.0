@@ -47,9 +47,12 @@ const signingKeySchema = z.object({
 }).strict();
 const revokeSchema = z.object({ reason: z.string().trim().min(8).max(500) }).strict();
 const signingKeyIdSchema = z.string().regex(/^[a-zA-Z0-9._-]{3,80}$/);
-const loginSchema = z.object({
-  email: z.email().max(254), password: z.string().min(12).max(200), totp: z.string().regex(/^\d{6}$/),
-}).strict();
+const loginBase = { email: z.email().max(254), password: z.string().min(12).max(200) };
+const loginSchema = z.union([
+  z.object({ ...loginBase, totp: z.string().regex(/^\d{6}$/) }).strict(),
+  z.object({ ...loginBase, recoveryCode: z.string().trim().min(20).max(40) }).strict(),
+]);
+const reauthSchema = z.object({ password: z.string().min(12).max(200), totp: z.string().regex(/^\d{6}$/) }).strict();
 
 function validate(schema, value) {
   const parsed = schema.safeParse(value);
@@ -98,6 +101,10 @@ function createApp({ pool, activationPepper, rateLimitPepper, signingKeyId, sign
     res.clearCookie(COOKIE_NAME, { httpOnly: true, secure: true, sameSite: 'strict', path: '/' });
     res.json({ success: true });
   }));
+  admin.post('/recovery-codes/regenerate', asyncRoute(async (req, res) => {
+    const codes = await sessions.regenerateRecoveryCodes(req.admin.id, validate(reauthSchema, req.body));
+    res.json({ success: true, recoveryCodes: codes, warning: 'Estos códigos se muestran una sola vez; los anteriores ya no son válidos.' });
+  }));
   admin.get('/customers', asyncRoute(async (_req, res) => res.json({ success: true, customers: await service.listCustomers() })));
   admin.post('/customers', asyncRoute(async (req, res) => res.status(201).json({ success: true, customer: await service.createCustomer(validate(customerSchema, req.body)) })));
   admin.get('/plans', asyncRoute(async (_req, res) => res.json({ success: true, plans: await service.listPlans() })));
@@ -139,7 +146,8 @@ function createApp({ pool, activationPepper, rateLimitPepper, signingKeyId, sign
   app.use((error, _req, res, _next) => {
     const duplicate = error?.code === 'ER_DUP_ENTRY';
     const publicActivationFailure = /^(ACTIVATION_CODE_|INSTANCE_ALREADY_ACTIVATED|SUBSCRIPTION_NOT_ACTIVE)/.test(error?.code || '');
-    const status = error?.code === 'ACTIVATION_RATE_LIMITED' ? 429 : error?.code === 'ADMIN_LOGIN_FAILED' ? 401
+    const status = ['ACTIVATION_RATE_LIMITED', 'ADMIN_LOGIN_RATE_LIMITED'].includes(error?.code) ? 429
+      : ['ADMIN_LOGIN_FAILED', 'ADMIN_REAUTH_FAILED'].includes(error?.code) ? 401
       : publicActivationFailure ? 400 : error?.code === 'VALIDATION_ERROR' ? 400
       : duplicate || /(_NOT_FOUND|_ALREADY_|_NOT_REVOCABLE|_NOT_ACTIVATABLE|_INCOMPLETE|_EXHAUSTED)$/.test(error?.code || '') ? 409
         : 500;
