@@ -5,4 +5,5 @@ module.exports = {
   ...require('./domain/activationCodes'),
   ...require('./domain/licenses'),
   ...require('./services/consumeActivation'),
+  ...require('./services/issueLicense'),
 };

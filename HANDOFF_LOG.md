@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-15 — Emisión transaccional de licencias.** Rama `vps_prod` (base `06428fc`). Estado: 20/20 pruebas y Semgrep security 0 hallazgos; sin despliegue.
+> - La licencia se construye exclusivamente desde identidad, suscripción, plan, entitlements y clave central validados bajo transacción.
+> - El lease dura como máximo 7 días y nunca supera el fin pagado; incorpora 72 h de gracia offline y supersede el anterior sin borrarlo.
+> - Pendiente: rate limiting durable y una única transacción pública que consuma activación, registre identidad y emita licencia.
+
 > **Sesión 2026-08-15 — Licencias firmadas y gracia offline.** Rama `vps_prod` (base `435acac`). Estado: 18/18 pruebas, esquema MariaDB 11 de 12 tablas y Semgrep security/secrets 0 hallazgos; sin despliegue.
 > - Se creó el formato canónico `jpl1` con firma Ed25519, selección de clave por `kid`, vínculo obligatorio a instancia y detección de manipulación.
 > - La evaluación distingue activo, aún no válido, gracia offline y vencido; ningún estado comercial ejecuta cambios de red.
