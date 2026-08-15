@@ -6,6 +6,13 @@
 > - El wrapper Semgrep de Windows ahora incluye las fuentes del agente; se cerró el escaneo pendiente de fases anteriores.
 > - Pendiente: empaquetar el agente dentro del instalador/imagen oficial y reportar salud resumida de VPS/Core.
 
+> **Sesion 2026-08-15 - Configuracion greenfield del primer cliente.** Rama `vps_prod`; sin despliegue.
+> - El usuario confirmo que el primer cliente se levantara en un VPS nuevo y limpio.
+> - El instalador genera secretos unicos y archivos 0600; URLs/CORS derivan del FQDN activado.
+> - Telegram, Gemini, Firebase y WG autosync quedan apagados hasta el asistente del moderador.
+> - Estado/clave del agente quedan preparados para ejecucion no-root; Compose, Bash, ShellCheck y contrato 5/5 correctos.
+> - Pendiente: TLS renovable, bootstrap, preseed del /22 y arranque con health gates.
+
 > **Sesion 2026-08-15 - Compose endurecido de instancia.** Rama `vps_prod`; sin despliegue.
 > - Se declaro MariaDB, backend, frontend y agente sin credenciales de integraciones embebidas.
 > - DB solo loopback; backend host-mode sin capabilities; agente read-only, tmpfs, clave read-only y cero capabilities.

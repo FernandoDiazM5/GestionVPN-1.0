@@ -14,6 +14,8 @@ El estado `READY_FOR_TLS` no significa que la instancia ya este publicada: delib
 
 La plantilla `.env.compose.example` documenta referencias, no credenciales utilizables. El instalador generara los secretos reales fuera del codigo y nunca reutilizara valores entre clientes.
 
+Para el primer cliente se asume un VPS nuevo y una distribucion oficial completa indicada mediante `JOINPOINT_SOURCE_DIR`. La configuracion generada deja Telegram, Gemini, Firebase y el autosync de WireGuard apagados. El moderador incorporara sus propias credenciales y conectara su MikroTik local despues del primer acceso; ninguna integracion personal bloquea el arranque base.
+
 ## Agente de instancia
 
 `Dockerfile.agent` construye solamente el agente y el protocolo criptografico compartido. Se ejecuta sin privilegios y no contiene claves, licencias ni datos de un cliente.

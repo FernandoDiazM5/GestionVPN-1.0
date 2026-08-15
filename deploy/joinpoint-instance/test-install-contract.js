@@ -35,3 +35,12 @@ test('compose aisla base de datos y endurece el agente',()=>{
   assert.match(compose,/instance-private\.pem:ro/);
   assert.doesNotMatch(compose,/TELEGRAM_BOT_TOKEN|GEMINI_API_KEY|SMTP_PASS/);
 });
+
+test('genera secretos unicos y deja integraciones personales apagadas',()=>{
+  assert.match(installer,/random_hex\(\) \{ openssl rand -hex/);
+  assert.match(installer,/TELEGRAM_BOT_ENABLED=false/);
+  assert.match(installer,/GEMINI_AI_ENABLED=false/);
+  assert.match(installer,/FEDERATED_AUTH_ENABLED=false/);
+  assert.match(installer,/WG0_AUTOSYNC=false/);
+  assert.doesNotMatch(installer,/gmail\.com|AIza|bot[0-9]+:/);
+});

@@ -92,7 +92,7 @@ services:
       JOINPOINT_SYNC_INTERVAL_SECONDS: ${JOINPOINT_SYNC_INTERVAL_SECONDS:-300}
     volumes:
       - ${JOINPOINT_INSTANCE_PRIVATE_KEY_FILE:?required}:/run/secrets/instance-private.pem:ro
-      - agent-state:/var/lib/joinpoint-agent
+      - ${JOINPOINT_AGENT_STATE_DIR:?required}:/var/lib/joinpoint-agent
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=16m
     security_opt:
@@ -103,4 +103,3 @@ services:
 volumes:
   db-data:
   backend-data:
-  agent-state:
