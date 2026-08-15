@@ -108,6 +108,18 @@ async function inspectCore() {
   }
 }
 
+function unexpectedManagementOverlaps(ipAddresses, networkPlan) {
+  const expectedManagement = new Map([
+    [mgmtNet.vps.iface, networkPlan.vpsNet],
+    [mgmtNet.clients.iface, networkPlan.clientsNet],
+    [mgmtNet.admin.iface, networkPlan.adminNet],
+  ]);
+  return (ipAddresses || [])
+    .map(row => ({ interface: row.interface || '', cidr: normalizeCidr(row.address, { allowHost: false }) }))
+    .filter(row => row.cidr && cidrOverlaps(networkPlan.net, row.cidr))
+    .filter(row => expectedManagement.get(row.interface) !== row.cidr);
+}
+
 async function previewProvision() {
   const creds = await loadCoreCredentials();
   if (!creds) return { canProvision: false, blockers: ['Configura IP, usuario y contraseña del MikroTik.'], actions: [] };
@@ -129,9 +141,7 @@ async function previewProvision() {
     const networkPlan = mgmtNet.deriveSupernet(managementSupernet);
     if (!networkPlan) blockers.push('Define y guarda el bloque privado /22 de gestión antes de preparar el servidor.');
     else {
-      const coreOverlaps = (inv.ipAddresses || [])
-        .map(row => ({ interface: row.interface || '', cidr: normalizeCidr(row.address, { allowHost: false }) }))
-        .filter(row => row.cidr && cidrOverlaps(networkPlan.net, row.cidr));
+      const coreOverlaps = unexpectedManagementOverlaps(inv.ipAddresses, networkPlan);
       if (coreOverlaps.length) {
         blockers.push(`El /22 se solapa con direcciones existentes del Core: ${coreOverlaps.map(row => `${row.interface} ${row.cidr}`).join(', ')}.`);
       }
@@ -306,5 +316,5 @@ async function provisionCore() {
 
 module.exports = {
   loadCoreCredentials, deriveWanInterface, summarizeInventory, inspectCore,
-  previewProvision, provisionCore, readInventory,
+  previewProvision, provisionCore, readInventory, unexpectedManagementOverlaps,
 };
