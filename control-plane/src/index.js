@@ -7,4 +7,5 @@ module.exports = {
   ...require('./services/consumeActivation'),
   ...require('./services/issueLicense'),
   ...require('./services/activationRateLimit'),
+  ...require('./services/activateInstance'),
 };

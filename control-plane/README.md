@@ -8,6 +8,7 @@ Servicio aislado para clientes, planes, instancias, pools y activaciones. No con
 - `CONTROL_PLANE_ADMIN_TOKEN` (mínimo 32 caracteres; secreto fuera del repositorio)
 - `ACTIVATION_CODE_PEPPER` (mínimo 32 caracteres; secreto distinto al token)
 - `ACTIVATION_RATE_LIMIT_PEPPER` (mínimo 32 caracteres; distinto de los anteriores)
+- `LICENSE_SIGNING_KEY_ID` y `LICENSE_SIGNING_PRIVATE_KEY_FILE` (PEM Ed25519 fuera del repositorio)
 - `CONTROL_DB_HOST`, `CONTROL_DB_PORT`, `CONTROL_DB_USER`, `CONTROL_DB_PASSWORD`, `CONTROL_DB_NAME`
 
 El servidor escucha exclusivamente en `127.0.0.1`. La publicación futura debe pasar por HTTPS y un proxy con rate limiting. El Bearer actual es una protección administrativa provisional; debe sustituirse por sesiones fuertes con MFA antes de construir la interfaz central.
@@ -21,6 +22,9 @@ Todas las rutas bajo `/api/admin` exigen `Authorization: Bearer <token>`.
 - `GET|POST /api/admin/instances`
 - `GET|POST /api/admin/instances/:id/activation-codes`
 - `POST /api/admin/activation-codes/:id/revoke`
+- `POST /api/admin/instances/:id/subscriptions`
+
+El instalador usa `POST /api/activate`. El endpoint aplica primero rate limiting durable y después ejecuta atómicamente: consumir código, registrar identidad Ed25519, activar instancia y emitir la primera licencia. Devuelve FQDN, `/22`, licencia y clave pública de verificación; los errores de código/suscripción se unifican como `ACTIVATION_FAILED` para evitar enumeración.
 
 El código en claro sólo aparece al emitirlo. Los listados exponen estado y fechas, pero nunca el código ni su huella HMAC.
 

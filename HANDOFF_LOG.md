@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-15 — Flujo atómico del instalador.** Rama `vps_prod` (base `3bb3945`). Estado: 23/23 pruebas y Semgrep security/secrets 0 hallazgos; sin despliegue.
+> - Se añadió asignación administrativa de suscripción y `POST /api/activate` con rate limit persistente previo.
+> - Código, identidad, instancia y primera licencia se confirman juntos o se revierten; la respuesta bootstrap incluye FQDN y `/22` sin secretos centrales.
+> - Los fallos públicos se unifican para evitar enumerar códigos o estados internos; la privada Ed25519 se exige como archivo externo.
+> - Pendiente: prueba HTTP contra MariaDB real, rotación/revocación y autenticación administrativa MFA.
+
 > **Sesión 2026-08-15 — Rate limiting durable de activación.** Rama `vps_prod` (base `6c687ac`). Estado: 22/22 pruebas y Semgrep security/secrets 0 hallazgos; sin despliegue.
 > - Los intentos se cuentan en MariaDB por HMAC de IP con pepper independiente; la IP no queda guardada en claro en el bucket.
 > - Política inicial: 5 intentos por 15 minutos y bloqueo de 60 minutos al excederlos, persistente entre reinicios.

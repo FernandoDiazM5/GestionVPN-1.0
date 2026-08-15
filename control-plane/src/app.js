@@ -4,6 +4,7 @@ const express = require('express');
 const { z } = require('zod');
 const { createAdminAuth } = require('./middleware/adminAuth');
 const { createAdminService } = require('./services/adminService');
+const { activateInstance } = require('./services/activateInstance');
 
 const uuid = z.string().uuid();
 const customerSchema = z.object({
@@ -27,6 +28,16 @@ const instanceSchema = z.object({
   publicIp: z.union([z.ipv4(), z.ipv6()]).optional(),
 }).strict();
 const activationSchema = z.object({ ttlHours: z.number().int().min(1).max(72).default(24) }).strict();
+const subscriptionSchema = z.object({
+  planId: uuid,
+  status: z.enum(['TRIAL', 'ACTIVE']),
+  startsAt: z.iso.datetime(),
+  endsAt: z.iso.datetime(),
+}).strict();
+const publicActivationSchema = z.object({
+  code: z.string().trim().min(20).max(100),
+  instancePublicKeyPem: z.string().trim().min(80).max(1000),
+}).strict();
 
 function validate(schema, value) {
   const parsed = schema.safeParse(value);
@@ -43,12 +54,19 @@ function asyncRoute(handler) {
   return (req, res, next) => Promise.resolve(handler(req, res)).catch(next);
 }
 
-function createApp({ pool, adminToken, activationPepper, now }) {
+function createApp({ pool, adminToken, activationPepper, rateLimitPepper, signingKeyId, signingPrivateKey, now }) {
   const app = express();
   const service = createAdminService({ pool, activationPepper, now });
   app.disable('x-powered-by');
+  app.set('trust proxy', 'loopback');
   app.use(express.json({ limit: '64kb' }));
   app.get('/health', (_req, res) => res.json({ success: true, status: 'ok' }));
+  if (rateLimitPepper && signingKeyId && signingPrivateKey) app.post('/api/activate', asyncRoute(async (req, res) => {
+    const input = validate(publicActivationSchema, req.body);
+    const activation = await activateInstance({ pool, ...input, activationPepper, rateLimitPepper,
+      sourceIp: req.ip, signingKeyId, signingPrivateKey, now: now?.() || new Date() });
+    res.status(201).json({ success: true, activation });
+  }));
 
   const admin = express.Router();
   admin.use(createAdminAuth(adminToken));
@@ -64,15 +82,21 @@ function createApp({ pool, adminToken, activationPepper, now }) {
     const activation = await service.issueActivation(validate(uuid, req.params.id), '00000000-0000-4000-8000-000000000000', input.ttlHours);
     res.status(201).json({ success: true, activation, warning: 'El código sólo se mostrará en esta respuesta.' });
   }));
+  admin.post('/instances/:id/subscriptions', asyncRoute(async (req, res) => res.status(201).json({
+    success: true,
+    subscription: await service.assignSubscription(validate(uuid, req.params.id), validate(subscriptionSchema, req.body)),
+  })));
   admin.post('/activation-codes/:id/revoke', asyncRoute(async (req, res) => res.json({ success: true, activation: await service.revokeActivation(validate(uuid, req.params.id)) })));
   app.use('/api/admin', admin);
 
   app.use((error, _req, res, _next) => {
     const duplicate = error?.code === 'ER_DUP_ENTRY';
-    const status = error?.code === 'VALIDATION_ERROR' ? 400
+    const publicActivationFailure = /^(ACTIVATION_CODE_|INSTANCE_ALREADY_ACTIVATED|SUBSCRIPTION_NOT_ACTIVE)/.test(error?.code || '');
+    const status = error?.code === 'ACTIVATION_RATE_LIMITED' ? 429 : publicActivationFailure ? 400 : error?.code === 'VALIDATION_ERROR' ? 400
       : duplicate || /(_NOT_FOUND|_ALREADY_|_NOT_REVOCABLE|_INCOMPLETE|_EXHAUSTED)$/.test(error?.code || '') ? 409
         : 500;
-    const code = duplicate ? 'RESOURCE_CONFLICT' : status === 500 ? 'INTERNAL_ERROR' : error.code;
+    const code = duplicate ? 'RESOURCE_CONFLICT' : publicActivationFailure ? 'ACTIVATION_FAILED' : status === 500 ? 'INTERNAL_ERROR' : error.code;
+    if (error?.retryAfterSeconds) res.set('Retry-After', String(error.retryAfterSeconds));
     res.status(status).json({ success: false, code, ...(error.issues ? { issues: error.issues } : {}) });
   });
   return app;

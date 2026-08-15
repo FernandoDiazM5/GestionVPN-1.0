@@ -15,7 +15,7 @@ function createAdminService({ pool, activationPepper, now = () => new Date() }) 
 
   async function createCustomer(input) {
     const id = crypto.randomUUID();
-    await pool.query(
+    const [result] = await pool.query(
       'INSERT INTO customers (id, legal_name, display_name, tax_id) VALUES (?, ?, ?, ?)',
       [id, input.legalName, input.displayName, input.taxId || null],
     );
@@ -106,7 +106,22 @@ function createAdminService({ pool, activationPepper, now = () => new Date() }) 
     return rows;
   }
 
-  return { listCustomers, createCustomer, listPlans, createPlan, createInstance, listInstances, issueActivation, revokeActivation, listActivations };
+  async function assignSubscription(instanceId, input) {
+    const id = crypto.randomUUID();
+    const startsAt = new Date(input.startsAt);
+    const endsAt = new Date(input.endsAt);
+    if (endsAt <= startsAt) throw conflict('SUBSCRIPTION_DATES_INVALID');
+    const [result] = await pool.query(
+      `INSERT INTO subscriptions (id,instance_id,plan_id,status,starts_at,ends_at)
+       SELECT ?,pi.id,sp.id,?,?,? FROM product_instances pi JOIN subscription_plans sp ON sp.id=? AND sp.is_active=TRUE
+       WHERE pi.id=?`,
+      [id, input.status, startsAt, endsAt, input.planId, instanceId],
+    );
+    if (result.affectedRows !== 1) throw conflict('SUBSCRIPTION_TARGET_NOT_FOUND');
+    return { id, instanceId, ...input };
+  }
+
+  return { listCustomers, createCustomer, listPlans, createPlan, createInstance, listInstances, issueActivation, revokeActivation, listActivations, assignSubscription };
 }
 
 module.exports = { createAdminService };

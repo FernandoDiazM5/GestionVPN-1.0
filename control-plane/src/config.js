@@ -12,6 +12,8 @@ function loadConfig(env = process.env) {
     adminToken: required(env.CONTROL_PLANE_ADMIN_TOKEN, 'CONTROL_PLANE_ADMIN_TOKEN', 32),
     activationPepper: required(env.ACTIVATION_CODE_PEPPER, 'ACTIVATION_CODE_PEPPER', 32),
     rateLimitPepper: required(env.ACTIVATION_RATE_LIMIT_PEPPER, 'ACTIVATION_RATE_LIMIT_PEPPER', 32),
+    signingKeyId: required(env.LICENSE_SIGNING_KEY_ID, 'LICENSE_SIGNING_KEY_ID', 3),
+    signingPrivateKeyFile: required(env.LICENSE_SIGNING_PRIVATE_KEY_FILE, 'LICENSE_SIGNING_PRIVATE_KEY_FILE'),
     db: {
       host: required(env.CONTROL_DB_HOST, 'CONTROL_DB_HOST'),
       port: Number(env.CONTROL_DB_PORT || 3306),
