@@ -6,6 +6,13 @@
 > - El wrapper Semgrep de Windows ahora incluye las fuentes del agente; se cerró el escaneo pendiente de fases anteriores.
 > - Pendiente: empaquetar el agente dentro del instalador/imagen oficial y reportar salud resumida de VPS/Core.
 
+> **Sesion 2026-08-15 - Instalador reanudable hasta DNS/TLS.** Rama `vps_prod`; sin despliegue.
+> - Se implementaron `--check`, `--apply` con confirmacion literal y `--resume` sin segundo codigo.
+> - La identidad Ed25519 nace en el VPS; solo la publica viaja a Central y todos los artefactos quedan con permisos restrictivos.
+> - DNS incorrecto produce `PENDING_DNS_TLS`; ningun contenedor arranca antes de certificado valido.
+> - Bash syntax, ShellCheck, contrato 3/3, Central 39/39, agente 6/6 y Semgrep sin hallazgos.
+> - Pendiente: TLS y compose endurecido de la instancia completa.
+
 > **Sesion 2026-08-15 - Base de la imagen oficial Joinpoint.** Rama `vps_prod`; sin despliegue.
 > - Se creo `@joinpoint/protocol` para compartir criptografia sin acoplar el agente al backend central.
 > - El agente incorpora bootstrap seguro desde archivo `0600` y mantiene secretos fuera de la imagen.

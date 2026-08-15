@@ -2,6 +2,12 @@
 
 Este directorio contiene componentes reproducibles para instalar una instancia aislada en el VPS de un cliente. Todavia no modifica ni despliega el VPS de produccion.
 
+## Instalador por estados
+
+`install.sh --check` solo verifica requisitos y no escribe nada. `--apply` exige la frase explicita `JOINPOINT_CONFIRM='INSTALAR JOINPOINT'`, genera la identidad Ed25519 dentro del VPS y consume el codigo de un solo uso. Si DNS aun no apunta a la IP declarada, conserva el estado protegido como `PENDING_DNS_TLS`; `--resume` retoma la misma instalacion sin consumir otro codigo.
+
+El estado `READY_FOR_TLS` no significa que la instancia ya este publicada: deliberadamente no inicia contenedores hasta que el siguiente incremento emita o monte un certificado valido. El directorio `/opt/joinpoint` nunca se sobrescribe automaticamente.
+
 ## Agente de instancia
 
 `Dockerfile.agent` construye solamente el agente y el protocolo criptografico compartido. Se ejecuta sin privilegios y no contiene claves, licencias ni datos de un cliente.
