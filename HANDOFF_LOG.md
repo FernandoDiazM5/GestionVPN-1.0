@@ -1,5 +1,9 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-15 — Joinpoint Central pilot.5 desplegada.** Rama `vps_prod` (base `c585ecb`). Estado: HTML/CSS histórico verificado, health OK y contenedores saludables.
+> - Workflow completo verde y actualización conservadora de Central; cuenta, MFA, MariaDB, TLS y llave firmante preservados.
+> - Backup SQL previo verificado y timers de backup/TLS activos.
+
 > **Sesión 2026-08-15 — Reuso visual NOC y bootstrap Central.** Rama `vps_prod` (base `9f46e4b`). Estado: panel 2/2, Central 40/40, deploy 9/9 y build correcto.
 > - Login Central adaptado al componente visual histórico sin mezclar autenticación Google/invitaciones del cliente; consola alineada con sidebar y paleta NOC.
 > - Bootstrap corregido para omitir el servidor de la imagen y pasar correo/nombre/contraseña únicamente como entorno temporal.
