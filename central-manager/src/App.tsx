@@ -1234,10 +1234,18 @@ function CommunicationsPanel() {
 function SettingsPanel() {
   return (
     <div className="settings-stack">
+      <CommercialSettings />
       <SmtpSettings />
       <TelegramSettings />
     </div>
   );
+}
+function CommercialSettings(){
+  const [v,setV]=useState<Record<string,any>>({});const [message,setMessage]=useState("");
+  useEffect(()=>{centralApi.getCommercialSettings().then(x=>setV({legalName:x.legal_name,taxId:x.tax_id||"",billingEmail:x.billing_email||"",address:x.address||"",invoicePrefix:x.invoice_prefix,defaultCurrency:x.default_currency,defaultTaxPercent:Number(x.default_tax_percent),invoiceDueDays:x.invoice_due_days,graceDays:x.grace_days,paymentInstructions:x.payment_instructions||"",brandName:x.brand_name,supportEmail:x.support_email||"",version:x.version})).catch(e=>setMessage(e.message))},[]);
+  async function save(e:FormEvent){e.preventDefault();setMessage("");try{const x=await centralApi.saveCommercialSettings({...v,defaultTaxPercent:Number(v.defaultTaxPercent),invoiceDueDays:Number(v.invoiceDueDays),graceDays:Number(v.graceDays)});setV({...v,version:x.version});setMessage("Identidad y políticas comerciales guardadas.")}catch(e){setMessage(e instanceof Error?e.message:"No se pudo guardar")}}
+  const field=(key:string,label:string,type="text")=><label><span>{label}</span><input type={type} required={['legalName','invoicePrefix','defaultCurrency','brandName'].includes(key)} value={v[key]??""} onChange={e=>setV({...v,[key]:e.target.value})}/></label>;
+  return <section className="card"><div className="card-head"><div><h2>Identidad comercial y facturación</h2><p className="muted">Datos que se congelarán en cada factura y comunicación emitida.</p></div><strong>v{v.version||1}</strong></div><form className="inline-form smtp-form" onSubmit={save}>{field('brandName','Marca')}{field('legalName','Razón social')}{field('taxId','RUC / identificación')}{field('billingEmail','Correo de facturación','email')}{field('supportEmail','Correo de soporte','email')}{field('address','Dirección')}{field('invoicePrefix','Prefijo de factura')}{field('defaultCurrency','Moneda predeterminada')}{field('defaultTaxPercent','Impuesto %','number')}{field('invoiceDueDays','Días para vencimiento','number')}{field('graceDays','Días de gracia','number')}<label className="wide"><span>Instrucciones y medios de pago</span><textarea rows={4} value={v.paymentInstructions||""} onChange={e=>setV({...v,paymentInstructions:e.target.value})} placeholder="Banco, cuenta, Yape/Plin, referencia requerida..."/></label><button className="primary">Guardar configuración comercial</button></form>{message?<p className="muted" role="status">{message}</p>:null}</section>
 }
 function TelegramSettings() {
   const [provider, setProvider] = useState<any>(null);

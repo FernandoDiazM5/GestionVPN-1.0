@@ -14,6 +14,7 @@ const { createNotificationProviderService } = require('./services/notificationPr
 const { createCommercialService } = require('./services/commercialService');
 const { createNotificationDeliveryService } = require('./services/notificationDeliveryService');
 const { customerInstallationHtml } = require('./manuals/customerInstallation');
+const { createCommercialSettingsService } = require('./services/commercialSettingsService');
 
 const uuid = z.string().uuid();
 const customerSchema = z.object({
@@ -107,6 +108,7 @@ const paymentVerificationSchema=z.discriminatedUnion('confirmed',[
   z.object({confirmed:z.literal(false),reason:z.string().trim().min(8).max(500)}).strict(),
   z.object({confirmed:z.literal(true),invoiceId:uuid,amountApplied:z.number().positive()}).strict(),
 ]);
+const commercialSettingsSchema=z.object({legalName:z.string().trim().min(2).max(180),taxId:z.string().trim().max(40).optional(),billingEmail:z.email().max(254).optional(),address:z.string().trim().max(500).optional(),invoicePrefix:z.string().trim().toUpperCase().regex(/^[A-Z0-9-]{1,12}$/),defaultCurrency:z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/),defaultTaxPercent:z.number().min(0).max(100),invoiceDueDays:z.number().int().min(0).max(365),graceDays:z.number().int().min(0).max(90),paymentInstructions:z.string().trim().max(4000).optional(),brandName:z.string().trim().min(2).max(120),supportEmail:z.email().max(254).optional(),version:z.number().int().nonnegative()}).strict();
 
 function validate(schema, value) {
   const parsed = schema.safeParse(value);
@@ -129,6 +131,7 @@ function createApp({ pool, activationPepper, rateLimitPepper, signingKeyId, sign
   const service = createAdminService({ pool, activationPepper, now });
   const notificationProviders=createNotificationProviderService({pool,encryptionKey:adminMfaEncryptionKey,now});
   const commercial=createCommercialService({pool,now});
+  const commercialSettings=createCommercialSettingsService({pool});
   app.locals.reconcileCommercial=()=>commercial.reconcileExpirations();
   const deliveries=createNotificationDeliveryService({pool,encryptionKey:adminMfaEncryptionKey,providers:notificationProviders,now});
   app.locals.processNotifications=()=>deliveries.processDue();
@@ -173,6 +176,8 @@ function createApp({ pool, activationPepper, rateLimitPepper, signingKeyId, sign
     res.json({ success: true, recoveryCodes: codes, warning: 'Estos códigos se muestran una sola vez; los anteriores ya no son válidos.' });
   }));
   admin.get('/settings/smtp',asyncRoute(async(_req,res)=>res.json({success:true,provider:await notificationProviders.getSmtp()})));
+  admin.get('/settings/commercial',asyncRoute(async(_req,res)=>res.json({success:true,settings:await commercialSettings.get()})));
+  admin.put('/settings/commercial',asyncRoute(async(req,res)=>res.json({success:true,settings:await commercialSettings.save(validate(commercialSettingsSchema,req.body),req.admin.id)})));
   admin.put('/settings/smtp',asyncRoute(async(req,res)=>{const input=validate(smtpSchema,req.body);await sessions.reauthenticate(req.admin.id,input.reauth);res.json({success:true,provider:await notificationProviders.saveSmtp(input.config,req.admin.id)})}));
   admin.post('/settings/smtp/test',asyncRoute(async(req,res)=>res.json({success:true,test:await notificationProviders.testSmtp(validate(smtpTestSchema,req.body).recipient)})));
   admin.get('/settings/telegram',asyncRoute(async(_req,res)=>res.json({success:true,provider:await notificationProviders.getTelegram()})));

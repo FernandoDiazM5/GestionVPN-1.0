@@ -226,6 +226,21 @@ CREATE TABLE IF NOT EXISTS billing_sequences (
   next_value BIGINT UNSIGNED NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS commercial_settings (
+  id TINYINT UNSIGNED PRIMARY KEY DEFAULT 1,
+  legal_name VARCHAR(180) NOT NULL DEFAULT 'Joinpoint', tax_id VARCHAR(40) NULL,
+  billing_email VARCHAR(254) NULL, address VARCHAR(500) NULL,
+  invoice_prefix VARCHAR(12) NOT NULL DEFAULT 'JP', default_currency CHAR(3) NOT NULL DEFAULT 'PEN',
+  default_tax_percent DECIMAL(5,2) NOT NULL DEFAULT 18.00,
+  invoice_due_days SMALLINT UNSIGNED NOT NULL DEFAULT 7, grace_days SMALLINT UNSIGNED NOT NULL DEFAULT 3,
+  payment_instructions TEXT NULL, brand_name VARCHAR(120) NOT NULL DEFAULT 'Joinpoint', support_email VARCHAR(254) NULL,
+  version INT UNSIGNED NOT NULL DEFAULT 1, updated_by CHAR(36) NULL,
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  CONSTRAINT chk_commercial_settings_singleton CHECK (id=1),
+  CONSTRAINT chk_commercial_tax CHECK (default_tax_percent BETWEEN 0 AND 100)
+);
+INSERT INTO commercial_settings (id) VALUES (1) ON DUPLICATE KEY UPDATE id=id;
+
 CREATE TABLE IF NOT EXISTS billing_invoices (
   id CHAR(36) PRIMARY KEY,
   instance_id CHAR(36) NOT NULL,

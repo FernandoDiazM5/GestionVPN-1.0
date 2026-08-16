@@ -233,6 +233,8 @@ export const centralApi = {
     request<{ provider: SmtpProvider }>("/api/admin/settings/smtp").then(
       (x) => x.provider,
     ),
+  getCommercialSettings: () => request<{settings:Record<string, any>}>("/api/admin/settings/commercial").then(x=>x.settings),
+  saveCommercialSettings: (body:Record<string, unknown>) => request<{settings:Record<string, any>}>("/api/admin/settings/commercial",{method:"PUT",body:JSON.stringify(body)}).then(x=>x.settings),
   saveSmtp: (body: Record<string, unknown>) =>
     request<{ provider: SmtpProvider }>("/api/admin/settings/smtp", {
       method: "PUT",
