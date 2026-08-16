@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-15 — Reuso visual NOC y bootstrap Central.** Rama `vps_prod` (base `9f46e4b`). Estado: panel 2/2, Central 40/40, deploy 9/9 y build correcto.
+> - Login Central adaptado al componente visual histórico sin mezclar autenticación Google/invitaciones del cliente; consola alineada con sidebar y paleta NOC.
+> - Bootstrap corregido para omitir el servidor de la imagen y pasar correo/nombre/contraseña únicamente como entorno temporal.
+> - Pendiente: publicar y desplegar `pilot.5` preservando identidad administrativa y datos.
+
 > **Sesión 2026-08-15 — Panel Central publicado y desplegado.** Rama `vps_prod` (base `890113b`). Estado: `pilot.4` verde, HTML 200, health OK y tres contenedores saludables.
 > - Publicación completa: Central, backend, frontend, agente y bundle; despliegue actualizó sólo Central y preservó MariaDB/TLS/llaves.
 > - Backup SQL y configuración pre-upgrade verificados; timers de backup/TLS activos.
