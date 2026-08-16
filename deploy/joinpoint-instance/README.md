@@ -29,6 +29,21 @@ workflow adjunta a su GitHub Release `joinpoint-installer-<version>.tar.gz` y su
 Ese paquete contiene solamente Compose, instalador, renovacion TLS, plantilla Nginx y este runbook;
 el VPS no necesita clonar el monorepo.
 
+Descarga verificada para un VPS nuevo:
+
+```bash
+version=0.1.0-pilot.1
+base="https://github.com/FernandoDiazM5/GestionVPN-1.0/releases/download/joinpoint-v$version"
+curl --fail --location --remote-name "$base/joinpoint-installer-$version.tar.gz"
+curl --fail --location --remote-name "$base/joinpoint-installer-$version.tar.gz.sha256"
+sha256sum --check "joinpoint-installer-$version.tar.gz.sha256"
+install -d -m 0755 /opt/joinpoint-installer
+tar -xzf "joinpoint-installer-$version.tar.gz" -C /opt/joinpoint-installer
+```
+
+Para un rollout fijado completamente, usar los digests publicados como overrides de las tres variables
+`JOINPOINT_*_IMAGE`; una etiqueta inmutable facilita la operacion, pero el digest garantiza el contenido exacto.
+
 ## Composicion de servicios
 
 `compose.yaml` declara MariaDB, backend, frontend y agente. La base de datos solo publica su puerto en loopback; el backend conserva red de host para alcanzar WireGuard/MikroTik, pero elimina capacidades Linux y aplica `no-new-privileges`; el agente usa filesystem de solo lectura, `tmpfs`, cero capacidades y una clave privada montada en solo lectura. Las integraciones del moderador permanecen desactivadas hasta que este ingrese sus propias credenciales.
