@@ -1,5 +1,7 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-16 — Configuración comercial pilot.8.** Identidad de facturación, políticas y medios de pago implementados con control de versión, publicados y desplegados saludablemente tras backup.
+
 > **Sesión 2026-08-16 — Administración comercial Central.** Rama `vps_prod` (base `3163c0c`). Estado: implementación y validación local completas; pendiente publicación/despliegue.
 > - Planes detallados, clientes/contactos, membresías, facturación/pagos, comunicaciones y configuración SMTP/Telegram Central.
 > - Alta transaccional, correo de bienvenida reintentable, manual versionado y suspensión/vencimiento enlazados con licencias.
