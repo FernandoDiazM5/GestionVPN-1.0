@@ -503,31 +503,18 @@ function Table({ headers, rows }: { headers: string[]; rows: string[][] }) {
   );
 }
 function CustomerForm({ done }: { done: () => void }) {
-  return (
-    <QuickCreate
-      label="Nuevo cliente"
-      fields={[
-        ["legalName", "Razón social"],
-        ["displayName", "Nombre visible"],
-        ["taxId", "RUC / identificación"],
-        ["contactName", "Nombre del responsable"],
-        ["contactEmail", "Correo del responsable"],
-        ["contactPhone", "Teléfono"],
-      ]}
-      map={(v) => ({
-        legalName: v.legalName,
-        displayName: v.displayName,
-        taxId: v.taxId,
-        contact: {
-          fullName: v.contactName,
-          email: v.contactEmail,
-          phone: v.contactPhone,
-        },
-      })}
-      submit={centralApi.createCustomer}
-      done={done}
-    />
-  );
+  const [open,setOpen]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState("");
+  const [v,setV]=useState<Record<string,string>>({});
+  if(!open)return <button className="primary" onClick={()=>setOpen(true)}><Plus/>Nuevo cliente</button>;
+  async function save(e:FormEvent){e.preventDefault();setBusy(true);setError("");try{await centralApi.createCustomer({legalName:v.legalName.trim(),displayName:v.displayName.trim(),taxId:v.taxId?.trim()||undefined,contact:{fullName:v.contactName.trim(),email:v.contactEmail.trim(),phone:v.contactPhone?.trim()||undefined}});setOpen(false);done()}catch(e){setError(e instanceof Error?e.message:"No se pudo guardar el cliente.")}finally{setBusy(false)}}
+  const field=(key:string,label:string,help:string,type="text",required=true)=><label className="form-field"><span>{label}{required?<b aria-hidden="true"> *</b>:null}</span><input required={required} type={type} value={v[key]||""} onChange={e=>setV({...v,[key]:e.target.value})} aria-describedby={key+"-help"}/><small id={key+"-help"}>{help}</small></label>;
+  return <form className="crud-form" onSubmit={save} noValidate={false}>
+    <div className="crud-form-head"><div><h3>Registrar cliente</h3><p>Completa la identidad comercial y el contacto que recibirá la activación.</p></div><span className="required-note">* Obligatorio</span></div>
+    <fieldset><legend>Datos de la empresa</legend><div className="crud-grid">{field('legalName','Razón social','Nombre legal para contratos y facturas.')}{field('displayName','Nombre visible','Nombre corto usado dentro de Joinpoint.')}{field('taxId','RUC / identificación','Opcional; puede completarse antes de facturar.','text',false)}</div></fieldset>
+    <fieldset><legend>Contacto principal</legend><div className="crud-grid">{field('contactName','Nombre completo','Responsable autorizado del servicio.')}{field('contactEmail','Correo electrónico','Aquí se enviará el manual y código de activación.','email')}{field('contactPhone','Teléfono','Opcional, incluye código de país.','tel',false)}</div></fieldset>
+    {error?<div className="form-feedback error" role="alert">{error}</div>:null}
+    <div className="form-actions"><button type="button" className="secondary" onClick={()=>setOpen(false)} disabled={busy}>Cancelar</button><button className="primary" disabled={busy}>{busy?'Guardando…':'Crear cliente'}</button></div>
+  </form>;
 }
 function PlanForm({ done }: { done: () => void }) {
   const featureCatalog = [
@@ -602,48 +589,51 @@ function PlanForm({ done }: { done: () => void }) {
     }
   }
   return (
-    <form className="plan-editor" onSubmit={save}>
+    <form className="plan-editor crud-form" onSubmit={save}>
+      <div className="crud-form-head"><div><h3>Configurar nuevo plan</h3><p>Define primero la oferta comercial y luego las capacidades incluidas.</p></div><span className="required-note">* Obligatorio</span></div>
+      <fieldset><legend>Información y precio</legend>
       <div className="form-grid">
-        <input
+        <label className="form-field"><span>Código *</span><input
           required
-          placeholder="Código"
+          placeholder="BASICO"
           onChange={(e) => setValues({ ...values, code: e.target.value })}
-        />
-        <input
+        /><small>Identificador interno único, sin espacios.</small></label>
+        <label className="form-field"><span>Nombre comercial *</span><input
           required
-          placeholder="Nombre comercial"
+          placeholder="Plan Básico"
           onChange={(e) => setValues({ ...values, name: e.target.value })}
-        />
-        <input
-          placeholder="Descripción"
+        /><small>Nombre que verá el cliente.</small></label>
+        <label className="form-field"><span>Descripción</span><input
+          placeholder="Para operaciones pequeñas"
           onChange={(e) =>
             setValues({ ...values, description: e.target.value })
           }
-        />
-        <select
+        /><small>Resumen breve de su propósito.</small></label>
+        <label className="form-field"><span>Moneda *</span><select
           value={values.currency}
           onChange={(e) => setValues({ ...values, currency: e.target.value })}
         >
           <option value="PEN">Soles (PEN)</option>
           <option value="USD">Dólares (USD)</option>
-        </select>
-        <input
+        </select><small>Se conservará en sus precios históricos.</small></label>
+        <label className="form-field"><span>Precio mensual *</span><input
           required
           type="number"
           min="0"
           step="0.01"
           placeholder="Precio mensual"
           onChange={(e) => setValues({ ...values, monthly: e.target.value })}
-        />
-        <input
+        /><small>Importe sin símbolos de moneda.</small></label>
+        <label className="form-field"><span>Precio anual</span><input
           type="number"
           min="0"
           step="0.01"
-          placeholder="Precio anual (opcional)"
+          placeholder="Opcional"
           onChange={(e) => setValues({ ...values, annual: e.target.value })}
-        />
+        /><small>Déjalo vacío si no ofrecerás ciclo anual.</small></label>
       </div>
-      <h4>Capacidades incluidas</h4>
+      </fieldset>
+      <fieldset><legend>Capacidades incluidas</legend><p className="fieldset-help">Activa únicamente lo incluido en la membresía. Los límites se aplicarán en el VPS cliente.</p>
       <div className="feature-grid">
         {featureCatalog.map(([key, label, hasLimit]) => (
           <label key={key}>
@@ -671,17 +661,18 @@ function PlanForm({ done }: { done: () => void }) {
           </label>
         ))}
       </div>
+      </fieldset>
       {error ? <div className="error">{error}</div> : null}
       <div className="form-actions">
-        <button className="primary" disabled={busy}>
-          {busy ? "Guardando…" : "Guardar plan"}
-        </button>
         <button
           type="button"
           className="secondary"
           onClick={() => setOpen(false)}
         >
           Cancelar
+        </button>
+        <button className="primary" disabled={busy}>
+          {busy ? "Guardando…" : "Guardar plan"}
         </button>
       </div>
     </form>
@@ -949,7 +940,8 @@ function BillingPanel({
         </button>
       </div>
       {open ? (
-        <form className="inline-form" onSubmit={save}>
+        <form className="inline-form crud-form crud-compact" onSubmit={save}>
+          <div className="crud-form-head wide"><div><h3>Emitir factura</h3><p>Selecciona la instancia, periodo e importes que quedarán congelados.</p></div></div>
           <select
             required
             onChange={(e) =>
@@ -1017,7 +1009,8 @@ function BillingPanel({
         </form>
       ) : null}
       {paymentOpen ? (
-        <form className="inline-form" onSubmit={savePayment}>
+        <form className="inline-form crud-form crud-compact" onSubmit={savePayment}>
+          <div className="crud-form-head wide"><div><h3>Registrar pago</h3><p>El pago quedará pendiente de verificación antes de renovar la membresía.</p></div></div>
           <select
             required
             onChange={(e) =>
@@ -1620,7 +1613,8 @@ function InstanceForm({
       </div>
     );
   return (
-    <form className="onboarding-form" onSubmit={save}>
+    <form className="onboarding-form crud-form" onSubmit={save}>
+      <div className="crud-form-head wide"><div><h3>Alta completa del cliente</h3><p>Crea la instancia, asigna la membresía y genera el código en una sola operación segura.</p></div><span className="required-note">* Obligatorio</span></div>
       <select
         required
         value={values.customerId}
