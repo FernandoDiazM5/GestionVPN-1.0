@@ -1,5 +1,9 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-15 — Empaquetado de la Plataforma Central.** Rama `vps_prod` (base `fa3b968`). Estado: Central 39/39, deploy 3/3, cliente 10/10, imagen Central 0 vulnerabilidades productivas y Compose/Actionlint correctos.
+> - Imagen no-root con migración idempotente; Compose aísla MariaDB y clave firmante; Nginx fuerza HTTPS, host canónico, HSTS y rate limit.
+> - Pendiente: instalador Central con TLS, secretos, backup y bootstrap MFA; sin despliegue real.
+
 > **Sesión 2026-08-15 — Imágenes oficiales versionadas.** Rama `vps_prod` (base `057db3d`). Estado: instalador 10/10, Compose/Actionlint/Bash/ShellCheck correctos, Semgrep security/secrets 0 hallazgos y tres imágenes construidas localmente.
 > - Compose e instalador pasaron de builds en el VPS a pulls GHCR versionados, sin `latest` y con soporte de referencias por digest.
 > - Un tag `joinpoint-v<version>` publica backend/frontend/agente y genera un bundle mínimo del instalador con checksum dentro de GitHub Releases.

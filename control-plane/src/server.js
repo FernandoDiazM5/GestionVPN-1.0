@@ -11,8 +11,8 @@ const pool = mysql.createPool({ ...config.db, waitForConnections: true, connecti
 const app = createApp({ pool, activationPepper: config.activationPepper,
   rateLimitPepper: config.rateLimitPepper, signingKeyId: config.signingKeyId, signingPrivateKey,
   adminMfaEncryptionKey: config.adminMfaEncryptionKey, adminSessionPepper: config.adminSessionPepper });
-const server = app.listen(config.port, '127.0.0.1', () => {
-  process.stdout.write(`Joinpoint control plane escuchando en 127.0.0.1:${config.port}\n`);
+const server = app.listen(config.port, config.host, () => {
+  process.stdout.write(`Joinpoint control plane escuchando en ${config.host}:${config.port}\n`);
 });
 
 async function shutdown() {

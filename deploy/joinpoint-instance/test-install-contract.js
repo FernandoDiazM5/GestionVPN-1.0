@@ -85,6 +85,7 @@ test('publicacion GHCR construye las tres imagenes solo para una version explici
   assert.match(workflow,/server\/Dockerfile\.prod/);
   assert.match(workflow,/vpn-manager\/Dockerfile\.prod/);
   assert.match(workflow,/deploy\/joinpoint-instance\/Dockerfile\.agent/);
+  assert.match(workflow,/control-plane\/Dockerfile\.prod/);
   assert.match(workflow,/joinpoint-installer-\$version\.tar\.gz/);
   assert.match(workflow,/sha256sum/);
   assert.match(workflow,/gh release upload/);

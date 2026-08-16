@@ -9,6 +9,7 @@ function required(value, name, minLength = 1) {
 function loadConfig(env = process.env) {
   return {
     port: Number(env.CONTROL_PLANE_PORT || 3100),
+    host: env.CONTROL_PLANE_HOST || '127.0.0.1',
     adminMfaEncryptionKey: required(env.CONTROL_ADMIN_MFA_ENCRYPTION_KEY, 'CONTROL_ADMIN_MFA_ENCRYPTION_KEY', 44),
     adminSessionPepper: required(env.CONTROL_ADMIN_SESSION_PEPPER, 'CONTROL_ADMIN_SESSION_PEPPER', 32),
     activationPepper: required(env.ACTIVATION_CODE_PEPPER, 'ACTIVATION_CODE_PEPPER', 32),

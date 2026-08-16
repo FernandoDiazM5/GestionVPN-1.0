@@ -32,6 +32,8 @@ jobs:
             dockerfile: vpn-manager/Dockerfile.prod
           - name: joinpoint-agent
             dockerfile: deploy/joinpoint-instance/Dockerfile.agent
+          - name: joinpoint-central
+            dockerfile: control-plane/Dockerfile.prod
     steps:
       - name: Checkout
         uses: actions/checkout@v6

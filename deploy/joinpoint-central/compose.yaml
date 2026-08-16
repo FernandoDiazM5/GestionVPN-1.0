@@ -1,0 +1,48 @@
+name: joinpoint-central
+services:
+  db:
+    image: mariadb:11
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?required}
+      MARIADB_DATABASE: joinpoint_control
+      MARIADB_USER: joinpoint_control
+      MARIADB_PASSWORD: ${DB_APP_PASSWORD:?required}
+    volumes: [central-db:/var/lib/mysql]
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    security_opt: [no-new-privileges:true]
+  central:
+    image: ${JOINPOINT_CENTRAL_IMAGE:?required}
+    restart: unless-stopped
+    env_file:
+      - ${JOINPOINT_CENTRAL_ENV_FILE:?required}
+    environment:
+      CONTROL_PLANE_HOST: 0.0.0.0
+      CONTROL_DB_HOST: db
+      CONTROL_DB_PORT: 3306
+      CONTROL_DB_USER: joinpoint_control
+      CONTROL_DB_PASSWORD: ${DB_APP_PASSWORD:?required}
+      CONTROL_DB_NAME: joinpoint_control
+      LICENSE_SIGNING_PRIVATE_KEY_FILE: /run/secrets/license-signing.pem
+    volumes:
+      - ${LICENSE_SIGNING_PRIVATE_KEY_FILE:?required}:/run/secrets/license-signing.pem:ro
+    depends_on:
+      db: {condition: service_healthy}
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+  proxy:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ${CENTRAL_NGINX_CONFIG:?required}:/etc/nginx/conf.d/default.conf:ro
+      - ${CENTRAL_TLS_DIR:?required}:/etc/nginx/ssl:ro
+    depends_on:
+      central: {condition: service_healthy}
+    security_opt: [no-new-privileges:true]
+volumes:
+  central-db:
