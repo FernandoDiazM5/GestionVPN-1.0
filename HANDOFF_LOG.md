@@ -4,6 +4,8 @@
 > - Planes detallados, clientes/contactos, membresías, facturación/pagos, comunicaciones y configuración SMTP/Telegram Central.
 > - Alta transaccional, correo de bienvenida reintentable, manual versionado y suspensión/vencimiento enlazados con licencias.
 > - Verificación: servidor 47/47, interfaz 3/3, deploy 9/9, build y auditorías limpias; imagen 0 críticas/altas.
+> - Publicación: `pilot.6` falló por un error transitorio del publicador en la imagen agente; la misma imagen fue reproducida localmente con éxito. Se publicó sin sobrescribirla como `pilot.7`, con los cinco trabajos verdes.
+> - Despliegue: `pilot.7` saludable en producción tras backup SQL/configuración; MariaDB, cuenta/MFA, TLS y llave firmante preservados. HTTPS/HSTS y timers comprobados.
 
 > **Sesión 2026-08-15 — Joinpoint Central pilot.5 desplegada.** Rama `vps_prod` (base `c585ecb`). Estado: HTML/CSS histórico verificado, health OK y contenedores saludables.
 > - Workflow completo verde y actualización conservadora de Central; cuenta, MFA, MariaDB, TLS y llave firmante preservados.
