@@ -1,5 +1,7 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-16 — Formularios CRUD pilot.10.** Se normalizaron Clientes, Planes, Facturas/Pagos y Alta completa con secciones, ayudas, validación accesible, carga y responsive. UI 3/3 y build correctos; publicado y desplegado saludablemente tras backup.
+
 > **Sesión 2026-08-16 — Plantillas versionadas pilot.9.** Editor seguro para correo de bienvenida, historial por versión y variables permitidas. Servidor 49/49, UI 3/3, esquema 2×, Semgrep limpio; publicado y desplegado con backup, health y timers verificados.
 
 > **Sesión 2026-08-16 — Configuración comercial pilot.8.** Identidad de facturación, políticas y medios de pago implementados con control de versión, publicados y desplegados saludablemente tras backup.

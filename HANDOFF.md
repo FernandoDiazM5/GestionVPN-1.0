@@ -9,6 +9,8 @@
 
 ## 0) Estado actual
 
+- **Formularios CRUD Central mejorados (2026-08-16):** `0.1.0-pilot.10` saludable en producción. Clientes, Planes, Facturas/Pagos y Alta completa usan jerarquía por secciones, etiquetas persistentes, ayudas, obligatoriedad visible, feedback accesible, estados de carga, acciones consistentes y respuesta móvil, conservando el tema Joinpoint. UI 3/3 y build verde; backup/timers preservados. Regla durable: todo nuevo CRUD Central debe reutilizar este patrón visual y no depender sólo de placeholders.
+
 - **Plantillas Central desplegadas (2026-08-16):** `0.1.0-pilot.9` saludable en `central.joinpoint.cloud`. La bienvenida dejó de estar fija en código: el administrador edita asunto/cuerpo, cada guardado crea versión histórica y sólo se aceptan variables de una lista segura. El código de activación permanece cifrado hasta el envío. Verificación: Central 49/49, UI 3/3, MariaDB limpia aplicada 2× (29 tablas), Semgrep security/secrets 0 hallazgos, workflow verde, backup y timers preservados. Siguiente: eventos automáticos de vencimiento/pagos/fallos y plantillas adicionales.
 
 - **Configuración comercial Central desplegada (2026-08-16):** `0.1.0-pilot.8` saludable en producción. Configuración permite identidad legal/marca, RUC, correos comercial y soporte, dirección, prefijo, moneda, impuesto, vencimiento, gracia e instrucciones/medios de pago con control optimista de versión. Servidor 47/47, UI 3/3, build y Semgrep limpios; backup/configuración previa preservados.
