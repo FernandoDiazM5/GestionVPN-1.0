@@ -108,6 +108,16 @@ function createAdminSessionService({ pool, mfaEncryptionKey, sessionPepper, now 
     await pool.query('UPDATE control_plane_admin_sessions SET revoked_at=? WHERE id=? AND revoked_at IS NULL', [now(), sessionId]);
   }
 
+  async function refreshCsrf(sessionId) {
+    const csrf = crypto.randomBytes(32).toString('base64url');
+    const [result] = await pool.query(
+      'UPDATE control_plane_admin_sessions SET csrf_digest=? WHERE id=? AND revoked_at IS NULL',
+      [digest(csrf), sessionId],
+    );
+    if (result.affectedRows !== 1) throw coded('ADMIN_AUTH_REQUIRED');
+    return csrf;
+  }
+
   async function regenerateRecoveryCodes(adminId, { password, totp }) {
     const timestamp = now();
     const connection = await pool.getConnection();
@@ -133,7 +143,7 @@ function createAdminSessionService({ pool, mfaEncryptionKey, sessionPepper, now 
     } catch (error) { await connection.rollback().catch(() => {}); throw error; } finally { connection.release(); }
   }
 
-  return { login, logout, regenerateRecoveryCodes };
+  return { login, logout, refreshCsrf, regenerateRecoveryCodes };
 }
 
 module.exports = { createAdminSessionService, SESSION_MS, IDLE_MS, RATE_MAX_ATTEMPTS };

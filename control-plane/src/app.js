@@ -1,6 +1,7 @@
 'use strict';
 
 const express = require('express');
+const path = require('path');
 const { z } = require('zod');
 const { COOKIE_NAME, createAdminAuth } = require('./middleware/adminAuth');
 const { createAdminSessionService } = require('./services/adminSessions');
@@ -109,7 +110,9 @@ function createApp({ pool, activationPepper, rateLimitPepper, signingKeyId, sign
 
   const admin = express.Router();
   admin.use(createAdminAuth({ pool, now }));
-  admin.get('/me', (req, res) => res.json({ success: true, admin: req.admin }));
+  admin.get('/me', asyncRoute(async (req, res) => res.json({
+    success: true, admin: req.admin, csrfToken: await sessions.refreshCsrf(req.adminSessionId),
+  })));
   admin.post('/logout', asyncRoute(async (req, res) => {
     await sessions.logout(req.adminSessionId);
     res.clearCookie(COOKIE_NAME, { httpOnly: true, secure: true, sameSite: 'strict', path: '/' });
@@ -156,6 +159,10 @@ function createApp({ pool, activationPepper, rateLimitPepper, signingKeyId, sign
     res.json({ success: true, license: await licenseLifecycle.revokeLicense(validate(uuid, req.params.id), input.reason) });
   }));
   app.use('/api/admin', admin);
+
+  const webRoot = path.resolve(__dirname, '../../central-manager/dist');
+  app.use(express.static(webRoot, { index: false, maxAge: '1h' }));
+  app.get(/^(?!\/api\/|\/health$).*/, (_req, res) => res.sendFile(path.join(webRoot, 'index.html')));
 
   app.use((error, _req, res, _next) => {
     const duplicate = error?.code === 'ER_DUP_ENTRY';

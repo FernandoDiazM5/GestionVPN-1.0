@@ -67,6 +67,9 @@ playwright/.cache/
 coverage/
 **/coverage/
 
+# Caché incremental de TypeScript
+*.tsbuildinfo
+
 # Artefactos compilados de Python
 __pycache__/
 *.py[cod]

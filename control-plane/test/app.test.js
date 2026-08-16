@@ -38,6 +38,13 @@ test('health es publico pero la administracion exige sesion valida', async () =>
   assert.equal(response.body.customers.length, 1);
 });
 
+test('me rota y entrega un CSRF para pestañas nuevas con cookie válida', async () => {
+  const app = createApp({ pool: testPool(), activationPepper, now: fixedNow });
+  const response = await request(app).get('/api/admin/me').set('Cookie', cookie).expect(200);
+  assert.equal(response.body.admin.email, 'admin@joinpoint.cloud');
+  assert.match(response.body.csrfToken, /^[A-Za-z0-9_-]{40,}$/);
+});
+
 test('exige CSRF en escrituras y no filtra detalles internos', async () => {
   const app = createApp({ pool: testPool(), activationPepper, now: fixedNow });
   await request(app).post('/api/admin/customers').set('Cookie', cookie)

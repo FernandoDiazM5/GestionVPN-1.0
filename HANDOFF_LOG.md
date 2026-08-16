@@ -1,5 +1,21 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-15 — Panel web de Joinpoint Central.** Rama `vps_prod` (base `81b1ab5`). Estado: panel 2/2, Central 40/40, deploy 8/8, build e imagen Docker correctos.
+> - Se reutilizó el lenguaje visual del login anterior en una aplicación React Central separada, con contraseña+TOTP y módulos iniciales de clientes, planes e instancias.
+> - La imagen sirve el SPA desde `/`; `/health` y APIs conservan su contrato. La sesión rota CSRF en `/me` para pestañas nuevas.
+> - Auditoría productiva del nuevo panel: 0 vulnerabilidades. Pendiente publicar `0.1.0-pilot.3`, desplegar y ejecutar bootstrap/login MFA.
+
+> **Sesión 2026-08-15 — Despliegue real de Central y HTTPS.** Rama `vps_prod` (base `81b1ab5`). Estado: HTTPS 200, tres contenedores saludables, timers activos y contrato Central 8/8.
+> - `central.joinpoint.cloud` quedó publicado en `157.245.134.209`; certificado Let's Encrypt emitido con renovación y backup automatizados.
+> - Se detectó y corrigió el acceso de la imagen no-root a la privada Ed25519: propiedad UID/GID 1000 y modo `0600`, sin ampliar lectura.
+> - El primer intento preservó MariaDB; API/proxy se recrearon sin tocar su volumen y el health gate terminó en `RUNNING`.
+> - Pendiente: bootstrap interactivo del primer administrador, custodia de TOTP/códigos y prueba de login MFA.
+
+> **Sesión 2026-08-15 — Preparación del VPS administrador.** Rama `vps_prod` (base `81b1ab5`). Estado: VPS base verificado y preflight Central `PRECHECK_OK`; despliegue pausado por DNS.
+> - Se autorizó acceso SSH por llave pública y se preparó el VPS `157.245.134.209` con actualizaciones, Docker/Compose, UFW, Fail2ban y swap de 2 GB.
+> - El bundle público `0.1.0-pilot.2` pasó verificación SHA-256 y quedó extraído bajo `/opt`; no se iniciaron contenedores ni se generaron secretos.
+> - Pendiente: registro A `central.joinpoint.cloud` hacia el VPS, instalación HTTPS y bootstrap administrativo con MFA.
+
 > **Sesión 2026-08-15 — TLS, timers y restauración Central.** Rama `vps_prod` (base `eb8bde0`). Estado: Central 7/7, cliente 10/10, Bash/ShellCheck/Compose/Actionlint y Semgrep security/secrets correctos.
 > - Renovación TLS webroot sin corte, backup diario, timers persistentes y restauración confirmada con backup previo.
 > - El bundle de Release incluye ahora el instalador Central completo; sin cambios en ningún VPS.

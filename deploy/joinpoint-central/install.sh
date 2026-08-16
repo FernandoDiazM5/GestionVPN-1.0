@@ -11,6 +11,9 @@ ip="$(curl -4fsS https://api.ipify.org)"; getent ahostsv4 "$JOINPOINT_CENTRAL_FQ
 mkdir -p "$root"/{config,secrets,tls,acme,acme-challenge,backups,bundle/deploy}; chmod 700 "$root"/{config,secrets,backups}
 rm -rf "$root/bundle/deploy/joinpoint-central"; cp -a "$bundle/deploy/joinpoint-central" "$root/bundle/deploy/"
 [[ -f $root/secrets/license-signing.pem ]] || openssl genpkey -algorithm ED25519 -out "$root/secrets/license-signing.pem"
+runtime_uid="${JOINPOINT_CENTRAL_RUNTIME_UID:-1000}"; runtime_gid="${JOINPOINT_CENTRAL_RUNTIME_GID:-1000}"
+[[ $runtime_uid =~ ^[0-9]+$ && $runtime_gid =~ ^[0-9]+$ ]] || fail 'UID/GID runtime inválido'
+chown "$runtime_uid:$runtime_gid" "$root/secrets/license-signing.pem"; chmod 600 "$root/secrets/license-signing.pem"
 rand(){ openssl rand -hex "$1"; }; mfa="$(openssl rand -base64 32)"
 [[ -f $root/config/central.env ]] || printf '%s\n' "CONTROL_ADMIN_MFA_ENCRYPTION_KEY=$mfa" "CONTROL_ADMIN_SESSION_PEPPER=$(rand 32)" "ACTIVATION_CODE_PEPPER=$(rand 32)" "ACTIVATION_RATE_LIMIT_PEPPER=$(rand 32)" 'LICENSE_SIGNING_KEY_ID=central-1' > "$root/config/central.env"
 [[ -f $root/config/compose.env ]] || printf '%s\n' "JOINPOINT_CENTRAL_IMAGE=ghcr.io/fernandodiazm5/joinpoint-central:$JOINPOINT_CENTRAL_VERSION" "JOINPOINT_CENTRAL_ENV_FILE=$root/config/central.env" "LICENSE_SIGNING_PRIVATE_KEY_FILE=$root/secrets/license-signing.pem" "CENTRAL_NGINX_CONFIG=$root/config/nginx.conf" "CENTRAL_TLS_DIR=$root/tls" "CENTRAL_ACME_CHALLENGE_DIR=$root/acme-challenge" "CENTRAL_FQDN=$JOINPOINT_CENTRAL_FQDN" "DB_ROOT_PASSWORD=$(rand 32)" "DB_APP_PASSWORD=$(rand 32)" > "$root/config/compose.env"

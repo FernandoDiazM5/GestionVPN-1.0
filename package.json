@@ -10,6 +10,7 @@
   },
   "license": "UNLICENSED",
   "workspaces": [
+    "central-manager",
     "control-plane",
     "packages/*",
     "server",
