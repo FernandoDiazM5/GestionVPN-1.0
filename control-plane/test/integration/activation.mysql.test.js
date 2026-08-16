@@ -37,8 +37,10 @@ test('flujo HTTP completo contra MariaDB real', { skip: !enabled }, async () => 
   const app = createApp({ pool, activationPepper, rateLimitPepper, signingKeyId:keyId, signingPrivateKey:centralPrivate, now:()=>now });
   const auth = { Cookie:`__Host-joinpoint_admin=${adminSessionToken}`, 'x-csrf-token':csrfToken, 'User-Agent':userAgent };
   try {
-    const customer = (await request(app).post('/api/admin/customers').set(auth).send({ legalName:'Cliente Integración SAC', displayName:'Cliente Integración' }).expect(201)).body.customer;
-    const plan = (await request(app).post('/api/admin/plans').set(auth).send({ code:'BASIC', name:'Básico', entitlements:[{key:'sites.max',enabled:true,limit:5}] }).expect(201)).body.plan;
+    const customer = (await request(app).post('/api/admin/customers').set(auth).send({ legalName:'Cliente Integración SAC', displayName:'Cliente Integración',
+      contact:{fullName:'Cliente Integración',email:'owner.integracion@example.test'} }).expect(201)).body.customer;
+    const plan = (await request(app).post('/api/admin/plans').set(auth).send({ code:'BASIC', name:'Básico',
+      entitlements:[{key:'sites.max',enabled:true,limit:5}],prices:[{interval:'MONTH',currency:'PEN',amount:149}] }).expect(201)).body.plan;
     const instanceRecord = (await request(app).post('/api/admin/instances').set(auth).send({ customerId:customer.id }).expect(201)).body.instance;
     assert.equal(instanceRecord.fqdn, 'cliente-integracion.joinpoint.cloud');
     assert.equal(instanceRecord.managementCidr, '10.64.0.0/22');

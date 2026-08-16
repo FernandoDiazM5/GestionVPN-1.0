@@ -13,7 +13,7 @@ const cookie = `__Host-joinpoint_admin=${sessionToken}`;
 const fixedNow = () => new Date('2026-08-15T12:00:00Z');
 
 function testPool() {
-  return {
+  const pool = {
     query: async sql => {
       if (sql.includes('FROM control_plane_admin_sessions')) return [[{
         id: 'session-1', admin_id: 'admin-1', csrf_digest: digest(csrfToken),
@@ -26,8 +26,9 @@ function testPool() {
       if (sql.includes('FROM product_instances')) return [[]];
       return [{ affectedRows: 1 }];
     },
-    getConnection: async () => { throw new Error('UNEXPECTED_TRANSACTION'); },
   };
+  pool.getConnection = async () => ({ query:pool.query,beginTransaction:async()=>{},commit:async()=>{},rollback:async()=>{},release:()=>{} });
+  return pool;
 }
 
 test('health es publico pero la administracion exige sesion valida', async () => {
@@ -36,6 +37,11 @@ test('health es publico pero la administracion exige sesion valida', async () =>
   await request(app).get('/api/admin/customers').expect(401, { success: false, code: 'ADMIN_AUTH_REQUIRED' });
   const response = await request(app).get('/api/admin/customers').set('Cookie', cookie).expect(200);
   assert.equal(response.body.customers.length, 1);
+});
+test('publica el manual de instalación sin exponer datos de clientes',async()=>{
+ const response=await request(createApp({pool:testPool(),activationPepper,now:fixedNow})).get('/manual/instalacion').expect(200);
+ assert.match(response.text,/Activación de tu instancia Joinpoint/);
+ assert.equal(response.text.includes('JPR-'),false);
 });
 
 test('me rota y entrega un CSRF para pestañas nuevas con cookie válida', async () => {
@@ -53,7 +59,8 @@ test('exige CSRF en escrituras y no filtra detalles internos', async () => {
     .send({ legalName: 'A', displayName: 'Cliente', unexpected: true }).expect(400);
   assert.equal(invalid.body.code, 'VALIDATION_ERROR');
   const created = await request(app).post('/api/admin/customers').set('Cookie', cookie).set('x-csrf-token', csrfToken)
-    .send({ legalName: 'Empresa Legal', displayName: 'Cliente' }).expect(201);
+    .send({ legalName: 'Empresa Legal', displayName: 'Cliente',
+      contact:{ fullName:'Dueño Cliente',email:'owner@cliente.test' } }).expect(201);
   assert.equal(created.body.customer.status, 'ACTIVE');
 });
 

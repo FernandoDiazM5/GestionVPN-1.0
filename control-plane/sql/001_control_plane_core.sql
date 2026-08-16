@@ -29,6 +29,23 @@ CREATE TABLE IF NOT EXISTS customers (
     ON UPDATE CURRENT_TIMESTAMP(3)
 );
 
+CREATE TABLE IF NOT EXISTS customer_contacts (
+  id CHAR(36) PRIMARY KEY,
+  customer_id CHAR(36) NOT NULL,
+  full_name VARCHAR(160) NOT NULL,
+  email VARCHAR(254) NOT NULL,
+  phone VARCHAR(40) NULL,
+  role ENUM('OWNER','BILLING','TECHNICAL','OTHER') NOT NULL DEFAULT 'OWNER',
+  is_primary BOOLEAN NOT NULL DEFAULT FALSE,
+  status ENUM('ACTIVE','INACTIVE') NOT NULL DEFAULT 'ACTIVE',
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  CONSTRAINT fk_customer_contacts_customer FOREIGN KEY (customer_id)
+    REFERENCES customers(id) ON DELETE CASCADE,
+  UNIQUE KEY uq_customer_contact_email (customer_id, email),
+  INDEX idx_customer_contact_primary (customer_id, is_primary, status)
+);
+
 CREATE TABLE IF NOT EXISTS subscription_plans (
   id CHAR(36) PRIMARY KEY,
   code VARCHAR(40) NOT NULL UNIQUE,
@@ -51,6 +68,54 @@ CREATE TABLE IF NOT EXISTS plan_entitlements (
     REFERENCES subscription_plans(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS subscription_plan_prices (
+  id CHAR(36) PRIMARY KEY,
+  plan_id CHAR(36) NOT NULL,
+  billing_interval ENUM('MONTH','YEAR') NOT NULL,
+  currency CHAR(3) NOT NULL DEFAULT 'PEN',
+  amount DECIMAL(12,2) NOT NULL,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  effective_from DATETIME(3) NOT NULL,
+  effective_to DATETIME(3) NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  CONSTRAINT fk_plan_prices_plan FOREIGN KEY (plan_id)
+    REFERENCES subscription_plans(id) ON DELETE RESTRICT,
+  CONSTRAINT chk_plan_price_amount CHECK (amount >= 0),
+  CONSTRAINT chk_plan_price_dates CHECK (effective_to IS NULL OR effective_to > effective_from),
+  INDEX idx_plan_price_effective (plan_id, billing_interval, is_active, effective_from)
+);
+
+CREATE TABLE IF NOT EXISTS notification_providers (
+  id CHAR(36) PRIMARY KEY,
+  provider_type ENUM('SMTP','TELEGRAM') NOT NULL UNIQUE,
+  display_name VARCHAR(120) NOT NULL,
+  config_json JSON NOT NULL,
+  secret_encrypted TEXT NULL,
+  status ENUM('NOT_CONFIGURED','CONFIGURED','HEALTHY','ERROR','DISABLED') NOT NULL DEFAULT 'NOT_CONFIGURED',
+  last_tested_at DATETIME(3) NULL,
+  last_success_at DATETIME(3) NULL,
+  last_error_code VARCHAR(80) NULL,
+  version INT UNSIGNED NOT NULL DEFAULT 1,
+  updated_by CHAR(36) NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
+);
+
+CREATE TABLE IF NOT EXISTS notification_templates (
+  id CHAR(36) PRIMARY KEY,
+  template_key VARCHAR(80) NOT NULL,
+  channel ENUM('EMAIL','TELEGRAM') NOT NULL,
+  locale VARCHAR(12) NOT NULL DEFAULT 'es-PE',
+  subject_template VARCHAR(250) NULL,
+  body_text_template TEXT NOT NULL,
+  body_html_template MEDIUMTEXT NULL,
+  version INT UNSIGNED NOT NULL DEFAULT 1,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_by CHAR(36) NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  UNIQUE KEY uq_notification_template_version (template_key, channel, locale, version)
+);
+
 CREATE TABLE IF NOT EXISTS product_instances (
   id CHAR(36) PRIMARY KEY,
   customer_id CHAR(36) NOT NULL,
@@ -66,6 +131,31 @@ CREATE TABLE IF NOT EXISTS product_instances (
     ON UPDATE CURRENT_TIMESTAMP(3),
   CONSTRAINT fk_instances_customer FOREIGN KEY (customer_id)
     REFERENCES customers(id) ON DELETE RESTRICT
+);
+
+CREATE TABLE IF NOT EXISTS notification_deliveries (
+  id CHAR(36) PRIMARY KEY,
+  customer_id CHAR(36) NULL,
+  instance_id CHAR(36) NULL,
+  template_key VARCHAR(80) NOT NULL,
+  channel ENUM('EMAIL','TELEGRAM') NOT NULL,
+  recipient VARCHAR(254) NOT NULL,
+  payload_json JSON NOT NULL,
+  payload_secret_encrypted TEXT NULL,
+  idempotency_key CHAR(64) NOT NULL UNIQUE,
+  status ENUM('QUEUED','PROCESSING','DELIVERED','RETRY','FAILED','CANCELLED') NOT NULL DEFAULT 'QUEUED',
+  attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  next_attempt_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  last_attempt_at DATETIME(3) NULL,
+  delivered_at DATETIME(3) NULL,
+  last_error_code VARCHAR(80) NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  CONSTRAINT fk_notification_delivery_customer FOREIGN KEY (customer_id)
+    REFERENCES customers(id) ON DELETE SET NULL,
+  CONSTRAINT fk_notification_delivery_instance FOREIGN KEY (instance_id)
+    REFERENCES product_instances(id) ON DELETE SET NULL,
+  INDEX idx_notification_delivery_queue (status, next_attempt_at)
 );
 
 CREATE TABLE IF NOT EXISTS instance_identities (
@@ -112,6 +202,96 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     REFERENCES subscription_plans(id) ON DELETE RESTRICT,
   CONSTRAINT chk_subscription_dates CHECK (ends_at > starts_at),
   INDEX idx_subscription_effective (instance_id, status, ends_at)
+);
+
+CREATE TABLE IF NOT EXISTS subscription_events (
+  id CHAR(36) PRIMARY KEY,
+  subscription_id CHAR(36) NOT NULL,
+  instance_id CHAR(36) NOT NULL,
+  event_type ENUM('CREATED','RENEWED','PLAN_CHANGED','GRACE_STARTED','EXPIRED','SUSPENDED','REACTIVATED','CANCELLED','NOTE_ADDED') NOT NULL,
+  actor_id CHAR(36) NULL,
+  reason VARCHAR(500) NULL,
+  previous_values_json JSON NULL,
+  new_values_json JSON NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  CONSTRAINT fk_subscription_event_subscription FOREIGN KEY (subscription_id)
+    REFERENCES subscriptions(id) ON DELETE RESTRICT,
+  CONSTRAINT fk_subscription_event_instance FOREIGN KEY (instance_id)
+    REFERENCES product_instances(id) ON DELETE RESTRICT,
+  INDEX idx_subscription_events_timeline (subscription_id, created_at)
+);
+
+CREATE TABLE IF NOT EXISTS billing_sequences (
+  sequence_year SMALLINT UNSIGNED PRIMARY KEY,
+  next_value BIGINT UNSIGNED NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS billing_invoices (
+  id CHAR(36) PRIMARY KEY,
+  instance_id CHAR(36) NOT NULL,
+  subscription_id CHAR(36) NULL,
+  invoice_number VARCHAR(40) NOT NULL UNIQUE,
+  plan_id CHAR(36) NOT NULL,
+  billing_interval ENUM('MONTH','YEAR','CUSTOM') NOT NULL,
+  period_start DATETIME(3) NOT NULL,
+  period_end DATETIME(3) NOT NULL,
+  subtotal DECIMAL(12,2) NOT NULL,
+  tax DECIMAL(12,2) NOT NULL DEFAULT 0,
+  total DECIMAL(12,2) NOT NULL,
+  currency CHAR(3) NOT NULL,
+  status ENUM('DRAFT','ISSUED','PARTIALLY_PAID','PAID','OVERDUE','VOID') NOT NULL DEFAULT 'DRAFT',
+  snapshot_json JSON NOT NULL,
+  issued_at DATETIME(3) NULL,
+  due_at DATETIME(3) NULL,
+  paid_at DATETIME(3) NULL,
+  created_by CHAR(36) NOT NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  CONSTRAINT fk_billing_invoice_instance FOREIGN KEY (instance_id)
+    REFERENCES product_instances(id) ON DELETE RESTRICT,
+  CONSTRAINT fk_billing_invoice_subscription FOREIGN KEY (subscription_id)
+    REFERENCES subscriptions(id) ON DELETE RESTRICT,
+  CONSTRAINT fk_billing_invoice_plan FOREIGN KEY (plan_id)
+    REFERENCES subscription_plans(id) ON DELETE RESTRICT,
+  CONSTRAINT chk_billing_invoice_dates CHECK (period_end > period_start),
+  CONSTRAINT chk_billing_invoice_amounts CHECK (subtotal >= 0 AND tax >= 0 AND total = subtotal + tax),
+  INDEX idx_billing_invoice_status (status, due_at)
+);
+
+CREATE TABLE IF NOT EXISTS subscription_payments (
+  id CHAR(36) PRIMARY KEY,
+  instance_id CHAR(36) NOT NULL,
+  amount DECIMAL(12,2) NOT NULL,
+  currency CHAR(3) NOT NULL,
+  payment_method VARCHAR(40) NOT NULL,
+  reference VARCHAR(120) NULL,
+  paid_at DATETIME(3) NOT NULL,
+  status ENUM('PENDING_VERIFICATION','CONFIRMED','REJECTED','REFUNDED') NOT NULL DEFAULT 'PENDING_VERIFICATION',
+  evidence_url VARCHAR(1000) NULL,
+  notes VARCHAR(1000) NULL,
+  registered_by CHAR(36) NOT NULL,
+  verified_by CHAR(36) NULL,
+  verified_at DATETIME(3) NULL,
+  rejection_reason VARCHAR(500) NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  CONSTRAINT fk_subscription_payment_instance FOREIGN KEY (instance_id)
+    REFERENCES product_instances(id) ON DELETE RESTRICT,
+  CONSTRAINT chk_subscription_payment_amount CHECK (amount > 0),
+  INDEX idx_subscription_payment_status (status, created_at)
+);
+
+CREATE TABLE IF NOT EXISTS invoice_payments (
+  invoice_id CHAR(36) NOT NULL,
+  payment_id CHAR(36) NOT NULL,
+  amount_applied DECIMAL(12,2) NOT NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (invoice_id, payment_id),
+  CONSTRAINT fk_invoice_payment_invoice FOREIGN KEY (invoice_id)
+    REFERENCES billing_invoices(id) ON DELETE RESTRICT,
+  CONSTRAINT fk_invoice_payment_payment FOREIGN KEY (payment_id)
+    REFERENCES subscription_payments(id) ON DELETE RESTRICT,
+  CONSTRAINT chk_invoice_payment_amount CHECK (amount_applied > 0)
 );
 
 CREATE TABLE IF NOT EXISTS network_allocations (

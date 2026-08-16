@@ -9,22 +9,37 @@ function conflict(code) { const error = new Error(code); error.code = code; retu
 
 function createAdminService({ pool, activationPepper, now = () => new Date() }) {
   async function listCustomers() {
-    const [rows] = await pool.query('SELECT id, legal_name, display_name, tax_id, status, created_at, updated_at FROM customers ORDER BY created_at DESC');
+    const [rows] = await pool.query(`SELECT c.id,c.legal_name,c.display_name,c.tax_id,c.status,c.created_at,c.updated_at,
+      cc.id AS contact_id,cc.full_name AS contact_name,cc.email AS contact_email,cc.phone AS contact_phone
+      FROM customers c LEFT JOIN customer_contacts cc ON cc.customer_id=c.id AND cc.is_primary=TRUE AND cc.status='ACTIVE'
+      ORDER BY c.created_at DESC`);
     return rows;
   }
 
   async function createCustomer(input) {
     const id = crypto.randomUUID();
-    const [result] = await pool.query(
-      'INSERT INTO customers (id, legal_name, display_name, tax_id) VALUES (?, ?, ?, ?)',
-      [id, input.legalName, input.displayName, input.taxId || null],
-    );
-    return { id, ...input, status: 'ACTIVE' };
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      await connection.query('INSERT INTO customers (id,legal_name,display_name,tax_id) VALUES (?,?,?,?)',
+        [id,input.legalName,input.displayName,input.taxId || null]);
+      const contactId = crypto.randomUUID();
+      await connection.query(`INSERT INTO customer_contacts
+        (id,customer_id,full_name,email,phone,role,is_primary) VALUES (?,?,?,?,?,'OWNER',TRUE)`,
+        [contactId,id,input.contact.fullName,input.contact.email.toLowerCase(),input.contact.phone || null]);
+      await connection.commit();
+      return { id, ...input, contactId, status:'ACTIVE' };
+    } catch (error) { await connection.rollback().catch(() => {}); throw error; } finally { connection.release(); }
   }
 
   async function listPlans() {
-    const [rows] = await pool.query('SELECT id, code, name, description, is_active FROM subscription_plans ORDER BY name');
-    return rows;
+    const [plans] = await pool.query('SELECT id,code,name,description,is_active FROM subscription_plans ORDER BY name');
+    const [entitlements] = await pool.query('SELECT plan_id,feature_key,enabled,numeric_limit,config_json FROM plan_entitlements ORDER BY feature_key');
+    const [prices] = await pool.query(`SELECT id,plan_id,billing_interval,currency,amount,effective_from,effective_to
+      FROM subscription_plan_prices WHERE is_active=TRUE ORDER BY effective_from DESC`);
+    return plans.map(plan => ({ ...plan,
+      entitlements:entitlements.filter(item=>item.plan_id===plan.id),
+      prices:prices.filter(item=>item.plan_id===plan.id) }));
   }
 
   async function createPlan(input) {
@@ -36,6 +51,11 @@ function createAdminService({ pool, activationPepper, now = () => new Date() }) 
       for (const item of input.entitlements || []) {
         await connection.query('INSERT INTO plan_entitlements (plan_id, feature_key, enabled, numeric_limit) VALUES (?, ?, ?, ?)', [id, item.key, item.enabled, item.limit ?? null]);
       }
+      for (const price of input.prices) await connection.query(
+        `INSERT INTO subscription_plan_prices (id,plan_id,billing_interval,currency,amount,effective_from)
+         VALUES (?,?,?,?,?,?)`,
+        [crypto.randomUUID(),id,price.interval,price.currency,price.amount,now()],
+      );
       await connection.commit();
       return { id, ...input };
     } catch (error) { await connection.rollback().catch(() => {}); throw error; } finally { connection.release(); }
@@ -106,22 +126,55 @@ function createAdminService({ pool, activationPepper, now = () => new Date() }) 
     return rows;
   }
 
-  async function assignSubscription(instanceId, input) {
-    const id = crypto.randomUUID();
-    const startsAt = new Date(input.startsAt);
-    const endsAt = new Date(input.endsAt);
+  async function assignSubscription(instanceId, input, actorId) {
+    const id = crypto.randomUUID(), startsAt = new Date(input.startsAt), endsAt = new Date(input.endsAt);
     if (endsAt <= startsAt) throw conflict('SUBSCRIPTION_DATES_INVALID');
-    const [result] = await pool.query(
-      `INSERT INTO subscriptions (id,instance_id,plan_id,status,starts_at,ends_at)
-       SELECT ?,pi.id,sp.id,?,?,? FROM product_instances pi JOIN subscription_plans sp ON sp.id=? AND sp.is_active=TRUE
-       WHERE pi.id=?`,
-      [id, input.status, startsAt, endsAt, input.planId, instanceId],
-    );
-    if (result.affectedRows !== 1) throw conflict('SUBSCRIPTION_TARGET_NOT_FOUND');
-    return { id, instanceId, ...input };
+    const connection=await pool.getConnection();
+    try{
+      await connection.beginTransaction();
+      const [existing]=await connection.query("SELECT id FROM subscriptions WHERE instance_id=? AND status IN ('TRIAL','ACTIVE','GRACE_PERIOD','PAST_DUE') FOR UPDATE",[instanceId]);
+      if(existing[0])throw conflict('SUBSCRIPTION_ALREADY_EXISTS');
+      const [result] = await connection.query('INSERT INTO subscriptions (id,instance_id,plan_id,status,starts_at,ends_at) SELECT ?,pi.id,sp.id,?,?,? FROM product_instances pi JOIN subscription_plans sp ON sp.id=? AND sp.is_active=TRUE WHERE pi.id=?',[id,input.status,startsAt,endsAt,input.planId,instanceId]);
+      if (result.affectedRows !== 1) throw conflict('SUBSCRIPTION_TARGET_NOT_FOUND');
+      await connection.query("INSERT INTO subscription_events (id,subscription_id,instance_id,event_type,actor_id,new_values_json) VALUES (?,?,?,'CREATED',?,?)",[crypto.randomUUID(),id,instanceId,actorId,JSON.stringify({status:input.status,startsAt,endsAt,planId:input.planId})]);
+      await connection.commit();return { id, instanceId, ...input };
+    }catch(error){await connection.rollback().catch(()=>{});throw error}finally{connection.release()}
   }
 
-  return { listCustomers, createCustomer, listPlans, createPlan, createInstance, listInstances, issueActivation, revokeActivation, listActivations, assignSubscription };
+  async function onboardInstance(input, actorId) {
+    const startsAt = new Date(input.startsAt), endsAt = new Date(input.endsAt);
+    if (endsAt <= startsAt) throw conflict('SUBSCRIPTION_DATES_INVALID');
+    const connection = await pool.getConnection();
+    const instanceId = crypto.randomUUID(), subscriptionId = crypto.randomUUID();
+    try {
+      await connection.beginTransaction();
+      const [customers] = await connection.query("SELECT display_name FROM customers WHERE id=? AND status='ACTIVE' FOR UPDATE", [input.customerId]);
+      if (!customers[0]) throw conflict('CUSTOMER_NOT_FOUND');
+      const [plans] = await connection.query('SELECT id FROM subscription_plans WHERE id=? AND is_active=TRUE FOR UPDATE', [input.planId]);
+      if (!plans[0]) throw conflict('PLAN_NOT_FOUND');
+      const label = input.subdomainLabel ? normalizeSubdomainLabel(input.subdomainLabel) : proposeSubdomainLabel(customers[0].display_name);
+      const [settings] = await connection.query("SELECT setting_key,setting_value FROM platform_settings WHERE setting_key IN ('root_domain','network_pool') FOR UPDATE");
+      const config = Object.fromEntries(settings.map(row => [row.setting_key, row.setting_value]));
+      if (!config.root_domain || !config.network_pool) throw conflict('PLATFORM_SETTINGS_INCOMPLETE');
+      const [allocations] = await connection.query("SELECT management_cidr FROM network_allocations WHERE status IN ('RESERVED','ASSIGNED')");
+      const managementCidr = lowestFreeSubnet(config.network_pool, allocations.map(row => row.management_cidr));
+      await connection.query('INSERT INTO product_instances (id,customer_id,subdomain_label,public_ip) VALUES (?,?,?,?)', [instanceId,input.customerId,label,input.publicIp || null]);
+      await connection.query('INSERT INTO network_allocations (id,instance_id,management_cidr) VALUES (?,?,?)', [crypto.randomUUID(),instanceId,managementCidr]);
+      await connection.query('INSERT INTO subscriptions (id,instance_id,plan_id,status,starts_at,ends_at) VALUES (?,?,?,?,?,?)', [subscriptionId,instanceId,input.planId,input.status,startsAt,endsAt]);
+      await connection.query("INSERT INTO subscription_events (id,subscription_id,instance_id,event_type,actor_id,new_values_json) VALUES (?,?,?,'CREATED',?,?)", [crypto.randomUUID(),subscriptionId,instanceId,actorId,JSON.stringify({status:input.status,startsAt,endsAt,planId:input.planId})]);
+      const generated = generateActivationCode(activationPepper), activationId = crypto.randomUUID();
+      const expiresAt = new Date(now().getTime() + input.ttlHours * 60 * 60 * 1000);
+      await connection.query('INSERT INTO activation_codes (id,instance_id,code_digest,expires_at,created_by) VALUES (?,?,?,?,?)', [activationId,instanceId,generated.digest,expiresAt,actorId]);
+      await connection.commit();
+      return {
+        instance:{id:instanceId,customerId:input.customerId,subdomainLabel:label,fqdn:deriveFqdn(config.root_domain,label),managementCidr,status:'PENDING_ACTIVATION'},
+        subscription:{id:subscriptionId,instanceId,planId:input.planId,status:input.status,startsAt,endsAt},
+        activation:{id:activationId,instanceId,code:generated.code,expiresAt},
+      };
+    } catch (error) { await connection.rollback().catch(() => {}); throw error; } finally { connection.release(); }
+  }
+
+  return { listCustomers, createCustomer, listPlans, createPlan, createInstance, listInstances, issueActivation, revokeActivation, listActivations, assignSubscription, onboardInstance };
 }
 
 module.exports = { createAdminService };

@@ -18,7 +18,7 @@ async function issueLicense({ pool, instanceId, keyId, privateKey, now = new Dat
     const [rows] = await connection.query(
       `SELECT pi.id AS instance_id, pi.customer_id, pi.status AS instance_status,
               ii.public_key_fingerprint AS instance_fingerprint,
-              s.id AS subscription_id, s.status AS subscription_status, s.ends_at,
+              s.id AS subscription_id, s.status AS subscription_status, s.ends_at, s.grace_ends_at,
               sp.code AS plan_code, lsk.public_key_pem, lsk.public_key_fingerprint
          FROM product_instances pi
          JOIN instance_identities ii ON ii.instance_id=pi.id AND ii.revoked_at IS NULL
@@ -50,7 +50,8 @@ async function issueLicense({ pool, instanceId, keyId, privateKey, now = new Dat
         WHERE s.id=? ORDER BY pe.feature_key`, [record.subscription_id],
     );
     const entitlements = Object.fromEntries(features.map(item => [item.feature_key, item.numeric_limit == null ? Boolean(item.enabled) : Number(item.numeric_limit)]));
-    const hardEnd = new Date(record.ends_at);
+    const hardEnd = record.subscription_status === 'GRACE_PERIOD' && record.grace_ends_at
+      ? new Date(record.grace_ends_at) : new Date(record.ends_at);
     const requestedEnd = new Date(now.getTime() + leaseDays * 86400000);
     const expiresAt = hardEnd < requestedEnd ? hardEnd : requestedEnd;
     if (expiresAt <= now) throw coded('SUBSCRIPTION_EXPIRED');

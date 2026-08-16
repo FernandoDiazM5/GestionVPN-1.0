@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-16 — Administración comercial Central.** Rama `vps_prod` (base `3163c0c`). Estado: implementación y validación local completas; pendiente publicación/despliegue.
+> - Planes detallados, clientes/contactos, membresías, facturación/pagos, comunicaciones y configuración SMTP/Telegram Central.
+> - Alta transaccional, correo de bienvenida reintentable, manual versionado y suspensión/vencimiento enlazados con licencias.
+> - Verificación: servidor 47/47, interfaz 3/3, deploy 9/9, build y auditorías limpias; imagen 0 críticas/altas.
+
 > **Sesión 2026-08-15 — Joinpoint Central pilot.5 desplegada.** Rama `vps_prod` (base `c585ecb`). Estado: HTML/CSS histórico verificado, health OK y contenedores saludables.
 > - Workflow completo verde y actualización conservadora de Central; cuenta, MFA, MariaDB, TLS y llave firmante preservados.
 > - Backup SQL previo verificado y timers de backup/TLS activos.

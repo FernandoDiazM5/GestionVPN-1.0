@@ -51,3 +51,8 @@ test('no firma una suscripción vencida', async () => {
   await assert.rejects(issueLicense({ pool, instanceId: 'instance-1', keyId: 'key-2026', privateKey, now: new Date('2026-08-15T00:00:00Z') }), /SUBSCRIPTION_EXPIRED/);
   assert.equal(state.rollback, true);
 });
+test('la gracia manual licencia sólo hasta grace_ends_at',async()=>{
+ const {pool}=fixture({subscription_status:'GRACE_PERIOD',ends_at:new Date('2026-08-14T00:00:00Z'),grace_ends_at:new Date('2026-08-18T00:00:00Z')});
+ const issued=await issueLicense({pool,instanceId:'instance-1',keyId:'key-2026',privateKey,now:new Date('2026-08-16T00:00:00Z')});
+ assert.equal(new Date(issued.expiresAt).toISOString(),'2026-08-18T00:00:00.000Z');
+});

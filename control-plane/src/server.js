@@ -15,7 +15,14 @@ const server = app.listen(config.port, config.host, () => {
   process.stdout.write(`Joinpoint control plane escuchando en ${config.host}:${config.port}\n`);
 });
 
+const notificationTimer=setInterval(()=>app.locals.processNotifications?.().catch(()=>{}),30_000);
+notificationTimer.unref();
+const commercialTimer=setInterval(()=>app.locals.reconcileCommercial?.().catch(()=>{}),60_000);
+commercialTimer.unref();
+
 async function shutdown() {
+  clearInterval(notificationTimer);
+  clearInterval(commercialTimer);
   server.close(async () => {
     await pool.end();
     process.exit(0);

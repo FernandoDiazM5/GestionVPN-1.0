@@ -142,8 +142,20 @@ function createAdminSessionService({ pool, mfaEncryptionKey, sessionPepper, now 
       return codes;
     } catch (error) { await connection.rollback().catch(() => {}); throw error; } finally { connection.release(); }
   }
+  async function reauthenticate(adminId, { password, totp }) {
+    const [rows] = await pool.query(
+      'SELECT password_hash,totp_secret_encrypted,status FROM control_plane_admins WHERE id=?',
+      [adminId],
+    );
+    const admin = rows[0];
+    const passwordValid = admin && await verifyPassword(password, admin.password_hash);
+    const totpValid = passwordValid && admin.status === 'ACTIVE'
+      && verifyTotp(decryptSecret(admin.totp_secret_encrypted, mfaEncryptionKey), totp, now());
+    if (!totpValid) throw coded('ADMIN_REAUTH_FAILED');
+    return true;
+  }
 
-  return { login, logout, refreshCsrf, regenerateRecoveryCodes };
+  return { login, logout, refreshCsrf, regenerateRecoveryCodes, reauthenticate };
 }
 
 module.exports = { createAdminSessionService, SESSION_MS, IDLE_MS, RATE_MAX_ATTEMPTS };

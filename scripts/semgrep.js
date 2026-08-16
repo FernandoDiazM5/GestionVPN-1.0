@@ -57,7 +57,7 @@ function stageWindowsSources() {
     cwd: root,
     encoding: 'utf8',
   }).split(/\r?\n/).filter(Boolean);
-  const sourceRoots = ['control-plane/', 'server/', 'vpn-manager/src/', 'packages/contracts/src/',
+  const sourceRoots = ['central-manager/src/', 'control-plane/', 'server/', 'vpn-manager/src/', 'packages/contracts/src/',
     'packages/joinpoint-instance-agent/', 'packages/joinpoint-protocol/', 'deploy/joinpoint-instance/',
     'deploy/joinpoint-central/', 'semgrep-rules/'];
   const ignored = /(^|\/)(node_modules|dist|build|coverage|test|tests)(\/|$)|\.(test|spec)\.(js|jsx|ts|tsx)$/;
