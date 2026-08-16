@@ -1,5 +1,9 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-15 — TLS, timers y restauración Central.** Rama `vps_prod` (base `eb8bde0`). Estado: Central 7/7, cliente 10/10, Bash/ShellCheck/Compose/Actionlint y Semgrep security/secrets correctos.
+> - Renovación TLS webroot sin corte, backup diario, timers persistentes y restauración confirmada con backup previo.
+> - El bundle de Release incluye ahora el instalador Central completo; sin cambios en ningún VPS.
+
 > **Sesión 2026-08-15 — Empaquetado de la Plataforma Central.** Rama `vps_prod` (base `fa3b968`). Estado: Central 39/39, deploy 3/3, cliente 10/10, imagen Central 0 vulnerabilidades productivas y Compose/Actionlint correctos.
 > - Imagen no-root con migración idempotente; Compose aísla MariaDB y clave firmante; Nginx fuerza HTTPS, host canónico, HSTS y rate limit.
 > - Pendiente: instalador Central con TLS, secretos, backup y bootstrap MFA; sin despliegue real.

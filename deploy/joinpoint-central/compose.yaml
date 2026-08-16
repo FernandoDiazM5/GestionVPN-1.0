@@ -41,6 +41,7 @@ services:
     volumes:
       - ${CENTRAL_NGINX_CONFIG:?required}:/etc/nginx/conf.d/default.conf:ro
       - ${CENTRAL_TLS_DIR:?required}:/etc/nginx/ssl:ro
+      - ${CENTRAL_ACME_CHALLENGE_DIR:?required}:/var/www/certbot:ro
     depends_on:
       central: {condition: service_healthy}
     security_opt: [no-new-privileges:true]

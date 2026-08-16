@@ -103,7 +103,8 @@ jobs:
             deploy/joinpoint-instance/install.sh \
             deploy/joinpoint-instance/renew-tls.sh \
             deploy/joinpoint-instance/nginx.instance.conf.template \
-            deploy/joinpoint-instance/README.md
+            deploy/joinpoint-instance/README.md \
+            deploy/joinpoint-central
           sha256sum "$archive" > "$archive.sha256"
           echo "archive=$archive" >> "$GITHUB_ENV"
 
