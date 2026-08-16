@@ -1,5 +1,9 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-15 — Corrección de publicación Central pilot.3.** Rama `vps_prod` (base `71d959a`). Estado: build Docker Linux sin caché correcto y panel 2/2.
+> - `pilot.3` falló antes de publicar Central porque `@testing-library/user-event` no estaba declarado en el workspace nuevo; no se desplegó esa versión.
+> - Dependencia declarada explícitamente y build limpio reproducido. Próxima etiqueta inmutable: `pilot.4`.
+
 > **Sesión 2026-08-15 — Panel web de Joinpoint Central.** Rama `vps_prod` (base `81b1ab5`). Estado: panel 2/2, Central 40/40, deploy 8/8, build e imagen Docker correctos.
 > - Se reutilizó el lenguaje visual del login anterior en una aplicación React Central separada, con contraseña+TOTP y módulos iniciales de clientes, planes e instancias.
 > - La imagen sirve el SPA desde `/`; `/health` y APIs conservan su contrato. La sesión rota CSRF en `/me` para pestañas nuevas.
