@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-15 — Imágenes oficiales versionadas.** Rama `vps_prod` (base `057db3d`). Estado: instalador 10/10, Compose/Actionlint/Bash/ShellCheck correctos, Semgrep security/secrets 0 hallazgos y tres imágenes construidas localmente.
+> - Compose e instalador pasaron de builds en el VPS a pulls GHCR versionados, sin `latest` y con soporte de referencias por digest.
+> - Un tag `joinpoint-v<version>` publica backend/frontend/agente y genera un bundle mínimo del instalador con checksum dentro de GitHub Releases.
+> - No se publicaron imágenes ni se tocó ningún VPS; falta emitir la primera versión piloto y ejecutar el E2E real antes de WireGuard/Core.
+
 > **Sesión 2026-08-15 — Agente local de instancia.** Rama `vps_prod` (base `77b81d9`). Estado: Central 39/39, agente 5/5, npm productivo 0 vulnerabilidades y Semgrep security/secrets 0 hallazgos; sin despliegue.
 > - Se creó un workspace independiente con bootstrap de confianza, sync firmado, verificación local y almacenamiento atómico restrictivo.
 > - Heartbeat con renovación automática, jitter/backoff y degradación offline sin desmontar ni invocar la red.

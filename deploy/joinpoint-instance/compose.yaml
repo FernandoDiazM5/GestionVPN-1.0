@@ -26,9 +26,7 @@ services:
       - no-new-privileges:true
 
   backend:
-    build:
-      context: ${JOINPOINT_SOURCE_DIR:?required}
-      dockerfile: server/Dockerfile.prod
+    image: ${JOINPOINT_BACKEND_IMAGE:?required}
     restart: unless-stopped
     network_mode: host
     env_file:
@@ -51,17 +49,7 @@ services:
       - ALL
 
   frontend:
-    build:
-      context: ${JOINPOINT_SOURCE_DIR:?required}
-      dockerfile: vpn-manager/Dockerfile.prod
-      args:
-        VITE_API_URL: ""
-        VITE_FEDERATED_AUTH_ENABLED: ${VITE_FEDERATED_AUTH_ENABLED:-false}
-        VITE_FIREBASE_API_KEY: ${VITE_FIREBASE_API_KEY:-}
-        VITE_FIREBASE_AUTH_DOMAIN: ${VITE_FIREBASE_AUTH_DOMAIN:-}
-        VITE_FIREBASE_PROJECT_ID: ${VITE_FIREBASE_PROJECT_ID:-}
-        VITE_FIREBASE_APP_ID: ${VITE_FIREBASE_APP_ID:-}
-        VITE_FIREBASE_TENANT_ID: ${VITE_FIREBASE_TENANT_ID:-}
+    image: ${JOINPOINT_FRONTEND_IMAGE:?required}
     restart: unless-stopped
     ports:
       - "80:80"
@@ -79,9 +67,7 @@ services:
       - no-new-privileges:true
 
   instance-agent:
-    build:
-      context: ${JOINPOINT_SOURCE_DIR:?required}
-      dockerfile: deploy/joinpoint-instance/Dockerfile.agent
+    image: ${JOINPOINT_AGENT_IMAGE:?required}
     restart: unless-stopped
     read_only: true
     init: true

@@ -1,0 +1,116 @@
+name: Publish Joinpoint instance images
+
+on:
+  push:
+    tags:
+      - 'joinpoint-v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Immutable image version (for example 0.1.0-pilot.1)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: joinpoint-images-${{ github.ref }}-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - name: joinpoint-backend
+            dockerfile: server/Dockerfile.prod
+          - name: joinpoint-frontend
+            dockerfile: vpn-manager/Dockerfile.prod
+          - name: joinpoint-agent
+            dockerfile: deploy/joinpoint-instance/Dockerfile.agent
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Resolve immutable version
+        id: version
+        shell: bash
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [[ -n "$REQUESTED_VERSION" ]]; then
+            version="$REQUESTED_VERSION"
+          else
+            version="${REF_NAME#joinpoint-v}"
+          fi
+          if [[ ! "$version" =~ ^[0-9A-Za-z][0-9A-Za-z._-]*$ || "$version" == latest ]]; then
+            echo 'Invalid or mutable image version' >&2
+            exit 1
+          fi
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Normalize image namespace
+        id: image
+        shell: bash
+        env:
+          OWNER: ${{ github.repository_owner }}
+          IMAGE_NAME: ${{ matrix.name }}
+        run: echo "name=ghcr.io/${OWNER,,}/$IMAGE_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.image.outputs.name }}:${{ steps.version.outputs.value }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.version.outputs.value }}
+
+  installer-bundle:
+    if: startsWith(github.ref, 'refs/tags/joinpoint-v')
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Package minimal installer
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#joinpoint-v}"
+          archive="joinpoint-installer-$version.tar.gz"
+          tar -czf "$archive" \
+            deploy/joinpoint-instance/compose.yaml \
+            deploy/joinpoint-instance/install.sh \
+            deploy/joinpoint-instance/renew-tls.sh \
+            deploy/joinpoint-instance/nginx.instance.conf.template \
+            deploy/joinpoint-instance/README.md
+          sha256sum "$archive" > "$archive.sha256"
+          echo "archive=$archive" >> "$GITHUB_ENV"
+
+      - name: Create or update GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" --verify-tag --title "Joinpoint $GITHUB_REF_NAME" --generate-notes
+          fi
+          gh release upload "$GITHUB_REF_NAME" "$archive" "$archive.sha256" --clobber

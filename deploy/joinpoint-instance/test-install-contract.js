@@ -7,6 +7,7 @@ const installer=fs.readFileSync(path.join(__dirname,'install.sh'),'utf8');
 const compose=fs.readFileSync(path.join(__dirname,'compose.yaml'),'utf8');
 const nginx=fs.readFileSync(path.join(__dirname,'nginx.instance.conf.template'),'utf8');
 const renewal=fs.readFileSync(path.join(__dirname,'renew-tls.sh'),'utf8');
+const workflow=fs.readFileSync(path.join(__dirname,'..','..','.github','workflows','publish-joinpoint-images.yml'),'utf8');
 
 test('el instalador es fail-closed y reanudable',()=>{
   assert.match(installer,/set -Eeuo pipefail/);
@@ -57,14 +58,37 @@ test('TLS y agente se preparan antes de permitir el arranque',()=>{
 });
 
 test('arranca por health gates y preserva la base ante rollback',()=>{
-  assert.match(installer,/compose up -d --build db backend/);
+  assert.match(installer,/compose up -d db backend/);
   assert.match(installer,/wait_backend/);
-  assert.match(installer,/compose up -d --build frontend instance-agent/);
+  assert.match(installer,/compose up -d frontend instance-agent/);
   assert.match(installer,/wait_https/);
   assert.match(installer,/compose stop frontend backend instance-agent/);
   assert.doesNotMatch(installer,/compose down|volume rm/);
   assert.match(installer,/START_FAILED_DB_PRESERVED/);
   assert.match(installer,/joinpoint-tls-renew\.timer/);
+});
+
+test('consume imagenes versionadas y nunca latest ni builds en el VPS',()=>{
+  assert.match(compose,/JOINPOINT_BACKEND_IMAGE/);
+  assert.match(compose,/JOINPOINT_FRONTEND_IMAGE/);
+  assert.match(compose,/JOINPOINT_AGENT_IMAGE/);
+  assert.doesNotMatch(compose,/\bbuild:/);
+  assert.match(installer,/JOINPOINT_SOFTWARE_VERSION.*obligatoria/);
+  assert.match(installer,/etiqueta latest no esta permitida/);
+  assert.match(installer,/compose pull db backend frontend instance-agent/);
+  assert.doesNotMatch(installer,/compose build|--build/);
+});
+
+test('publicacion GHCR construye las tres imagenes solo para una version explicita',()=>{
+  assert.match(workflow,/packages: write/);
+  assert.match(workflow,/registry: ghcr\.io/);
+  assert.match(workflow,/server\/Dockerfile\.prod/);
+  assert.match(workflow,/vpn-manager\/Dockerfile\.prod/);
+  assert.match(workflow,/deploy\/joinpoint-instance\/Dockerfile\.agent/);
+  assert.match(workflow,/joinpoint-installer-\$version\.tar\.gz/);
+  assert.match(workflow,/sha256sum/);
+  assert.match(workflow,/gh release upload/);
+  assert.doesNotMatch(workflow,/:latest/);
 });
 
 test('nginx limita el host y permite renovacion ACME sin apagar el panel',()=>{

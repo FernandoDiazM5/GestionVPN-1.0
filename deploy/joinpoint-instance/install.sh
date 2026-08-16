@@ -6,6 +6,7 @@ readonly INSTALL_ROOT="${JOINPOINT_INSTALL_ROOT:-/opt/joinpoint}"
 readonly SOURCE_DIR="${JOINPOINT_SOURCE_DIR:-}"
 readonly CONFIRM_PHRASE='INSTALAR JOINPOINT'
 readonly CERTBOT_IMAGE='certbot/certbot:v5.7.0'
+readonly DEFAULT_IMAGE_REGISTRY='ghcr.io/fernandodiazm5'
 MODE="${1:---check}"
 
 fail() { printf 'ERROR: %s\n' "$1" >&2; exit 1; }
@@ -28,8 +29,13 @@ preflight() {
   require_https "$JOINPOINT_CENTRAL_URL"
   [[ -n "${JOINPOINT_PUBLIC_IP:-}" ]] || fail 'Falta JOINPOINT_PUBLIC_IP.'
   valid_ipv4 "$JOINPOINT_PUBLIC_IP" || fail 'JOINPOINT_PUBLIC_IP no es una IPv4 valida.'
-  [[ "$SOURCE_DIR" = /* && -f "$SOURCE_DIR/package.json" && -f "$SOURCE_DIR/deploy/joinpoint-instance/compose.yaml" ]] \
-    || fail 'JOINPOINT_SOURCE_DIR debe apuntar a una distribucion oficial completa.'
+  [[ "${JOINPOINT_SOFTWARE_VERSION:-}" =~ ^[0-9A-Za-z][0-9A-Za-z._-]*$ ]] \
+    || fail 'JOINPOINT_SOFTWARE_VERSION es obligatoria y debe ser una etiqueta valida.'
+  [[ "$JOINPOINT_SOFTWARE_VERSION" != 'latest' ]] || fail 'La etiqueta latest no esta permitida.'
+  [[ "$SOURCE_DIR" = /* && -f "$SOURCE_DIR/deploy/joinpoint-instance/compose.yaml" \
+    && -f "$SOURCE_DIR/deploy/joinpoint-instance/nginx.instance.conf.template" \
+    && -f "$SOURCE_DIR/deploy/joinpoint-instance/renew-tls.sh" ]] \
+    || fail 'JOINPOINT_SOURCE_DIR debe apuntar al paquete oficial del instalador.'
   [[ ! "$SOURCE_DIR$INSTALL_ROOT" =~ [[:space:]] ]] || fail 'Las rutas de instalacion no pueden contener espacios.'
   curl --fail --silent --show-error --connect-timeout 5 --max-time 15 "${JOINPOINT_CENTRAL_URL%/}/health" >/dev/null \
     || fail 'La Plataforma Central no responde por HTTPS.'
@@ -62,10 +68,12 @@ activate() {
 random_hex() { openssl rand -hex "$1"; }
 
 generate_config() {
-  local fqdn instance_id management_cidr db_root db_app jwt_secret auth_hmac security_secret ai_key
+  local fqdn instance_id management_cidr db_root db_app jwt_secret auth_hmac security_secret ai_key registry version
   fqdn="$(jq -r '.fqdn' "$INSTALL_ROOT/instance.json")"
   instance_id="$(jq -r '.instanceId' "$INSTALL_ROOT/instance.json")"
   management_cidr="$(jq -r '.managementCidr' "$INSTALL_ROOT/instance.json")"
+  registry="${JOINPOINT_IMAGE_REGISTRY:-$DEFAULT_IMAGE_REGISTRY}"
+  version="$JOINPOINT_SOFTWARE_VERSION"
   db_root="$(random_hex 32)"; db_app="$(random_hex 32)"; jwt_secret="$(random_hex 64)"
   auth_hmac="$(random_hex 32)"; security_secret="$(random_hex 32)"; ai_key="$(random_hex 32)"
   printf '%s\n' \
@@ -78,7 +86,10 @@ generate_config() {
     "JOINPOINT_AGENT_STATE_DIR=$INSTALL_ROOT/agent-state" \
     "JOINPOINT_INSTANCE_ID=$instance_id" \
     "JOINPOINT_CENTRAL_URL=$JOINPOINT_CENTRAL_URL" \
-    "JOINPOINT_SOFTWARE_VERSION=${JOINPOINT_SOFTWARE_VERSION:-greenfield}" \
+    "JOINPOINT_SOFTWARE_VERSION=$version" \
+    "JOINPOINT_BACKEND_IMAGE=${JOINPOINT_BACKEND_IMAGE:-$registry/joinpoint-backend:$version}" \
+    "JOINPOINT_FRONTEND_IMAGE=${JOINPOINT_FRONTEND_IMAGE:-$registry/joinpoint-frontend:$version}" \
+    "JOINPOINT_AGENT_IMAGE=${JOINPOINT_AGENT_IMAGE:-$registry/joinpoint-agent:$version}" \
     "DB_HOST_PORT=3307" "DB_ROOT_PASSWORD=$db_root" "DB_APP_PASSWORD=$db_app" \
     "WG0_INTENT_DIR=/opt/wg0-autosync" "VITE_FEDERATED_AUTH_ENABLED=false" \
     > "$INSTALL_ROOT/config/compose.env"
@@ -128,7 +139,6 @@ bootstrap_agent() {
   local compose_file env_file
   compose_file="$SOURCE_DIR/deploy/joinpoint-instance/compose.yaml"
   env_file="$INSTALL_ROOT/config/compose.env"
-  docker compose --env-file "$env_file" -f "$compose_file" build instance-agent
   docker compose --env-file "$env_file" -f "$compose_file" run --rm --no-deps \
     -e JOINPOINT_ACTIVATION_RESPONSE_FILE=/run/secrets/activation-response.json \
     -v "$INSTALL_ROOT/secrets/activation-response.json:/run/secrets/activation-response.json:ro" \
@@ -136,6 +146,11 @@ bootstrap_agent() {
   [[ -s "$INSTALL_ROOT/agent-state/agent-state.json" ]] || fail 'El bootstrap no persistio el estado del agente.'
   rm -f "$INSTALL_ROOT/secrets/activation-response.json"
   write_status AGENT_BOOTSTRAPPED
+}
+
+pull_images() {
+  compose pull db backend frontend instance-agent
+  write_status IMAGES_READY
 }
 
 compose() {
@@ -170,9 +185,9 @@ wait_https() {
 }
 
 start_platform() {
-  compose up -d --build db backend
+  compose up -d db backend
   wait_backend || { rollback_start; fail 'Backend/MySQL no superaron el health gate.'; }
-  compose up -d --build frontend instance-agent
+  compose up -d frontend instance-agent
   wait_https || { rollback_start; fail 'HTTPS no supero el health gate; MariaDB fue preservada.'; }
   compose ps --status running --services | grep -Fxq 'instance-agent' \
     || { rollback_start; fail 'El agente no quedo en ejecucion; MariaDB fue preservada.'; }
@@ -216,6 +231,7 @@ case "$MODE" in
     activate
     check_dns || exit $?
     generate_config
+    pull_images
     issue_tls
     bootstrap_agent
     start_platform
@@ -228,6 +244,7 @@ case "$MODE" in
     [[ -f "$INSTALL_ROOT/install-status" && -f "$INSTALL_ROOT/instance.json" ]] || fail 'No existe una instalacion reanudable.'
     check_dns || exit $?
     [[ -f "$INSTALL_ROOT/config/compose.env" ]] || generate_config
+    pull_images
     [[ -f "$INSTALL_ROOT/tls/fullchain.pem" && -f "$INSTALL_ROOT/tls/privkey.pem" ]] || issue_tls
     [[ -f "$INSTALL_ROOT/agent-state/agent-state.json" ]] || bootstrap_agent
     start_platform
