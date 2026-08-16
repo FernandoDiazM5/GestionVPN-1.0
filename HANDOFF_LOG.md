@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-15 — Panel Central publicado y desplegado.** Rama `vps_prod` (base `890113b`). Estado: `pilot.4` verde, HTML 200, health OK y tres contenedores saludables.
+> - Publicación completa: Central, backend, frontend, agente y bundle; despliegue actualizó sólo Central y preservó MariaDB/TLS/llaves.
+> - Backup SQL y configuración pre-upgrade verificados; timers de backup/TLS activos.
+> - Pendiente: bootstrap interactivo del primer administrador y prueba del login MFA.
+
 > **Sesión 2026-08-15 — Corrección de publicación Central pilot.3.** Rama `vps_prod` (base `71d959a`). Estado: build Docker Linux sin caché correcto y panel 2/2.
 > - `pilot.3` falló antes de publicar Central porque `@testing-library/user-event` no estaba declarado en el workspace nuevo; no se desplegó esa versión.
 > - Dependencia declarada explícitamente y build limpio reproducido. Próxima etiqueta inmutable: `pilot.4`.
