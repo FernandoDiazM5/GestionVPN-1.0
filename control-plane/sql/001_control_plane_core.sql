@@ -116,6 +116,11 @@ CREATE TABLE IF NOT EXISTS notification_templates (
   UNIQUE KEY uq_notification_template_version (template_key, channel, locale, version)
 );
 
+INSERT INTO notification_templates (id,template_key,channel,locale,subject_template,body_text_template,version,is_active)
+SELECT UUID(),'CUSTOMER_WELCOME','EMAIL','es-PE','Bienvenido a Joinpoint · {{customerName}}',
+'Hola {{contactName}},\n\nTu instancia Joinpoint está preparada.\nPortal: https://{{fqdn}}\nIP pública: {{publicIp}}\nPool de gestión: {{managementCidr}}\nCódigo de activación: {{activationCode}}\nEl código vence: {{expiresAt}}\nManual: {{manualUrl}}\n\nNo compartas este código. Si no solicitaste el alta, contacta a Joinpoint.',1,TRUE
+WHERE NOT EXISTS (SELECT 1 FROM notification_templates WHERE template_key='CUSTOMER_WELCOME' AND channel='EMAIL');
+
 CREATE TABLE IF NOT EXISTS product_instances (
   id CHAR(36) PRIMARY KEY,
   customer_id CHAR(36) NOT NULL,

@@ -1235,11 +1235,13 @@ function SettingsPanel() {
   return (
     <div className="settings-stack">
       <CommercialSettings />
+      <TemplateSettings />
       <SmtpSettings />
       <TelegramSettings />
     </div>
   );
 }
+function TemplateSettings(){const [item,setItem]=useState<any>(null);const [allowed,setAllowed]=useState<string[]>([]);const [message,setMessage]=useState("");useEffect(()=>{centralApi.templates().then(x=>{setItem(x.templates.find(t=>t.template_key==='CUSTOMER_WELCOME'));setAllowed(x.allowedVariables)}).catch(e=>setMessage(e.message))},[]);async function save(e:FormEvent){e.preventDefault();try{await centralApi.saveTemplate('CUSTOMER_WELCOME',{channel:'EMAIL',locale:'es-PE',subject:item.subject_template,body:item.body_text_template});setMessage('Nueva versión de la plantilla guardada.');const x=await centralApi.templates();setItem(x.templates.find(t=>t.template_key==='CUSTOMER_WELCOME'))}catch(e){setMessage(e instanceof Error?e.message:'No se pudo guardar')}}return <section className="card"><div className="card-head"><div><h2>Plantilla de bienvenida</h2><p className="muted">Correo enviado al crear la instancia y emitir su activación.</p></div><strong>v{item?.version||1}</strong></div>{item?<form className="inline-form smtp-form" onSubmit={save}><label className="wide"><span>Asunto</span><input required value={item.subject_template||''} onChange={e=>setItem({...item,subject_template:e.target.value})}/></label><label className="wide"><span>Contenido en texto</span><textarea required rows={12} value={item.body_text_template||''} onChange={e=>setItem({...item,body_text_template:e.target.value})}/></label><p className="muted wide">Variables permitidas: {allowed.map(x=>'{{'+x+'}}').join(', ')}</p><button className="primary">Guardar nueva versión</button></form>:<p className="muted">Cargando plantilla…</p>}{message?<p role="status" className="muted">{message}</p>:null}</section>}
 function CommercialSettings(){
   const [v,setV]=useState<Record<string,any>>({});const [message,setMessage]=useState("");
   useEffect(()=>{centralApi.getCommercialSettings().then(x=>setV({legalName:x.legal_name,taxId:x.tax_id||"",billingEmail:x.billing_email||"",address:x.address||"",invoicePrefix:x.invoice_prefix,defaultCurrency:x.default_currency,defaultTaxPercent:Number(x.default_tax_percent),invoiceDueDays:x.invoice_due_days,graceDays:x.grace_days,paymentInstructions:x.payment_instructions||"",brandName:x.brand_name,supportEmail:x.support_email||"",version:x.version})).catch(e=>setMessage(e.message))},[]);

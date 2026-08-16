@@ -15,6 +15,7 @@ const { createCommercialService } = require('./services/commercialService');
 const { createNotificationDeliveryService } = require('./services/notificationDeliveryService');
 const { customerInstallationHtml } = require('./manuals/customerInstallation');
 const { createCommercialSettingsService } = require('./services/commercialSettingsService');
+const { createNotificationTemplateService } = require('./services/notificationTemplateService');
 
 const uuid = z.string().uuid();
 const customerSchema = z.object({
@@ -109,6 +110,8 @@ const paymentVerificationSchema=z.discriminatedUnion('confirmed',[
   z.object({confirmed:z.literal(true),invoiceId:uuid,amountApplied:z.number().positive()}).strict(),
 ]);
 const commercialSettingsSchema=z.object({legalName:z.string().trim().min(2).max(180),taxId:z.string().trim().max(40).optional(),billingEmail:z.email().max(254).optional(),address:z.string().trim().max(500).optional(),invoicePrefix:z.string().trim().toUpperCase().regex(/^[A-Z0-9-]{1,12}$/),defaultCurrency:z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/),defaultTaxPercent:z.number().min(0).max(100),invoiceDueDays:z.number().int().min(0).max(365),graceDays:z.number().int().min(0).max(90),paymentInstructions:z.string().trim().max(4000).optional(),brandName:z.string().trim().min(2).max(120),supportEmail:z.email().max(254).optional(),version:z.number().int().nonnegative()}).strict();
+const templateSchema=z.object({channel:z.literal('EMAIL'),locale:z.literal('es-PE'),subject:z.string().trim().min(2).max(250),body:z.string().trim().min(20).max(20000)}).strict();
+const templateKey=z.string().regex(/^[A-Z][A-Z0-9_]{2,79}$/);
 
 function validate(schema, value) {
   const parsed = schema.safeParse(value);
@@ -133,7 +136,8 @@ function createApp({ pool, activationPepper, rateLimitPepper, signingKeyId, sign
   const commercial=createCommercialService({pool,now});
   const commercialSettings=createCommercialSettingsService({pool});
   app.locals.reconcileCommercial=()=>commercial.reconcileExpirations();
-  const deliveries=createNotificationDeliveryService({pool,encryptionKey:adminMfaEncryptionKey,providers:notificationProviders,now});
+  const templates=createNotificationTemplateService({pool});
+  const deliveries=createNotificationDeliveryService({pool,encryptionKey:adminMfaEncryptionKey,providers:notificationProviders,templates,now});
   app.locals.processNotifications=()=>deliveries.processDue();
   const licenseLifecycle = createLicenseLifecycleService({ pool, now });
   const sessions = createAdminSessionService({ pool, mfaEncryptionKey: adminMfaEncryptionKey,
@@ -178,6 +182,8 @@ function createApp({ pool, activationPepper, rateLimitPepper, signingKeyId, sign
   admin.get('/settings/smtp',asyncRoute(async(_req,res)=>res.json({success:true,provider:await notificationProviders.getSmtp()})));
   admin.get('/settings/commercial',asyncRoute(async(_req,res)=>res.json({success:true,settings:await commercialSettings.get()})));
   admin.put('/settings/commercial',asyncRoute(async(req,res)=>res.json({success:true,settings:await commercialSettings.save(validate(commercialSettingsSchema,req.body),req.admin.id)})));
+  admin.get('/settings/templates',asyncRoute(async(_req,res)=>res.json({success:true,templates:await templates.list(),allowedVariables:templates.allowedVariables})));
+  admin.put('/settings/templates/:key',asyncRoute(async(req,res)=>res.json({success:true,template:await templates.save(validate(templateKey,req.params.key),validate(templateSchema,req.body),req.admin.id)})));
   admin.put('/settings/smtp',asyncRoute(async(req,res)=>{const input=validate(smtpSchema,req.body);await sessions.reauthenticate(req.admin.id,input.reauth);res.json({success:true,provider:await notificationProviders.saveSmtp(input.config,req.admin.id)})}));
   admin.post('/settings/smtp/test',asyncRoute(async(req,res)=>res.json({success:true,test:await notificationProviders.testSmtp(validate(smtpTestSchema,req.body).recipient)})));
   admin.get('/settings/telegram',asyncRoute(async(_req,res)=>res.json({success:true,provider:await notificationProviders.getTelegram()})));
