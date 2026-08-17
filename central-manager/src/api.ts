@@ -269,7 +269,7 @@ export const centralApi = {
       (x) => x.subscriptions,
     ),
   transitionSubscription: (id: string, body: Record<string, unknown>) =>
-    request("/api/admin/subscriptions/" + id + "/transition", {
+    request<{subscription:Subscription;notification?:{queued:boolean;reason?:string}}>("/api/admin/subscriptions/" + id + "/transition", {
       method: "POST",
       body: JSON.stringify(body),
     }),

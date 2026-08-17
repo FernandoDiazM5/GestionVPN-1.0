@@ -139,10 +139,10 @@ function createApp({ pool, activationPepper, rateLimitPepper, signingKeyId, sign
   const notificationProviders=createNotificationProviderService({pool,encryptionKey:adminMfaEncryptionKey,now});
   const commercial=createCommercialService({pool,now});
   const commercialSettings=createCommercialSettingsService({pool});
-  app.locals.reconcileCommercial=()=>commercial.reconcileExpirations();
   const templates=createNotificationTemplateService({pool});
   const deliveries=createNotificationDeliveryService({pool,encryptionKey:adminMfaEncryptionKey,providers:notificationProviders,templates,now});
   app.locals.processNotifications=()=>deliveries.processDue();
+  app.locals.reconcileCommercial=async()=>{const result=await commercial.reconcileExpirations();for(const event of result.events||[])await deliveries.queueSubscriptionEvent(event.subscriptionId,event);return result};
   const licenseLifecycle = createLicenseLifecycleService({ pool, now });
   const sessions = createAdminSessionService({ pool, mfaEncryptionKey: adminMfaEncryptionKey,
     sessionPepper: adminSessionPepper, now });
@@ -194,7 +194,7 @@ function createApp({ pool, activationPepper, rateLimitPepper, signingKeyId, sign
   admin.put('/settings/telegram',asyncRoute(async(req,res)=>{const input=validate(telegramSchema,req.body);await sessions.reauthenticate(req.admin.id,input.reauth);res.json({success:true,provider:await notificationProviders.saveTelegram(input.config,req.admin.id)})}));
   admin.post('/settings/telegram/test',asyncRoute(async(_req,res)=>res.json({success:true,test:await notificationProviders.testTelegram()})));
   admin.get('/subscriptions',asyncRoute(async(_req,res)=>res.json({success:true,subscriptions:await commercial.listSubscriptions()})));
-  admin.post('/subscriptions/:id/transition',asyncRoute(async(req,res)=>res.json({success:true,subscription:await commercial.transition(validate(uuid,req.params.id),validate(transitionSchema,req.body),req.admin.id)})));
+  admin.post('/subscriptions/:id/transition',asyncRoute(async(req,res)=>{const subscription=await commercial.transition(validate(uuid,req.params.id),validate(transitionSchema,req.body),req.admin.id);let notification;try{notification=await deliveries.queueSubscriptionEvent(subscription.id,subscription);if(notification.queued)await deliveries.processDue(1)}catch(_){notification={queued:false,reason:'SUBSCRIPTION_NOTIFICATION_FAILED'}}res.json({success:true,subscription,notification})}));
   admin.get('/invoices',asyncRoute(async(_req,res)=>res.json({success:true,invoices:await commercial.listInvoices()})));
   admin.post('/invoices',asyncRoute(async(req,res)=>res.status(201).json({success:true,invoice:await commercial.createInvoice(validate(invoiceSchema,req.body),req.admin.id)})));
   admin.post('/payments',asyncRoute(async(req,res)=>res.status(201).json({success:true,payment:await commercial.registerPayment(validate(paymentSchema,req.body),req.admin.id)})));

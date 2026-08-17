@@ -651,6 +651,13 @@ function PlanForm({ done }: { done: () => void }) {
 function SubscriptionPanel() {
   const [items, setItems] = useState<Subscription[]>([]);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [selected, setSelected] = useState<Subscription | null>(null);
+  const [operation, setOperation] = useState("RENEW");
+  const [months, setMonths] = useState("1");
+  const [graceEndsAt, setGraceEndsAt] = useState("");
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
   const load = useCallback(
     () =>
       centralApi
@@ -662,31 +669,29 @@ function SubscriptionPanel() {
   useEffect(() => {
     void load();
   }, [load]);
-  async function action(item: Subscription, action: string) {
-    let body: Record<string, unknown> = {
-      action,
-      version: Number(item.version),
-    };
-    if (action === "RENEW") body.months = 1;
-    if (["SUSPEND", "CANCEL", "GRANT_GRACE"].includes(action)) {
-      const reason = window.prompt("Indica el motivo (mínimo 8 caracteres):");
-      if (!reason) return;
-      body.reason = reason;
-    }
-    if (action === "GRANT_GRACE") {
-      const value = window.prompt("Fecha final de gracia (AAAA-MM-DD):");
-      if (!value) return;
-      body.graceEndsAt = new Date(value + "T23:59:59-05:00").toISOString();
-    }
+  function openAction(item: Subscription, action: string) {
+    setSelected(item); setOperation(action); setReason(""); setMonths("1");
+    const suggested = new Date(Math.max(Date.now(), new Date(item.ends_at).getTime()) + 7 * 86400000);
+    setGraceEndsAt(suggested.toISOString().slice(0, 10)); setError(""); setNotice("");
+  }
+  async function submitAction(event: FormEvent) {
+    event.preventDefault(); if (!selected) return;
+    const body: Record<string, unknown> = { action: operation, version: Number(selected.version) };
+    if (operation === "RENEW") body.months = Number(months);
+    if (["SUSPEND", "CANCEL", "GRANT_GRACE"].includes(operation)) body.reason = reason;
+    if (operation === "GRANT_GRACE") body.graceEndsAt = new Date(graceEndsAt + "T23:59:59-05:00").toISOString();
+    setBusy(true); setError(""); setNotice("");
     try {
-      await centralApi.transitionSubscription(item.id, body);
-      await load();
+      const result = await centralApi.transitionSubscription(selected.id, body) as {notification?:{queued?:boolean;reason?:string}};
+      await load(); setSelected(null);
+      setNotice(result.notification?.queued ? "Membresía actualizada y aviso enviado a la cola." : "Membresía actualizada. El aviso quedó pendiente: " + (result.notification?.reason || "proveedor no disponible"));
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo actualizar.");
-    }
+    } finally { setBusy(false); }
   }
+  const operationLabels: Record<string,string>={RENEW:"Renovar membresía",GRANT_GRACE:"Conceder periodo de gracia",SUSPEND:"Suspender membresía",REACTIVATE:"Reactivar membresía",CANCEL:"Cancelar membresía"};
   return (
-    <section className="card">
+    <div className="membership-stack"><section className="card">
       <div className="card-head">
         <div>
           <h2>Membresías</h2>
@@ -701,6 +706,7 @@ function SubscriptionPanel() {
         </button>
       </div>
       {error ? <div className="error">{error}</div> : null}
+      {notice ? <div className="success-note" role="status">{notice}</div> : null}
       <div className="table-wrap">
         <table>
           <thead>
@@ -717,24 +723,25 @@ function SubscriptionPanel() {
               <tr key={item.id}>
                 <td>{item.customer_name}</td>
                 <td>{item.plan_name}</td>
-                <td>{item.status}</td>
+                <td><span className={"status-pill " + item.status.toLowerCase().replace("_","-")}>{item.status}</span></td>
                 <td>{new Date(item.ends_at).toLocaleDateString("es-PE")}</td>
                 <td className="row-actions">
-                  <button onClick={() => action(item, "RENEW")}>
+                  <button onClick={() => openAction(item, "RENEW")}>
                     Renovar 1 mes
                   </button>
-                  <button onClick={() => action(item, "GRANT_GRACE")}>
+                  <button onClick={() => openAction(item, "GRANT_GRACE")}>
                     Dar gracia
                   </button>
                   {item.status === "SUSPENDED" ? (
-                    <button onClick={() => action(item, "REACTIVATE")}>
+                    <button onClick={() => openAction(item, "REACTIVATE")}>
                       Reactivar
                     </button>
                   ) : (
-                    <button onClick={() => action(item, "SUSPEND")}>
+                    <button onClick={() => openAction(item, "SUSPEND")}>
                       Suspender
                     </button>
                   )}
+                  {!['CANCELLED'].includes(item.status) ? <button className="danger-text" onClick={() => openAction(item,"CANCEL")}>Cancelar</button> : null}
                 </td>
               </tr>
             ))}
@@ -745,6 +752,17 @@ function SubscriptionPanel() {
         ) : null}
       </div>
     </section>
+    {selected ? <form className="card crud-form membership-editor" onSubmit={submitAction}>
+      <div className="crud-form-head"><div><h3>{operationLabels[operation]}</h3><p>{selected.customer_name} · {selected.plan_name} · vence {new Date(selected.ends_at).toLocaleDateString('es-PE')}</p></div><span className="required-note">* Obligatorio</span></div>
+      <fieldset><legend>Acción administrativa</legend><p className="fieldset-help">La operación conserva el historial. Suspender o cancelar revoca el acceso, pero no elimina la instancia ni sus datos.</p><div className="crud-grid">
+        {operation==='RENEW'?<label className="form-field"><span>Meses a renovar <b>*</b></span><input type="number" min="1" max="36" required value={months} onChange={e=>setMonths(e.target.value)}/><small>Se suman desde el vencimiento vigente o desde hoy.</small></label>:null}
+        {operation==='GRANT_GRACE'?<label className="form-field"><span>Fin del periodo de gracia <b>*</b></span><input type="date" required value={graceEndsAt} onChange={e=>setGraceEndsAt(e.target.value)}/><small>Debe ser posterior al vencimiento de la membresía.</small></label>:null}
+        {['SUSPEND','CANCEL','GRANT_GRACE'].includes(operation)?<label className="form-field wide"><span>Motivo <b>*</b></span><textarea rows={3} minLength={8} maxLength={500} required value={reason} onChange={e=>setReason(e.target.value)} placeholder="Explica el motivo para la auditoría y comunicación al cliente."/><small>Mínimo 8 caracteres. Se guardará en el historial.</small></label>:null}
+        {operation==='REACTIVATE'?<div className="operation-warning">La reactivación devuelve el servicio a ACTIVO sólo si la vigencia no terminó; de lo contrario quedará pendiente de renovación.</div>:null}
+        {operation==='CANCEL'?<div className="operation-warning danger">La cancelación revoca las licencias activas. No elimina al cliente, la instancia, facturas ni pagos.</div>:null}
+      </div></fieldset>
+      <div className="form-actions"><button type="button" className="secondary" onClick={()=>setSelected(null)}>Volver</button><button className={operation==='CANCEL'?'danger':'primary'} disabled={busy}>{busy?'Procesando…':operationLabels[operation]}</button></div>
+    </form>:null}</div>
   );
 }
 function BillingPanel({

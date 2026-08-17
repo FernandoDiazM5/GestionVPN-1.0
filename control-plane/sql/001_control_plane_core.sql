@@ -123,6 +123,18 @@ SELECT UUID(),'CUSTOMER_WELCOME','EMAIL','es-PE','Bienvenido a Joinpoint · {{cu
 'Hola {{contactName}},\n\nTu instancia Joinpoint está preparada.\nPortal: https://{{fqdn}}\nIP pública: {{publicIp}}\nPool de gestión: {{managementCidr}}\nCódigo de activación: {{activationCode}}\nEl código vence: {{expiresAt}}\nManual: {{manualUrl}}\n\nNo compartas este código. Si no solicitaste el alta, contacta a Joinpoint.',1,TRUE
 WHERE NOT EXISTS (SELECT 1 FROM notification_templates WHERE template_key='CUSTOMER_WELCOME' AND channel='EMAIL');
 
+INSERT INTO notification_templates (id,template_key,channel,locale,subject_template,body_text_template,version,is_active)
+SELECT UUID(),seed.template_key,'EMAIL','es-PE',seed.subject_template,seed.body_text_template,1,TRUE
+FROM (
+  SELECT 'SUBSCRIPTION_RENEWED' template_key,'Membresía renovada · {{customerName}}' subject_template,'Hola {{contactName}},\n\nTu membresía del plan {{planName}} fue renovada hasta {{endsAt}}.\nPortal: https://{{fqdn}}\n\nGracias por continuar con Joinpoint.' body_text_template
+  UNION ALL SELECT 'SUBSCRIPTION_GRACE_STARTED','Periodo de gracia · {{customerName}}','Hola {{contactName}},\n\nTu membresía del plan {{planName}} está en periodo de gracia hasta {{graceEndsAt}}.\nMotivo: {{reason}}\nPortal: https://{{fqdn}}'
+  UNION ALL SELECT 'SUBSCRIPTION_SUSPENDED','Membresía suspendida · {{customerName}}','Hola {{contactName}},\n\nTu membresía del plan {{planName}} fue suspendida.\nMotivo: {{reason}}\nContacta a soporte para regularizar el servicio.'
+  UNION ALL SELECT 'SUBSCRIPTION_REACTIVATED','Membresía reactivada · {{customerName}}','Hola {{contactName}},\n\nTu membresía del plan {{planName}} fue reactivada.\nVigencia: {{endsAt}}\nPortal: https://{{fqdn}}'
+  UNION ALL SELECT 'SUBSCRIPTION_CANCELLED','Membresía cancelada · {{customerName}}','Hola {{contactName}},\n\nTu membresía del plan {{planName}} fue cancelada.\nMotivo: {{reason}}\nLos datos administrativos se conservan según la política de Joinpoint.'
+  UNION ALL SELECT 'SUBSCRIPTION_EXPIRED','Membresía vencida · {{customerName}}','Hola {{contactName}},\n\nTu membresía del plan {{planName}} venció el {{endsAt}} y el acceso fue suspendido.\nContacta a soporte para renovarla.'
+) seed
+WHERE NOT EXISTS (SELECT 1 FROM notification_templates nt WHERE nt.template_key=seed.template_key AND nt.channel='EMAIL');
+
 CREATE TABLE IF NOT EXISTS product_instances (
   id CHAR(36) PRIMARY KEY,
   customer_id CHAR(36) NOT NULL,

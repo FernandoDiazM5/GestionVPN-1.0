@@ -19,3 +19,14 @@ test('la cola de bienvenida nunca persiste el código en claro',async()=>{
  assert.equal(JSON.stringify(insertArgs).includes('JPR-CODIGO-SECRETO'),false);
  assert.match(insertArgs[5],/^v1\./);
 });
+test('encola una sola comunicación por evento de membresía sin secretos',async()=>{
+ let insertArgs;
+ const pool={query:async(sql,args)=>{if(sql.startsWith('SELECT s.id'))return[[{id:'s1',status:'SUSPENDED',ends_at:new Date('2026-09-01T00:00:00Z'),grace_ends_at:null,plan_name:'Profesional',instance_id:'i1',subdomain_label:'cliente',customer_id:'c1',display_name:'Cliente',full_name:'Owner',email:'owner@example.test',root_domain:'joinpoint.cloud'}]];insertArgs=args;return[{affectedRows:1}]}};
+ const service=createNotificationDeliveryService({pool,encryptionKey:key,providers:{},now:()=>new Date('2026-08-16T00:00:00Z')});
+ const result=await service.queueSubscriptionEvent('s1',{eventId:'event-1',eventType:'SUSPENDED',reason:'Pago pendiente'});
+ assert.equal(result.queued,true);
+ assert.equal(insertArgs[3],'SUBSCRIPTION_SUSPENDED');
+ assert.equal(insertArgs[4],'owner@example.test');
+ assert.equal(JSON.parse(insertArgs[5]).reason,'Pago pendiente');
+ assert.match(insertArgs[6],/^[a-f0-9]{64}$/);
+});
