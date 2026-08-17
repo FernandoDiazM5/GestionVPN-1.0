@@ -1,5 +1,7 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-16 — Facturación y plantillas pilot.13.** Rama `vps_prod` (base `d6ac300`). Se añadió editor visual para 11 plantillas versionadas y avisos idempotentes de factura emitida/vencida y pago confirmado/rechazado. El reconciliador marca vencimientos y se corrigió la aplicación de pagos sobre facturas `OVERDUE`. Validación: Central 52/52, UI 3/3, build, esquema 2× y Semgrep limpios. Desplegado tras backup con imagen healthy, HTTPS 200 y timers activos.
+
 > **Sesión 2026-08-16 — Membresías y comunicaciones pilot.12.** Rama `vps_prod` (base `56264b0`). Se reemplazaron prompts por un formulario CRUD accesible para renovar, conceder gracia, suspender, reactivar y cancelar. Las transiciones y vencimientos encolan avisos idempotentes con seis plantillas y backoff, sin persistir secretos. Validación: Central 50/50, UI 3/3, build, esquema 2× y Semgrep limpios. Desplegado tras backup: imagen healthy, esquema aplicado, HTTPS 200 y timers activos. Pendiente: SMTP real, editor multi-plantilla y eventos de facturación/pagos.
 
 > **Sesión 2026-08-16 — Formularios CRUD pilot.10.** Se normalizaron Clientes, Planes, Facturas/Pagos y Alta completa con secciones, ayudas, validación accesible, carga y responsive. UI 3/3 y build correctos; publicado y desplegado saludablemente tras backup.
