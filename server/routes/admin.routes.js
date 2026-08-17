@@ -431,18 +431,19 @@ router.post('/invite-moderator', asyncHandler(async (req, res) => {
   // Crear workspace placeholder + invitación role=OWNER (todo en transacción)
   const wsName = workspaceName || `Espacio de ${name || email.split('@')[0]}`;
   const inviteId = crypto.randomUUID();
-  const wsId = crypto.randomUUID();
   const otp = genOtp();
   const otpHash = await bcrypt.hash(otp, 8);
   const now = Date.now();
 
+  let wsId;
   await withTransaction(async (tx) => {
-    // owner_id es NOT NULL: usamos al platform_admin como placeholder; en /accept
-    // se actualiza al user_id del invitado cuando se convierte en OWNER real.
-    await tx.query(
-      'INSERT INTO workspaces (id, name, owner_id, created_at, updated_at) VALUES (?,?,?,?,?)',
-      [wsId, wsName, req.account.sub, now, now]
-    );
+    // Reutilizar createForOwner que genera slug, membresía OWNER y scan-IP
+    // atómicamente. owner_id placeholder = platform_admin; en /accept se
+    // actualiza al user_id del invitado cuando se convierte en OWNER real.
+    const { workspaceId } = await workspaceRepo.createForOwner(tx, {
+      ownerId: req.account.sub, name: wsName,
+    });
+    wsId = workspaceId;
     await tx.query(
       `INSERT INTO invitations
          (id, workspace_id, email, name, otp_hash, role, status, invited_by, attempts, expires_at, created_at)
