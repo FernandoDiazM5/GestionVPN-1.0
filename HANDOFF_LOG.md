@@ -1,5 +1,7 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-16 — Membresías y comunicaciones pilot.12.** Rama `vps_prod` (base `56264b0`). Se reemplazaron prompts por un formulario CRUD accesible para renovar, conceder gracia, suspender, reactivar y cancelar. Las transiciones y vencimientos encolan avisos idempotentes con seis plantillas y backoff, sin persistir secretos. Validación: Central 50/50, UI 3/3, build, esquema 2× y Semgrep limpios. Desplegado tras backup: imagen healthy, esquema aplicado, HTTPS 200 y timers activos. Pendiente: SMTP real, editor multi-plantilla y eventos de facturación/pagos.
+
 > **Sesión 2026-08-16 — Formularios CRUD pilot.10.** Se normalizaron Clientes, Planes, Facturas/Pagos y Alta completa con secciones, ayudas, validación accesible, carga y responsive. UI 3/3 y build correctos; publicado y desplegado saludablemente tras backup.
 
 > **Sesión 2026-08-16 — Plantillas versionadas pilot.9.** Editor seguro para correo de bienvenida, historial por versión y variables permitidas. Servidor 49/49, UI 3/3, esquema 2×, Semgrep limpio; publicado y desplegado con backup, health y timers verificados.
