@@ -356,22 +356,7 @@ function TabContent({
         action={<CustomerForm done={reload} />}
         empty="Todavía no hay clientes."
       >
-        <Table
-          headers={[
-            "Nombre",
-            "Razón social",
-            "Responsable",
-            "Correo",
-            "Estado",
-          ]}
-          rows={customers.map((x) => [
-            x.display_name,
-            x.legal_name,
-            x.contact_name || "—",
-            x.contact_email || "—",
-            x.status,
-          ])}
-        />
+        <CustomerManager items={customers} reload={reload}/>
       </Resource>
     );
   if (tab === "plans")
@@ -381,24 +366,7 @@ function TabContent({
         action={<PlanForm done={reload} />}
         empty="Todavía no hay planes."
       >
-        <Table
-          headers={[
-            "Código",
-            "Nombre",
-            "Mensual",
-            "Anual",
-            "Capacidades",
-            "Estado",
-          ]}
-          rows={plans.map((x) => [
-            x.code,
-            x.name,
-            formatPlanPrice(x, "MONTH"),
-            formatPlanPrice(x, "YEAR"),
-            String(x.entitlements.filter((item) => item.enabled).length),
-            x.is_active ? "Activo" : "Archivado",
-          ])}
-        />
+        <PlanManager items={plans} reload={reload}/>
       </Resource>
     );
   if (tab === "subscriptions") return <SubscriptionPanel />;
@@ -502,6 +470,8 @@ function Table({ headers, rows }: { headers: string[]; rows: string[][] }) {
     </div>
   );
 }
+function CustomerManager({items,reload}:{items:Customer[];reload:()=>void}){const [edit,setEdit]=useState<Customer|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState("");async function status(x:Customer){setBusy(true);setError("");try{await centralApi.setCustomerStatus(x.id,x.status==='ACTIVE'?'SUSPENDED':'ACTIVE',x.version);reload()}catch(e){setError(e instanceof Error?e.message:'No se pudo cambiar el estado')}finally{setBusy(false)}}async function save(e:FormEvent){e.preventDefault();if(!edit)return;setBusy(true);setError("");try{await centralApi.updateCustomer(edit.id,{legalName:edit.legal_name,displayName:edit.display_name,taxId:edit.tax_id||undefined,contact:{fullName:edit.contact_name,email:edit.contact_email,phone:edit.contact_phone||undefined},version:edit.version});setEdit(null);reload()}catch(e){setError(e instanceof Error?e.message:'No se pudo actualizar')}finally{setBusy(false)}}if(!items.length)return <div className="empty">Sin registros todavía.</div>;return <><div className="table-wrap"><table><thead><tr><th>Nombre</th><th>Razón social</th><th>Responsable</th><th>Correo</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>{items.map(x=><tr key={x.id}><td>{x.display_name}</td><td>{x.legal_name}</td><td>{x.contact_name||'—'}</td><td>{x.contact_email||'—'}</td><td><span className={'status-pill '+x.status.toLowerCase()}>{x.status==='ACTIVE'?'Activo':'Suspendido'}</span></td><td><div className="row-actions"><button onClick={()=>setEdit({...x})}>Editar</button><button disabled={busy} onClick={()=>status(x)}>{x.status==='ACTIVE'?'Suspender':'Reactivar'}</button></div></td></tr>)}</tbody></table></div>{edit?<form className="crud-form edit-form" onSubmit={save}><div className="crud-form-head"><div><h3>Editar cliente</h3><p>Los cambios no modifican facturas ni comunicaciones ya emitidas.</p></div></div><div className="crud-grid">{[['display_name','Nombre visible'],['legal_name','Razón social'],['tax_id','RUC / identificación'],['contact_name','Responsable'],['contact_email','Correo'],['contact_phone','Teléfono']].map(([k,l])=><label className="form-field" key={k}><span>{l}</span><input required={!['tax_id','contact_phone'].includes(k)} type={k==='contact_email'?'email':'text'} value={(edit as any)[k]||''} onChange={e=>setEdit({...edit,[k]:e.target.value})}/></label>)}</div>{error?<div className="form-feedback error" role="alert">{error}</div>:null}<div className="form-actions"><button type="button" className="secondary" onClick={()=>setEdit(null)}>Cancelar</button><button className="primary" disabled={busy}>{busy?'Guardando…':'Guardar cambios'}</button></div></form>:error?<div className="form-feedback error" role="alert">{error}</div>:null}</>}
+function PlanManager({items,reload}:{items:Plan[];reload:()=>void}){const [edit,setEdit]=useState<Plan|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState("");async function status(x:Plan){setBusy(true);setError("");try{await centralApi.setPlanStatus(x.id,!x.is_active,x.version);reload()}catch(e){setError(e instanceof Error?e.message:'No se pudo cambiar el estado')}finally{setBusy(false)}}async function save(e:FormEvent){e.preventDefault();if(!edit)return;setBusy(true);setError("");try{await centralApi.updatePlan(edit.id,{name:edit.name,description:edit.description||undefined,version:edit.version});setEdit(null);reload()}catch(e){setError(e instanceof Error?e.message:'No se pudo actualizar')}finally{setBusy(false)}}if(!items.length)return <div className="empty">Sin registros todavía.</div>;return <><div className="table-wrap"><table><thead><tr><th>Código</th><th>Nombre</th><th>Mensual</th><th>Anual</th><th>Capacidades</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>{items.map(x=><tr key={x.id}><td>{x.code}</td><td>{x.name}</td><td>{formatPlanPrice(x,'MONTH')}</td><td>{formatPlanPrice(x,'YEAR')}</td><td>{x.entitlements.filter(i=>i.enabled).length}</td><td><span className={'status-pill '+(x.is_active?'active':'suspended')}>{x.is_active?'Activo':'Archivado'}</span></td><td><div className="row-actions"><button onClick={()=>setEdit({...x})}>Editar</button><button disabled={busy} onClick={()=>status(x)}>{x.is_active?'Archivar':'Reactivar'}</button></div></td></tr>)}</tbody></table></div>{edit?<form className="crud-form edit-form" onSubmit={save}><div className="crud-form-head"><div><h3>Editar plan {edit.code}</h3><p>Para cambiar precios o capacidades crea un plan nuevo; así no alteras contratos históricos.</p></div></div><div className="crud-grid"><label className="form-field"><span>Nombre comercial</span><input required value={edit.name} onChange={e=>setEdit({...edit,name:e.target.value})}/></label><label className="form-field wide"><span>Descripción</span><textarea rows={3} value={edit.description||''} onChange={e=>setEdit({...edit,description:e.target.value})}/></label></div>{error?<div className="form-feedback error" role="alert">{error}</div>:null}<div className="form-actions"><button type="button" className="secondary" onClick={()=>setEdit(null)}>Cancelar</button><button className="primary" disabled={busy}>{busy?'Guardando…':'Guardar cambios'}</button></div></form>:error?<div className="form-feedback error" role="alert">{error}</div>:null}</>}
 function CustomerForm({ done }: { done: () => void }) {
   const [open,setOpen]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState("");
   const [v,setV]=useState<Record<string,string>>({});

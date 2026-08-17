@@ -9,6 +9,7 @@ export type Customer = {
   contact_name?: string;
   contact_email?: string;
   contact_phone?: string;
+  version: number;
 };
 export type PlanEntitlement = {
   feature_key: string;
@@ -26,6 +27,7 @@ export type Plan = {
   name: string;
   description?: string;
   is_active: boolean;
+  version: number;
   entitlements: PlanEntitlement[];
   prices: PlanPrice[];
 };
@@ -169,6 +171,8 @@ export const centralApi = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  updateCustomer: (id:string,body:Record<string,unknown>) => request("/api/admin/customers/"+id,{method:"PUT",body:JSON.stringify(body)}),
+  setCustomerStatus: (id:string,status:"ACTIVE"|"SUSPENDED",version:number) => request("/api/admin/customers/"+id+"/status",{method:"POST",body:JSON.stringify({status,version})}),
   createPlan: (body: {
     code: string;
     name: string;
@@ -185,6 +189,8 @@ export const centralApi = {
     }>;
   }) =>
     request("/api/admin/plans", { method: "POST", body: JSON.stringify(body) }),
+  updatePlan: (id:string,body:Record<string,unknown>) => request("/api/admin/plans/"+id,{method:"PUT",body:JSON.stringify(body)}),
+  setPlanStatus: (id:string,active:boolean,version:number) => request("/api/admin/plans/"+id+"/status",{method:"POST",body:JSON.stringify({active,version})}),
   createInstance: (body: {
     customerId: string;
     subdomainLabel?: string;

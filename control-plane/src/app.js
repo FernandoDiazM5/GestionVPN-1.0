@@ -28,6 +28,8 @@ const customerSchema = z.object({
     phone: z.string().trim().max(40).optional(),
   }).strict(),
 }).strict();
+const customerUpdateSchema=customerSchema.extend({version:z.number().int().nonnegative()}).strict();
+const customerStatusSchema=z.object({status:z.enum(['ACTIVE','SUSPENDED']),version:z.number().int().nonnegative()}).strict();
 const planSchema = z.object({
   code: z.string().trim().toUpperCase().regex(/^[A-Z][A-Z0-9_]{1,39}$/),
   name: z.string().trim().min(2).max(100),
@@ -45,6 +47,8 @@ const planSchema = z.object({
     if(new Set(prices.map(x=>x.interval)).size!==prices.length) ctx.addIssue({code:'custom',message:'No se puede repetir el ciclo de precio.'});
   }),
 }).strict();
+const planUpdateSchema=z.object({name:z.string().trim().min(2).max(100),description:z.string().trim().max(500).optional(),version:z.number().int().nonnegative()}).strict();
+const planStatusSchema=z.object({active:z.boolean(),version:z.number().int().nonnegative()}).strict();
 const instanceSchema = z.object({
   customerId: uuid,
   subdomainLabel: z.string().trim().min(3).max(63).optional(),
@@ -200,8 +204,12 @@ function createApp({ pool, activationPepper, rateLimitPepper, signingKeyId, sign
   admin.post('/communications/:id/retry',asyncRoute(async(req,res)=>res.json({success:true,delivery:await deliveries.retry(validate(uuid,req.params.id))})));
   admin.get('/customers', asyncRoute(async (_req, res) => res.json({ success: true, customers: await service.listCustomers() })));
   admin.post('/customers', asyncRoute(async (req, res) => res.status(201).json({ success: true, customer: await service.createCustomer(validate(customerSchema, req.body)) })));
+  admin.put('/customers/:id',asyncRoute(async(req,res)=>res.json({success:true,customer:await service.updateCustomer(validate(uuid,req.params.id),validate(customerUpdateSchema,req.body))})));
+  admin.post('/customers/:id/status',asyncRoute(async(req,res)=>res.json({success:true,customer:await service.setCustomerStatus(validate(uuid,req.params.id),validate(customerStatusSchema,req.body))})));
   admin.get('/plans', asyncRoute(async (_req, res) => res.json({ success: true, plans: await service.listPlans() })));
   admin.post('/plans', asyncRoute(async (req, res) => res.status(201).json({ success: true, plan: await service.createPlan(validate(planSchema, req.body)) })));
+  admin.put('/plans/:id',asyncRoute(async(req,res)=>res.json({success:true,plan:await service.updatePlan(validate(uuid,req.params.id),validate(planUpdateSchema,req.body))})));
+  admin.post('/plans/:id/status',asyncRoute(async(req,res)=>res.json({success:true,plan:await service.setPlanStatus(validate(uuid,req.params.id),validate(planStatusSchema,req.body))})));
   admin.get('/instances', asyncRoute(async (_req, res) => res.json({ success: true, instances: await service.listInstances() })));
   admin.post('/onboarding', asyncRoute(async (req, res) => {
     const result = await service.onboardInstance(validate(onboardingSchema, req.body), req.admin.id);

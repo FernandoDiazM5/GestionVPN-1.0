@@ -9,12 +9,17 @@ function conflict(code) { const error = new Error(code); error.code = code; retu
 
 function createAdminService({ pool, activationPepper, now = () => new Date() }) {
   async function listCustomers() {
-    const [rows] = await pool.query(`SELECT c.id,c.legal_name,c.display_name,c.tax_id,c.status,c.created_at,c.updated_at,
+    const [rows] = await pool.query(`SELECT c.id,c.legal_name,c.display_name,c.tax_id,c.status,c.version,c.created_at,c.updated_at,
       cc.id AS contact_id,cc.full_name AS contact_name,cc.email AS contact_email,cc.phone AS contact_phone
       FROM customers c LEFT JOIN customer_contacts cc ON cc.customer_id=c.id AND cc.is_primary=TRUE AND cc.status='ACTIVE'
       ORDER BY c.created_at DESC`);
     return rows;
   }
+
+  async function updateCustomer(id,input) {
+    const db=await pool.getConnection();try{await db.beginTransaction();const [result]=await db.query(`UPDATE customers SET legal_name=?,display_name=?,tax_id=?,version=version+1 WHERE id=? AND version=?`,[input.legalName,input.displayName,input.taxId||null,id,input.version]);if(result.affectedRows!==1)throw conflict('CUSTOMER_VERSION_CONFLICT');await db.query(`UPDATE customer_contacts SET full_name=?,email=?,phone=? WHERE customer_id=? AND is_primary=TRUE AND status='ACTIVE'`,[input.contact.fullName,input.contact.email.toLowerCase(),input.contact.phone||null,id]);await db.commit();return{id,...input,version:input.version+1}}catch(e){await db.rollback().catch(()=>{});throw e}finally{db.release()}
+  }
+  async function setCustomerStatus(id,input){const [result]=await pool.query('UPDATE customers SET status=?,version=version+1 WHERE id=? AND version=?',[input.status,id,input.version]);if(result.affectedRows!==1)throw conflict('CUSTOMER_VERSION_CONFLICT');return{id,status:input.status,version:input.version+1}}
 
   async function createCustomer(input) {
     const id = crypto.randomUUID();
@@ -33,7 +38,7 @@ function createAdminService({ pool, activationPepper, now = () => new Date() }) 
   }
 
   async function listPlans() {
-    const [plans] = await pool.query('SELECT id,code,name,description,is_active FROM subscription_plans ORDER BY name');
+    const [plans] = await pool.query('SELECT id,code,name,description,is_active,version FROM subscription_plans ORDER BY name');
     const [entitlements] = await pool.query('SELECT plan_id,feature_key,enabled,numeric_limit,config_json FROM plan_entitlements ORDER BY feature_key');
     const [prices] = await pool.query(`SELECT id,plan_id,billing_interval,currency,amount,effective_from,effective_to
       FROM subscription_plan_prices WHERE is_active=TRUE ORDER BY effective_from DESC`);
@@ -41,6 +46,8 @@ function createAdminService({ pool, activationPepper, now = () => new Date() }) 
       entitlements:entitlements.filter(item=>item.plan_id===plan.id),
       prices:prices.filter(item=>item.plan_id===plan.id) }));
   }
+  async function updatePlan(id,input){const [result]=await pool.query('UPDATE subscription_plans SET name=?,description=?,version=version+1 WHERE id=? AND version=?',[input.name,input.description||null,id,input.version]);if(result.affectedRows!==1)throw conflict('PLAN_VERSION_CONFLICT');return{id,...input,version:input.version+1}}
+  async function setPlanStatus(id,input){const [result]=await pool.query('UPDATE subscription_plans SET is_active=?,version=version+1 WHERE id=? AND version=?',[input.active,id,input.version]);if(result.affectedRows!==1)throw conflict('PLAN_VERSION_CONFLICT');return{id,isActive:input.active,version:input.version+1}}
 
   async function createPlan(input) {
     const connection = await pool.getConnection();
@@ -174,7 +181,7 @@ function createAdminService({ pool, activationPepper, now = () => new Date() }) 
     } catch (error) { await connection.rollback().catch(() => {}); throw error; } finally { connection.release(); }
   }
 
-  return { listCustomers, createCustomer, listPlans, createPlan, createInstance, listInstances, issueActivation, revokeActivation, listActivations, assignSubscription, onboardInstance };
+  return { listCustomers, createCustomer, updateCustomer, setCustomerStatus, listPlans, createPlan, updatePlan, setPlanStatus, createInstance, listInstances, issueActivation, revokeActivation, listActivations, assignSubscription, onboardInstance };
 }
 
 module.exports = { createAdminService };
