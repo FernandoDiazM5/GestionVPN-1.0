@@ -27,3 +27,9 @@ test('el vencimiento revoca la licencia sin borrar infraestructura',async()=>{
  assert.equal(writes.some(x=>x.sql.includes("status='REVOKED'")),true);
  assert.equal(writes.some(x=>/DELETE/i.test(x.sql)),false);
 });
+test('marca facturas vencidas una sola vez y devuelve el evento notificable',async()=>{
+ const writes=[];const pool={query:async(sql,args)=>{writes.push({sql,args});if(sql.startsWith('SELECT id FROM billing_invoices'))return[[{id:'invoice-1'}]];return[{affectedRows:1}]}};
+ const out=await createCommercialService({pool,now:()=>new Date('2026-08-16T00:00:00Z')}).reconcileInvoices();
+ assert.equal(out.reconciled,1);assert.equal(out.events[0].eventType,'INVOICE_OVERDUE');
+ assert.equal(writes.some(x=>x.sql.includes("status='OVERDUE'")),true);
+});

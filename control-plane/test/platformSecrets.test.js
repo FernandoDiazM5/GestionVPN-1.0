@@ -30,3 +30,8 @@ test('encola una sola comunicación por evento de membresía sin secretos',async
  assert.equal(JSON.parse(insertArgs[5]).reason,'Pago pendiente');
  assert.match(insertArgs[6],/^[a-f0-9]{64}$/);
 });
+test('encola factura emitida con snapshot comercial y clave idempotente',async()=>{
+ let insertArgs;const pool={query:async(sql,args)=>{if(sql.startsWith('SELECT bi.id'))return[[{id:'f1',invoice_number:'JP-2026-000001',total:'118.00',currency:'PEN',due_at:new Date('2026-08-20T00:00:00Z'),plan_name:'Profesional',instance_id:'i1',subdomain_label:'cliente',customer_id:'c1',display_name:'Cliente',full_name:'Owner',email:'owner@example.test',root_domain:'joinpoint.cloud',payment_instructions:'Transferencia'}]];insertArgs=args;return[{affectedRows:1}]}};
+ const service=createNotificationDeliveryService({pool,encryptionKey:key,providers:{},now:()=>new Date('2026-08-16T00:00:00Z')});const result=await service.queueInvoiceEvent('f1','INVOICE_ISSUED');
+ assert.equal(result.queued,true);assert.equal(insertArgs[3],'INVOICE_ISSUED');assert.equal(JSON.parse(insertArgs[5]).invoiceNumber,'JP-2026-000001');assert.match(insertArgs[6],/^[a-f0-9]{64}$/);
+});

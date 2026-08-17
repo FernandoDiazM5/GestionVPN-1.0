@@ -132,6 +132,10 @@ FROM (
   UNION ALL SELECT 'SUBSCRIPTION_REACTIVATED','Membresía reactivada · {{customerName}}','Hola {{contactName}},\n\nTu membresía del plan {{planName}} fue reactivada.\nVigencia: {{endsAt}}\nPortal: https://{{fqdn}}'
   UNION ALL SELECT 'SUBSCRIPTION_CANCELLED','Membresía cancelada · {{customerName}}','Hola {{contactName}},\n\nTu membresía del plan {{planName}} fue cancelada.\nMotivo: {{reason}}\nLos datos administrativos se conservan según la política de Joinpoint.'
   UNION ALL SELECT 'SUBSCRIPTION_EXPIRED','Membresía vencida · {{customerName}}','Hola {{contactName}},\n\nTu membresía del plan {{planName}} venció el {{endsAt}} y el acceso fue suspendido.\nContacta a soporte para renovarla.'
+  UNION ALL SELECT 'INVOICE_ISSUED','Factura {{invoiceNumber}} emitida · {{customerName}}','Hola {{contactName}},\n\nSe emitió la factura {{invoiceNumber}} por {{currency}} {{total}}.\nVence: {{dueAt}}.\nPlan: {{planName}}.\n{{paymentInstructions}}'
+  UNION ALL SELECT 'INVOICE_OVERDUE','Factura {{invoiceNumber}} vencida · {{customerName}}','Hola {{contactName}},\n\nLa factura {{invoiceNumber}} por {{currency}} {{total}} venció el {{dueAt}} y continúa pendiente.\n{{paymentInstructions}}'
+  UNION ALL SELECT 'PAYMENT_CONFIRMED','Pago confirmado · {{customerName}}','Hola {{contactName}},\n\nConfirmamos tu pago de {{currency}} {{amount}} mediante {{paymentMethod}}.\nFactura aplicada: {{invoiceNumber}}.\nGracias por tu pago.'
+  UNION ALL SELECT 'PAYMENT_REJECTED','Pago requiere revisión · {{customerName}}','Hola {{contactName}},\n\nNo pudimos validar el pago de {{currency}} {{amount}}.\nMotivo: {{reason}}\nPor favor revisa la información o contacta a soporte.'
 ) seed
 WHERE NOT EXISTS (SELECT 1 FROM notification_templates nt WHERE nt.template_key=seed.template_key AND nt.channel='EMAIL');
 

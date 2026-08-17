@@ -1,6 +1,6 @@
 'use strict';
 const crypto=require('crypto');
-const ALLOWED=new Set(['contactName','customerName','fqdn','publicIp','managementCidr','activationCode','expiresAt','manualUrl','planName','status','endsAt','graceEndsAt','reason','eventName']);
+const ALLOWED=new Set(['contactName','customerName','fqdn','publicIp','managementCidr','activationCode','expiresAt','manualUrl','planName','status','endsAt','graceEndsAt','reason','eventName','invoiceNumber','total','currency','dueAt','amount','paymentMethod','paymentInstructions']);
 function variables(text){return [...String(text||'').matchAll(/{{\s*([A-Za-z][A-Za-z0-9]*)\s*}}/g)].map(x=>x[1])}
 function validateTemplate(subject,body){const invalid=[...variables(subject),...variables(body)].filter(x=>!ALLOWED.has(x));if(invalid.length){const e=new Error('TEMPLATE_VARIABLE_INVALID');e.code=e.message;e.variables=[...new Set(invalid)];throw e}}
 function render(text,data){return String(text||'').replace(/{{\s*([A-Za-z][A-Za-z0-9]*)\s*}}/g,(_,key)=>String(data[key]??''))}

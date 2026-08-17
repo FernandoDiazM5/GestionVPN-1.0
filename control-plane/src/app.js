@@ -142,7 +142,7 @@ function createApp({ pool, activationPepper, rateLimitPepper, signingKeyId, sign
   const templates=createNotificationTemplateService({pool});
   const deliveries=createNotificationDeliveryService({pool,encryptionKey:adminMfaEncryptionKey,providers:notificationProviders,templates,now});
   app.locals.processNotifications=()=>deliveries.processDue();
-  app.locals.reconcileCommercial=async()=>{const result=await commercial.reconcileExpirations();for(const event of result.events||[])await deliveries.queueSubscriptionEvent(event.subscriptionId,event);return result};
+  app.locals.reconcileCommercial=async()=>{const subscriptions=await commercial.reconcileExpirations();for(const event of subscriptions.events||[])await deliveries.queueSubscriptionEvent(event.subscriptionId,event);const invoices=await commercial.reconcileInvoices();for(const event of invoices.events||[])await deliveries.queueInvoiceEvent(event.invoiceId,event.eventType,event.eventId);return{subscriptions,invoices}};
   const licenseLifecycle = createLicenseLifecycleService({ pool, now });
   const sessions = createAdminSessionService({ pool, mfaEncryptionKey: adminMfaEncryptionKey,
     sessionPepper: adminSessionPepper, now });
@@ -196,10 +196,10 @@ function createApp({ pool, activationPepper, rateLimitPepper, signingKeyId, sign
   admin.get('/subscriptions',asyncRoute(async(_req,res)=>res.json({success:true,subscriptions:await commercial.listSubscriptions()})));
   admin.post('/subscriptions/:id/transition',asyncRoute(async(req,res)=>{const subscription=await commercial.transition(validate(uuid,req.params.id),validate(transitionSchema,req.body),req.admin.id);let notification;try{notification=await deliveries.queueSubscriptionEvent(subscription.id,subscription);if(notification.queued)await deliveries.processDue(1)}catch(_){notification={queued:false,reason:'SUBSCRIPTION_NOTIFICATION_FAILED'}}res.json({success:true,subscription,notification})}));
   admin.get('/invoices',asyncRoute(async(_req,res)=>res.json({success:true,invoices:await commercial.listInvoices()})));
-  admin.post('/invoices',asyncRoute(async(req,res)=>res.status(201).json({success:true,invoice:await commercial.createInvoice(validate(invoiceSchema,req.body),req.admin.id)})));
+  admin.post('/invoices',asyncRoute(async(req,res)=>{const invoice=await commercial.createInvoice(validate(invoiceSchema,req.body),req.admin.id);let notification;try{notification=await deliveries.queueInvoiceEvent(invoice.id,'INVOICE_ISSUED');if(notification.queued)await deliveries.processDue(1)}catch(_){notification={queued:false,reason:'INVOICE_NOTIFICATION_FAILED'}}res.status(201).json({success:true,invoice,notification})}));
   admin.post('/payments',asyncRoute(async(req,res)=>res.status(201).json({success:true,payment:await commercial.registerPayment(validate(paymentSchema,req.body),req.admin.id)})));
   admin.get('/payments',asyncRoute(async(_req,res)=>res.json({success:true,payments:await commercial.listPayments()})));
-  admin.post('/payments/:id/verify',asyncRoute(async(req,res)=>res.json({success:true,payment:await commercial.verifyPayment(validate(uuid,req.params.id),validate(paymentVerificationSchema,req.body),req.admin.id)})));
+  admin.post('/payments/:id/verify',asyncRoute(async(req,res)=>{const payment=await commercial.verifyPayment(validate(uuid,req.params.id),validate(paymentVerificationSchema,req.body),req.admin.id);let notification;try{const eventType=payment.status==='CONFIRMED'?'PAYMENT_CONFIRMED':'PAYMENT_REJECTED';notification=await deliveries.queuePaymentEvent(payment.id,eventType,{...payment,eventId:eventType+':'+payment.id+':'+(payment.invoiceId||'none')});if(notification.queued)await deliveries.processDue(1)}catch(_){notification={queued:false,reason:'PAYMENT_NOTIFICATION_FAILED'}}res.json({success:true,payment,notification})}));
   admin.get('/communications',asyncRoute(async(_req,res)=>res.json({success:true,deliveries:await deliveries.listDeliveries()})));
   admin.post('/communications/:id/retry',asyncRoute(async(req,res)=>res.json({success:true,delivery:await deliveries.retry(validate(uuid,req.params.id))})));
   admin.get('/customers', asyncRoute(async (_req, res) => res.json({ success: true, customers: await service.listCustomers() })));
