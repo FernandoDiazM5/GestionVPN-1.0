@@ -777,6 +777,12 @@ function BillingPanel({
   const [payments, setPayments] = useState<Payment[]>([]);
   const [open, setOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const [reviewingPayment,setReviewingPayment]=useState<Payment|null>(null);
+  const [reviewMode,setReviewMode]=useState<'confirm'|'reject'>('confirm');
+  const [reviewInvoiceId,setReviewInvoiceId]=useState('');
+  const [reviewAmount,setReviewAmount]=useState('');
+  const [reviewReason,setReviewReason]=useState('');
+  const [reviewBusy,setReviewBusy]=useState(false);
   const [paymentValues, setPaymentValues] = useState<Record<string, string>>({
     currency: "PEN",
     paymentMethod: "TRANSFER",
@@ -850,56 +856,30 @@ function BillingPanel({
       );
     }
   }
-  async function reviewPayment(payment: Payment, confirmed: boolean) {
+  function openPaymentReview(payment:Payment,mode:'confirm'|'reject'){
+    setReviewingPayment(payment);setReviewMode(mode);setReviewReason('');setError('');
+    const eligible=items.filter(invoice=>invoice.instance_id===payment.instance_id&&['ISSUED','PARTIALLY_PAID','OVERDUE'].includes(invoice.status));
+    const invoice=eligible[0];setReviewInvoiceId(invoice?.id||'');
+    const available=Number(payment.amount)-Number(payment.amount_applied),pending=invoice?Number(invoice.total)-Number(invoice.amount_paid):0;
+    setReviewAmount(String(Math.max(0,Math.min(available,pending))));
+  }
+  function chooseReviewInvoice(id:string){setReviewInvoiceId(id);const invoice=items.find(x=>x.id===id);if(reviewingPayment&&invoice){setReviewAmount(String(Math.max(0,Math.min(Number(reviewingPayment.amount)-Number(reviewingPayment.amount_applied),Number(invoice.total)-Number(invoice.amount_paid)))))} }
+  async function reviewPayment(event:FormEvent) {
+    event.preventDefault();if(!reviewingPayment)return;setReviewBusy(true);setError('');
     try {
-      if (!confirmed) {
-        const reason = window.prompt(
-          "Motivo del rechazo (mínimo 8 caracteres):",
-        );
-        if (!reason) return;
-        await centralApi.verifyPayment(payment.id, {
-          confirmed: false,
-          reason,
-        });
+      if (reviewMode==='reject') {
+        await centralApi.verifyPayment(reviewingPayment.id, {confirmed:false,reason:reviewReason});
       } else {
-        const eligible = items.filter(
-          (invoice) =>
-            invoice.instance_id === payment.instance_id &&
-            ["ISSUED", "PARTIALLY_PAID", "OVERDUE"].includes(invoice.status),
-        );
-        if (!eligible.length) {
-          setError("No existe una factura pendiente para este pago.");
-          return;
-        }
-        const invoiceNumber = window.prompt(
-          "Número de factura:",
-          eligible[0].invoice_number,
-        );
-        const invoice = eligible.find(
-          (item) => item.invoice_number === invoiceNumber,
-        );
-        if (!invoice) return;
-        const remainingPayment =
-            Number(payment.amount) - Number(payment.amount_applied),
-          remainingInvoice =
-            Number(invoice.total) - Number(invoice.amount_paid);
-        const proposed = Math.min(remainingPayment, remainingInvoice);
-        const amount = window.prompt("Monto a aplicar:", String(proposed));
-        if (!amount) return;
-        await centralApi.verifyPayment(payment.id, {
-          confirmed: true,
-          invoiceId: invoice.id,
-          amountApplied: Number(amount),
-        });
+        await centralApi.verifyPayment(reviewingPayment.id,{confirmed:true,invoiceId:reviewInvoiceId,amountApplied:Number(reviewAmount)});
       }
-      await load();
+      setReviewingPayment(null);await load();
     } catch (cause) {
       setError(
         cause instanceof Error
           ? cause.message
           : "No se pudo verificar el pago.",
       );
-    }
+    } finally {setReviewBusy(false)}
   }
   return (
     <section className="card">
@@ -1116,11 +1096,11 @@ function BillingPanel({
                     payment.status,
                   ) ? (
                     <>
-                      <button onClick={() => reviewPayment(payment, true)}>
+                      <button onClick={() => openPaymentReview(payment, 'confirm')}>
                         Confirmar / aplicar
                       </button>
                       {payment.status === "PENDING_VERIFICATION" ? (
-                        <button onClick={() => reviewPayment(payment, false)}>
+                        <button onClick={() => openPaymentReview(payment, 'reject')}>
                           Rechazar
                         </button>
                       ) : null}
@@ -1137,6 +1117,7 @@ function BillingPanel({
           <div className="empty">Sin pagos registrados.</div>
         ) : null}
       </div>
+      {reviewingPayment?<form className="crud-form payment-review" onSubmit={reviewPayment}><div className="crud-form-head"><div><h3>{reviewMode==='confirm'?'Confirmar y aplicar pago':'Rechazar pago'}</h3><p>{reviewingPayment.customer_name} · {reviewingPayment.currency} {Number(reviewingPayment.amount).toFixed(2)} · {reviewingPayment.payment_method}</p></div><span className="required-note">* Obligatorio</span></div><fieldset><legend>Decisión de verificación</legend><div className="crud-grid">{reviewMode==='confirm'?<><label className="form-field wide"><span>Factura pendiente <b>*</b></span><select required value={reviewInvoiceId} onChange={e=>chooseReviewInvoice(e.target.value)}><option value="">Selecciona una factura</option>{items.filter(x=>x.instance_id===reviewingPayment.instance_id&&['ISSUED','PARTIALLY_PAID','OVERDUE'].includes(x.status)).map(x=><option key={x.id} value={x.id}>{x.invoice_number} · pendiente {x.currency} {(Number(x.total)-Number(x.amount_paid)).toFixed(2)} · {x.status}</option>)}</select><small>Sólo aparecen facturas pendientes del mismo cliente y moneda.</small></label><label className="form-field"><span>Monto a aplicar <b>*</b></span><input type="number" min="0.01" step="0.01" required value={reviewAmount} onChange={e=>setReviewAmount(e.target.value)}/><small>Disponible del pago: {reviewingPayment.currency} {(Number(reviewingPayment.amount)-Number(reviewingPayment.amount_applied)).toFixed(2)}</small></label></>:<label className="form-field wide"><span>Motivo del rechazo <b>*</b></span><textarea required minLength={8} maxLength={500} rows={4} value={reviewReason} onChange={e=>setReviewReason(e.target.value)} placeholder="Explica qué dato o evidencia debe corregirse."/><small>Se guardará para auditoría y se incluirá en el aviso al cliente.</small></label>}</div></fieldset><div className="form-actions"><button type="button" className="secondary" onClick={()=>setReviewingPayment(null)}>Cancelar</button><button className={reviewMode==='reject'?'danger':'primary'} disabled={reviewBusy|| (reviewMode==='confirm'&&!reviewInvoiceId)}>{reviewBusy?'Procesando…':reviewMode==='confirm'?'Confirmar pago':'Rechazar pago'}</button></div></form>:null}
     </section>
   );
 }
@@ -1223,13 +1204,15 @@ function SettingsPanel() {
   );
 }
 function TemplateSettings(){
-  const [items,setItems]=useState<any[]>([]);const [selectedKey,setSelectedKey]=useState('CUSTOMER_WELCOME');const [item,setItem]=useState<any>(null);const [allowed,setAllowed]=useState<string[]>([]);const [message,setMessage]=useState('');const [busy,setBusy]=useState(false);
+  const [items,setItems]=useState<any[]>([]);const [selectedKey,setSelectedKey]=useState('CUSTOMER_WELCOME');const [item,setItem]=useState<any>(null);const [allowed,setAllowed]=useState<string[]>([]);const [message,setMessage]=useState('');const [busy,setBusy]=useState(false);const [preview,setPreview]=useState<{subject:string;body:string}|null>(null);const [testRecipient,setTestRecipient]=useState('');const [testing,setTesting]=useState(false);
   const labels:Record<string,string>={CUSTOMER_WELCOME:'Bienvenida y activación',SUBSCRIPTION_RENEWED:'Membresía renovada',SUBSCRIPTION_GRACE_STARTED:'Periodo de gracia',SUBSCRIPTION_SUSPENDED:'Membresía suspendida',SUBSCRIPTION_REACTIVATED:'Membresía reactivada',SUBSCRIPTION_CANCELLED:'Membresía cancelada',SUBSCRIPTION_EXPIRED:'Membresía vencida',INVOICE_ISSUED:'Factura emitida',INVOICE_OVERDUE:'Factura vencida',PAYMENT_CONFIRMED:'Pago confirmado',PAYMENT_REJECTED:'Pago rechazado'};
   const load=useCallback(async(key=selectedKey)=>{try{const x=await centralApi.templates();setItems(x.templates);setAllowed(x.allowedVariables);setItem(x.templates.find(t=>t.template_key===key)||x.templates[0]||null)}catch(e){setMessage(e instanceof Error?e.message:'No se pudieron cargar las plantillas')}},[selectedKey]);
   useEffect(()=>{void load()},[load]);
-  function choose(key:string){setSelectedKey(key);setItem(items.find(t=>t.template_key===key)||null);setMessage('')}
+  function choose(key:string){setSelectedKey(key);setItem(items.find(t=>t.template_key===key)||null);setMessage('');setPreview(null)}
   async function save(e:FormEvent){e.preventDefault();if(!item)return;setBusy(true);setMessage('');try{await centralApi.saveTemplate(item.template_key,{channel:'EMAIL',locale:'es-PE',subject:item.subject_template,body:item.body_text_template});setMessage('Nueva versión guardada correctamente.');await load(item.template_key)}catch(e){setMessage(e instanceof Error?e.message:'No se pudo guardar')}finally{setBusy(false)}}
-  return <section className="card template-manager"><div className="card-head"><div><h2>Plantillas de comunicaciones</h2><p className="muted">Personaliza los correos transaccionales. Cada guardado crea una versión nueva y conserva el historial.</p></div><span className="status-pill active">{items.length} activas</span></div><div className="template-layout"><nav className="template-list" aria-label="Tipos de comunicación">{items.map(t=><button type="button" key={t.template_key} className={t.template_key===item?.template_key?'selected':''} onClick={()=>choose(t.template_key)}><span>{labels[t.template_key]||t.template_key}</span><small>Versión {t.version}</small></button>)}</nav>{item?<form className="crud-form template-editor" onSubmit={save}><div className="crud-form-head"><div><h3>{labels[item.template_key]||item.template_key}</h3><p>Clave interna: {item.template_key}</p></div><strong>v{item.version}</strong></div><fieldset><legend>Contenido del correo</legend><div className="crud-grid"><label className="form-field wide"><span>Asunto <b>*</b></span><input required maxLength={250} value={item.subject_template||''} onChange={e=>setItem({...item,subject_template:e.target.value})}/><small>Usa un asunto breve y reconocible para el cliente.</small></label><label className="form-field wide"><span>Contenido en texto <b>*</b></span><textarea required minLength={20} maxLength={20000} rows={12} value={item.body_text_template||''} onChange={e=>setItem({...item,body_text_template:e.target.value})}/><small>Las variables se reemplazarán al enviar el correo.</small></label></div></fieldset><details className="variable-help"><summary>Variables permitidas</summary><div>{allowed.map(x=><code key={x}>{'{{'+x+'}}'}</code>)}</div></details><div className="form-actions"><button className="primary" disabled={busy}>{busy?'Guardando…':'Guardar nueva versión'}</button></div></form>:<p className="muted">Cargando plantillas…</p>}</div>{message?<p role="status" className={message.includes('correctamente')?'success-note':'muted'}>{message}</p>:null}</section>
+  async function showPreview(){if(!item)return;try{setPreview(await centralApi.previewTemplate(item.template_key,{channel:'EMAIL',locale:'es-PE',subject:item.subject_template,body:item.body_text_template}));setMessage('')}catch(e){setMessage(e instanceof Error?e.message:'No se pudo generar la vista previa')}}
+  async function sendTest(){if(!item||!testRecipient)return;setTesting(true);setMessage('');try{await centralApi.testTemplate(item.template_key,{channel:'EMAIL',locale:'es-PE',subject:item.subject_template,body:item.body_text_template,recipient:testRecipient});setMessage('Correo de prueba enviado correctamente.')}catch(e){setMessage(e instanceof Error?e.message:'No se pudo enviar la prueba')}finally{setTesting(false)}}
+  return <section className="card template-manager"><div className="card-head"><div><h2>Plantillas de comunicaciones</h2><p className="muted">Personaliza los correos transaccionales. Cada guardado crea una versión nueva y conserva el historial.</p></div><span className="status-pill active">{items.length} activas</span></div><div className="template-layout"><nav className="template-list" aria-label="Tipos de comunicación">{items.map(t=><button type="button" key={t.template_key} className={t.template_key===item?.template_key?'selected':''} onClick={()=>choose(t.template_key)}><span>{labels[t.template_key]||t.template_key}</span><small>Versión {t.version}</small></button>)}</nav>{item?<form className="crud-form template-editor" onSubmit={save}><div className="crud-form-head"><div><h3>{labels[item.template_key]||item.template_key}</h3><p>Clave interna: {item.template_key}</p></div><strong>v{item.version}</strong></div><fieldset><legend>Contenido del correo</legend><div className="crud-grid"><label className="form-field wide"><span>Asunto <b>*</b></span><input required maxLength={250} value={item.subject_template||''} onChange={e=>{setItem({...item,subject_template:e.target.value});setPreview(null)}}/><small>Usa un asunto breve y reconocible para el cliente.</small></label><label className="form-field wide"><span>Contenido en texto <b>*</b></span><textarea required minLength={20} maxLength={20000} rows={12} value={item.body_text_template||''} onChange={e=>{setItem({...item,body_text_template:e.target.value});setPreview(null)}}/><small>Las variables se reemplazarán al enviar el correo.</small></label></div></fieldset><details className="variable-help"><summary>Variables permitidas</summary><div>{allowed.map(x=><code key={x}>{'{{'+x+'}}'}</code>)}</div></details><div className="template-test"><label className="form-field"><span>Destinatario de prueba</span><input type="email" value={testRecipient} onChange={e=>setTestRecipient(e.target.value)} placeholder="correo@ejemplo.com"/><small>El asunto llevará el prefijo [PRUEBA].</small></label><button type="button" className="secondary" onClick={showPreview}>Vista previa</button><button type="button" className="secondary" disabled={!testRecipient||testing} onClick={sendTest}>{testing?'Enviando…':'Enviar prueba'}</button></div>{preview?<div className="mail-preview"><strong>{preview.subject}</strong><pre>{preview.body}</pre></div>:null}<div className="form-actions"><button className="primary" disabled={busy}>{busy?'Guardando…':'Guardar nueva versión'}</button></div></form>:<p className="muted">Cargando plantillas…</p>}</div>{message?<p role="status" className={message.includes('correctamente')?'success-note':'muted'}>{message}</p>:null}</section>
 }
 function CommercialSettings(){
   const [v,setV]=useState<Record<string,any>>({});const [message,setMessage]=useState("");

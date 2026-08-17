@@ -243,6 +243,8 @@ export const centralApi = {
   saveCommercialSettings: (body:Record<string, unknown>) => request<{settings:Record<string, any>}>("/api/admin/settings/commercial",{method:"PUT",body:JSON.stringify(body)}).then(x=>x.settings),
   templates: () => request<{templates:any[];allowedVariables:string[]}>("/api/admin/settings/templates"),
   saveTemplate: (key:string,body:Record<string,unknown>) => request("/api/admin/settings/templates/"+key,{method:"PUT",body:JSON.stringify(body)}),
+  previewTemplate: (key:string,body:Record<string,unknown>) => request<{preview:{subject:string;body:string}}>("/api/admin/settings/templates/"+key+"/preview",{method:"POST",body:JSON.stringify(body)}).then(x=>x.preview),
+  testTemplate: (key:string,body:Record<string,unknown>) => request("/api/admin/settings/templates/"+key+"/test",{method:"POST",body:JSON.stringify(body)}),
   saveSmtp: (body: Record<string, unknown>) =>
     request<{ provider: SmtpProvider }>("/api/admin/settings/smtp", {
       method: "PUT",

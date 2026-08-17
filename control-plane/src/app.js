@@ -115,6 +115,7 @@ const paymentVerificationSchema=z.discriminatedUnion('confirmed',[
 ]);
 const commercialSettingsSchema=z.object({legalName:z.string().trim().min(2).max(180),taxId:z.string().trim().max(40).optional(),billingEmail:z.email().max(254).optional(),address:z.string().trim().max(500).optional(),invoicePrefix:z.string().trim().toUpperCase().regex(/^[A-Z0-9-]{1,12}$/),defaultCurrency:z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/),defaultTaxPercent:z.number().min(0).max(100),invoiceDueDays:z.number().int().min(0).max(365),graceDays:z.number().int().min(0).max(90),paymentInstructions:z.string().trim().max(4000).optional(),brandName:z.string().trim().min(2).max(120),supportEmail:z.email().max(254).optional(),version:z.number().int().nonnegative()}).strict();
 const templateSchema=z.object({channel:z.literal('EMAIL'),locale:z.literal('es-PE'),subject:z.string().trim().min(2).max(250),body:z.string().trim().min(20).max(20000)}).strict();
+const templateTestSchema=templateSchema.extend({recipient:z.email().max(254)}).strict();
 const templateKey=z.string().regex(/^[A-Z][A-Z0-9_]{2,79}$/);
 
 function validate(schema, value) {
@@ -188,6 +189,8 @@ function createApp({ pool, activationPepper, rateLimitPepper, signingKeyId, sign
   admin.put('/settings/commercial',asyncRoute(async(req,res)=>res.json({success:true,settings:await commercialSettings.save(validate(commercialSettingsSchema,req.body),req.admin.id)})));
   admin.get('/settings/templates',asyncRoute(async(_req,res)=>res.json({success:true,templates:await templates.list(),allowedVariables:templates.allowedVariables})));
   admin.put('/settings/templates/:key',asyncRoute(async(req,res)=>res.json({success:true,template:await templates.save(validate(templateKey,req.params.key),validate(templateSchema,req.body),req.admin.id)})));
+  admin.post('/settings/templates/:key/preview',asyncRoute(async(req,res)=>{validate(templateKey,req.params.key);res.json({success:true,preview:templates.preview(validate(templateSchema,req.body))})}));
+  admin.post('/settings/templates/:key/test',asyncRoute(async(req,res)=>{validate(templateKey,req.params.key);const input=validate(templateTestSchema,req.body),preview=templates.preview(input),smtp=await notificationProviders.transporterAndProvider();await smtp.transporter.sendMail({to:input.recipient,from:{name:smtp.config.fromName,address:smtp.config.fromEmail},replyTo:smtp.config.replyTo||undefined,subject:'[PRUEBA] '+preview.subject,text:preview.body});res.json({success:true,test:{delivered:true,recipient:input.recipient}})}));
   admin.put('/settings/smtp',asyncRoute(async(req,res)=>{const input=validate(smtpSchema,req.body);await sessions.reauthenticate(req.admin.id,input.reauth);res.json({success:true,provider:await notificationProviders.saveSmtp(input.config,req.admin.id)})}));
   admin.post('/settings/smtp/test',asyncRoute(async(req,res)=>res.json({success:true,test:await notificationProviders.testSmtp(validate(smtpTestSchema,req.body).recipient)})));
   admin.get('/settings/telegram',asyncRoute(async(_req,res)=>res.json({success:true,provider:await notificationProviders.getTelegram()})));
