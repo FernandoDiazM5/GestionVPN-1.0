@@ -1,4 +1,8 @@
-const { deriveWanInterface, summarizeInventory } = require('../../lib/coreServerService');
+const {
+  deriveWanInterface,
+  summarizeInventory,
+  managementAddressListNetworks,
+} = require('../../lib/coreServerService');
 
 describe('coreServerService inventory', () => {
   it('detecta la WAN desde immediate-gw y usa DHCP como respaldo', () => {
@@ -17,5 +21,13 @@ describe('coreServerService inventory', () => {
     expect(summary.status).toBe('HEALTHY');
     expect(summary.vpnReady).toBe(true);
     expect(summary.operationalObjects).toBe(0);
+  });
+
+  it('confía el pool de escaneo tanto para la ida como para el retorno', () => {
+    const lists = managementAddressListNetworks('10.12.248.0/24');
+
+    expect(lists.active).toContain('10.12.248.0/24');
+    expect(lists.trusted).toContain('10.12.248.0/24');
+    expect(lists.active).toEqual(lists.trusted);
   });
 });

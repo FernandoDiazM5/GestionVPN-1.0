@@ -82,8 +82,8 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `routes/admin.routes.js` | 285 | DELETE | `/moderators/:id` | sí | platform-admin | no | n/a | network-admin | — |
 | `routes/admin.routes.js` | 388 | POST | `/moderators` | sí | platform-admin | no | sí | — | — |
 | `routes/admin.routes.js` | 420 | POST | `/invite-moderator` | sí | platform-admin | no | sí | — | — |
-| `routes/admin.routes.js` | 487 | GET | `/invitations` | sí | platform-admin | no | n/a | — | — |
-| `routes/admin.routes.js` | 502 | POST | `/invitations/:id/link` | sí | platform-admin | no | n/a | network-admin | — |
+| `routes/admin.routes.js` | 488 | GET | `/invitations` | sí | platform-admin | no | n/a | — | — |
+| `routes/admin.routes.js` | 503 | POST | `/invitations/:id/link` | sí | platform-admin | no | n/a | network-admin | — |
 | `routes/adminSecurity.routes.js` | 53 | POST | `/step-up` | sí | — | no | sí | — | — |
 | `routes/adminSecurity.routes.js` | 124 | GET | `/status` | sí | — | no | n/a | network-admin | — |
 | `routes/adminSecurity.routes.js` | 174 | GET | `/history` | sí | — | no | n/a | — | — |

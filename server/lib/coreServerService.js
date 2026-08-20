@@ -8,6 +8,16 @@ const log = require('./logger').child({ scope: 'core-server' });
 const OWNED = 'GVPN:';
 const NODE_NAME_RE = /^(WG-ND|VPN-SSTP-ND|VRF-ND)/i;
 
+function managementAddressListNetworks(scanNet) {
+  const networks = [...new Set([
+    mgmtNet.vps.net,
+    mgmtNet.clients.net,
+    mgmtNet.admin.net,
+    scanNet,
+  ].filter(Boolean))];
+  return { trusted: networks, active: networks };
+}
+
 async function loadCoreCredentials() {
   const [ip, user, passData] = await Promise.all([
     getAppSetting('MT_IP'), getAppSetting('MT_USER'), getAppSetting('MT_PASS'),
@@ -271,11 +281,13 @@ async function provisionCore() {
     record('Listener SSTP', true);
 
     const addrLists = await safeWrite(api, ['/ip/firewall/address-list/print']).catch(() => []);
-    for (const net of [mgmtNet.vps.net, mgmtNet.clients.net, mgmtNet.admin.net]) {
+    const managementLists = managementAddressListNetworks(scanNet);
+    for (const net of managementLists.trusted) {
       record(`Trusted ${net}`, await ensureAddressList(api, addrLists, 'LIST-MGMT-TRUSTED', net, `${OWNED}MGMT-TRUSTED`));
+    }
+    for (const net of managementLists.active) {
       record(`VPN activa ${net}`, await ensureAddressList(api, addrLists, 'vpn-activa', net, `${OWNED}VPN-ACTIVA`));
     }
-    record(`VPN activa ${scanNet}`, await ensureAddressList(api, addrLists, 'vpn-activa', scanNet, `${OWNED}SCAN`));
 
     const filters = await safeWrite(api, ['/ip/firewall/filter/print']).catch(() => []);
     const inputDrop = filters.find(f => f.chain === 'input' && f.action === 'drop' && f['.id'])?.['.id'];
@@ -317,4 +329,5 @@ async function provisionCore() {
 module.exports = {
   loadCoreCredentials, deriveWanInterface, summarizeInventory, inspectCore,
   previewProvision, provisionCore, readInventory, unexpectedManagementOverlaps,
+  managementAddressListNetworks,
 };

@@ -337,33 +337,35 @@ router.post('/tunnel/repair', requireOperator, validate({ body: TunnelRepairRequ
       }
     }
 
-    // ── Paso 6: vpn-activa (pool de gestión: CLIENTES/ADMIN/VPS + scan-pool) ──
-    // El scan-pool DEBE ir aquí: sin él, el escaneo (src=scan-IP) no pasa el
-    // filtro forward "Permitir acceso a red remota" (src-address-list=vpn-activa).
-    // `scanNet` se deriva del pool arriba (única fuente).
+    // ── Paso 6: listas de gestión (CLIENTES/ADMIN/VPS + scan-pool) ────
+    // El scan-pool debe estar en AMBAS listas:
+    //   - vpn-activa permite la ida hacia LIST-NET-REMOTE-TOWERS.
+    //   - LIST-MGMT-TRUSTED permite el retorno hacia la scan-IP del VPS.
+    // Omitir la segunda deja el escaneo en 0 aunque mangle, rutas y AllowedIPs
+    // sean correctos, porque la respuesta alcanza el bloqueo preventivo.
     const ADMIN_POOLS_REPAIR = [
       mgmtNet.clients.net, mgmtNet.admin.net, mgmtNet.vps.net,
       ...(scanNet ? [scanNet] : []),
     ];
     for (const pool of ADMIN_POOLS_REPAIR) {
-      try {
-        const existsInVpnActiva = allAddrs.some(a =>
-          a.list === 'vpn-activa' && a.address === pool
-        );
-        if (existsInVpnActiva) {
-          steps.push({ step: 6, obj: 'vpn-activa', name: pool, status: 'ok', action: 'exists' });
-        } else {
-          await writeIdempotent(api, [
-            '/ip/firewall/address-list/add',
-            '=list=vpn-activa',
-            `=address=${pool}`,
-            '=comment=User Access',
-          ]);
-          steps.push({ step: 6, obj: 'vpn-activa', name: pool, status: 'created', action: 'created' });
-          repaired++;
+      for (const list of ['LIST-MGMT-TRUSTED', 'vpn-activa']) {
+        try {
+          const exists = allAddrs.some(a => a.list === list && a.address === pool);
+          if (exists) {
+            steps.push({ step: 6, obj: list, name: pool, status: 'ok', action: 'exists' });
+          } else {
+            await writeIdempotent(api, [
+              '/ip/firewall/address-list/add',
+              `=list=${list}`,
+              `=address=${pool}`,
+              `=comment=${list === 'vpn-activa' ? 'User Access' : 'Gestion confiable'}`,
+            ]);
+            steps.push({ step: 6, obj: list, name: pool, status: 'created', action: 'created' });
+            repaired++;
+          }
+        } catch (e) {
+          steps.push({ step: 6, obj: list, name: pool, status: 'error', action: e.message });
         }
-      } catch (e) {
-        steps.push({ step: 6, obj: 'vpn-activa', name: pool, status: 'error', action: e.message });
       }
     }
 

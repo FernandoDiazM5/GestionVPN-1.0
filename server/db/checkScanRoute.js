@@ -28,7 +28,13 @@ const scanIpRepo = require('./repos/scanIpRepo');
   let pass = await get('MT_PASS');
   try { pass = decryptPass(pass); } catch (_) { /* texto plano (dev) */ }
 
-  const scanNet = scanIpRepo.poolSubnet();   // 10.11.252.0/24 (derivado del pool)
+  // Este script corre fuera del bootstrap HTTP. Debe cargar explícitamente el
+  // /22 persistido; de lo contrario mgmtNet conserva el default histórico y el
+  // diagnóstico reporta/repara 10.11.252.0/24 en una instalación ya migrada.
+  const configuredSupernet = await get('management_supernet');
+  if (configuredSupernet) mgmtNet.configureSupernet(configuredSupernet);
+
+  const scanNet = scanIpRepo.poolSubnet();
   const gw = mgmtNet.vps.iface;              // VPN-WG-VPS
   console.log(`Router ${user}@${ip} · scan-pool=${scanNet} · gateway=${gw}`);
   console.log(`Modo: ${apply ? '⚠️  APPLY (escribirá las rutas que falten)' : 'DRY-RUN (solo lectura, no escribe nada)'}\n`);

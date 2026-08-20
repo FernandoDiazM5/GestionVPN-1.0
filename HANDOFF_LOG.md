@@ -1,5 +1,22 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-19 — Corrección local del retorno de escaneo `/22`.** Rama `vps_uni` (base `40a1081`). Estado: backend 117/675, `check:all`, inventario de rutas y diff correctos; sin despliegue ni cambios en Core.
+> - El aprovisionamiento del Core agrega ahora `scanNet` a `LIST-MGMT-TRUSTED` y `vpn-activa`; una prueba unitaria fija el contrato de ida+retorno.
+> - Reparar túnel reconcilia idempotentemente ambas listas para los planos de gestión y el scan-pool.
+> - `check:scanroute` carga `management_supernet` antes de derivar el pool, evitando el falso diagnóstico con `10.11.252.0/24`.
+> - Pendiente: publicar commit, pedir autorización, desplegar/reparar y validar escaneo en vivo.
+
+> **Sesión 2026-08-19 — Diagnóstico del escaneo VPS tras `/22`.** Rama `vps_uni` (base `40a1081`). Estado: inspección local y remota de solo lectura; sin cambios en VPS/Core ni despliegue.
+> - `wg0`, scan-IP `10.12.248.4`, handshake, AllowedIPs, ruta a `10.1.1.0/24`, mangle de activación, LAN remota y rutas VRF resultaron correctos.
+> - Causa confirmada: `coreServerService` agrega el scan `/24` a `vpn-activa` pero lo omite de `LIST-MGMT-TRUSTED`; el filtro de retorno no acepta respuestas destinadas a la scan-IP y las alcanza `Bloqueo preventivo`.
+> - Hallazgo adicional: `check:scanroute` aislado conserva el default antiguo si no se le carga el setting `management_supernet`; con `10.12.248.0/24` confirma ruta saludable.
+> - Pendiente: implementar corrección idempotente y pruebas, publicar en `vps_uni`, solicitar autorización y sólo entonces reparar/desplegar y validar en vivo.
+
+> **Sesión 2026-08-19 — Rama exclusiva para joinpoint.cloud.** Rama `vps_uni` (base `40a1081`). Estado: documentación operativa actualizada; sin cambios en el VPS ni despliegue.
+> - `vps_uni` pasa a ser la única rama de trabajo, publicación y despliegue para `134.199.212.232` / `joinpoint.cloud`.
+> - `vps_prod` corresponde a otro VPS y queda explícitamente excluida de los despliegues en este servidor.
+> - Se actualizaron las reglas durables de rama, publicación, reset y autorización previa; las referencias cronológicas antiguas a `vps_prod` se conservan como historia.
+
 > **Sesión 2026-08-16 — Formularios de pago y pruebas pilot.14.** Rama `vps_prod` (base `6020831`). Se retiraron todos los prompts de Central; la verificación de pagos ahora calcula saldos y usa formularios auditables. Las 11 plantillas admiten preview con datos ficticios y envío directo de prueba sin versionar. Validación: Central 53/53, UI 3/3, build y Semgrep limpios. Desplegado tras backup con imagen healthy, HTTPS 200 y timers activos. Pendiente externo: configurar SMTP y probar un buzón autorizado.
 
 > **Sesión 2026-08-16 — Facturación y plantillas pilot.13.** Rama `vps_prod` (base `d6ac300`). Se añadió editor visual para 11 plantillas versionadas y avisos idempotentes de factura emitida/vencida y pago confirmado/rechazado. El reconciliador marca vencimientos y se corrigió la aplicación de pagos sobre facturas `OVERDUE`. Validación: Central 52/52, UI 3/3, build, esquema 2× y Semgrep limpios. Desplegado tras backup con imagen healthy, HTTPS 200 y timers activos.
