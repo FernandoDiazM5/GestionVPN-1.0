@@ -1,5 +1,12 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-19 — Despliegue y reparación integral del escaneo `/22`.** Rama `vps_uni`; producción `cda8ad7`. Estado: backend/DB/frontend sanos, HTTPS 200, rutas y listas verificadas; pendiente escaneo humano con túnel activo.
+> - Se desplegaron `28c23f2` y el hardening `cda8ad7`; backend 117/676 y `check:all` verdes antes del despliegue.
+> - VPS alineado a `10.12.248.*`; diagnóstico carga el supernet persistido y confirma la ruta de retorno del VRF.
+> - Core reparado: scan-pool en `vpn-activa` + `LIST-MGMT-TRUSTED`, peer VPS con el pool nuevo y residuos `10.11.252.0/24` retirados.
+> - Backup verificable: `/root/pre-vps-uni-scan-fix-20260820T042302Z`; imagen rollback `gestionvpn-10-backend:pre-scan-fix-20260820T042302Z`.
+> - Se retiraron sólo los rollbacks antiguos `pre-supernet-e7b40b8`, recuperables desde Git; disco 80%→70%, contenedores y volúmenes preservados.
+
 > **Sesión 2026-08-19 — Corrección local del retorno de escaneo `/22`.** Rama `vps_uni` (base `40a1081`). Estado: backend 117/675, `check:all`, inventario de rutas y diff correctos; sin despliegue ni cambios en Core.
 > - El aprovisionamiento del Core agrega ahora `scanNet` a `LIST-MGMT-TRUSTED` y `vpn-activa`; una prueba unitaria fija el contrato de ida+retorno.
 > - Reparar túnel reconcilia idempotentemente ambas listas para los planos de gestión y el scan-pool.
