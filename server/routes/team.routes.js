@@ -315,6 +315,7 @@ router.post('/accept', rl.guardPolicy('OTP_VERIFY'), asyncHandler(async (req, re
         'UPDATE workspaces SET owner_id = ?, updated_at = ? WHERE id = ?',
         [user.id, Date.now(), inv.workspace_id]
       );
+      await memberRepo.removePlatformAdminPlaceholders(tx, inv.workspace_id, user.id);
     }
     // Asigna el túnel adjuntado en la invitación (si lo hay)
     if (inv.tunnel_id) {

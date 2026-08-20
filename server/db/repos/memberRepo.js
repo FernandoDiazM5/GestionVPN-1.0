@@ -29,10 +29,28 @@ async function listMembers(workspaceId) {
        FROM workspace_members wm
        JOIN users u ON u.id = wm.user_id
       WHERE wm.workspace_id = ? AND wm.deleted_at IS NULL AND u.deleted_at IS NULL
+        AND u.is_platform_admin = 0
       ORDER BY FIELD(wm.role,'OWNER','MEMBER'), wm.created_at ASC`,
     [workspaceId]
   );
   return rows.map(r => ({ ...r, disabled: !!r.disabled_at }));
+}
+
+/**
+ * Retira membresias placeholder de administradores de plataforma cuando el
+ * OWNER real acepta su invitacion. Se conserva el registro mediante soft-delete.
+ */
+async function removePlatformAdminPlaceholders(runner, workspaceId, ownerUserId) {
+  const q = runner && runner.query ? runner.query.bind(runner) : query;
+  const result = await q(
+    `UPDATE workspace_members wm
+       JOIN users u ON u.id = wm.user_id
+        SET wm.deleted_at = ?
+      WHERE wm.workspace_id = ? AND wm.user_id <> ?
+        AND wm.deleted_at IS NULL AND u.is_platform_admin = 1`,
+    [Date.now(), workspaceId, ownerUserId]
+  );
+  return result.affectedRows || 0;
 }
 
 async function softRemove(workspaceId, userId) {
@@ -43,4 +61,4 @@ async function softRemove(workspaceId, userId) {
   return r.affectedRows > 0;
 }
 
-module.exports = { findMembership, add, listMembers, softRemove };
+module.exports = { findMembership, add, listMembers, removePlatformAdminPlaceholders, softRemove };

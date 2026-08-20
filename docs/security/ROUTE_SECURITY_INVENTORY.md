@@ -168,21 +168,21 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `routes/settings.routes.js` | 141 | POST | `/settings/test-error-email` | sí | platform-admin | no | n/a | — | — |
 | `routes/team.routes.js` | 218 | POST | `/invite` | sí | OWNER | no | sí | — | — |
 | `routes/team.routes.js` | 277 | POST | `/accept` | no | — | sí | sí | network-admin | `PUBLIC_MUTATION_REVIEW` |
-| `routes/team.routes.js` | 384 | GET | `/my-invitations` | sí | — | no | n/a | — | — |
-| `routes/team.routes.js` | 392 | POST | `/invitations/:id/accept` | sí | — | no | sí | network-admin | — |
-| `routes/team.routes.js` | 446 | GET | `/members` | sí | — | no | n/a | — | — |
-| `routes/team.routes.js` | 452 | GET | `/invitations` | sí | OWNER | no | n/a | network-admin | — |
-| `routes/team.routes.js` | 467 | PATCH | `/member/:userId` | sí | OWNER | no | sí | sql | — |
-| `routes/team.routes.js` | 529 | DELETE | `/member/:userId` | sí | OWNER | no | n/a | sql, network-admin | — |
-| `routes/team.routes.js` | 586 | POST | `/invitation/:id/revoke` | sí | OWNER | no | n/a | network-admin | — |
-| `routes/team.routes.js` | 597 | GET | `/workspace-tunnels` | sí | OWNER | no | n/a | — | — |
-| `routes/team.routes.js` | 613 | GET | `/assignments` | sí | — | no | n/a | — | — |
-| `routes/team.routes.js` | 622 | POST | `/assignments` | sí | OWNER | no | sí | — | — |
-| `routes/team.routes.js` | 634 | DELETE | `/assignments/:id` | sí | OWNER | no | n/a | network-admin | — |
-| `routes/team.routes.js` | 646 | POST | `/member/:id/wireguard` | sí | OWNER | no | sí | sql, network-admin | — |
-| `routes/team.routes.js` | 730 | POST | `/me/wireguard` | sí | — | no | n/a | network-admin | — |
-| `routes/team.routes.js` | 759 | GET | `/member/:id/wireguard` | sí | — | no | n/a | network-admin | — |
-| `routes/team.routes.js` | 780 | GET | `/wireguard/by-key/:publicKey` | sí | OWNER | no | n/a | network-admin | — |
+| `routes/team.routes.js` | 385 | GET | `/my-invitations` | sí | — | no | n/a | — | — |
+| `routes/team.routes.js` | 393 | POST | `/invitations/:id/accept` | sí | — | no | sí | network-admin | — |
+| `routes/team.routes.js` | 447 | GET | `/members` | sí | — | no | n/a | — | — |
+| `routes/team.routes.js` | 453 | GET | `/invitations` | sí | OWNER | no | n/a | network-admin | — |
+| `routes/team.routes.js` | 468 | PATCH | `/member/:userId` | sí | OWNER | no | sí | sql | — |
+| `routes/team.routes.js` | 530 | DELETE | `/member/:userId` | sí | OWNER | no | n/a | sql, network-admin | — |
+| `routes/team.routes.js` | 587 | POST | `/invitation/:id/revoke` | sí | OWNER | no | n/a | network-admin | — |
+| `routes/team.routes.js` | 598 | GET | `/workspace-tunnels` | sí | OWNER | no | n/a | — | — |
+| `routes/team.routes.js` | 614 | GET | `/assignments` | sí | — | no | n/a | — | — |
+| `routes/team.routes.js` | 623 | POST | `/assignments` | sí | OWNER | no | sí | — | — |
+| `routes/team.routes.js` | 635 | DELETE | `/assignments/:id` | sí | OWNER | no | n/a | network-admin | — |
+| `routes/team.routes.js` | 647 | POST | `/member/:id/wireguard` | sí | OWNER | no | sí | sql, network-admin | — |
+| `routes/team.routes.js` | 731 | POST | `/me/wireguard` | sí | — | no | n/a | network-admin | — |
+| `routes/team.routes.js` | 760 | GET | `/member/:id/wireguard` | sí | — | no | n/a | network-admin | — |
+| `routes/team.routes.js` | 781 | GET | `/wireguard/by-key/:publicKey` | sí | OWNER | no | n/a | network-admin | — |
 | `routes/wireguard.routes.js` | 25 | POST | `/wireguard/peers` | sí | — | no | n/a | sql, network-admin | — |
 | `routes/wireguard.routes.js` | 122 | POST | `/wireguard/peer/add` | sí | — | no | sí | sql, network-admin | — |
 | `routes/wireguard.routes.js` | 171 | POST | `/wireguard/peer/edit` | sí | — | no | sí | sql, network-admin | — |

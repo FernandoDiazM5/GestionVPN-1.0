@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-19 — Corrección local de administrador duplicado en miembros.** Rama `vps_uni` (base `64dd762`). Estado: backend 118/678 y `check:all` verdes; sin despliegue ni mutación de producción.
+> - Producción confirmó `admin@local.app` como OWNER temporal de `Housenet` junto a Fernando; el workspace ya apunta correctamente a Fernando como `owner_id`.
+> - Causa: aceptar una invitación OWNER reasignaba el workspace, pero conservaba la membresía placeholder creada por `createForOwner`.
+> - El listado excluye cuentas de plataforma y la aceptación ahora retira transaccionalmente esos placeholders mediante soft-delete; se añadieron dos pruebas unitarias.
+> - Pendiente: commit/publicación y, con autorización, backup SQL, saneamiento de la fila histórica y despliegue en `134.199.212.232`.
+
 > **Sesión 2026-08-19 — Despliegue y reparación integral del escaneo `/22`.** Rama `vps_uni`; producción `cda8ad7`. Estado: backend/DB/frontend sanos, HTTPS 200, rutas y listas verificadas; pendiente escaneo humano con túnel activo.
 > - Se desplegaron `28c23f2` y el hardening `cda8ad7`; backend 117/676 y `check:all` verdes antes del despliegue.
 > - VPS alineado a `10.12.248.*`; diagnóstico carga el supernet persistido y confirma la ruta de retorno del VRF.
