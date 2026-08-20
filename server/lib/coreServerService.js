@@ -18,6 +18,16 @@ function managementAddressListNetworks(scanNet) {
   return { trusted: networks, active: networks };
 }
 
+function vpsPeerAllowedAddresses(scanNet) {
+  return [...new Set([`${mgmtNet.vps.ip}/32`, scanNet].filter(Boolean))];
+}
+
+function sameAddressSet(current, expected) {
+  const actual = String(current || '').split(',').map(value => value.trim()).filter(Boolean).sort();
+  const wanted = [...expected].sort();
+  return actual.length === wanted.length && actual.every((value, index) => value === wanted[index]);
+}
+
 async function loadCoreCredentials() {
   const [ip, user, passData] = await Promise.all([
     getAppSetting('MT_IP'), getAppSetting('MT_USER'), getAppSetting('MT_PASS'),
@@ -255,10 +265,16 @@ async function provisionCore() {
     }
 
     const peers = await safeWrite(api, ['/interface/wireguard/peers/print']).catch(() => []);
-    if (!peers.some(p => p.interface === mgmtNet.vps.iface && p['public-key'] === vpsPublicKey)) {
+    const expectedVpsAllowed = vpsPeerAllowedAddresses(scanNet);
+    const vpsPeer = peers.find(p => p.interface === mgmtNet.vps.iface && p['public-key'] === vpsPublicKey);
+    if (!vpsPeer) {
       await writeIdempotent(api, ['/interface/wireguard/peers/add', `=interface=${mgmtNet.vps.iface}`,
-        `=public-key=${vpsPublicKey}`, `=allowed-address=${mgmtNet.vps.ip}/32,${scanNet}`,
+        `=public-key=${vpsPublicKey}`, `=allowed-address=${expectedVpsAllowed.join(',')}`,
         '=persistent-keepalive=25s', `=comment=${OWNED}VPS`]);
+      record('Peer VPS', true);
+    } else if (!sameAddressSet(vpsPeer['allowed-address'], expectedVpsAllowed)) {
+      await safeWrite(api, ['/interface/wireguard/peers/set', `=.id=${vpsPeer['.id']}`,
+        `=allowed-address=${expectedVpsAllowed.join(',')}`]);
       record('Peer VPS', true);
     } else record('Peer VPS', false);
 
@@ -329,5 +345,5 @@ async function provisionCore() {
 module.exports = {
   loadCoreCredentials, deriveWanInterface, summarizeInventory, inspectCore,
   previewProvision, provisionCore, readInventory, unexpectedManagementOverlaps,
-  managementAddressListNetworks,
+  managementAddressListNetworks, vpsPeerAllowedAddresses, sameAddressSet,
 };

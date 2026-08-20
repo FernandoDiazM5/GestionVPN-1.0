@@ -588,7 +588,7 @@ Mantener la clave previous durante al menos el valor completo de `JWT_EXPIRES` (
 
 ### Despliegue
 - [ ] `git fetch origin && git reset --hard origin/main` en `/opt/GestionVPN-1.0` (NUNCA `git pull` — historial purgado).
-- [ ] `server/.env.production` (incl. `SCAN_IP_POOL_BASE=10.11.252.`, `SCAN_RETURN_SUBNET=10.11.252.0/24`) y `.env` raíz desde las plantillas; cert autofirmado en `./ssl` (`/CN=134.199.212.232`).
+- [ ] `server/.env.production` (para el `/22` vigente: `SCAN_IP_POOL_BASE=10.12.248.`, `SCAN_RETURN_SUBNET=10.12.248.0/24`) y `.env` raíz desde las plantillas; cert autofirmado en `./ssl` (`/CN=134.199.212.232`).
 - [ ] `docker compose -f docker-compose.prod.yml up -d --build` → 3 servicios arriba; `curl -s http://localhost:3001/api/health | jq` OK. (El `entrypoint.sh` corre `migrate:dropcomod` y demás migraciones.)
 - [ ] Login admin → **Ajustes → Configurar router** (`MT_IP=10.12.250.1`) → activar un nodo → confirmar que "Acceso Restringido" desaparece.
 
@@ -634,7 +634,7 @@ Despliegue ejecutado en el droplet DigitalOcean (`134.199.212.232`, repo en **`/
 > - **Usuarios:** `10.13.250.0/24` (CLIENTES) · `10.14.250.0/24` (ADMIN).
 > - **scan-IPs del VPS:** `10.11.252.0/24` (pool `.2–.254`).
 > - MikroTik: peer del VPS `allowed-address=10.12.250.60/32,10.11.252.0/24` + ruta de retorno `dst=10.11.252.0/24 gw=VPN-WG-VPS` por VRF (creada al provisionar nodo / `check:scanroute`).
-> - `server/.env.production`: `SCAN_IP_POOL_BASE=10.11.252.`, `SCAN_IP_POOL_START=2`, `SCAN_IP_POOL_END=254`, `SCAN_RETURN_SUBNET=10.11.252.0/24`, `NODE_OPTIONS=--dns-result-order=ipv4first`.
+> - `server/.env.production`: `SCAN_IP_POOL_BASE=10.12.248.`, `SCAN_IP_POOL_START=2`, `SCAN_IP_POOL_END=50`, `SCAN_RETURN_SUBNET=10.12.248.0/24`, `NODE_OPTIONS=--dns-result-order=ipv4first`.
 
 _(Histórico 2026-06-17, plano viejo:)_
 - **Usuarios:** `192.168.21.0/24`.

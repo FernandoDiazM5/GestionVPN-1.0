@@ -43,7 +43,10 @@ router.post('/tunnel/repair', requireOperator, validate({ body: TunnelRepairRequ
   if (adminWgNet) mgmtReturnRoutes[0] = { subnet: adminWgNet, gateway: mgmtNet.clients.iface, tag: 'MGMT-CLIENTES' };
   // /24 del pool de scan (Opción C): DERIVADO del pool (no de un env que pueda
   // estar sin setear) → el "reparar" crea la ruta de retorno del scan sola.
-  const scanNet = (process.env.SCAN_RETURN_SUBNET || scanIpRepo.poolSubnet() || '').trim();
+  // mgmtNet ya absorbe el override de entorno y, en instalaciones `/22`, el
+  // setting persistido durante el bootstrap. No volver a priorizar process.env
+  // aquí: un env histórico podría reparar el pool equivocado.
+  const scanNet = (scanIpRepo.poolSubnet() || '').trim();
   const steps      = [];
   let   repaired   = 0;
 

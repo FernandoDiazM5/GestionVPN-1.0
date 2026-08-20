@@ -2,6 +2,8 @@ const {
   deriveWanInterface,
   summarizeInventory,
   managementAddressListNetworks,
+  vpsPeerAllowedAddresses,
+  sameAddressSet,
 } = require('../../lib/coreServerService');
 
 describe('coreServerService inventory', () => {
@@ -29,5 +31,13 @@ describe('coreServerService inventory', () => {
     expect(lists.active).toContain('10.12.248.0/24');
     expect(lists.trusted).toContain('10.12.248.0/24');
     expect(lists.active).toEqual(lists.trusted);
+  });
+
+  it('reconcilia el peer VPS con la IP del servidor y el pool vigente', () => {
+    const expected = vpsPeerAllowedAddresses('10.12.248.0/24');
+
+    expect(expected).toEqual([`${require('../../lib/mgmtNet').vps.ip}/32`, '10.12.248.0/24']);
+    expect(sameAddressSet(expected.join(','), expected)).toBe(true);
+    expect(sameAddressSet('10.12.250.60/32,10.11.252.0/24', expected)).toBe(false);
   });
 });
