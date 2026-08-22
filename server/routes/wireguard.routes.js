@@ -71,24 +71,49 @@ router.post('/wireguard/peers', asyncHandler(async (req, res) => {
     // undefined y la UI muestra "—".
     if (result.length > 0) {
       const mwRows = await db.all(
-        `SELECT mw.public_key, u.email
+        `SELECT mw.public_key, u.email, w.name AS workspace_name, wm.role
            FROM member_wireguard mw
-           JOIN users u ON u.id = mw.user_id`
+           JOIN users u ON u.id = mw.user_id
+           JOIN workspaces w ON w.id = mw.workspace_id
+           JOIN workspace_members wm
+             ON wm.workspace_id = mw.workspace_id
+            AND wm.user_id = mw.user_id
+            AND wm.deleted_at IS NULL`
       );
       const umiRows = await db.all(
-        `SELECT umi.public_key, umi.mgmt_ip, u.email
+        `SELECT umi.public_key, umi.mgmt_ip, u.email, w.name AS workspace_name, wm.role
            FROM user_mgmt_ips umi
-           JOIN users u ON u.id = umi.user_id`
+           JOIN users u ON u.id = umi.user_id
+           JOIN workspaces w ON w.id = umi.workspace_id
+           JOIN workspace_members wm
+             ON wm.workspace_id = umi.workspace_id
+            AND wm.user_id = umi.user_id
+            AND wm.deleted_at IS NULL`
       );
       const emailByPk = {};
       const emailByIp = {};
-      mwRows.forEach(r => { if (r.public_key && r.email) emailByPk[r.public_key] = r.email; });
+      const nameByPk = {};
+      const nameByIp = {};
+      const canonicalName = r => `${r.workspace_name} - ${r.email} - ${r.role || 'MEMBER'}`;
+      mwRows.forEach(r => {
+        if (r.public_key && r.email) {
+          emailByPk[r.public_key] = r.email;
+          nameByPk[r.public_key] = canonicalName(r);
+        }
+      });
       umiRows.forEach(r => {
-        if (r.public_key && r.email) emailByPk[r.public_key] = emailByPk[r.public_key] || r.email;
-        if (r.mgmt_ip   && r.email) emailByIp[r.mgmt_ip]   = emailByIp[r.mgmt_ip]   || r.email;
+        if (r.public_key && r.email) {
+          emailByPk[r.public_key] = emailByPk[r.public_key] || r.email;
+          nameByPk[r.public_key] = nameByPk[r.public_key] || canonicalName(r);
+        }
+        if (r.mgmt_ip && r.email) {
+          emailByIp[r.mgmt_ip] = emailByIp[r.mgmt_ip] || r.email;
+          nameByIp[r.mgmt_ip] = nameByIp[r.mgmt_ip] || canonicalName(r);
+        }
       });
       result = result.map(p => ({
         ...p,
+        name: nameByPk[p.publicKey] || nameByIp[p.allowedAddress] || p.name,
         email: emailByPk[p.publicKey] || emailByIp[p.allowedAddress] || undefined,
       }));
     }

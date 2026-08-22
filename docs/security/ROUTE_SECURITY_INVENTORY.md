@@ -58,22 +58,22 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `auth.routes.js` | 147 | GET | `/me` | sí | — | no | n/a | — | — |
 | `auth.routes.js` | 173 | POST | `/password-reset/request` | no | — | sí | sí | — | — |
 | `auth.routes.js` | 203 | POST | `/password-reset/confirm` | no | — | sí | sí | — | — |
-| `routes/account.routes.js` | 81 | POST | `/register` | no | — | sí | sí | — | — |
-| `routes/account.routes.js` | 108 | POST | `/verify` | no | — | sí | sí | — | — |
-| `routes/account.routes.js` | 149 | POST | `/resend` | no | — | sí | sí | — | — |
-| `routes/account.routes.js` | 163 | POST | `/login` | no | — | sí | sí | — | — |
-| `routes/account.routes.js` | 179 | POST | `/logout` | sí | — | no | n/a | — | — |
-| `routes/account.routes.js` | 186 | POST | `/logout-all` | sí | — | no | n/a | — | — |
-| `routes/account.routes.js` | 193 | GET | `/session-status` | sí | — | no | n/a | — | — |
-| `routes/account.routes.js` | 197 | POST | `/session-renew` | sí | — | no | n/a | — | — |
-| `routes/account.routes.js` | 211 | GET | `/me` | no | — | no | n/a | — | — |
-| `routes/account.routes.js` | 238 | PATCH | `/password` | sí | — | no | sí | — | — |
-| `routes/account.routes.js` | 264 | PATCH | `/email/request` | sí | — | no | sí | — | — |
-| `routes/account.routes.js` | 299 | POST | `/email/confirm` | sí | — | no | sí | — | — |
-| `routes/account.routes.js` | 352 | GET | `/notifications` | sí | — | no | n/a | — | — |
-| `routes/account.routes.js` | 367 | PATCH | `/notifications` | sí | — | no | sí | — | — |
-| `routes/account.routes.js` | 385 | POST | `/telegram/link/start` | sí | — | no | n/a | — | — |
-| `routes/account.routes.js` | 395 | POST | `/telegram/unlink` | sí | — | no | n/a | — | — |
+| `routes/account.routes.js` | 146 | POST | `/register` | no | — | sí | sí | — | — |
+| `routes/account.routes.js` | 173 | POST | `/verify` | no | — | sí | sí | — | — |
+| `routes/account.routes.js` | 214 | POST | `/resend` | no | — | sí | sí | — | — |
+| `routes/account.routes.js` | 228 | POST | `/login` | no | — | sí | sí | — | — |
+| `routes/account.routes.js` | 244 | POST | `/logout` | sí | — | no | n/a | — | — |
+| `routes/account.routes.js` | 251 | POST | `/logout-all` | sí | — | no | n/a | — | — |
+| `routes/account.routes.js` | 258 | GET | `/session-status` | sí | — | no | n/a | — | — |
+| `routes/account.routes.js` | 262 | POST | `/session-renew` | sí | — | no | n/a | — | — |
+| `routes/account.routes.js` | 276 | GET | `/me` | no | — | no | n/a | — | — |
+| `routes/account.routes.js` | 303 | PATCH | `/password` | sí | — | no | sí | — | — |
+| `routes/account.routes.js` | 329 | PATCH | `/email/request` | sí | — | no | sí | — | — |
+| `routes/account.routes.js` | 364 | POST | `/email/confirm` | sí | — | no | sí | network-admin | — |
+| `routes/account.routes.js` | 420 | GET | `/notifications` | sí | — | no | n/a | — | — |
+| `routes/account.routes.js` | 435 | PATCH | `/notifications` | sí | — | no | sí | — | — |
+| `routes/account.routes.js` | 453 | POST | `/telegram/link/start` | sí | — | no | n/a | — | — |
+| `routes/account.routes.js` | 463 | POST | `/telegram/unlink` | sí | — | no | n/a | — | — |
 | `routes/admin.routes.js` | 85 | GET | `/operational-reset-preview` | sí | platform-admin | no | n/a | — | — |
 | `routes/admin.routes.js` | 133 | GET | `/summary` | sí | platform-admin | no | n/a | — | — |
 | `routes/admin.routes.js` | 138 | GET | `/moderators` | sí | platform-admin | no | n/a | — | — |
@@ -184,10 +184,10 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `routes/team.routes.js` | 760 | GET | `/member/:id/wireguard` | sí | — | no | n/a | network-admin | — |
 | `routes/team.routes.js` | 781 | GET | `/wireguard/by-key/:publicKey` | sí | OWNER | no | n/a | network-admin | — |
 | `routes/wireguard.routes.js` | 39 | POST | `/wireguard/peers` | sí | — | no | n/a | sql, network-admin | — |
-| `routes/wireguard.routes.js` | 126 | POST | `/wireguard/peer/add` | sí | — | no | sí | sql, network-admin | — |
-| `routes/wireguard.routes.js` | 175 | POST | `/wireguard/peer/edit` | sí | — | no | sí | sql, network-admin | — |
-| `routes/wireguard.routes.js` | 209 | POST | `/wireguard/peer/color/save` | sí | — | no | sí | sql, network-admin | — |
-| `routes/wireguard.routes.js` | 219 | GET | `/wireguard/peer/colors` | sí | — | no | n/a | sql, network-admin | — |
-| `routes/wireguard.routes.js` | 232 | POST | `/wireguard/peer/alias/save` | sí | — | no | sí | sql, network-admin | — |
+| `routes/wireguard.routes.js` | 151 | POST | `/wireguard/peer/add` | sí | — | no | sí | sql, network-admin | — |
+| `routes/wireguard.routes.js` | 200 | POST | `/wireguard/peer/edit` | sí | — | no | sí | sql, network-admin | — |
+| `routes/wireguard.routes.js` | 234 | POST | `/wireguard/peer/color/save` | sí | — | no | sí | sql, network-admin | — |
+| `routes/wireguard.routes.js` | 244 | GET | `/wireguard/peer/colors` | sí | — | no | n/a | sql, network-admin | — |
+| `routes/wireguard.routes.js` | 257 | POST | `/wireguard/peer/alias/save` | sí | — | no | sí | sql, network-admin | — |
 | `routes/workspace.routes.js` | 36 | GET | `/export` | sí | OWNER | no | n/a | network-admin | — |
 | `routes/workspace.routes.js` | 135 | POST | `/import` | sí | OWNER | no | sí | network-admin | — |

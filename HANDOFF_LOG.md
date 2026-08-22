@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-22 — Sincronización del correo en Usuarios VPN.** Rama `vps_uni` (base `e51bbf4`). Estado: backend 120/683 y `check:all` verdes; sin deploy.
+> - Causa: la columna Usuario mostraba el comment creado al provisionar el peer, mientras el cambio de correo sólo modificaba `users` y la sesión.
+> - El listado ahora deriva la identidad vigente por clave pública/IP desde usuario, workspace y membresía; corrige también peers históricos sin exigir reprovisión.
+> - Las confirmaciones futuras sincronizan metadatos MySQL y el comment RouterOS de forma best-effort, sin convertir una caída del Core en fallo del cambio de correo.
+> - Pendiente: desplegar backend junto con el commit local previo de modales cuando el usuario lo autorice.
+
 > **Sesión 2026-08-22 — Auditoría responsive de ventanas emergentes.** Rama `vps_uni` (base `e69dfd5`). Estado: frontend 76/258, build, `check:all` y lint verdes; sin deploy.
 > - La base modal limita ancho/alto al viewport móvil, usa `100dvh`, scroll/overscroll contenido, padding responsive, footer flexible y cierres de 44 px; cubre 28 consumidores `Dialog` y tres modales administrativos heredados.
 > - `WgConfigModal` corrige el recorte mostrado: header compacto, bloque `.conf` con scroll propio y acciones en dos columnas. `MemberWireGuardModal` adapta QR y botones.

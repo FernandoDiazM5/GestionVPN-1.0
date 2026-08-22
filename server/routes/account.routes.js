@@ -39,6 +39,7 @@ const { query } = require('../db/mysql');
 const log = require('../lib/logger').child({ scope: 'account' });
 const tunnelService = require('../lib/tunnelService');
 const { loadCoreMikrotik } = require('../lib/coreMikrotikSettings');
+const { connectToMikrotik, safeWrite } = require('../routeros.service');
 
 const router = express.Router();
 
@@ -47,6 +48,70 @@ const OTP_MAX_ATTEMPTS = 5;
 const GENERIC_REGISTER_MESSAGE = 'Si el registro puede procesarse, recibirás un código de verificación.';
 const GENERIC_RESEND_MESSAGE = 'Si la cuenta requiere verificación, se enviará un código.';
 const GENERIC_BAD_CREDENTIALS = 'Correo o contraseña incorrectos';
+
+function peerComment(workspaceName, email, role) {
+  return `${workspaceName} - ${email} - ${role || 'MEMBER'}`
+    .replace(/[\r\n=]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 200);
+}
+
+/**
+ * Mantiene alineada la identidad visible de los peers con la cuenta actual.
+ * La base de datos se actualiza siempre; RouterOS es best-effort para que una
+ * caída del core no revierta un cambio de correo ya confirmado.
+ */
+async function syncWireguardIdentity(userId, email) {
+  const rows = await query(
+    `SELECT mw.public_key, mw.workspace_id, w.name AS workspace_name, wm.role
+       FROM member_wireguard mw
+       JOIN workspace_members wm
+         ON wm.workspace_id = mw.workspace_id
+        AND wm.user_id = mw.user_id
+        AND wm.deleted_at IS NULL
+       JOIN workspaces w ON w.id = mw.workspace_id
+      WHERE mw.user_id = ? AND mw.public_key IS NOT NULL`,
+    [userId]
+  );
+  if (rows.length === 0) return;
+
+  for (const row of rows) {
+    row.comment = peerComment(row.workspace_name, email, row.role);
+    await query(
+      'UPDATE member_wireguard SET peer_name = ? WHERE workspace_id = ? AND user_id = ?',
+      [row.comment, row.workspace_id, userId]
+    );
+    await query(
+      'UPDATE mgmt_peer_owners SET comment = ? WHERE public_key = ?',
+      [row.comment, row.public_key]
+    );
+  }
+
+  const mikrotik = await loadCoreMikrotik().catch(() => null);
+  if (!mikrotik) return;
+
+  let api;
+  try {
+    api = await connectToMikrotik(mikrotik.ip, mikrotik.user, mikrotik.pass);
+    const peers = await safeWrite(api, ['/interface/wireguard/peers/print']);
+    const byPublicKey = new Map(peers.map(peer => [peer['public-key'], peer]));
+    for (const row of rows) {
+      const peer = byPublicKey.get(row.public_key);
+      if (peer && peer.comment !== row.comment) {
+        await safeWrite(api, [
+          '/interface/wireguard/peers/set',
+          `=.id=${peer['.id']}`,
+          `=comment=${row.comment}`,
+        ]);
+      }
+    }
+  } catch (error) {
+    log.warn({ userId, err: error?.message }, 'email: no se pudo sincronizar el comment WireGuard');
+  } finally {
+    if (api) try { await api.close(); } catch (_) { /* noop */ }
+  }
+}
 
 async function revokeTunnelBeforeLogout(account, requestIp) {
   if (!account?.sub || !account?.workspace_id) return;
@@ -328,6 +393,9 @@ router.post('/email/confirm', requireSession, asyncHandler(async (req, res) => {
     'UPDATE users SET email = ?, otp_hash = NULL, otp_expires_at = NULL, updated_at = ? WHERE id = ?',
     [lc, Date.now(), user.id]
   );
+  await syncWireguardIdentity(user.id, lc).catch(error => {
+    log.warn({ userId: user.id, err: error?.message }, 'email: no se pudo actualizar la identidad WireGuard');
+  });
   const renewed = await replaceAllSessions(req.account, { email: lc });
   setSessionCookie(res, renewed.token);
 
