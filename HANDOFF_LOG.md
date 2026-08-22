@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-22 — Privacidad y estabilidad del indicador SSH.** Rama `vps_uni` (base `ac724a8`). Estado: pruebas focalizadas 8/8, build y `check:all` verdes; sin despliegue.
+> - El badge muestra únicamente la cantidad de credenciales y deja de exponer los usuarios SSH configurados.
+> - La recarga dependía del objeto `NodeInfo`; cada renovación de inventario creaba otra referencia y repetía la consulta, ocultando el badge por milisegundos. Ahora depende sólo del `ppp_user` estable.
+> - Nueva prueba confirma que rerenderizar el mismo sitio no ejecuta una segunda consulta ni vuelve al estado de carga.
+
 > **Sesión 2026-08-22 — Despliegue del estado SSH de Buscar equipos.** Rama/runtime `vps_uni@e6666ef`. Estado: HTTPS 200, backend/DB sanos y frontend 0 reinicios.
 > - Se construyó y recreó únicamente `vpn-frontend`; backend y MariaDB conservaron contenedores, datos y uptime.
 > - El bundle activo contiene los estados carga/sin credenciales/403/error y credenciales propias; health 200 con MySQL/SMTP `ok` y RouterOS `stale` transitorio por ausencia de escrituras recientes.

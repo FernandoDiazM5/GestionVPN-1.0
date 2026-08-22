@@ -40,5 +40,7 @@ describe('presentación de Buscar equipos', () => {
     expect(controlsSource).toContain('No se pudieron verificar las credenciales del nodo');
     expect(controlsSource).toContain('con credencial propia');
     expect(controlsSource).toContain('Reintentar');
+    expect(controlsSource).toContain('SSH configurado');
+    expect(controlsSource).not.toContain("nodeSshCreds.map(c => c.user)");
   });
 });

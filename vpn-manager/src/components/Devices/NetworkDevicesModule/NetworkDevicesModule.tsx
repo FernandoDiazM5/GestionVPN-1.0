@@ -73,7 +73,7 @@ export default function NetworkDevicesModule() {
 
   // ── Derivados básicos del estado externo ──────────────────────────
   const activeNode = activeNodeVrf ? nodes.find(n => n.nombre_vrf === activeNodeVrf) ?? null : null;
-  const nodeCredentials = useNodeSshCredentials(activeNode);
+  const nodeCredentials = useNodeSshCredentials(activeNode?.ppp_user);
 
   // Fallback: si `selectedNode` aún no se hidrató (el useEffect de sync se
   // dispara post-mount, y a veces VpnContext rehidrata activeNodeVrf más

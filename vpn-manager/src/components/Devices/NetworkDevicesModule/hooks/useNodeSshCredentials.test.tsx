@@ -25,7 +25,7 @@ describe('useNodeSshCredentials', () => {
       { user: 'ubnt', pass: 'secret', port: 22 },
       { user: '', pass: 'invalid', port: 22 },
     ] }));
-    const { result } = renderHook(() => useNodeSshCredentials(node));
+    const { result } = renderHook(() => useNodeSshCredentials(node.ppp_user));
     await waitFor(() => expect(result.current.status).toBe('ready'));
     expect(result.current.creds).toEqual([{ user: 'ubnt', pass: 'secret', port: 22 }]);
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/node/ssh-creds/get'), expect.objectContaining({
@@ -33,9 +33,21 @@ describe('useNodeSshCredentials', () => {
     }), 5_000);
   });
 
+  it('no vuelve a consultar si el inventario se renderiza de nuevo con el mismo sitio', async () => {
+    fetchMock.mockResolvedValue(response({ success: true, creds: [{ user: 'ubnt', pass: 'secret' }] }));
+    const { result, rerender } = renderHook(
+      ({ pppUser }) => useNodeSshCredentials(pppUser),
+      { initialProps: { pppUser: node.ppp_user } },
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    rerender({ pppUser: `${node.ppp_user}` });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result.current.status).toBe('ready');
+  });
+
   it('diferencia ausencia real de credenciales de un fallo de consulta', async () => {
     fetchMock.mockResolvedValueOnce(response({ success: true, creds: [] }));
-    const { result } = renderHook(() => useNodeSshCredentials(node));
+    const { result } = renderHook(() => useNodeSshCredentials(node.ppp_user));
     await waitFor(() => expect(result.current.status).toBe('ready'));
     expect(result.current.creds).toEqual([]);
     expect(result.current.error).toBe('');
@@ -43,7 +55,7 @@ describe('useNodeSshCredentials', () => {
 
   it('expone permiso insuficiente sin convertirlo en "sin credenciales"', async () => {
     fetchMock.mockResolvedValueOnce(response({ success: false, message: 'Acceso denegado' }, 403));
-    const { result } = renderHook(() => useNodeSshCredentials(node));
+    const { result } = renderHook(() => useNodeSshCredentials(node.ppp_user));
     await waitFor(() => expect(result.current.status).toBe('forbidden'));
     expect(result.current.error).toBe('Acceso denegado');
   });
@@ -51,7 +63,7 @@ describe('useNodeSshCredentials', () => {
   it('expone errores de red y permite reintentar', async () => {
     fetchMock.mockRejectedValueOnce(new Error('Sin conexión'))
       .mockResolvedValueOnce(response({ success: true, creds: [{ user: 'housenet', pass: 'secret' }] }));
-    const { result } = renderHook(() => useNodeSshCredentials(node));
+    const { result } = renderHook(() => useNodeSshCredentials(node.ppp_user));
     await waitFor(() => expect(result.current.status).toBe('error'));
     result.current.reload();
     await waitFor(() => expect(result.current.status).toBe('ready'));

@@ -105,7 +105,7 @@ function ScanControlsImpl({
                 : credentialsStatus === 'error'
                   ? <span>No se pudieron verificar las credenciales del nodo</span>
                   : nodeSshCreds.length > 0
-                    ? <span>SSH: <strong>{nodeSshCreds.map(c => c.user).join(', ')}</strong> · {nodeSshCreds.length} credencial{nodeSshCreds.length > 1 ? 'es' : ''}</span>
+                    ? <span>SSH configurado · <strong>{nodeSshCreds.length} credencial{nodeSshCreds.length > 1 ? 'es' : ''}</strong></span>
                     : <span>Sin credenciales SSH en el nodo — configúralas con el ícono <KeyRound className="w-3 h-3 inline" /></span>
             }
           </div>
