@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-22 — Auditoría del MikroTik Core y túneles.** Rama `vps_uni` (base `bd512db`). Estado: inspección RouterOS/API/BD de sólo lectura; sin cambios ni despliegue.
+> - Core saludable: RB750GL RouterOS 7.19.3, uptime 8+ semanas, Internet/API, WG y SSTP operativos. Housenet lleva 2d20h conectado; su nodo, secret, VRF, LAN y sesión coinciden 1:1 con BD.
+> - Sin VRF/secrets huérfanos ni Allowed Address duplicados. Dos mangles corresponden a la sesión de usuario y al scan del workspace.
+> - Drift: conviven redes y reglas legacy con el supernet actual; peer Admin sin handshake por 5d; allowlists de API conservan orígenes legacy. No limpiar sin confirmar dependencias y backup.
+> - Defecto de código confirmado: `parseHandshakeSecs` suma h/m/s pero ignora `d`, pudiendo informar un peer antiguo como reciente cuando el remanente horario es bajo.
+
 > **Sesión 2026-08-22 — Privacidad y estabilidad del indicador SSH.** Rama `vps_uni` (base `ac724a8`). Estado: pruebas focalizadas 8/8, build y `check:all` verdes; sin despliegue.
 > - El badge muestra únicamente la cantidad de credenciales y deja de exponer los usuarios SSH configurados.
 > - La recarga dependía del objeto `NodeInfo`; cada renovación de inventario creaba otra referencia y repetía la consulta, ocultando el badge por milisegundos. Ahora depende sólo del `ppp_user` estable.
