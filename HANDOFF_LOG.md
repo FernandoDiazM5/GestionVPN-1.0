@@ -1,5 +1,9 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-22 — Retiro de leyenda inferior del login.** Rama `vps_uni` (base `2a3b3e1`). Estado: AuthForms 7/7, build y `check:all` verdes; sin deploy.
+> - Se eliminó únicamente `Operación segura · Monitoreo centralizado · AES-256-GCM` de `RouterAccess`; autenticación, recuperación e invitaciones permanecen intactas.
+> - Pendiente: desplegar junto con los cambios responsive ya acumulados cuando el usuario lo solicite.
+
 > **Sesión 2026-08-22 — Configuración responsive en móvil.** Rama `vps_uni` (base `bee4bf7`). Estado: frontend 76/258, build, `check:all` y lint verdes; sin deploy.
 > - Navegación de Ajustes en cuadrícula compacta; Perfil usa tabs accesibles sin recorte horizontal y botones/formularios adaptables.
 > - WireGuard/QR, Workspace, Notificaciones y Respaldo/importación ajustan padding, apilado y objetivos táctiles para teléfonos.

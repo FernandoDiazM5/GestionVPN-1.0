@@ -297,9 +297,6 @@ export default function RouterAccess() {
                 </button>
               </div>
             )}
-            <p className="mt-6 text-center text-xs font-medium text-slate-500 sm:mt-8 lg:text-left dark:text-slate-400">
-              Operación segura · Monitoreo centralizado · AES-256-GCM
-            </p>
           </div>
         </section>
 

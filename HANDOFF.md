@@ -10,6 +10,7 @@
 
 ## 0) Estado actual
 
+- **Login simplificado (2026-08-22; local, sin deploy):** retirada la leyenda inferior `Operación segura · Monitoreo centralizado · AES-256-GCM` sin alterar autenticación. Prueba AuthForms **7/7**, build y `check:all` verdes. Pendiente autorización para deploy junto con los responsive anteriores.
 - **Configuración móvil reorganizada (2026-08-22; local, sin deploy):** navegación principal en cuadrícula de dos columnas; Perfil usa tabs semánticas sin overflow y formularios/acciones móviles a ancho completo. WireGuard, QR, Workspace, Notificaciones y Respaldo/importación adaptan padding, controles y acciones a pantallas estrechas. Frontend **76/258**, build, `check:all` y lint verdes. Pendiente autorización para deploy.
 - **“Mi equipo” móvil reorganizado (2026-08-22; local, sin deploy):** la barra de filtros VPN usa una cuadrícula sin scroll horizontal; las tarjetas separan sitio, correo y rol en vez de repetir el nombre compuesto. Miembros usa tarjetas móviles con acciones táctiles y conserva la tabla desde `sm`; Actividad adapta header, exportación y filas a pantallas angostas. Frontend **76/258**, build, `check:all` y lint verdes. Pendiente autorización para deploy.
 
