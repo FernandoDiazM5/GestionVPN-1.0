@@ -1,11 +1,13 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
-> **Sesión 2026-08-22 — Limpieza y endurecimiento del Core MikroTik.** Rama `vps_uni` (base `710c624`). Estado: Core aplicado y saludable; backend 120/683, frontend 76/258 y `check:all` verdes; código aún sin deploy.
+> **Sesión 2026-08-22 — Limpieza, endurecimiento y despliegue del Core MikroTik.** Rama/runtime `vps_uni@f23211b`. Estado: Core aplicado; backend 120/683, frontend 76/258 y `check:all` verdes; backend/frontend desplegados y sanos.
 > - Backup previo dual cifrado `.backup` + `.rsc` verificado y enviado: `servervpn_2026-08-22_17-26-59_GW-VPN-CORE-ISP.*`.
 > - Retirado sólo CLIENTES legacy `10.13.250.0/24`; ADMIN legacy `10.14.250.0/24` y peer `10.14.250.2/32` preservados/comentados por instrucción. Firewall 21→13 al retirar 8 duplicados.
 > - API 8728 limitada al origen WG del VPS `10.12.250.60/32`; no se expuso API plain a la IP pública. API-SSL sin certificado, btest, SNMP y neighbor discovery deshabilitados. Winbox conserva pools actuales + peer admin legacy.
 > - Verificación: reconexión API, Housenet SSTP activo, LAN y scan-route activos, ping desde scan-IP 0% pérdida, health completo `ok`, contenedores sanos.
-> - Código: parser RouterOS suma `w+d+h+m+s`, con pruebas para 5d y 1w; evita estados WG falsamente recientes. Pendiente desplegar backend/frontend acumulados.
+> - Código desplegado: parser RouterOS suma `w+d+h+m+s`, con pruebas para 5d y 1w; evita estados WG falsamente recientes. También quedaron publicados el badge SSH privado/estable y el resto de correcciones acumuladas. HTTPS/health 200; DB/backend healthy; cero reinicios de contenedores.
+> - Durante la ventana el Core arrancó alrededor de 17:39. RouterOS no conserva una causa demostrable: historial posterior al arranque sin acción `reboot`, watchdog sin `watch-address` y sin `autosupout.rif`; no atribuirlo al deploy sin evidencia. Housenet SSTP reconectó y las seis rutas VRF quedaron activas.
+> - Las dos mangles temporales desaparecieron de forma coherente con el ciclo de sesión: BD muestra 0 sesiones ACTIVE y la última cerró a las 17:39:36. No restaurarlas manualmente; al activar un túnel, el servicio crea `ACCESO-USER` y `SCAN-WS`, y al cerrar/expirar las retira.
 
 > **Sesión 2026-08-22 — Auditoría del MikroTik Core y túneles.** Rama `vps_uni` (base `bd512db`). Estado: inspección RouterOS/API/BD de sólo lectura; sin cambios ni despliegue.
 > - Core saludable: RB750GL RouterOS 7.19.3, uptime 8+ semanas, Internet/API, WG y SSTP operativos. Housenet lleva 2d20h conectado; su nodo, secret, VRF, LAN y sesión coinciden 1:1 con BD.
