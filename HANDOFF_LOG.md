@@ -1,5 +1,12 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-22 — Despliegue acumulativo Equipo, Actividad y miembros.** Rama `vps_uni`; runtime `4c7d08e`. Estado: backend/DB/frontend sanos, HTTPS 200, Core y scan-route verificados.
+> - Se desplegaron el filtrado/limpieza futura de placeholders admin, Equipo móvil con estado WG real y exportación PDF con retención física semanal.
+> - El primer build Docker detectó un constructor de peer sin `disabled`; se detuvo antes del cambio de contenedores, se corrigió en `4c7d08e`, se validó con build limpio local y el segundo build terminó correctamente.
+> - Producción: 12 eventos, 0 vencidos y 0 placeholders admin activos; no fue necesario mutar filas. PDF presente en el bundle, WG con handshake reciente, ruta Core y scan-route 1/1.
+> - Backup `/root/pre-vps-uni-b477872-20260822T165819Z`; rollbacks backend/frontend `pre-b477872-20260822T165819Z` preservados.
+> - Se retiró sólo el rollback backend antiguo `pre-scan-fix-20260820T042302Z`, ya superado; disco 86%→77%, 5.7 GiB libres.
+
 > **Sesión 2026-08-22 — PDF de actividad y retención semanal endurecidos localmente.** Rama `vps_uni` (base `abb3846`). Estado: backend 119/679, frontend 75/252 y `check:all` verdes; sin despliegue.
 > - Actividad ofrece PDF junto a CSV/JSON; usa carga dinámica de jsPDF y genera A4 horizontal con periodo, conteo, tabla y pie paginado.
 > - El PDF de prueba fue renderizado a PNG, inspeccionado visualmente y validado como PDF real de una página sin recortes.
