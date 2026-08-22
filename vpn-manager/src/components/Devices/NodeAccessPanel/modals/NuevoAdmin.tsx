@@ -46,6 +46,7 @@ export default function NuevoAdmin({ peers, onClose, onSuccess }: NuevoAdminProp
         allowedAddress: d.assignedIP,
         publicKey: pubKey.trim(),
         lastHandshakeSecs: null,
+        disabled: false,
         active: false,
       });
     } catch (e) {
