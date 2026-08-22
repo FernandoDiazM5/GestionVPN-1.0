@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-22 — Dashboard del Administrador responsive.** Rama `vps_uni` (base `1fd7be6`). Estado: frontend 76/258, build, TypeScript y lint verdes; sin deploy.
+> - Se creó jerarquía explícita entre resumen funcional y salud técnica, manteniendo los datos y permisos existentes.
+> - Encabezado, actualización, estado en vivo, uptime, tarjetas, sparklines y actividad reciente responden desde 320 px sin compresión ni desborde de correos largos.
+> - La guía `ui-design-system` orientó los breakpoints, blancos, objetivos táctiles y jerarquía visual sin introducir tokens nuevos.
+> - Pendiente: desplegar junto con los cambios locales anteriores cuando el usuario lo solicite.
+
 > **Sesión 2026-08-22 — Sincronización del correo en Usuarios VPN.** Rama `vps_uni` (base `e51bbf4`). Estado: backend 120/683 y `check:all` verdes; sin deploy.
 > - Causa: la columna Usuario mostraba el comment creado al provisionar el peer, mientras el cambio de correo sólo modificaba `users` y la sesión.
 > - El listado ahora deriva la identidad vigente por clave pública/IP desde usuario, workspace y membresía; corrige también peers históricos sin exigir reprovisión.

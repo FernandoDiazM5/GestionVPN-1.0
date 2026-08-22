@@ -44,16 +44,16 @@ export default function AdminDashboard() {
   ] : [];
 
   return (
-    <div className="space-y-5 reveal-stagger">
-      <div className="card p-6 flex items-center justify-between gap-4">
-        <div>
+    <div className="space-y-4 sm:space-y-5 reveal-stagger">
+      <div className="card flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+        <div className="min-w-0">
           <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
             <LayoutDashboard className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
             <span>Dashboard</span>
           </h2>
           <p className="text-slate-500 dark:text-slate-500 text-sm mt-1">Resumen general de la plataforma</p>
         </div>
-        <button onClick={load} disabled={loading} className="btn-outline px-4 py-2.5 flex items-center gap-2 text-sm disabled:opacity-50">
+        <button onClick={load} disabled={loading} className="btn-outline flex min-h-11 w-full items-center justify-center gap-2 px-4 py-2.5 text-sm disabled:opacity-50 sm:w-auto">
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Actualizar
         </button>
       </div>
@@ -71,27 +71,38 @@ export default function AdminDashboard() {
         skeletonRows={4}
       >
         <>
-          {/* Tarjetas de métricas */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <section aria-labelledby="admin-overview-title" className="space-y-3">
+            <div>
+              <h3 id="admin-overview-title" className="text-sm font-bold text-slate-800 dark:text-slate-100">Resumen de la plataforma</h3>
+              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Usuarios, espacios y actividad administrativa.</p>
+            </div>
+          <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-4">
             {cards.map(({ label, value, icon: Icon, color, bg }) => (
-              <div key={label} className="card p-4 flex flex-col gap-3">
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${bg}`}>
+              <div key={label} className="card flex min-w-0 items-center gap-3 p-4 sm:flex-col sm:items-start">
+                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${bg}`}>
                   <Icon className={`w-4 h-4 ${color}`} />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <div className="text-2xl font-bold text-slate-800 dark:text-slate-100 leading-none">{value}</div>
-                  <div className="text-2xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-500 mt-1.5">{label}</div>
+                  <div className="mt-1.5 break-words text-2xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-500">{label}</div>
                 </div>
               </div>
             ))}
           </div>
+          </section>
 
           {/* Q2 — métricas en vivo del backend (Prometheus → JSON) */}
-          <MetricsPanel />
+          <section aria-labelledby="admin-health-title" className="space-y-3">
+            <div>
+              <h3 id="admin-health-title" className="text-sm font-bold text-slate-800 dark:text-slate-100">Salud del sistema</h3>
+              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Rendimiento, accesos y comunicación con RouterOS.</p>
+            </div>
+            <MetricsPanel />
+          </section>
 
           {/* Actividad reciente (global) */}
           <div className="card overflow-hidden border border-slate-200 dark:border-slate-800">
-            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40">
+            <div className="border-b border-slate-100 bg-slate-50/60 px-4 py-4 dark:border-slate-800 dark:bg-slate-800/40 sm:px-6">
               <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">Actividad reciente (toda la plataforma)</h3>
             </div>
             {recent.length === 0 ? (
@@ -99,13 +110,13 @@ export default function AdminDashboard() {
             ) : (
               <ul className="divide-y divide-slate-100 dark:divide-slate-800">
                 {recent.map((log, i) => (
-                  <li key={i} className="flex items-center gap-3 px-6 py-3">
+                  <li key={i} className="flex items-start gap-3 px-4 py-3 sm:items-center sm:px-6">
                     <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
                       <Activity className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs text-slate-700 dark:text-slate-200">
-                        <span className="font-bold">{log.user_email || 'Sistema'}</span>{' '}
+                      <p className="break-words text-xs leading-5 text-slate-700 dark:text-slate-200">
+                        <span className="break-all font-bold">{log.user_email || 'Sistema'}</span>{' '}
                         <span className="text-slate-500 dark:text-slate-400">{log.action}</span>{' '}
                         {log.tunnel_id && <span className="font-mono text-slate-600 dark:text-slate-300">{log.tunnel_id}</span>}
                       </p>

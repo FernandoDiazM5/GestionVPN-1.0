@@ -109,22 +109,23 @@ export default function MetricsPanel() {
           <span className="flex items-start gap-2"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> No se pudieron actualizar las metricas: {err}</span>
         </div>
       )}
-      <div className="flex items-center gap-2 text-xs text-slate-500">
-        <span className="inline-flex items-center gap-1">
+      <div className="card flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 text-xs text-slate-500">
+        <span className="inline-flex min-w-0 items-center gap-1">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> En vivo · cada {POLL_MS / 1000}s
         </span>
         <button
           onClick={() => { setLoading(true); void refresh(); }}
-          className="ml-auto btn-outline btn-sm inline-flex items-center"
+          className="btn-outline order-3 inline-flex min-h-11 w-full items-center justify-center sm:order-none sm:ml-auto sm:min-h-0 sm:w-auto"
+          aria-label="Actualizar métricas ahora"
           title="Refrescar ahora"
         >
           <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
         </button>
-        <span className="text-slate-500 dark:text-slate-400">Uptime: <span className="font-mono">{formatUptime(current.uptimeMs)}</span></span>
+        <span className="ml-auto whitespace-nowrap text-slate-500 dark:text-slate-400 sm:ml-0">Uptime: <span className="font-mono">{formatUptime(current.uptimeMs)}</span></span>
       </div>
 
       {/* 4 cards de KPI principales con sparkline embebida */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-4">
         <KpiCard
           icon={Activity}
           label="Requests / min"
@@ -226,19 +227,19 @@ interface KpiCardProps {
 
 function KpiCard({ icon: Icon, label, value, sub, sparkline, color }: KpiCardProps) {
   return (
-    <div className="card p-4 flex flex-col gap-2">
+    <div className="card flex min-w-0 flex-col gap-3 p-4">
       <div className="flex items-center justify-between">
         <div className={`w-9 h-9 rounded-xl flex items-center justify-center bg-slate-100 dark:bg-slate-800 ${color}`}>
           <Icon className="w-4 h-4" />
         </div>
-        <div className={color}>
-          <Sparkline data={sparkline} width={80} height={28} />
+        <div className={`min-w-0 overflow-hidden ${color}`}>
+          <Sparkline data={sparkline} width={80} height={28} className="h-7 w-16 sm:w-20" />
         </div>
       </div>
       <div>
         <div className="text-2xl font-bold text-slate-800 dark:text-slate-100 leading-none font-mono">{value}</div>
         <div className="text-2xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-500 mt-1.5">{label}</div>
-        <div className="text-2xs text-slate-500 dark:text-slate-400 mt-0.5">{sub}</div>
+        <div className="mt-0.5 break-words text-2xs text-slate-500 dark:text-slate-400">{sub}</div>
       </div>
     </div>
   );
