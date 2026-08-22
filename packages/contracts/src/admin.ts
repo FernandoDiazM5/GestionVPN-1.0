@@ -47,6 +47,8 @@ export interface Moderator {
   workspace_name: string;
   miembros: number;
   disabled?: boolean;
+  /** Último inicio/renovación de sesión conocido; null si nunca accedió. */
+  last_access_at?: number | null;
   ai_access?: import('./airOsAi').ModeratorAiAccess;
 }
 

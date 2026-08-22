@@ -139,6 +139,7 @@ router.get('/moderators', asyncHandler(async (_req, res) => {
   const moderators = await query(
     `SELECT u.id AS user_id, u.email, u.name, u.created_at, u.disabled_at,
             w.id AS workspace_id, w.name AS workspace_name,
+            (SELECT MAX(s.created_at) FROM auth_sessions s WHERE s.user_id = u.id) AS last_access_at,
             COALESCE(aia.enabled, 0) AS ai_enabled,
             aia.enabled_at AS ai_enabled_at, aia.disabled_at AS ai_disabled_at,
             aia.updated_at AS ai_updated_at,

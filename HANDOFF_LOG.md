@@ -1,5 +1,12 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-22 — Mejora integral de Moderadores.** Rama `vps_uni` (base `0c01db4`). Estado: backend 120/683, frontend 76/258, contratos/build y `check:all` verdes; sin deploy.
+> - Agregados resumen, búsqueda, filtro de estado, cuatro órdenes y resultado filtrado; “Alta” pasa a “Fecha de alta”.
+> - La API calcula `last_access_at` desde la última sesión emitida y la vista permite verlo/ordenarlo sin una migración nueva.
+> - En móvil cada moderador es una tarjeta con estado, workspace, miembros, fechas, Gemini y cuatro acciones rotuladas; las invitaciones pendientes también evitan overflow.
+> - La guía `ui-design-system` orientó jerarquía, breakpoints, foco, etiquetas accesibles y objetivos táctiles.
+> - Pendiente: desplegar el backend y frontend acumulados cuando el usuario lo solicite.
+
 > **Sesión 2026-08-22 — Dashboard del Administrador responsive.** Rama `vps_uni` (base `1fd7be6`). Estado: frontend 76/258, build, TypeScript y lint verdes; sin deploy.
 > - Se creó jerarquía explícita entre resumen funcional y salud técnica, manteniendo los datos y permisos existentes.
 > - Encabezado, actualización, estado en vivo, uptime, tarjetas, sparklines y actividad reciente responden desde 320 px sin compresión ni desborde de correos largos.

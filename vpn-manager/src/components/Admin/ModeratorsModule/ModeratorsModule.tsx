@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   UserCog, UserPlus, Loader2, RefreshCw, X, Briefcase, Mail, KeyRound,
   Pencil, Trash2, Ban, Power, AlertTriangle, Link2, Copy, Check, Clock,
-  Sparkles,
+  Sparkles, Search, SlidersHorizontal, Users, CheckCircle2,
 } from 'lucide-react';
 import Dialog from '../../Common/Dialog';
 import { adminApi } from '../../../services/adminApi';
@@ -27,6 +27,18 @@ async function copyToClipboard(text: string) {
 const inputCls = 'w-full px-3 py-2.5 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 text-slate-700 placeholder:text-slate-400 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500';
 const iconBtn = 'p-2 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed';
 
+type StatusFilter = 'all' | 'active' | 'suspended';
+type ModeratorSort = 'newest' | 'name' | 'members' | 'recent';
+
+function formatLastAccess(value?: number | null) {
+  if (!value) return 'Sin accesos';
+  const elapsed = Date.now() - Number(value);
+  if (elapsed < 60_000) return 'Hace instantes';
+  if (elapsed < 3_600_000) return `Hace ${Math.floor(elapsed / 60_000)} min`;
+  if (elapsed < 86_400_000) return `Hace ${Math.floor(elapsed / 3_600_000)} h`;
+  return new Date(Number(value)).toLocaleDateString('es');
+}
+
 export default function ModeratorsModule() {
   const [moderators, setModerators] = useState<Moderator[]>([]);
   const [invites, setInvites] = useState<PendingInvitation[]>([]);
@@ -38,6 +50,9 @@ export default function ModeratorsModule() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [aiBusyId, setAiBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [sort, setSort] = useState<ModeratorSort>('newest');
   const { session } = useWorkspaceSession();
   const canAdmin = isPlatformAdmin(session);
 
@@ -87,6 +102,23 @@ export default function ModeratorsModule() {
     }
   };
 
+  const visibleModerators = useMemo(() => {
+    const q = search.trim().toLocaleLowerCase('es');
+    return moderators
+      .filter(m => statusFilter === 'all' || (statusFilter === 'suspended' ? !!m.disabled : !m.disabled))
+      .filter(m => !q || [m.name, m.email, m.workspace_name].some(value => value?.toLocaleLowerCase('es').includes(q)))
+      .sort((a, b) => {
+        if (sort === 'name') return (a.name || a.email).localeCompare(b.name || b.email, 'es');
+        if (sort === 'members') return b.miembros - a.miembros;
+        if (sort === 'recent') return Number(b.last_access_at || 0) - Number(a.last_access_at || 0);
+        return Number(b.created_at) - Number(a.created_at);
+      });
+  }, [moderators, search, sort, statusFilter]);
+
+  const activeCount = moderators.filter(m => !m.disabled).length;
+  const suspendedCount = moderators.length - activeCount;
+  const workspaceCount = new Set(moderators.map(m => m.workspace_id)).size;
+
   return (
     <div className="space-y-5 reveal-stagger">
       <div className="card p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -97,11 +129,11 @@ export default function ModeratorsModule() {
           </h2>
           <p className="text-slate-500 dark:text-slate-500 text-sm mt-1">Da de alta y gestiona los clientes que usan la plataforma</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => setShowCreate(true)} className="btn-primary px-4 py-2.5 flex items-center gap-2 text-sm">
+        <div className="flex w-full items-center gap-2 sm:w-auto">
+          <button onClick={() => setShowCreate(true)} className="btn-primary flex min-h-11 flex-1 items-center justify-center gap-2 px-4 py-2.5 text-sm sm:flex-none">
             <UserPlus className="w-4 h-4" /> Nuevo Moderador
           </button>
-          <button onClick={load} disabled={loading} className="btn-outline px-4 py-2.5 flex items-center gap-2 text-sm disabled:opacity-50" title="Recargar">
+          <button onClick={load} disabled={loading} className="btn-outline flex min-h-11 min-w-11 items-center justify-center px-3 py-2.5 text-sm disabled:opacity-50" title="Recargar" aria-label="Recargar moderadores">
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
@@ -114,8 +146,43 @@ export default function ModeratorsModule() {
         </div>
       )}
 
+      <section aria-label="Resumen de moderadores" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[
+          { label: 'Total', value: moderators.length, icon: UserCog, tone: 'text-indigo-600 bg-indigo-100 dark:bg-indigo-500/20 dark:text-indigo-300' },
+          { label: 'Activos', value: activeCount, icon: CheckCircle2, tone: 'text-emerald-600 bg-emerald-100 dark:bg-emerald-500/20 dark:text-emerald-300' },
+          { label: 'Suspendidos', value: suspendedCount, icon: Ban, tone: 'text-amber-600 bg-amber-100 dark:bg-amber-500/20 dark:text-amber-300' },
+          { label: 'Workspaces', value: workspaceCount, icon: Briefcase, tone: 'text-sky-600 bg-sky-100 dark:bg-sky-500/20 dark:text-sky-300' },
+        ].map(({ label, value, icon: Icon, tone }) => (
+          <div key={label} className="card flex min-w-0 items-center gap-3 p-3 sm:p-4">
+            <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tone}`}><Icon className="h-4 w-4" /></span>
+            <span className="min-w-0"><strong className="block text-xl leading-none text-slate-800 dark:text-slate-100">{value}</strong><span className="mt-1 block truncate text-2xs font-semibold uppercase tracking-wide text-slate-500">{label}</span></span>
+          </div>
+        ))}
+      </section>
+
+      <div className="card grid gap-3 p-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:p-4">
+        <label className="relative min-w-0">
+          <span className="sr-only">Buscar moderador</span>
+          <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input value={search} onChange={event => setSearch(event.target.value)} className={`${inputCls} min-h-11 pl-10`} placeholder="Buscar nombre, correo o workspace…" />
+        </label>
+        <label className="relative">
+          <span className="sr-only">Filtrar por estado</span>
+          <SlidersHorizontal className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <select value={statusFilter} onChange={event => setStatusFilter(event.target.value as StatusFilter)} className={`${inputCls} min-h-11 pl-9 pr-8`}>
+            <option value="all">Todos los estados</option><option value="active">Activos</option><option value="suspended">Suspendidos</option>
+          </select>
+        </label>
+        <label>
+          <span className="sr-only">Ordenar moderadores</span>
+          <select value={sort} onChange={event => setSort(event.target.value as ModeratorSort)} className={`${inputCls} min-h-11 pr-8`}>
+            <option value="newest">Más recientes</option><option value="name">Nombre</option><option value="members">Más miembros</option><option value="recent">Último acceso</option>
+          </select>
+        </label>
+      </div>
+
       <div className="card overflow-hidden border border-slate-200 dark:border-slate-800">
-        <div className="overflow-x-auto">
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 select-none dark:border-slate-800 dark:bg-slate-800/50">
@@ -123,7 +190,8 @@ export default function ModeratorsModule() {
                 <th className="th-cell dark:text-slate-400">Workspace</th>
                 <th className="th-cell dark:text-slate-400">Miembros</th>
                 <th className="th-cell dark:text-slate-400">Gemini AirOS</th>
-                <th className="th-cell dark:text-slate-400">Alta</th>
+                <th className="th-cell dark:text-slate-400">Fecha de alta</th>
+                <th className="th-cell dark:text-slate-400">Último acceso</th>
                 <th className="th-cell dark:text-slate-400 text-right">Acciones</th>
               </tr>
             </thead>
@@ -143,10 +211,11 @@ export default function ModeratorsModule() {
                   <td className="px-4 py-3"><div className="skeleton h-5 w-8 rounded-full" /></td>
                   <td className="px-4 py-3"><div className="skeleton h-6 w-20 rounded-full" /></td>
                   <td className="px-4 py-3"><div className="skeleton h-3 w-20" /></td>
+                  <td className="px-4 py-3"><div className="skeleton h-3 w-20" /></td>
                   <td className="px-4 py-3"><div className="skeleton h-7 w-28 ml-auto" /></td>
                 </tr>
               ))}
-              {moderators.map(m => (
+              {visibleModerators.map(m => (
                 <tr key={m.user_id} className={`transition-colors ${m.disabled ? 'opacity-60' : ''} hover:bg-indigo-50/30 dark:hover:bg-indigo-500/10`}>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
@@ -186,23 +255,24 @@ export default function ModeratorsModule() {
                     </button>
                   </td>
                   <td className="px-4 py-3"><span className="text-slate-500 dark:text-slate-400">{new Date(m.created_at).toLocaleDateString('es')}</span></td>
+                  <td className="px-4 py-3"><span className="whitespace-nowrap text-slate-500 dark:text-slate-400">{formatLastAccess(m.last_access_at)}</span></td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1">
-                      <button title="Editar nombre" onClick={() => setEditing(m)}
+                      <button title="Editar nombre" aria-label={`Editar ${m.name || m.email}`} onClick={() => setEditing(m)}
                         className={`${iconBtn} text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10`}>
                         <Pencil className="w-4 h-4" />
                       </button>
-                      <button title="Resetear contraseña" onClick={() => setResetting(m)}
+                      <button title="Resetear contraseña" aria-label={`Restablecer contraseña de ${m.name || m.email}`} onClick={() => setResetting(m)}
                         className={`${iconBtn} text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:text-slate-200 dark:hover:bg-slate-800`}>
                         <KeyRound className="w-4 h-4" />
                       </button>
-                      <button title={m.disabled ? 'Activar' : 'Suspender'} onClick={() => toggleSuspend(m)} disabled={busyId === m.user_id}
+                      <button title={m.disabled ? 'Activar' : 'Suspender'} aria-label={`${m.disabled ? 'Activar' : 'Suspender'} ${m.name || m.email}`} onClick={() => toggleSuspend(m)} disabled={busyId === m.user_id}
                         className={`${iconBtn} ${m.disabled
                           ? 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/10'
                           : 'text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-500/10'}`}>
                         {busyId === m.user_id ? <Loader2 className="w-4 h-4 animate-spin" /> : m.disabled ? <Power className="w-4 h-4" /> : <Ban className="w-4 h-4" />}
                       </button>
-                      <button title="Eliminar" onClick={() => setDeleting(m)}
+                      <button title="Eliminar" aria-label={`Eliminar ${m.name || m.email}`} onClick={() => setDeleting(m)}
                         className={`${iconBtn} text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10`}>
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -210,27 +280,51 @@ export default function ModeratorsModule() {
                   </td>
                 </tr>
               ))}
-              {!loading && moderators.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-14 text-center">
+              {!loading && visibleModerators.length === 0 && (
+                <tr><td colSpan={7} className="px-4 py-14 text-center">
                   <div className="flex flex-col items-center gap-3">
                     <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center">
                       <UserCog className="w-7 h-7 text-indigo-400 dark:text-indigo-400/70" />
                     </div>
                     <div>
-                      <p className="text-slate-600 dark:text-slate-300 font-semibold">Aún no hay moderadores</p>
-                      <p className="text-slate-500 dark:text-slate-500 text-xs mt-0.5">Da de alta al primer cliente para que use la plataforma.</p>
+                      <p className="text-slate-600 dark:text-slate-300 font-semibold">{moderators.length ? 'Sin resultados' : 'Aún no hay moderadores'}</p>
+                      <p className="text-slate-500 dark:text-slate-500 text-xs mt-0.5">{moderators.length ? 'Prueba con otra búsqueda o filtro.' : 'Da de alta al primer cliente para que use la plataforma.'}</p>
                     </div>
-                    <button onClick={() => setShowCreate(true)} className="btn-primary px-4 py-2 flex items-center gap-2 text-sm mt-1">
+                    {!moderators.length && <button onClick={() => setShowCreate(true)} className="btn-primary px-4 py-2 flex items-center gap-2 text-sm mt-1">
                       <UserPlus className="w-4 h-4" /> Nuevo Moderador
-                    </button>
+                    </button>}
                   </div>
                 </td></tr>
               )}
             </tbody>
           </table>
         </div>
-        <div className="px-6 py-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 text-xs text-slate-500 dark:text-slate-400">
-          <span className="font-bold text-slate-700 dark:text-slate-200">{moderators.length}</span> moderador{moderators.length !== 1 ? 'es' : ''}
+        <div className="space-y-3 p-3 md:hidden">
+          {visibleModerators.map(m => (
+            <article key={m.user_id} className={`rounded-2xl border border-slate-200 p-4 dark:border-slate-700 ${m.disabled ? 'bg-slate-50 opacity-75 dark:bg-slate-900/40' : 'bg-white dark:bg-slate-900/20'}`}>
+              <div className="flex items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300"><UserCog className="h-5 w-5" /></span>
+                <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h3 className="font-bold text-slate-800 dark:text-slate-100">{m.name || m.email.split('@')[0]}</h3><span className={`badge ${m.disabled ? 'badge-warning' : 'badge-success'}`}>{m.disabled ? 'Suspendido' : 'Activo'}</span></div><p className="mt-1 break-all font-mono text-2xs text-slate-500">{m.email}</p></div>
+              </div>
+              <dl className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3 text-xs dark:bg-slate-800/60">
+                <div><dt className="text-2xs font-semibold uppercase text-slate-500">Workspace</dt><dd className="mt-1 break-words font-semibold text-slate-700 dark:text-slate-200">{m.workspace_name}</dd></div>
+                <div><dt className="text-2xs font-semibold uppercase text-slate-500">Miembros</dt><dd className="mt-1 font-semibold text-slate-700 dark:text-slate-200"><Users className="mr-1 inline h-3.5 w-3.5" />{m.miembros}</dd></div>
+                <div><dt className="text-2xs font-semibold uppercase text-slate-500">Fecha de alta</dt><dd className="mt-1 text-slate-700 dark:text-slate-200">{new Date(m.created_at).toLocaleDateString('es')}</dd></div>
+                <div><dt className="text-2xs font-semibold uppercase text-slate-500">Último acceso</dt><dd className="mt-1 text-slate-700 dark:text-slate-200">{formatLastAccess(m.last_access_at)}</dd></div>
+              </dl>
+              <button type="button" role="switch" aria-checked={!!m.ai_access?.enabled} disabled={m.disabled || aiBusyId !== null} onClick={() => toggleAiAccess(m)} className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-slate-100 px-3 text-xs font-bold text-slate-600 disabled:opacity-50 dark:bg-slate-800 dark:text-slate-300">{aiBusyId === m.user_id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}Gemini AirOS: {m.ai_access?.enabled ? 'Habilitado' : 'Deshabilitado'}</button>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button onClick={() => setEditing(m)} className="btn-outline min-h-11 text-xs"><Pencil className="mr-1.5 inline h-4 w-4" />Editar</button>
+                <button onClick={() => setResetting(m)} className="btn-outline min-h-11 text-xs"><KeyRound className="mr-1.5 inline h-4 w-4" />Contraseña</button>
+                <button onClick={() => toggleSuspend(m)} disabled={busyId === m.user_id} className="btn-outline min-h-11 text-xs">{busyId === m.user_id ? <Loader2 className="mr-1.5 inline h-4 w-4 animate-spin" /> : m.disabled ? <Power className="mr-1.5 inline h-4 w-4" /> : <Ban className="mr-1.5 inline h-4 w-4" />}{m.disabled ? 'Activar' : 'Suspender'}</button>
+                <button onClick={() => setDeleting(m)} className="btn-outline min-h-11 text-xs text-rose-600"><Trash2 className="mr-1.5 inline h-4 w-4" />Eliminar</button>
+              </div>
+            </article>
+          ))}
+          {!loading && visibleModerators.length === 0 && <div className="py-10 text-center text-sm text-slate-500">{moderators.length ? 'No hay resultados para estos filtros.' : 'Aún no hay moderadores.'}</div>}
+        </div>
+        <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 text-xs text-slate-500 dark:text-slate-400 sm:px-6">
+          Mostrando <span className="font-bold text-slate-700 dark:text-slate-200">{visibleModerators.length}</span> de {moderators.length} moderador{moderators.length !== 1 ? 'es' : ''}
         </div>
       </div>
 
@@ -293,7 +387,7 @@ function PendingInvitationsCard({ invites }: { invites: PendingInvitation[] }) {
 
   return (
     <div className="card overflow-hidden border border-slate-200 dark:border-slate-800">
-      <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-4 dark:border-slate-800 sm:px-6">
         <Clock className="w-4 h-4 text-amber-500" />
         <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">Invitaciones pendientes</h3>
         <span className="badge badge-warning text-2xs ml-1">{invites.length}</span>
@@ -301,10 +395,10 @@ function PendingInvitationsCard({ invites }: { invites: PendingInvitation[] }) {
           ¿No llegó el correo? Copia el enlace y compártelo manualmente.
         </p>
       </div>
-      {err && <p className="px-6 py-2 text-xs text-rose-600 dark:text-rose-400 font-medium">{err}</p>}
+      {err && <p className="px-4 py-2 text-xs text-rose-600 dark:text-rose-400 font-medium sm:px-6">{err}</p>}
       <ul className="divide-y divide-slate-100 dark:divide-slate-800">
         {invites.map((inv) => (
-          <li key={inv.id} className="px-6 py-3 flex items-center gap-3">
+          <li key={inv.id} className="flex flex-wrap items-center gap-3 px-4 py-3 sm:flex-nowrap sm:px-6">
             <div className="min-w-0 flex-1">
               <p className="font-semibold text-sm text-slate-800 dark:text-slate-100 truncate">{inv.name || inv.email.split('@')[0]}</p>
               <p className="data-muted text-2xs truncate">{inv.email}{inv.workspace_name ? ` · ${inv.workspace_name}` : ''}</p>
@@ -315,7 +409,7 @@ function PendingInvitationsCard({ invites }: { invites: PendingInvitation[] }) {
             <button
               onClick={() => copyLink(inv.id)}
               disabled={busyId === inv.id}
-              className="btn-outline px-3 py-2 flex items-center gap-2 text-xs shrink-0 disabled:opacity-40"
+              className="btn-outline flex min-h-11 w-full shrink-0 items-center justify-center gap-2 px-3 py-2 text-xs disabled:opacity-40 sm:w-auto"
               title="Genera y copia un enlace de aceptación para compartirlo a mano"
             >
               {busyId === inv.id ? <Loader2 className="w-4 h-4 animate-spin" />
