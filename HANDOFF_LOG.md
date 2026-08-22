@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-22 — Despliegue de responsive móvil y login.** Rama/runtime `vps_uni@0a8a52b`. Estado: frontend recreado; backend/DB preservados; HTTPS 200 y 0 reinicios.
+> - Publicados “Mi equipo” móvil, Configuración móvil y retiro de la leyenda inferior del login.
+> - El bundle activo no contiene `Operación segura` y sí contiene las clases responsive nuevas. Checkout productivo confirmado en `0a8a52b`.
+> - RouterOS quedó accesible: `check:scanroute` dry-run confirmó interfaz VPS y ruta Housenet 1/1. El health puede mostrar `stale` sólo por ausencia de escritura reciente.
+> - Rollback frontend: `gestionvpn-10-frontend:pre-mobile-ui-0a8a52b-20260822T231432Z`; disco final 80% con 4.9 GiB libres.
+
 > **Sesión 2026-08-22 — Retiro de leyenda inferior del login.** Rama `vps_uni` (base `2a3b3e1`). Estado: AuthForms 7/7, build y `check:all` verdes; sin deploy.
 > - Se eliminó únicamente `Operación segura · Monitoreo centralizado · AES-256-GCM` de `RouterAccess`; autenticación, recuperación e invitaciones permanecen intactas.
 > - Pendiente: desplegar junto con los cambios responsive ya acumulados cuando el usuario lo solicite.
