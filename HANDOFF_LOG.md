@@ -1,5 +1,17 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-22 — Corrección local del estado de credenciales en Buscar equipos.** Rama `vps_uni` (base `c28bda0`). Estado: frontend 76/257, build y `check:all` verdes; sin despliegue.
+> - Nuevo hook hidrata las credenciales al seleccionar el nodo, cancela/descarta respuestas obsoletas y ofrece reintento explícito.
+> - La interfaz diferencia carga, ausencia real, permiso insuficiente y fallo de consulta; también informa cuántos equipos de la red tienen credencial propia.
+> - El escaneo dejó de realizar una segunda consulta silenciosa y consume la misma fuente de credenciales mostrada por la interfaz.
+> - Producción no fue modificada; pendiente desplegar sólo con autorización del usuario.
+
+> **Sesión 2026-08-22 — Diagnóstico del falso aviso de credenciales SSH.** Rama `vps_uni` (base `c28bda0`). Estado: inspección local y producción de sólo lectura; sin cambios funcionales ni despliegue.
+> - Producción confirma 3 credenciales SSH de nodo con contraseña para Housenet y un AP guardado con credencial propia; no existe ausencia real de credenciales.
+> - `ScanControls` sólo evalúa el estado efímero `nodeSshCreds`, que nace vacío. Al restaurar la vista, `sessionStorage` recupera resultados y estados autenticados, pero las credenciales del nodo no se hidratan.
+> - `/api/node/ssh-creds/get` se consulta recién al lanzar un nuevo escaneo; su error se ignora silenciosamente. El escaneo además puede usar credenciales guardadas por dispositivo o en caché de memoria, por lo que puede autenticar aunque el badge diga lo contrario.
+> - Pendiente: hidratar credenciales al seleccionar el nodo, mostrar carga/error y describir por separado las fuentes disponibles; requiere autorización explícita para corregir y desplegar.
+
 > **Sesión 2026-08-22 — Despliegue acumulativo Equipo, Actividad y miembros.** Rama `vps_uni`; runtime `4c7d08e`. Estado: backend/DB/frontend sanos, HTTPS 200, Core y scan-route verificados.
 > - Se desplegaron el filtrado/limpieza futura de placeholders admin, Equipo móvil con estado WG real y exportación PDF con retención física semanal.
 > - El primer build Docker detectó un constructor de peer sin `disabled`; se detuvo antes del cambio de contenedores, se corrigió en `4c7d08e`, se validó con build limpio local y el segundo build terminó correctamente.

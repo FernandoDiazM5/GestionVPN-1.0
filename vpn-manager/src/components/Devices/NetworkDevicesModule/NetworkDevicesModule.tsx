@@ -38,8 +38,7 @@ import ConfirmModal from '../../Common/ConfirmModal';
 import { Button, EmptyState, PageHeader } from '../../Common/ui';
 import type { ExportMetadata } from './utils/exportShared';
 
-import { SESSION_SCAN_KEY } from './constants';
-import type { ScanCred } from './types';
+import { ipInCidr, SESSION_SCAN_KEY } from './constants';
 
 import { useDeviceScan } from './hooks/useDeviceScan';
 import { useDeviceList } from './hooks/useDeviceList';
@@ -49,6 +48,7 @@ import { useScanPreferences } from './hooks/useScanPreferences';
 import { useWorkspaceSession } from '../../../context/WorkspaceSession';
 import { useNodeInventory } from '../../../query/nodeInventory';
 import { useAirOsAi } from './hooks/useAirOsAi';
+import { useNodeSshCredentials } from './hooks/useNodeSshCredentials';
 import { AirOsAiDialog } from './components/AirOsAiDialog';
 import { AirOsAiHistoryDialog } from './components/AirOsAiHistoryDialog';
 
@@ -70,10 +70,10 @@ export default function NetworkDevicesModule() {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showAiHistory, setShowAiHistory] = useState(false);
-  const [nodeSshCreds, setNodeSshCreds] = useState<ScanCred[]>([]);
 
   // ── Derivados básicos del estado externo ──────────────────────────
   const activeNode = activeNodeVrf ? nodes.find(n => n.nombre_vrf === activeNodeVrf) ?? null : null;
+  const nodeCredentials = useNodeSshCredentials(activeNode);
 
   // Fallback: si `selectedNode` aún no se hidrató (el useEffect de sync se
   // dispara post-mount, y a veces VpnContext rehidrata activeNodeVrf más
@@ -103,9 +103,9 @@ export default function NetworkDevicesModule() {
   });
 
   const scan = useDeviceScan({
-    activeNodeVrf, nodes, effectiveLan,
+    activeNodeVrf, effectiveLan,
     savedDevices: library.savedDevices,
-    nodeSshCreds, setNodeSshCreds,
+    nodeSshCreds: nodeCredentials.creds,
   });
   // Asignar el ref en effect (no durante render — anti-pattern en strict mode R19).
   // Seguro porque los wrappers de `library` solo se invocan dentro de handlers de
@@ -177,7 +177,6 @@ export default function NetworkDevicesModule() {
     if (prevSelectedNodeIdRef.current !== null && newId !== prevSelectedNodeIdRef.current) {
       resetScanResults([]);
       resetSshStatus({});
-      setNodeSshCreds([]);
       // §42-2: la selección de bulk save también se limpia al cambiar de nodo
       // — los devIds del nodo anterior no aplican aquí y dejarlos confunde.
       setSelectedIds(new Set());
@@ -193,6 +192,10 @@ export default function NetworkDevicesModule() {
       : (activeNode.segmento_lan ? [activeNode.segmento_lan] : []);
     return [...new Set(subnets)];
   }, [activeNode]);
+
+  const savedCredentialCount = useMemo(() => library.savedDevices.filter(device =>
+    (device.hasSshPass || !!device.sshPass) && (!effectiveLan || ipInCidr(device.ip, effectiveLan))
+  ).length, [library.savedDevices, effectiveLan]);
 
   // ── Handlers de fila (cierran sobre setters del orquestador) ──────
   // Desestructuramos `scan` y `library` para depender SOLO de las funciones
@@ -414,9 +417,13 @@ export default function NetworkDevicesModule() {
           availableSubnets={availableSubnets}
           manualLan={prefs.manualLan}
           setManualLan={prefs.setManualLan}
-          nodeSshCreds={nodeSshCreds}
+          nodeSshCreds={nodeCredentials.creds}
+          credentialsStatus={nodeCredentials.status}
+          credentialsError={nodeCredentials.error}
+          savedCredentialCount={savedCredentialCount}
+          onReloadCredentials={nodeCredentials.reload}
           effectiveLan={effectiveLan}
-          canScan={scan.canScan}
+          canScan={scan.canScan && nodeCredentials.status !== 'loading'}
           isScanning={scan.isScanning}
           onScan={scan.handleScan}
         />

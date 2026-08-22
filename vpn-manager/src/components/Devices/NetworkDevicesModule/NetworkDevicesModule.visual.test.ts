@@ -33,4 +33,12 @@ describe('presentación de Buscar equipos', () => {
     expect(controlsSource).toContain("'Buscar equipos'");
     expect(progressSource).toContain('Búsqueda finalizada');
   });
+
+  it('distingue las fuentes y errores de credenciales SSH', () => {
+    expect(controlsSource).toContain('Consultando credenciales SSH');
+    expect(controlsSource).toContain('No puedes consultar las credenciales del nodo con este rol');
+    expect(controlsSource).toContain('No se pudieron verificar las credenciales del nodo');
+    expect(controlsSource).toContain('con credencial propia');
+    expect(controlsSource).toContain('Reintentar');
+  });
 });

@@ -14,18 +14,15 @@ import { fetchWithTimeout } from '../../../../utils/fetchWithTimeout';
 import { apiFetch } from '../../../../utils/apiClient';
 import { credCache } from '../../../../store/deviceDb';
 import type { ScannedDevice, SavedDevice, AntennaStats } from '../../../../types/devices';
-import type { NodeInfo } from '../../../../types/api';
 import { SESSION_SCAN_KEY, estimateIpCount } from '../constants';
 import type { SshAuthStatus, ScanCred, ScanState } from '../types';
 import { API_BASE_URL } from '../../../../config';
 
 interface UseDeviceScanInput {
   activeNodeVrf: string | null;
-  nodes: NodeInfo[];
   effectiveLan: string;
   savedDevices: SavedDevice[];
   nodeSshCreds: ScanCred[];
-  setNodeSshCreds: (creds: ScanCred[]) => void;
 }
 
 // Schema del payload en sessionStorage. Bump SCAN_CACHE_VERSION si el shape
@@ -81,7 +78,7 @@ function loadCachedScan(): CachedScanPayload | null {
 }
 
 export function useDeviceScan(input: UseDeviceScanInput) {
-  const { activeNodeVrf, nodes, effectiveLan, savedDevices, nodeSshCreds, setNodeSshCreds } = input;
+  const { activeNodeVrf, effectiveLan, savedDevices, nodeSshCreds } = input;
 
   // Lazy init desde sessionStorage — patrón vercel `rerender-derived-state-no-effect`.
   // Antes era un useEffect con [] que disparaba 5 setStates en cascada al montar
@@ -406,23 +403,7 @@ export function useDeviceScan(input: UseDeviceScanInput) {
         if (gotComplete) break;
       }
 
-      let creds: ScanCred[] = nodeSshCreds;
-      const activeNode2 = activeNodeVrf ? nodes.find(n => n.nombre_vrf === activeNodeVrf) : null;
-      if (activeNode2?.ppp_user) {
-        try {
-          const cr = await fetchWithTimeout(`${API_BASE_URL}/api/node/ssh-creds/get`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ pppUser: activeNode2.ppp_user }),
-          }, 5_000);
-          const cd = await cr.json();
-          if (cd.success && Array.isArray(cd.creds) && cd.creds.length > 0) {
-            creds = cd.creds.filter((c: ScanCred) => c.user);
-            setNodeSshCreds(creds);
-          }
-        } catch { /* sin creds del nodo → usar nodeSshCreds existentes */ }
-      }
-
-      await runAuthPhase(discoveredDevices, creds);
+      await runAuthPhase(discoveredDevices, nodeSshCreds);
 
       // Fin de la fase de auth → cerrar el SSE → el backend desmonta la scan-mangle
       // (su teardown está atado al cierre de esta conexión, req 'close').
@@ -434,7 +415,7 @@ export function useDeviceScan(input: UseDeviceScanInput) {
       setScanError(err instanceof Error ? err.message : 'Error desconocido');
       setScanState({ phase: 'idle', current: 0, total: 0 });
     }
-  }, [effectiveLan, scanState.phase, activeNodeVrf, nodes, nodeSshCreds, setNodeSshCreds, runAuthPhase]);
+  }, [effectiveLan, scanState.phase, nodeSshCreds, runAuthPhase]);
 
   const isScanning = scanState.phase === 'discovering' || scanState.phase === 'authenticating';
   // Para escanear se necesita: (a) estar en estado quiescente, (b) tener una
