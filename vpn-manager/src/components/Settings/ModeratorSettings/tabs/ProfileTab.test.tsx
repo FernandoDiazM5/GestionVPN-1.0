@@ -35,7 +35,7 @@ describe('ProfileTab Google', () => {
     const user = userEvent.setup();
     render(<ProfileTab />);
 
-    await user.click(screen.getByRole('button', { name: 'Google' }));
+    await user.click(screen.getByRole('tab', { name: 'Google' }));
     await screen.findByText('Enlaza el mismo correo de tu perfil para habilitar el acceso con Google.');
     const linkButton = screen.getByRole('button', { name: 'Enlazar cuenta de Google' });
     expect(screen.queryByLabelText('Contraseña actual para Google')).not.toBeInTheDocument();
@@ -58,7 +58,7 @@ describe('ProfileTab Google', () => {
     const user = userEvent.setup();
     render(<ProfileTab />);
 
-    await user.click(screen.getByRole('button', { name: 'Google' }));
+    await user.click(screen.getByRole('tab', { name: 'Google' }));
     expect(await screen.findByText('Google enlazado')).toBeInTheDocument();
     await user.type(screen.getByLabelText('Contraseña actual para Google'), 'password-local');
     await user.click(screen.getByRole('button', { name: 'Desvincular Google' }));

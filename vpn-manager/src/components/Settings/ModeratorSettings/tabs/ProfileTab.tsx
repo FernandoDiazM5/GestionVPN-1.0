@@ -18,7 +18,7 @@ export default function ProfileTab() {
   return (
     <div className="card border border-slate-200 dark:border-slate-800 overflow-hidden">
       {/* Sub-tabs */}
-      <div className="border-b border-slate-100 dark:border-slate-800 px-4 flex gap-1 overflow-x-auto">
+      <div className={`grid border-b border-slate-100 px-2 dark:border-slate-800 sm:flex sm:gap-1 sm:px-4 ${federatedAuthAvailable ? 'grid-cols-3' : 'grid-cols-2'}`} role="tablist" aria-label="Opciones de perfil">
         <SubTab active={section === 'password'} onClick={() => setSection('password')} icon={Lock} label="Contraseña" />
         <SubTab active={section === 'email'}    onClick={() => setSection('email')}    icon={Mail} label="Correo" />
         {federatedAuthAvailable ? (
@@ -26,7 +26,7 @@ export default function ProfileTab() {
         ) : null}
       </div>
 
-      <div className="p-6">
+      <div className="min-w-0 p-4 sm:p-6">
         {section === 'password' && <ChangePassword />}
         {section === 'email'    && <ChangeEmail />}
         {section === 'google' && federatedAuthAvailable ? <GoogleAccount /> : null}
@@ -37,8 +37,8 @@ export default function ProfileTab() {
 
 function SubTab({ active, onClick, icon: Icon, label }: { active: boolean; onClick: () => void; icon: typeof Lock; label: string }) {
   return (
-    <button onClick={onClick}
-      className={`shrink-0 px-4 py-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors
+    <button onClick={onClick} role="tab" aria-selected={active}
+      className={`flex min-h-12 min-w-0 items-center justify-center gap-1.5 border-b-2 px-2 py-3 text-xs font-semibold transition-colors sm:shrink-0 sm:gap-2 sm:px-4 sm:text-sm
         ${active
           ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400'
           : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'}`}>
@@ -115,7 +115,7 @@ function GoogleAccount() {
           <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
           <div className="min-w-0">
             <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">Google enlazado</p>
-            <p className="truncate text-xs text-emerald-700/80 dark:text-emerald-300/80">{status.email}</p>
+            <p className="break-all text-xs text-emerald-700/80 dark:text-emerald-300/80">{status.email}</p>
           </div>
         </div>
       ) : null}
@@ -152,7 +152,7 @@ function GoogleAccount() {
             type="button"
             onClick={unlink}
             disabled={busy || !password}
-            className="btn-outline px-5 py-2.5 flex items-center gap-2 text-sm text-rose-600 disabled:opacity-50 dark:text-rose-300"
+            className="btn-outline flex min-h-11 w-full items-center justify-center gap-2 px-5 py-2.5 text-sm text-rose-600 disabled:opacity-50 sm:w-auto dark:text-rose-300"
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unlink className="h-4 w-4" />}
             Desvincular Google
@@ -163,7 +163,7 @@ function GoogleAccount() {
           type="button"
           onClick={link}
           disabled={busy}
-          className="btn-primary px-5 py-2.5 flex items-center gap-2 text-sm disabled:opacity-50"
+          className="btn-primary flex min-h-11 w-full items-center justify-center gap-2 px-5 py-2.5 text-sm disabled:opacity-50 sm:w-auto"
         >
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
           Enlazar cuenta de Google
@@ -254,7 +254,7 @@ function ChangePassword() {
       {mismatch && <p className="text-2xs text-rose-600 dark:text-rose-400 -mt-2">No coinciden</p>}
 
       <button type="submit" disabled={busy || !canSubmit}
-        className="btn-primary px-5 py-2.5 flex items-center gap-2 text-sm disabled:opacity-50">
+        className="btn-primary flex min-h-11 w-full items-center justify-center gap-2 px-5 py-2.5 text-sm disabled:opacity-50 sm:w-auto">
         {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
         Actualizar contraseña
       </button>
@@ -304,7 +304,7 @@ function ChangeEmail() {
       <div>
         <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-1">Cambiar correo</h3>
         <p className="text-xs text-slate-500 dark:text-slate-400">
-          Correo actual: <span className="font-mono">{session?.email}</span>
+          Correo actual: <span className="break-all font-mono">{session?.email}</span>
         </p>
       </div>
 
@@ -334,7 +334,7 @@ function ChangeEmail() {
             Te enviaremos un código de 6 dígitos al nuevo correo para confirmar el cambio.
           </p>
           <button type="submit" disabled={busy || !newEmail.trim()}
-            className="btn-primary px-5 py-2.5 flex items-center gap-2 text-sm disabled:opacity-50">
+            className="btn-primary flex min-h-11 w-full items-center justify-center gap-2 px-5 py-2.5 text-sm disabled:opacity-50 sm:w-auto">
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
             Enviar código
           </button>
@@ -361,13 +361,13 @@ function ChangeEmail() {
           <p className="text-2xs text-slate-500 dark:text-slate-400">
             Por seguridad, te pedimos también tu contraseña actual.
           </p>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
             <button type="button" onClick={() => { setStep('request'); setOtp(''); setPassword(''); }}
-              className="px-3 py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl">
+              className="min-h-11 w-full rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100 sm:w-auto dark:text-slate-300 dark:hover:bg-slate-800">
               Cambiar correo
             </button>
             <button type="submit" disabled={busy || otp.length !== 6 || !password}
-              className="btn-primary px-5 py-2.5 flex items-center gap-2 text-sm disabled:opacity-50">
+              className="btn-primary flex min-h-11 w-full items-center justify-center gap-2 px-5 py-2.5 text-sm disabled:opacity-50 sm:w-auto">
               {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
               Confirmar cambio
             </button>

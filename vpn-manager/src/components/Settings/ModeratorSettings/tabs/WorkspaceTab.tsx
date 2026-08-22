@@ -5,7 +5,7 @@ export default function WorkspaceTab() {
   const { session } = useWorkspaceSession();
 
   return (
-    <div className="card border border-slate-200 p-6 dark:border-slate-800">
+    <div className="card border border-slate-200 p-4 sm:p-6 dark:border-slate-800">
       <div className="max-w-md space-y-4">
         <div>
           <h3 className="mb-1 text-sm font-bold text-slate-800 dark:text-slate-100">Nombre del espacio de trabajo</h3>

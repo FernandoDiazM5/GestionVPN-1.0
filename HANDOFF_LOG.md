@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-22 — Configuración responsive en móvil.** Rama `vps_uni` (base `bee4bf7`). Estado: frontend 76/258, build, `check:all` y lint verdes; sin deploy.
+> - Navegación de Ajustes en cuadrícula compacta; Perfil usa tabs accesibles sin recorte horizontal y botones/formularios adaptables.
+> - WireGuard/QR, Workspace, Notificaciones y Respaldo/importación ajustan padding, apilado y objetivos táctiles para teléfonos.
+> - Se actualizó el test de Perfil para consultar el rol semántico `tab`; el flujo Google permanece cubierto.
+> - Pendiente: revisión visual del usuario y autorización de despliegue.
+
 > **Sesión 2026-08-22 — Reorganización responsive de “Mi equipo”.** Rama `vps_uni` (base `b1c30c7`). Estado: frontend 76/258, build de producción, `check:all` y lint verdes; sin deploy.
 > - Usuarios VPN: filtros en cuadrícula móvil, selector de columnas compacto y tarjeta con sitio/correo/rol separados.
 > - Miembros: tarjetas móviles sin tabla recortada, con objetivos táctiles de 44 px; escritorio conserva su tabla.

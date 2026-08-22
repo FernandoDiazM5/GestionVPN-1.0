@@ -46,9 +46,9 @@ export default function ModeratorSettingsModule() {
       <PageHeader title="Ajustes" description={isMember ? 'Gestiona tu perfil y vincula Telegram para activar túneles desde el bot' : 'Gestiona tu perfil, el workspace y los respaldos'} icon={SettingsIcon} titleId="moderator-settings-title" />
 
       {/* ── Tabs ── */}
-      <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-5">
+      <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-[200px_minmax(0,1fr)] md:gap-5">
         {/* Sidebar de tabs */}
-        <div className="space-y-1">
+        <div className="grid grid-cols-2 gap-2 md:block md:space-y-1" role="tablist" aria-label="Secciones de ajustes">
           {tabs.map(t => {
             const Icon = t.icon;
             const active = tab === t.id;
@@ -56,7 +56,9 @@ export default function ModeratorSettingsModule() {
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                className={`w-full text-left px-3 py-2.5 rounded-xl flex items-center gap-2.5 transition-all
+                role="tab"
+                aria-selected={active}
+                className={`flex min-h-14 w-full min-w-0 items-center gap-2.5 rounded-xl px-3 py-2.5 text-left transition-all md:min-h-0
                   ${active
                     ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20'
                     : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -65,7 +67,7 @@ export default function ModeratorSettingsModule() {
                 <Icon className="w-4 h-4 shrink-0" />
                 <div className="min-w-0">
                   <div className="text-sm font-semibold truncate">{t.label}</div>
-                  <div className={`text-2xs truncate ${active ? 'text-indigo-100' : 'text-slate-500 dark:text-slate-500'}`}>
+                  <div className={`hidden text-2xs truncate min-[380px]:block ${active ? 'text-indigo-100' : 'text-slate-500 dark:text-slate-500'}`}>
                     {t.description}
                   </div>
                 </div>
@@ -75,7 +77,7 @@ export default function ModeratorSettingsModule() {
         </div>
 
         {/* Contenido */}
-        <div>
+        <div className="min-w-0">
           {tab === 'profile'       && <ProfileTab />}
           {tab === 'wireguard'     && <WireGuardTab />}
           {tab === 'workspace'     && !isMember && <WorkspaceTab />}

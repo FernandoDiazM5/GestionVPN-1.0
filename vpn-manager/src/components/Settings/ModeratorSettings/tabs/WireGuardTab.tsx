@@ -85,7 +85,7 @@ export default function WireGuardTab() {
 
   return (
     <div className="card border border-slate-200 dark:border-slate-800 overflow-hidden">
-      <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3 bg-slate-50/60 dark:bg-slate-800/40">
+      <div className="flex items-center gap-3 border-b border-slate-100 bg-slate-50/60 px-4 py-4 sm:px-6 dark:border-slate-800 dark:bg-slate-800/40">
         <div className="w-9 h-9 rounded-xl bg-violet-500/10 flex items-center justify-center shrink-0">
           <Shield className="w-5 h-5 text-violet-500" />
         </div>
@@ -95,7 +95,7 @@ export default function WireGuardTab() {
         </div>
       </div>
 
-      <div className="p-6 space-y-4 max-w-md">
+      <div className="max-w-md space-y-4 p-4 sm:p-6">
         <AsyncQueryState
           loading={loading}
           error={loadError}
@@ -113,7 +113,7 @@ export default function WireGuardTab() {
             {qr && (
               <div className="flex flex-col items-center gap-2 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700">
                 {/* QR siempre sobre blanco para que la cámara lo escanee — no se invierte en dark. */}
-                <img src={qr} alt="QR WireGuard" className="rounded-lg bg-white dark:bg-white p-1" width={200} height={200} />
+                <img src={qr} alt="QR WireGuard" className="h-auto max-w-full rounded-lg bg-white p-1 dark:bg-white" width={200} height={200} />
                 <p className="flex items-center gap-1.5 text-2xs text-slate-400 dark:text-slate-500">
                   <Smartphone className="w-3 h-3" /> Escanea desde la app WireGuard del móvil
                 </p>
@@ -121,14 +121,14 @@ export default function WireGuardTab() {
             )}
             {qrError && <p className="text-xs text-amber-600 dark:text-amber-400" role="status">{qrError}</p>}
             <pre className="text-2xs font-mono bg-slate-900 text-slate-200 rounded-xl p-3 overflow-x-auto max-h-32 leading-relaxed">{conf}</pre>
-            <div className="flex items-center gap-2">
+            <div className="grid grid-cols-[minmax(0,1fr)_44px_44px] gap-2">
               <button onClick={download} className="btn-primary flex-1 px-4 py-2.5 flex items-center justify-center gap-2 text-sm">
                 <Download className="w-4 h-4" /> Descargar .conf
               </button>
-              <button onClick={copyConf} className="btn-outline px-4 py-2.5 flex items-center gap-2 text-sm" title="Copiar">
+              <button onClick={copyConf} className="btn-outline flex min-h-11 items-center justify-center px-3 py-2.5 text-sm" title="Copiar" aria-label="Copiar configuración">
                 {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
               </button>
-              <button onClick={provision} disabled={busy} title="Regenerar (invalida el anterior)" className="btn-outline px-3 py-2.5 disabled:opacity-50">
+              <button onClick={provision} disabled={busy} title="Regenerar (invalida el anterior)" aria-label="Regenerar configuración" className="btn-outline flex min-h-11 items-center justify-center px-3 py-2.5 disabled:opacity-50">
                 {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
               </button>
             </div>

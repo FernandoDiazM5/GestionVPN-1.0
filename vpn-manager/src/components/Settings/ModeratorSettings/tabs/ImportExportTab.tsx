@@ -45,7 +45,7 @@ function ExportCard({ disabled }: { disabled?: boolean }) {
   };
 
   return (
-    <div className="card border border-slate-200 dark:border-slate-800 p-6 space-y-4">
+    <div className="card space-y-4 border border-slate-200 p-4 sm:p-6 dark:border-slate-800">
       <div className="flex items-start gap-3">
         <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 flex items-center justify-center shrink-0">
           <Download className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
@@ -66,13 +66,13 @@ function ExportCard({ disabled }: { disabled?: boolean }) {
         </div>
       )}
 
-      <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+      <div className="flex flex-col items-stretch gap-3 border-t border-slate-100 pt-3 sm:flex-row sm:items-center dark:border-slate-800">
         <ShieldCheck className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
         <p className="text-2xs text-slate-500 dark:text-slate-400 flex-1">
           Guarda este archivo en un lugar seguro — contiene datos sensibles cifrados.
         </p>
         <button onClick={download} disabled={busy || disabled}
-          className="btn-primary px-4 py-2 flex items-center gap-2 text-xs disabled:opacity-50">
+          className="btn-primary flex min-h-11 items-center justify-center gap-2 px-4 py-2 text-xs disabled:opacity-50">
           {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
           Descargar JSON
         </button>
@@ -138,7 +138,7 @@ function ImportCard({ disabled }: { disabled?: boolean }) {
   };
 
   return (
-    <div className="card border border-slate-200 dark:border-slate-800 p-6 space-y-4">
+    <div className="card space-y-4 border border-slate-200 p-4 sm:p-6 dark:border-slate-800">
       <div className="flex items-start gap-3">
         <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-500/15 flex items-center justify-center shrink-0">
           <Upload className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
@@ -164,7 +164,7 @@ function ImportCard({ disabled }: { disabled?: boolean }) {
           <input ref={fileRef} type="file" accept="application/json,.json" className="hidden"
             onChange={e => e.target.files?.[0] && onSelectFile(e.target.files[0])} />
           <button onClick={() => fileRef.current?.click()} disabled={disabled}
-            className="w-full border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl p-8
+            className="w-full rounded-2xl border-2 border-dashed border-slate-200 p-5 sm:p-8 dark:border-slate-700
                        hover:border-indigo-300 hover:bg-indigo-50/40 dark:hover:bg-indigo-500/5 transition-colors
                        text-center group disabled:opacity-50 disabled:cursor-not-allowed">
             <FileJson className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-2 group-hover:text-indigo-400" />
@@ -196,7 +196,7 @@ function ImportCard({ disabled }: { disabled?: boolean }) {
             <label className="block text-2xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
               Política de conflictos
             </label>
-            <div className="flex gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <ConflictPill active={conflict === 'skip'} onClick={() => setConflict('skip')}
                 label="Omitir existentes" sub="No tocar lo que ya existe (recomendado)" />
               <ConflictPill active={conflict === 'overwrite'} onClick={() => setConflict('overwrite')}
@@ -210,7 +210,7 @@ function ImportCard({ disabled }: { disabled?: boolean }) {
 
           <PlanSummary plan={plan} />
 
-          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2">
+          <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-3 sm:flex-row sm:items-center sm:justify-end dark:border-slate-800">
             <button onClick={reset} disabled={phase === 'applying'}
               className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl">
               Descartar

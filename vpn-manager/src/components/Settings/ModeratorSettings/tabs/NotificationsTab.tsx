@@ -160,7 +160,7 @@ export default function NotificationsTab({ memberMode = false }: NotificationsTa
           </div>
         </div>
 
-        <div className="card p-5 space-y-4">
+        <div className="card space-y-4 p-4 sm:p-5">
           <h3 className="font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
             <Send className="w-4 h-4 text-indigo-500" /> Canales
           </h3>
@@ -182,7 +182,7 @@ export default function NotificationsTab({ memberMode = false }: NotificationsTa
   return (
     <div className="space-y-5">
       {/* Pausa global */}
-      <div className="card p-4 flex items-center justify-between">
+      <div className="card flex flex-col items-stretch gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${status.paused ? 'bg-amber-50 dark:bg-amber-500/15' : 'bg-emerald-50 dark:bg-emerald-500/15'}`}>
             {status.paused ? <Pause className="w-5 h-5 text-amber-600" /> : <Bell className="w-5 h-5 text-emerald-600" />}
@@ -198,14 +198,14 @@ export default function NotificationsTab({ memberMode = false }: NotificationsTa
         </div>
         <button
           onClick={() => update('paused', !status.paused)}
-          className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm shrink-0 ${status.paused ? 'btn-success' : 'btn-outline'}`}
+          className={`inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 px-4 py-2 text-sm ${status.paused ? 'btn-success' : 'btn-outline'}`}
         >
           {status.paused ? <><Play className="w-3.5 h-3.5" /> Reanudar</> : <><Pause className="w-3.5 h-3.5" /> Pausar</>}
         </button>
       </div>
 
       {/* Canales */}
-      <div className="card p-5 space-y-4">
+      <div className="card space-y-4 p-4 sm:p-5">
         <h3 className="font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
           <Send className="w-4 h-4 text-indigo-500" /> Canales
         </h3>
@@ -224,7 +224,7 @@ export default function NotificationsTab({ memberMode = false }: NotificationsTa
       </div>
 
       {/* Eventos */}
-      <div className="card p-5 space-y-2">
+      <div className="card space-y-2 p-4 sm:p-5">
         <h3 className="font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
           <Bell className="w-4 h-4 text-indigo-500" /> Eventos
         </h3>
@@ -246,10 +246,10 @@ export default function NotificationsTab({ memberMode = false }: NotificationsTa
       </div>
 
       {/* Guardar */}
-      <div className="flex items-center justify-end gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
         {err && <p className="text-sm text-rose-600 flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5" /> {err}</p>}
         {ok && <p className="text-sm text-emerald-600 flex items-center gap-1"><Check className="w-3.5 h-3.5" /> Guardado</p>}
-        <button onClick={save} disabled={saving} className="btn-primary btn-md inline-flex items-center">
+        <button onClick={save} disabled={saving} className="btn-primary btn-md inline-flex min-h-11 items-center justify-center">
           {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
           Guardar
         </button>
@@ -270,7 +270,7 @@ interface ChannelRowProps {
 
 function ChannelRow({ icon: Icon, title, desc, checked, disabled, onChange, extra }: ChannelRowProps) {
   return (
-    <div className={`flex items-center justify-between p-3 rounded-xl border ${disabled ? 'opacity-50' : ''} border-slate-100 dark:border-slate-800`}>
+    <div className={`flex flex-col items-stretch gap-3 rounded-xl border p-3 sm:flex-row sm:items-center sm:justify-between ${disabled ? 'opacity-50' : ''} border-slate-100 dark:border-slate-800`}>
       <div className="flex items-start gap-3">
         <Icon className="w-5 h-5 text-slate-500 mt-0.5" />
         <div>
@@ -278,7 +278,7 @@ function ChannelRow({ icon: Icon, title, desc, checked, disabled, onChange, extr
           <p className="text-xs text-slate-500">{desc}</p>
         </div>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex min-h-11 items-center justify-end gap-2">
         {extra}
         <input
           type="checkbox"
@@ -369,7 +369,7 @@ function Step({ n, title, desc, action, children }: StepProps) {
         {n}
       </span>
       <div className="flex-1 min-w-0 space-y-2">
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-indigo-900 dark:text-indigo-100">{title}</p>
             {desc && <p className="text-xs text-indigo-700/80 dark:text-indigo-300/80 truncate">{desc}</p>}
