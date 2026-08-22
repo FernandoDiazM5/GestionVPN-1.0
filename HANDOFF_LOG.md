@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-22 — Reorganización responsive de “Mi equipo”.** Rama `vps_uni` (base `b1c30c7`). Estado: frontend 76/258, build de producción, `check:all` y lint verdes; sin deploy.
+> - Usuarios VPN: filtros en cuadrícula móvil, selector de columnas compacto y tarjeta con sitio/correo/rol separados.
+> - Miembros: tarjetas móviles sin tabla recortada, con objetivos táctiles de 44 px; escritorio conserva su tabla.
+> - Actividad: cabecera, exportador y filas adaptados a pantallas estrechas, sin pérdida de CSV/JSON/PDF.
+> - Pendiente: revisión visual del usuario y autorización de despliegue.
+
 > **Sesión 2026-08-22 — Limpieza, endurecimiento y despliegue del Core MikroTik.** Rama/runtime `vps_uni@f23211b`. Estado: Core aplicado; backend 120/683, frontend 76/258 y `check:all` verdes; backend/frontend desplegados y sanos.
 > - Backup previo dual cifrado `.backup` + `.rsc` verificado y enviado: `servervpn_2026-08-22_17-26-59_GW-VPN-CORE-ISP.*`.
 > - Retirado sólo CLIENTES legacy `10.13.250.0/24`; ADMIN legacy `10.14.250.0/24` y peer `10.14.250.2/32` preservados/comentados por instrucción. Firewall 21→13 al retirar 8 duplicados.

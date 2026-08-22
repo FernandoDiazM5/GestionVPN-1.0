@@ -246,10 +246,10 @@ export default function UsersTable({
             </button>
           )}
         </div>
-        <div className="flex w-full max-w-full shrink-0 items-center gap-1.5 overflow-x-auto overscroll-x-contain pb-1 sm:w-auto sm:pb-0">
+        <div className="grid w-full grid-cols-[repeat(3,minmax(0,1fr))_44px] gap-1.5 sm:flex sm:w-auto sm:items-center">
           {statusChips.map(c => (
             <button type="button" key={c.key} onClick={() => setStatus(c.key)} aria-pressed={status === c.key}
-              className={`min-h-11 shrink-0 px-3 py-2 rounded-lg text-xs font-bold border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500
+              className={`min-h-11 min-w-0 px-2 py-2 rounded-lg text-xs font-bold border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 sm:shrink-0 sm:px-3
                 ${status === c.key
                   ? 'bg-indigo-50 border-indigo-300 text-indigo-700 dark:bg-indigo-500/15 dark:border-indigo-500/40 dark:text-indigo-300'
                   : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-200 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400 dark:hover:border-indigo-500/40'}`}>
@@ -266,12 +266,12 @@ export default function UsersTable({
               aria-label="Columnas visibles"
               aria-haspopup="true"
               aria-expanded={showColPicker}
-              className={`min-h-11 shrink-0 px-3 py-2 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500
+              className={`flex min-h-11 w-11 items-center justify-center rounded-lg border p-0 text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 sm:w-auto sm:shrink-0 sm:gap-1.5 sm:px-3 sm:py-2
                 ${showColPicker
                   ? 'bg-indigo-50 border-indigo-300 text-indigo-700 dark:bg-indigo-500/15 dark:border-indigo-500/40 dark:text-indigo-300'
                   : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-200 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400 dark:hover:border-indigo-500/40'}`}>
               <SlidersHorizontal className="w-3.5 h-3.5" />
-              <span>Columnas</span>
+              <span className="sr-only sm:not-sr-only">Columnas</span>
             </button>
             {showColPicker && createPortal(
               <div
@@ -611,15 +611,22 @@ function UsersMobileCard({
   peer, color, copied, editingAlias, draftAlias, savingAlias,
   onCopyConfig, onStartAlias, onCancelAlias, onChangeAlias, onCommitAlias,
 }: UsersMobileCardProps) {
+  const nameParts = peer.name.split(' - ').map(part => part.trim()).filter(Boolean);
+  const siteName = nameParts[0] || peer.name;
+  const role = nameParts.find(part => /^(owner|member|propietario|miembro)$/i.test(part));
+
   return (
-    <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+    <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-2">
             <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color || (peer.active ? '#10b981' : '#cbd5e1') }} />
-            <h3 className="break-words text-sm font-bold text-slate-800 dark:text-slate-100">{peer.name}</h3>
+            <div className="min-w-0">
+              <h3 className="break-words text-sm font-bold text-slate-800 dark:text-slate-100">{siteName}</h3>
+              {role && <span className="mt-1 inline-flex badge badge-neutral">{role === 'OWNER' ? 'Propietario' : role}</span>}
+            </div>
           </div>
-          {peer.email && <p className="mt-1 break-all pl-[18px] text-xs text-slate-500 dark:text-slate-400">{peer.email}</p>}
+          {peer.email && <p className="mt-2 break-all pl-[18px] text-xs leading-relaxed text-slate-500 dark:text-slate-400">{peer.email}</p>}
         </div>
         <PeerStatusBadge peer={peer} />
       </div>

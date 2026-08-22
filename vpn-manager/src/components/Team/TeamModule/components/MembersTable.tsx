@@ -6,6 +6,8 @@ import { canRemoveMembers, isOwner, isModerator } from '../../../../utils/permis
 import MemberWireGuardModal from './MemberWireGuardModal';
 import AssignTunnelsModal from './AssignTunnelsModal';
 
+const MOBILE_MEMBER_ACTION = 'flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800';
+
 interface MembersTableProps {
   members: Member[];
   loading?: boolean;
@@ -43,7 +45,56 @@ export default function MembersTable({
         <p className="text-2xs text-slate-400 dark:text-slate-500 mt-0.5">{members.length} miembro{members.length !== 1 ? 's' : ''}</p>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="space-y-2 p-3 sm:hidden">
+        {loading && members.length === 0 && [...Array(2)].map((_, i) => (
+          <div key={`mobile-sk-${i}`} className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+            <div className="skeleton mb-2 h-4 w-32" /><div className="skeleton h-3 w-48" />
+          </div>
+        ))}
+        {members.map(m => {
+          const Icon = ROLE_ICON[m.role];
+          const isSelf = m.user_id === currentUserId;
+          const ownerRow = m.role === 'OWNER';
+          const busy = busyId === m.user_id;
+          return (
+            <article key={m.user_id} className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800">
+                  <Icon className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h4 className="break-words text-sm font-bold text-slate-800 dark:text-slate-100">{m.name || m.email.split('@')[0]}</h4>
+                    {isSelf && <span className="text-2xs font-semibold text-indigo-600 dark:text-indigo-300">Tú</span>}
+                  </div>
+                  <p className="mt-1 break-all text-xs text-slate-500 dark:text-slate-400">{m.email}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <span className={roleBadgeClass(m.role)}>{ROLE_LABEL[m.role]}</span>
+                    {m.disabled && <span className="badge badge-danger">Deshabilitado</span>}
+                  </div>
+                </div>
+              </div>
+
+              {canManage && !ownerRow ? (
+                <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+                  {busy ? <Loader2 className="h-5 w-5 animate-spin text-slate-400" /> : (
+                    <>
+                      <button onClick={() => setWgFor(m)} title="Acceso WireGuard" aria-label="Acceso WireGuard" className={MOBILE_MEMBER_ACTION}><Shield className="h-4 w-4" /></button>
+                      {m.role === 'MEMBER' && <button onClick={() => setAssignFor(m)} title="Asignar túneles" aria-label="Asignar túneles" className={MOBILE_MEMBER_ACTION}><Waypoints className="h-4 w-4" /></button>}
+                      {!isSelf && (m.disabled
+                        ? <button onClick={() => onSetDisabled(m.user_id, false)} title="Habilitar miembro" aria-label="Habilitar miembro" className={`${MOBILE_MEMBER_ACTION} text-emerald-600`}><Power className="h-4 w-4" /></button>
+                        : <button onClick={() => confirmDisableId === m.user_id ? (onSetDisabled(m.user_id, true), setConfirmDisableId(null)) : setConfirmDisableId(m.user_id)} className={`${MOBILE_MEMBER_ACTION} ${confirmDisableId === m.user_id ? 'w-auto px-3 text-amber-700' : ''}`} aria-label="Deshabilitar miembro"><PowerOff className="h-4 w-4" />{confirmDisableId === m.user_id && <span className="ml-2 text-xs font-bold">Confirmar</span>}</button>)}
+                      {canRemoveMembers(currentRole) && !isSelf && <button onClick={() => confirmId === m.user_id ? (onRemove(m), setConfirmId(null)) : setConfirmId(m.user_id)} className={`${MOBILE_MEMBER_ACTION} ${confirmId === m.user_id ? 'w-auto px-3 text-rose-600' : ''}`} aria-label="Remover miembro"><Trash2 className="h-4 w-4" />{confirmId === m.user_id && <span className="ml-2 text-xs font-bold">Confirmar</span>}</button>}
+                    </>
+                  )}
+                </div>
+              ) : null}
+            </article>
+          );
+        })}
+      </div>
+
+      <div className="hidden overflow-x-auto sm:block">
         <table className="w-full text-xs table-fixed">
           <colgroup>
             <col />

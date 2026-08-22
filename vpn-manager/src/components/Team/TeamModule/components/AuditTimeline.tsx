@@ -67,9 +67,9 @@ export default function AuditTimeline({ logs, live }: AuditTimelineProps) {
 
   return (
     <div className="card overflow-hidden border border-slate-200 dark:border-slate-800">
-      <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 flex items-center gap-2 relative">
+      <div className="relative flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50/60 px-4 py-4 sm:px-6 dark:border-slate-800 dark:bg-slate-800/40">
         <FileClock className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
-        <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">Actividad reciente</h3>
+        <h3 className="min-w-0 text-sm font-bold text-slate-700 dark:text-slate-200">Actividad reciente</h3>
         {live && (
           <span className="inline-flex items-center gap-1.5 text-2xs font-semibold text-emerald-600 dark:text-emerald-400">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> En vivo
@@ -77,7 +77,7 @@ export default function AuditTimeline({ logs, live }: AuditTimelineProps) {
         )}
         <button
           onClick={() => { setShowExport(v => !v); setErr(null); }}
-          className="ml-auto btn-outline btn-sm inline-flex items-center"
+          className="ml-auto inline-flex min-h-11 items-center btn-outline btn-sm"
           title="Exportar bitácora"
         >
           <Download className="w-3.5 h-3.5" /> Exportar
@@ -87,7 +87,7 @@ export default function AuditTimeline({ logs, live }: AuditTimelineProps) {
           <div
             role="dialog"
             aria-label="Exportar bitácora"
-            className="absolute top-full right-6 mt-2 z-20 w-72 card p-4 shadow-xl border border-slate-200 dark:border-slate-700 space-y-3"
+            className="absolute left-3 right-3 top-full z-20 mt-2 space-y-3 border border-slate-200 p-4 shadow-xl card sm:left-auto sm:right-6 sm:w-72 dark:border-slate-700"
           >
             <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Exportar bitácora</p>
             <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -127,19 +127,19 @@ export default function AuditTimeline({ logs, live }: AuditTimelineProps) {
             const { icon: Icon, color, label } = actionMeta(log.action);
             const actor = log.user_name || log.user_email || 'Sistema';
             return (
-              <li key={log.id} className="flex items-start gap-3 px-6 py-3 hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
+              <li key={log.id} className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-slate-50/60 sm:px-6 dark:hover:bg-slate-800/40">
                 <div className={`w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 ${color}`}>
                   <Icon className="w-4 h-4" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs text-slate-700 dark:text-slate-200">
+                  <p className="break-words text-xs leading-relaxed text-slate-700 dark:text-slate-200">
                     <span className="font-bold">{actor}</span>{' '}
                     <span className="text-slate-500 dark:text-slate-400">{label.toLowerCase()}</span>{' '}
                     {log.tunnel_id && <span className="font-mono text-slate-600 dark:text-slate-300">{log.tunnel_id}</span>}
                   </p>
                   <p className="text-2xs text-slate-500 dark:text-slate-500 mt-0.5">
                     {timeAgo(log.created_at)}
-                    {log.ip_address && <span className="font-mono ml-2">· {log.ip_address}</span>}
+                    {log.ip_address && <span className="ml-1 font-mono sm:ml-2">· {log.ip_address}</span>}
                   </p>
                 </div>
               </li>
