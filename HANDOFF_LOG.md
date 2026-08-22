@@ -1,5 +1,17 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-22 — Equipo WireGuard responsivo y estado corregido localmente.** Rama `vps_uni` (base `9ff9e24`). Estado: backend 119/679, frontend 73/250 y `check:all` verdes; sin despliegue.
+> - La tabla ancha se reemplaza por tarjetas móviles hasta 639 px usando el mismo patrón de Sitios y Buscar equipos; escritorio conserva tabla y selector de columnas.
+> - Las tarjetas conservan usuario, correo, alias editable, IP, protocolo, último handshake y acción para copiar configuración.
+> - Contrato y endpoint exponen `disabled`; la UI diferencia `Deshabilitado`, `Conectado` y `Desconectado`, eliminando el falso activo por handshake residual.
+> - Se añadieron pruebas de estado backend y render móvil frontend; pendiente únicamente el despliegue autorizado.
+
+> **Sesión 2026-08-22 — Diagnóstico de estado WireGuard en Equipo.** Rama `vps_uni`; estado: inspección local y remota de solo lectura, sin corrección ni despliegue.
+> - La tabla marca `Activo` sólo cuando el último handshake tiene menos de cinco minutos; ignora si el peer RouterOS está `disabled`.
+> - La captura con peer desactivado y handshake de hace dos minutos corresponde exactamente a esa ventana de falso activo.
+> - Producción confirma cuenta de Fernando habilitada y sesiones recientes cerradas; el estado mostrado no equivale a una sesión activa.
+> - Pendiente: separar disponibilidad (`Habilitado/Deshabilitado`) de conectividad (`Conectado/Desconectado`) en API y UI.
+
 > **Sesión 2026-08-19 — Corrección local de administrador duplicado en miembros.** Rama `vps_uni` (base `64dd762`). Estado: backend 118/678 y `check:all` verdes; sin despliegue ni mutación de producción.
 > - Producción confirmó `admin@local.app` como OWNER temporal de `Housenet` junto a Fernando; el workspace ya apunta correctamente a Fernando como `owner_id`.
 > - Causa: aceptar una invitación OWNER reasignaba el workspace, pero conservaba la membresía placeholder creada por `createForOwner`.

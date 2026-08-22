@@ -19,6 +19,20 @@ const mgmtNet = require('../lib/mgmtNet');
 const { lowestFreeOctet } = require('../lib/ipAlloc');
 const log = require('../lib/logger').child({ scope: 'wireguard' });
 
+function mapWgPeer(p) {
+  const secs = parseHandshakeSecs(p['last-handshake'] || '');
+  const disabled = p.disabled === 'true' || p.disabled === true;
+  return {
+    id: p['.id'],
+    name: p.comment || p.name || `Peer ${p['.id']}`,
+    allowedAddress: (p['allowed-address'] || '').split('/')[0],
+    publicKey: p['public-key'] || '',
+    lastHandshakeSecs: isFinite(secs) ? secs : null,
+    disabled,
+    active: !disabled && secs < 300,
+  };
+}
+
 // ─────────────────────────────────────────────────────────────
 //  POST /wireguard/peers — listar peers de gestión visibles
 // ─────────────────────────────────────────────────────────────
@@ -38,17 +52,7 @@ router.post('/wireguard/peers', asyncHandler(async (req, res) => {
     const publicIP = cloud?.[0]?.['public-address'] || '';
     let result = peers
       .filter(p => mgmtNet.userIfaces.includes(p.interface))
-      .map(p => {
-        const secs = parseHandshakeSecs(p['last-handshake'] || '');
-        return {
-          id: p['.id'],
-          name: p.comment || p.name || `Peer ${p['.id']}`,
-          allowedAddress: (p['allowed-address'] || '').split('/')[0],
-          publicKey: p['public-key'] || '',
-          lastHandshakeSecs: isFinite(secs) ? secs : null,
-          active: secs < 300,
-        };
-      });
+      .map(mapWgPeer);
 
     // Aislamiento multi-tenant: cada moderador solo ve sus peers de gestión.
     // Admin (ws === null) ve todos. Peers sin dueño → solo admin.
@@ -246,3 +250,4 @@ router.post('/wireguard/peer/alias/save', asyncHandler(async (req, res) => {
 }));
 
 module.exports = router;
+module.exports.mapWgPeer = mapWgPeer;

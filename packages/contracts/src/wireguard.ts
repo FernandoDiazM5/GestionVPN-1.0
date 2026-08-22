@@ -38,6 +38,7 @@ export const WgPeerSchema = z.object({
   allowedAddress: z.string(),
   publicKey: z.string(),
   lastHandshakeSecs: z.number().nullable(),
+  disabled: z.boolean(),
   active: z.boolean(),
   email: z.string().optional(),
   alias: z.string().optional(),

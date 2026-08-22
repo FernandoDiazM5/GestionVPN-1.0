@@ -20,6 +20,7 @@ const peer: WgPeer = {
   publicKey: 'PUBKEY1234567890abcdef==',
   allowedAddress: '10.13.250.50',
   lastHandshakeSecs: 5,
+  disabled: false,
   active: true,
 };
 

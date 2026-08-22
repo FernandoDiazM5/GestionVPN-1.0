@@ -11,6 +11,7 @@ const peers: WgPeer[] = [
     allowedAddress: '10.13.250.2/32',
     publicKey: 'public-key-1',
     lastHandshakeSecs: 30,
+    disabled: false,
     active: true,
     email: 'zeta@example.com',
   },
@@ -39,5 +40,38 @@ describe('UsersTable accessibility', () => {
     await user.keyboard('{Enter}');
 
     expect(screen.getByRole('columnheader', { name: /usuario/i })).toHaveAttribute('aria-sort', 'ascending');
+  });
+
+  it('reemplaza la tabla ancha por tarjetas en móvil y muestra el estado real', () => {
+    const originalMatchMedia = window.matchMedia;
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: query === '(max-width: 639px)',
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+
+    try {
+      render(
+        <UsersTable
+          peers={[{ ...peers[0], disabled: true, active: false }]}
+          peerColors={{}}
+          copiedPeerId={null}
+          onCopyConfig={vi.fn()}
+          onSaveAlias={vi.fn().mockResolvedValue(true)}
+        />,
+      );
+
+      expect(screen.getByRole('region', { name: /usuarios wireguard en vista móvil/i })).toBeInTheDocument();
+      expect(screen.queryByRole('table')).not.toBeInTheDocument();
+      expect(screen.getByText('Deshabilitado')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /copiar configuración wg/i })).toBeInTheDocument();
+    } finally {
+      window.matchMedia = originalMatchMedia;
+    }
   });
 });

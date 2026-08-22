@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Search, X, ArrowUpDown, ArrowUp, ArrowDown, Copy, Check, Pencil, Loader2,
@@ -36,6 +36,18 @@ const COLUMNS: ColumnDef[] = [
 
 const LS_VISIBLE_COLS = 'vpn_users_visible_cols';
 const PAGE_SIZE = 50;
+const MOBILE_USERS_QUERY = '(max-width: 639px)';
+
+function subscribeToMobileUsers(callback: () => void) {
+  if (typeof window === 'undefined' || !window.matchMedia) return () => undefined;
+  const media = window.matchMedia(MOBILE_USERS_QUERY);
+  media.addEventListener('change', callback);
+  return () => media.removeEventListener('change', callback);
+}
+
+function getMobileUsersSnapshot() {
+  return typeof window !== 'undefined' && !!window.matchMedia?.(MOBILE_USERS_QUERY).matches;
+}
 
 function loadVisibleCols(): Set<ColId> {
   // Default: todo lo no-defaultHidden.
@@ -134,6 +146,7 @@ export default function UsersTable({
   const [sortKey, setSortKey] = useState<SortKey>('active');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [page, setPage] = useState(1);
+  const isMobile = useSyncExternalStore(subscribeToMobileUsers, getMobileUsersSnapshot, () => false);
 
   // ── Columnas visibles (persistido) ────────────────────────────
   const [visibleCols, setVisibleCols] = useState<Set<ColId>>(loadVisibleCols);
@@ -202,8 +215,8 @@ export default function UsersTable({
   // ── Helpers ───────────────────────────────────────────────────
   const statusChips: { key: StatusFilter; label: string }[] = [
     { key: 'all',      label: 'Todos' },
-    { key: 'active',   label: 'Activos' },
-    { key: 'inactive', label: 'Inactivos' },
+    { key: 'active',   label: 'Conectados' },
+    { key: 'inactive', label: 'Sin conexión' },
   ];
 
   const isVisible = (id: ColId) => visibleCols.has(id);
@@ -302,7 +315,48 @@ export default function UsersTable({
         </div>
       </div>
 
-      {/* Tabla */}
+      {/* En móvil reutiliza el patrón de tarjetas de Sitios y Buscar equipos. */}
+      {isMobile ? (
+        <section className="space-y-2 px-3 pb-3" aria-label="Usuarios WireGuard en vista móvil">
+          {!loading && pagedPeers.length > 0 && (
+            <div className="flex min-h-11 items-center rounded-xl border border-slate-200 bg-slate-100 px-3 text-xs font-bold uppercase tracking-wider text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+              {filtered.length} {filtered.length === 1 ? 'usuario' : 'usuarios'}
+            </div>
+          )}
+          {loading && peers.length === 0 && [...Array(3)].map((_, index) => (
+            <div key={`mobile-sk-${index}`} className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+              <div className="skeleton mb-3 h-4 w-2/3" />
+              <div className="skeleton mb-2 h-3 w-full" />
+              <div className="skeleton h-11 w-full" />
+            </div>
+          ))}
+          {pagedPeers.map(peer => (
+            <UsersMobileCard
+              key={peer.id}
+              peer={peer}
+              color={peerColors[peer.allowedAddress]}
+              copied={copiedPeerId === peer.id}
+              editingAlias={editingAliasAddr === peer.allowedAddress}
+              draftAlias={draftAlias}
+              savingAlias={savingAliasAddr === peer.allowedAddress}
+              onCopyConfig={() => onCopyConfig(peer)}
+              onStartAlias={() => startEditAlias(peer)}
+              onCancelAlias={cancelEditAlias}
+              onChangeAlias={setDraftAlias}
+              onCommitAlias={() => commitAlias(peer)}
+            />
+          ))}
+          {!loading && filtered.length === 0 && (
+            <div className="flex flex-col items-center gap-2 rounded-xl border border-slate-200 px-4 py-12 text-center dark:border-slate-700">
+              <Users className="h-8 w-8 text-slate-500" />
+              <p className="font-semibold text-slate-600 dark:text-slate-300">Sin usuarios</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {search || status !== 'all' ? 'Ningún usuario coincide con los filtros' : 'No hay usuarios configurados'}
+              </p>
+            </div>
+          )}
+        </section>
+      ) : (
       <div
         className="max-w-full overflow-x-auto overscroll-x-contain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-400"
         role="region"
@@ -362,15 +416,7 @@ export default function UsersTable({
                   {/* Estado */}
                   {isVisible('status') && (
                     <td className="px-4 py-3">
-                      {peer.active ? (
-                        <span className="inline-flex items-center gap-2 text-2xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
-                          <span className="status-live w-1.5 h-1.5 rounded-full bg-emerald-500 text-emerald-500" /> Activo
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-2 badge badge-neutral">
-                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400 dark:bg-slate-500" /> Inactivo
-                        </span>
-                      )}
+                      <PeerStatusBadge peer={peer} />
                     </td>
                   )}
 
@@ -485,14 +531,15 @@ export default function UsersTable({
           </tbody>
         </table>
       </div>
+      )}
 
       {/* Footer: totales + columnas activas */}
       {peers.length > 0 && (
         <div className="px-6 py-3 border-t border-slate-100 bg-slate-50 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-400 flex items-center justify-between gap-3 flex-wrap">
           <div>
             <span className="font-bold text-slate-700 dark:text-slate-200">{peers.length}</span> usuario{peers.length !== 1 ? 's' : ''}
-            {' · '}<span className="text-emerald-600 font-semibold">{activeCount} activo{activeCount !== 1 ? 's' : ''}</span>
-            {' · '}<span className="text-slate-500 dark:text-slate-400 font-semibold">{peers.length - activeCount} inactivo{peers.length - activeCount !== 1 ? 's' : ''}</span>
+            {' · '}<span className="text-emerald-600 font-semibold">{activeCount} conectado{activeCount !== 1 ? 's' : ''}</span>
+            {' · '}<span className="text-slate-500 dark:text-slate-400 font-semibold">{peers.length - activeCount} sin conexión</span>
           </div>
           <div className="text-2xs text-slate-500 dark:text-slate-500">
             {visibleCount} de {COLUMNS.length} columnas visibles
@@ -523,6 +570,100 @@ export default function UsersTable({
 // ────────────────────────────────────────────────────────────────────
 //  Subcomponentes
 // ────────────────────────────────────────────────────────────────────
+
+function PeerStatusBadge({ peer }: { peer: WgPeer }) {
+  if (peer.disabled) {
+    return (
+      <span className="inline-flex items-center gap-2 badge badge-warning">
+        <span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> Deshabilitado
+      </span>
+    );
+  }
+  if (peer.active) {
+    return (
+      <span className="inline-flex items-center gap-2 text-2xs font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
+        <span className="status-live h-1.5 w-1.5 rounded-full bg-emerald-500 text-emerald-500" /> Conectado
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-2 badge badge-neutral">
+      <span className="h-1.5 w-1.5 rounded-full bg-slate-400 dark:bg-slate-500" /> Desconectado
+    </span>
+  );
+}
+
+interface UsersMobileCardProps {
+  peer: WgPeer;
+  color?: string;
+  copied: boolean;
+  editingAlias: boolean;
+  draftAlias: string;
+  savingAlias: boolean;
+  onCopyConfig: () => void;
+  onStartAlias: () => void;
+  onCancelAlias: () => void;
+  onChangeAlias: (value: string) => void;
+  onCommitAlias: () => void;
+}
+
+function UsersMobileCard({
+  peer, color, copied, editingAlias, draftAlias, savingAlias,
+  onCopyConfig, onStartAlias, onCancelAlias, onChangeAlias, onCommitAlias,
+}: UsersMobileCardProps) {
+  return (
+    <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start gap-2">
+            <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color || (peer.active ? '#10b981' : '#cbd5e1') }} />
+            <h3 className="break-words text-sm font-bold text-slate-800 dark:text-slate-100">{peer.name}</h3>
+          </div>
+          {peer.email && <p className="mt-1 break-all pl-[18px] text-xs text-slate-500 dark:text-slate-400">{peer.email}</p>}
+        </div>
+        <PeerStatusBadge peer={peer} />
+      </div>
+
+      <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-3 rounded-lg bg-slate-50 p-3 text-xs dark:bg-slate-800/60">
+        <div>
+          <dt className="text-2xs font-bold uppercase tracking-wider text-slate-500">IP</dt>
+          <dd className="mt-1 break-all font-mono font-semibold text-slate-700 dark:text-slate-200">{peer.allowedAddress}</dd>
+        </div>
+        <div>
+          <dt className="text-2xs font-bold uppercase tracking-wider text-slate-500">Protocolo</dt>
+          <dd className="mt-1"><span className="badge badge-accent">WG</span></dd>
+        </div>
+        <div className="col-span-2">
+          <dt className="text-2xs font-bold uppercase tracking-wider text-slate-500">Último handshake</dt>
+          <dd className="mt-1 font-medium text-slate-700 dark:text-slate-200">{formatLastHandshake(peer.lastHandshakeSecs)}</dd>
+        </div>
+      </dl>
+
+      <div className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-800">
+        <p className="mb-1 text-2xs font-bold uppercase tracking-wider text-slate-500">Alias</p>
+        <AliasCell
+          peer={peer}
+          editing={editingAlias}
+          draft={draftAlias}
+          saving={savingAlias}
+          onStart={onStartAlias}
+          onCancel={onCancelAlias}
+          onChange={onChangeAlias}
+          onCommit={onCommitAlias}
+        />
+      </div>
+
+      <button
+        type="button"
+        onClick={onCopyConfig}
+        className={`mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-lg px-4 text-xs font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${copied ? 'btn-success' : 'btn-outline'}`}
+      >
+        {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+        {copied ? '¡Configuración copiada!' : 'Copiar configuración WG'}
+      </button>
+    </article>
+  );
+}
 
 interface CopyableCellProps {
   text: string;

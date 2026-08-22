@@ -183,11 +183,11 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `routes/team.routes.js` | 731 | POST | `/me/wireguard` | sí | — | no | n/a | network-admin | — |
 | `routes/team.routes.js` | 760 | GET | `/member/:id/wireguard` | sí | — | no | n/a | network-admin | — |
 | `routes/team.routes.js` | 781 | GET | `/wireguard/by-key/:publicKey` | sí | OWNER | no | n/a | network-admin | — |
-| `routes/wireguard.routes.js` | 25 | POST | `/wireguard/peers` | sí | — | no | n/a | sql, network-admin | — |
-| `routes/wireguard.routes.js` | 122 | POST | `/wireguard/peer/add` | sí | — | no | sí | sql, network-admin | — |
-| `routes/wireguard.routes.js` | 171 | POST | `/wireguard/peer/edit` | sí | — | no | sí | sql, network-admin | — |
-| `routes/wireguard.routes.js` | 205 | POST | `/wireguard/peer/color/save` | sí | — | no | sí | sql, network-admin | — |
-| `routes/wireguard.routes.js` | 215 | GET | `/wireguard/peer/colors` | sí | — | no | n/a | sql, network-admin | — |
-| `routes/wireguard.routes.js` | 228 | POST | `/wireguard/peer/alias/save` | sí | — | no | sí | sql, network-admin | — |
+| `routes/wireguard.routes.js` | 39 | POST | `/wireguard/peers` | sí | — | no | n/a | sql, network-admin | — |
+| `routes/wireguard.routes.js` | 126 | POST | `/wireguard/peer/add` | sí | — | no | sí | sql, network-admin | — |
+| `routes/wireguard.routes.js` | 175 | POST | `/wireguard/peer/edit` | sí | — | no | sí | sql, network-admin | — |
+| `routes/wireguard.routes.js` | 209 | POST | `/wireguard/peer/color/save` | sí | — | no | sí | sql, network-admin | — |
+| `routes/wireguard.routes.js` | 219 | GET | `/wireguard/peer/colors` | sí | — | no | n/a | sql, network-admin | — |
+| `routes/wireguard.routes.js` | 232 | POST | `/wireguard/peer/alias/save` | sí | — | no | sí | sql, network-admin | — |
 | `routes/workspace.routes.js` | 36 | GET | `/export` | sí | OWNER | no | n/a | network-admin | — |
 | `routes/workspace.routes.js` | 135 | POST | `/import` | sí | OWNER | no | sí | network-admin | — |
