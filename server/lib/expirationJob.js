@@ -27,7 +27,7 @@ const platformSecurityRepo = require('../db/repos/platformSecurityRepo');
 // → purga rodante que va quitando el día más viejo. Se ejecuta como
 // mucho 1×/hora (throttle) dentro del mismo tick del job de expiración, para no
 // añadir otro interval. No es información crítica; solo sirve para ver la semana.
-const PURGE_THROTTLE_MS = Number(process.env.AUDIT_PURGE_THROTTLE_MS || 60 * 60 * 1000); // 1h
+const PURGE_THROTTLE_MS = Number(process.env.AUDIT_PURGE_THROTTLE_MS || 5 * 60 * 1000); // 5 min
 let _lastPurge = 0;
 let _lastAiPurge = 0;
 let _lastSecurityPurge = 0;
@@ -144,6 +144,9 @@ function start() {
     return;
   }
   const interval = Math.max(10_000, Number(process.env.EXPIRATION_JOB_INTERVAL_MS || 30_000));
+  // Ejecutar también al arrancar: no esperar al primer intervalo para aplicar
+  // la retención de 7 días después de un reinicio o despliegue.
+  void runOnce();
   _handle = setInterval(runOnce, interval);
   log.info({ intervalMs: interval }, 'Job de expiración iniciado');
 }

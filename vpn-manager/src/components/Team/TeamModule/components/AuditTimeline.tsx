@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Activity, Power, PowerOff, ScanLine, ShieldOff, FileClock, Download, Loader2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import type { AuditExportJsonResponse } from '@gestionvpn/contracts';
 import type { AuditLog } from '../../../../types/account';
 import { auditApi, downloadBlob } from '../../../../services/auditApi';
 
@@ -42,16 +43,22 @@ export default function AuditTimeline({ logs, live }: AuditTimelineProps) {
   const safePage = Math.min(page, totalPages - 1);
   const pageLogs = logs.slice(safePage * PER_PAGE, safePage * PER_PAGE + PER_PAGE);
 
-  async function doExport(format: 'csv' | 'json') {
+  async function doExport(format: 'csv' | 'json' | 'pdf') {
     setBusy(true); setErr(null);
     try {
       const now = Date.now();
       const result = await auditApi.exportLogs({
         from: now - RETENTION_MS,
         to: now,
-        format,
+        format: format === 'pdf' ? 'json' : format,
       });
-      downloadBlob(result);
+      if (format === 'pdf') {
+        const report = JSON.parse(await result.blob.text()) as AuditExportJsonResponse;
+        const { auditPdfFileName, createAuditPdf } = await import('../utils/auditExportPdf');
+        downloadBlob({ blob: await createAuditPdf(report), filename: auditPdfFileName(report.meta.to) });
+      } else {
+        downloadBlob(result);
+      }
       setShowExport(false);
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Error exportando');
@@ -89,13 +96,16 @@ export default function AuditTimeline({ logs, live }: AuditTimelineProps) {
             {err && (
               <p className="text-xs text-rose-600 flex items-start gap-1"><AlertCircle className="w-3 h-3 mt-0.5 shrink-0" /> {err}</p>
             )}
-            <div className="flex items-center gap-2 pt-1">
+            <div className="grid grid-cols-3 gap-2 pt-1">
               <button onClick={() => doExport('csv')} disabled={busy} className="btn-primary btn-sm flex-1 inline-flex items-center justify-center">
                 {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
                 CSV
               </button>
               <button onClick={() => doExport('json')} disabled={busy} className="btn-outline btn-sm flex-1 inline-flex items-center justify-center">
                 JSON
+              </button>
+              <button onClick={() => doExport('pdf')} disabled={busy} className="btn-outline btn-sm flex-1 inline-flex items-center justify-center">
+                PDF
               </button>
             </div>
             <p className="text-2xs text-slate-500 dark:text-slate-400 leading-snug">

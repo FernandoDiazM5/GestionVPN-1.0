@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-22 — PDF de actividad y retención semanal endurecidos localmente.** Rama `vps_uni` (base `abb3846`). Estado: backend 119/679, frontend 75/252 y `check:all` verdes; sin despliegue.
+> - Actividad ofrece PDF junto a CSV/JSON; usa carga dinámica de jsPDF y genera A4 horizontal con periodo, conteo, tabla y pie paginado.
+> - El PDF de prueba fue renderizado a PNG, inspeccionado visualmente y validado como PDF real de una página sin recortes.
+> - La purga de ambas tablas de auditoría corre inmediatamente al arrancar y se revisa cada 5 minutos; consultas/exportaciones ya aplican corte estricto de 7 días.
+> - Producción: 12 eventos actuales, ninguno anterior a siete días; no se borró ni modificó información.
+
 > **Sesión 2026-08-22 — Equipo WireGuard responsivo y estado corregido localmente.** Rama `vps_uni` (base `9ff9e24`). Estado: backend 119/679, frontend 73/250 y `check:all` verdes; sin despliegue.
 > - La tabla ancha se reemplaza por tarjetas móviles hasta 639 px usando el mismo patrón de Sitios y Buscar equipos; escritorio conserva tabla y selector de columnas.
 > - Las tarjetas conservan usuario, correo, alias editable, IP, protocolo, último handshake y acción para copiar configuración.
