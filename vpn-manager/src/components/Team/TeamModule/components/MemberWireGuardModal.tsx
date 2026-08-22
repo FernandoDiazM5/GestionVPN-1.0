@@ -122,7 +122,7 @@ export default function MemberWireGuardModal({ member, onClose }: Props) {
               {qr && (
                 <div className="flex flex-col items-center gap-2 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700">
                   {/* QR siempre sobre blanco para que la cámara lo escanee — no se invierte en dark. */}
-                  <img src={qr} alt="QR WireGuard" className="rounded-lg bg-white dark:bg-white p-1" width={200} height={200} />
+                  <img src={qr} alt="QR WireGuard" className="h-auto max-w-full rounded-lg bg-white p-1 dark:bg-white" width={200} height={200} />
                   <p className="flex items-center gap-1.5 text-2xs text-slate-400 dark:text-slate-500">
                     <Smartphone className="w-3 h-3" /> Escanea desde la app WireGuard del móvil
                   </p>
@@ -131,11 +131,11 @@ export default function MemberWireGuardModal({ member, onClose }: Props) {
               {qrError && <p className="text-xs text-amber-600 dark:text-amber-400" role="status">{qrError}</p>}
               {/* .conf */}
               <pre className="text-2xs font-mono bg-slate-900 text-slate-200 rounded-xl p-3 overflow-x-auto max-h-32 leading-relaxed">{conf}</pre>
-              <div className="flex items-center gap-2">
+              <div className="grid grid-cols-[minmax(0,1fr)_44px] gap-2">
                 <button onClick={download} className="btn-primary flex-1 px-4 py-2.5 flex items-center justify-center gap-2 text-sm">
                   <Download className="w-4 h-4" /> Descargar .conf
                 </button>
-                <button onClick={copyConf} className="btn-outline px-4 py-2.5 flex items-center gap-2 text-sm">
+                <button onClick={copyConf} aria-label="Copiar configuración" className="btn-outline flex min-h-11 items-center justify-center px-3 py-2.5 text-sm">
                   {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
                 </button>
                 <button onClick={provision} disabled={busy} title="Regenerar" className="btn-outline px-3 py-2.5 disabled:opacity-50">

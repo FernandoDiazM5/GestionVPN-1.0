@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-22 — Auditoría responsive de ventanas emergentes.** Rama `vps_uni` (base `e69dfd5`). Estado: frontend 76/258, build, `check:all` y lint verdes; sin deploy.
+> - La base modal limita ancho/alto al viewport móvil, usa `100dvh`, scroll/overscroll contenido, padding responsive, footer flexible y cierres de 44 px; cubre 28 consumidores `Dialog` y tres modales administrativos heredados.
+> - `WgConfigModal` corrige el recorte mostrado: header compacto, bloque `.conf` con scroll propio y acciones en dos columnas. `MemberWireGuardModal` adapta QR y botones.
+> - `SessionExpiryDialog` era el único consumidor productivo sin `.modal-panel`; quedó alineado al patrón canónico.
+> - Pendiente: desplegar frontend cuando el usuario lo autorice.
+
 > **Sesión 2026-08-22 — Despliegue de responsive móvil y login.** Rama/runtime `vps_uni@0a8a52b`. Estado: frontend recreado; backend/DB preservados; HTTPS 200 y 0 reinicios.
 > - Publicados “Mi equipo” móvil, Configuración móvil y retiro de la leyenda inferior del login.
 > - El bundle activo no contiene `Operación segura` y sí contiene las clases responsive nuevas. Checkout productivo confirmado en `0a8a52b`.
