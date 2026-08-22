@@ -333,6 +333,8 @@ const writeIdempotent = async (api, commands, timeoutMs = 8000) => {
 const parseHandshakeSecs = (str) => {
     if (!str || str.trim() === '') return Infinity;
     let total = 0;
+    const w = str.match(/(\d+)w/); if (w) total += parseInt(w[1]) * 7 * 86400;
+    const d = str.match(/(\d+)d/); if (d) total += parseInt(d[1]) * 86400;
     const h = str.match(/(\d+)h/); if (h) total += parseInt(h[1]) * 3600;
     const m = str.match(/(\d+)m/); if (m) total += parseInt(m[1]) * 60;
     const s = str.match(/(\d+)s/); if (s) total += parseInt(s[1]);
