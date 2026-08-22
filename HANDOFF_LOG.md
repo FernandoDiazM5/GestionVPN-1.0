@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-22 — Despliegue del estado SSH de Buscar equipos.** Rama/runtime `vps_uni@e6666ef`. Estado: HTTPS 200, backend/DB sanos y frontend 0 reinicios.
+> - Se construyó y recreó únicamente `vpn-frontend`; backend y MariaDB conservaron contenedores, datos y uptime.
+> - El bundle activo contiene los estados carga/sin credenciales/403/error y credenciales propias; health 200 con MySQL/SMTP `ok` y RouterOS `stale` transitorio por ausencia de escrituras recientes.
+> - `check:scanroute` de sólo lectura confirmó Housenet 1/1 y no modificó RouterOS.
+> - Rollback `gestionvpn-10-frontend:pre-ssh-status-e6666ef-20260822T180740Z`; disco 80%/4.9 GiB libres.
+
 > **Sesión 2026-08-22 — Corrección local del estado de credenciales en Buscar equipos.** Rama `vps_uni` (base `c28bda0`). Estado: frontend 76/257, build y `check:all` verdes; sin despliegue.
 > - Nuevo hook hidrata las credenciales al seleccionar el nodo, cancela/descarta respuestas obsoletas y ofrece reintento explícito.
 > - La interfaz diferencia carga, ausencia real, permiso insuficiente y fallo de consulta; también informa cuántos equipos de la red tienen credencial propia.
