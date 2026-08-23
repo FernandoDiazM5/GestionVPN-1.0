@@ -270,6 +270,11 @@ CREATE TABLE IF NOT EXISTS core_backup_runs (
     KEY idx_core_backup_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- El producto desplegado opera exclusivamente desde el VPS. Normaliza también
+-- instalaciones antiguas que conservaran el selector local.
+INSERT INTO app_settings (`key`, value, updated_at) VALUES ('scan_mode', 'vps', 0)
+ON DUPLICATE KEY UPDATE value = 'vps';
+
 -- ── 12c. Trazabilidad del asistente de Servidor VPN ─────────
 -- Nunca almacena contraseñas, claves privadas ni la configuración exportada.
 CREATE TABLE IF NOT EXISTS core_provision_runs (

@@ -1,255 +1,50 @@
-import { useEffect, useState, useCallback } from 'react';
-import { Radar, Server, MonitorSmartphone, Check, Loader2, Network, AlertTriangle } from 'lucide-react';
-import { apiFetch } from '../../../../utils/apiClient';
-import { API_BASE_URL } from '../../../../config';
-import type { ScanMode } from '../types';
-
-interface ScanLocalCheck {
-  ok: boolean;
-  configured: string;
-  candidates: { ip: string; iface: string; plane: string }[];
-}
-
-interface ScanModeToggleProps {
-  scanMode: ScanMode;
-  localScanIp: string;
-  /** Sincroniza el objeto settings del padre tras un cambio persistido. */
-  onChange: (patch: { scan_mode?: ScanMode; local_scan_ip?: string }) => void;
-}
+import { CheckCircle2, Radar, Server } from 'lucide-react';
 
 /**
- * Toggle global Producción(VPS) ↔ Local del Administrador. Conmuta cómo el
- * backend origina el tráfico de escaneo / Monitor AP:
- *   • VPS  (apagado, default) → pool de scan-IPs por workspace (multi-tenant).
- *   • Local (encendido)       → IP WG de esta máquina (1 equipo hace todo).
- * Persiste al instante en app_settings (scan_mode / local_scan_ip).
+ * El producto opera exclusivamente desde el VPS. Esta vista sólo comunica la
+ * topología activa; no expone un selector que pueda desviar el escaneo a una PC.
  */
-export function ScanModeToggle({ scanMode, localScanIp, onChange }: ScanModeToggleProps) {
-  const [mode, setMode] = useState<ScanMode>(scanMode);
-  const [ip, setIp] = useState(localScanIp);
-  const [saving, setSaving] = useState<null | 'mode' | 'ip'>(null);
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState('');
-  const [check, setCheck] = useState<ScanLocalCheck | null>(null);
-
-  // Re-sincroniza si el padre recarga los settings.
-  useEffect(() => { setMode(scanMode); }, [scanMode]);
-  useEffect(() => { setIp(localScanIp); }, [localScanIp]);
-
-  const isLocal = mode === 'local';
-
-  // Chequeo READ-ONLY: ¿la IP de escaneo local está viva en este equipo?
-  // Solo aplica en modo local; alimenta la alerta de abajo sin tocar config.
-  const refreshCheck = useCallback(async () => {
-    try {
-      const resp = await apiFetch(`${API_BASE_URL}/api/settings/scan-local-check`);
-      const data = await resp.json();
-      if (data?.success) setCheck({ ok: data.ok, configured: data.configured, candidates: data.candidates || [] });
-    } catch { /* sin chequeo → no bloquea la UI */ }
-  }, []);
-
-  useEffect(() => { if (isLocal) refreshCheck(); else setCheck(null); }, [isLocal, refreshCheck]);
-
-  const persist = async (key: string, value: string) => {
-    const resp = await apiFetch(`${API_BASE_URL}/api/settings/save`, {
-      method: 'POST',
-      body: JSON.stringify({ key, value }),
-    });
-    const data = await resp.json();
-    if (!data.success) throw new Error(data.message || 'No se pudo guardar');
-  };
-
-  const flashSaved = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  };
-
-  const toggleMode = async () => {
-    if (saving) return;
-    const prev = mode;
-    const next: ScanMode = prev === 'local' ? 'vps' : 'local';
-    setMode(next);
-    setError('');
-    setSaving('mode');
-    try {
-      await persist('scan_mode', next);
-      onChange({ scan_mode: next });
-      flashSaved();
-      if (next === 'local') refreshCheck();
-    } catch (e) {
-      setMode(prev); // rollback óptimista
-      setError(e instanceof Error ? e.message : 'Error al cambiar el modo');
-    } finally {
-      setSaving(null);
-    }
-  };
-
-  const saveIp = async () => {
-    const clean = ip.trim();
-    if (clean === (localScanIp || '').trim()) return;
-    setError('');
-    setSaving('ip');
-    try {
-      await persist('local_scan_ip', clean);
-      onChange({ local_scan_ip: clean });
-      flashSaved();
-      refreshCheck();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error al guardar la IP');
-    } finally {
-      setSaving(null);
-    }
-  };
-
+export function ScanModeToggle() {
   return (
     <div className="card overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center gap-3 px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40">
-        <div className="w-9 h-9 rounded-xl bg-indigo-500/10 flex items-center justify-center shrink-0">
-          <Radar className="w-5 h-5 text-indigo-500" />
+      <div className="flex items-center gap-3 border-b border-slate-100 bg-slate-50/60 px-4 py-4 dark:border-slate-800 dark:bg-slate-800/40 sm:px-6">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-500/10">
+          <Radar className="h-5 w-5 text-indigo-500" />
         </div>
         <div className="min-w-0">
-          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">Modo de escaneo de red</h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Cómo origina el backend el tráfico de escaneo y Monitor AP
-          </p>
+          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">Escaneo de red desde el VPS</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Configuración fija para Buscar equipos y Monitor AP</p>
         </div>
       </div>
 
-      <div className="p-6 space-y-5">
-        {/* Switch + estado actual */}
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          {/* Badge de modo activo */}
-          <span
-            className={`badge ${isLocal ? 'badge-warning' : 'badge-success'} gap-1.5`}
-            aria-live="polite"
-          >
-            {isLocal ? <MonitorSmartphone className="w-3.5 h-3.5" /> : <Server className="w-3.5 h-3.5" />}
-            {isLocal ? 'Local · 1 equipo' : 'Producción · VPS'}
+      <div className="space-y-4 p-4 sm:p-6">
+        <div className="flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300 sm:flex-row sm:items-start">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/80 dark:bg-slate-900/50">
+            <Server className="h-5 w-5" />
           </span>
-
-          <div className="flex items-center gap-3">
-            <span className={`text-xs font-semibold transition-colors ${!isLocal ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-500'}`}>
-              VPS
-            </span>
-
-            <button
-              type="button"
-              role="switch"
-              aria-checked={isLocal}
-              aria-label={`Modo de escaneo: ${isLocal ? 'Local' : 'VPS'}. Pulsa para cambiar.`}
-              onClick={toggleMode}
-              disabled={saving === 'mode'}
-              className={`relative inline-flex h-7 w-[3.25rem] shrink-0 items-center rounded-full transition-colors
-                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2
-                focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900
-                disabled:opacity-60 disabled:cursor-not-allowed
-                ${isLocal ? 'bg-amber-500 focus-visible:ring-amber-500/60' : 'bg-emerald-500 focus-visible:ring-emerald-500/60'}`}
-            >
-              {/* Knob siempre blanco — va sobre el track emerald/amber en ambos temas. */}
-              <span
-                className={`inline-block h-5 w-5 transform rounded-full bg-white dark:bg-white shadow-sm transition-transform
-                  ${isLocal ? 'translate-x-7' : 'translate-x-1'}`}
-              />
-            </button>
-
-            <span className={`text-xs font-semibold transition-colors ${isLocal ? 'text-amber-600 dark:text-amber-400' : 'text-slate-500 dark:text-slate-500'}`}>
-              Local
-            </span>
-
-            {/* feedback de guardado */}
-            <span className="w-4 shrink-0" aria-hidden={!saving && !saved}>
-              {saving === 'mode' ? (
-                <Loader2 className="w-4 h-4 text-indigo-500 motion-safe:animate-spin" />
-              ) : saved ? (
-                <Check className="w-4 h-4 text-emerald-500" />
-              ) : null}
-            </span>
-          </div>
-        </div>
-
-        {/* Descripción del modo activo */}
-        <div
-          className={`rounded-xl border p-4 text-xs leading-relaxed
-            ${isLocal
-              ? 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300'
-              : 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300'}`}
-        >
-          {isLocal ? (
-            <span>
-              <strong>Local (1 equipo):</strong> el escaneo y el Monitor AP originan desde la
-              IP WG de gestión de <em>esta</em> máquina (abajo). Úsalo cuando el backend corre en
-              la misma PC del moderador. No requiere pool ni asignación por workspace.
-            </span>
-          ) : (
-            <span>
-              <strong>Producción (VPS):</strong> multi-tenant — cada workspace usa su scan-IP del
-              pool <span className="font-mono">10.11.252.x</span> (asignada con
-              <span className="font-mono"> scan:assign</span>). Requiere las rutas de retorno del
-              pool en el router. Es el modo correcto cuando el backend corre en el VPS.
-            </span>
-          )}
-        </div>
-
-        {/* IP local — solo en modo Local */}
-        {isLocal && (
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-              IP WG de gestión de esta máquina
-            </label>
-            <div className="relative">
-              <Network className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400" />
-              <input
-                type="text"
-                value={ip}
-                onChange={(e) => setIp(e.target.value)}
-                onBlur={saveIp}
-                onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-                className="input-field pl-10 h-11 font-mono"
-                placeholder="ej. 10.13.250.20 (tu IP real de WireGuard)"
-                aria-describedby="local-scan-ip-hint"
-              />
-              {saving === 'ip' && (
-                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-500 motion-safe:animate-spin" />
-              )}
+            <div className="flex items-center gap-2">
+              <h4 className="font-bold">Modo VPS activo</h4>
+              <CheckCircle2 className="h-4 w-4" aria-label="Activo" />
             </div>
-            <p id="local-scan-ip-hint" className="text-xs text-slate-500 dark:text-slate-400 mt-2 font-medium">
-              La IP del túnel de gestión que ves en WireGuard en esta PC. El escaneo se ata a ella
-              y el mangle del router la enruta a tu VRF activo. Se guarda al salir del campo.
+            <p className="mt-1 text-sm leading-relaxed">
+              El backend origina el escaneo desde el pool privado asignado a cada workspace.
+              Esto mantiene separados a los clientes y permite operar la plataforma únicamente
+              desde el servidor central.
             </p>
-
-            {/* Alerta: la IP configurada NO está viva en este equipo → el escaneo
-                fallaría en silencio. Solo en modo local. */}
-            {check && !check.ok && (
-              <div
-                role="alert"
-                className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs leading-relaxed dark:border-amber-500/30 dark:bg-amber-500/10
-                  text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300"
-              >
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <div>
-                    <strong>Hay que cambiar la IP de escaneo.</strong>{' '}
-                    {check.configured
-                      ? <>La IP configurada <span className="font-mono">{check.configured}</span> no está activa en este equipo.</>
-                      : <>No hay ninguna IP de escaneo local configurada.</>}{' '}
-                    El escaneo fallaría sin encontrar dispositivos. Actualízala arriba con tu IP real de WireGuard.
-                    {check.candidates.length > 0 && (
-                      <>
-                        {' '}IP WG detectada en este equipo:{' '}
-                        <span className="font-mono">{check.candidates.map((c) => c.ip).join(', ')}</span>.
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
-        )}
+        </div>
 
-        {error && (
-          <p className="text-xs font-medium text-rose-600 dark:text-rose-400" role="alert">{error}</p>
-        )}
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="rounded-xl border border-slate-200 p-3 dark:border-slate-700"><span className="block text-xs text-slate-500">Origen</span><b className="mt-1 block text-sm">VPS central</b></div>
+          <div className="rounded-xl border border-slate-200 p-3 dark:border-slate-700"><span className="block text-xs text-slate-500">Asignación</span><b className="mt-1 block text-sm">Una IP por workspace</b></div>
+          <div className="rounded-xl border border-slate-200 p-3 dark:border-slate-700"><span className="block text-xs text-slate-500">Ruta de retorno</span><b className="mt-1 block text-sm">Validada en el Router Core</b></div>
+        </div>
+
+        <p className="text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+          La red utilizada corresponde al segmento de escaneo del bloque privado /22 configurado
+          en el Router Core. No requiere instalar ni configurar un origen local.
+        </p>
       </div>
     </div>
   );

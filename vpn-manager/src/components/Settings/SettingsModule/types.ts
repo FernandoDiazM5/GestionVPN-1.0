@@ -1,5 +1,3 @@
-export type ScanMode = 'local' | 'vps';
-
 export interface AppSettings {
   /** Bloque privado /22 elegido una sola vez antes de preparar el Core. */
   management_supernet?: string;
@@ -13,12 +11,8 @@ export interface AppSettings {
   /** Puerto del listener SSTP del Core (default 443). Se embebe en el script
    *  sstp-client del CPE como `connect-to=<ip>:<puerto>` al crear nodos SSTP. */
   sstp_port?: string;
-  /** Modo global de escaneo de red. 'vps' (default) usa el pool de scan-IPs por
-   *  workspace (multi-tenant). 'local' usa una sola IP (local_scan_ip) cuando el
-   *  backend corre en el mismo equipo del moderador. */
-  scan_mode?: ScanMode;
-  /** IP WG de gestión de ESTA máquina — origen del escaneo en modo 'local'. */
-  local_scan_ip?: string;
+  /** El despliegue opera exclusivamente desde el VPS. */
+  scan_mode?: 'vps';
   /** Destinatario de errores inesperados del frontend. Las credenciales SMTP
    *  permanecen exclusivamente en el backend. */
   error_report_email?: string;

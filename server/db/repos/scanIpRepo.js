@@ -129,27 +129,8 @@ async function getSetting(key) {
   return rows[0] ? rows[0].value : null;
 }
 
-/**
- * Resuelve la scan-IP EFECTIVA según el modo global de escaneo
- * (app_settings.scan_mode, conmutable por el Administrador desde el panel):
- *
- *  • 'local' → usa una sola IP global `local_scan_ip` = la IP WG de gestión de
- *    ESTA máquina. Para el caso "1 box hace todo" (backend corre en el equipo
- *    del moderador): el escaneo origina desde su propia IP y la mangle la marca
- *    a su VRF. No requiere pool ni asignación por workspace.
- *
- *  • 'vps' (default, multi-tenant) → usa la scan-IP del POOL asignada por
- *    workspace (10.11.252.x). Cada workspace tiene la suya → moderadores de
- *    distintos workspaces escanean en paralelo sin colisión.
- *
- * Devuelve null si no hay IP resoluble → el escaneo cae a modo legacy.
- */
+/** Resuelve exclusivamente la scan-IP del pool VPS asignada al workspace. */
 async function resolveForWorkspace(workspaceId) {
-  const mode = (await getSetting('scan_mode')) || 'vps';
-  if (mode === 'local') {
-    const ip = String((await getSetting('local_scan_ip')) || '').split('/')[0].trim();
-    return ip || null;
-  }
   return getScanIpForWorkspace(workspaceId);
 }
 

@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-22 — Escaneo exclusivamente desde VPS.** Rama `vps_uni` (base `b099f54`). Estado: backend 121/685, frontend 77/259, build y `check:all` verdes; sin deploy.
+> - Retirados selector Local, captura de IP WG local y chequeo asociado; Escaneo ahora comunica el origen VPS fijo y la asignación aislada por workspace.
+> - `schema_ops` normaliza instalaciones antiguas a `scan_mode=vps`; la API rechaza cualquier intento de guardar `local` y el runtime resuelve únicamente asignaciones del pool VPS.
+> - Eliminados el endpoint y las ramas de ejecución locales ya inalcanzables. Pendiente deploy junto con el asistente de Servidor VPN.
+
 > **Sesión 2026-08-22 — Asistente trazable para Servidor VPN.** Rama `vps_uni` (base `53d280e`). Estado: backend 121/685, frontend 76/258, build y `check:all` verdes; sin deploy.
 > - Reemplazada la configuración plana por pasos: operación, red/WireGuard, revisión y resultado; los conflictos se resumen y el respaldo queda separado.
 > - Se distinguen “conectar existente” y “preparar nuevo”; “reemplazar Core” se muestra no disponible hasta implementar migración y recuperación verificables.

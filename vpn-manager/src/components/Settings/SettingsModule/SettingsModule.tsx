@@ -148,11 +148,7 @@ export default function SettingsModule() {
           )}
 
           {tab === 'scan' && !loadState.isLoading && (
-            <ScanModeToggle
-              scanMode={loadState.settings.scan_mode ?? 'vps'}
-              localScanIp={loadState.settings.local_scan_ip ?? ''}
-              onChange={(patch) => loadState.setSettings({ ...loadState.settings, ...patch })}
-            />
+            <ScanModeToggle />
           )}
 
           {tab === 'reports' && !loadState.isLoading && (

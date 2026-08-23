@@ -25,7 +25,6 @@ const { getDb } = require('../../db.service');
 const scanIpRepo = require('../../db/repos/scanIpRepo');
 const sessionRepo = require('../../db/repos/sessionRepo');
 const scanLock = require('../../lib/scanLock');
-const wgDetect = require('../../lib/wgDetect');
 const { resolveScanTargetVrf } = require('../../lib/scanTarget');
 const log = require('../../lib/logger').child({ scope: 'scan' });
 const { validate } = require('../../middleware/validate');
@@ -90,23 +89,6 @@ router.post('/node/scan-stream', validate({ body: NodeScanRequestSchema }), asyn
   if (acc && !acc.platform_admin && targetVrf && req.mikrotik) {
     const scanIp = await scanIpRepo.resolveForWorkspace(acc.workspace_id).catch(() => null);
     if (scanIp) {
-      // ── Alerta SOLO en modo local: la scan-IP debe ser una IP WG VIVA en este
-      // equipo. Si no lo es (WG reconectó con otra IP, o el admin la tipeó mal),
-      // el bind() del probe falla en silencio → 0 resultados (síntoma confuso).
-      // Avisamos claro en vez de escanear a ciegas. NO tocamos la config.
-      const scanMode = await scanIpRepo.getSetting('scan_mode').catch(() => 'vps');
-      if (scanMode === 'local' && !wgDetect.isLocalIpv4(scanIp)) {
-        const cands = wgDetect.listLocalMgmtIps().map((c) => c.ip);
-        return res.status(409).json({
-          success: false,
-          code: 'LOCAL_SCAN_IP_STALE',
-          message:
-            `La IP de escaneo local configurada (${scanIp}) no está activa en este equipo. ` +
-            `El administrador debe actualizarla en Ajustes → Modo de escaneo` +
-            (cands.length ? ` — IP WG detectada: ${cands.join(', ')}.` : '.'),
-        });
-      }
-
       // Serializa contra el job de Monitor AP del mismo workspace (misma scan-IP).
       // El timeout de seguridad del lock se dimensiona al tamaño del escaneo:
       // un /16 puede tardar bastante; con un timeout fijo de 5 min el lock se

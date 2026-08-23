@@ -72,10 +72,19 @@ describe('A2 — escritura de settings solo para platform_admin', () => {
     expect(r.status).toBe(403);
   });
 
-  it('platform_admin → 200 y persiste', async () => {
+  it('platform_admin no puede reactivar el modo local retirado', async () => {
     const r = await request(app).post('/api/settings/save')
       .set('x-test-identity', 'platformAdmin')
       .send({ key: 'scan_mode', value: 'local' });
+    expect(r.status).toBe(422);
+    expect(r.body.code).toBe('SCAN_MODE_VPS_ONLY');
+    expect(db.run).not.toHaveBeenCalled();
+  });
+
+  it('platform_admin puede reafirmar el modo VPS', async () => {
+    const r = await request(app).post('/api/settings/save')
+      .set('x-test-identity', 'platformAdmin')
+      .send({ key: 'scan_mode', value: 'vps' });
     expect(r.status).toBe(200);
     expect(db.run).toHaveBeenCalled();
   });

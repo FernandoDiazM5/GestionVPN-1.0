@@ -6,7 +6,7 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 
 ## Resumen
 
-- Rutas detectadas: 164
+- Rutas detectadas: 163
 - Rutas de mutación (POST/PUT/PATCH): 105
 - Rutas que consumen `req.body`: 84
 - Rutas con esquema de `req.body` detectable: 84/84
@@ -159,15 +159,14 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `routes/nodes/provision.routes.js` | 216 | POST | `/node/provision` | sí | — | no | sí | sql, network-admin | — |
 | `routes/nodes/provision.routes.js` | 591 | POST | `/node/deprovision-impact` | sí | — | no | sí | — | — |
 | `routes/nodes/provision.routes.js` | 603 | POST | `/node/deprovision` | sí | — | no | sí | network-admin | — |
-| `routes/nodes/scan.routes.js` | 51 | POST | `/node/scan-stream` | sí | — | no | sí | network-admin | — |
+| `routes/nodes/scan.routes.js` | 50 | POST | `/node/scan-stream` | sí | — | no | sí | network-admin | — |
 | `routes/nodes/tags.routes.js` | 16 | GET | `/node/tags` | sí | — | no | n/a | sql | — |
 | `routes/nodes/tags.routes.js` | 41 | POST | `/node/tag/save` | sí | — | no | sí | sql | — |
-| `routes/settings.routes.js` | 40 | GET | `/settings/get` | sí | platform-admin | no | n/a | sql | — |
-| `routes/settings.routes.js` | 71 | GET | `/settings/scan-local-check` | sí | platform-admin | no | n/a | sql | — |
-| `routes/settings.routes.js` | 82 | GET | `/settings/management-supernet-preview` | sí | platform-admin | no | n/a | network-admin | — |
-| `routes/settings.routes.js` | 89 | POST | `/settings/test-core-connection` | sí | platform-admin | no | sí | network-admin | — |
-| `routes/settings.routes.js` | 115 | POST | `/settings/save` | sí | platform-admin | no | sí | sql, network-admin | — |
-| `routes/settings.routes.js` | 190 | POST | `/settings/test-error-email` | sí | platform-admin | no | n/a | — | — |
+| `routes/settings.routes.js` | 39 | GET | `/settings/get` | sí | platform-admin | no | n/a | sql | — |
+| `routes/settings.routes.js` | 67 | GET | `/settings/management-supernet-preview` | sí | platform-admin | no | n/a | network-admin | — |
+| `routes/settings.routes.js` | 74 | POST | `/settings/test-core-connection` | sí | platform-admin | no | sí | network-admin | — |
+| `routes/settings.routes.js` | 100 | POST | `/settings/save` | sí | platform-admin | no | sí | sql, network-admin | — |
+| `routes/settings.routes.js` | 179 | POST | `/settings/test-error-email` | sí | platform-admin | no | n/a | — | — |
 | `routes/team.routes.js` | 218 | POST | `/invite` | sí | OWNER | no | sí | — | — |
 | `routes/team.routes.js` | 277 | POST | `/accept` | no | — | sí | sí | network-admin | `PUBLIC_MUTATION_REVIEW` |
 | `routes/team.routes.js` | 385 | GET | `/my-invitations` | sí | — | no | n/a | — | — |

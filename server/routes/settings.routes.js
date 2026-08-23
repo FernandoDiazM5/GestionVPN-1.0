@@ -10,7 +10,6 @@ const { getDb, encryptPass, decryptPass, getAppSetting } = require('../db.servic
 const { sendOk, AppError, asyncHandler } = require('../lib/apiResponse');
 const { SaveSettingRequestSchema, CORE_ROUTER_KEYS } = require('@gestionvpn/contracts');
 const { sendGeneric } = require('../lib/mailer');
-const wgDetect = require('../lib/wgDetect');
 const { previewManagementSupernet, saveManagementSupernet } = require('../lib/managementNetworkService');
 const { connectToMikrotik, safeWrite } = require('../routeros.service');
 const { mikrotikAppError } = require('../lib/mikrotikError');
@@ -65,20 +64,6 @@ const requirePlatformAdmin = (req, _res, next) => {
   next();
 };
 
-// Chequeo READ-ONLY (solo admin): ¿la local_scan_ip configurada está viva en
-// este equipo? Solo relevante en modo 'local'. Alimenta la alerta de la UI sin
-// modificar nada. `ok=true` cuando no aplica (modo VPS) o la IP sí está activa.
-router.get('/settings/scan-local-check', requirePlatformAdmin, asyncHandler(async (req, res) => {
-  const db = await getDb();
-  const modeRow = await db.get("SELECT value FROM app_settings WHERE `key` = 'scan_mode'");
-  const ipRow = await db.get("SELECT value FROM app_settings WHERE `key` = 'local_scan_ip'");
-  const mode = modeRow?.value || 'vps';
-  const configured = (ipRow?.value || '').trim();
-  const candidates = wgDetect.listLocalMgmtIps();
-  const ok = mode !== 'local' ? true : (!!configured && wgDetect.isLocalIpv4(configured));
-  return sendOk(res, { mode, configured, ok, candidates });
-}));
-
 router.get('/settings/management-supernet-preview', requirePlatformAdmin, asyncHandler(async (req, res) => {
   const { cidr } = z.object({ cidr: z.string().trim().min(1).max(18) }).parse(req.query);
   return sendOk(res, { preview: await previewManagementSupernet(cidr) });
@@ -114,6 +99,10 @@ router.post('/settings/test-core-connection', requirePlatformAdmin, asyncHandler
 
 router.post('/settings/save', requirePlatformAdmin, asyncHandler(async (req, res) => {
   const { key, value } = SaveSettingRequestSchema.parse(req.body);
+
+  if (key === 'scan_mode' && value !== 'vps') {
+    throw new AppError('El escaneo opera exclusivamente desde el VPS.', 422, 'SCAN_MODE_VPS_ONLY');
+  }
 
   if (CORE_ROUTER_KEYS.includes(key) && !req.account?.platform_admin) {
     throw new AppError('Solo el Administrador puede modificar la configuración del router core.', 403, 'FORBIDDEN');
