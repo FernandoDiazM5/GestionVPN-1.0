@@ -6622,3 +6622,4 @@ Verificado con `grep` sobre todo `server/`:
 - Se reactivó únicamente el Administrador y se retiró de forma lógica su membresía ajena; el moderador objetivo permanece suspendido y no se cambiaron contraseñas.
 - El backend filtra `is_platform_admin=0` y membresías activas en ambas fases de la suspensión. Una migración idempotente limpia futuras membresías administrativas ajenas sin tocar el workspace propio.
 - Verificación local: 123 archivos/687 pruebas backend, `check:all` y Semgrep security correctos.
+- Desplegado `6056648` usando exclusivamente `docker-compose.prod.yml`; HTTPS/health 200, backend healthy y 0 reinicios. Un primer intento con el compose local dejó temporalmente el backend esperando MariaDB en 3306 y produjo 502; se revirtió de inmediato y el despliegue correcto usa 3307/entorno productivo. Rollback preservado: `gestionvpn-10-backend:pre-auth-isolation-20260823T030306Z`.
