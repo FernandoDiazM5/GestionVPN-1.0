@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-22 — Despliegue de asistente VPN y escaneo VPS-only.** Rama/runtime `vps_uni@11aea0a`. Estado: backend/frontend/DB activos, HTTPS y health `ok`, 0 reinicios.
+> - Publicados el asistente por pasos, historial persistente y retiro integral del modo local; `core_provision_runs` existe y `scan_mode` quedó normalizado a `vps`.
+> - Bundle productivo contiene las tres marcas nuevas; la ruta de historial responde 401 sin sesión, confirmando que existe y permanece protegida.
+> - RouterOS verificado read-only: `VPN-WG-VPS` existe y `10.12.248.0/24` está en `VRF-ND2-HOUSENET` (1/1); no se realizaron escrituras.
+> - Backup `/root/pre-vps-uni-11aea0a-20260823T011144Z`; rollback `gestionvpn-10-backend:pre-11aea0a-20260823T011144Z` y `gestionvpn-10-frontend:pre-11aea0a-20260823T011144Z`. Disco final 86%/3.4 GiB libres.
+
 > **Sesión 2026-08-22 — Escaneo exclusivamente desde VPS.** Rama `vps_uni` (base `b099f54`). Estado: backend 121/685, frontend 77/259, build y `check:all` verdes; sin deploy.
 > - Retirados selector Local, captura de IP WG local y chequeo asociado; Escaneo ahora comunica el origen VPS fijo y la asignación aislada por workspace.
 > - `schema_ops` normaliza instalaciones antiguas a `scan_mode=vps`; la API rechaza cualquier intento de guardar `local` y el runtime resuelve únicamente asignaciones del pool VPS.
