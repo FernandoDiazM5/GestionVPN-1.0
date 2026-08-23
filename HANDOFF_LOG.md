@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-22 — Despliegue del paquete administrador/configuración/WireGuard.** Rama/runtime `vps_uni@acc8424`. Estado: backend, frontend y DB saludables; HTTPS 200.
+> - Publicados seis commits: modales móviles, correo vigente en Usuarios VPN, Dashboard responsive, Moderadores, Seguridad y Configuración del Router Core.
+> - Verificación productiva: `/api/health` con MySQL/RouterOS/SMTP `ok`; la nueva prueba del Core responde 401 sin sesión (ruta presente y protegida); bundle contiene las vistas nuevas.
+> - `wg0` activo, ping al Core sin pérdidas, API 8728 accesible y `check:scanroute` dry-run confirma `10.12.248.0/24` en `VRF-ND2-HOUSENET` (1/1). No se mutó RouterOS.
+> - Backup completo: `/root/pre-vps-uni-acc8424-20260823T001911Z`; rollback `gestionvpn-10-backend:pre-acc8424-20260823T001911Z` y `gestionvpn-10-frontend:pre-acc8424-20260823T001911Z`. Disco final 83%/4.2 GiB libres.
+
 > **Sesión 2026-08-22 — Mejora de Configuración del Router Core.** Rama `vps_uni` (base `c807bb1`). Estado: backend 120/683, frontend 76/258, build y `check:all` verdes; sin deploy.
 > - Renombrados títulos/ayudas ambiguos; credenciales y endpoint/SSTP quedan en secciones distintas con navegación móvil compacta.
 > - Mostrar contraseña, validación inmediata y de API, detección de cambios, advertencia operativa y guardado sticky/deshabilitado sin cambios.
