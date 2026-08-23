@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-22 — Limpieza segura del VPS operativo.** Runtime preservado `vps_uni@11aea0a`. Estado: 3 contenedores activos, backend/DB saludables, HTTPS 200 y 0 reinicios.
+> - Disco pasó de 86%/3.4 GiB libres a 68%/7.8 GiB libres; inodos 28%→21%.
+> - Retirados 3 rollbacks backend y 5 frontend ya superados, caché APT y 160 MiB de journals archivados. Docker liberó principalmente capas únicas de imágenes antiguas.
+> - Se preservaron imágenes activas, rollback más reciente `pre-11aea0a-20260823T011144Z`, volúmenes, DB, certificados, configuración y todos los respaldos `/root`.
+> - `docker builder prune -af` no retiró capas porque las 7.228 GB reportadas siguen referenciadas por las imágenes activa/rollback; no son espacio recuperable mientras ambas se conserven.
+
 > **Sesión 2026-08-22 — Despliegue de asistente VPN y escaneo VPS-only.** Rama/runtime `vps_uni@11aea0a`. Estado: backend/frontend/DB activos, HTTPS y health `ok`, 0 reinicios.
 > - Publicados el asistente por pasos, historial persistente y retiro integral del modo local; `core_provision_runs` existe y `scan_mode` quedó normalizado a `vps`.
 > - Bundle productivo contiene las tres marcas nuevas; la ruta de historial responde 401 sin sesión, confirmando que existe y permanece protegida.
