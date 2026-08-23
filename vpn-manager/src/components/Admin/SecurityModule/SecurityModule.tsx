@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  AlertTriangle, Ban, Clock3, Eye, Infinity as InfinityIcon, RefreshCw, Search, Shield, ShieldCheck,
-  ShieldOff, Unlock, UserRoundX, X,
+  AlertTriangle, Ban, Clock3, Download, Eye, Infinity as InfinityIcon, RefreshCw, Search, Shield, ShieldCheck,
+  ShieldOff, SlidersHorizontal, Unlock, UserRoundX, X,
 } from 'lucide-react';
 import { confirmGoogleIdentity } from '../../../services/federatedAuth';
 import { securityAdminApi, type LockedAccount, type SecurityJail, type SecurityMutation, type WebObservation } from '../../../services/securityAdminApi';
@@ -20,6 +20,8 @@ const categories: Array<[SecurityMutation['category'], string]> = [
 
 type SecurityAction = 'ban' | 'promote' | 'unban' | 'trust' | 'untrust' | null;
 type SecurityTab = 'blocked' | 'accounts' | 'trusted' | 'activity' | 'policies';
+type BlockedSort = 'recent' | 'attempts' | 'expiry' | 'ip';
+const BLOCKED_PAGE_SIZE = 10;
 
 interface BlockedRow {
   ip: string;
@@ -49,6 +51,19 @@ const formatDate = (value?: number | null) => {
 const isIndefiniteJail = (jail: string) => ['gestionvpn-indefinite', 'gestionvpn-recidive',
   'gestionvpn-web-auth', 'gestionvpn-web-recidive'].includes(jail);
 
+function downloadCsv(filename: string, headers: string[], values: Array<Array<string | number>>) {
+  const escape = (value: string | number) => {
+    const raw = String(value);
+    const safe = /^[=+\-@]/.test(raw) ? `'${raw}` : raw;
+    return `"${safe.replace(/"/g, '""')}"`;
+  };
+  const csv = [headers, ...values].map(row => row.map(escape).join(',')).join('\r\n');
+  const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }));
+  const link = document.createElement('a');
+  link.href = url; link.download = filename; document.body.appendChild(link); link.click(); link.remove();
+  URL.revokeObjectURL(url);
+}
+
 export default function SecurityModule() {
   const { session } = useWorkspaceSession();
   const platformAdmin = Boolean(session?.platform_admin);
@@ -75,6 +90,10 @@ export default function SecurityModule() {
   const [lockedAccounts, setLockedAccounts] = useState<LockedAccount[]>([]);
   const [unlockAccount, setUnlockAccount] = useState<LockedAccount | null>(null);
   const [webObservation, setWebObservation] = useState<WebObservation | null>(null);
+  const [updatedAt, setUpdatedAt] = useState<number | null>(null);
+  const [protectionFilter, setProtectionFilter] = useState('all');
+  const [blockedSort, setBlockedSort] = useState<BlockedSort>('recent');
+  const [blockedPage, setBlockedPage] = useState(1);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -94,6 +113,7 @@ export default function SecurityModule() {
         setHistory(recent.history);
         setWebObservation(web);
       }
+      setUpdatedAt(Date.now());
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'No se pudo cargar la seguridad del VPS');
     } finally {
@@ -104,7 +124,7 @@ export default function SecurityModule() {
   useEffect(() => { setActiveTab(platformAdmin ? 'blocked' : 'accounts'); }, [platformAdmin]);
   useEffect(() => { void load(); }, [load]);
 
-  const rows = useMemo<BlockedRow[]>(() => jails.flatMap((item) => item.banned.map((ip) => {
+  const allRows = useMemo<BlockedRow[]>(() => jails.flatMap((item) => item.banned.map((ip) => {
     const detail = item.banDetails?.find((entry) => entry.target === ip);
     return {
       ip,
@@ -114,12 +134,30 @@ export default function SecurityModule() {
       blockedSince: detail?.blockedSince,
       expiresAt: detail?.expiresAt,
     };
-  })).filter((row) => {
+  })), [jails]);
+
+  const rows = useMemo(() => allRows.filter((row) => {
     const query = filter.trim().toLowerCase();
-    return !query || row.ip.toLowerCase().includes(query)
+    const matchesQuery = !query || row.ip.toLowerCase().includes(query)
       || row.jail.toLowerCase().includes(query)
       || row.protection.toLowerCase().includes(query);
-  }), [jails, filter]);
+    const matchesProtection = protectionFilter === 'all'
+      || (protectionFilter === 'indefinite' && isIndefiniteJail(row.jail))
+      || (protectionFilter === 'ssh' && ['sshd', 'gestionvpn-recidive'].includes(row.jail))
+      || (protectionFilter === 'web' && row.jail.includes('web'))
+      || (protectionFilter === 'manual' && !row.jail.includes('web') && !['sshd', 'gestionvpn-recidive', 'gestionvpn-indefinite'].includes(row.jail));
+    return matchesQuery && matchesProtection;
+  }).sort((a, b) => {
+    if (blockedSort === 'attempts') return b.attempts - a.attempts;
+    if (blockedSort === 'expiry') return Number(a.expiresAt ?? Infinity) - Number(b.expiresAt ?? Infinity);
+    if (blockedSort === 'ip') return a.ip.localeCompare(b.ip, undefined, { numeric: true });
+    return Number(b.blockedSince || 0) - Number(a.blockedSince || 0);
+  }), [allRows, blockedSort, filter, protectionFilter]);
+
+  useEffect(() => { setBlockedPage(1); }, [filter, protectionFilter, blockedSort]);
+  const blockedPages = Math.max(1, Math.ceil(rows.length / BLOCKED_PAGE_SIZE));
+  useEffect(() => { if (blockedPage > blockedPages) setBlockedPage(blockedPages); }, [blockedPage, blockedPages]);
+  const pagedRows = rows.slice((blockedPage - 1) * BLOCKED_PAGE_SIZE, blockedPage * BLOCKED_PAGE_SIZE);
 
   const managedTrusted = useMemo(() => {
     return managedTrustedTargets(trusted, systemTrusted);
@@ -198,18 +236,21 @@ export default function SecurityModule() {
   };
 
   return (
-    <div className="space-y-5 p-4 md:p-6">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-4 p-3 sm:p-4 md:space-y-5 md:p-6">
+      <header className="card flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{platformAdmin ? 'Seguridad del VPS' : 'Seguridad del workspace'}</h1>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
             {platformAdmin ? 'Controla bloqueos, intentos y direcciones de confianza.' : 'Gestiona cuentas bloqueadas de tu propio workspace.'}
           </p>
         </div>
-        <button className="btn-outline btn-md self-start" onClick={() => void load()} disabled={loading}>
+        <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:items-end">
+        <button className="btn-outline btn-md min-h-11 w-full justify-center sm:w-auto" onClick={() => void load()} disabled={loading}>
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           {loading ? 'Actualizando' : 'Actualizar'}
         </button>
+        <span className="text-center text-2xs text-slate-500 sm:text-right">{updatedAt ? `Actualizado ${formatDate(updatedAt)}` : 'Esperando datos'}</span>
+        </div>
       </header>
 
       {error && (
@@ -224,8 +265,8 @@ export default function SecurityModule() {
 
       <SecurityTabs active={activeTab} setActive={setActiveTab} platformAdmin={platformAdmin} />
 
-      {platformAdmin && <div className="grid gap-3 sm:grid-cols-3">
-        <Summary icon={Shield} label="Direcciones bloqueadas" value={rows.length} />
+      {platformAdmin && <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <Summary icon={Shield} label="Direcciones bloqueadas" value={allRows.length} />
         <Summary icon={ShieldCheck} label="Direcciones confiables" value={trusted.length} />
         <Summary icon={ShieldOff} label="Protecciones activas" value={jails.length} />
       </div>}
@@ -279,7 +320,7 @@ export default function SecurityModule() {
                 Los desbloqueos no crean una excepción permanente. Los intentos corresponden únicamente a detecciones SSH reales.
               </p>
             </div>
-            <div className="grid w-full gap-2 sm:grid-cols-2 xl:w-auto xl:grid-cols-[minmax(18rem,22rem)_auto_auto] xl:items-center">
+            <div className="grid w-full gap-2 sm:grid-cols-2 xl:w-auto xl:grid-cols-[minmax(17rem,21rem)_12rem_12rem_auto_auto] xl:items-center">
               <div className="relative min-w-0 sm:col-span-2 xl:col-span-1">
                 <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-500" />
                 <input
@@ -289,10 +330,12 @@ export default function SecurityModule() {
                   placeholder="Buscar IP, motivo o protección"
                 />
               </div>
-              <button className="btn-outline inline-flex min-h-11 min-w-[12rem] shrink-0 items-center justify-center gap-2 whitespace-nowrap px-4 text-sm" onClick={() => open('trust')}>
+              <label className="relative"><span className="sr-only">Filtrar por protección</span><SlidersHorizontal className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><select className="input-field min-h-11 pl-9" value={protectionFilter} onChange={event => setProtectionFilter(event.target.value)}><option value="all">Toda protección</option><option value="ssh">Fail2ban SSH</option><option value="web">Protección web</option><option value="indefinite">Indefinidos</option><option value="manual">Manuales</option></select></label>
+              <label><span className="sr-only">Ordenar bloqueos</span><select className="input-field min-h-11" value={blockedSort} onChange={event => setBlockedSort(event.target.value as BlockedSort)}><option value="recent">Más recientes</option><option value="attempts">Más intentos</option><option value="expiry">Próximos a vencer</option><option value="ip">Dirección IP</option></select></label>
+              <button className="btn-outline inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 whitespace-nowrap px-4 text-sm" onClick={() => open('trust')}>
                 <ShieldCheck className="h-4 w-4" /> Agregar confiable
               </button>
-              <button className="btn-primary inline-flex min-h-11 min-w-[10rem] shrink-0 items-center justify-center gap-2 whitespace-nowrap px-4 text-sm" onClick={() => open('ban')}>
+              <button className="btn-primary inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 whitespace-nowrap px-4 text-sm" onClick={() => open('ban')}>
                 <Ban className="h-4 w-4" /> Bloquear IP
               </button>
             </div>
@@ -313,7 +356,7 @@ export default function SecurityModule() {
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {loading && rows.length === 0 && [...Array(4)].map((_, index) => <BlockedRowSkeleton key={index} />)}
-              {rows.map((row) => (
+              {pagedRows.map((row) => (
                 <BlockedTableRow key={`${row.jail}-${row.ip}`} row={row} open={open} showAttempts={showAttempts} />
               ))}
               {!loading && rows.length === 0 && <EmptyBlockedRows colSpan={5} />}
@@ -323,11 +366,12 @@ export default function SecurityModule() {
 
         <div className="divide-y divide-slate-100 md:hidden dark:divide-slate-800">
           {loading && rows.length === 0 && [...Array(3)].map((_, index) => <BlockedCardSkeleton key={index} />)}
-          {rows.map((row) => (
+          {pagedRows.map((row) => (
             <BlockedCard key={`${row.jail}-${row.ip}`} row={row} open={open} showAttempts={showAttempts} />
           ))}
           {!loading && rows.length === 0 && <div className="flex flex-col items-center gap-3 p-8 text-center"><div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400"><ShieldCheck className="h-6 w-6" /></div><div><p className="text-sm font-semibold text-slate-700 dark:text-slate-200">No hay direcciones bloqueadas</p><p className="mt-1 text-xs text-slate-500">Fail2ban no reporta bloqueos activos para este filtro.</p></div></div>}
         </div>
+        {rows.length > 0 && <Pagination page={blockedPage} pages={blockedPages} total={rows.length} setPage={setBlockedPage} />}
       </section>}
 
       {platformAdmin && activeTab === 'trusted' && <section className="card p-4 md:p-5">
@@ -389,8 +433,9 @@ function SecurityTabs({ active, setActive, platformAdmin }: {
       ['trusted', 'Direcciones confiables'], ['activity', 'Actividad reciente'],
       ['policies', 'Políticas automáticas']]
     : [['accounts', 'Usuarios bloqueados']];
-  return <nav className="overflow-x-auto" aria-label="Secciones de seguridad">
-    <div className="inline-flex min-w-full gap-1 rounded-2xl border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900" role="tablist">
+  return <nav aria-label="Secciones de seguridad">
+    <label className="block sm:hidden"><span className="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-300">Sección de seguridad</span><select className="input-field min-h-11" value={active} onChange={event => setActive(event.target.value as SecurityTab)}>{tabs.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
+    <div className="hidden min-w-full gap-1 rounded-2xl border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900 sm:inline-flex" role="tablist">
       {tabs.map(([id, label]) => <button key={id} type="button" role="tab"
         aria-selected={active === id} onClick={() => setActive(id)}
         className={`tab-btn min-h-11 flex-1 justify-center whitespace-nowrap rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${active === id ? 'tab-active' : 'tab-inactive'}`}>
@@ -398,6 +443,13 @@ function SecurityTabs({ active, setActive, platformAdmin }: {
       </button>)}
     </div>
   </nav>;
+}
+
+function Pagination({ page, pages, total, setPage }: { page: number; pages: number; total: number; setPage: (page: number) => void }) {
+  return <div className="flex flex-col gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-900/40 sm:flex-row sm:items-center sm:justify-between">
+    <span>{total} resultado{total !== 1 ? 's' : ''} · Página {page} de {pages}</span>
+    <div className="grid grid-cols-2 gap-2"><button className="btn-outline min-h-11 px-4 text-xs" disabled={page <= 1} onClick={() => setPage(page - 1)}>Anterior</button><button className="btn-outline min-h-11 px-4 text-xs" disabled={page >= pages} onClick={() => setPage(page + 1)}>Siguiente</button></div>
+  </div>;
 }
 
 function WebObservationPanel({ observation }: { observation: WebObservation }) {
@@ -621,17 +673,24 @@ function RecentActivity({ history, webActions }: {
     return 'api';
   };
   const filtered = rows.filter((row) => sourceFilter === 'all' || sourceOf(row) === sourceFilter);
+  const exportRows = () => downloadCsv(
+    `seguridad-actividad-${new Date().toISOString().slice(0, 10)}.csv`,
+    ['Fecha', 'Administrador', 'Acción', 'Objetivo', 'Resultado', 'Motivo'],
+    filtered.map(row => [
+      formatDate(Number(row.created_at)), String(row.actor_email || 'Administrador'), String(row.action || ''),
+      String(row.target || ''), String(row.outcome || ''), String(row.reason || ''),
+    ])
+  );
   return (
     <section className="card overflow-hidden">
       <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-end sm:justify-between dark:border-slate-700">
         <div><h2 className="font-bold text-slate-900 dark:text-white">Actividad reciente</h2>
           <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">Cambios administrativos y decisiones automáticas con su evidencia.</p></div>
-        <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">Origen
-          <select className="input-field mt-1 min-h-11 min-w-48" value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)}>
+        <div className="grid w-full gap-2 sm:w-auto sm:grid-cols-[minmax(12rem,1fr)_auto] sm:items-end"><label className="text-xs font-semibold text-slate-600 dark:text-slate-300">Origen
+          <select className="input-field mt-1 min-h-11 w-full sm:min-w-48" value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)}>
             <option value="all">Todos</option><option value="login">Login</option><option value="api">API sensible</option>
             <option value="scan">Escaneo</option><option value="ssh">SSH</option><option value="recidive">Reincidencia</option>
-          </select>
-        </label>
+          </select></label><button className="btn-outline min-h-11 justify-center px-4 text-xs" disabled={filtered.length === 0} onClick={exportRows}><Download className="h-4 w-4" /> Exportar CSV</button></div>
       </div>
       <div className="hidden overflow-x-auto md:block">
         <table className="min-w-[780px] w-full text-left text-sm">
@@ -747,9 +806,9 @@ function AttemptsDialog({ result, close }: { result: AttemptResult; close: () =>
 
 function Summary({ icon: Icon, label, value }: { icon: typeof Shield; label: string; value: number }) {
   return (
-    <div className="card flex items-center gap-3 p-4">
+    <div className="card flex min-w-0 items-center gap-3 p-3 last:col-span-2 sm:p-4 sm:last:col-span-1">
       <div className="rounded-xl bg-indigo-50 p-2.5 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-300"><Icon className="h-5 w-5" /></div>
-      <div><div className="text-2xl font-bold text-slate-900 dark:text-white">{value}</div><div className="text-xs font-medium text-slate-600 dark:text-slate-300">{label}</div></div>
+      <div className="min-w-0"><div className="text-2xl font-bold text-slate-900 dark:text-white">{value}</div><div className="break-words text-xs font-medium text-slate-600 dark:text-slate-300">{label}</div></div>
     </div>
   );
 }

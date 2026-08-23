@@ -1,5 +1,12 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-22 — Mejora responsive y operativa de Seguridad.** Rama `vps_uni` (base `ccc820c`). Estado: frontend 76/258, build y `check:all` verdes; sin deploy.
+> - Navegación móvil mediante selector sin overflow; encabezado/tres métricas consistentes y última actualización visible.
+> - Bloqueos: búsqueda existente complementada con filtro de protección, cuatro órdenes y páginas de 10 en tabla/tarjetas.
+> - Actividad exporta el filtro visible a CSV UTF-8 y neutraliza prefijos interpretables como fórmulas.
+> - Decisión de seguridad: no se implementó desbloqueo masivo; cada IP conserva motivo, step-up y confirmación individual auditada.
+> - La guía `ui-design-system` orientó jerarquía, responsive y objetivos táctiles; pendiente desplegar el acumulado cuando el usuario lo solicite.
+
 > **Sesión 2026-08-22 — Mejora integral de Moderadores.** Rama `vps_uni` (base `0c01db4`). Estado: backend 120/683, frontend 76/258, contratos/build y `check:all` verdes; sin deploy.
 > - Agregados resumen, búsqueda, filtro de estado, cuatro órdenes y resultado filtrado; “Alta” pasa a “Fecha de alta”.
 > - La API calcula `last_access_at` desde la última sesión emitida y la vista permite verlo/ordenarlo sin una migración nueva.
