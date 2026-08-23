@@ -3,6 +3,8 @@ const { z } = require('zod');
 const { asyncHandler, AppError, sendOk } = require('../lib/apiResponse');
 const { inspectCore, previewProvision, provisionCore } = require('../lib/coreServerService');
 const { getLastBackup, loadConfig, runCoreBackup } = require('../lib/coreBackupService');
+const coreProvisionRepo = require('../db/repos/coreProvisionRepo');
+const { getAppSetting } = require('../db.service');
 
 const router = express.Router();
 const CONFIRMATION = 'PREPARAR DESDE CERO';
@@ -44,12 +46,32 @@ router.get('/provision-preview', asyncHandler(async (_req, res) => {
   }
 }));
 
+router.get('/provision-history', asyncHandler(async (_req, res) => {
+  return sendOk(res, { runs: await coreProvisionRepo.history(20) });
+}));
+
 router.post('/provision', asyncHandler(async (req, res) => {
   const body = z.object({ confirmation: z.literal(CONFIRMATION) }).parse(req.body);
   if (body.confirmation !== CONFIRMATION) throw new AppError('Confirmación inválida.', 422, 'INVALID_CONFIRMATION');
+  const preview = await previewProvision();
+  const runId = await coreProvisionRepo.start({
+    actorUserId: req.account?.sub,
+    targetHost: preview.summary?.host || await getAppSetting('MT_IP'),
+    targetIdentity: preview.summary?.identity,
+    targetVersion: preview.summary?.version,
+    targetModel: preview.summary?.model,
+    networkSupernet: await getAppSetting('management_supernet'),
+  });
+  if (!preview.canProvision) {
+    await coreProvisionRepo.finish(runId, { status: 'BLOCKED', steps: [], errorCode: 'CORE_PROVISION_BLOCKED', errorMessage: preview.blockers.join(' ') });
+    throw asAppError(Object.assign(new Error(preview.blockers.join(' ')), { code: 'CORE_PROVISION_BLOCKED', preview }));
+  }
   try {
-    return sendOk(res, { result: await provisionCore() });
+    const result = await provisionCore();
+    await coreProvisionRepo.finish(runId, { status: 'COMPLETED', steps: result.steps, identity: result.health?.identity });
+    return sendOk(res, { result: { ...result, runId } });
   } catch (error) {
+    await coreProvisionRepo.finish(runId, { status: 'FAILED', steps: error.steps || [], errorCode: error.code || 'CORE_OPERATION_FAILED', errorMessage: error.message });
     throw asAppError(error);
   }
 }));

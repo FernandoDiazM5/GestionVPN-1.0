@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-22 — Asistente trazable para Servidor VPN.** Rama `vps_uni` (base `53d280e`). Estado: backend 121/685, frontend 76/258, build y `check:all` verdes; sin deploy.
+> - Reemplazada la configuración plana por pasos: operación, red/WireGuard, revisión y resultado; los conflictos se resumen y el respaldo queda separado.
+> - Se distinguen “conectar existente” y “preparar nuevo”; “reemplazar Core” se muestra no disponible hasta implementar migración y recuperación verificables.
+> - `core_provision_runs` y `/api/admin/core-server/provision-history` conservan actor, destino, red, estado, duración, pasos y errores sin secretos; los pasos parciales también acompañan fallos.
+> - La guía UI definió responsive/objetivos táctiles y la guía de redes mantuvo revisión previa, bloqueo por objetos operativos y ausencia de una falsa migración. Pendiente deploy cuando el usuario lo autorice.
+
 > **Sesión 2026-08-22 — Despliegue del paquete administrador/configuración/WireGuard.** Rama/runtime `vps_uni@acc8424`. Estado: backend, frontend y DB saludables; HTTPS 200.
 > - Publicados seis commits: modales móviles, correo vigente en Usuarios VPN, Dashboard responsive, Moderadores, Seguridad y Configuración del Router Core.
 > - Verificación productiva: `/api/health` con MySQL/RouterOS/SMTP `ok`; la nueva prueba del Core responde 401 sin sesión (ruta presente y protegida); bundle contiene las vistas nuevas.

@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CoreServerPanel } from './CoreServerPanel';
 
-const mocks = vi.hoisted(() => ({ status: vi.fn(), health: vi.fn(), preview: vi.fn(), provision: vi.fn(), backupNow: vi.fn(), managementSupernetPreview: vi.fn() }));
+const mocks = vi.hoisted(() => ({ status: vi.fn(), health: vi.fn(), preview: vi.fn(), provision: vi.fn(), backupNow: vi.fn(), history: vi.fn(), managementSupernetPreview: vi.fn() }));
 
 vi.mock('../../../../services/coreServerApi', () => ({
   coreServerApi: mocks,
@@ -31,6 +31,7 @@ describe('CoreServerPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.status.mockResolvedValue(status);
+    mocks.history.mockResolvedValue({ success: true, runs: [] });
     mocks.managementSupernetPreview.mockResolvedValue({
       success: true,
       preview: { valid: true, canSave: true, locked: false, blockers: [], overlaps: [], plan: {
@@ -45,7 +46,7 @@ describe('CoreServerPanel', () => {
     render(<CoreServerPanel {...baseProps} />);
     expect(await screen.findByText('GW-VPN-CORE-ISP')).toBeInTheDocument();
     expect(screen.getByText('Operativo')).toBeInTheDocument();
-    expect(screen.getByText(/Envía juntos un .backup AES-SHA256 y un .rsc legible/)).toBeInTheDocument();
+    expect(screen.getByText(/Mantenimiento independiente del asistente/)).toBeInTheDocument();
   });
 
   it('presenta bloqueadores antes de preparar el equipo', async () => {
@@ -57,8 +58,11 @@ describe('CoreServerPanel', () => {
     const user = userEvent.setup();
     render(<CoreServerPanel {...baseProps} />);
     await screen.findByText('GW-VPN-CORE-ISP');
-    await user.click(screen.getByRole('button', { name: 'Revisar antes de preparar' }));
-    expect(await screen.findByText('Preparación bloqueada')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Preparar un servidor nuevo/ }));
+    const review = screen.getByRole('button', { name: 'Guardar y revisar' });
+    await waitFor(() => expect(review).toBeEnabled());
+    await user.click(review);
+    expect(await screen.findByText('No se puede continuar')).toBeInTheDocument();
     expect(screen.getByText('Se detectaron objetos operativos.')).toBeInTheDocument();
   });
 
@@ -73,7 +77,10 @@ describe('CoreServerPanel', () => {
   });
 
   it('muestra la división autoritativa devuelta por el backend', async () => {
+    const user = userEvent.setup();
     render(<CoreServerPanel {...baseProps} settings={{ ...baseProps.settings, management_supernet: '10.12.248.0/22' }} />);
+    await screen.findByText('GW-VPN-CORE-ISP');
+    await user.click(screen.getByRole('button', { name: /Preparar un servidor nuevo/ }));
     expect(await screen.findByText('10.12.248.0/24')).toBeInTheDocument();
     expect(screen.getByText('10.12.251.0/24')).toBeInTheDocument();
     expect(mocks.managementSupernetPreview).toHaveBeenCalledWith('10.12.248.0/22');

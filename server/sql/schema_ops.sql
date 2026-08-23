@@ -270,6 +270,28 @@ CREATE TABLE IF NOT EXISTS core_backup_runs (
     KEY idx_core_backup_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ── 12c. Trazabilidad del asistente de Servidor VPN ─────────
+-- Nunca almacena contraseñas, claves privadas ni la configuración exportada.
+CREATE TABLE IF NOT EXISTS core_provision_runs (
+    id                CHAR(36) NOT NULL PRIMARY KEY,
+    operation_type    ENUM('PREPARE_NEW') NOT NULL,
+    status            ENUM('RUNNING','COMPLETED','FAILED','BLOCKED') NOT NULL,
+    actor_user_id     CHAR(36) DEFAULT NULL,
+    target_host       VARCHAR(255) DEFAULT NULL,
+    target_identity   VARCHAR(190) DEFAULT NULL,
+    target_version    VARCHAR(80) DEFAULT NULL,
+    target_model      VARCHAR(120) DEFAULT NULL,
+    network_supernet  VARCHAR(64) DEFAULT NULL,
+    steps_json        LONGTEXT DEFAULT NULL,
+    error_code        VARCHAR(80) DEFAULT NULL,
+    error_message     VARCHAR(500) DEFAULT NULL,
+    started_at        BIGINT NOT NULL,
+    finished_at       BIGINT DEFAULT NULL,
+    KEY idx_core_provision_started (started_at),
+    KEY idx_core_provision_status (status),
+    CONSTRAINT fk_core_provision_actor FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ── 13. Colores de peers WireGuard ─────────────────────────
 CREATE TABLE IF NOT EXISTS peer_colors (
     peer_address VARCHAR(190) NOT NULL PRIMARY KEY,

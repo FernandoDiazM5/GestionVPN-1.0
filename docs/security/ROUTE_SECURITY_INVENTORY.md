@@ -6,7 +6,7 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 
 ## Resumen
 
-- Rutas detectadas: 163
+- Rutas detectadas: 164
 - Rutas de mutación (POST/PUT/PATCH): 105
 - Rutas que consumen `req.body`: 84
 - Rutas con esquema de `req.body` detectable: 84/84
@@ -118,11 +118,12 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `routes/core/tunnel.routes.js` | 156 | GET | `/tunnel/status` | sí | — | no | n/a | network-admin | — |
 | `routes/core/tunnel.routes.js` | 194 | GET | `/tunnel/my-mgmt-ip` | sí | — | no | n/a | — | — |
 | `routes/core/tunnel.routes.js` | 215 | POST | `/tunnel/register-my-ip` | sí | — | no | sí | sql, network-admin | — |
-| `routes/coreServer.routes.js` | 23 | GET | `/status` | sí | platform-admin | no | n/a | — | — |
-| `routes/coreServer.routes.js` | 37 | POST | `/health` | sí | platform-admin | no | n/a | — | — |
-| `routes/coreServer.routes.js` | 39 | GET | `/provision-preview` | sí | platform-admin | no | n/a | — | — |
-| `routes/coreServer.routes.js` | 47 | POST | `/provision` | sí | platform-admin | no | sí | — | — |
-| `routes/coreServer.routes.js` | 57 | POST | `/backup-now` | sí | platform-admin | no | n/a | — | — |
+| `routes/coreServer.routes.js` | 25 | GET | `/status` | sí | platform-admin | no | n/a | — | — |
+| `routes/coreServer.routes.js` | 39 | POST | `/health` | sí | platform-admin | no | n/a | — | — |
+| `routes/coreServer.routes.js` | 41 | GET | `/provision-preview` | sí | platform-admin | no | n/a | — | — |
+| `routes/coreServer.routes.js` | 49 | GET | `/provision-history` | sí | platform-admin | no | n/a | — | — |
+| `routes/coreServer.routes.js` | 53 | POST | `/provision` | sí | platform-admin | no | sí | — | — |
+| `routes/coreServer.routes.js` | 79 | POST | `/backup-now` | sí | platform-admin | no | n/a | — | — |
 | `routes/dashboard.routes.js` | 16 | GET | `/dashboard/metrics` | sí | — | no | n/a | — | — |
 | `routes/device.routes.js` | 26 | POST | `/device/auto-login` | sí | — | no | sí | network-admin | — |
 | `routes/device.routes.js` | 48 | POST | `/device/antenna` | sí | — | no | sí | sql, network-admin | — |

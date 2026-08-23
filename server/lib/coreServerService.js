@@ -335,6 +335,7 @@ async function provisionCore() {
     const finalInventory = await readInventory(api);
     return { steps, health: summarizeInventory(finalInventory) };
   } catch (error) {
+    error.steps = steps;
     log.error({ code: error.code, message: error.message }, 'Aprovisionamiento del core falló');
     throw error;
   } finally {
