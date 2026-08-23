@@ -6614,3 +6614,11 @@ Verificado con `grep` sobre todo `server/`:
 > - La emisión y activación comparan la privada externa con la pública activa y fallan cerradas ante desajuste.
 > - Semgrep no concluyó: CLI ausente y descarga del contenedor agotó dos tiempos acotados. Repetir antes del despliegue.
 > **Sesión 2026-08-16 — CRUD completo de clientes y planes.** Se publicó y desplegó `joinpoint-v0.1.0-pilot.11` en el VPS administrador. Clientes admiten edición de datos y contacto principal, suspensión y reactivación; planes admiten edición de nombre/descripción, archivado y reactivación. Las escrituras usan control optimista de versión y estados no destructivos. Los precios, límites y capacidades de un plan existente se preservan para no alterar contratos históricos; cambios comerciales requieren un plan nuevo. Validación: servidor 49/49, UI 3/3, build correcto, MariaDB limpia aplicada dos veces, Semgrep security/secrets 0 hallazgos. Producción: imagen `ghcr.io/fernandodiazm5/joinpoint-central:0.1.0-pilot.11`, contenedor healthy, esquema aplicado, HTTPS `/health` 200, backup diario y renovación TLS activos. Se guardó `/opt/joinpoint-central/backups/compose.env.pre-pilot11`.
+## 2026-08-22 — Incidente de suspensión cruzada Administrador/Moderador
+
+- Se confirmó en producción que el Administrador tenía una membresía OWNER residual en Housenet además de su workspace propio.
+- La suspensión del moderador actualizaba y revocaba a todos los miembros del workspace sin excluir cuentas de plataforma; por ello el Administrador quedó suspendido y sin sesiones.
+- Se respaldaron `users`, `workspace_members`, `auth_sessions` y `account_login_security` en `/root/backups/auth-incident-20260823T025802Z/auth-tables.sql`.
+- Se reactivó únicamente el Administrador y se retiró de forma lógica su membresía ajena; el moderador objetivo permanece suspendido y no se cambiaron contraseñas.
+- El backend filtra `is_platform_admin=0` y membresías activas en ambas fases de la suspensión. Una migración idempotente limpia futuras membresías administrativas ajenas sin tocar el workspace propio.
+- Verificación local: 123 archivos/687 pruebas backend, `check:all` y Semgrep security correctos.

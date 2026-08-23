@@ -79,11 +79,11 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `routes/admin.routes.js` | 138 | GET | `/moderators` | sí | platform-admin | no | n/a | — | — |
 | `routes/admin.routes.js` | 186 | PATCH | `/moderators/:id/ai-access` | sí | platform-admin | no | sí | — | — |
 | `routes/admin.routes.js` | 218 | PATCH | `/moderators/:id` | sí | platform-admin | no | sí | — | — |
-| `routes/admin.routes.js` | 286 | DELETE | `/moderators/:id` | sí | platform-admin | no | n/a | network-admin | — |
-| `routes/admin.routes.js` | 389 | POST | `/moderators` | sí | platform-admin | no | sí | — | — |
-| `routes/admin.routes.js` | 421 | POST | `/invite-moderator` | sí | platform-admin | no | sí | — | — |
-| `routes/admin.routes.js` | 489 | GET | `/invitations` | sí | platform-admin | no | n/a | — | — |
-| `routes/admin.routes.js` | 504 | POST | `/invitations/:id/link` | sí | platform-admin | no | n/a | network-admin | — |
+| `routes/admin.routes.js` | 293 | DELETE | `/moderators/:id` | sí | platform-admin | no | n/a | network-admin | — |
+| `routes/admin.routes.js` | 396 | POST | `/moderators` | sí | platform-admin | no | sí | — | — |
+| `routes/admin.routes.js` | 428 | POST | `/invite-moderator` | sí | platform-admin | no | sí | — | — |
+| `routes/admin.routes.js` | 496 | GET | `/invitations` | sí | platform-admin | no | n/a | — | — |
+| `routes/admin.routes.js` | 511 | POST | `/invitations/:id/link` | sí | platform-admin | no | n/a | network-admin | — |
 | `routes/adminSecurity.routes.js` | 53 | POST | `/step-up` | sí | — | no | sí | — | — |
 | `routes/adminSecurity.routes.js` | 124 | GET | `/status` | sí | — | no | n/a | network-admin | — |
 | `routes/adminSecurity.routes.js` | 174 | GET | `/history` | sí | — | no | n/a | — | — |

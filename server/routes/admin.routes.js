@@ -234,8 +234,11 @@ router.patch('/moderators/:id', validate({ params: IdParamsSchema }), asyncHandl
     //    solo el OWNER cuando rehabilitamos — los MEMBERs no se reactivan en cadena).
     if (disabled) {
       await query(
-        `UPDATE users SET disabled_at = ?, updated_at = ?
-           WHERE id IN (SELECT user_id FROM workspace_members WHERE workspace_id = ?)`,
+        `UPDATE users u
+           JOIN workspace_members wm ON wm.user_id = u.id
+          SET u.disabled_at = ?, u.updated_at = ?
+          WHERE wm.workspace_id = ? AND wm.deleted_at IS NULL
+            AND u.deleted_at IS NULL AND u.is_platform_admin = 0`,
         [now, now, mod.workspace_id]
       );
     } else {
@@ -253,7 +256,11 @@ router.patch('/moderators/:id', validate({ params: IdParamsSchema }), asyncHandl
     // 3) Si deshabilitamos: borrar mangles activos + cerrar sesiones + invalidar cache
     if (disabled) {
       const memberIds = await query(
-        'SELECT user_id FROM workspace_members WHERE workspace_id = ?',
+        `SELECT wm.user_id
+           FROM workspace_members wm
+           JOIN users u ON u.id = wm.user_id
+          WHERE wm.workspace_id = ? AND wm.deleted_at IS NULL
+            AND u.deleted_at IS NULL AND u.is_platform_admin = 0`,
         [mod.workspace_id]
       );
       const userIds = memberIds.map(r => r.user_id);
