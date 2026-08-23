@@ -17,15 +17,15 @@ export const SETTINGS_LABELS = {
   MT_IP: 'IP / Host del Router MikroTik',
   MT_USER: 'Usuario Full-Access RouterOS',
   MT_PASS: 'Contraseña del RouterOS',
-  server_public_ip: 'IP Pública WAN del Servidor',
-  sstp_port: 'Puerto del Servidor SSTP',
+  server_public_ip: 'IP pública o dominio del Router Core',
+  sstp_port: 'Puerto SSTP del Router Core',
 };
 
 export const SETTINGS_HINTS = {
   MT_IP: '',
   MT_USER: '',
   MT_PASS: 'Esta contraseña se cifrará con AES-256-GCM en la DB del servidor.',
-  server_public_ip: 'IP pública del MikroTik. Se configura una sola vez aquí y se reutiliza automáticamente al crear nodos WireGuard (los comandos del CPE la necesitan).',
+  server_public_ip: 'Endpoint público del MikroTik/Core. Se reutiliza al generar los accesos de los nodos; no corresponde a la IP pública del VPS.',
   sstp_port: 'Puerto donde escucha el listener SSTP del Core (RouterOS usa 443 por defecto). Si tu Core escucha en otro puerto (ej. 4443), se embebe en el script del CPE como connect-to=<ip>:<puerto>.',
 };
 
@@ -40,6 +40,6 @@ export const TAB_LABELS = {
 } as const;
 
 export const CARD_HEADER = {
-  TITLE: 'Inyección de Core (RouterOS)',
-  SUBTITLE: 'Configura de forma oculta los accesos supremos para que el Backend opere.',
+  TITLE: 'Conexión con el Router Core',
+  SUBTITLE: 'Configura las credenciales administrativas y los endpoints que utiliza el servidor.',
 };

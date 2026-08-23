@@ -40,8 +40,10 @@ export function useSaveSettings() {
       if (settings.management_supernet) writes.push(saveSetting('management_supernet', settings.management_supernet));
       await Promise.all(writes);
       setSuccessMsg(SETTINGS_MESSAGES.SAVE_SUCCESS);
+      return true;
     } catch (e: unknown) {
       setErrorMsg(e instanceof Error ? e.message : SETTINGS_MESSAGES.SAVE_ERROR);
+      return false;
     } finally {
       setIsSaving(false);
     }

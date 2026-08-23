@@ -1,5 +1,12 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-22 — Mejora de Configuración del Router Core.** Rama `vps_uni` (base `c807bb1`). Estado: backend 120/683, frontend 76/258, build y `check:all` verdes; sin deploy.
+> - Renombrados títulos/ayudas ambiguos; credenciales y endpoint/SSTP quedan en secciones distintas con navegación móvil compacta.
+> - Mostrar contraseña, validación inmediata y de API, detección de cambios, advertencia operativa y guardado sticky/deshabilitado sin cambios.
+> - Nueva prueba platform-admin de solo lectura: usa valores sin guardar, no devuelve/registra contraseña, consulta identidad+recursos secuencialmente y muestra nombre, versión y placa.
+> - Invariante: no paralelizar comandos en una misma conexión RouterOS. La máscara `********` usa la credencial cifrada ya guardada sólo dentro del backend.
+> - Las guías `ui-design-system` y `network-engineer` determinaron responsive, seguridad de secretos y prueba por capa de aplicación. Pendiente deploy.
+
 > **Sesión 2026-08-22 — Mejora responsive y operativa de Seguridad.** Rama `vps_uni` (base `ccc820c`). Estado: frontend 76/258, build y `check:all` verdes; sin deploy.
 > - Navegación móvil mediante selector sin overflow; encabezado/tres métricas consistentes y última actualización visible.
 > - Bloqueos: búsqueda existente complementada con filtro de protección, cuatro órdenes y páginas de 10 en tabla/tarjetas.

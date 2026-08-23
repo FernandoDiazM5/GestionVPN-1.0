@@ -6,12 +6,14 @@ const express = require('express');
 const { z } = require('zod');
 const router = express.Router();
 
-const { getDb, encryptPass, getAppSetting } = require('../db.service');
+const { getDb, encryptPass, decryptPass, getAppSetting } = require('../db.service');
 const { sendOk, AppError, asyncHandler } = require('../lib/apiResponse');
 const { SaveSettingRequestSchema, CORE_ROUTER_KEYS } = require('@gestionvpn/contracts');
 const { sendGeneric } = require('../lib/mailer');
 const wgDetect = require('../lib/wgDetect');
 const { previewManagementSupernet, saveManagementSupernet } = require('../lib/managementNetworkService');
+const { connectToMikrotik, safeWrite } = require('../routeros.service');
+const { mikrotikAppError } = require('../lib/mikrotikError');
 
 const ERROR_REPORT_EMAIL_KEY = 'error_report_email';
 const CORE_SERVER_SETTING_KEYS = [
@@ -24,6 +26,11 @@ const errorReportEmailSchema = z.union([
   z.literal(''),
   z.string().trim().email('Correo de reportes no valido').max(254),
 ]);
+const coreConnectionTestSchema = z.object({
+  ip: z.string().trim().min(1).max(253).regex(/^[a-zA-Z0-9.-]+$/, 'IP o host no válido'),
+  user: z.string().trim().min(1).max(64),
+  pass: z.string().max(1024),
+}).strict();
 
 // CORE_ROUTER_KEYS: las claves del router core (MT_IP, MT_USER, MT_PASS) viven
 // en @gestionvpn/contracts. Son infraestructura de plataforma: solo el
@@ -77,6 +84,34 @@ router.get('/settings/management-supernet-preview', requirePlatformAdmin, asyncH
   return sendOk(res, { preview: await previewManagementSupernet(cidr) });
 }));
 
+// Prueba READ-ONLY con los valores actuales del formulario. No guarda ni
+// registra la contraseña: sólo consulta identidad y recursos del RouterOS.
+router.post('/settings/test-core-connection', requirePlatformAdmin, asyncHandler(async (req, res) => {
+  const input = coreConnectionTestSchema.parse(req.body);
+  const savedPass = input.pass === '********' ? await getAppSetting('MT_PASS').catch(() => '') : '';
+  const pass = input.pass === '********' && savedPass ? decryptPass(savedPass) : input.pass;
+  if (!pass) throw new AppError('Ingresa la contraseña del RouterOS.', 400, 'CORE_PASSWORD_REQUIRED');
+
+  let api;
+  try {
+    api = await connectToMikrotik(input.ip, input.user, pass);
+    // RouterOS API no admite comandos concurrentes sobre la misma conexión.
+    const identity = await safeWrite(api, ['/system/identity/print']);
+    const resource = await safeWrite(api, ['/system/resource/print']);
+    return sendOk(res, {
+      connected: true,
+      identity: identity?.[0]?.name || 'RouterOS',
+      version: resource?.[0]?.version || '',
+      board: resource?.[0]?.['board-name'] || '',
+      testedAt: Date.now(),
+    });
+  } catch (error) {
+    throw mikrotikAppError(error, input.ip, input.user);
+  } finally {
+    if (api) try { await api.close(); } catch (_) { /* noop */ }
+  }
+}));
+
 router.post('/settings/save', requirePlatformAdmin, asyncHandler(async (req, res) => {
   const { key, value } = SaveSettingRequestSchema.parse(req.body);
 
@@ -90,6 +125,20 @@ router.post('/settings/save', requirePlatformAdmin, asyncHandler(async (req, res
   if (key === 'MT_PASS') {
     if (finalValue === '********') return sendOk(res);
     if (finalValue) finalValue = encryptPass(String(finalValue));
+  } else if (key === 'MT_IP' || key === 'server_public_ip') {
+    finalValue = String(finalValue || '').trim();
+    if ((key === 'MT_IP' && !finalValue) || (finalValue && !/^[a-zA-Z0-9.-]+$/.test(finalValue))) {
+      throw new AppError('La IP o el nombre de host no es válido.', 422, 'CORE_HOST_INVALID');
+    }
+  } else if (key === 'MT_USER') {
+    finalValue = String(finalValue || '').trim();
+    if (!finalValue || finalValue.length > 64) throw new AppError('El usuario RouterOS no es válido.', 422, 'CORE_USER_INVALID');
+  } else if (key === 'sstp_port') {
+    finalValue = String(finalValue || '').trim();
+    const port = Number(finalValue);
+    if (finalValue && (!Number.isInteger(port) || port < 1 || port > 65535)) {
+      throw new AppError('El puerto SSTP debe estar entre 1 y 65535.', 422, 'SSTP_PORT_INVALID');
+    }
   } else if (key === 'core_backup_password') {
     if (finalValue === '********') return sendOk(res);
     const plain = String(finalValue || '');
