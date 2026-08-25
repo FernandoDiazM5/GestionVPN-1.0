@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-24 — Despliegue de validaciones, acordeón y guías de integraciones.** Runtime `vps_uni@0921bb6`. Estado: backend/frontend/DB sanos, HTTPS operativo y 0 reinicios.
+> - Antes del checkout se creó dump comprimido con SHA-256, se restauró en MariaDB aislada con 58 tablas y se etiquetaron las imágenes anteriores. Se reconstruyeron backend/frontend exclusivamente con `docker-compose.prod.yml`; la DB conservó contenedor y volumen.
+> - Producción confirma columna de huella Telegram, bundle con guías Brevo/Gmail/Telegram/Gemini/Firebase, raíz/legacy/health 200, CORS 204/403, login inválido 401, MySQL/RouterOS/SMTP `ok` y logs recientes limpios.
+> - Backup `/root/pre-notification-validation-20260825T043400Z`; rollback `gestionvpn-10-backend:pre-notification-validation-20260825T043400Z` y `gestionvpn-10-frontend:pre-notification-validation-20260825T043400Z`; disco 80%/5.0 GiB libres.
+
 > **Sesión 2026-08-24 — Asistentes de configuración para todas las integraciones.** Rama `vps_uni` sobre `7f8544d`; sin deploy.
 > - Cada formulario desplegado presenta pasos numerados, acceso al portal oficial y una advertencia específica: SMTP de Brevo, contraseña de aplicación Gmail, BotFather/vinculación, API key/modelo Gemini y proveedor web/cuenta de servicio/dominio Firebase.
 > - El componente de guía es compartido, responsive y mantiene objetivos táctiles de 44 px; las instrucciones varían entre workspace y Administración cuando cambia el uso posterior.
