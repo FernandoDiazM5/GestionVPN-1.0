@@ -83,7 +83,7 @@ export default function ModeratorSettingsModule() {
           {tab === 'profile'       && <ProfileTab />}
           {tab === 'wireguard'     && <WireGuardTab />}
           {tab === 'workspace'     && !isMember && <WorkspaceTab />}
-          {tab === 'notifications' && <NotificationsTab memberMode={isMember} />}
+          {tab === 'notifications' && <NotificationsTab memberMode={isMember} onOpenIntegrations={!isMember ? () => setTab('integrations') : undefined} />}
           {tab === 'integrations'  && !isMember && <IntegrationsTab />}
           {tab === 'import-export' && !isMember && <ImportExportTab />}
         </div>

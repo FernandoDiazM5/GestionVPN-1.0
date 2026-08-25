@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-24 — Integraciones contraídas y flujo Telegram mejorado.** Rama `vps_uni` sobre `e285aeb`; sin deploy.
+> - Brevo, Gmail, Telegram y Gemini quedan contraídos al entrar; sólo se despliega uno y cada cabecera resume estado, identidad y atención requerida.
+> - Telegram incorpora guía BotFather, exclusividad del token y continuidad hacia Notificaciones. El canal ya no se atenúa cuando falta configuración: muestra el estado exacto y ofrece configurar, vincular, esperar confirmación, activar o desvincular según corresponda.
+> - Verificación: backend 129/711, frontend 79/264, build, TypeScript, lint, inventario de rutas, `check:all` y diff verdes. Pendiente commit/push y autorización final para desplegar junto con las validaciones.
+
 > **Sesión 2026-08-24 — Validaciones de canales y vinculación por bot.** Rama `vps_uni` (base `1cef6ac`). Estado: backend 129/711, frontend 79/263, contratos/build/lint/inventario/`check:all` verdes; sin deploy.
 > - Email queda bloqueado sin Brevo/Gmail activo del workspace o correo verificado; Telegram queda bloqueado sin integración propia, confirmación de código y huella del mismo bot. El servidor repite todas las reglas y el notifier no cae al proveedor global para avisos del moderador.
 > - Códigos vencen y la UI consulta confirmación; desconectar/reemplazar el bot invalida el vínculo anterior. Tokens compartidos entre workspaces o reutilizados desde Administración se rechazan.

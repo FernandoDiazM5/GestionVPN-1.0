@@ -6,7 +6,7 @@
 //  código de 6 chars (anti-spoofing).
 // ============================================================
 import { useCallback, useEffect, useState } from 'react';
-import { Bell, Mail, Send, Loader2, AlertCircle, Check, Pause, Play, Copy, X, Smartphone, ExternalLink } from 'lucide-react';
+import { Bell, Bot, Mail, Send, Loader2, AlertCircle, Check, Pause, Play, Copy, X, Smartphone, ExternalLink } from 'lucide-react';
 import { accountApi } from '../../../../services/accountApi';
 import type { NotificationEvent, NotificationStatus } from '@gestionvpn/contracts';
 import AsyncQueryState from '../../../Common/AsyncQueryState';
@@ -35,9 +35,10 @@ const ALL_EVENTS: NotificationEvent[] = [
 interface NotificationsTabProps {
   /** Modo MEMBER: solo muestra vincular/desvincular Telegram (sin email, eventos, pausa ni guardar). */
   memberMode?: boolean;
+  onOpenIntegrations?: () => void;
 }
 
-export default function NotificationsTab({ memberMode = false }: NotificationsTabProps = {}) {
+export default function NotificationsTab({ memberMode = false, onOpenIntegrations }: NotificationsTabProps = {}) {
   const [status, setStatus] = useState<NotificationStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -143,25 +144,7 @@ export default function NotificationsTab({ memberMode = false }: NotificationsTa
   // Para MEMBER: solo mostramos la fila de Telegram y el flujo de vincular.
   // El bot Telegram es el camino canónico del MEMBER para activar/desactivar
   // sus túneles asignados (ver §32 del HANDOFF).
-  const telegramRow = (
-    <ChannelRow
-      icon={Send}
-      title="Telegram"
-      desc={status.telegramLinked ? 'Vinculado ✓' : status.telegramBotConfigured ? 'Bot configurado; falta confirmar el código.' : status.channelAvailability.telegram.reason || 'Bot no disponible.'}
-      checked={status.channels.telegram}
-      disabled={!status.telegramBotConfigured || !status.telegramLinked}
-      onChange={(v) => update('channels', { ...status.channels, telegram: v })}
-      extra={
-        status.telegramBotConfigured && !status.telegramLinked ? (
-          <button onClick={startLink} className="btn-primary inline-flex items-center gap-1.5 px-4 py-2 text-xs shrink-0">
-            <Send className="w-3.5 h-3.5" /> Vincular
-          </button>
-        ) : status.telegramLinked ? (
-          <button onClick={unlink} className="btn-outline btn-sm inline-flex items-center text-rose-600 border-rose-200"><X className="w-3.5 h-3.5" /> Desvincular</button>
-        ) : null
-      }
-    />
-  );
+  const telegramRow = <TelegramChannelCard status={status} linkPending={Boolean(linkCode)} memberMode={memberMode} onOpenIntegrations={onOpenIntegrations} onStartLink={() => void startLink()} onUnlink={() => void unlink()} onChange={(v) => update('channels', { ...status.channels, telegram: v })} />;
 
   const emailAvailable = status.channelAvailability.email.available;
   const telegramAvailable = status.channelAvailability.telegram.available;
@@ -294,7 +277,7 @@ interface ChannelRowProps {
 
 function ChannelRow({ icon: Icon, title, desc, checked, disabled, onChange, extra }: ChannelRowProps) {
   return (
-    <div className={`flex flex-col items-stretch gap-3 rounded-xl border p-3 sm:flex-row sm:items-center sm:justify-between ${disabled ? 'opacity-50' : ''} border-slate-100 dark:border-slate-800`}>
+    <div className="flex flex-col items-stretch gap-3 rounded-xl border border-slate-100 p-3 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
       <div className="flex items-start gap-3">
         <Icon className="w-5 h-5 text-slate-500 mt-0.5" />
         <div>
@@ -313,6 +296,44 @@ function ChannelRow({ icon: Icon, title, desc, checked, disabled, onChange, extr
       </div>
     </div>
   );
+}
+
+interface TelegramChannelCardProps {
+  status: NotificationStatus;
+  linkPending: boolean;
+  memberMode: boolean;
+  onOpenIntegrations?: () => void;
+  onStartLink: () => void;
+  onUnlink: () => void;
+  onChange: (value: boolean) => void;
+}
+
+function TelegramChannelCard({ status, linkPending, memberMode, onOpenIntegrations, onStartLink, onUnlink, onChange }: TelegramChannelCardProps) {
+  const configured = status.telegramBotConfigured;
+  const linked = status.telegramLinked;
+  const active = linked && status.channels.telegram;
+  const state = !configured
+    ? { label: 'Bot sin configurar', cls: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300', description: status.channelAvailability.telegram.reason || 'Configura un bot para habilitar este canal.' }
+    : linkPending
+      ? { label: 'Esperando confirmación', cls: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300', description: 'Abre el bot y envía el código que aparece abajo.' }
+      : !linked
+        ? { label: 'Falta vincular', cls: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300', description: `El bot ${status.telegramBotUsername ? `@${status.telegramBotUsername}` : 'del workspace'} está listo; vincula tu cuenta.` }
+        : active
+          ? { label: 'Canal activo', cls: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300', description: `Recibirás avisos mediante ${status.telegramBotUsername ? `@${status.telegramBotUsername}` : 'Telegram'}.` }
+          : { label: 'Vinculado', cls: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300', description: 'La cuenta está vinculada. Activa la casilla para recibir avisos.' };
+
+  return <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-700 dark:bg-slate-800/40">
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 items-start gap-3"><span className="rounded-xl bg-white p-2.5 text-sky-500 shadow-sm dark:bg-slate-900"><Send className="h-5 w-5" /></span><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-slate-800 dark:text-slate-100">Telegram</p><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${state.cls}`}>{state.label}</span></div><p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">{state.description}</p></div></div>
+      <div className="flex min-h-11 shrink-0 flex-wrap items-center justify-end gap-2">
+        {!configured && !memberMode && onOpenIntegrations ? <button type="button" onClick={onOpenIntegrations} className="btn-primary inline-flex min-h-11 items-center gap-1.5 px-4 text-xs"><Bot className="h-4 w-4" />Configurar bot</button> : null}
+        {!configured && memberMode ? <span className="text-xs font-medium text-slate-500">Solicita al moderador configurar el bot</span> : null}
+        {configured && !linked ? <button type="button" onClick={onStartLink} disabled={linkPending} className="btn-primary inline-flex min-h-11 items-center gap-1.5 px-4 text-xs disabled:opacity-50"><Send className="h-4 w-4" />{linkPending ? 'Código generado' : 'Vincular cuenta'}</button> : null}
+        {linked ? <button type="button" onClick={onUnlink} className="btn-outline btn-sm inline-flex min-h-11 items-center text-rose-600 border-rose-200"><X className="h-4 w-4" />Desvincular</button> : null}
+        <label className={`inline-flex min-h-11 items-center gap-2 text-xs font-semibold ${linked ? 'text-slate-700 dark:text-slate-200' : 'text-slate-400'}`}><span className="sr-only">Activar notificaciones por Telegram</span><input type="checkbox" aria-label="Activar notificaciones por Telegram" checked={status.channels.telegram} disabled={!configured || !linked} onChange={(event) => onChange(event.target.checked)} /></label>
+      </div>
+    </div>
+  </div>;
 }
 
 // URL oficial de la app de Telegram en Google Play.
@@ -343,7 +364,7 @@ function TelegramLinkSteps({ code, expiresAt, botUsername }: TelegramLinkStepsPr
 
   return (
     <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-500/10 p-4 space-y-3.5">
-      <p className="text-sm font-semibold text-indigo-900 dark:text-indigo-100">Vincular en 3 pasos</p>
+      <div><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-semibold text-indigo-900 dark:text-indigo-100">Vinculación pendiente</p><span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"><Loader2 className="h-3 w-3 animate-spin" />Esperando al bot</span></div><p className="mt-1 text-xs text-indigo-700/80 dark:text-indigo-300/80">El canal seguirá deshabilitado hasta que Telegram confirme el código.</p></div>
 
       <Step n={1} title="Instala Telegram" desc="En tu teléfono, si aún no la tienes."
         action={

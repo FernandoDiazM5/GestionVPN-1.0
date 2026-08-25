@@ -34,7 +34,7 @@ describe('NotificationsTab availability', () => {
     api.getNotifications.mockResolvedValue({ ...unavailable, telegramBotConfigured: true, channelAvailability: { ...unavailable.channelAvailability, telegram: { available: true, configured: true, username: 'workspace_bot', reason: null } } });
     api.startTelegramLink.mockResolvedValue({ success: true, code: 'ABC123', expiresAt: Date.now() + 60000, botUsername: 'workspace_bot' });
     render(<NotificationsTab />);
-    await user.click(await screen.findByRole('button', { name: 'Vincular' }));
+    await user.click(await screen.findByRole('button', { name: 'Vincular cuenta' }));
     expect(await screen.findByText('/link ABC123')).toBeInTheDocument();
     expect(screen.getAllByRole('checkbox')[1]).toBeDisabled();
   });
