@@ -35,9 +35,10 @@ const RESPONSE_JSON_SCHEMA = {
 };
 
 let client;
-function configured() {
-  return process.env.GEMINI_AI_ENABLED === 'true'
-    && !!process.env.GEMINI_API_KEY
+let clientKey;
+function configured(apiKey = process.env.GEMINI_API_KEY) {
+  return (process.env.GEMINI_AI_ENABLED === 'true' || Boolean(apiKey))
+    && !!apiKey
     && !!process.env.AI_PSEUDONYM_KEY;
 }
 
@@ -45,19 +46,21 @@ function model() {
   return process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite';
 }
 
-function getClient() {
-  if (!configured()) throw Object.assign(new Error('Gemini no configurado'), { code: 'AI_NOT_CONFIGURED' });
-  if (!client) client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+function getClient(apiKey) {
+  const effectiveKey = apiKey || process.env.GEMINI_API_KEY;
+  if (!configured(effectiveKey)) throw Object.assign(new Error('Gemini no configurado'), { code: 'AI_NOT_CONFIGURED' });
+  if (!client || clientKey !== effectiveKey) { client = new GoogleGenAI({ apiKey: effectiveKey }); clientKey = effectiveKey; }
   return client;
 }
 
-async function generateAnalysis({ kind, dto }) {
+async function generateAnalysis({ kind, dto, apiKey, model: requestedModel }) {
   const maxOutputTokens = kind === 'NETWORK'
     ? Number(process.env.GEMINI_MAX_OUTPUT_TOKENS_NETWORK || 2000)
     : Number(process.env.GEMINI_MAX_OUTPUT_TOKENS_DEVICE || 700);
   const timeoutMs = Number(process.env.GEMINI_TIMEOUT_MS || 30000);
-  const response = await getClient().models.generateContent({
-    model: model(),
+  const selectedModel = requestedModel || model();
+  const response = await getClient(apiKey).models.generateContent({
+    model: selectedModel,
     contents: buildPrompt(kind, dto),
     config: {
       abortSignal: AbortSignal.timeout(timeoutMs),
@@ -85,10 +88,10 @@ async function generateAnalysis({ kind, dto }) {
       outputTokens: Number(usage.candidatesTokenCount || 0),
       totalTokens: Number(usage.totalTokenCount || 0),
     },
-    model: model(),
+    model: selectedModel,
   };
 }
 
-function resetClientForTests() { client = undefined; }
+function resetClientForTests() { client = undefined; clientKey = undefined; }
 
 module.exports = { RESPONSE_JSON_SCHEMA, configured, model, generateAnalysis, resetClientForTests };

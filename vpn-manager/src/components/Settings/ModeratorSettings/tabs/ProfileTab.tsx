@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Lock, Mail, Check, Loader2, AlertCircle, Eye, EyeOff, KeyRound, ShieldCheck, Unlink } from 'lucide-react';
 import { accountApi } from '../../../../services/accountApi';
 import { useWorkspaceSession } from '../../../../context/WorkspaceSession';
-import { federatedAuthAvailable } from '../../../../config/federatedAuth';
+import { federatedAuthAvailable, getFederatedAuthConfig } from '../../../../config/federatedAuth';
 import {
   getGoogleLinkStatus,
   linkGoogleAccount,
@@ -14,14 +14,17 @@ type Section = 'password' | 'email' | 'google';
 
 export default function ProfileTab() {
   const [section, setSection] = useState<Section>('password');
+  const [googleAvailable, setGoogleAvailable] = useState(federatedAuthAvailable);
+
+  useEffect(() => { void getFederatedAuthConfig().then(config => setGoogleAvailable(Boolean(config))); }, []);
 
   return (
     <div className="card border border-slate-200 dark:border-slate-800 overflow-hidden">
       {/* Sub-tabs */}
-      <div className={`grid border-b border-slate-100 px-2 dark:border-slate-800 sm:flex sm:gap-1 sm:px-4 ${federatedAuthAvailable ? 'grid-cols-3' : 'grid-cols-2'}`} role="tablist" aria-label="Opciones de perfil">
+      <div className={`grid border-b border-slate-100 px-2 dark:border-slate-800 sm:flex sm:gap-1 sm:px-4 ${googleAvailable ? 'grid-cols-3' : 'grid-cols-2'}`} role="tablist" aria-label="Opciones de perfil">
         <SubTab active={section === 'password'} onClick={() => setSection('password')} icon={Lock} label="Contraseña" />
         <SubTab active={section === 'email'}    onClick={() => setSection('email')}    icon={Mail} label="Correo" />
-        {federatedAuthAvailable ? (
+        {googleAvailable ? (
           <SubTab active={section === 'google'} onClick={() => setSection('google')} icon={ShieldCheck} label="Google" />
         ) : null}
       </div>
@@ -29,7 +32,7 @@ export default function ProfileTab() {
       <div className="min-w-0 p-4 sm:p-6">
         {section === 'password' && <ChangePassword />}
         {section === 'email'    && <ChangeEmail />}
-        {section === 'google' && federatedAuthAvailable ? <GoogleAccount /> : null}
+        {section === 'google' && googleAvailable ? <GoogleAccount /> : null}
       </div>
     </div>
   );

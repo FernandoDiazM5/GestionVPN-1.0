@@ -45,3 +45,17 @@ export const federatedAuthConfig = resolveFederatedAuthConfig(
   import.meta.env as unknown as FirebaseClientEnv,
 );
 export const federatedAuthAvailable = federatedAuthConfig !== null;
+
+let runtimeConfigPromise: Promise<FederatedAuthConfig | null> | null = null;
+export function getFederatedAuthConfig(): Promise<FederatedAuthConfig | null> {
+  if (runtimeConfigPromise) return runtimeConfigPromise;
+  runtimeConfigPromise = fetch('/api/account/federated/config', { credentials: 'include', cache: 'no-store' })
+    .then(async response => {
+      if (!response.ok) return federatedAuthConfig;
+      const body = await response.json() as { enabled?: boolean; config?: FirebaseWebConfig & { tenantId?: string | null } };
+      if (!body.enabled || !body.config) return federatedAuthConfig;
+      return { client: { apiKey: body.config.apiKey, authDomain: body.config.authDomain, projectId: body.config.projectId, appId: body.config.appId }, tenantId: body.config.tenantId || null };
+    })
+    .catch(() => federatedAuthConfig);
+  return runtimeConfigPromise;
+}

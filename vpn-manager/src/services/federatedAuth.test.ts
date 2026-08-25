@@ -16,8 +16,8 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock('../config/federatedAuth', () => ({
-  federatedAuthConfig: {
+vi.mock('../config/federatedAuth', () => {
+  const config = {
     client: {
       apiKey: 'public-api-key',
       authDomain: 'gestion-vpn-pilot.firebaseapp.com',
@@ -25,8 +25,9 @@ vi.mock('../config/federatedAuth', () => ({
       appId: '1:123:web:abc',
     },
     tenantId: 'tenant-1',
-  },
-}));
+  };
+  return { federatedAuthConfig: config, getFederatedAuthConfig: vi.fn().mockResolvedValue(config) };
+});
 
 vi.mock('./sessionClient', () => ({
   apiJson: (...args: unknown[]) => mocks.apiJson(...args),

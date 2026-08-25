@@ -1,5 +1,25 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-24 — Preparación de despliegue e importación de APIs existentes.** Rama `vps_uni` (base `589c963`). Estado: backend 127/702, frontend 78/261, build, lint, inventario de rutas y `check:all` verdes; despliegue aún no iniciado.
+> - Inventario read-only del VPS identificó Brevo, Telegram, Gemini y Firebase configurados; no se imprimieron ni almacenaron valores secretos. Las claves HMAC/pseudonimización/agente se clasificaron correctamente como controles internos no administrables.
+> - Gemini fue agregado también al módulo global como fallback de los workspaces. Se añadió un importador idempotente que valida y cifra las cuatro integraciones sin sobrescribir registros existentes.
+> - Pendiente: commit/push, presentar SHA/impacto/rollback y obtener autorización final exigida por §4.42 antes de modificar producción.
+
+> **Sesión 2026-08-24 — Integraciones globales del Administrador.** Rama `vps_uni`. Estado: backend 127/701, frontend 78/261, build, lint, inventario de rutas y `check:all` verdes; sin deploy.
+> - Nueva pestaña global con Brevo/Gmail, Telegram administrativo y Firebase Google Login, aislada de las integraciones de cada workspace y exclusiva de `platform_admin`.
+> - Credenciales validadas y cifradas; la API/UI no retorna secretos. SMTP global cubre invitaciones/correos administrativos; Telegram se recarga al reemplazar y ofrece consultas limitadas de moderadores; Firebase se activa dinámicamente y mantiene la cuenta de servicio sólo en backend.
+> - Agregadas tabla `platform_integrations`, API administrativa, fallback de correo/Telegram, configuración Firebase pública mínima y pruebas de servicio/RBAC/bot. Pendiente revisión visual y despliegue autorizado con backup/canary.
+
+> **Sesión 2026-08-24 — Integraciones cifradas por workspace.** Rama `vps_uni` (base `589c963`). Estado: backend 125/693, frontend 78/261, build, lint, inventario de rutas y `check:all` verdes; sin deploy.
+> - Nueva pestaña Integraciones para OWNER con Brevo, Gmail, Telegram Bot y Gemini; responsive, validación real, estado, prueba, reemplazo y desconexión.
+> - Nueva tabla `workspace_integrations`, aislada por workspace; secretos AES-256-GCM nunca retornados. Brevo/Gmail son alternativas y una validación fallida marca estado inválido.
+> - Correo de invitaciones/notificaciones, avisos Telegram y análisis Gemini consumen las credenciales activas del workspace con fallback global.
+> - Pruebas nuevas 8/8; pendiente revisión visual y autorización de despliegue con respaldo/canary.
+
+> **Sesión 2026-08-24 — Corrección de alcance del handoff.** Rama `vps_uni`. Estado: documentación corregida; sin cambios de código ni despliegue.
+> - Retirado de `HANDOFF.md` el estado y los pendientes de la Plataforma Central porque pertenecen a otra rama.
+> - Añadida una regla explícita para evitar mezclar nuevamente el contexto entre ramas.
+
 > **Sesión 2026-08-22 — Limpieza segura del VPS operativo.** Runtime preservado `vps_uni@11aea0a`. Estado: 3 contenedores activos, backend/DB saludables, HTTPS 200 y 0 reinicios.
 > - Disco pasó de 86%/3.4 GiB libres a 68%/7.8 GiB libres; inodos 28%→21%.
 > - Retirados 3 rollbacks backend y 5 frontend ya superados, caché APT y 160 MiB de journals archivados. Docker liberó principalmente capas únicas de imágenes antiguas.

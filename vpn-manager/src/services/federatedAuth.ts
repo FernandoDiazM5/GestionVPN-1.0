@@ -1,5 +1,5 @@
 import type { SessionUser } from '../types/account';
-import { federatedAuthConfig } from '../config/federatedAuth';
+import { getFederatedAuthConfig } from '../config/federatedAuth';
 import { apiJson, type ApiError } from './sessionClient';
 
 const FIREBASE_APP_NAME = 'gestionvpn-web-federated';
@@ -30,7 +30,7 @@ export interface GoogleLinkResult {
 let runtimePromise: Promise<FirebaseRuntime> | null = null;
 
 async function loadRuntime(): Promise<FirebaseRuntime> {
-  const config = federatedAuthConfig;
+  const config = await getFederatedAuthConfig();
   if (!config) throw new Error('Acceso federado no disponible');
   if (!runtimePromise) {
     runtimePromise = Promise.all([

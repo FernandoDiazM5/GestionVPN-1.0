@@ -39,6 +39,23 @@ function getTransporter() {
   return transporter;
 }
 
+async function getWorkspaceTransport(workspaceId) {
+  const integrations = require('./workspaceIntegrationService');
+  const platform = require('./platformIntegrationService');
+  const [brevo, gmail, platformBrevo, platformGmail] = await Promise.all([
+    workspaceId ? integrations.getSecret(workspaceId, 'BREVO') : null,
+    workspaceId ? integrations.getSecret(workspaceId, 'GMAIL') : null,
+    platform.getSecret('BREVO').catch(() => null),
+    platform.getSecret('GMAIL').catch(() => null),
+  ]);
+  const config = brevo || gmail || platformBrevo || platformGmail;
+  if (!config || !nodemailer) return { tx: getTransporter(), from: process.env.SMTP_FROM || FROM_DEFAULT };
+  return {
+    tx: nodemailer.createTransport({ host: config.host, port: Number(config.port), secure: Boolean(config.secure), auth: { user: config.username, pass: config.password }, connectionTimeout: 10000, greetingTimeout: 10000, socketTimeout: 15000 }),
+    from: `${config.fromName || BRAND_NAME} <${config.fromEmail}>`,
+  };
+}
+
 // El nombre visible sí forma parte de la marca; la dirección real sigue
 // viniendo de SMTP_FROM para respetar SPF/DKIM del proveedor configurado.
 const FROM_DEFAULT = 'Joinpoint NOC <no-reply@vpn.local>';
@@ -89,12 +106,13 @@ async function sendOtp(email, code, purpose = 'verificación') {
  * @param {string} [opts.tunnelId] Túnel pre-asignado (opcional)
  * @param {string} [opts.role]     'OWNER' (moderador) | 'MEMBER'
  */
-async function sendInvitation({ email, code, inviterName, workspaceName, tunnelId, role }) {
+async function sendInvitation({ email, code, inviterName, workspaceName, tunnelId, role, workspaceId }) {
   const baseUrl = (process.env.APP_BASE_URL || 'http://localhost:5173/GestionVPN-1.0/').replace(/\/+$/, '/');
   const acceptUrl = `${baseUrl}?accept=1&email=${encodeURIComponent(email)}&otp=${encodeURIComponent(code)}`;
   const roleLabel = role === 'OWNER' ? 'Moderador' : 'Miembro';
 
-  const tx = getTransporter();
+  const resolved = await getWorkspaceTransport(workspaceId);
+  const tx = resolved.tx;
   if (!tx) {
     log.info({
       email, inviterName, workspaceName, roleLabel, tunnelId,
@@ -166,7 +184,7 @@ async function sendInvitation({ email, code, inviterName, workspaceName, tunnelI
 </body></html>`;
 
   await sendAndCount(tx, 'invitation', {
-    from: process.env.SMTP_FROM || FROM_DEFAULT,
+    from: resolved.from,
     to: email,
     subject,
     text,
@@ -312,16 +330,17 @@ async function verifySmtp() {
  * En dev (sin SMTP) imprime resumen y marca dev=true sin throwear — el caller
  * (lib/notifier.js) registra el resultado en notification_log.
  */
-async function sendGeneric({ to, subject, html, text, kind = 'notification', attachments }) {
+async function sendGeneric({ to, subject, html, text, kind = 'notification', attachments, workspaceId }) {
   if (!to || !subject) return { delivered: false, error: 'to y subject requeridos' };
-  const tx = getTransporter();
+  const resolved = await getWorkspaceTransport(workspaceId);
+  const tx = resolved.tx;
   if (!tx) {
     log.debug({ to, subject }, 'sendGeneric en modo DEV (sin SMTP)');
     return { delivered: false, dev: true };
   }
   try {
     await sendAndCount(tx, kind, {
-      from: process.env.SMTP_FROM || FROM_DEFAULT,
+      from: resolved.from,
       to, subject, html, text: text || subject, attachments,
     });
     return { delivered: true };

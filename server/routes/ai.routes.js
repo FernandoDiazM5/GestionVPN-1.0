@@ -20,6 +20,8 @@ const { buildDeviceDto, buildNetworkDto, deviceFingerprint, snapshotHash } = req
 const { analysisRetentionDays, historyCutoff } = require('../lib/ai/aiRetention');
 const { PROMPT_VERSION } = require('../lib/ai/airOsPrompt');
 const { validate } = require('../middleware/validate');
+const integrations = require('../lib/workspaceIntegrationService');
+const platformIntegrations = require('../lib/platformIntegrationService');
 
 const router = express.Router();
 router.use(requireOwner);
@@ -47,23 +49,28 @@ function ensurePayloadSize(body) {
   }
 }
 
-function ensureConfigured() {
-  if (!geminiClient.configured()) {
+async function ensureConfigured(workspaceId) {
+  const workspaceGemini = await integrations.getSecret(workspaceId, 'GEMINI').catch(() => null);
+  const platformGemini = workspaceGemini ? null : await platformIntegrations.getSecret('GEMINI').catch(() => null);
+  if (!geminiClient.configured((workspaceGemini || platformGemini)?.apiKey)) {
     throw new AppError('Gemini no está configurado o está deshabilitado', 503, 'AI_NOT_CONFIGURED');
   }
 }
 
 router.get('/status', asyncHandler(async (req, res) => {
-  const [access, consentAccepted, usage] = await Promise.all([
+  const [access, consentAccepted, usage, workspaceGemini, platformGemini] = await Promise.all([
     aiAccessRepo.getForUser(req.account.sub),
     aiConsentRepo.get(req.account.sub, AIR_OS_AI_POLICY_VERSION),
     aiUsageRepo.get(`workspace:${req.account.workspace_id}`),
+    integrations.getSecret(req.account.workspace_id, 'GEMINI').catch(() => null),
+    platformIntegrations.getSecret('GEMINI').catch(() => null),
   ]);
+  const effectiveGemini = workspaceGemini || platformGemini;
   return sendOk(res, {
     status: {
-      configured: geminiClient.configured(),
-      enabled: process.env.GEMINI_AI_ENABLED === 'true',
-      model: process.env.GEMINI_API_KEY ? geminiClient.model() : null,
+      configured: geminiClient.configured(effectiveGemini?.apiKey),
+      enabled: Boolean(effectiveGemini?.apiKey) || process.env.GEMINI_AI_ENABLED === 'true',
+      model: effectiveGemini?.model || (process.env.GEMINI_API_KEY ? geminiClient.model() : null),
       moderatorAccessEnabled: access.enabled,
       consentAccepted,
       policyVersion: AIR_OS_AI_POLICY_VERSION,
@@ -84,7 +91,7 @@ router.post('/consent', requireAiAccess, asyncHandler(async (req, res) => {
 }));
 
 router.post('/device-analysis', requireAiAccess, requireAiConsent, asyncHandler(async (req, res) => {
-  ensureConfigured();
+  await ensureConfigured(req.account.workspace_id);
   ensurePayloadSize(req.body);
   const input = AirOsAiDeviceAnalysisRequestSchema.parse(req.body);
   const dto = buildDeviceDto({ workspaceId: req.account.workspace_id, device: input.device });
@@ -102,7 +109,7 @@ router.post('/device-analysis', requireAiAccess, requireAiConsent, asyncHandler(
 }));
 
 router.post('/network-analysis', requireAiAccess, requireAiConsent, asyncHandler(async (req, res) => {
-  ensureConfigured();
+  await ensureConfigured(req.account.workspace_id);
   ensurePayloadSize(req.body);
   const input = AirOsAiNetworkAnalysisRequestSchema.parse(req.body);
   const maximum = limits().maxDevicesPerNetwork;

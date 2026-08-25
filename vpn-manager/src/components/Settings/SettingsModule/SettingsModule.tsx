@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Mail, Radar, Server, ServerCog, Settings as SettingsIcon, User } from 'lucide-react';
+import { Mail, PlugZap, Radar, Server, ServerCog, Settings as SettingsIcon, User } from 'lucide-react';
 import {
   SettingsHeader,
   SettingsForm,
@@ -11,17 +11,19 @@ import {
 import { useLoadSettings, useSaveSettings } from './hooks';
 import AsyncQueryState from '../../Common/AsyncQueryState';
 import ProfileTab from '../ModeratorSettings/tabs/ProfileTab';
+import IntegrationsTab from '../ModeratorSettings/tabs/IntegrationsTab';
 import { PageHeader } from '../../Common/ui';
 import { post } from '../../../services/sessionClient';
 import type { AppSettings } from './types';
 
-type TabId = 'core' | 'server' | 'scan' | 'reports' | 'account';
+type TabId = 'core' | 'server' | 'scan' | 'reports' | 'integrations' | 'account';
 
 const TABS = [
   { id: 'core', label: 'Router Core', icon: Server, description: 'RouterOS, IP publica y SSTP' },
   { id: 'server', label: 'Servidor VPN', icon: ServerCog, description: 'Estado, respaldo y provision' },
   { id: 'scan', label: 'Escaneo', icon: Radar, description: 'Origen VPS o equipo local' },
   { id: 'reports', label: 'Reportes tecnicos', icon: Mail, description: 'Destinatario y correo de prueba' },
+  { id: 'integrations', label: 'Integraciones', icon: PlugZap, description: 'Correo, Telegram y Google Login' },
   { id: 'account', label: 'Cuenta', icon: User, description: 'Correo y contrasena' },
 ] satisfies Array<{ id: TabId; label: string; icon: typeof Server; description: string }>;
 
@@ -166,6 +168,7 @@ export default function SettingsModule() {
           )}
 
           {tab === 'account' && <ProfileTab />}
+          {tab === 'integrations' && <IntegrationsTab scope="platform" />}
         </div>
       </div>
     </div>

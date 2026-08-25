@@ -6,7 +6,7 @@ import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
 import AcceptInvitationForm from './AcceptInvitationForm';
 import PasswordResetRequest from './PasswordResetRequest';
 import PasswordResetConfirm from './PasswordResetConfirm';
-import { federatedAuthAvailable } from '../../config/federatedAuth';
+import { federatedAuthAvailable, getFederatedAuthConfig } from '../../config/federatedAuth';
 import { signInWithGoogle } from '../../services/federatedAuth';
 import JoinpointLogo from '../Common/JoinpointLogo';
 
@@ -48,6 +48,7 @@ export default function RouterAccess() {
   const [errorDetail, setErrorDetail] = useState('');
 
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
+  const [googleAvailable, setGoogleAvailable] = useState(federatedAuthAvailable);
 
   useEffect(() => {
     fetchWithTimeout(`${API_BASE_URL}/api/auth/status`, { method: 'GET' }, 5000)
@@ -61,6 +62,8 @@ export default function RouterAccess() {
       })
       .catch(() => setNeedsSetup(false));
   }, []);
+
+  useEffect(() => { void getFederatedAuthConfig().then(config => setGoogleAvailable(Boolean(config))); }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -179,7 +182,7 @@ export default function RouterAccess() {
               </p>
             </div>
 
-            {!needsSetup && federatedAuthAvailable && (
+            {!needsSetup && googleAvailable && (
               <div className="mb-5 sm:mb-6">
                 <button
                   type="button"

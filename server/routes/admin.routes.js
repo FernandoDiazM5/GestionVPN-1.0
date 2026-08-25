@@ -473,6 +473,7 @@ router.post('/invite-moderator', asyncHandler(async (req, res) => {
       workspaceName: wsName,
       tunnelId: null,
       role: 'OWNER',
+      workspaceId: wsId,
     });
     emailSent = true;
   } catch (e) {

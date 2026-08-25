@@ -8,11 +8,12 @@ function getAuthClient() {
   const config = readFederatedAuthConfig();
   if (!config.enabled) throw new Error('Autenticación federada deshabilitada');
 
-  const { applicationDefault, getApps, initializeApp } = require('firebase-admin/app');
+  const { applicationDefault, cert, getApps, initializeApp } = require('firebase-admin/app');
   const { getAuth } = require('firebase-admin/auth');
   let app = getApps().find(candidate => candidate.name === APP_NAME);
   if (!app) {
-    app = initializeApp({ credential: applicationDefault(), projectId: config.projectId }, APP_NAME);
+    const runtime = require('./platformIntegrationService').getRuntimeFirebase();
+    app = initializeApp({ credential: runtime?.serviceAccount ? cert(runtime.serviceAccount) : applicationDefault(), projectId: config.projectId }, APP_NAME);
   }
 
   const baseAuth = getAuth(app);
@@ -77,6 +78,11 @@ async function probeFirebaseAuthAccess() {
 
 function resetForTests() {
   authClient = null;
+  try {
+    const { deleteApp, getApps } = require('firebase-admin/app');
+    const app = getApps().find(candidate => candidate.name === APP_NAME);
+    if (app) void deleteApp(app).catch(() => {});
+  } catch (_) { /* Firebase puede no estar cargado durante el arranque */ }
 }
 
 function setAuthClientForTests(client) {

@@ -22,6 +22,8 @@ const notificationRepo = require('../db/repos/notificationRepo');
 const userRepo = require('../db/repos/userRepo');
 const mailer = require('./mailer');
 const telegram = require('./telegram');
+const { query } = require('../db/mysql');
+const integrations = require('./workspaceIntegrationService');
 const BRAND_SUBJECT = '[Joinpoint NOC]';
 
 function emailShell(content) {
@@ -120,7 +122,7 @@ function buildMessage(event, payload = {}) {
   }
 }
 
-async function dispatchEmail(user, msg) {
+async function dispatchEmail(user, msg, workspaceId) {
   if (!user?.email) return { ok: false, reason: 'sin email' };
   try {
     const out = await mailer.sendGeneric({
@@ -128,6 +130,7 @@ async function dispatchEmail(user, msg) {
       subject: msg.subject,
       html: emailShell(msg.html),
       text: msg.text,
+      workspaceId,
     });
     return { ok: out?.delivered !== false, error: out?.error };
   } catch (err) {
@@ -135,12 +138,14 @@ async function dispatchEmail(user, msg) {
   }
 }
 
-async function dispatchTelegram(sub, msg) {
+async function dispatchTelegram(sub, msg, workspaceId) {
   if (!sub.telegram_chat_id) return { ok: false, reason: 'sin chat_id vinculado' };
+  const telegramConfig = workspaceId ? await integrations.getSecret(workspaceId, 'TELEGRAM') : null;
   const out = await telegram.sendMessage({
     chatId: sub.telegram_chat_id,
     text: `<b>🔵 Joinpoint NOC</b>\n${msg.html}`,   // Telegram acepta HTML
     html: true,
+    token: telegramConfig?.botToken,
   });
   return { ok: out.ok, error: out.error, skipped: out.skipped };
 }
@@ -174,9 +179,11 @@ async function notify({ userId, event, payload = {} }) {
 
   const msg = buildMessage(event, payload);
   const results = {};
+  const membership = payload.workspaceId ? null : (await query('SELECT workspace_id FROM workspace_members WHERE user_id=? AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1', [userId]).catch(() => []))[0];
+  const workspaceId = payload.workspaceId || membership?.workspace_id || null;
 
   if (sub.channels.email) {
-    results.email = await dispatchEmail(user, msg);
+    results.email = await dispatchEmail(user, msg, workspaceId);
     void notificationRepo.log({
       userId, event, channel: 'email',
       status: results.email.ok ? 'sent' : 'failed',
@@ -185,7 +192,7 @@ async function notify({ userId, event, payload = {} }) {
   }
 
   if (sub.channels.telegram) {
-    results.telegram = await dispatchTelegram(sub, msg);
+    results.telegram = await dispatchTelegram(sub, msg, workspaceId);
     void notificationRepo.log({
       userId, event, channel: 'telegram',
       status: results.telegram.skipped ? 'skipped'

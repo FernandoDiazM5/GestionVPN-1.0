@@ -24,7 +24,7 @@ vi.mock('../../utils/fetchWithTimeout', () => ({
   fetchWithTimeout: (...args: unknown[]) => mocks.fetchWithTimeout(...args),
 }));
 
-vi.mock('../../config/federatedAuth', () => ({ federatedAuthAvailable: true }));
+vi.mock('../../config/federatedAuth', () => ({ federatedAuthAvailable: true, getFederatedAuthConfig: vi.fn().mockResolvedValue({ projectId: 'test' }) }));
 
 vi.mock('../../services/federatedAuth', () => ({
   signInWithGoogle: (...args: unknown[]) => mocks.signInWithGoogle(...args),

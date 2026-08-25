@@ -323,3 +323,34 @@ describe('handleMessage — con auth', () => {
     expect(getReplyText()).toContain('Alice');
   });
 });
+
+describe('handleMessage — consultas del administrador', () => {
+  beforeEach(() => {
+    userRepoMocks.findById.mockResolvedValue({ id: 'admin-1', email: 'admin@example.com', name: 'Admin', is_platform_admin: 1 });
+    mysqlMocks.query.mockImplementation(async (sql) => {
+      if (/notification_subscriptions/i.test(sql)) return [{ user_id: 'admin-1' }];
+      if (/ORDER BY u\.created_at DESC LIMIT 30/i.test(sql)) return [{ email: 'moderador@example.com', name: 'Moderador', disabled_at: null, workspace_name: 'Operaciones' }];
+      if (/LOWER\(u\.email\)=\?/i.test(sql)) return [{ email: 'moderador@example.com', name: 'Moderador', disabled_at: null, workspace_name: 'Operaciones', member_count: 4, last_access_at: null }];
+      return [];
+    });
+  });
+
+  it('/help muestra los comandos administrativos sólo al administrador', async () => {
+    await bot.handleMessage({ chat: { id: 1 }, text: '/help' });
+    expect(getReplyText()).toContain('/moderadores');
+    expect(getReplyText()).toContain('/moderador');
+  });
+
+  it('/moderadores entrega un resumen sin incluir credenciales', async () => {
+    await bot.handleMessage({ chat: { id: 1 }, text: '/moderadores' });
+    expect(getReplyText()).toContain('moderador@example.com');
+    expect(getReplyText()).toContain('Operaciones');
+    expect(getReplyText()).not.toContain('password');
+  });
+
+  it('/moderador consulta un moderador por correo', async () => {
+    await bot.handleMessage({ chat: { id: 1 }, text: '/moderador moderador@example.com' });
+    expect(getReplyText()).toContain('Detalle del moderador');
+    expect(getReplyText()).toContain('Miembros: 4');
+  });
+});

@@ -7,6 +7,8 @@ const aiSnapshotRepo = require('../../db/repos/aiSnapshotRepo');
 const metrics = require('../metrics');
 const { snapshotRetentionDays } = require('./aiRetention');
 const inFlight = new Map();
+const integrations = require('../workspaceIntegrationService');
+const platformIntegrations = require('../platformIntegrationService');
 
 function positiveNumber(value, fallback) {
   const number = Number(value);
@@ -78,7 +80,10 @@ function normalizeNetworkAnalysis(analysis, type) {
 }
 
 async function analyzeOnce({ workspaceId, userId, type, dto, snapshotDevices, hash, promptVersion, scope }) {
-  if (!geminiClient.configured()) throw providerError({ code: 'AI_NOT_CONFIGURED' });
+  const workspaceGemini = await integrations.getSecret(workspaceId, 'GEMINI');
+  const platformGemini = workspaceGemini ? null : await platformIntegrations.getSecret('GEMINI').catch(() => null);
+  const effectiveGemini = workspaceGemini || platformGemini;
+  if (!geminiClient.configured(effectiveGemini?.apiKey)) throw providerError({ code: 'AI_NOT_CONFIGURED' });
   const settings = config();
   const ttlMs = type === 'NETWORK' ? settings.networkCacheTtlMs : settings.deviceCacheTtlMs;
   const cached = await aiAnalysisRepo.findCached({ workspaceId, type, hash, promptVersion });
@@ -140,7 +145,7 @@ async function analyzeOnce({ workspaceId, userId, type, dto, snapshotDevices, ha
       throw new AppError('Se alcanzó el presupuesto diario configurado para Gemini', 429, 'AI_DAILY_LIMIT');
     }
 
-    const result = await geminiClient.generateAnalysis({ kind: type, dto });
+    const result = await geminiClient.generateAnalysis({ kind: type, dto, apiKey: effectiveGemini?.apiKey, model: effectiveGemini?.model });
     const analysis = normalizeNetworkAnalysis(result.analysis, type);
     const latencyMs = Date.now() - startedAt;
     await aiAnalysisRepo.succeed(run.id, { analysis, usage: result.usage, latencyMs });

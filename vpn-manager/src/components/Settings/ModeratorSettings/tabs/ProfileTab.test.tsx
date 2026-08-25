@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   unlink: vi.fn(),
 }));
 
-vi.mock('../../../../config/federatedAuth', () => ({ federatedAuthAvailable: true }));
+vi.mock('../../../../config/federatedAuth', () => ({ federatedAuthAvailable: true, getFederatedAuthConfig: vi.fn().mockResolvedValue({ projectId: 'test' }) }));
 vi.mock('../../../../services/federatedAuth', () => ({
   getGoogleLinkStatus: (...args: unknown[]) => mocks.getStatus(...args),
   linkGoogleAccount: (...args: unknown[]) => mocks.link(...args),

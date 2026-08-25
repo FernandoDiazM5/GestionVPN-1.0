@@ -46,6 +46,7 @@ const SELECTION_TTL_MS = 15 * 60 * 1000;     // 15 min para responder con el nú
 let _running = false;
 let _offset = 0;
 let _abort = null;
+let _activeToken = null;
 
 // pendingSelections — chatId → { tunnels, expiresAt }
 // Map en memoria. Si el backend reinicia se pierden las pendientes;
@@ -94,7 +95,7 @@ async function getCoreCreds() {
 
 // ── Helpers de reply ──────────────────────────────────────────────
 function reply(chatId, text) {
-  return telegram.sendMessage({ chatId, text, html: true });
+  return telegram.sendMessage({ chatId, text, html: true, token: _activeToken });
 }
 
 // ── Helpers de selección pendiente ────────────────────────────────
@@ -195,8 +196,35 @@ async function cmdHelp(chatId, user) {
       '/desactivar — cierra tu túnel actual',
       '/cancelar — descarta una selección pendiente',
     );
+    if (Number(user.is_platform_admin) === 1) lines.push('/moderadores — resumen de moderadores', '/moderador &lt;correo&gt; — detalle de un moderador');
   }
   return reply(chatId, lines.join('\n'));
+}
+
+async function cmdModeradores(chatId, user) {
+  if (Number(user?.is_platform_admin) !== 1) return reply(chatId, '🔒 Comando disponible sólo para el Administrador.');
+  const rows = await query(`SELECT u.email,u.name,u.disabled_at,w.name AS workspace_name,
+      (SELECT MAX(s.created_at) FROM auth_sessions s WHERE s.user_id=u.id) AS last_access_at
+    FROM users u JOIN workspace_members wm ON wm.user_id=u.id AND wm.role='OWNER' AND wm.deleted_at IS NULL
+    JOIN workspaces w ON w.id=wm.workspace_id WHERE u.deleted_at IS NULL AND COALESCE(u.is_platform_admin,0)=0
+    ORDER BY u.created_at DESC LIMIT 30`);
+  if (!rows.length) return reply(chatId, 'No hay moderadores registrados.');
+  const lines = rows.map((row, index) => `${index + 1}) ${row.disabled_at ? '⛔' : '✅'} <b>${row.name || row.email}</b>\n<code>${row.email}</code> · ${row.workspace_name}`);
+  return reply(chatId, `<b>🔵 Moderadores (${rows.length})</b>\n\n${lines.join('\n\n')}`);
+}
+
+async function cmdModerador(chatId, user, args) {
+  if (Number(user?.is_platform_admin) !== 1) return reply(chatId, '🔒 Comando disponible sólo para el Administrador.');
+  const email = String(args?.[0] || '').trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return reply(chatId, 'Usa: <code>/moderador correo@dominio.com</code>');
+  const rows = await query(`SELECT u.email,u.name,u.disabled_at,u.created_at,w.name AS workspace_name,
+      (SELECT MAX(s.created_at) FROM auth_sessions s WHERE s.user_id=u.id) AS last_access_at,
+      (SELECT COUNT(*) FROM workspace_members members WHERE members.workspace_id=w.id AND members.deleted_at IS NULL) AS member_count
+    FROM users u JOIN workspace_members wm ON wm.user_id=u.id AND wm.role='OWNER' AND wm.deleted_at IS NULL
+    JOIN workspaces w ON w.id=wm.workspace_id WHERE LOWER(u.email)=? AND u.deleted_at IS NULL AND COALESCE(u.is_platform_admin,0)=0 LIMIT 1`, [email]);
+  const row = rows[0];
+  if (!row) return reply(chatId, 'Moderador no encontrado.');
+  return reply(chatId, `<b>🔵 Detalle del moderador</b>\n${row.disabled_at ? '⛔ Suspendido' : '✅ Activo'}\nNombre: <b>${row.name || 'Sin nombre'}</b>\nCorreo: <code>${row.email}</code>\nWorkspace: ${row.workspace_name}\nMiembros: ${row.member_count}\nÚltimo acceso: ${row.last_access_at ? new Date(Number(row.last_access_at)).toLocaleString('es-PE') : 'Sin accesos'}`);
 }
 
 async function cmdLink(chatId, args) {
@@ -362,6 +390,8 @@ const COMMANDS = {
   '/activar': cmdActivar,
   '/desactivar': cmdDesactivar,
   '/cancelar': cmdCancelar,
+  '/moderadores': cmdModeradores,
+  '/moderador': cmdModerador,
 };
 
 /**
@@ -410,7 +440,7 @@ async function handleMessage(msg) {
 
 // ── Long-polling loop ─────────────────────────────────────────────
 async function getUpdates(signal) {
-  const url = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/getUpdates` +
+  const url = `https://api.telegram.org/bot${_activeToken}/getUpdates` +
               `?timeout=${POLL_TIMEOUT_SEC}&offset=${_offset}&allowed_updates=${encodeURIComponent('["message"]')}`;
   const res = await fetch(url, { signal });
   if (!res.ok) throw new Error(`getUpdates HTTP ${res.status}`);
@@ -438,13 +468,14 @@ async function loop() {
   }
 }
 
-function start() {
+async function start() {
   if (_running) return;
   if (process.env.TELEGRAM_BOT_ENABLED === 'false') {
     log.info('Deshabilitado por TELEGRAM_BOT_ENABLED=false');
     return;
   }
-  if (!telegram.isConfigured()) {
+  _activeToken = (await require('./platformIntegrationService').getSecret('TELEGRAM').catch(() => null))?.botToken || process.env.TELEGRAM_BOT_TOKEN || null;
+  if (!telegram.isConfigured(_activeToken)) {
     log.info('TELEGRAM_BOT_TOKEN no configurado — bot no inicia');
     return;
   }
@@ -459,6 +490,7 @@ function stop() {
   _running = false;
   if (_abort) _abort.abort();
   _abort = null;
+  _activeToken = null;
   log.info('Bot detenido');
 }
 

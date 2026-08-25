@@ -259,6 +259,7 @@ router.post('/invite', requireSession, requireRole('OWNER'),
         workspaceName: ctx.ws_name || 'tu workspace',
         tunnelId: tunnelId || null,
         role,
+        workspaceId: wsId,
       });
     } catch (e) {
       mailError = e.message || 'No se pudo enviar el correo';

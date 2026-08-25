@@ -401,3 +401,37 @@ FROM aps a
 LEFT JOIN signal_history sh ON sh.ap_id = a.id
     AND sh.timestamp > (UNIX_TIMESTAMP() * 1000 - 86400000)
 GROUP BY a.id;
+CREATE TABLE IF NOT EXISTS workspace_integrations (
+  workspace_id VARCHAR(36) NOT NULL,
+  provider VARCHAR(24) NOT NULL,
+  config_enc TEXT NOT NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE',
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  display_label VARCHAR(255) DEFAULT NULL,
+  metadata_json TEXT DEFAULT NULL,
+  last_validated_at BIGINT NOT NULL,
+  last_error_code VARCHAR(64) DEFAULT NULL,
+  configured_by VARCHAR(36) NOT NULL,
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL,
+  PRIMARY KEY (workspace_id, provider),
+  KEY idx_workspace_integrations_active (workspace_id, active),
+  CONSTRAINT fk_workspace_integrations_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_workspace_integrations_user FOREIGN KEY (configured_by) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS platform_integrations (
+  provider VARCHAR(24) NOT NULL PRIMARY KEY,
+  config_enc TEXT NOT NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE',
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  display_label VARCHAR(255) DEFAULT NULL,
+  metadata_json TEXT DEFAULT NULL,
+  last_validated_at BIGINT NOT NULL,
+  last_error_code VARCHAR(64) DEFAULT NULL,
+  configured_by VARCHAR(36) NOT NULL,
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL,
+  KEY idx_platform_integrations_active (active),
+  CONSTRAINT fk_platform_integrations_user FOREIGN KEY (configured_by) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

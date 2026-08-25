@@ -29,6 +29,13 @@ const router = express.Router();
 const GENERIC_BAD_CREDENTIALS = 'Correo o contraseña incorrectos';
 const GOOGLE_PROVIDER = 'google.com';
 
+router.get('/config', asyncHandler(async (_req, res) => {
+  const runtime = await require('../lib/platformIntegrationService').publicFirebaseConfig().catch(() => null);
+  const envEnabled = readFederatedAuthConfig().enabled;
+  res.set('Cache-Control', 'no-store');
+  return sendOk(res, { enabled: Boolean(runtime) || envEnabled, config: runtime });
+}));
+
 function requirePilotEnabled(_req, _res, next) {
   if (!readFederatedAuthConfig().enabled) {
     return next(new AppError('Ruta no disponible', 404, 'FEDERATED_AUTH_DISABLED'));

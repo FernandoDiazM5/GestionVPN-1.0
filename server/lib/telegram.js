@@ -15,8 +15,8 @@ const log = require('./logger').child({ scope: 'telegram' });
 const BASE_URL = 'https://api.telegram.org';
 const TIMEOUT_MS = 8000;
 
-function isConfigured() {
-  return !!(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_BOT_TOKEN.includes(':'));
+function isConfigured(token = process.env.TELEGRAM_BOT_TOKEN) {
+  return !!(token && token.includes(':'));
 }
 
 // Cache del username del bot. undefined = no consultado · null = desconocido · string = ok.
@@ -29,16 +29,16 @@ let _cachedUsername;
  * degrada (muestra el código sin enlace directo al bot).
  * @returns {Promise<string|null>}
  */
-async function getBotUsername() {
+async function getBotUsername(token = process.env.TELEGRAM_BOT_TOKEN) {
   const envName = process.env.TELEGRAM_BOT_USERNAME;
   if (envName) return envName.replace(/^@/, '');
-  if (!isConfigured()) return null;
+  if (!isConfigured(token)) return null;
   if (_cachedUsername !== undefined) return _cachedUsername;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const res = await fetch(`${BASE_URL}/bot${process.env.TELEGRAM_BOT_TOKEN}/getMe`, { signal: controller.signal });
+    const res = await fetch(`${BASE_URL}/bot${token}/getMe`, { signal: controller.signal });
     const data = await res.json().catch(() => ({}));
     _cachedUsername = (data.ok && data.result && data.result.username) ? data.result.username : null;
   } catch (err) {
@@ -59,14 +59,15 @@ async function getBotUsername() {
  * @param {boolean} [args.html=true]  Usa parse_mode=HTML
  * @returns {Promise<{ok:boolean, skipped?:boolean, error?:string, status?:number}>}
  */
-async function sendMessage({ chatId, text, html = true }) {
-  if (!isConfigured()) {
+async function sendMessage({ chatId, text, html = true, token }) {
+  if (!token) token = (await require('./platformIntegrationService').getSecret('TELEGRAM').catch(() => null))?.botToken || process.env.TELEGRAM_BOT_TOKEN;
+  if (!isConfigured(token)) {
     log.debug({ chatId }, 'sendMessage skipped — TELEGRAM_BOT_TOKEN no configurado');
     return { ok: false, skipped: true };
   }
   if (!chatId || !text) return { ok: false, error: 'chatId y text requeridos' };
 
-  const url = `${BASE_URL}/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`;
+  const url = `${BASE_URL}/bot${token}/sendMessage`;
   const body = {
     chat_id: chatId,
     text: String(text).slice(0, 4000), // Telegram límite 4096; deja margen

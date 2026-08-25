@@ -30,11 +30,14 @@ vi.mock('./components', () => ({
 vi.mock('../ModeratorSettings/tabs/ProfileTab', () => ({
   default: () => <div>Contenido Cuenta</div>,
 }));
+vi.mock('../ModeratorSettings/tabs/IntegrationsTab', () => ({
+  default: () => <div>Contenido Integraciones</div>,
+}));
 
 import SettingsModule from './SettingsModule';
 
 describe('SettingsModule menu', () => {
-  it('muestra una sola seccion y permite navegar entre las cinco opciones', async () => {
+  it('muestra una sola seccion y permite navegar entre las seis opciones', async () => {
     const user = userEvent.setup();
     render(<SettingsModule />);
 
@@ -55,5 +58,9 @@ describe('SettingsModule menu', () => {
     await user.click(screen.getByRole('button', { name: 'Cuenta Correo y contrasena' }));
     expect(screen.getByText('Contenido Cuenta')).toBeInTheDocument();
     expect(screen.queryByText('Contenido Reportes')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Integraciones Correo, Telegram y Google Login' }));
+    expect(screen.getByText('Contenido Integraciones')).toBeInTheDocument();
+    expect(screen.queryByText('Contenido Cuenta')).not.toBeInTheDocument();
   });
 });
