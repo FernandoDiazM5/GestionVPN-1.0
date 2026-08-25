@@ -1,9 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
-> **Sesión 2026-08-25 — Acceso Telegram de 15 minutos por usuario.** Rama `vps_uni` sobre `2a54264`; sin deploy.
+> **Sesión 2026-08-25 — Acceso Telegram de 15 minutos por usuario desplegado.** Runtime `vps_uni@8a40ff0`; backend/frontend/DB sanos.
 > - Cada activación desde Telegram crea un lease fijo de 15 minutos, no renovable desde web, aislado por workspace/usuario y revocado por el job seguro ya existente. Se envía un aviso 5 minutos antes usando el mismo bot vinculado.
 > - `/sitios` y `/activar` ofrecen botones; `/misitio` muestra sitio y tiempo restante; `/desactivar` exige confirmación ligada a la sesión exacta. Los argumentos manuales no eluden las asignaciones del usuario.
-> - Migración aditiva de `lease_source` y `expiry_warning_sent_at`. Verificación: backend 129/717, frontend 79/267, focalizadas 41/41, build, TypeScript, lint, inventario de rutas y `check:all` verdes. Pendiente commit/push y autorización de despliegue.
+> - Migración aditiva aplicada. Producción preserva 58 tablas y conteos 2 usuarios/2 workspaces/2 sitios; ambos bots iniciaron. Raíz/legacy/health 200, CORS 204/403, login inválido 401, MySQL/RouterOS/SMTP `ok`, 0 reinicios y logs sin errores.
+> - Backup restaurado `/root/pre-telegram-sites-20260825T051148Z`; rollback `gestionvpn-10-{backend|frontend}:pre-telegram-sites-20260825T051148Z`; disco 83%/4.3 GiB libres.
 
 > **Sesión 2026-08-24 — Email accionable y comandos completos en bots de workspace.** Rama `vps_uni` sobre `d75039f`; sin deploy.
 > - Email abre directamente Brevo desde `Vincular email`; Telegram abre su integración. Notificaciones lista comandos básicos antes del enlace y operativos después.
