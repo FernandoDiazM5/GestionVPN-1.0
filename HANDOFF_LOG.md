@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-24 — Despliegue de integraciones e importación de credenciales.** Runtime `vps_uni@51ca7bb`. Estado: backend/DB saludables, HTTPS operativo y 0 reinicios.
+> - Respaldo MySQL verificado y rollback de imágenes creados antes del checkout. Backend/frontend reconstruidos exclusivamente con `docker-compose.prod.yml`; MariaDB conservó contenedor y volumen.
+> - Migraciones crearon `platform_integrations` y `workspace_integrations`. Se detectaron, validaron, cifraron e importaron sin revelar valores: Brevo, Telegram, Gemini y Firebase; todas quedaron `ACTIVE` y Gmail `NOT_CONFIGURED` como alternativa.
+> - Firebase público confirma `vpn-noc` habilitado con campos web completos; health MySQL/SMTP `ok`, raíz/legacy 200, CORS 204/403, login inválido 401, tablas presentes y logs sin errores recientes.
+> - Backup `/root/pre-integrations-20260825T033714Z`; rollback `gestionvpn-10-backend:pre-integrations-20260825T033714Z` y `gestionvpn-10-frontend:pre-integrations-20260825T033714Z`; disco 80%/5.1 GiB libres.
+
 > **Sesión 2026-08-24 — Preparación de despliegue e importación de APIs existentes.** Rama `vps_uni` (base `589c963`). Estado: backend 127/702, frontend 78/261, build, lint, inventario de rutas y `check:all` verdes; despliegue aún no iniciado.
 > - Inventario read-only del VPS identificó Brevo, Telegram, Gemini y Firebase configurados; no se imprimieron ni almacenaron valores secretos. Las claves HMAC/pseudonimización/agente se clasificaron correctamente como controles internos no administrables.
 > - Gemini fue agregado también al módulo global como fallback de los workspaces. Se añadió un importador idempotente que valida y cifra las cuatro integraciones sin sobrescribir registros existentes.
