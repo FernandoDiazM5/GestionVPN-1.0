@@ -145,15 +145,15 @@ describe('handleMessage — con auth', () => {
   it('/help vinculado → incluye comandos avanzados', async () => {
     await bot.handleMessage({ chat: { id: 1 }, text: '/help' });
     const text = getReplyText();
-    expect(text).toContain('/status');
-    expect(text).toContain('/tuneles');
+    expect(text).toContain('/estado');
+    expect(text).toContain('/sitios');
     expect(text).toContain('/activar');
   });
 
-  it('/status sin sesión activa', async () => {
+  it('/estado sin acceso activo', async () => {
     sessionRepoMocks.getActiveByUser.mockResolvedValue(null);
-    await bot.handleMessage({ chat: { id: 1 }, text: '/status' });
-    expect(getReplyText()).toContain('Sin túnel activo');
+    await bot.handleMessage({ chat: { id: 1 }, text: '/estado' });
+    expect(getReplyText()).toContain('ningún sitio');
   });
 
   it('/status con sesión activa muestra VRF y expiración', async () => {
@@ -164,17 +164,15 @@ describe('handleMessage — con auth', () => {
     });
     await bot.handleMessage({ chat: { id: 1 }, text: '/status' });
     const text = getReplyText();
-    expect(text).toContain('VRF-A');
-    expect(text).toContain('tunnel-a');
+    expect(text).toContain('Torre Norte');
     expect(text).toMatch(/Expira en: [45] min/);
   });
 
-  it('/tuneles OWNER → lista todos del workspace', async () => {
-    await bot.handleMessage({ chat: { id: 1 }, text: '/tuneles' });
+  it('/sitios OWNER → lista todos los sitios del workspace', async () => {
+    await bot.handleMessage({ chat: { id: 1 }, text: '/sitios' });
     const text = getReplyText();
-    expect(text).toContain('VRF-A');
-    expect(text).toContain('VRF-B');
     expect(text).toContain('Torre Norte');
+    expect(text).toContain('Torre Sur');
     expect(text).toContain('/activar');
   });
 
@@ -188,8 +186,8 @@ describe('handleMessage — con auth', () => {
     assignmentRepoMocks.assignedTunnelIds.mockResolvedValue(['tunnel-a']);
     await bot.handleMessage({ chat: { id: 1 }, text: '/tuneles' });
     const text = getReplyText();
-    expect(text).toContain('VRF-A');
-    expect(text).not.toContain('VRF-B');
+    expect(text).toContain('Torre Norte');
+    expect(text).not.toContain('Torre Sur');
   });
 
   // Regresión: el `tunnel_id` en `tunnel_assignments` suele ser el `nombre_vrf`
@@ -210,7 +208,7 @@ describe('handleMessage — con auth', () => {
     });
     assignmentRepoMocks.assignedTunnelIds.mockResolvedValue(['VRF-HOUSENET']);
     await bot.handleMessage({ chat: { id: 1 }, text: '/tuneles' });
-    expect(getReplyText()).toContain('VRF-HOUSENET');
+    expect(getReplyText()).toContain('Casa');
   });
 
   it('/tuneles MEMBER sin asignaciones', async () => {
@@ -221,7 +219,7 @@ describe('handleMessage — con auth', () => {
     });
     assignmentRepoMocks.assignedTunnelIds.mockResolvedValue([]);
     await bot.handleMessage({ chat: { id: 1 }, text: '/tuneles' });
-    expect(getReplyText()).toContain('No tienes túneles');
+    expect(getReplyText()).toContain('No tienes sitios');
   });
 
   it('/activar VRF-X → activa directo vía tunnelService', async () => {
@@ -253,9 +251,9 @@ describe('handleMessage — con auth', () => {
   it('/activar sin argumento → lista numerada (pending)', async () => {
     await bot.handleMessage({ chat: { id: 1 }, text: '/activar' });
     const text = getReplyText();
-    expect(text).toContain('Elige un túnel');
-    expect(text).toMatch(/1\).*VRF-A/);
-    expect(text).toMatch(/2\).*VRF-B/);
+    expect(text).toContain('Elige el sitio');
+    expect(text).toMatch(/1\).*Torre Norte/);
+    expect(text).toMatch(/2\).*Torre Sur/);
     expect(bot._pendingSelections.has(1)).toBe(true);
   });
 
@@ -302,7 +300,7 @@ describe('handleMessage — con auth', () => {
     await bot.handleMessage({ chat: { id: 1 }, text: '/desactivar' });
     expect(tunnelServiceMocks.deactivateTunnel).toHaveBeenCalled();
     const last = telegramMocks.sendMessage.mock.calls.at(-1)[0].text;
-    expect(last).toContain('desactivado');
+    expect(last).toContain('Acceso cerrado');
   });
 
   it('/desactivar sin sesión → mensaje idempotente', async () => {
@@ -311,7 +309,7 @@ describe('handleMessage — con auth', () => {
     });
     await bot.handleMessage({ chat: { id: 1 }, text: '/desactivar' });
     const last = telegramMocks.sendMessage.mock.calls.at(-1)[0].text;
-    expect(last).toContain('No tenías túnel activo');
+    expect(last).toContain('ningún sitio');
   });
 
   it('/unlink → desvincula y avisa', async () => {

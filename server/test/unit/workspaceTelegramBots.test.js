@@ -32,8 +32,8 @@ describe('workspaceTelegramBots', () => {
     mysql.query.mockImplementation(async sql => /notification_subscriptions/i.test(sql) ? [{ user_id: 'u1' }] : []);
     await bots.handleMessage({ workspaceId: 'ws-1', botToken: 'token' }, { chat: { id: 123 }, text: '/help' });
     const text = telegram.sendMessage.mock.calls[0][0].text;
-    expect(text).toContain('/status');
-    expect(text).toContain('/tuneles');
+    expect(text).toContain('/estado');
+    expect(text).toContain('/sitios');
     expect(text).toContain('/activar');
     expect(text).toContain('/desactivar');
   });

@@ -147,7 +147,7 @@ async function fetchUserTunnels(userId) {
   let tunnels;
   if (role === 'MEMBER') {
     const ids = await assignmentRepo.assignedTunnelIds(wsId, userId);
-    if (!ids.length) return { error: 'No tienes túneles asignados.' };
+    if (!ids.length) return { error: 'No tienes sitios asignados.' };
     // El `tunnel_id` guardado en `tunnel_assignments` puede contener cualquiera
     // de los dos identificadores: el modal de asignar usa `nombre_vrf || ppp_user`
     // (la mayoría termina siendo el VRF). Filtramos por ambos campos, mismo
@@ -165,13 +165,13 @@ async function fetchUserTunnels(userId) {
       [wsId]
     );
   }
-  if (!tunnels.length) return { error: 'Tu workspace no tiene túneles cargados.' };
+  if (!tunnels.length) return { error: 'Tu workspace no tiene sitios cargados.' };
   return { tunnels: tunnels.slice(0, 30) };
 }
 
 function formatNumberedList(tunnels) {
   return tunnels.map((t, i) =>
-    `${i + 1}) <code>${t.nombre_vrf || t.ppp_user}</code> — ${t.nombre_nodo || 'sin nombre'}`
+    `${i + 1}) <b>${t.nombre_nodo || t.nombre_vrf || t.ppp_user || 'Sitio sin nombre'}</b>`
   ).join('\n');
 }
 
@@ -201,12 +201,10 @@ async function cmdHelp(chatId, user) {
   ];
   if (user) {
     lines.push(
-      '/status — tu sesión activa',
-      '/tuneles — lista numerada de túneles',
-      '/activar — elige un número de la lista (TTL 15 min)',
-      '/activar &lt;n&gt; — activa por número directo',
-      '/activar &lt;VRF&gt; — activa por nombre',
-      '/desactivar — cierra tu túnel actual',
+      '/estado — ver tu acceso activo',
+      '/sitios — lista de sitios disponibles',
+      '/activar — elige un sitio de la lista',
+      '/desactivar — cierra tu acceso actual',
       '/cancelar — descarta una selección pendiente',
     );
     if (!currentContext().workspaceId && Number(user.is_platform_admin) === 1) lines.push('/moderadores — resumen de moderadores', '/moderador &lt;correo&gt; — detalle de un moderador');
@@ -254,8 +252,8 @@ async function cmdLink(chatId, args) {
     `<b>🔵 Joinpoint NOC</b>\n✅ Chat vinculado a <b>${user?.email || r.userId}</b>.\n\n` +
     `Habilita el canal Telegram en el panel para recibir notificaciones.\n\n` +
     `<b>Comandos disponibles</b>\n` +
-    `/status — ver tu sesión activa\n/tuneles — listar tus túneles\n/activar — elegir y activar un túnel\n` +
-    `/desactivar — cerrar tu túnel actual\n/help — ver todos los comandos`
+    `/estado — ver tu acceso activo\n/sitios — listar tus sitios\n/activar — abrir acceso a un sitio\n` +
+    `/desactivar — cerrar tu acceso actual\n/help — ver todos los comandos`
   );
 }
 
@@ -275,12 +273,13 @@ async function cmdStatus(chatId, user) {
   );
   if (!ws.length) return reply(chatId, 'Tu cuenta no tiene workspace asignado.');
   const sess = await sessionRepo.getActiveByUser(ws[0].workspace_id, user.id);
-  if (!sess) return reply(chatId, '🔒 Sin túnel activo.');
+  if (!sess) return reply(chatId, '🔒 No tienes acceso activo a ningún sitio.');
+  const sites = await query('SELECT nombre_nodo FROM nodes WHERE workspace_id=? AND (ppp_user=? OR nombre_vrf=?) LIMIT 1', [ws[0].workspace_id, sess.tunnel_id, sess.vrf_name]);
+  const siteName = sites[0]?.nombre_nodo || sess.vrf_name || sess.tunnel_id;
   const remaining = sess.expires_at ? Math.max(0, Math.round((sess.expires_at - Date.now()) / 60000)) : null;
   return reply(chatId,
-    `<b>🔵 Joinpoint NOC · Estado</b>\n🔓 <b>Túnel activo</b>\n` +
-    `Túnel: <code>${sess.tunnel_id}</code>\n` +
-    `VRF: <code>${sess.vrf_name}</code>\n` +
+    `<b>🔵 Joinpoint NOC · Estado</b>\n🔓 <b>Acceso activo</b>\n` +
+    `Sitio: <b>${siteName}</b>\n` +
     (remaining != null ? `Expira en: ${remaining} min` : '')
   );
 }
@@ -290,7 +289,7 @@ async function cmdTuneles(chatId, user) {
   const r = await fetchUserTunnels(user.id);
   if (r.error) return reply(chatId, r.error);
   return reply(chatId,
-    `<b>🔵 Joinpoint NOC · Túneles disponibles</b> (${r.tunnels.length})\n\n` +
+    `<b>🔵 Joinpoint NOC · Sitios disponibles</b> (${r.tunnels.length})\n\n` +
     formatNumberedList(r.tunnels) + '\n\n' +
     `Para activar uno: <code>/activar</code> y responde con el número.`
   );
@@ -333,7 +332,7 @@ async function cmdActivar(chatId, user, args) {
     if (r.error) return reply(chatId, r.error);
     setPending(chatId, r.tunnels);
     return reply(chatId,
-      `<b>Elige un túnel para activar</b> (responde con el número)\n\n` +
+      `<b>Elige el sitio al que deseas acceder</b> (responde con el número)\n\n` +
       formatNumberedList(r.tunnels) + '\n\n' +
       `<i>La selección expira en 15 min. Envía /cancelar para descartar.</i>`
     );
@@ -376,7 +375,7 @@ async function cmdDesactivar(chatId, user) {
   const mikrotik = await getCoreCreds();
   if (!mikrotik) return reply(chatId, '❌ El MikroTik no está configurado en el panel.');
 
-  await reply(chatId, '⏳ Desactivando tu túnel…');
+  await reply(chatId, '⏳ Cerrando tu acceso…');
   const result = await tunnelService.deactivateTunnel({
     account, mikrotik, clientIp: 'telegram',
   });
@@ -384,9 +383,9 @@ async function cmdDesactivar(chatId, user) {
     return reply(chatId, `❌ <b>No se pudo desactivar</b>\n${result.message}`);
   }
   if (!result.hadSession) {
-    return reply(chatId, '🔒 No tenías túnel activo. (Mangle limpia igualmente.)');
+    return reply(chatId, '🔒 No tenías acceso activo a ningún sitio.');
   }
-  return reply(chatId, `✅ Túnel <code>${result.vrf || result.tunnelId}</code> desactivado.`);
+  return reply(chatId, '✅ Acceso cerrado correctamente.');
 }
 
 async function cmdCancelar(chatId, user) {
@@ -403,7 +402,9 @@ const COMMANDS = {
   '/link': cmdLink,
   '/unlink': cmdUnlink,
   '/status': cmdStatus,
+  '/estado': cmdStatus,
   '/tuneles': cmdTuneles,
+  '/sitios': cmdTuneles,
   '/activar': cmdActivar,
   '/desactivar': cmdDesactivar,
   '/cancelar': cmdCancelar,

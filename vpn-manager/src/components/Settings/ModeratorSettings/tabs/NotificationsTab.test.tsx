@@ -36,7 +36,8 @@ describe('NotificationsTab availability', () => {
     api.getNotifications.mockResolvedValue({ ...unavailable, telegramLinked: true, telegramBotConfigured: true, channels: { email: false, telegram: false }, telegramBotUsername: 'workspace_bot', channelAvailability: { ...unavailable.channelAvailability, telegram: { available: true, configured: true, username: 'workspace_bot', reason: null } } });
     render(<NotificationsTab />);
     expect(await screen.findByText('Comandos disponibles en Telegram')).toBeInTheDocument();
-    expect(screen.getByText('/status')).toBeInTheDocument();
+    expect(screen.getByText('/estado')).toBeInTheDocument();
+    expect(screen.getByText('/sitios')).toBeInTheDocument();
     expect(screen.getByText('/activar')).toBeInTheDocument();
     expect(screen.getByText('/desactivar')).toBeInTheDocument();
   });

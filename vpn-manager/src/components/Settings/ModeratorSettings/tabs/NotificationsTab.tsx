@@ -12,16 +12,16 @@ import type { NotificationEvent, NotificationStatus } from '@gestionvpn/contract
 import AsyncQueryState from '../../../Common/AsyncQueryState';
 
 const EVENT_LABEL: Record<NotificationEvent, string> = {
-  TUNNEL_ACTIVATED: 'Túnel activado',
-  TUNNEL_DEACTIVATED: 'Túnel desactivado',
+  TUNNEL_ACTIVATED: 'Acceso a sitio activado',
+  TUNNEL_DEACTIVATED: 'Acceso a sitio desactivado',
   SESSION_EXPIRED: 'Sesión expirada',
   NODE_DOWN: 'Nodo caído',
   NODE_RECOVERED: 'Nodo recuperado',
 };
 
 const EVENT_DESC: Record<NotificationEvent, string> = {
-  TUNNEL_ACTIVATED: 'Cuando alguien (tú u otro) activa un túnel.',
-  TUNNEL_DEACTIVATED: 'Cuando un túnel queda en estado revocado.',
+  TUNNEL_ACTIVATED: 'Cuando alguien (tú u otro) abre el acceso a un sitio.',
+  TUNNEL_DEACTIVATED: 'Cuando se cierra el acceso a un sitio.',
   SESSION_EXPIRED: 'Cuando el TTL de tu sesión vence y se cierra sola.',
   NODE_DOWN: 'El monitoreo proactivo detectó un nodo sin responder (3 polls consecutivos).',
   NODE_RECOVERED: 'Un nodo previamente caído volvió a responder.',
@@ -170,7 +170,7 @@ export default function NotificationsTab({ memberMode = false, onOpenIntegration
             <Send className="w-4 h-4 text-indigo-500" /> Canales
           </h3>
           <p className="text-xs text-slate-500">
-            Vincula tu Telegram para activar y desactivar tus túneles desde el bot.
+            Vincula tu Telegram para abrir y cerrar el acceso a tus sitios desde el bot.
           </p>
           {telegramRow}
 
@@ -339,10 +339,10 @@ function TelegramChannelCard({ status, linkPending, memberMode, onOpenIntegratio
 }
 
 const LINKED_TELEGRAM_COMMANDS = [
-  ['/status', 'Ver el túnel que tienes activo.'],
-  ['/tuneles', 'Listar los túneles disponibles para tu cuenta.'],
-  ['/activar', 'Elegir y activar un túnel.'],
-  ['/desactivar', 'Cerrar tu túnel actual.'],
+  ['/estado', 'Ver el sitio al que tienes acceso.'],
+  ['/sitios', 'Listar los sitios disponibles para tu cuenta.'],
+  ['/activar', 'Elegir y abrir el acceso a un sitio.'],
+  ['/desactivar', 'Cerrar tu acceso actual.'],
   ['/cancelar', 'Cancelar una selección pendiente.'],
   ['/help', 'Volver a mostrar todos los comandos.'],
   ['/unlink', 'Desvincular este chat.'],
