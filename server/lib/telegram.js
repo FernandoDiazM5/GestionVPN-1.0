@@ -100,4 +100,22 @@ async function sendMessage({ chatId, text, html = true, token }) {
   }
 }
 
-module.exports = { sendMessage, isConfigured, getBotUsername };
+/** Publica el menú nativo de comandos del bot. Es best-effort y nunca expone el token. */
+async function setCommands({ token, commands }) {
+  if (!isConfigured(token) || !Array.isArray(commands) || !commands.length) return { ok: false, skipped: true };
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const res = await fetch(`${BASE_URL}/bot${token}/setMyCommands`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ commands }), signal: controller.signal,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.ok !== true) return { ok: false, status: res.status, error: data.description || `HTTP ${res.status}` };
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err.name === 'AbortError' ? `timeout ${TIMEOUT_MS}ms` : err.message };
+  } finally { clearTimeout(timer); }
+}
+
+module.exports = { sendMessage, setCommands, isConfigured, getBotUsername };

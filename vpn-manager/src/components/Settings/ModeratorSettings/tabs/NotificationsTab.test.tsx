@@ -19,14 +19,26 @@ beforeEach(() => { vi.clearAllMocks(); api.getNotifications.mockResolvedValue(un
 
 describe('NotificationsTab availability', () => {
   it('no presenta canales como activos antes de configurar las integraciones', async () => {
-    render(<NotificationsTab />);
+    const openIntegrations = vi.fn();
+    const user = userEvent.setup();
+    render(<NotificationsTab onOpenIntegrations={openIntegrations} />);
     expect(await screen.findByText('Sin canales activos')).toBeInTheDocument();
     expect(screen.getByText(/Configura Brevo o Gmail/)).toBeInTheDocument();
     expect(screen.getByText(/Telegram Bot Token/)).toBeInTheDocument();
     const checks = screen.getAllByRole('checkbox');
     expect(checks[0]).toBeDisabled();
     expect(checks[1]).toBeDisabled();
-    expect(screen.queryByRole('button', { name: 'Vincular' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Vincular email' }));
+    expect(openIntegrations).toHaveBeenCalledWith('email');
+  });
+
+  it('muestra los comandos operativos cuando Telegram está vinculado', async () => {
+    api.getNotifications.mockResolvedValue({ ...unavailable, telegramLinked: true, telegramBotConfigured: true, channels: { email: false, telegram: false }, telegramBotUsername: 'workspace_bot', channelAvailability: { ...unavailable.channelAvailability, telegram: { available: true, configured: true, username: 'workspace_bot', reason: null } } });
+    render(<NotificationsTab />);
+    expect(await screen.findByText('Comandos disponibles en Telegram')).toBeInTheDocument();
+    expect(screen.getByText('/status')).toBeInTheDocument();
+    expect(screen.getByText('/activar')).toBeInTheDocument();
+    expect(screen.getByText('/desactivar')).toBeInTheDocument();
   });
 
   it('permite generar código sólo cuando el bot está configurado, pero no activa el checkbox', async () => {

@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-24 — Email accionable y comandos completos en bots de workspace.** Rama `vps_uni` sobre `d75039f`; sin deploy.
+> - Email abre directamente Brevo desde `Vincular email`; Telegram abre su integración. Notificaciones lista comandos básicos antes del enlace y operativos después.
+> - Los bots propios delegan en el motor seguro existente: publican menú nativo y soportan estado, listado, activación, desactivación, cancelación y desvinculación. `/link` devuelve inmediatamente el catálogo. Contexto asíncrono separa token/workspace/chat y evita colisiones de identidad o selecciones entre bots.
+> - Verificación: backend 129/712, frontend 79/267, focalizadas 36/36, build, TypeScript, lint, inventario de rutas y `check:all` verdes. Pendiente commit/push y autorización de despliegue.
+
 > **Sesión 2026-08-24 — Despliegue de validaciones, acordeón y guías de integraciones.** Runtime `vps_uni@0921bb6`. Estado: backend/frontend/DB sanos, HTTPS operativo y 0 reinicios.
 > - Antes del checkout se creó dump comprimido con SHA-256, se restauró en MariaDB aislada con 58 tablas y se etiquetaron las imágenes anteriores. Se reconstruyeron backend/frontend exclusivamente con `docker-compose.prod.yml`; la DB conservó contenedor y volumen.
 > - Producción confirma columna de huella Telegram, bundle con guías Brevo/Gmail/Telegram/Gemini/Firebase, raíz/legacy/health 200, CORS 204/403, login inválido 401, MySQL/RouterOS/SMTP `ok` y logs recientes limpios.

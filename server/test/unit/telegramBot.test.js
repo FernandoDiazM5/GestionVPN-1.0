@@ -9,6 +9,7 @@ const { stubModule } = require('../helpers/moduleMock');
 
 const telegramMocks = stubModule(__dirname, '../../lib/telegram', {
   sendMessage: vi.fn().mockResolvedValue({ ok: true }),
+  setCommands: vi.fn().mockResolvedValue({ ok: true }),
   isConfigured: vi.fn().mockReturnValue(true),
 });
 
@@ -103,6 +104,8 @@ describe('handleMessage — sin auth', () => {
     const text = getReplyText();
     expect(text).toContain('vinculado');
     expect(text).toContain('alice@example.com');
+    expect(text).toContain('/activar');
+    expect(text).toContain('/desactivar');
   });
 
   it('comandos protegidos sin vinculación → rechazo', async () => {

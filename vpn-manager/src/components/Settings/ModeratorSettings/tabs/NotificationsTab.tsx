@@ -35,7 +35,7 @@ const ALL_EVENTS: NotificationEvent[] = [
 interface NotificationsTabProps {
   /** Modo MEMBER: solo muestra vincular/desvincular Telegram (sin email, eventos, pausa ni guardar). */
   memberMode?: boolean;
-  onOpenIntegrations?: () => void;
+  onOpenIntegrations?: (provider: 'email' | 'telegram') => void;
 }
 
 export default function NotificationsTab({ memberMode = false, onOpenIntegrations }: NotificationsTabProps = {}) {
@@ -222,8 +222,10 @@ export default function NotificationsTab({ memberMode = false, onOpenIntegration
           checked={status.channels.email}
           disabled={!emailAvailable}
           onChange={(v) => update('channels', { ...status.channels, email: v })}
+          extra={!emailAvailable && !memberMode && onOpenIntegrations ? <button type="button" onClick={() => onOpenIntegrations('email')} className="btn-primary inline-flex min-h-11 items-center gap-1.5 px-4 text-xs"><Mail className="h-4 w-4" />Vincular email</button> : !emailAvailable && memberMode ? <span className="text-xs font-medium text-slate-500">Solicita al moderador configurar el correo</span> : null}
         />
         {telegramRow}
+        {status.telegramBotConfigured ? <TelegramCommands linked={status.telegramLinked} /> : null}
 
         {linkCode && (
           <TelegramLinkSteps code={linkCode.code} expiresAt={linkCode.expiresAt} botUsername={linkCode.botUsername || status.telegramBotUsername} />
@@ -302,7 +304,7 @@ interface TelegramChannelCardProps {
   status: NotificationStatus;
   linkPending: boolean;
   memberMode: boolean;
-  onOpenIntegrations?: () => void;
+  onOpenIntegrations?: (provider: 'email' | 'telegram') => void;
   onStartLink: () => void;
   onUnlink: () => void;
   onChange: (value: boolean) => void;
@@ -326,7 +328,7 @@ function TelegramChannelCard({ status, linkPending, memberMode, onOpenIntegratio
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 items-start gap-3"><span className="rounded-xl bg-white p-2.5 text-sky-500 shadow-sm dark:bg-slate-900"><Send className="h-5 w-5" /></span><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-slate-800 dark:text-slate-100">Telegram</p><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${state.cls}`}>{state.label}</span></div><p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">{state.description}</p></div></div>
       <div className="flex min-h-11 shrink-0 flex-wrap items-center justify-end gap-2">
-        {!configured && !memberMode && onOpenIntegrations ? <button type="button" onClick={onOpenIntegrations} className="btn-primary inline-flex min-h-11 items-center gap-1.5 px-4 text-xs"><Bot className="h-4 w-4" />Configurar bot</button> : null}
+        {!configured && !memberMode && onOpenIntegrations ? <button type="button" onClick={() => onOpenIntegrations('telegram')} className="btn-primary inline-flex min-h-11 items-center gap-1.5 px-4 text-xs"><Bot className="h-4 w-4" />Configurar bot</button> : null}
         {!configured && memberMode ? <span className="text-xs font-medium text-slate-500">Solicita al moderador configurar el bot</span> : null}
         {configured && !linked ? <button type="button" onClick={onStartLink} disabled={linkPending} className="btn-primary inline-flex min-h-11 items-center gap-1.5 px-4 text-xs disabled:opacity-50"><Send className="h-4 w-4" />{linkPending ? 'Código generado' : 'Vincular cuenta'}</button> : null}
         {linked ? <button type="button" onClick={onUnlink} className="btn-outline btn-sm inline-flex min-h-11 items-center text-rose-600 border-rose-200"><X className="h-4 w-4" />Desvincular</button> : null}
@@ -334,6 +336,21 @@ function TelegramChannelCard({ status, linkPending, memberMode, onOpenIntegratio
       </div>
     </div>
   </div>;
+}
+
+const LINKED_TELEGRAM_COMMANDS = [
+  ['/status', 'Ver el túnel que tienes activo.'],
+  ['/tuneles', 'Listar los túneles disponibles para tu cuenta.'],
+  ['/activar', 'Elegir y activar un túnel.'],
+  ['/desactivar', 'Cerrar tu túnel actual.'],
+  ['/cancelar', 'Cancelar una selección pendiente.'],
+  ['/help', 'Volver a mostrar todos los comandos.'],
+  ['/unlink', 'Desvincular este chat.'],
+];
+
+function TelegramCommands({ linked }: { linked: boolean }) {
+  const commands = linked ? LINKED_TELEGRAM_COMMANDS : [['/start', 'Ver la bienvenida y cómo vincularte.'], ['/link CÓDIGO', 'Confirmar el código generado por el panel.'], ['/help', 'Mostrar la ayuda disponible.']];
+  return <div className="rounded-xl border border-sky-200 bg-sky-50/70 p-4 dark:border-sky-800/60 dark:bg-sky-500/10"><div className="flex items-start gap-3"><span className="rounded-lg bg-white p-2 text-sky-600 shadow-sm dark:bg-slate-900 dark:text-sky-300"><Bot className="h-4 w-4" /></span><div><p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Comandos disponibles en Telegram</p><p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{linked ? 'El bot también te enviará este resumen al confirmar la vinculación.' : 'Primero vincula el chat; después se habilitarán los comandos operativos.'}</p></div></div><div className="mt-3 grid gap-2 sm:grid-cols-2">{commands.map(([command, description]) => <div key={command} className="rounded-lg border border-sky-100 bg-white px-3 py-2 dark:border-sky-900 dark:bg-slate-900"><code className="text-xs font-bold text-sky-700 dark:text-sky-300">{command}</code><p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{description}</p></div>)}</div></div>;
 }
 
 // URL oficial de la app de Telegram en Google Play.

@@ -1,29 +1,23 @@
 const log = require('./logger').child({ scope: 'workspace-telegram-bots' });
 const integrations = require('./workspaceIntegrationService');
-const notificationRepo = require('../db/repos/notificationRepo');
-const telegram = require('./telegram');
-const crypto = require('crypto');
+const telegramBot = require('./telegramBot');
 
 const bots = new Map();
 let enabled = true;
-
-async function reply(botToken, chatId, text) {
-  return telegram.sendMessage({ token: botToken, chatId, text, html: true });
-}
+const WORKSPACE_COMMANDS = [
+  { command: 'start', description: 'Bienvenida y estado de vinculación' },
+  { command: 'help', description: 'Ver todos los comandos disponibles' },
+  { command: 'link', description: 'Vincular este chat con un código' },
+  { command: 'status', description: 'Ver tu túnel activo' },
+  { command: 'tuneles', description: 'Listar tus túneles disponibles' },
+  { command: 'activar', description: 'Elegir y activar un túnel' },
+  { command: 'desactivar', description: 'Cerrar tu túnel actual' },
+  { command: 'cancelar', description: 'Cancelar una selección pendiente' },
+  { command: 'unlink', description: 'Desvincular este chat' },
+];
 
 async function handleMessage(bot, message) {
-  const chatId = message?.chat?.id;
-  const text = String(message?.text || '').trim();
-  if (!chatId || !text.startsWith('/')) return;
-  const [rawCommand, rawCode] = text.split(/\s+/, 2);
-  const command = rawCommand.toLowerCase().split('@')[0];
-  if (command === '/start') return reply(bot.botToken, chatId, '<b>Joinpoint NOC</b>\nGenera tu código desde Ajustes → Notificaciones y envía <code>/link CÓDIGO</code>.');
-  if (command !== '/link') return reply(bot.botToken, chatId, 'Este bot gestiona avisos del workspace. Usa <code>/link CÓDIGO</code> para vincularte.');
-  const code = String(rawCode || '').trim().toUpperCase();
-  if (!/^[A-F0-9]{6}$/.test(code)) return reply(bot.botToken, chatId, 'Código inválido. Usa <code>/link CÓDIGO</code>.');
-  const botFingerprint = crypto.createHash('sha256').update(bot.botToken).digest('hex');
-  const result = await notificationRepo.confirmTelegramLink({ code, chatId, workspaceId: bot.workspaceId, botFingerprint });
-  return reply(bot.botToken, chatId, result.ok ? '✅ Telegram vinculado. Vuelve al panel para activar el canal.' : `❌ ${result.error}`);
+  return telegramBot.handleWorkspaceMessage(bot, message);
 }
 
 async function poll(bot) {
@@ -54,6 +48,8 @@ async function refresh() {
     const controller = new AbortController();
     const bot = { ...item, controller, offset: 0 };
     bots.set(item.workspaceId, bot);
+    const menu = await require('./telegram').setCommands({ token: item.botToken, commands: WORKSPACE_COMMANDS });
+    if (!menu.ok) log.warn({ workspaceId: item.workspaceId, error: menu.error }, 'No se pudo publicar el menú de comandos');
     void poll(bot);
   }
   log.info({ count: bots.size }, 'Bots Telegram de workspace activos');

@@ -48,13 +48,13 @@ const PLATFORM_DEFINITIONS: Definition[] = [
 
 function formatDate(value: number | null) { return value ? new Intl.DateTimeFormat('es-PE', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : 'Sin validar'; }
 
-export default function IntegrationsTab({ scope = 'workspace' }: { scope?: 'workspace' | 'platform' }) {
+export default function IntegrationsTab({ scope = 'workspace', initialProvider = null }: { scope?: 'workspace' | 'platform'; initialProvider?: IntegrationProvider | null }) {
   const definitions = scope === 'platform' ? PLATFORM_DEFINITIONS : WORKSPACE_DEFINITIONS;
   const api = scope === 'platform' ? platformIntegrationsApi : integrationsApi;
   const [items, setItems] = useState<WorkspaceIntegration[]>([]);
   const [forms, setForms] = useState<Record<string, FormValues>>(() => Object.fromEntries(definitions.map(d => [d.provider, d.defaults || {}])));
   const [editing, setEditing] = useState<IntegrationProvider | null>(null);
-  const [expanded, setExpanded] = useState<IntegrationProvider | null>(null);
+  const [expanded, setExpanded] = useState<IntegrationProvider | null>(initialProvider);
   const [busy, setBusy] = useState<IntegrationProvider | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<IntegrationProvider | null>(null);
   const [loading, setLoading] = useState(true);

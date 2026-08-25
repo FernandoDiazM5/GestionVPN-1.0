@@ -6,6 +6,7 @@ import WorkspaceTab from './tabs/WorkspaceTab';
 import ImportExportTab from './tabs/ImportExportTab';
 import NotificationsTab from './tabs/NotificationsTab';
 import IntegrationsTab from './tabs/IntegrationsTab';
+import type { IntegrationProvider } from '../../../services/integrationsApi';
 import { useWorkspaceSession } from '../../../context/WorkspaceSession';
 import { PageHeader } from '../../Common/ui';
 
@@ -41,6 +42,7 @@ export default function ModeratorSettingsModule() {
     [isMember],
   );
   const [tab, setTab] = useState<TabId>('profile');
+  const [integrationFocus, setIntegrationFocus] = useState<IntegrationProvider | null>(null);
 
   return (
     <div className="space-y-5">
@@ -83,8 +85,8 @@ export default function ModeratorSettingsModule() {
           {tab === 'profile'       && <ProfileTab />}
           {tab === 'wireguard'     && <WireGuardTab />}
           {tab === 'workspace'     && !isMember && <WorkspaceTab />}
-          {tab === 'notifications' && <NotificationsTab memberMode={isMember} onOpenIntegrations={!isMember ? () => setTab('integrations') : undefined} />}
-          {tab === 'integrations'  && !isMember && <IntegrationsTab />}
+          {tab === 'notifications' && <NotificationsTab memberMode={isMember} onOpenIntegrations={!isMember ? (provider) => { setIntegrationFocus(provider === 'email' ? 'BREVO' : 'TELEGRAM'); setTab('integrations'); } : undefined} />}
+          {tab === 'integrations'  && !isMember && <IntegrationsTab initialProvider={integrationFocus} />}
           {tab === 'import-export' && !isMember && <ImportExportTab />}
         </div>
       </div>

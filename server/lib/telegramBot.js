@@ -39,6 +39,7 @@ const assignmentRepo = require('../db/repos/assignmentRepo');
 const { query } = require('../db/mysql');
 const tunnelService = require('./tunnelService');
 const { getAppSetting, decryptPass } = require('../db.service');
+const { AsyncLocalStorage } = require('async_hooks');
 
 const POLL_TIMEOUT_SEC = 25;
 const RETRY_DELAY_MS = 2000;
@@ -53,13 +54,23 @@ let _activeToken = null;
 // Map en memoria. Si el backend reinicia se pierden las pendientes;
 // el usuario simplemente envía /activar de nuevo.
 const pendingSelections = new Map();
+const messageContext = new AsyncLocalStorage();
+
+function currentContext() { return messageContext.getStore() || {}; }
+function pendingKey(chatId) { return currentContext().workspaceId ? `${currentContext().workspaceId}:${chatId}` : chatId; }
 
 // ── Helpers de identidad ──────────────────────────────────────────
 async function userForChat(chatId) {
-  const rows = await query(
-    'SELECT user_id FROM notification_subscriptions WHERE telegram_chat_id = ? LIMIT 1',
-    [String(chatId)]
-  );
+  const context = currentContext();
+  const token = context.token || _activeToken || '';
+  const fingerprint = crypto.createHash('sha256').update(token).digest('hex');
+  const rows = context.workspaceId
+    ? await query(`SELECT n.user_id FROM notification_subscriptions n
+        JOIN workspace_members wm ON wm.user_id=n.user_id AND wm.workspace_id=? AND wm.deleted_at IS NULL
+        WHERE n.telegram_chat_id=? AND n.telegram_bot_fingerprint=? LIMIT 1`, [context.workspaceId, String(chatId), fingerprint])
+    : await query(`SELECT n.user_id FROM notification_subscriptions n
+        JOIN users u ON u.id=n.user_id AND u.is_platform_admin=1 AND u.deleted_at IS NULL
+        WHERE n.telegram_chat_id=? AND n.telegram_bot_fingerprint=? LIMIT 1`, [String(chatId), fingerprint]);
   if (!rows.length) return null;
   return await userRepo.findById(rows[0].user_id).catch(() => null);
 }
@@ -96,24 +107,25 @@ async function getCoreCreds() {
 
 // ── Helpers de reply ──────────────────────────────────────────────
 function reply(chatId, text) {
-  return telegram.sendMessage({ chatId, text, html: true, token: _activeToken });
+  return telegram.sendMessage({ chatId, text, html: true, token: currentContext().token || _activeToken });
 }
 
 // ── Helpers de selección pendiente ────────────────────────────────
 function getPending(chatId) {
-  const p = pendingSelections.get(chatId);
+  const key = pendingKey(chatId);
+  const p = pendingSelections.get(key);
   if (!p) return null;
   if (Date.now() > p.expiresAt) {
-    pendingSelections.delete(chatId);
+    pendingSelections.delete(key);
     return null;
   }
   return p;
 }
 function setPending(chatId, tunnels) {
-  pendingSelections.set(chatId, { tunnels, expiresAt: Date.now() + SELECTION_TTL_MS });
+  pendingSelections.set(pendingKey(chatId), { tunnels, expiresAt: Date.now() + SELECTION_TTL_MS });
 }
 function clearPending(chatId) {
-  pendingSelections.delete(chatId);
+  pendingSelections.delete(pendingKey(chatId));
 }
 
 // ── Listado de túneles para el usuario ────────────────────────────
@@ -197,7 +209,7 @@ async function cmdHelp(chatId, user) {
       '/desactivar — cierra tu túnel actual',
       '/cancelar — descarta una selección pendiente',
     );
-    if (Number(user.is_platform_admin) === 1) lines.push('/moderadores — resumen de moderadores', '/moderador &lt;correo&gt; — detalle de un moderador');
+    if (!currentContext().workspaceId && Number(user.is_platform_admin) === 1) lines.push('/moderadores — resumen de moderadores', '/moderador &lt;correo&gt; — detalle de un moderador');
   }
   return reply(chatId, lines.join('\n'));
 }
@@ -233,14 +245,17 @@ async function cmdLink(chatId, args) {
   if (!/^[A-F0-9]{6}$/.test(code)) {
     return reply(chatId, '❌ Formato inválido. Usa: <code>/link CODE</code> (6 chars hex).');
   }
-  const botFingerprint = crypto.createHash('sha256').update(_activeToken || '').digest('hex');
-  const r = await notificationRepo.confirmTelegramLink({ code, chatId, platformOnly: true, botFingerprint });
+  const context = currentContext();
+  const botFingerprint = crypto.createHash('sha256').update(context.token || _activeToken || '').digest('hex');
+  const r = await notificationRepo.confirmTelegramLink({ code, chatId, workspaceId: context.workspaceId || null, platformOnly: !context.workspaceId, botFingerprint });
   if (!r.ok) return reply(chatId, `❌ ${r.error}`);
   const user = await userRepo.findById(r.userId).catch(() => null);
   return reply(chatId,
     `<b>🔵 Joinpoint NOC</b>\n✅ Chat vinculado a <b>${user?.email || r.userId}</b>.\n\n` +
-    `Habilita el canal Telegram en el panel para recibir notificaciones.\n` +
-    `Usa /help para ver comandos.`
+    `Habilita el canal Telegram en el panel para recibir notificaciones.\n\n` +
+    `<b>Comandos disponibles</b>\n` +
+    `/status — ver tu sesión activa\n/tuneles — listar tus túneles\n/activar — elegir y activar un túnel\n` +
+    `/desactivar — cerrar tu túnel actual\n/help — ver todos los comandos`
   );
 }
 
@@ -376,7 +391,7 @@ async function cmdDesactivar(chatId, user) {
 
 async function cmdCancelar(chatId, user) {
   if (!user) return reply(chatId, '🔒 Tu chat no está vinculado. Envía /start.');
-  const had = pendingSelections.has(chatId);
+  const had = pendingSelections.has(pendingKey(chatId));
   clearPending(chatId);
   return reply(chatId, had ? '✓ Selección cancelada.' : 'No tenías una lista pendiente.');
 }
@@ -409,7 +424,7 @@ async function handleMessage(msg) {
   // Mensaje plano que no es comando
   if (!text.startsWith('/')) {
     // ¿Es un número solo y hay selección pendiente?
-    if (/^\d+$/.test(text) && pendingSelections.has(chatId)) {
+    if (/^\d+$/.test(text) && pendingSelections.has(pendingKey(chatId))) {
       const user = await userForChat(chatId);
       if (!user) return reply(chatId, '🔒 Tu chat no está vinculado. Envía /start.');
       return resolveSelectionAndActivate(chatId, user, Number(text));
@@ -438,6 +453,11 @@ async function handleMessage(msg) {
     return reply(chatId, '🔒 Tu chat no está vinculado. Envía /start.');
   }
   return handler(chatId, user, args);
+}
+
+/** Procesa un update usando el token y workspace del bot propio, sin mezclar identidades entre bots. */
+function handleWorkspaceMessage({ botToken, workspaceId }, msg) {
+  return messageContext.run({ token: botToken, workspaceId }, () => handleMessage(msg));
 }
 
 // ── Long-polling loop ─────────────────────────────────────────────
@@ -483,6 +503,14 @@ async function start() {
   }
   _running = true;
   _abort = new AbortController();
+  await telegram.setCommands({ token: _activeToken, commands: [
+    { command: 'start', description: 'Bienvenida y estado de vinculación' },
+    { command: 'help', description: 'Ver todos los comandos disponibles' },
+    { command: 'link', description: 'Vincular la cuenta administrativa' },
+    { command: 'moderadores', description: 'Resumen de moderadores' },
+    { command: 'moderador', description: 'Consultar un moderador por correo' },
+    { command: 'unlink', description: 'Desvincular este chat' },
+  ] });
   log.info('Bot iniciado (long-polling)');
   loop().catch(err => log.error({ err: err.message }, 'loop terminó con error'));
 }
@@ -497,7 +525,7 @@ function stop() {
 }
 
 module.exports = {
-  start, stop, handleMessage,
+  start, stop, handleMessage, handleWorkspaceMessage,
   // Para tests:
   _pendingSelections: pendingSelections,
 };
