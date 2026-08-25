@@ -407,6 +407,7 @@ router.post('/email/confirm', requireSession, asyncHandler(async (req, res) => {
 // ──────────────────────────────────────────────────────────────────────────
 const notificationRepo = require('../db/repos/notificationRepo');
 const telegram = require('../lib/telegram');
+const { getNotificationChannelAvailability, getNotificationTelegramCredential, assertNotificationPreferences } = require('../lib/notificationChannelAvailability');
 const { NotificationPreferencesSchema } = require('@gestionvpn/contracts');
 
 /** Convierte ER_NO_SUCH_TABLE en un 503 con mensaje accionable. */
@@ -422,18 +423,31 @@ router.get('/notifications', requireSession, asyncHandler(async (req, res) => {
   // así que este endpoint sirve 200 incluso sin migrar — el frontend ve
   // los defaults y puede mostrarlos sin error.
   const sub = await notificationRepo.getOrDefault(req.account.sub);
+  const availability = await getNotificationChannelAvailability(req.account);
+  const telegramCredential = availability.telegram.available ? await getNotificationTelegramCredential(req.account) : null;
+  const telegramLinked = Boolean(sub.telegram_chat_id && telegramCredential && sub.telegram_bot_fingerprint === telegramCredential.fingerprint);
+  const channels = {
+    email: Boolean(sub.channels.email && availability.email.available),
+    telegram: Boolean(sub.channels.telegram && telegramLinked),
+  };
   return sendOk(res, {
-    channels: sub.channels,
+    channels,
     eventTypes: sub.event_types,
     paused: sub.paused,
-    telegramLinked: !!sub.telegram_chat_id,
-    telegramBotConfigured: telegram.isConfigured(),
-    telegramBotUsername: await telegram.getBotUsername(),
+    telegramLinked,
+    telegramBotConfigured: availability.telegram.configured,
+    telegramBotUsername: availability.telegram.username,
+    channelAvailability: availability,
   });
 }));
 
 router.patch('/notifications', requireSession, asyncHandler(async (req, res) => {
   const { channels, eventTypes, paused } = NotificationPreferencesSchema.parse(req.body);
+  const availability = await getNotificationChannelAvailability(req.account);
+  const sub = await notificationRepo.getOrDefault(req.account.sub);
+  const telegramCredential = availability.telegram.available ? await getNotificationTelegramCredential(req.account) : null;
+  const telegramLinked = Boolean(sub.telegram_chat_id && telegramCredential && sub.telegram_bot_fingerprint === telegramCredential.fingerprint);
+  assertNotificationPreferences({ channels, paused, availability, telegramLinked });
   try {
     await notificationRepo.updatePreferences({
       userId: req.account.sub,
@@ -451,13 +465,14 @@ router.patch('/notifications', requireSession, asyncHandler(async (req, res) => 
 //  En esta primera entrega solo exponemos el step 1 + un endpoint admin para
 //  confirmar manualmente con chatId (útil hasta tener el bot en línea).
 router.post('/telegram/link/start', requireSession, asyncHandler(async (req, res) => {
-  if (!telegram.isConfigured()) {
-    throw new AppError('El bot de Telegram no está habilitado en este servidor.', 503, 'TELEGRAM_NOT_CONFIGURED');
-  }
+  const availability = await getNotificationChannelAvailability(req.account);
+  if (!availability.telegram.available) throw new AppError(availability.telegram.reason, 422, 'TELEGRAM_NOT_CONFIGURED');
+  const config = await getNotificationTelegramCredential(req.account);
+  if (!telegram.isConfigured(config?.botToken)) throw new AppError('La credencial de Telegram ya no es válida. Reemplázala en Integraciones.', 422, 'TELEGRAM_NOT_CONFIGURED');
   let r;
   try { r = await notificationRepo.generateTelegramLinkCode(req.account.sub); }
   catch (err) { throw asNotMigratedIfNeeded(err); }
-  return sendOk(res, { code: r.code, expiresAt: r.expiresAt });
+  return sendOk(res, { code: r.code, expiresAt: r.expiresAt, botUsername: availability.telegram.username });
 }));
 
 router.post('/telegram/unlink', requireSession, asyncHandler(async (req, res) => {

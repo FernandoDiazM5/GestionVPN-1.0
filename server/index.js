@@ -237,6 +237,7 @@ function gracefulShutdown(signal) {
     return () => {
         logger.info({ signal }, 'Shutdown — drenando bot y jobs');
         try { telegramBot.stop(); } catch (_) {}
+        try { require('./lib/workspaceTelegramBots').stop(); } catch (_) {}
         try { expirationJob.stop(); } catch (_) {}
         try { coreBackupJob.stop(); } catch (_) {}
         try { require('./lib/rateLimit').stopBucketCleanup(); } catch (_) {}
@@ -264,6 +265,7 @@ function startServer(attempt = 1) {
         require('./lib/webSecurityEnforcement').start();
         expirationJob.start();
         telegramBot.start();
+        void require('./lib/workspaceTelegramBots').start().catch(err => logger.warn({ err: err.message }, 'No se iniciaron los bots Telegram de workspace'));
         dashboardMetrics.start();
         monitoringJob.start();
         apPollJob.start();

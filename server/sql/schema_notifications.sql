@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS notification_subscriptions (
   channels         TEXT         NOT NULL DEFAULT '{"email":true,"telegram":false}',
   event_types      TEXT         NOT NULL DEFAULT '["TUNNEL_ACTIVATED","TUNNEL_DEACTIVATED","SESSION_EXPIRED"]',
   telegram_chat_id VARCHAR(64)  DEFAULT NULL,
+  telegram_bot_fingerprint CHAR(64) DEFAULT NULL,
   telegram_link_code VARCHAR(16) DEFAULT NULL,        -- código temporal para vincular
   telegram_link_expires_at BIGINT DEFAULT NULL,       -- TTL del código (15 min)
   paused           TINYINT      NOT NULL DEFAULT 0,

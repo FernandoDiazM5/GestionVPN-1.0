@@ -20,7 +20,7 @@ function isConfigured(token = process.env.TELEGRAM_BOT_TOKEN) {
 }
 
 // Cache del username del bot. undefined = no consultado · null = desconocido · string = ok.
-let _cachedUsername;
+const cachedUsernames = new Map();
 
 /**
  * Devuelve el @username del bot (sin la @) para construir `https://t.me/<user>`.
@@ -33,21 +33,21 @@ async function getBotUsername(token = process.env.TELEGRAM_BOT_TOKEN) {
   const envName = process.env.TELEGRAM_BOT_USERNAME;
   if (envName) return envName.replace(/^@/, '');
   if (!isConfigured(token)) return null;
-  if (_cachedUsername !== undefined) return _cachedUsername;
+  if (cachedUsernames.has(token)) return cachedUsernames.get(token);
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
     const res = await fetch(`${BASE_URL}/bot${token}/getMe`, { signal: controller.signal });
     const data = await res.json().catch(() => ({}));
-    _cachedUsername = (data.ok && data.result && data.result.username) ? data.result.username : null;
+    cachedUsernames.set(token, (data.ok && data.result && data.result.username) ? data.result.username : null);
   } catch (err) {
     log.debug({ err: err.message }, 'getMe falló — username de bot desconocido');
-    _cachedUsername = null;
+    cachedUsernames.set(token, null);
   } finally {
     clearTimeout(timer);
   }
-  return _cachedUsername;
+  return cachedUsernames.get(token) || null;
 }
 
 /**

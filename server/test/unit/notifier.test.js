@@ -28,10 +28,15 @@ const telegramMocks = stubModule(__dirname, '../../lib/telegram', {
   isConfigured: vi.fn().mockReturnValue(true),
 });
 
+const integrationMocks = stubModule(__dirname, '../../lib/workspaceIntegrationService', {
+  getSecret: vi.fn(),
+});
+
 const notifier = require('../../lib/notifier');
 
 beforeEach(() => {
   vi.clearAllMocks();
+  integrationMocks.getSecret.mockImplementation(async (_workspaceId, provider) => provider === 'BREVO' ? { username: 'smtp-user' } : provider === 'TELEGRAM' ? { botToken: '123456:valid-token-for-tests-abcdef' } : null);
 });
 
 describe('notifier.notify — routing', () => {
@@ -66,7 +71,7 @@ describe('notifier.notify — routing', () => {
       channels: { email: true, telegram: true },
       telegram_chat_id: 'chat1',
     });
-    userRepoMocks.findById.mockResolvedValue({ id: 'u1', email: 'alice@example.com' });
+    userRepoMocks.findById.mockResolvedValue({ id: 'u1', email: 'alice@example.com', email_verified: 1 });
     mailerMocks.sendGeneric.mockResolvedValue({ delivered: true });
     telegramMocks.sendMessage.mockResolvedValue({ ok: true });
 
@@ -94,7 +99,7 @@ describe('notifier.notify — routing', () => {
       channels: { email: true, telegram: true },
       telegram_chat_id: 'chat1',
     });
-    userRepoMocks.findById.mockResolvedValue({ id: 'u1', email: 'a@b.com' });
+    userRepoMocks.findById.mockResolvedValue({ id: 'u1', email: 'a@b.com', email_verified: 1 });
     mailerMocks.sendGeneric.mockResolvedValue({ delivered: false, error: 'SMTP unreachable' });
     telegramMocks.sendMessage.mockResolvedValue({ ok: true });
 
@@ -133,6 +138,15 @@ describe('notifier.notify — routing', () => {
     await notifier.notify({ userId: 'u1', event: 'TUNNEL_ACTIVATED', payload: {} });
     const logCall = notifRepoMocks.log.mock.calls.find(c => c[0].channel === 'telegram');
     expect(logCall[0].status).toBe('skipped');
+  });
+
+  it('no envía email del workspace si falta SMTP propio aunque exista fallback global', async () => {
+    notifRepoMocks.getOrDefault.mockResolvedValue({ paused: false, event_types: ['TUNNEL_ACTIVATED'], channels: { email: true, telegram: false }, telegram_chat_id: null });
+    userRepoMocks.findById.mockResolvedValue({ id: 'u1', email: 'alice@example.com', email_verified: 1 });
+    integrationMocks.getSecret.mockResolvedValue(null);
+    const out = await notifier.notify({ userId: 'u1', event: 'TUNNEL_ACTIVATED', payload: { workspaceId: 'ws1' } });
+    expect(mailerMocks.sendGeneric).not.toHaveBeenCalled();
+    expect(out.results.email).toMatchObject({ ok: false, skipped: true });
   });
 });
 

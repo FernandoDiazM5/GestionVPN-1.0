@@ -124,6 +124,14 @@ function buildMessage(event, payload = {}) {
 
 async function dispatchEmail(user, msg, workspaceId) {
   if (!user?.email) return { ok: false, reason: 'sin email' };
+  if (!user.email_verified) return { ok: false, skipped: true, reason: 'correo no verificado' };
+  if (workspaceId) {
+    const [brevo, gmail] = await Promise.all([
+      integrations.getSecret(workspaceId, 'BREVO').catch(() => null),
+      integrations.getSecret(workspaceId, 'GMAIL').catch(() => null),
+    ]);
+    if (!brevo && !gmail) return { ok: false, skipped: true, reason: 'SMTP del workspace no configurado' };
+  }
   try {
     const out = await mailer.sendGeneric({
       to: user.email,
@@ -141,6 +149,7 @@ async function dispatchEmail(user, msg, workspaceId) {
 async function dispatchTelegram(sub, msg, workspaceId) {
   if (!sub.telegram_chat_id) return { ok: false, reason: 'sin chat_id vinculado' };
   const telegramConfig = workspaceId ? await integrations.getSecret(workspaceId, 'TELEGRAM') : null;
+  if (workspaceId && !telegramConfig?.botToken) return { ok: false, skipped: true, reason: 'Telegram del workspace no configurado' };
   const out = await telegram.sendMessage({
     chatId: sub.telegram_chat_id,
     text: `<b>🔵 Joinpoint NOC</b>\n${msg.html}`,   // Telegram acepta HTML
@@ -186,7 +195,7 @@ async function notify({ userId, event, payload = {} }) {
     results.email = await dispatchEmail(user, msg, workspaceId);
     void notificationRepo.log({
       userId, event, channel: 'email',
-      status: results.email.ok ? 'sent' : 'failed',
+      status: results.email.skipped ? 'skipped' : results.email.ok ? 'sent' : 'failed',
       detail: results.email.error || results.email.reason || null,
     });
   }

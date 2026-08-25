@@ -31,6 +31,7 @@
 // ============================================================
 const log = require('./logger').child({ scope: 'telegram-bot' });
 const telegram = require('./telegram');
+const crypto = require('crypto');
 const notificationRepo = require('../db/repos/notificationRepo');
 const sessionRepo = require('../db/repos/sessionRepo');
 const userRepo = require('../db/repos/userRepo');
@@ -232,7 +233,8 @@ async function cmdLink(chatId, args) {
   if (!/^[A-F0-9]{6}$/.test(code)) {
     return reply(chatId, '❌ Formato inválido. Usa: <code>/link CODE</code> (6 chars hex).');
   }
-  const r = await notificationRepo.confirmTelegramLink({ code, chatId });
+  const botFingerprint = crypto.createHash('sha256').update(_activeToken || '').digest('hex');
+  const r = await notificationRepo.confirmTelegramLink({ code, chatId, platformOnly: true, botFingerprint });
   if (!r.ok) return reply(chatId, `❌ ${r.error}`);
   const user = await userRepo.findById(r.userId).catch(() => null);
   return reply(chatId,

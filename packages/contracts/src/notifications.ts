@@ -43,6 +43,10 @@ export interface NotificationStatus {
   telegramBotConfigured: boolean;
   /** @username del bot (sin @) para armar https://t.me/<user>. null si se desconoce. */
   telegramBotUsername?: string | null;
+  channelAvailability: {
+    email: { available: boolean; configured: boolean; verified: boolean; provider: 'BREVO' | 'GMAIL' | null; reason: string | null };
+    telegram: { available: boolean; configured: boolean; username: string | null; reason: string | null };
+  };
 }
 
 /** Respuesta de POST /api/account/telegram/link/start. */
@@ -50,4 +54,5 @@ export interface TelegramLinkStartResponse {
   success: true;
   code: string;        // 6 chars hex MAYÚS
   expiresAt: number;   // epoch ms
+  botUsername?: string | null;
 }

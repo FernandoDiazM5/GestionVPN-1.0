@@ -34,6 +34,7 @@ function normalize(row) {
     channels: parse(row.channels, DEFAULT_CHANNELS),
     event_types: parse(row.event_types, DEFAULT_EVENTS),
     telegram_chat_id: row.telegram_chat_id || null,
+    telegram_bot_fingerprint: row.telegram_bot_fingerprint || null,
     telegram_link_code: row.telegram_link_code || null,
     telegram_link_expires_at: row.telegram_link_expires_at || null,
     paused: !!row.paused,
@@ -107,12 +108,15 @@ async function generateTelegramLinkCode(userId) {
 }
 
 /** Confirma vinculación: el bot recibe /start <code> y llamamos esto. */
-async function confirmTelegramLink({ code, chatId }) {
-  const rows = await query(
-    `SELECT user_id, telegram_link_expires_at FROM notification_subscriptions
-       WHERE telegram_link_code = ? LIMIT 1`,
-    [code]
-  );
+async function confirmTelegramLink({ code, chatId, workspaceId = null, platformOnly = false, botFingerprint }) {
+  if (!/^[a-f0-9]{64}$/.test(String(botFingerprint || ''))) return { ok: false, error: 'bot no identificado' };
+  let sql = `SELECT n.user_id,n.telegram_link_expires_at FROM notification_subscriptions n`;
+  const params = [];
+  if (workspaceId) { sql += ` JOIN workspace_members wm ON wm.user_id=n.user_id AND wm.workspace_id=? AND wm.deleted_at IS NULL`; params.push(workspaceId); }
+  if (platformOnly) sql += ` JOIN users u ON u.id=n.user_id AND u.is_platform_admin=1 AND u.deleted_at IS NULL`;
+  sql += ` WHERE n.telegram_link_code=? LIMIT 1`;
+  params.push(code);
+  const rows = await query(sql, params);
   const row = rows[0];
   if (!row) return { ok: false, error: 'código inválido' };
   if (row.telegram_link_expires_at && row.telegram_link_expires_at < Date.now()) {
@@ -120,10 +124,10 @@ async function confirmTelegramLink({ code, chatId }) {
   }
   await query(
     `UPDATE notification_subscriptions
-        SET telegram_chat_id = ?, telegram_link_code = NULL,
+        SET telegram_chat_id = ?, telegram_bot_fingerprint = ?, telegram_link_code = NULL,
             telegram_link_expires_at = NULL, updated_at = ?
       WHERE user_id = ?`,
-    [String(chatId), Date.now(), row.user_id]
+    [String(chatId), botFingerprint, Date.now(), row.user_id]
   );
   return { ok: true, userId: row.user_id };
 }
@@ -131,7 +135,9 @@ async function confirmTelegramLink({ code, chatId }) {
 async function unlinkTelegram(userId) {
   await query(
     `UPDATE notification_subscriptions
-        SET telegram_chat_id = NULL, updated_at = ?
+        SET telegram_chat_id = NULL, telegram_bot_fingerprint = NULL, telegram_link_code = NULL,
+            telegram_link_expires_at = NULL,
+            channels = JSON_SET(COALESCE(channels, '{}'), '$.telegram', FALSE), updated_at = ?
       WHERE user_id = ?`,
     [Date.now(), userId]
   );

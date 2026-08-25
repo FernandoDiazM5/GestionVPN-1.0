@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-24 — Validaciones de canales y vinculación por bot.** Rama `vps_uni` (base `1cef6ac`). Estado: backend 129/711, frontend 79/263, contratos/build/lint/inventario/`check:all` verdes; sin deploy.
+> - Email queda bloqueado sin Brevo/Gmail activo del workspace o correo verificado; Telegram queda bloqueado sin integración propia, confirmación de código y huella del mismo bot. El servidor repite todas las reglas y el notifier no cae al proveedor global para avisos del moderador.
+> - Códigos vencen y la UI consulta confirmación; desconectar/reemplazar el bot invalida el vínculo anterior. Tokens compartidos entre workspaces o reutilizados desde Administración se rechazan.
+> - Añadido listener long-polling aislado por bot/workspace para que `/link` funcione con bots propios. Pendiente commit/push y autorización de despliegue.
+
 > **Sesión 2026-08-24 — Despliegue de integraciones e importación de credenciales.** Runtime `vps_uni@51ca7bb`. Estado: backend/DB saludables, HTTPS operativo y 0 reinicios.
 > - Respaldo MySQL verificado y rollback de imágenes creados antes del checkout. Backend/frontend reconstruidos exclusivamente con `docker-compose.prod.yml`; MariaDB conservó contenedor y volumen.
 > - Migraciones crearon `platform_integrations` y `workspace_integrations`. Se detectaron, validaron, cifraron e importaron sin revelar valores: Brevo, Telegram, Gemini y Firebase; todas quedaron `ACTIVE` y Gmail `NOT_CONFIGURED` como alternativa.

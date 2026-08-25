@@ -43,7 +43,7 @@ export default function NotificationsTab({ memberMode = false }: NotificationsTa
   const [saving, setSaving] = useState(false);
   const [ok, setOk] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [linkCode, setLinkCode] = useState<{ code: string; expiresAt: number } | null>(null);
+  const [linkCode, setLinkCode] = useState<{ code: string; expiresAt: number; botUsername?: string | null } | null>(null);
 
   const load = useCallback(async () => {
     setBusy(true);
@@ -58,6 +58,23 @@ export default function NotificationsTab({ memberMode = false }: NotificationsTa
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    if (!linkCode) return;
+    const refresh = async () => {
+      if (Date.now() >= linkCode.expiresAt) {
+        setLinkCode(null);
+        setErr('El código de Telegram expiró. Genera uno nuevo.');
+        return;
+      }
+      try {
+        const fresh = await accountApi.getNotifications();
+        if (fresh.telegramLinked) { setStatus(fresh); setLinkCode(null); setOk(true); }
+      } catch { /* el siguiente ciclo reintenta sin interrumpir al usuario */ }
+    };
+    const timer = window.setInterval(() => { void refresh(); }, 3000);
+    return () => window.clearInterval(timer);
+  }, [linkCode]);
 
   if (!status) {
     return (
@@ -105,7 +122,7 @@ export default function NotificationsTab({ memberMode = false }: NotificationsTa
     setErr(null);
     try {
       const r = await accountApi.startTelegramLink();
-      setLinkCode({ code: r.code, expiresAt: r.expiresAt });
+      setLinkCode({ code: r.code, expiresAt: r.expiresAt, botUsername: r.botUsername });
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'No se pudo iniciar la vinculación');
     }
@@ -130,7 +147,7 @@ export default function NotificationsTab({ memberMode = false }: NotificationsTa
     <ChannelRow
       icon={Send}
       title="Telegram"
-      desc={status.telegramLinked ? 'Vinculado ✓' : status.telegramBotConfigured ? 'No vinculado' : 'Bot no disponible en este servidor'}
+      desc={status.telegramLinked ? 'Vinculado ✓' : status.telegramBotConfigured ? 'Bot configurado; falta confirmar el código.' : status.channelAvailability.telegram.reason || 'Bot no disponible.'}
       checked={status.channels.telegram}
       disabled={!status.telegramBotConfigured || !status.telegramLinked}
       onChange={(v) => update('channels', { ...status.channels, telegram: v })}
@@ -146,6 +163,11 @@ export default function NotificationsTab({ memberMode = false }: NotificationsTa
     />
   );
 
+  const emailAvailable = status.channelAvailability.email.available;
+  const telegramAvailable = status.channelAvailability.telegram.available;
+  const hasEnabledChannel = status.channels.email || status.channels.telegram;
+  const canResume = (status.channels.email && emailAvailable) || (status.channels.telegram && telegramAvailable && status.telegramLinked);
+
   // Render compacto para MEMBER — únicamente Telegram + el código de vinculación.
   if (memberMode) {
     return (
@@ -155,8 +177,8 @@ export default function NotificationsTab({ memberMode = false }: NotificationsTa
             <Bell className="w-5 h-5 text-emerald-600" />
           </div>
           <div>
-            <p className="font-semibold text-slate-800 dark:text-slate-100">Notificaciones activas</p>
-            <p className="text-xs text-slate-500">Recibes según los canales y eventos elegidos.</p>
+            <p className="font-semibold text-slate-800 dark:text-slate-100">{status.telegramLinked ? 'Telegram vinculado' : 'Telegram no disponible'}</p>
+            <p className="text-xs text-slate-500">{status.telegramLinked ? 'Puedes usar el bot y activar el canal.' : status.channelAvailability.telegram.reason || 'Completa la vinculación para usar el bot.'}</p>
           </div>
         </div>
 
@@ -170,7 +192,7 @@ export default function NotificationsTab({ memberMode = false }: NotificationsTa
           {telegramRow}
 
           {linkCode && (
-            <TelegramLinkSteps code={linkCode.code} expiresAt={linkCode.expiresAt} botUsername={status.telegramBotUsername} />
+            <TelegramLinkSteps code={linkCode.code} expiresAt={linkCode.expiresAt} botUsername={linkCode.botUsername || status.telegramBotUsername} />
           )}
 
           {err && <p className="text-sm text-rose-600 flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5" /> {err}</p>}
@@ -189,18 +211,19 @@ export default function NotificationsTab({ memberMode = false }: NotificationsTa
           </div>
           <div>
             <p className="font-semibold text-slate-800 dark:text-slate-100">
-              {status.paused ? 'Notificaciones en pausa' : 'Notificaciones activas'}
+              {status.paused ? 'Notificaciones en pausa' : hasEnabledChannel ? 'Notificaciones activas' : 'Sin canales activos'}
             </p>
             <p className="text-xs text-slate-500">
-              {status.paused ? 'No recibes nada mientras esté pausado.' : 'Recibes según los canales y eventos elegidos.'}
+              {status.paused ? 'No recibes nada mientras esté pausado.' : hasEnabledChannel ? 'Recibes según los canales y eventos elegidos.' : 'Configura y activa al menos un canal para recibir avisos.'}
             </p>
           </div>
         </div>
         <button
           onClick={() => update('paused', !status.paused)}
+          disabled={!canResume}
           className={`inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 px-4 py-2 text-sm ${status.paused ? 'btn-success' : 'btn-outline'}`}
         >
-          {status.paused ? <><Play className="w-3.5 h-3.5" /> Reanudar</> : <><Pause className="w-3.5 h-3.5" /> Pausar</>}
+          {!canResume ? <><Play className="w-3.5 h-3.5" /> Sin canales</> : status.paused ? <><Play className="w-3.5 h-3.5" /> Reanudar</> : <><Pause className="w-3.5 h-3.5" /> Pausar</>}
         </button>
       </div>
 
@@ -212,14 +235,15 @@ export default function NotificationsTab({ memberMode = false }: NotificationsTa
         <ChannelRow
           icon={Mail}
           title="Email"
-          desc="Te avisamos al correo de tu cuenta."
+          desc={emailAvailable ? `Disponible mediante ${status.channelAvailability.email.provider}.` : status.channelAvailability.email.reason || 'Canal no disponible.'}
           checked={status.channels.email}
+          disabled={!emailAvailable}
           onChange={(v) => update('channels', { ...status.channels, email: v })}
         />
         {telegramRow}
 
         {linkCode && (
-          <TelegramLinkSteps code={linkCode.code} expiresAt={linkCode.expiresAt} botUsername={status.telegramBotUsername} />
+          <TelegramLinkSteps code={linkCode.code} expiresAt={linkCode.expiresAt} botUsername={linkCode.botUsername || status.telegramBotUsername} />
         )}
       </div>
 
@@ -249,7 +273,7 @@ export default function NotificationsTab({ memberMode = false }: NotificationsTa
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
         {err && <p className="text-sm text-rose-600 flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5" /> {err}</p>}
         {ok && <p className="text-sm text-emerald-600 flex items-center gap-1"><Check className="w-3.5 h-3.5" /> Guardado</p>}
-        <button onClick={save} disabled={saving} className="btn-primary btn-md inline-flex min-h-11 items-center justify-center">
+        <button onClick={save} disabled={saving || (!status.paused && !hasEnabledChannel)} className="btn-primary btn-md inline-flex min-h-11 items-center justify-center">
           {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
           Guardar
         </button>

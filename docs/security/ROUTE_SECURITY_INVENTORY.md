@@ -72,10 +72,10 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `routes/account.routes.js` | 303 | PATCH | `/password` | sí | — | no | sí | — | — |
 | `routes/account.routes.js` | 329 | PATCH | `/email/request` | sí | — | no | sí | — | — |
 | `routes/account.routes.js` | 364 | POST | `/email/confirm` | sí | — | no | sí | network-admin | — |
-| `routes/account.routes.js` | 420 | GET | `/notifications` | sí | — | no | n/a | — | — |
-| `routes/account.routes.js` | 435 | PATCH | `/notifications` | sí | — | no | sí | — | — |
-| `routes/account.routes.js` | 453 | POST | `/telegram/link/start` | sí | — | no | n/a | — | — |
-| `routes/account.routes.js` | 463 | POST | `/telegram/unlink` | sí | — | no | n/a | — | — |
+| `routes/account.routes.js` | 421 | GET | `/notifications` | sí | — | no | n/a | — | — |
+| `routes/account.routes.js` | 444 | PATCH | `/notifications` | sí | — | no | sí | — | — |
+| `routes/account.routes.js` | 467 | POST | `/telegram/link/start` | sí | — | no | n/a | — | — |
+| `routes/account.routes.js` | 478 | POST | `/telegram/unlink` | sí | — | no | n/a | — | — |
 | `routes/admin.routes.js` | 85 | GET | `/operational-reset-preview` | sí | platform-admin | no | n/a | — | — |
 | `routes/admin.routes.js` | 133 | GET | `/summary` | sí | platform-admin | no | n/a | — | — |
 | `routes/admin.routes.js` | 138 | GET | `/moderators` | sí | platform-admin | no | n/a | — | — |
@@ -146,10 +146,10 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `routes/federatedAuth.routes.js` | 214 | POST | `/exchange` | no | — | sí | sí | — | `PUBLIC_MUTATION_REVIEW` |
 | `routes/health.routes.js` | 64 | GET | `/` | no | — | no | n/a | network-admin | — |
 | `routes/health.routes.js` | 82 | GET | `/db` | no | — | no | n/a | — | — |
-| `routes/integrations.routes.js` | 9 | GET | `/` | sí | — | no | n/a | — | — |
-| `routes/integrations.routes.js` | 10 | PUT | `/:provider` | sí | — | no | **no** | — | `BODY_SCHEMA_MISSING`, `PARAM_SCHEMA_MISSING` |
-| `routes/integrations.routes.js` | 11 | POST | `/:provider/test` | sí | — | no | n/a | — | `PARAM_SCHEMA_MISSING` |
-| `routes/integrations.routes.js` | 12 | DELETE | `/:provider` | sí | — | no | n/a | — | `PARAM_SCHEMA_MISSING` |
+| `routes/integrations.routes.js` | 10 | GET | `/` | sí | — | no | n/a | — | — |
+| `routes/integrations.routes.js` | 12 | PUT | `/:provider` | sí | — | no | **no** | — | `BODY_SCHEMA_MISSING`, `PARAM_SCHEMA_MISSING` |
+| `routes/integrations.routes.js` | 13 | POST | `/:provider/test` | sí | — | no | n/a | — | `PARAM_SCHEMA_MISSING` |
+| `routes/integrations.routes.js` | 14 | DELETE | `/:provider` | sí | — | no | n/a | — | `PARAM_SCHEMA_MISSING` |
 | `routes/nodes/credentials.routes.js` | 25 | POST | `/node/creds/save` | sí | — | no | sí | sql | — |
 | `routes/nodes/credentials.routes.js` | 39 | POST | `/node/creds/get` | sí | — | no | sí | sql | — |
 | `routes/nodes/credentials.routes.js` | 54 | POST | `/node/ssh-creds/save` | sí | — | no | sí | sql, network-admin | — |

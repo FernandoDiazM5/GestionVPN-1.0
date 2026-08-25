@@ -92,6 +92,7 @@ async function list(workspaceId) {
 async function save({ workspaceId, userId, provider: rawProvider, config: input }) {
   const provider = assertProvider(rawProvider);
   const config = normalize(provider, input);
+  if (provider === 'TELEGRAM') await assertTelegramTokenUnique(workspaceId, config.botToken);
   const checked = await validate(provider, config);
   const now = Date.now();
   await withTransaction(async tx => {
@@ -101,6 +102,21 @@ async function save({ workspaceId, userId, provider: rawProvider, config: input 
       [workspaceId, provider, encryptPass(JSON.stringify(config)), 'ACTIVE', checked.label, JSON.stringify(checked.metadata), now, userId, now, now]);
   });
   return (await list(workspaceId)).find(item => item.provider === provider);
+}
+
+async function assertTelegramTokenUnique(workspaceId, token) {
+  const rows = await query("SELECT workspace_id,config_enc FROM workspace_integrations WHERE provider='TELEGRAM' AND active=1");
+  for (const row of rows) {
+    if (row.workspace_id === workspaceId) continue;
+    try { if (JSON.parse(decryptPass(row.config_enc)).botToken === token) throw new AppError('Este Bot Token ya está asignado a otro workspace.', 409, 'TELEGRAM_TOKEN_ALREADY_ASSIGNED'); } catch (error) { if (error instanceof AppError) throw error; }
+  }
+  const platform = await require('./platformIntegrationService').getSecret('TELEGRAM').catch(() => null);
+  if (platform?.botToken === token) throw new AppError('Usa un bot diferente al bot administrativo de la plataforma.', 409, 'TELEGRAM_TOKEN_ALREADY_ASSIGNED');
+}
+
+async function listActiveTelegramBots() {
+  const rows = await query("SELECT workspace_id,config_enc FROM workspace_integrations WHERE provider='TELEGRAM' AND active=1 AND status='ACTIVE'");
+  return rows.flatMap(row => { try { const config = JSON.parse(decryptPass(row.config_enc)); return config.botToken ? [{ workspaceId: row.workspace_id, botToken: config.botToken }] : []; } catch (_) { return []; } });
 }
 
 async function remove(workspaceId, rawProvider) {
@@ -133,4 +149,4 @@ async function revalidate(workspaceId, rawProvider) {
   return (await list(workspaceId)).find(item => item.provider === provider);
 }
 
-module.exports = { PROVIDERS, EMAIL_PROVIDERS, list, save, remove, getSecret, revalidate, validate, normalize };
+module.exports = { PROVIDERS, EMAIL_PROVIDERS, list, save, remove, getSecret, revalidate, validate, normalize, listActiveTelegramBots, assertTelegramTokenUnique };
