@@ -9,6 +9,7 @@ const WORKSPACE_COMMANDS = [
   { command: 'help', description: 'Ver todos los comandos disponibles' },
   { command: 'link', description: 'Vincular este chat con un código' },
   { command: 'estado', description: 'Ver tu acceso activo' },
+  { command: 'misitio', description: 'Ver sitio activo y tiempo restante' },
   { command: 'sitios', description: 'Listar tus sitios disponibles' },
   { command: 'activar', description: 'Elegir y abrir acceso a un sitio' },
   { command: 'desactivar', description: 'Cerrar tu acceso actual' },
@@ -20,16 +21,21 @@ async function handleMessage(bot, message) {
   return telegramBot.handleWorkspaceMessage(bot, message);
 }
 
+async function handleCallback(bot, callback) {
+  return telegramBot.handleWorkspaceCallback(bot, callback);
+}
+
 async function poll(bot) {
   while (enabled && !bot.controller.signal.aborted) {
     try {
-      const url = `https://api.telegram.org/bot${bot.botToken}/getUpdates?timeout=20&offset=${bot.offset}&allowed_updates=${encodeURIComponent('["message"]')}`;
+      const url = `https://api.telegram.org/bot${bot.botToken}/getUpdates?timeout=20&offset=${bot.offset}&allowed_updates=${encodeURIComponent('["message","callback_query"]')}`;
       const response = await fetch(url, { signal: bot.controller.signal });
       const body = await response.json().catch(() => ({}));
       if (!response.ok || body.ok !== true) throw new Error(body.description || `HTTP ${response.status}`);
       for (const update of body.result || []) {
         bot.offset = update.update_id + 1;
         if (update.message) await handleMessage(bot, update.message);
+        if (update.callback_query) await handleCallback(bot, update.callback_query);
       }
     } catch (error) {
       if (error.name === 'AbortError') return;
@@ -58,4 +64,4 @@ async function refresh() {
 function start() { enabled = true; return refresh(); }
 function stop() { enabled = false; for (const bot of bots.values()) bot.controller.abort(); bots.clear(); }
 
-module.exports = { start, stop, refresh, handleMessage, _bots: bots };
+module.exports = { start, stop, refresh, handleMessage, handleCallback, _bots: bots };

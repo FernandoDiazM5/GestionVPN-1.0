@@ -12,6 +12,7 @@ const logger = require('../../lib/logger').child({ scope: 'session-repo' });
 // Lease corto renovado por el cliente. Si el navegador/laptop desaparece,
 // el backend revoca el acceso sin depender de beforeunload.
 const TTL_MS = Math.max(2 * 60 * 1000, Number(process.env.TUNNEL_LEASE_TTL_MS || 5 * 60 * 1000));
+const TELEGRAM_TTL_MS = 15 * 60 * 1000;
 
 /** Sesión ACTIVE del usuario (o null). */
 async function getActiveByUser(workspaceId, userId) {
@@ -60,10 +61,11 @@ async function activeMapForWorkspace(workspaceId) {
  * (garantía "1 por usuario") en una sola transacción.
  * @returns {Promise<{ id, expires_at }>}
  */
-async function createSession({ workspaceId, userId, tunnelId, vrfName, mgmtIp, mangleId, firewallRuleIds }) {
+async function createSession({ workspaceId, userId, tunnelId, vrfName, mgmtIp, mangleId, firewallRuleIds, leaseSource = 'WEB' }) {
   const id = crypto.randomUUID();
   const now = Date.now();
-  const expiresAt = now + TTL_MS;
+  const normalizedSource = leaseSource === 'TELEGRAM' ? 'TELEGRAM' : 'WEB';
+  const expiresAt = now + (normalizedSource === 'TELEGRAM' ? TELEGRAM_TTL_MS : TTL_MS);
   await withTransaction(async (tx) => {
     // Cierra cualquier ACTIVE previa del usuario (defensa anti-duplicado)
     await tx.query(
@@ -75,10 +77,10 @@ async function createSession({ workspaceId, userId, tunnelId, vrfName, mgmtIp, m
     await tx.query(
       `INSERT INTO tunnel_user_sessions
          (id, workspace_id, user_id, tunnel_id, vrf_name, mgmt_ip, status,
-          mangle_id, firewall_rule_ids, activated_at, expires_at)
-       VALUES (?,?,?,?,?,?, 'ACTIVE', ?,?,?,?)`,
+          mangle_id, firewall_rule_ids, activated_at, expires_at, lease_source)
+       VALUES (?,?,?,?,?,?, 'ACTIVE', ?,?,?,?,?)`,
       [id, workspaceId, userId, tunnelId, vrfName, mgmtIp,
-       mangleId || null, firewallRuleIds ? JSON.stringify(firewallRuleIds) : null, now, expiresAt]
+       mangleId || null, firewallRuleIds ? JSON.stringify(firewallRuleIds) : null, now, expiresAt, normalizedSource]
     );
   });
   return { id, expires_at: expiresAt };
@@ -108,11 +110,29 @@ async function touch(id, now = Date.now()) {
   const expiresAt = now + TTL_MS;
   const result = await query(
     `UPDATE tunnel_user_sessions SET expires_at = ?
-      WHERE id = ? AND status = 'ACTIVE'
+      WHERE id = ? AND status = 'ACTIVE' AND lease_source <> 'TELEGRAM'
         AND (expires_at IS NULL OR expires_at >= ?)`,
     [expiresAt, id, now]
   );
   return result.affectedRows > 0 ? expiresAt : null;
+}
+
+/** Accesos Telegram que entraron en su ventana única de aviso de 5 minutos. */
+async function findTelegramExpiryWarnings(now = Date.now(), warningMs = 5 * 60 * 1000) {
+  return query(`SELECT s.id,s.user_id,s.workspace_id,s.expires_at,n.telegram_chat_id,n.telegram_bot_fingerprint,
+      u.is_platform_admin,COALESCE((SELECT nd.nombre_nodo FROM nodes nd WHERE nd.workspace_id=s.workspace_id
+        AND (nd.ppp_user=s.tunnel_id OR nd.nombre_vrf=s.vrf_name) LIMIT 1),s.vrf_name,s.tunnel_id) AS site_name
+    FROM tunnel_user_sessions s
+    JOIN users u ON u.id=s.user_id AND u.deleted_at IS NULL
+    JOIN notification_subscriptions n ON n.user_id=s.user_id AND n.telegram_chat_id IS NOT NULL
+    WHERE s.status='ACTIVE' AND s.lease_source='TELEGRAM' AND s.expiry_warning_sent_at IS NULL
+      AND s.expires_at>? AND s.expires_at<=?`, [now, now + warningMs]);
+}
+
+async function markExpiryWarning(id, now = Date.now()) {
+  const result = await query(`UPDATE tunnel_user_sessions SET expiry_warning_sent_at=?
+    WHERE id=? AND status='ACTIVE' AND expiry_warning_sent_at IS NULL`, [now, id]);
+  return result.affectedRows > 0;
 }
 
 /** Inserta una línea de auditoría (append-only, nunca lanza hacia arriba). */
@@ -131,7 +151,7 @@ async function log({ workspaceId, sessionId, userId, tunnelId, action, mgmtIp, s
 }
 
 module.exports = {
-  TTL_MS,
+  TTL_MS, TELEGRAM_TTL_MS,
   getActiveByUser, getActiveByTunnel, listActiveForWorkspace, activeMapForWorkspace,
-  createSession, closeSession, findExpired, touch, log,
+  createSession, closeSession, findExpired, findTelegramExpiryWarnings, markExpiryWarning, touch, log,
 };

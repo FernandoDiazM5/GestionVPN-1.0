@@ -32,7 +32,7 @@ const revocations = new Map();
  * @param {string} [args.clientIp]         — IP forense (opcional, '-' si falta)
  * @returns {Promise<{ok:true, sessionId, expiresAt, mgmtIp, vrf, switched}|{ok:false, code, message}>}
  */
-async function activateTunnel({ account, targetVRF, mikrotik, clientIp = '-' }) {
+async function activateTunnel({ account, targetVRF, mikrotik, clientIp = '-', leaseSource = 'WEB' }) {
   if (!account?.sub || !account?.workspace_id) return { ok: false, code: 401, message: 'Sesión inválida' };
   if (!targetVRF) return { ok: false, code: 400, message: 'targetVRF requerido' };
   if (!mikrotik?.ip || !mikrotik?.user) return { ok: false, code: 503, message: 'MikroTik no configurado' };
@@ -112,7 +112,7 @@ async function activateTunnel({ account, targetVRF, mikrotik, clientIp = '-' }) 
     // 3) Sesión en BD
     const { id: sessionId, expires_at } = await sessionRepo.createSession({
       workspaceId: account.workspace_id, userId: account.sub,
-      tunnelId: targetVRF, vrfName: targetVRF, mgmtIp,
+      tunnelId: targetVRF, vrfName: targetVRF, mgmtIp, leaseSource,
     });
 
     await sessionRepo.log({ workspaceId: account.workspace_id, sessionId, userId: account.sub, tunnelId: targetVRF, action: prev ? 'SWITCH' : 'ACTIVATE', mgmtIp, statusCode: 200, ipAddress: clientIp });

@@ -1,9 +1,8 @@
 // ============================================================
 //  lib/telegramBot.js — bot Telegram interactivo (M1 + iter2)
 //
-//  iter2: /activar y /desactivar ejecutan acción real (antes daban
-//  deep-link). /activar sin args muestra lista numerada con TTL 15 min;
-//  el usuario responde con el número.
+//  iter2: /activar y /desactivar ejecutan acción real con botones.
+//  Cada acceso iniciado por Telegram dura 15 min fijos por usuario.
 //
 //  Modelo: long-polling con getUpdates (sin HTTPS público, sin webhook).
 //   • Loop con offset incremental.
@@ -106,8 +105,8 @@ async function getCoreCreds() {
 }
 
 // ── Helpers de reply ──────────────────────────────────────────────
-function reply(chatId, text) {
-  return telegram.sendMessage({ chatId, text, html: true, token: currentContext().token || _activeToken });
+function reply(chatId, text, replyMarkup) {
+  return telegram.sendMessage({ chatId, text, html: true, replyMarkup, token: currentContext().token || _activeToken });
 }
 
 // ── Helpers de selección pendiente ────────────────────────────────
@@ -202,6 +201,7 @@ async function cmdHelp(chatId, user) {
   if (user) {
     lines.push(
       '/estado — ver tu acceso activo',
+      '/misitio — acceso y tiempo restante',
       '/sitios — lista de sitios disponibles',
       '/activar — elige un sitio de la lista',
       '/desactivar — cierra tu acceso actual',
@@ -210,6 +210,19 @@ async function cmdHelp(chatId, user) {
     if (!currentContext().workspaceId && Number(user.is_platform_admin) === 1) lines.push('/moderadores — resumen de moderadores', '/moderador &lt;correo&gt; — detalle de un moderador');
   }
   return reply(chatId, lines.join('\n'));
+}
+
+function siteKeyboard(tunnels) {
+  const rows = tunnels.map((t, i) => [{
+    text: `${i + 1}. ${t.nombre_nodo || t.nombre_vrf || t.ppp_user || 'Sitio sin nombre'}`.slice(0, 64),
+    callback_data: `site:${i + 1}`,
+  }]);
+  rows.push([{ text: '❌ Cancelar', callback_data: 'site:cancel' }]);
+  return { inline_keyboard: rows };
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 async function cmdModeradores(chatId, user) {
@@ -252,7 +265,7 @@ async function cmdLink(chatId, args) {
     `<b>🔵 Joinpoint NOC</b>\n✅ Chat vinculado a <b>${user?.email || r.userId}</b>.\n\n` +
     `Habilita el canal Telegram en el panel para recibir notificaciones.\n\n` +
     `<b>Comandos disponibles</b>\n` +
-    `/estado — ver tu acceso activo\n/sitios — listar tus sitios\n/activar — abrir acceso a un sitio\n` +
+    `/estado — ver tu acceso activo\n/misitio — acceso y tiempo restante\n/sitios — listar tus sitios\n/activar — abrir acceso a un sitio\n` +
     `/desactivar — cerrar tu acceso actual\n/help — ver todos los comandos`
   );
 }
@@ -279,7 +292,7 @@ async function cmdStatus(chatId, user) {
   const remaining = sess.expires_at ? Math.max(0, Math.round((sess.expires_at - Date.now()) / 60000)) : null;
   return reply(chatId,
     `<b>🔵 Joinpoint NOC · Estado</b>\n🔓 <b>Acceso activo</b>\n` +
-    `Sitio: <b>${siteName}</b>\n` +
+    `Sitio: <b>${escapeHtml(siteName)}</b>\n` +
     (remaining != null ? `Expira en: ${remaining} min` : '')
   );
 }
@@ -288,10 +301,12 @@ async function cmdTuneles(chatId, user) {
   if (!user) return reply(chatId, '🔒 Tu chat no está vinculado. Envía /start.');
   const r = await fetchUserTunnels(user.id);
   if (r.error) return reply(chatId, r.error);
+  setPending(chatId, r.tunnels);
   return reply(chatId,
     `<b>🔵 Joinpoint NOC · Sitios disponibles</b> (${r.tunnels.length})\n\n` +
     formatNumberedList(r.tunnels) + '\n\n' +
-    `Para activar uno: <code>/activar</code> y responde con el número.`
+    `Toca un sitio para abrir tu acceso durante <b>15 minutos</b>.`,
+    siteKeyboard(r.tunnels)
   );
 }
 
@@ -299,7 +314,7 @@ async function cmdTuneles(chatId, user) {
  * Núcleo de activación llamado desde varias rutas (lista numerada,
  * /activar N, /activar VRF). Recibe el VRF ya resuelto.
  */
-async function performActivate(chatId, user, vrf) {
+async function performActivate(chatId, user, vrf, siteName = vrf) {
   const account = await buildAccount(user.id);
   if (!account) return reply(chatId, '❌ Tu cuenta no tiene workspace asignado.');
   const mikrotik = await getCoreCreds();
@@ -307,16 +322,14 @@ async function performActivate(chatId, user, vrf) {
 
   await reply(chatId, `⏳ Activando <code>${vrf}</code>…`);
   const result = await tunnelService.activateTunnel({
-    account, targetVRF: vrf, mikrotik, clientIp: 'telegram',
+    account, targetVRF: vrf, mikrotik, clientIp: 'telegram', leaseSource: 'TELEGRAM',
   });
   if (!result.ok) {
     return reply(chatId, `❌ <b>No se pudo activar</b>\n${result.message}`);
   }
-  const minutes = result.expiresAt ? Math.round((result.expiresAt - Date.now()) / 60000) : null;
   return reply(chatId,
-    `✅ <b>Acceso abierto a ${result.vrf}</b>\n` +
-    `IP de gestión: <code>${result.mgmtIp}</code>\n` +
-    (minutes != null ? `Expira en: ${minutes} min\n` : '') +
+    `✅ <b>Acceso abierto a ${escapeHtml(siteName)}</b>\n` +
+    `Duración: <b>15 minutos</b>. Se cerrará automáticamente y te avisaremos 5 minutos antes.\n` +
     (result.switched ? '<i>(reemplazó tu sesión anterior)</i>' : '')
   );
 }
@@ -332,9 +345,10 @@ async function cmdActivar(chatId, user, args) {
     if (r.error) return reply(chatId, r.error);
     setPending(chatId, r.tunnels);
     return reply(chatId,
-      `<b>Elige el sitio al que deseas acceder</b> (responde con el número)\n\n` +
+      `<b>Elige el sitio al que deseas acceder</b>\n\n` +
       formatNumberedList(r.tunnels) + '\n\n' +
-      `<i>La selección expira en 15 min. Envía /cancelar para descartar.</i>`
+      `<i>El acceso durará 15 minutos y será exclusivo para tu usuario.</i>`,
+      siteKeyboard(r.tunnels)
     );
   }
 
@@ -343,9 +357,16 @@ async function cmdActivar(chatId, user, args) {
     return resolveSelectionAndActivate(chatId, user, Number(arg));
   }
 
-  // Caso 3 — argumento texto (VRF): activación directa
+  // Caso 3 — argumento texto: sólo permite un sitio visible para este usuario.
   clearPending(chatId);
-  return performActivate(chatId, user, arg);
+  const r = await fetchUserTunnels(user.id);
+  if (r.error) return reply(chatId, r.error);
+  const normalized = arg.toLowerCase();
+  const selected = r.tunnels.find(t => [t.nombre_vrf, t.ppp_user, t.nombre_nodo]
+    .some(value => String(value || '').toLowerCase() === normalized));
+  if (!selected) return reply(chatId, '❌ Ese sitio no existe o no está asignado a tu usuario. Usa /sitios.');
+  const vrf = selected.nombre_vrf || selected.ppp_user;
+  return performActivate(chatId, user, vrf, selected.nombre_nodo || vrf);
 }
 
 /**
@@ -363,10 +384,10 @@ async function resolveSelectionAndActivate(chatId, user, n) {
   const t = pending.tunnels[n - 1];
   clearPending(chatId);
   const vrf = t.nombre_vrf || t.ppp_user;
-  return performActivate(chatId, user, vrf);
+  return performActivate(chatId, user, vrf, t.nombre_nodo || vrf);
 }
 
-async function cmdDesactivar(chatId, user) {
+async function performDeactivate(chatId, user) {
   if (!user) return reply(chatId, '🔒 Tu chat no está vinculado. Envía /start.');
   clearPending(chatId);
 
@@ -388,6 +409,21 @@ async function cmdDesactivar(chatId, user) {
   return reply(chatId, '✅ Acceso cerrado correctamente.');
 }
 
+async function cmdDesactivar(chatId, user) {
+  if (!user) return reply(chatId, '🔒 Tu chat no está vinculado. Envía /start.');
+  clearPending(chatId);
+  const account = await buildAccount(user.id);
+  if (!account) return reply(chatId, '❌ Tu cuenta no tiene workspace asignado.');
+  const active = await sessionRepo.getActiveByUser(account.workspace_id, user.id);
+  if (!active) return reply(chatId, '🔒 No tienes acceso activo a ningún sitio.');
+  return reply(chatId, '⚠️ <b>¿Deseas cerrar tu acceso activo ahora?</b>', {
+    inline_keyboard: [[
+      { text: '✅ Sí, cerrar', callback_data: `close:${active.id}` },
+      { text: '❌ Cancelar', callback_data: 'close:cancel' },
+    ]],
+  });
+}
+
 async function cmdCancelar(chatId, user) {
   if (!user) return reply(chatId, '🔒 Tu chat no está vinculado. Envía /start.');
   const had = pendingSelections.has(pendingKey(chatId));
@@ -403,6 +439,7 @@ const COMMANDS = {
   '/unlink': cmdUnlink,
   '/status': cmdStatus,
   '/estado': cmdStatus,
+  '/misitio': cmdStatus,
   '/tuneles': cmdTuneles,
   '/sitios': cmdTuneles,
   '/activar': cmdActivar,
@@ -456,15 +493,43 @@ async function handleMessage(msg) {
   return handler(chatId, user, args);
 }
 
+async function handleCallbackQuery(callback) {
+  if (!callback?.message?.chat || !callback.data) return;
+  const chatId = callback.message.chat.id;
+  const token = currentContext().token || _activeToken;
+  await telegram.answerCallbackQuery({ token, callbackQueryId: callback.id }).catch(() => null);
+  const user = await userForChat(chatId);
+  if (!user) return reply(chatId, '🔒 Tu chat no está vinculado. Envía /start.');
+
+  if (callback.data === 'site:cancel' || callback.data === 'close:cancel') {
+    clearPending(chatId);
+    return reply(chatId, '✓ Operación cancelada.');
+  }
+  const site = /^site:(\d+)$/.exec(callback.data);
+  if (site) return resolveSelectionAndActivate(chatId, user, Number(site[1]));
+  const close = /^close:([A-Za-z0-9_-]{1,40})$/.exec(callback.data);
+  if (close) {
+    const account = await buildAccount(user.id);
+    if (!account) return reply(chatId, '❌ Tu cuenta no tiene workspace asignado.');
+    const active = await sessionRepo.getActiveByUser(account.workspace_id, user.id);
+    if (!active || active.id !== close[1]) return reply(chatId, '⌛ Esa confirmación ya no es válida. Usa /misitio para ver tu acceso actual.');
+    return performDeactivate(chatId, user);
+  }
+}
+
 /** Procesa un update usando el token y workspace del bot propio, sin mezclar identidades entre bots. */
 function handleWorkspaceMessage({ botToken, workspaceId }, msg) {
   return messageContext.run({ token: botToken, workspaceId }, () => handleMessage(msg));
 }
 
+function handleWorkspaceCallback({ botToken, workspaceId }, callback) {
+  return messageContext.run({ token: botToken, workspaceId }, () => handleCallbackQuery(callback));
+}
+
 // ── Long-polling loop ─────────────────────────────────────────────
 async function getUpdates(signal) {
   const url = `https://api.telegram.org/bot${_activeToken}/getUpdates` +
-              `?timeout=${POLL_TIMEOUT_SEC}&offset=${_offset}&allowed_updates=${encodeURIComponent('["message"]')}`;
+              `?timeout=${POLL_TIMEOUT_SEC}&offset=${_offset}&allowed_updates=${encodeURIComponent('["message","callback_query"]')}`;
   const res = await fetch(url, { signal });
   if (!res.ok) throw new Error(`getUpdates HTTP ${res.status}`);
   const data = await res.json();
@@ -481,6 +546,10 @@ async function loop() {
         if (u.message) {
           handleMessage(u.message).catch(err =>
             log.warn({ err: err.message, updateId: u.update_id }, 'handler falló'));
+        }
+        if (u.callback_query) {
+          handleCallbackQuery(u.callback_query).catch(err =>
+            log.warn({ err: err.message, updateId: u.update_id }, 'callback falló'));
         }
       }
     } catch (err) {
@@ -526,7 +595,7 @@ function stop() {
 }
 
 module.exports = {
-  start, stop, handleMessage, handleWorkspaceMessage,
+  start, stop, handleMessage, handleCallbackQuery, handleWorkspaceMessage, handleWorkspaceCallback,
   // Para tests:
   _pendingSelections: pendingSelections,
 };

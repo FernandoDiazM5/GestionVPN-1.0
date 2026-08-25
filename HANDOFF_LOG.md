@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-25 — Acceso Telegram de 15 minutos por usuario.** Rama `vps_uni` sobre `2a54264`; sin deploy.
+> - Cada activación desde Telegram crea un lease fijo de 15 minutos, no renovable desde web, aislado por workspace/usuario y revocado por el job seguro ya existente. Se envía un aviso 5 minutos antes usando el mismo bot vinculado.
+> - `/sitios` y `/activar` ofrecen botones; `/misitio` muestra sitio y tiempo restante; `/desactivar` exige confirmación ligada a la sesión exacta. Los argumentos manuales no eluden las asignaciones del usuario.
+> - Migración aditiva de `lease_source` y `expiry_warning_sent_at`. Verificación: backend 129/717, frontend 79/267, focalizadas 41/41, build, TypeScript, lint, inventario de rutas y `check:all` verdes. Pendiente commit/push y autorización de despliegue.
+
 > **Sesión 2026-08-24 — Email accionable y comandos completos en bots de workspace.** Rama `vps_uni` sobre `d75039f`; sin deploy.
 > - Email abre directamente Brevo desde `Vincular email`; Telegram abre su integración. Notificaciones lista comandos básicos antes del enlace y operativos después.
 > - Los bots propios delegan en el motor seguro existente: publican menú nativo y soportan estado, listado, activación, desactivación, cancelación y desvinculación. `/link` devuelve inmediatamente el catálogo. Contexto asíncrono separa token/workspace/chat y evita colisiones de identidad o selecciones entre bots.

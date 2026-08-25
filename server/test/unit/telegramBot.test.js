@@ -9,6 +9,7 @@ const { stubModule } = require('../helpers/moduleMock');
 
 const telegramMocks = stubModule(__dirname, '../../lib/telegram', {
   sendMessage: vi.fn().mockResolvedValue({ ok: true }),
+  answerCallbackQuery: vi.fn().mockResolvedValue({ ok: true }),
   setCommands: vi.fn().mockResolvedValue({ ok: true }),
   isConfigured: vi.fn().mockReturnValue(true),
 });
@@ -148,6 +149,7 @@ describe('handleMessage — con auth', () => {
     expect(text).toContain('/estado');
     expect(text).toContain('/sitios');
     expect(text).toContain('/activar');
+    expect(text).toContain('/misitio');
   });
 
   it('/estado sin acceso activo', async () => {
@@ -168,12 +170,19 @@ describe('handleMessage — con auth', () => {
     expect(text).toMatch(/Expira en: [45] min/);
   });
 
+  it('/misitio muestra el sitio activo y el tiempo restante', async () => {
+    sessionRepoMocks.getActiveByUser.mockResolvedValue({ tunnel_id: 'tunnel-a', vrf_name: 'VRF-A', expires_at: Date.now() + 8 * 60 * 1000 });
+    await bot.handleMessage({ chat: { id: 1 }, text: '/misitio' });
+    expect(getReplyText()).toContain('Torre Norte');
+    expect(getReplyText()).toMatch(/Expira en: [78] min/);
+  });
+
   it('/sitios OWNER → lista todos los sitios del workspace', async () => {
     await bot.handleMessage({ chat: { id: 1 }, text: '/sitios' });
     const text = getReplyText();
     expect(text).toContain('Torre Norte');
     expect(text).toContain('Torre Sur');
-    expect(text).toContain('/activar');
+    expect(telegramMocks.sendMessage.mock.calls[0][0].replyMarkup.inline_keyboard).toHaveLength(3);
   });
 
   it('/tuneles MEMBER → solo asignados', async () => {
@@ -229,13 +238,13 @@ describe('handleMessage — con auth', () => {
     });
     await bot.handleMessage({ chat: { id: 1 }, text: '/activar VRF-A' });
     expect(tunnelServiceMocks.activateTunnel).toHaveBeenCalledWith(
-      expect.objectContaining({ targetVRF: 'VRF-A' })
+      expect.objectContaining({ targetVRF: 'VRF-A', leaseSource: 'TELEGRAM' })
     );
     // Replies: "⏳ Activando..." + "✅ Acceso abierto..."
     const last = telegramMocks.sendMessage.mock.calls.at(-1)[0].text;
     expect(last).toContain('Acceso abierto');
-    expect(last).toContain('VRF-A');
-    expect(last).toContain('10.13.250.20');
+    expect(last).toContain('Torre Norte');
+    expect(last).toContain('15 minutos');
   });
 
   it('/activar VRF-X con error del service → reporta', async () => {
@@ -255,6 +264,29 @@ describe('handleMessage — con auth', () => {
     expect(text).toMatch(/1\).*Torre Norte/);
     expect(text).toMatch(/2\).*Torre Sur/);
     expect(bot._pendingSelections.has(1)).toBe(true);
+    expect(telegramMocks.sendMessage.mock.calls[0][0].replyMarkup.inline_keyboard).toHaveLength(3);
+  });
+
+  it('/activar no permite un sitio fuera de la asignación del usuario', async () => {
+    mysqlMocks.query.mockImplementation(async (sql) => {
+      if (/notification_subscriptions/i.test(sql)) return [{ user_id: 'u1' }];
+      if (/workspace_members/i.test(sql)) return [{ workspace_id: 'ws1', role: 'MEMBER' }];
+      if (/ppp_user IN/i.test(sql)) return [{ ppp_user: 'tunnel-a', nombre_vrf: 'VRF-A', nombre_nodo: 'Torre Norte' }];
+      return [];
+    });
+    assignmentRepoMocks.assignedTunnelIds.mockResolvedValue(['tunnel-a']);
+    await bot.handleMessage({ chat: { id: 1 }, text: '/activar VRF-B' });
+    expect(tunnelServiceMocks.activateTunnel).not.toHaveBeenCalled();
+    expect(telegramMocks.sendMessage.mock.calls.at(-1)[0].text).toContain('no está asignado');
+  });
+
+  it('botón de sitio activa la selección del usuario', async () => {
+    await bot.handleMessage({ chat: { id: 1 }, text: '/sitios' });
+    tunnelServiceMocks.activateTunnel.mockResolvedValue({ ok: true, vrf: 'VRF-B', expiresAt: Date.now() + 15 * 60 * 1000 });
+    await bot.handleCallbackQuery({ id: 'cb-site', message: { chat: { id: 1 } }, data: 'site:2' });
+    expect(telegramMocks.answerCallbackQuery).toHaveBeenCalledWith(expect.objectContaining({ callbackQueryId: 'cb-site' }));
+    expect(tunnelServiceMocks.activateTunnel).toHaveBeenCalledWith(expect.objectContaining({ targetVRF: 'VRF-B', leaseSource: 'TELEGRAM' }));
+    expect(telegramMocks.sendMessage.mock.calls.at(-1)[0].text).toContain('Torre Sur');
   });
 
   it('número plano con pending → activa ese índice', async () => {
@@ -293,20 +325,22 @@ describe('handleMessage — con auth', () => {
     expect(last).toContain('cancelada');
   });
 
-  it('/desactivar ejecuta directo vía tunnelService', async () => {
+  it('/desactivar solicita confirmación y el botón cierra el acceso', async () => {
+    sessionRepoMocks.getActiveByUser.mockResolvedValue({ id: 's1', tunnel_id: 'tunnel-a' });
     tunnelServiceMocks.deactivateTunnel.mockResolvedValue({
       ok: true, hadSession: true, tunnelId: 'tunnel-a', vrf: 'VRF-A',
     });
     await bot.handleMessage({ chat: { id: 1 }, text: '/desactivar' });
+    expect(tunnelServiceMocks.deactivateTunnel).not.toHaveBeenCalled();
+    expect(telegramMocks.sendMessage.mock.calls.at(-1)[0].replyMarkup.inline_keyboard[0]).toHaveLength(2);
+    await bot.handleCallbackQuery({ id: 'cb-close', message: { chat: { id: 1 } }, data: 'close:s1' });
     expect(tunnelServiceMocks.deactivateTunnel).toHaveBeenCalled();
     const last = telegramMocks.sendMessage.mock.calls.at(-1)[0].text;
     expect(last).toContain('Acceso cerrado');
   });
 
   it('/desactivar sin sesión → mensaje idempotente', async () => {
-    tunnelServiceMocks.deactivateTunnel.mockResolvedValue({
-      ok: true, hadSession: false,
-    });
+    sessionRepoMocks.getActiveByUser.mockResolvedValue(null);
     await bot.handleMessage({ chat: { id: 1 }, text: '/desactivar' });
     const last = telegramMocks.sendMessage.mock.calls.at(-1)[0].text;
     expect(last).toContain('ningún sitio');

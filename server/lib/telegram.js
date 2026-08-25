@@ -59,7 +59,7 @@ async function getBotUsername(token = process.env.TELEGRAM_BOT_TOKEN) {
  * @param {boolean} [args.html=true]  Usa parse_mode=HTML
  * @returns {Promise<{ok:boolean, skipped?:boolean, error?:string, status?:number}>}
  */
-async function sendMessage({ chatId, text, html = true, token }) {
+async function sendMessage({ chatId, text, html = true, token, replyMarkup }) {
   if (!token) token = (await require('./platformIntegrationService').getSecret('TELEGRAM').catch(() => null))?.botToken || process.env.TELEGRAM_BOT_TOKEN;
   if (!isConfigured(token)) {
     log.debug({ chatId }, 'sendMessage skipped — TELEGRAM_BOT_TOKEN no configurado');
@@ -72,6 +72,7 @@ async function sendMessage({ chatId, text, html = true, token }) {
     chat_id: chatId,
     text: String(text).slice(0, 4000), // Telegram límite 4096; deja margen
     ...(html ? { parse_mode: 'HTML' } : {}),
+    ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
     disable_web_page_preview: true,
   };
 
@@ -100,6 +101,18 @@ async function sendMessage({ chatId, text, html = true, token }) {
   }
 }
 
+async function answerCallbackQuery({ token, callbackQueryId, text }) {
+  if (!isConfigured(token) || !callbackQueryId) return { ok: false, skipped: true };
+  try {
+    const res = await fetch(`${BASE_URL}/bot${token}/answerCallbackQuery`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ callback_query_id: callbackQueryId, ...(text ? { text } : {}) }),
+    });
+    const data = await res.json().catch(() => ({}));
+    return res.ok && data.ok === true ? { ok: true } : { ok: false, error: data.description || `HTTP ${res.status}` };
+  } catch (err) { return { ok: false, error: err.message }; }
+}
+
 /** Publica el menú nativo de comandos del bot. Es best-effort y nunca expone el token. */
 async function setCommands({ token, commands }) {
   if (!isConfigured(token) || !Array.isArray(commands) || !commands.length) return { ok: false, skipped: true };
@@ -118,4 +131,4 @@ async function setCommands({ token, commands }) {
   } finally { clearTimeout(timer); }
 }
 
-module.exports = { sendMessage, setCommands, isConfigured, getBotUsername };
+module.exports = { sendMessage, answerCallbackQuery, setCommands, isConfigured, getBotUsername };

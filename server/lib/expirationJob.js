@@ -22,6 +22,10 @@ const { analysisRetentionDays, snapshotRetentionDays } = require('./ai/aiRetenti
 const authSessionRepo = require('../db/repos/authSessionRepo');
 const tunnelService = require('./tunnelService');
 const platformSecurityRepo = require('../db/repos/platformSecurityRepo');
+const workspaceIntegrations = require('./workspaceIntegrationService');
+const platformIntegrations = require('./platformIntegrationService');
+const telegram = require('./telegram');
+const crypto = require('crypto');
 
 // Retención de la "Actividad reciente": guarda como MÁXIMO los últimos 7 días
 // → purga rodante que va quitando el día más viejo. Se ejecuta como
@@ -76,6 +80,28 @@ async function loadMikrotik() {
 let _handle = null;
 let _running = false;
 
+async function sendTelegramExpiryWarnings() {
+  if (typeof sessionRepo.findTelegramExpiryWarnings !== 'function') return;
+  const rows = await sessionRepo.findTelegramExpiryWarnings();
+  for (const row of rows) {
+    try {
+      const secret = Number(row.is_platform_admin) === 1
+        ? await platformIntegrations.getSecret('TELEGRAM')
+        : await workspaceIntegrations.getSecret(row.workspace_id, 'TELEGRAM');
+      const token = secret?.botToken;
+      if (!token) continue;
+      const fingerprint = crypto.createHash('sha256').update(token).digest('hex');
+      if (fingerprint !== row.telegram_bot_fingerprint) continue;
+      const siteName = String(row.site_name || 'tu sitio').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const result = await telegram.sendMessage({ token, chatId: row.telegram_chat_id, html: true,
+        text: `⏰ <b>Tu acceso está por vencer</b>\nEl acceso a <b>${siteName}</b> se cerrará automáticamente en 5 minutos.\nUsa /misitio para consultar el tiempo restante.` });
+      if (result.ok) await sessionRepo.markExpiryWarning(row.id);
+    } catch (error) {
+      log.warn({ sessionId: row.id, error: error.message }, 'No se pudo enviar aviso previo de Telegram');
+    }
+  }
+}
+
 async function runOnce() {
   if (_running) return;
   _running = true;
@@ -87,6 +113,9 @@ async function runOnce() {
     await purgeOldAiData();
     await authSessionRepo.purgeExpired().catch(error => {
       log.warn({ code: error?.code || 'UNKNOWN' }, 'sesiones web: purga falló (best-effort)');
+    });
+    await sendTelegramExpiryWarnings().catch(error => {
+      log.warn({ code: error?.code || 'UNKNOWN' }, 'avisos de expiración Telegram fallaron (best-effort)');
     });
 
     const expired = await sessionRepo.findExpired();

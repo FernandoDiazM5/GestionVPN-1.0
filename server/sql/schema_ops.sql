@@ -273,6 +273,10 @@ CREATE TABLE IF NOT EXISTS core_backup_runs (
 ALTER TABLE notification_subscriptions
   ADD COLUMN IF NOT EXISTS telegram_bot_fingerprint CHAR(64) DEFAULT NULL AFTER telegram_chat_id;
 
+ALTER TABLE tunnel_user_sessions
+  ADD COLUMN IF NOT EXISTS lease_source VARCHAR(20) NOT NULL DEFAULT 'WEB' AFTER expires_at,
+  ADD COLUMN IF NOT EXISTS expiry_warning_sent_at BIGINT DEFAULT NULL AFTER lease_source;
+
 -- El producto desplegado opera exclusivamente desde el VPS. Normaliza también
 -- instalaciones antiguas que conservaran el selector local.
 INSERT INTO app_settings (`key`, value, updated_at) VALUES ('scan_mode', 'vps', 0)

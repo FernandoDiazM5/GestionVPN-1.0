@@ -3,7 +3,7 @@ const { stubModule } = require('../helpers/moduleMock');
 
 stubModule(__dirname, '../../lib/workspaceIntegrationService', { listActiveTelegramBots: vi.fn().mockResolvedValue([]) });
 const repo = stubModule(__dirname, '../../db/repos/notificationRepo', { confirmTelegramLink: vi.fn(), unlinkTelegram: vi.fn() });
-const telegram = stubModule(__dirname, '../../lib/telegram', { sendMessage: vi.fn().mockResolvedValue({ ok: true }), setCommands: vi.fn().mockResolvedValue({ ok: true }) });
+const telegram = stubModule(__dirname, '../../lib/telegram', { sendMessage: vi.fn().mockResolvedValue({ ok: true }), answerCallbackQuery: vi.fn().mockResolvedValue({ ok: true }), setCommands: vi.fn().mockResolvedValue({ ok: true }) });
 const mysql = stubModule(__dirname, '../../db/mysql', { query: vi.fn(), withTransaction: vi.fn() });
 stubModule(__dirname, '../../db/repos/userRepo', { findById: vi.fn().mockResolvedValue({ id: 'u1', email: 'owner@example.com' }) });
 stubModule(__dirname, '../../db/repos/sessionRepo', { getActiveByUser: vi.fn() });
@@ -36,5 +36,6 @@ describe('workspaceTelegramBots', () => {
     expect(text).toContain('/sitios');
     expect(text).toContain('/activar');
     expect(text).toContain('/desactivar');
+    expect(text).toContain('/misitio');
   });
 });

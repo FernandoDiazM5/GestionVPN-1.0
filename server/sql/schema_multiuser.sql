@@ -49,7 +49,9 @@ CREATE TABLE IF NOT EXISTS tunnel_user_sessions (
   mangle_id         VARCHAR(64)  DEFAULT NULL,         -- .id de la regla mangle (cleanup preciso)
   firewall_rule_ids TEXT         DEFAULT NULL,         -- JSON [.id,...] (Fase 5 opcional)
   activated_at      BIGINT       NOT NULL,
-  expires_at        BIGINT       DEFAULT NULL,         -- activated_at + TTL (30 min)
+  expires_at        BIGINT       DEFAULT NULL,         -- WEB renovable | Telegram 15 min fijos
+  lease_source      VARCHAR(20)  NOT NULL DEFAULT 'WEB', -- WEB renovable | TELEGRAM fijo
+  expiry_warning_sent_at BIGINT  DEFAULT NULL,
   deactivated_at    BIGINT       DEFAULT NULL,
   PRIMARY KEY (id),
   KEY idx_tus_user (user_id),
