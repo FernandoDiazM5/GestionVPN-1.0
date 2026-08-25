@@ -33,6 +33,30 @@ describe('IntegrationsTab', () => {
     expect(screen.getByRole('link', { name: /Abrir BotFather/ })).toBeInTheDocument();
   });
 
+  it('incluye una guía paso a paso y el portal oficial en cada integración', async () => {
+    const user = userEvent.setup();
+    render(<IntegrationsTab />);
+    for (const integration of [
+      { button: /Brevo/, guide: 'Conectar Brevo en 3 pasos', link: 'Abrir Brevo' },
+      { button: /^Gmail/, guide: 'Conectar Gmail en 3 pasos', link: 'Abrir Google' },
+      { button: /Telegram Bot/, guide: 'Conectar Telegram en 3 pasos', link: 'Abrir BotFather' },
+      { button: /Google Gemini/, guide: 'Conectar Gemini en 3 pasos', link: 'Abrir AI Studio' },
+    ]) {
+      await user.click(await screen.findByRole('button', { name: integration.button }));
+      expect(screen.getByText(integration.guide)).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: integration.link })).toHaveAttribute('target', '_blank');
+    }
+  });
+
+  it('explica la configuración completa de Firebase al administrador', async () => {
+    const user = userEvent.setup();
+    render(<IntegrationsTab scope="platform" />);
+    await user.click(await screen.findByRole('button', { name: /Google Login · Firebase/ }));
+    expect(screen.getByText('Conectar Google Login en 4 pasos')).toBeInTheDocument();
+    expect(screen.getByText('Crea la cuenta de servicio')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Abrir Firebase' })).toHaveAttribute('href', 'https://console.firebase.google.com/');
+  });
+
   it('envía la credencial nueva y después limpia el formulario', async () => {
     const user = userEvent.setup();
     api.save.mockResolvedValue({ integration: { ...empty[3], configured: true, active: true, status: 'ACTIVE', label: 'gemini-3.1-flash-lite', lastValidatedAt: Date.now() } });

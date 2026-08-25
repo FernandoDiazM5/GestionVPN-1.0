@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-24 — Asistentes de configuración para todas las integraciones.** Rama `vps_uni` sobre `7f8544d`; sin deploy.
+> - Cada formulario desplegado presenta pasos numerados, acceso al portal oficial y una advertencia específica: SMTP de Brevo, contraseña de aplicación Gmail, BotFather/vinculación, API key/modelo Gemini y proveedor web/cuenta de servicio/dominio Firebase.
+> - El componente de guía es compartido, responsive y mantiene objetivos táctiles de 44 px; las instrucciones varían entre workspace y Administración cuando cambia el uso posterior.
+> - Verificación: backend 129/711, frontend 79/266, pruebas focalizadas 5/5, build, TypeScript, lint, inventario y `check:all` verdes. Pendiente commit/push y autorización final de despliegue.
+
 > **Sesión 2026-08-24 — Integraciones contraídas y flujo Telegram mejorado.** Rama `vps_uni` sobre `e285aeb`; sin deploy.
 > - Brevo, Gmail, Telegram y Gemini quedan contraídos al entrar; sólo se despliega uno y cada cabecera resume estado, identidad y atención requerida.
 > - Telegram incorpora guía BotFather, exclusividad del token y continuidad hacia Notificaciones. El canal ya no se atenúa cuando falta configuración: muestra el estado exacto y ofrece configurar, vincular, esperar confirmación, activar o desvincular según corresponda.
