@@ -20,6 +20,8 @@ Crear en Joinpoint un módulo sencillo para administrar un supergrupo privado de
 7. Joinpoint **no guarda mensajes, archivos ni conversaciones** del grupo. Todo ese contenido permanece sólo en Telegram.
 8. Joinpoint conserva únicamente los metadatos necesarios para controlar grupos, temas y participantes.
 9. El backend no tendrá un método genérico `request(ruta)`: el adaptador MikroWisp expondrá sólo consultas concretas incluidas en una allowlist.
+10. Un workspace puede vincular varios grupos; cada grupo se vincula manualmente y se lista con sus temas conocidos.
+11. Sólo el moderador del workspace puede vincular grupos, crear/cerrar/reabrir temas y agregar/retirar participantes. Los invitados sólo consultan e interactúan y no reciben controles administrativos.
 
 ## Módulo propuesto: Clientes en Telegram
 
@@ -31,7 +33,9 @@ Crear en Joinpoint un módulo sencillo para administrar un supergrupo privado de
 - Validar que tenga modo foro habilitado.
 - Validar que el bot pueda administrar temas, invitaciones y retiros antes de activar el módulo.
 - Mostrar nombre, estado del grupo y permisos faltantes.
-- Un workspace puede iniciar con un solo grupo `Historial de clientes`.
+- Un workspace puede vincular varios grupos. `Historial de clientes` es el grupo inicial recomendado, no un límite.
+- La pantalla lista todos los grupos vinculados y, al abrir uno, sus temas conocidos y estados.
+- Cada grupo completa su propio flujo manual de creación en Telegram y vinculación con Joinpoint.
 
 ### Guía PDF administrada
 
@@ -80,12 +84,23 @@ Las invitaciones deben ser individuales, con vencimiento y un solo uso. Si se us
 
 ### Consulta dentro del tema
 
-- `/informacion`: datos permitidos del cliente.
-- `/servicios`: servicios, plan/perfil y nodo con nombres resueltos.
-- `/facturacion`: cantidad y total de facturas pendientes.
+- `/informacion`: ID, nombre, documento, teléfono, dirección y estado del cliente.
+- `/servicios`: ID y estado del servicio, plan/perfil, sitio o nodo y datos operativos no secretos.
+- `/facturacion`: resumen de deuda, cantidad y total de facturas pendientes, sin datos de pago sensibles.
 - `/ayuda`: comandos disponibles.
 
 El bot identifica al cliente por el tema; el usuario no vuelve a escribir su ID. Cada comando consulta MikroWisp en ese momento y descarta la respuesta después de mostrarla.
+
+### Política de campos MikroWisp
+
+Se usa una allowlist de salida. Sólo pasan los campos necesarios para identificar al cliente, contactarlo, ubicar su servicio y conocer su estado:
+
+- cliente: ID, nombre, documento, teléfono, dirección y estado;
+- servicio: ID, estado, plan o perfil, sitio o nodo y referencias operativas no secretas;
+- facturación: resumen de deuda y facturas pendientes cuando corresponda;
+- catálogos: ID externo y nombre visible.
+
+Se descartan siempre, aunque MikroWisp los devuelva: usuario y clave PPP/PPPoE, credenciales Hotspot, contraseñas, tokens, API keys, secretos, comunidades SNMP, cookies, sesiones y cualquier campo futuro no reconocido. El filtrado ocurre en backend antes de guardar, registrar o enviar datos a Telegram. Los logs tampoco conservan la respuesta completa.
 
 ## Datos mínimos en Joinpoint
 
@@ -109,7 +124,7 @@ La regla se aplica en profundidad:
 2. **API Joinpoint:** sólo endpoints internos `GET/consulta` con validación de filtros; ningún proxy de ruta libre.
 3. **Adaptador:** métodos nominales como `getClientDetails`; allowlist exacta de URL, método y campos enviados.
 4. **Red:** URL base validada y fijada por integración para impedir SSRF o redirecciones a destinos no aprobados.
-5. **Datos:** DTO de salida por allowlist; elimina PPP, passwords, token, SNMP y campos futuros no reconocidos.
+5. **Datos:** DTO de salida por allowlist; sólo admite datos identificativos, contacto, dirección, estado, servicio, plan/perfil, sitio/nodo y resumen de deuda. Elimina PPP/PPPoE, Hotspot, passwords, token, API keys, SNMP y campos futuros no reconocidos.
 6. **Pruebas:** contrato que falla si aparece una ruta mutadora o si el adaptador acepta una ruta arbitraria.
 7. **Observabilidad:** logs guardan resultado, latencia y código interno, nunca token ni request/response completos.
 
@@ -171,6 +186,7 @@ flowchart TD
 - Ninguna operación de escritura MikroWisp es invocable.
 - El adaptador no acepta rutas arbitrarias ni puede convertirse en proxy hacia MikroWisp.
 - Ningún mensaje contiene credenciales o secretos.
+- Los campos PPP/PPPoE, Hotspot, contraseñas, tokens, API keys y SNMP se eliminan en backend antes de cualquier persistencia, log o envío a Telegram.
 - Un catálogo faltante no rompe la consulta.
 - No existen temas duplicados para el mismo cliente.
 - El ID se normaliza y la unicidad se aplica antes de llamar a Telegram.
@@ -183,9 +199,9 @@ flowchart TD
 - Una invitación no equivale a miembro activo hasta que Telegram confirme el ingreso.
 - MySQL no almacena conversaciones ni adjuntos de Telegram.
 
-## Decisiones pendientes
+## Decisiones cerradas
 
-1. Confirmar si habrá un solo grupo `Historial de clientes` por workspace.
-2. Definir quiénes pueden crear/cerrar temas y agregar/retirar participantes.
-3. Confirmar los endpoints de MikroWisp que listan los catálogos externos.
-4. Definir los campos exactos visibles en cada comando.
+1. El workspace admite varios grupos vinculados y Joinpoint lista cada grupo con sus temas conocidos.
+2. Sólo el moderador administra grupos, temas y participantes; los invitados no pueden crear, cerrar ni eliminar.
+3. Los catálogos se obtienen mediante los endpoints de nodos, servicios y demás catálogos publicados en la documentación MikroWisp, siempre con clientes nominales de solo lectura.
+4. Los comandos sólo muestran la allowlist operativa anterior; toda credencial o llave se elimina.
