@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-28 — Invariante read-only para MikroWisp.** Rama `vps_uni` sobre `00f6571`; sólo documentación, sin implementación ni deploy.
+> - MikroWisp queda limitado a consultas backend; se prohíben todas sus operaciones mutadoras y se excluyen credenciales PPP/Hotspot de cualquier respuesta Joinpoint/Telegram.
+> - El cliente usa su ID externo estable; servicios, perfiles, nodos y futuros catálogos conservan sus IDs externos. La caché será genérica, extensible y sincronizada manualmente; referencias desconocidas degradan con aviso y nunca rompen la ficha.
+> - Se registra como pendiente el diseño del historial colaborativo mediante supergrupo Telegram tipo foro y temas por cliente.
+> - Alcance refinado: Joinpoint no replica conversaciones; sólo monitorea grupo, temas y participantes. Agregar usuarios genera invitación o aprueba ingreso; retirar revoca acceso al grupo completo. Plan acotado en `docs/implementation/PLAN_MIKROWISP_TELEGRAM_HISTORIAL_CLIENTES_2026-08-28.md`.
+
 > **Sesión 2026-08-25 — Acceso Telegram de 15 minutos por usuario desplegado.** Runtime `vps_uni@8a40ff0`; backend/frontend/DB sanos.
 > - Cada activación desde Telegram crea un lease fijo de 15 minutos, no renovable desde web, aislado por workspace/usuario y revocado por el job seguro ya existente. Se envía un aviso 5 minutos antes usando el mismo bot vinculado.
 > - `/sitios` y `/activar` ofrecen botones; `/misitio` muestra sitio y tiempo restante; `/desactivar` exige confirmación ligada a la sesión exacta. Los argumentos manuales no eluden las asignaciones del usuario.
