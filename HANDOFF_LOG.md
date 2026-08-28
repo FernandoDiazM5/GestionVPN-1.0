@@ -5,6 +5,9 @@
 > - El cliente usa su ID externo estable; servicios, perfiles, nodos y futuros catálogos conservan sus IDs externos. La caché será genérica, extensible y sincronizada manualmente; referencias desconocidas degradan con aviso y nunca rompen la ficha.
 > - Se registra como pendiente el diseño del historial colaborativo mediante supergrupo Telegram tipo foro y temas por cliente.
 > - Alcance refinado: Joinpoint no replica conversaciones; sólo monitorea grupo, temas y participantes. Agregar usuarios genera invitación o aprueba ingreso; retirar revoca acceso al grupo completo. Plan acotado en `docs/implementation/PLAN_MIKROWISP_TELEGRAM_HISTORIAL_CLIENTES_2026-08-28.md`.
+> - Hardening del plan: adaptador MikroWisp sin ruta genérica y con allowlist exacta/pruebas negativas. Se documenta que Bot API no enumera todos los temas ni miembros; Joinpoint controla sólo entidades creadas, registradas, invitadas o detectadas mediante eventos futuros.
+> - Flujo de carpetas cerrado: ID obligatorio y normalizado → consulta exacta read-only → vista previa `ID · Nombre` → confirmación → reserva única → creación Telegram. Se contemplan carreras, duplicados, timeout ambiguo sin reintento, compensación y reparación de temas externos/borrados.
+> - Ayuda de vinculación: se mantiene una guía corta dentro de la interfaz y se añade al alcance un PDF opcional que el administrador puede subir, reemplazar o desactivar; el usuario abre la versión activa junto a la integración mediante descarga autenticada.
 
 > **Sesión 2026-08-25 — Acceso Telegram de 15 minutos por usuario desplegado.** Runtime `vps_uni@8a40ff0`; backend/frontend/DB sanos.
 > - Cada activación desde Telegram crea un lease fijo de 15 minutos, no renovable desde web, aislado por workspace/usuario y revocado por el job seguro ya existente. Se envía un aviso 5 minutos antes usando el mismo bot vinculado.
