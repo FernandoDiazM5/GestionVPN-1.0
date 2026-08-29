@@ -6752,3 +6752,10 @@ Verificado con `grep` sobre todo `server/`:
 > - Al confirmar `/vinculargrupo`, el OWNER que envía el código se inserta/upsertea como participante `ACTIVE`; esto permite usar al moderador ya vinculado como piloto sin flujo artificial de invitación.
 > - Pruebas focalizadas: backend **9**, frontend **7**; `check:all` verde. Pendiente aún configurar integración MikroWisp y crear/vincular el supergrupo real para ejecutar el canary.
 >
+> **Sesión 2026-08-28 — MikroWisp/Telegram desplegado para depuración.** Runtime productivo `9be5e22`, rama/check-out `vps_uni`; push realizado. Se preservaron `.env.production*` y `ssl/` no versionados.
+> - Antes del cambio: dump MariaDB gzip válido `/root/backups/pre-mikrowisp-telegram-20260828T2152.sql.gz` (184 KB) y tags de rollback `gestionvpn-10-backend:pre-mikrowisp-20260828T2152` / `gestionvpn-10-frontend:pre-mikrowisp-20260828T2152`.
+> - El primer arranque en MariaDB 11 mostró que el schema estático local (`utf8mb4_unicode_ci`) no podía crear 7 tablas contra padres productivos `utf8mb4_uca1400_ai_ci`. Hotfix `9be5e22`: migración dedicada detecta collation de `workspaces`, adapta las nueve sentencias, exige 9/9 y falla el entrypoint si queda incompleta. Producción confirmó 9 tablas y 17 FK.
+> - Estado final: backend/DB healthy, frontend activo, 0 reinicios; `/api/health` `ok`, MySQL/SMTP `ok`, CORS canónico 204, hostil 403, integraciones sin auth 401 y bundle contiene `No necesitas crear otro bot`. Sin errores fatales en logs.
+> - Disco 91% con 2.3 GB libres; `docker builder prune` no encontró caché reclamable y `docker image prune` sólo retiró 17.96 KB dangling. Rollbacks etiquetados y volúmenes se conservaron. Auditar imágenes antiguas antes del próximo build.
+> - Pendiente canary humano: ingresar URL/token/ID MikroWisp en Integraciones, sincronizar tres catálogos, crear supergrupo privado con temas/permisos, vincularlo y probar comandos con el OWNER piloto.
+>

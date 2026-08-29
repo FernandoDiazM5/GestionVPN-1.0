@@ -1,7 +1,7 @@
 # Plan acotado: MikroWisp + control de temas Telegram
 
 Fecha: 2026-08-28  
-Estado: fases 1–5 implementadas localmente; sin commit ni despliegue
+Estado: fases 1–5 y migración desplegadas; canary funcional guiado pendiente
 
 ## Progreso de implementación
 
@@ -10,7 +10,7 @@ Estado: fases 1–5 implementadas localmente; sin commit ni despliegue
 - [x] Fase 3: grupos, guía PDF y temas.
 - [x] Fase 4: participantes conocidos, invitación individual verificada, retiro, reintegro y auditoría.
 - [x] Fase 5: comandos de consulta efímera por tema y participante activo.
-- [ ] Fase 6: migración local verificada; canary y despliegue pendientes de un grupo/bot de laboratorio.
+- [ ] Fase 6: despliegue técnico verificado; pendiente configurar MikroWisp/supergrupo y completar el canary funcional.
 
 El alcance de catálogos queda cerrado a los datos que intervienen operativamente con el cliente: routers/nodos (`GetRouters`), equipos monitoreados (`GetMonitoreo`) y cajas NAP (`GetCajasNap`). No se habilitan operadores, departamentos, tareas, VLAN, profiles, ODB ni otros catálogos, aunque estén publicados. La documentación oficial vigente tampoco publica una operación para listar planes o todos los servicios; no se inventa esa ruta.
 
