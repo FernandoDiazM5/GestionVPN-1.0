@@ -469,3 +469,4 @@ Este doc se mantiene con la skill **`handoff-keeper`** (`.claude/skills/handoff-
 - **Narrativa de "qué hice esta sesión"** → se **añade** como nueva entrada arriba en [`HANDOFF_LOG.md`](./HANDOFF_LOG.md).
 - Cuando el usuario diga *"envía esto al handoff"*: clasificar primero (¿regla/función/proceso durable, o evento de bitácora?) y colocarlo en el archivo correcto.
 | 🟡 Canary primer sitio `/22` | Core, VPS y software ya están listos. Crear un sitio/CPE real, confirmar que recibe una sola ruta `10.12.248.0/22`, activar túnel y validar acceso a escaneo/clientes/VPS/admin según permisos. No crear datos ficticios. |
+- **Estado de entrega MikroWisp/Telegram:** commit local `e1a2769` en `vps_uni`; todavía sin push ni deploy. Canary bloqueado hasta disponer de bot de workspace, supergrupo foro y usuario piloto de laboratorio.

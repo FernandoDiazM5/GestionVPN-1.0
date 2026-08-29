@@ -6746,3 +6746,5 @@ Verificado con `grep` sobre todo `server/`:
 - Verificación local: 123 archivos/687 pruebas backend, `check:all` y Semgrep security correctos.
 - Desplegado `6056648` usando exclusivamente `docker-compose.prod.yml`; HTTPS/health 200, backend healthy y 0 reinicios. Un primer intento con el compose local dejó temporalmente el backend esperando MariaDB en 3306 y produjo 502; se revirtió de inmediato y el despliegue correcto usa 3307/entorno productivo. Rollback preservado: `gestionvpn-10-backend:pre-auth-isolation-20260823T030306Z`.
 - Tras restaurar la cuenta, el login devolvía 429 porque los intentos durante la suspensión llenaron los buckets persistentes `LOGIN_ID`, `LOGIN_PAIR` y `LOGIN_IP`. Se limpiaron exclusivamente los buckets del Administrador y su IP observada, además de su contador de seguridad; quedaron 0 buckets LOGIN bloqueados globalmente. No se cambió contraseña ni se desbloqueó a otros usuarios.
+> **Commit de la entrega:** `e1a2769` en rama `vps_uni`, creado localmente; sin push ni despliegue porque el canary Telegram de laboratorio aún no está disponible.
+>
