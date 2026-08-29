@@ -155,6 +155,7 @@ const createForumTopic = ({ token, chatId, name }) => callBotApi({ token, method
 const closeForumTopic = ({ token, chatId, threadId }) => callBotApi({ token, method: 'closeForumTopic', body: { chat_id: chatId, message_thread_id: Number(threadId) } });
 const reopenForumTopic = ({ token, chatId, threadId }) => callBotApi({ token, method: 'reopenForumTopic', body: { chat_id: chatId, message_thread_id: Number(threadId) } });
 const deleteForumTopic = ({ token, chatId, threadId }) => callBotApi({ token, method: 'deleteForumTopic', body: { chat_id: chatId, message_thread_id: Number(threadId) } });
+const sendChatAction = ({ token, chatId, threadId, action = 'typing' }) => callBotApi({ token, method: 'sendChatAction', body: { chat_id: chatId, message_thread_id: Number(threadId), action } });
 const createChatInviteLink = ({ token, chatId, name, expiresAt }) => callBotApi({ token, method: 'createChatInviteLink', body: { chat_id: chatId, name, expire_date: Math.floor(expiresAt / 1000), creates_join_request: true } });
 const revokeChatInviteLink = ({ token, chatId, inviteLink }) => callBotApi({ token, method: 'revokeChatInviteLink', body: { chat_id: chatId, invite_link: inviteLink } });
 const approveChatJoinRequest = ({ token, chatId, userId }) => callBotApi({ token, method: 'approveChatJoinRequest', body: { chat_id: chatId, user_id: userId } });
@@ -162,4 +163,4 @@ const declineChatJoinRequest = ({ token, chatId, userId }) => callBotApi({ token
 const banChatMember = ({ token, chatId, userId }) => callBotApi({ token, method: 'banChatMember', body: { chat_id: chatId, user_id: userId, revoke_messages: false } });
 const unbanChatMember = ({ token, chatId, userId }) => callBotApi({ token, method: 'unbanChatMember', body: { chat_id: chatId, user_id: userId, only_if_banned: true } });
 
-module.exports = { sendMessage, answerCallbackQuery, setCommands, callBotApi, getChat, getChatMember, createForumTopic, closeForumTopic, reopenForumTopic, deleteForumTopic, createChatInviteLink, revokeChatInviteLink, approveChatJoinRequest, declineChatJoinRequest, banChatMember, unbanChatMember, isConfigured, getBotUsername };
+module.exports = { sendMessage, answerCallbackQuery, setCommands, callBotApi, getChat, getChatMember, createForumTopic, closeForumTopic, reopenForumTopic, deleteForumTopic, sendChatAction, createChatInviteLink, revokeChatInviteLink, approveChatJoinRequest, declineChatJoinRequest, banChatMember, unbanChatMember, isConfigured, getBotUsername };

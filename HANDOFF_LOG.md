@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-29 — Sincronización de temas y estado Telegram implementada.** Rama `vps_uni` sobre `c11a68b`; pendiente despliegue.
+> - Se agregó eliminación confirmada desde Joinpoint con baja lógica `DELETED`, manejo `DELETE_UNKNOWN`, auditoría y recreación del mismo registro cliente/grupo.
+> - La verificación manual reconcilia grupo, foro, bot, permisos y detecta temas borrados directamente sólo ante errores inequívocos; fallas de red no se clasifican como eliminación.
+> - Renombres `forum_topic_edited` se sincronizan y el polling procesa `my_chat_member`. La UI muestra estados accionables y conserva acceso al historial de grupos degradados.
+> - Verificación: backend **135/753**, frontend **82/274**, focalizadas **12/12 + 3/3**, build, TypeScript, lint, inventario de rutas y `check:all` verdes.
+>
 > **Sesión 2026-08-29 — Auditoría de desincronización Telegram.** Rama `vps_uni` en `94f88a1`; sólo diagnóstico.
 > - Confirmado: `reconcileTopicEvent` procesa únicamente `forum_topic_closed/reopened`; ignora `forum_topic_edited`. El Bot API no entrega un servicio de eliminación de tema, así que borrar directamente en Telegram deja el registro `ACTIVE` y bloquea recreación por la restricción única cliente/grupo.
 > - El polling no incluye `my_chat_member`; tampoco reconcilia expulsión/degradación del bot, permisos, cambio de título/foro desactivado ni participantes añadidos directamente.

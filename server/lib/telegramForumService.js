@@ -19,6 +19,19 @@ function publicGroup(row) {
 function publicTopic(row) {
   return { id: row.id, groupId: row.group_id, clientId: row.client_external_id, clientName: row.client_name, name: row.topic_name, threadId: row.telegram_thread_id, status: row.status, createdAt: Number(row.created_at), updatedAt: Number(row.updated_at) };
 }
+function isMissingTopic(result) {
+  if (result?.ok || result?.ambiguous) return false;
+  return /(message thread not found|topic.*(?:deleted|not found)|thread.*(?:deleted|not found))/i.test(String(result?.error || ''));
+}
+function botPermissions(member) {
+  const permissions = member || {};
+  const missing = [];
+  if (!['administrator', 'creator'].includes(permissions.status)) missing.push('Administrador');
+  if (permissions.status !== 'creator' && !permissions.can_manage_topics) missing.push('Administrar temas');
+  if (permissions.status !== 'creator' && !permissions.can_invite_users) missing.push('Invitar usuarios');
+  if (permissions.status !== 'creator' && !permissions.can_restrict_members) missing.push('Restringir usuarios');
+  return missing;
+}
 function publicParticipant(row) {
   return {
     id: row.id || null, userId: row.user_id, name: row.user_name || row.name || null,
@@ -67,12 +80,7 @@ async function confirmGroupLink({ workspaceId, botToken, message, code }) {
   const me = await telegram.callBotApi({ token: botToken, method: 'getMe' });
   if (!me.ok) throw new AppError('No se pudo verificar el bot', 422, 'TELEGRAM_BOT_VALIDATION_FAILED');
   const member = await telegram.getChatMember({ token: botToken, chatId, userId: me.result.id });
-  const permissions = member.result || {};
-  const missing = [];
-  if (!['administrator', 'creator'].includes(permissions.status)) missing.push('Administrador');
-  if (permissions.status !== 'creator' && !permissions.can_manage_topics) missing.push('Administrar temas');
-  if (permissions.status !== 'creator' && !permissions.can_invite_users) missing.push('Invitar usuarios');
-  if (permissions.status !== 'creator' && !permissions.can_restrict_members) missing.push('Restringir usuarios');
+  const missing = botPermissions(member.result);
   if (missing.length) {
     await query('UPDATE telegram_forum_groups SET status=?,missing_permissions_json=?,updated_at=? WHERE id=?', ['MISSING_PERMISSIONS', JSON.stringify(missing), Date.now(), pending.id]);
     throw new AppError(`Faltan permisos del bot: ${missing.join(', ')}`, 422, 'TELEGRAM_GROUP_PERMISSIONS_MISSING');
@@ -98,6 +106,11 @@ async function groupRow(workspaceId, groupId) {
   if (!rows[0]) throw new AppError('Grupo Telegram no encontrado o inactivo', 404, 'TELEGRAM_GROUP_NOT_FOUND');
   return rows[0];
 }
+async function anyGroupRow(workspaceId, groupId) {
+  const rows = await query('SELECT * FROM telegram_forum_groups WHERE id=? AND workspace_id=? AND telegram_chat_id IS NOT NULL LIMIT 1', [groupId, workspaceId]);
+  if (!rows[0]) throw new AppError('Grupo Telegram no encontrado', 404, 'TELEGRAM_GROUP_NOT_FOUND');
+  return rows[0];
+}
 async function botConfig(workspaceId) {
   const config = await integrations.getSecret(workspaceId, 'TELEGRAM');
   if (!config?.botToken) throw new AppError('Configura primero el bot Telegram del workspace', 404, 'INTEGRATION_NOT_CONFIGURED');
@@ -112,7 +125,7 @@ async function previewTopic(workspaceId, groupId, clientId) {
   return { client, topicName: `${prefix}${name}`.slice(0, 128) };
 }
 async function listTopics(workspaceId, groupId) {
-  await groupRow(workspaceId, groupId);
+  await anyGroupRow(workspaceId, groupId);
   const rows = await query('SELECT * FROM telegram_forum_topics WHERE workspace_id=? AND group_id=? ORDER BY created_at DESC', [workspaceId, groupId]);
   return rows.map(publicTopic);
 }
@@ -164,6 +177,12 @@ async function reconcileTopicEvent({ workspaceId, message }) {
   let status = null;
   if (message.forum_topic_closed) status = 'CLOSED';
   if (message.forum_topic_reopened) status = 'ACTIVE';
+  if (message.forum_topic_edited?.name) {
+    await query(`UPDATE telegram_forum_topics t JOIN telegram_forum_groups g ON g.id=t.group_id
+      SET t.topic_name=?,t.updated_at=? WHERE t.workspace_id=? AND g.telegram_chat_id=? AND t.telegram_thread_id=?`,
+    [clean(message.forum_topic_edited.name, 128), Date.now(), workspaceId, String(message.chat.id), String(message.message_thread_id)]);
+    return true;
+  }
   if (!status) return false;
   await query(`UPDATE telegram_forum_topics t JOIN telegram_forum_groups g ON g.id=t.group_id
     SET t.status=?,t.updated_at=? WHERE t.workspace_id=? AND g.telegram_chat_id=? AND t.telegram_thread_id=?`,
@@ -179,6 +198,12 @@ async function changeTopicState(workspaceId, userId, groupId, topicId, action) {
   const fn = action === 'close' ? telegram.closeForumTopic : telegram.reopenForumTopic;
   const result = await fn({ token: config.botToken, chatId: group.telegram_chat_id, threadId: topic.telegram_thread_id });
   if (!result.ok) {
+    if (isMissingTopic(result)) {
+      const now = Date.now();
+      await query("UPDATE telegram_forum_topics SET status='DELETED',updated_at=? WHERE id=?", [now, topicId]);
+      await audit({ workspaceId, userId, action: 'TOPIC_MISSING_DETECTED', entityType: 'TOPIC', entityId: topicId, result: 'DELETED', detail: result.error });
+      throw new AppError('El tema ya no existe en Telegram. Se marcó como eliminado y puede recrearse.', 409, 'TELEGRAM_TOPIC_DELETED');
+    }
     await query("UPDATE telegram_forum_topics SET status='REPAIR_REQUIRED',updated_at=? WHERE id=?", [Date.now(), topicId]);
     throw new AppError('Telegram no confirmó la operación; el tema requiere revisión', 502, 'TELEGRAM_TOPIC_REPAIR_REQUIRED');
   }
@@ -187,11 +212,32 @@ async function changeTopicState(workspaceId, userId, groupId, topicId, action) {
   await audit({ workspaceId, userId, action: action === 'close' ? 'TOPIC_CLOSED' : 'TOPIC_REOPENED', entityType: 'TOPIC', entityId: topicId, result: 'SUCCESS' });
   return publicTopic({ ...topic, status, updated_at: Date.now() });
 }
+async function deleteTopic(workspaceId, userId, groupId, topicId) {
+  const group = await groupRow(workspaceId, groupId);
+  const rows = await query('SELECT * FROM telegram_forum_topics WHERE id=? AND group_id=? AND workspace_id=? LIMIT 1', [topicId, groupId, workspaceId]);
+  const topic = rows[0];
+  if (!topic) throw new AppError('Tema no encontrado', 404, 'TELEGRAM_TOPIC_NOT_FOUND');
+  if (topic.status === 'DELETED') return publicTopic(topic);
+  if (!topic.telegram_thread_id) throw new AppError('El tema no tiene identificador de Telegram', 409, 'TELEGRAM_TOPIC_REPAIR_REQUIRED');
+  const config = await botConfig(workspaceId);
+  await query("UPDATE telegram_forum_topics SET status='DELETING',updated_at=? WHERE id=?", [Date.now(), topicId]);
+  const result = await telegram.deleteForumTopic({ token: config.botToken, chatId: group.telegram_chat_id, threadId: topic.telegram_thread_id });
+  if (!result.ok && !isMissingTopic(result)) {
+    const status = result.ambiguous ? 'DELETE_UNKNOWN' : topic.status;
+    await query('UPDATE telegram_forum_topics SET status=?,updated_at=? WHERE id=?', [status, Date.now(), topicId]);
+    await audit({ workspaceId, userId, action: 'TOPIC_DELETE', entityType: 'TOPIC', entityId: topicId, result: status, detail: result.error });
+    throw new AppError(result.ambiguous ? 'Telegram no confirmó la eliminación. Verifica antes de repetir.' : 'Telegram rechazó la eliminación del tema', 502, 'TELEGRAM_TOPIC_DELETE_FAILED');
+  }
+  const now = Date.now();
+  await query("UPDATE telegram_forum_topics SET status='DELETED',updated_at=? WHERE id=?", [now, topicId]);
+  await audit({ workspaceId, userId, action: 'TOPIC_DELETED', entityType: 'TOPIC', entityId: topicId, result: 'SUCCESS', detail: result.ok ? null : result.error });
+  return publicTopic({ ...topic, status: 'DELETED', updated_at: now });
+}
 async function recreateTopic(workspaceId, userId, groupId, topicId) {
   const group = await groupRow(workspaceId, groupId);
   const rows = await query('SELECT * FROM telegram_forum_topics WHERE id=? AND group_id=? AND workspace_id=? LIMIT 1', [topicId, groupId, workspaceId]);
   const topic = rows[0];
-  if (!topic || !['REPAIR_REQUIRED', 'CREATE_UNKNOWN'].includes(topic.status)) throw new AppError('Este tema no está marcado para reparación', 409, 'TELEGRAM_TOPIC_RECREATE_NOT_ALLOWED');
+  if (!topic || !['REPAIR_REQUIRED', 'CREATE_UNKNOWN', 'DELETED', 'DELETE_UNKNOWN'].includes(topic.status)) throw new AppError('Este tema no está marcado para recreación', 409, 'TELEGRAM_TOPIC_RECREATE_NOT_ALLOWED');
   const config = await botConfig(workspaceId);
   await query("UPDATE telegram_forum_topics SET status='CREATING',updated_at=? WHERE id=?", [Date.now(), topicId]);
   const created = await telegram.createForumTopic({ token: config.botToken, chatId: group.telegram_chat_id, name: topic.topic_name });
@@ -205,8 +251,64 @@ async function recreateTopic(workspaceId, userId, groupId, topicId) {
   return publicTopic({ ...topic, telegram_thread_id: String(created.result.message_thread_id), status: 'ACTIVE', updated_at: Date.now() });
 }
 
+async function reconcileGroup(workspaceId, userId, groupId) {
+  const rows = await query('SELECT * FROM telegram_forum_groups WHERE id=? AND workspace_id=? LIMIT 1', [groupId, workspaceId]);
+  const group = rows[0];
+  if (!group?.telegram_chat_id) throw new AppError('Grupo Telegram no vinculado', 404, 'TELEGRAM_GROUP_NOT_FOUND');
+  const config = await botConfig(workspaceId);
+  const [chat, me] = await Promise.all([
+    telegram.getChat({ token: config.botToken, chatId: group.telegram_chat_id }),
+    telegram.callBotApi({ token: config.botToken, method: 'getMe' }),
+  ]);
+  let status = group.status;
+  let missing = [];
+  let name = group.display_name;
+  if (!chat.ok) {
+    if (!chat.ambiguous) status = 'BOT_REMOVED';
+  } else if (chat.result?.type !== 'supergroup' || chat.result?.is_forum !== true) {
+    status = 'FORUM_DISABLED';
+    name = clean(chat.result?.title || name || 'Grupo Telegram');
+  } else if (!me.ok) {
+    status = me.ambiguous ? status : 'BOT_REMOVED';
+  } else {
+    name = clean(chat.result.title || name || 'Grupo Telegram');
+    const member = await telegram.getChatMember({ token: config.botToken, chatId: group.telegram_chat_id, userId: me.result.id });
+    if (!member.ok) status = member.ambiguous ? status : 'BOT_REMOVED';
+    else {
+      missing = botPermissions(member.result);
+      status = missing.length ? 'MISSING_PERMISSIONS' : 'ACTIVE';
+    }
+  }
+  await query('UPDATE telegram_forum_groups SET display_name=?,status=?,missing_permissions_json=?,updated_at=? WHERE id=?', [name, status, JSON.stringify(missing), Date.now(), groupId]);
+  let deletedTopics = 0;
+  if (status === 'ACTIVE') {
+    const topics = await query("SELECT * FROM telegram_forum_topics WHERE workspace_id=? AND group_id=? AND telegram_thread_id IS NOT NULL AND status IN ('ACTIVE','CLOSED','DELETE_UNKNOWN')", [workspaceId, groupId]);
+    for (const topic of topics) {
+      const result = await telegram.sendChatAction({ token: config.botToken, chatId: group.telegram_chat_id, threadId: topic.telegram_thread_id });
+      if (isMissingTopic(result)) {
+        await query("UPDATE telegram_forum_topics SET status='DELETED',updated_at=? WHERE id=?", [Date.now(), topic.id]);
+        deletedTopics += 1;
+        await audit({ workspaceId, userId, action: 'TOPIC_MISSING_DETECTED', entityType: 'TOPIC', entityId: topic.id, result: 'DELETED', detail: result.error });
+      }
+    }
+  }
+  await audit({ workspaceId, userId, action: 'GROUP_RECONCILED', entityType: 'GROUP', entityId: groupId, result: status, detail: deletedTopics ? `${deletedTopics} tema(s) eliminado(s) detectado(s)` : null });
+  return { group: publicGroup({ ...group, display_name: name, status, missing_permissions_json: JSON.stringify(missing) }), deletedTopics };
+}
+
+async function reconcileBotMembership({ workspaceId, update }) {
+  const member = update?.my_chat_member;
+  if (!member?.chat?.id) return false;
+  const status = member.new_chat_member?.status;
+  const missing = botPermissions(member.new_chat_member);
+  const groupStatus = ['left', 'kicked'].includes(status) ? 'BOT_REMOVED' : missing.length ? 'MISSING_PERMISSIONS' : 'ACTIVE';
+  await query('UPDATE telegram_forum_groups SET status=?,missing_permissions_json=?,display_name=COALESCE(?,display_name),updated_at=? WHERE workspace_id=? AND telegram_chat_id=?',
+    [groupStatus, JSON.stringify(missing), clean(member.chat.title || '', 255) || null, Date.now(), workspaceId, String(member.chat.id)]);
+  return true;
+}
+
 async function listParticipants(workspaceId, groupId) {
-  await groupRow(workspaceId, groupId);
+  await anyGroupRow(workspaceId, groupId);
   const config = await botConfig(workspaceId);
   const fingerprint = crypto.createHash('sha256').update(config.botToken).digest('hex');
   const rows = await query(`SELECT u.id AS user_id,u.name AS user_name,u.email,wm.role,
@@ -311,4 +413,4 @@ async function clientForTopicCommand(workspaceId, message) {
   return integrations.getMikrowispClient(workspaceId, context.clientId);
 }
 
-module.exports = { clean, publicGroup, publicTopic, publicParticipant, createLinkCode, confirmGroupLink, listGroups, previewTopic, listTopics, createTopic, registerExistingTopic, reconcileTopicEvent, changeTopicState, recreateTopic, listParticipants, createParticipantInvite, removeParticipant, reconcileParticipantUpdate, topicContextForCommand, clientForTopicCommand, ownerForTelegramUser };
+module.exports = { clean, publicGroup, publicTopic, publicParticipant, createLinkCode, confirmGroupLink, listGroups, previewTopic, listTopics, createTopic, registerExistingTopic, reconcileTopicEvent, changeTopicState, deleteTopic, recreateTopic, reconcileGroup, reconcileBotMembership, listParticipants, createParticipantInvite, removeParticipant, reconcileParticipantUpdate, topicContextForCommand, clientForTopicCommand, ownerForTelegramUser };

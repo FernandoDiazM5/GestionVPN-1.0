@@ -34,7 +34,7 @@ async function handleCallback(bot, callback) {
 async function poll(bot) {
   while (enabled && !bot.controller.signal.aborted) {
     try {
-      const url = `https://api.telegram.org/bot${bot.botToken}/getUpdates?timeout=20&offset=${bot.offset}&allowed_updates=${encodeURIComponent('["message","callback_query","chat_join_request","chat_member"]')}`;
+      const url = `https://api.telegram.org/bot${bot.botToken}/getUpdates?timeout=20&offset=${bot.offset}&allowed_updates=${encodeURIComponent('["message","callback_query","chat_join_request","chat_member","my_chat_member"]')}`;
       const response = await fetch(url, { signal: bot.controller.signal });
       const body = await response.json().catch(() => ({}));
       if (!response.ok || body.ok !== true) throw new Error(body.description || `HTTP ${response.status}`);
@@ -43,6 +43,7 @@ async function poll(bot) {
         if (update.message) await handleMessage(bot, update.message);
         if (update.callback_query) await handleCallback(bot, update.callback_query);
         if (update.chat_join_request || update.chat_member) await require('./telegramForumService').reconcileParticipantUpdate({ workspaceId: bot.workspaceId, botToken: bot.botToken, update });
+        if (update.my_chat_member) await require('./telegramForumService').reconcileBotMembership({ workspaceId: bot.workspaceId, update });
       }
     } catch (error) {
       if (error.name === 'AbortError') return;
