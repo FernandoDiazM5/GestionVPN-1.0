@@ -32,7 +32,7 @@ const WORKSPACE_DEFINITIONS: Definition[] = [
   ] },
   { provider: 'MIKROWISP', name: 'MikroWisp', description: 'Consulta de clientes en modo estrictamente de sólo lectura.', icon: Database, fields: [
     { key: 'baseUrl', label: 'URL de MikroWisp', placeholder: 'https://tu-dominio.mikrowisp.net', help: 'Usa HTTPS. Puedes indicar el dominio o terminar en /api/v1.' },
-    { key: 'token', label: 'Token API', type: 'password', placeholder: 'Ingresa un token nuevo' },
+    { key: 'token', label: 'Token API', type: 'password', placeholder: 'Ingresa un token nuevo', help: 'Se cifra antes de guardarse y nunca vuelve a mostrarse.' },
     { key: 'validationClientId', label: 'ID de cliente para validar', placeholder: '14', help: 'Debe existir y sólo se consultará para comprobar la conexión.' },
   ] },
 ];

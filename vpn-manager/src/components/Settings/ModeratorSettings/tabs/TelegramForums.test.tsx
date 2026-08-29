@@ -18,6 +18,8 @@ describe('TelegramForums', () => {
     render(<TelegramForums />);
     expect(await screen.findByText(/Todavía no hay grupos vinculados/)).toBeInTheDocument();
     expect(screen.getByText(/no guarda conversaciones/i)).toBeInTheDocument();
+    expect(screen.getByText(/No necesitas crear otro bot/i)).toBeInTheDocument();
+    expect(screen.getByText(/Cómo preparar el supergrupo privado/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Vincular otro grupo/ })).toBeInTheDocument();
   });
 

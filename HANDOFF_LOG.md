@@ -6748,3 +6748,7 @@ Verificado con `grep` sobre todo `server/`:
 - Tras restaurar la cuenta, el login devolvía 429 porque los intentos durante la suspensión llenaron los buckets persistentes `LOGIN_ID`, `LOGIN_PAIR` y `LOGIN_IP`. Se limpiaron exclusivamente los buckets del Administrador y su IP observada, además de su contador de seguridad; quedaron 0 buckets LOGIN bloqueados globalmente. No se cambió contraseña ni se desbloqueó a otros usuarios.
 > **Commit de la entrega:** `e1a2769` en rama `vps_uni`, creado localmente; sin push ni despliegue porque el canary Telegram de laboratorio aún no está disponible.
 >
+> **Sesión 2026-08-28 — UX de preparación del canary completada.** Se confirmó que no hace falta otro bot: se reutiliza el bot del workspace que ya opera accesos. La web ahora explica cinco pasos del supergrupo y mantiene visible el formulario MikroWisp (URL HTTPS, token cifrado, ID de validación).
+> - Al confirmar `/vinculargrupo`, el OWNER que envía el código se inserta/upsertea como participante `ACTIVE`; esto permite usar al moderador ya vinculado como piloto sin flujo artificial de invitación.
+> - Pruebas focalizadas: backend **9**, frontend **7**; `check:all` verde. Pendiente aún configurar integración MikroWisp y crear/vincular el supergrupo real para ejecutar el canary.
+>

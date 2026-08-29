@@ -84,6 +84,12 @@ async function confirmGroupLink({ workspaceId, botToken, message, code }) {
     if (error.code === 'ER_DUP_ENTRY') throw new AppError('Este grupo ya está vinculado', 409, 'TELEGRAM_GROUP_ALREADY_LINKED');
     throw error;
   }
+  const now = Date.now();
+  await query(`INSERT INTO telegram_forum_participants
+    (id,workspace_id,group_id,user_id,telegram_user_id,status,acted_by,joined_at,created_at,updated_at)
+    VALUES (?,?,?,?,?,'ACTIVE',?,?,?,?)
+    ON DUPLICATE KEY UPDATE telegram_user_id=VALUES(telegram_user_id),status='ACTIVE',invite_link=NULL,invite_expires_at=NULL,acted_by=VALUES(acted_by),joined_at=COALESCE(joined_at,VALUES(joined_at)),removed_at=NULL,updated_at=VALUES(updated_at)`,
+  [crypto.randomUUID(), workspaceId, pending.id, userId, String(message.from.id), userId, now, now, now]);
   await audit({ workspaceId, userId, action: 'GROUP_LINKED', entityType: 'GROUP', entityId: pending.id, result: 'SUCCESS' });
   return { ...publicGroup({ ...pending, telegram_chat_id: chatId, display_name: chatResult.result.title, status: 'ACTIVE', missing_permissions_json: '[]', linked_at: Date.now() }) };
 }

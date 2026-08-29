@@ -33,6 +33,20 @@ describe('telegramForumService', () => {
     expect(preview.topicName.length).toBeLessThanOrEqual(128);
   });
 
+  it('registra como participante activo al moderador que vincula el grupo', async () => {
+    query.mockImplementation(async sql => {
+      if (sql.includes('FROM notification_subscriptions')) return [{ id: 'u-1' }];
+      if (sql.includes("status='PENDING_LINK'")) return [{ id: 'g-1', workspace_id: 'ws-1', created_at: 1, link_code_expires_at: Date.now() + 60_000 }];
+      return { affectedRows: 1 };
+    });
+    telegram.getChat.mockResolvedValue({ ok: true, result: { type: 'supergroup', is_forum: true, title: 'Clientes piloto' } });
+    telegram.callBotApi.mockResolvedValue({ ok: true, result: { id: 7001 } });
+    telegram.getChatMember.mockResolvedValue({ ok: true, result: { status: 'administrator', can_manage_topics: true, can_invite_users: true, can_restrict_members: true } });
+    const result = await service.confirmGroupLink({ workspaceId: 'ws-1', botToken: '123456:valid-token-for-tests-abcdef', message: { chat: { id: -1001 }, from: { id: 9002 } }, code: 'A1B2C3D4' });
+    expect(result).toMatchObject({ id: 'g-1', status: 'ACTIVE' });
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO telegram_forum_participants'), expect.arrayContaining(['ws-1', 'g-1', 'u-1', '9002']));
+  });
+
   it('reserva antes de llamar Telegram y confirma el thread ID', async () => {
     const topic = await service.createTopic('ws-1', 'u-1', 'g-1', '14');
     const insertIndex = query.mock.calls.findIndex(([sql]) => sql.includes('INSERT INTO telegram_forum_topics'));
