@@ -14,6 +14,7 @@ node db/initMultiuser.js       # tablas multi-usuario (sessions, mgmt_ips, ...)
 # Esquema operativo (nodes, aps, cpes, app_settings...) vía db.service.initDb().
 # DEBE ir antes de migrate:apnode, que altera 'aps'. Antes lo disparaba seedRoles.
 node -e "require('./db.service').initDb().then(()=>{console.log('[init:ops] schema_ops aplicado'); process.exit(0)}).catch(e=>{console.error('[init:ops] ERROR:', e.message); process.exit(1)})"
+node db/migrateMikrowispTelegram.js # tablas portables según collation real de workspaces
 node db/migratePerf.js         # índices compuestos (F11)
 node db/migrateNotifications.js
 node db/migrateMonitoring.js
