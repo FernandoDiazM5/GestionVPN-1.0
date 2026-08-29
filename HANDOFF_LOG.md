@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-29 — Auditoría de desincronización Telegram.** Rama `vps_uni` en `94f88a1`; sólo diagnóstico.
+> - Confirmado: `reconcileTopicEvent` procesa únicamente `forum_topic_closed/reopened`; ignora `forum_topic_edited`. El Bot API no entrega un servicio de eliminación de tema, así que borrar directamente en Telegram deja el registro `ACTIVE` y bloquea recreación por la restricción única cliente/grupo.
+> - El polling no incluye `my_chat_member`; tampoco reconcilia expulsión/degradación del bot, permisos, cambio de título/foro desactivado ni participantes añadidos directamente.
+> - Solución recomendada: soft-delete/auditoría, eliminar desde Joinpoint, verificación bajo demanda con clasificación cerrada de errores Telegram, reconciliación de renombres y estado grupo/bot, más pruebas de carrera/fallos ambiguos. Pendiente autorización de implementación.
+>
 > **Sesión 2026-08-29 — Rediseño operativo completo de Historial de clientes.** Rama `vps_uni` sobre `5868887`; pendiente despliegue.
 > - La vista ahora usa maestro–detalle responsive, buscador, métricas, regreso móvil y tabs para evitar una pantalla vertical extensa.
 > - Temas usan estado semántico y menú contextual; la creación valida el cliente en un Dialog antes de confirmar. Participantes quedaron en una pestaña secundaria.
