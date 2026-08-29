@@ -16,10 +16,9 @@ beforeEach(() => {
 describe('TelegramForums', () => {
   it('prioriza la lista de grupos y deja agregar otro grupo como acción separada', async () => {
     const user = userEvent.setup();
-    render(<TelegramForums />);
+    render(<TelegramForums standalone />);
     expect(await screen.findByText(/Todavía no hay grupos vinculados/)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Mis grupos' })).toBeInTheDocument();
-    expect(screen.getByText(/no guarda conversaciones/i)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Agregar grupo/ }));
     expect(screen.getByText(/Usa el mismo bot del workspace/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Generar código/ })).toBeInTheDocument();
@@ -28,7 +27,7 @@ describe('TelegramForums', () => {
   it('genera el comando de vinculación con vencimiento', async () => {
     const user = userEvent.setup();
     api.createTelegramForumLink.mockResolvedValue({ link: { id: 'g-1', code: 'A1B2C3D4', command: '/vinculargrupo A1B2C3D4', expiresAt: Date.now() + 60_000 } });
-    render(<TelegramForums />);
+    render(<TelegramForums standalone />);
     await user.click(await screen.findByRole('button', { name: /Agregar grupo/ }));
     await user.click(screen.getByRole('button', { name: /Generar código/ }));
     await waitFor(() => expect(api.createTelegramForumLink).toHaveBeenCalledOnce());

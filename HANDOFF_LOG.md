@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-29 — Historial de clientes convertido en módulo.** Rama `vps_uni` sobre `36121f1`; pendiente despliegue.
+> - Integraciones conserva la credencial MikroWisp y sólo muestra/sincroniza “Routers y nodos”. La allowlist backend también se estrechó a `GetRouters`; `GetMonitoreo` y `GetCajasNap` ya no son rutas permitidas.
+> - Nuevo módulo OWNER “Historial de clientes” en Operación: ruta propia, grupos, temas, participantes, alta de grupo y tarjeta explicativa de cinco comandos. MEMBER y Administrador de plataforma no lo ven.
+> - Verificación completa: backend **135 archivos/750 pruebas**, frontend **82/273**, focalizadas **35/35**, TypeScript, lint, build y `check:all` verdes.
+>
 > **Sesión 2026-08-29 — Limpieza segura y redespliegue completo.** Rama `vps_uni`, checkout productivo `a7f4021`.
 > - Auditoría encontró 91% de uso, rollbacks Docker históricos y caché de construcción. Se retiraron explícitamente cinco imágenes backend y cuatro frontend anteriores a MikroWisp, caché APT y 152 MB de journal. Se conservaron MariaDB, volúmenes, dumps, imágenes activas y `pre-mikrowisp-20260828T2152`.
 > - El disco quedó 74%/6.4 GiB libres. Se reconstruyeron backend y frontend exclusivamente con `docker compose -f docker-compose.prod.yml up -d --build`.

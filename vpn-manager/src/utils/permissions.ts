@@ -11,7 +11,7 @@ export const isModerator = (role?: Role) => role === 'OWNER';
 /** Administrador de plataforma (Sistemas). */
 export const isPlatformAdmin = (s?: SessionUser | null) => !!s?.platform_admin;
 
-export type ModuleId = 'dashboard' | 'moderators' | 'security' | 'nodes' | 'devices' | 'users' | 'team' | 'monitor' | 'settings';
+export type ModuleId = 'dashboard' | 'moderators' | 'security' | 'nodes' | 'devices' | 'users' | 'team' | 'monitor' | 'client-history' | 'settings';
 
 /**
  * Módulos visibles según la sesión (RBAC + plataforma).
@@ -38,7 +38,7 @@ export function visibleModules(s?: SessionUser | null): ModuleId[] {
   // 'users' (Gestión WG) se unificó dentro de 'team' como una tab — el item del
   // sidebar ya no existe. El ModuleId se mantiene como tipo válido por si una
   // URL vieja lo referencia, pero ningún flujo navegable apunta ahí.
-  return ['nodes', 'devices', 'team', 'monitor', 'settings'];
+  return ['nodes', 'devices', 'team', 'monitor', 'client-history', 'settings'];
 }
 
 export const canSeeModule = (s: SessionUser | null | undefined, m: ModuleId) => visibleModules(s).includes(m);

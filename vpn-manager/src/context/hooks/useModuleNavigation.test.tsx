@@ -67,6 +67,12 @@ describe('useModuleNavigation', () => {
     expect(await screen.findByLabelText('pathname')).toHaveTextContent('/dm/housenet/monitor');
   });
 
+  it('resuelve la ruta propia del historial de clientes', () => {
+    render(<MemoryRouter initialEntries={['/dm/housenet/client-history']}><Probe /></MemoryRouter>);
+    expect(screen.getByText('client-history')).toBeInTheDocument();
+    expect(screen.getByLabelText('pathname')).toHaveTextContent('/dm/housenet/client-history');
+  });
+
   it('muestra login en el public path histórico sin crear un bucle', () => {
     render(
       <MemoryRouter initialEntries={['/GestionVPN-1.0/']}>

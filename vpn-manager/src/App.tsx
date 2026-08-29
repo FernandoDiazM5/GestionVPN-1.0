@@ -33,6 +33,7 @@ const NodeAccessPanel           = lazy(moduleLoaders.nodes);
 const TeamModule                = lazy(moduleLoaders.team);
 const NetworkDevicesModule      = lazy(moduleLoaders.devices);
 const ApMonitorModule           = lazy(moduleLoaders.monitor);
+const ClientHistoryModule       = lazy(moduleLoaders['client-history']);
 const SettingsModule            = lazy(moduleLoaders.platformSettings);
 const ModeratorSettingsModule   = lazy(moduleLoaders.workspaceSettings);
 
@@ -194,6 +195,7 @@ function ModuleRouter() {
         {activeModule === 'team'        && <TeamModule />}
         {activeModule === 'devices'     && <NetworkDevicesModule />}
         {activeModule === 'monitor'     && <ApMonitorModule />}
+        {activeModule === 'client-history' && <ClientHistoryModule />}
         {activeModule === 'settings'    && <SettingsModuleRouter />}
       </Suspense>
     </ModuleErrorBoundary>

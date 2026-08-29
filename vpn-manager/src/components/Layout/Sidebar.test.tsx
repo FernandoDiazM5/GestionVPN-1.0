@@ -28,7 +28,7 @@ vi.mock('../../context/WorkspaceSession', () => ({
 }));
 
 vi.mock('../../utils/permissions', () => ({
-  visibleModules: () => ['nodes', 'devices', 'team', 'monitor', 'settings'],
+  visibleModules: () => ['nodes', 'devices', 'team', 'monitor', 'client-history', 'settings'],
   roleLabel: () => 'Moderador',
 }));
 
@@ -89,5 +89,6 @@ describe('<Sidebar /> móvil', () => {
     expect(screen.getByRole('button', { name: 'Activar modo oscuro' })).toBeInTheDocument();
     expect(screen.getByText('Fernando Díaz')).toBeInTheDocument();
     expect(screen.getByText('Moderador')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Historial de clientes' })).toBeInTheDocument();
   });
 });

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
   Radio, Cpu, Briefcase, Activity, Settings, LayoutDashboard, UserCog,
-  LogOut, ChevronLeft, Menu, X, Wifi, Sun, Moon, ShieldCheck,
+  LogOut, ChevronLeft, Menu, X, Wifi, Sun, Moon, ShieldCheck, BookOpenText,
 } from 'lucide-react';
 import { useVpn } from '../../context';
 import { useWorkspaceSession } from '../../context/WorkspaceSession';
@@ -37,6 +37,7 @@ const NAV: NavGroup[] = [
       { id: 'nodes', label: 'Sitios', icon: Radio },
       { id: 'devices', label: 'Buscar equipos', icon: Cpu },
       { id: 'monitor', label: 'Estado de equipos', icon: Activity },
+      { id: 'client-history', label: 'Historial de clientes', icon: BookOpenText },
     ],
   },
   {

@@ -10,7 +10,7 @@ const workspaceBots = require('../lib/workspaceTelegramBots');
 
 const router = express.Router();
 const MikrowispClientParamsSchema = z.object({ clientId: z.string().regex(/^\d{1,15}$/) }).strict();
-const CatalogParamsSchema = z.object({ type: z.enum(['ROUTERS', 'MONITORING_EQUIPMENT', 'NAP_BOXES']) }).strict();
+const CatalogParamsSchema = z.object({ type: z.literal('ROUTERS') }).strict();
 const GroupParamsSchema = z.object({ groupId: z.string().uuid() }).strict();
 const TopicParamsSchema = z.object({ groupId: z.string().uuid(), topicId: z.string().uuid() }).strict();
 const ParticipantParamsSchema = z.object({ groupId: z.string().uuid(), userId: z.string().uuid() }).strict();

@@ -19,8 +19,8 @@ beforeEach(() => {
 });
 
 describe('externalCatalogService', () => {
-  it('mantiene cerrado el alcance a los tres catálogos que intervienen con el cliente', () => {
-    expect(Object.keys(service.CATALOGS)).toEqual(['ROUTERS', 'MONITORING_EQUIPMENT', 'NAP_BOXES']);
+  it('mantiene cerrado el alcance al único catálogo que interviene con el cliente', () => {
+    expect(Object.keys(service.CATALOGS)).toEqual(['ROUTERS']);
   });
   it('sincroniza manualmente un catálogo soportado usando el secreto del mismo workspace', async () => {
     const result = await service.sync('ws-1', 'routers');

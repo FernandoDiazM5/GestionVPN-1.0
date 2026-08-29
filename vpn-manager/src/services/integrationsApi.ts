@@ -11,7 +11,7 @@ export interface WorkspaceIntegration {
   lastValidatedAt: number | null;
   updatedAt: number | null;
 }
-export type MikrowispCatalogType = 'ROUTERS' | 'MONITORING_EQUIPMENT' | 'NAP_BOXES';
+export type MikrowispCatalogType = 'ROUTERS';
 export interface ExternalCatalogSummary { type: MikrowispCatalogType; label: string; count: number; lastSyncedAt: number | null }
 export interface ExternalCatalogEntry { type: MikrowispCatalogType; externalId: string; name: string; metadata: Record<string, string>; lastSyncedAt: number }
 export interface ExternalCatalog { type: MikrowispCatalogType; label: string; entries: ExternalCatalogEntry[] }

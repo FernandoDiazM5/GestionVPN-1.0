@@ -4,7 +4,11 @@ import { integrationsApi, type IntegrationGuide, type TelegramForumGroup, type T
 
 const label = (value: string) => value === 'ACTIVE' ? 'Activo' : value === 'CLOSED' ? 'Cerrado' : value.replaceAll('_', ' ').toLowerCase();
 
-export default function TelegramForums() {
+export default function TelegramForums({ standalone = false }: { standalone?: boolean }) {
+  return standalone ? <TelegramForumsContent /> : null;
+}
+
+function TelegramForumsContent() {
   const [groups, setGroups] = useState<TelegramForumGroup[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [topics, setTopics] = useState<TelegramForumTopic[]>([]);
@@ -45,7 +49,6 @@ export default function TelegramForums() {
   const currentGroup = groups.find(group => group.id === selected) || null;
 
   return <div className="space-y-4 rounded-xl border border-violet-200 bg-violet-50 p-3 dark:border-violet-800/60 dark:bg-violet-500/10">
-    <header><p className="text-sm font-bold text-violet-950 dark:text-violet-100">Clientes en Telegram</p><p className="mt-1 text-xs leading-5 text-violet-800 dark:text-violet-200">Administra los grupos vinculados, sus temas y participantes. Joinpoint no guarda conversaciones.</p></header>
 
     <section className="rounded-xl bg-white p-3 dark:bg-slate-900" aria-labelledby="groups-heading">
       <div className="flex items-center justify-between gap-3"><div><h3 id="groups-heading" className="text-sm font-bold text-slate-900 dark:text-white">Mis grupos</h3><p className="mt-1 text-xs text-slate-500">Selecciona un grupo para ver sus temas.</p></div><button type="button" aria-label="Actualizar grupos" onClick={() => void load()} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700"><RefreshCw className="h-4 w-4" /></button></div>

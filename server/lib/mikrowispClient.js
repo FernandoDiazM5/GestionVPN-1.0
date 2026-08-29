@@ -6,8 +6,6 @@ const TIMEOUT_MS = 10_000;
 const CLIENT_DETAILS_PATH = 'GetClientsDetails';
 const CATALOG_OPERATIONS = Object.freeze({
   ROUTERS: { path: 'GetRouters', body: { id: -1 }, rows: ['routers'], id: ['id'], name: ['nombre'], metadata: { status: ['estado'], model: ['modelo'] } },
-  MONITORING_EQUIPMENT: { path: 'GetMonitoreo', body: { id: -1 }, rows: ['equipos'], id: ['id'], name: ['nombre'], metadata: { status: ['estado'], model: ['equipo'] } },
-  NAP_BOXES: { path: 'GetCajasNap', body: {}, rows: ['datos'], id: ['id'], name: ['descripcion'], metadata: { location: ['ubicacion'], ports: ['puertos'] } },
 });
 const READ_ONLY_PATHS = new Set([CLIENT_DETAILS_PATH, ...Object.values(CATALOG_OPERATIONS).map(operation => operation.path)]);
 

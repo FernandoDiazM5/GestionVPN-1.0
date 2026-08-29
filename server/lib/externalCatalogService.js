@@ -5,8 +5,6 @@ const { AppError } = require('./apiResponse');
 
 const CATALOGS = Object.freeze({
   ROUTERS: { label: 'Routers y nodos' },
-  MONITORING_EQUIPMENT: { label: 'Equipos monitoreados' },
-  NAP_BOXES: { label: 'Cajas NAP' },
 });
 
 function catalogType(value) {

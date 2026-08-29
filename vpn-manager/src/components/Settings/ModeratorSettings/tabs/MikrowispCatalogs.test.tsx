@@ -10,8 +10,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   api.listMikrowispCatalogs.mockResolvedValue({ catalogs: [
     { type: 'ROUTERS', label: 'Routers y nodos', count: 0, lastSyncedAt: null },
-    { type: 'MONITORING_EQUIPMENT', label: 'Equipos monitoreados', count: 0, lastSyncedAt: null },
-    { type: 'NAP_BOXES', label: 'Cajas NAP', count: 0, lastSyncedAt: null },
   ] });
 });
 
@@ -19,10 +17,10 @@ describe('MikrowispCatalogs', () => {
   it('explica el fallback y lista únicamente catálogos oficiales', async () => {
     render(<MikrowispCatalogs />);
     expect(await screen.findByText('Routers y nodos')).toBeInTheDocument();
-    expect(screen.getByText('Equipos monitoreados')).toBeInTheDocument();
-    expect(screen.getByText('Cajas NAP')).toBeInTheDocument();
+    expect(screen.queryByText('Equipos monitoreados')).not.toBeInTheDocument();
+    expect(screen.queryByText('Cajas NAP')).not.toBeInTheDocument();
     expect(screen.getByText(/Pendiente de sincronizar/)).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: 'Sincronizar ahora' })).toHaveLength(3);
+    expect(screen.getAllByRole('button', { name: 'Sincronizar ahora' })).toHaveLength(1);
   });
 
   it('sincroniza manualmente el tipo seleccionado y actualiza el conteo', async () => {

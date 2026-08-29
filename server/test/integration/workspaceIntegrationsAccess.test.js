@@ -55,6 +55,7 @@ describe('integraciones por workspace', () => {
     expect(response.status).toBe(200);
     expect(catalogs.sync).toHaveBeenCalledWith('ws-1', 'ROUTERS');
     expect((await request(app).post('/api/workspace/integrations/mikrowisp/catalogs/PLANES/sync').set('x-role', 'OWNER').send({})).status).toBe(400);
+    expect((await request(app).post('/api/workspace/integrations/mikrowisp/catalogs/NAP_BOXES/sync').set('x-role', 'OWNER').send({})).status).toBe(400);
     expect((await request(app).post('/api/workspace/integrations/mikrowisp/catalogs/ROUTERS/sync').set('x-role', 'OWNER').send({ extra: true })).status).toBe(400);
   });
 });

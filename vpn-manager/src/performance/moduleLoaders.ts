@@ -15,6 +15,7 @@ export const moduleLoaders: Record<ModuleLoaderKey, Loader> = {
   team: () => import('../components/Team/TeamModule'),
   devices: () => import('../components/Devices/NetworkDevicesModule'),
   monitor: () => import('../components/Monitor/ApMonitorModule'),
+  'client-history': () => import('../components/Clients/ClientHistoryModule'),
   platformSettings: () => import('../components/Settings/SettingsModule'),
   workspaceSettings: () => import('../components/Settings/ModeratorSettings/ModeratorSettingsModule'),
 };
