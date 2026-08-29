@@ -6759,3 +6759,7 @@ Verificado con `grep` sobre todo `server/`:
 > - Disco 91% con 2.3 GB libres; `docker builder prune` no encontró caché reclamable y `docker image prune` sólo retiró 17.96 KB dangling. Rollbacks etiquetados y volúmenes se conservaron. Auditar imágenes antiguas antes del próximo build.
 > - Pendiente canary humano: ingresar URL/token/ID MikroWisp en Integraciones, sincronizar tres catálogos, crear supergrupo privado con temas/permisos, vincularlo y probar comandos con el OWNER piloto.
 >
+> **Sesión 2026-08-28 — Jerarquía visual de grupos/temas corregida.** A partir de las capturas reales, se retiró el selector único y la guía dominante: ahora los grupos se listan primero como tarjetas, el detalle seleccionado muestra sus temas antes del formulario de alta y participantes, y agregar otro grupo queda separado al final con guía plegable.
+> - Se conservaron los tokens/patrones visuales existentes; responsive `1→2` columnas, secciones semánticas, estado seleccionado visible y objetivos táctiles de al menos 44 px.
+> - Pruebas del componente **2/2**, TypeScript, lint, build y `check:all` verdes. Pendiente publicar el frontend y validar visualmente en producción autenticada.
+>

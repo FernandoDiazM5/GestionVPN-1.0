@@ -14,20 +14,23 @@ beforeEach(() => {
 });
 
 describe('TelegramForums', () => {
-  it('explica el flujo manual y que no almacena conversaciones', async () => {
+  it('prioriza la lista de grupos y deja agregar otro grupo como acción separada', async () => {
+    const user = userEvent.setup();
     render(<TelegramForums />);
     expect(await screen.findByText(/Todavía no hay grupos vinculados/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Mis grupos' })).toBeInTheDocument();
     expect(screen.getByText(/no guarda conversaciones/i)).toBeInTheDocument();
-    expect(screen.getByText(/No necesitas crear otro bot/i)).toBeInTheDocument();
-    expect(screen.getByText(/Cómo preparar el supergrupo privado/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Vincular otro grupo/ })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Agregar grupo/ }));
+    expect(screen.getByText(/Usa el mismo bot del workspace/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Generar código/ })).toBeInTheDocument();
   });
 
   it('genera el comando de vinculación con vencimiento', async () => {
     const user = userEvent.setup();
     api.createTelegramForumLink.mockResolvedValue({ link: { id: 'g-1', code: 'A1B2C3D4', command: '/vinculargrupo A1B2C3D4', expiresAt: Date.now() + 60_000 } });
     render(<TelegramForums />);
-    await user.click(await screen.findByRole('button', { name: /Vincular otro grupo/ }));
+    await user.click(await screen.findByRole('button', { name: /Agregar grupo/ }));
+    await user.click(screen.getByRole('button', { name: /Generar código/ }));
     await waitFor(() => expect(api.createTelegramForumLink).toHaveBeenCalledOnce());
     expect(screen.getByText('/vinculargrupo A1B2C3D4')).toBeInTheDocument();
   });
