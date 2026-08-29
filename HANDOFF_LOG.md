@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-29 — Limpieza segura y redespliegue completo.** Rama `vps_uni`, checkout productivo `a7f4021`.
+> - Auditoría encontró 91% de uso, rollbacks Docker históricos y caché de construcción. Se retiraron explícitamente cinco imágenes backend y cuatro frontend anteriores a MikroWisp, caché APT y 152 MB de journal. Se conservaron MariaDB, volúmenes, dumps, imágenes activas y `pre-mikrowisp-20260828T2152`.
+> - El disco quedó 74%/6.4 GiB libres. Se reconstruyeron backend y frontend exclusivamente con `docker compose -f docker-compose.prod.yml up -d --build`.
+> - Producción: migración MikroWisp 9 tablas verificada, bundle Telegram nuevo presente, HTTPS y `/api/health` 200, MySQL/RouterOS/SMTP `ok`, CORS canónico 204/hostil 403 y tres contenedores con 0 reinicios.
+>
 > **Sesión 2026-08-28 — Fase 6 parcial: migración local corregida y verificada.** MariaDB/XAMPP local se inició de forma reversible. La primera aplicación reveló FK incompatibles: nuevas referencias estaban en `VARCHAR(36)`/collation por defecto frente a padres `CHAR(36)`/`utf8mb4_unicode_ci`. Se corrigió antes de commit/deploy.
 > - Resultado: nueve tablas de integración/foro creadas con `utf8mb4_unicode_ci`, 17 FK válidas y segunda inicialización idempotente. Persiste sólo el warning histórico ajeno de `core_provision_runs`. No se mutó producción.
 > - Verificación posterior: backend **134/747**, frontend **81/271**, `check:all`, `git diff --check` y búsqueda del token compartido verdes; el token no está en archivos.
