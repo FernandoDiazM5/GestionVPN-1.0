@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-29 — Rediseño operativo completo de Historial de clientes.** Rama `vps_uni` sobre `5868887`; pendiente despliegue.
+> - La vista ahora usa maestro–detalle responsive, buscador, métricas, regreso móvil y tabs para evitar una pantalla vertical extensa.
+> - Temas usan estado semántico y menú contextual; la creación valida el cliente en un Dialog antes de confirmar. Participantes quedaron en una pestaña secundaria.
+> - Nuevo grupo usa asistente accesible de tres pasos con verificación de permisos, código, copia, vencimiento y guía. Los cinco comandos están plegados y se copian individualmente.
+> - Verificación: backend **135/750**, frontend **82/273**, focalizadas **3/3**, TypeScript, lint, build y `check:all` verdes.
+>
 > **Sesión 2026-08-29 — Historial de clientes convertido en módulo.** Rama `vps_uni` sobre `36121f1`; pendiente despliegue.
 > - Integraciones conserva la credencial MikroWisp y sólo muestra/sincroniza “Routers y nodos”. La allowlist backend también se estrechó a `GetRouters`; `GetMonitoreo` y `GetCajasNap` ya no son rutas permitidas.
 > - Nuevo módulo OWNER “Historial de clientes” en Operación: ruta propia, grupos, temas, participantes, alta de grupo y tarjeta explicativa de cinco comandos. MEMBER y Administrador de plataforma no lo ven.
