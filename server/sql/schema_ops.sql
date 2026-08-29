@@ -409,7 +409,7 @@ LEFT JOIN signal_history sh ON sh.ap_id = a.id
     AND sh.timestamp > (UNIX_TIMESTAMP() * 1000 - 86400000)
 GROUP BY a.id;
 CREATE TABLE IF NOT EXISTS workspace_integrations (
-  workspace_id VARCHAR(36) NOT NULL,
+  workspace_id CHAR(36) NOT NULL,
   provider VARCHAR(24) NOT NULL,
   config_enc TEXT NOT NULL,
   status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE',
@@ -418,14 +418,14 @@ CREATE TABLE IF NOT EXISTS workspace_integrations (
   metadata_json TEXT DEFAULT NULL,
   last_validated_at BIGINT NOT NULL,
   last_error_code VARCHAR(64) DEFAULT NULL,
-  configured_by VARCHAR(36) NOT NULL,
+  configured_by CHAR(36) NOT NULL,
   created_at BIGINT NOT NULL,
   updated_at BIGINT NOT NULL,
   PRIMARY KEY (workspace_id, provider),
   KEY idx_workspace_integrations_active (workspace_id, active),
   CONSTRAINT fk_workspace_integrations_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_workspace_integrations_user FOREIGN KEY (configured_by) REFERENCES users(id) ON DELETE RESTRICT
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS platform_integrations (
   provider VARCHAR(24) NOT NULL PRIMARY KEY,
@@ -436,9 +436,120 @@ CREATE TABLE IF NOT EXISTS platform_integrations (
   metadata_json TEXT DEFAULT NULL,
   last_validated_at BIGINT NOT NULL,
   last_error_code VARCHAR(64) DEFAULT NULL,
-  configured_by VARCHAR(36) NOT NULL,
+  configured_by CHAR(36) NOT NULL,
   created_at BIGINT NOT NULL,
   updated_at BIGINT NOT NULL,
   KEY idx_platform_integrations_active (active),
   CONSTRAINT fk_platform_integrations_user FOREIGN KEY (configured_by) REFERENCES users(id) ON DELETE RESTRICT
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS external_catalog_entries (
+  workspace_id CHAR(36) NOT NULL,
+  catalog_type VARCHAR(48) NOT NULL,
+  external_id VARCHAR(128) NOT NULL,
+  display_name VARCHAR(255) NOT NULL,
+  metadata_json TEXT DEFAULT NULL,
+  last_synced_at BIGINT NOT NULL,
+  PRIMARY KEY (workspace_id, catalog_type, external_id),
+  KEY idx_external_catalog_type (workspace_id, catalog_type, display_name),
+  CONSTRAINT fk_external_catalog_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS external_catalog_sync_state (
+  workspace_id CHAR(36) NOT NULL,
+  catalog_type VARCHAR(48) NOT NULL,
+  entry_count INT UNSIGNED NOT NULL DEFAULT 0,
+  last_synced_at BIGINT NOT NULL,
+  PRIMARY KEY (workspace_id, catalog_type),
+  CONSTRAINT fk_external_catalog_state_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS integration_guides (
+  integration_key VARCHAR(48) NOT NULL PRIMARY KEY,
+  title VARCHAR(255) NOT NULL,
+  version_label VARCHAR(64) NOT NULL,
+  file_name VARCHAR(255) NOT NULL,
+  storage_path VARCHAR(768) NOT NULL,
+  file_size INT UNSIGNED NOT NULL,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  configured_by CHAR(36) NOT NULL,
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL,
+  CONSTRAINT fk_integration_guide_user FOREIGN KEY (configured_by) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS telegram_forum_groups (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  workspace_id CHAR(36) NOT NULL,
+  telegram_chat_id VARCHAR(32) DEFAULT NULL,
+  display_name VARCHAR(255) DEFAULT NULL,
+  status VARCHAR(24) NOT NULL DEFAULT 'PENDING_LINK',
+  missing_permissions_json TEXT DEFAULT NULL,
+  link_code_hash CHAR(64) DEFAULT NULL,
+  link_code_expires_at BIGINT DEFAULT NULL,
+  linked_by CHAR(36) NOT NULL,
+  linked_at BIGINT DEFAULT NULL,
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL,
+  UNIQUE KEY uq_telegram_forum_chat (telegram_chat_id),
+  KEY idx_telegram_forum_workspace (workspace_id,status),
+  CONSTRAINT fk_telegram_forum_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_telegram_forum_user FOREIGN KEY (linked_by) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS telegram_forum_topics (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  workspace_id CHAR(36) NOT NULL,
+  group_id CHAR(36) NOT NULL,
+  client_external_id VARCHAR(128) NOT NULL,
+  client_name VARCHAR(255) NOT NULL,
+  topic_name VARCHAR(128) NOT NULL,
+  telegram_thread_id VARCHAR(32) DEFAULT NULL,
+  status VARCHAR(24) NOT NULL,
+  created_by CHAR(36) NOT NULL,
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL,
+  UNIQUE KEY uq_telegram_topic_client (group_id,client_external_id),
+  KEY idx_telegram_topic_workspace (workspace_id,group_id,status),
+  CONSTRAINT fk_telegram_topic_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_telegram_topic_group FOREIGN KEY (group_id) REFERENCES telegram_forum_groups(id) ON DELETE CASCADE,
+  CONSTRAINT fk_telegram_topic_user FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS telegram_forum_participants (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  workspace_id CHAR(36) NOT NULL,
+  group_id CHAR(36) NOT NULL,
+  user_id CHAR(36) NOT NULL,
+  telegram_user_id VARCHAR(64) NOT NULL,
+  status VARCHAR(24) NOT NULL,
+  invite_link VARCHAR(512) DEFAULT NULL,
+  invite_expires_at BIGINT DEFAULT NULL,
+  acted_by CHAR(36) NOT NULL,
+  joined_at BIGINT DEFAULT NULL,
+  removed_at BIGINT DEFAULT NULL,
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL,
+  UNIQUE KEY uq_telegram_forum_participant_user (group_id,user_id),
+  UNIQUE KEY uq_telegram_forum_participant_telegram (group_id,telegram_user_id),
+  KEY idx_telegram_forum_participants (workspace_id,group_id,status),
+  CONSTRAINT fk_telegram_participant_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_telegram_participant_group FOREIGN KEY (group_id) REFERENCES telegram_forum_groups(id) ON DELETE CASCADE,
+  CONSTRAINT fk_telegram_participant_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_telegram_participant_actor FOREIGN KEY (acted_by) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS telegram_forum_audit (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  workspace_id CHAR(36) NOT NULL,
+  actor_user_id CHAR(36) NOT NULL,
+  action VARCHAR(48) NOT NULL,
+  entity_type VARCHAR(24) NOT NULL,
+  entity_id CHAR(36) DEFAULT NULL,
+  result VARCHAR(24) NOT NULL,
+  detail VARCHAR(512) DEFAULT NULL,
+  created_at BIGINT NOT NULL,
+  KEY idx_telegram_forum_audit (workspace_id,created_at),
+  CONSTRAINT fk_telegram_forum_audit_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_telegram_forum_audit_user FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

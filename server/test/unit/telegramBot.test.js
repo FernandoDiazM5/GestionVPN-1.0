@@ -47,6 +47,11 @@ const dbServiceMocks = stubModule(__dirname, '../../db.service', {
   getDb: vi.fn(),
 });
 
+const forumServiceMocks = stubModule(__dirname, '../../lib/telegramForumService', {
+  confirmGroupLink: vi.fn(), registerExistingTopic: vi.fn(), reconcileTopicEvent: vi.fn(),
+  topicContextForCommand: vi.fn(), clientForTopicCommand: vi.fn(),
+});
+
 const bot = require('../../lib/telegramBot');
 
 beforeEach(() => {
@@ -387,5 +392,46 @@ describe('handleMessage — consultas del administrador', () => {
     await bot.handleMessage({ chat: { id: 1 }, text: '/moderador moderador@example.com' });
     expect(getReplyText()).toContain('Detalle del moderador');
     expect(getReplyText()).toContain('Miembros: 4');
+  });
+});
+
+describe('comandos de cliente dentro de temas', () => {
+  const message = text => ({ chat: { id: -1001 }, from: { id: 9002 }, message_thread_id: 77, text });
+  const client = {
+    id: '6', name: 'ARIEL Perez', status: 'ACTIVO', email: '', phone: '45434565', mobile: '998283745', document: '65454323', address: '2301 Peger Rd.',
+    services: [{ id: '5', profile: { externalId: '2', name: 'Plan 4Mbps' }, node: { externalId: '2', name: 'Nodo Norte' }, cost: '150.00', accessPointIp: null, mac: '00:44:56:56:78:17', ip: '192.168.33.3', installedAt: '0000-00-00', type: 'internet', status: 'OFFLINE', coordinates: '-11,-77', address: null }],
+    billing: { pendingInvoices: 4, pendingTotal: '750.00' },
+  };
+  beforeEach(() => {
+    forumServiceMocks.topicContextForCommand.mockResolvedValue({ clientId: '6' });
+    forumServiceMocks.clientForTopicCommand.mockResolvedValue(client);
+  });
+
+  it('/informacion responde en el mismo tema con datos generales', async () => {
+    await bot.handleWorkspaceMessage({ botToken: '123456:workspace-token', workspaceId: 'ws-1' }, message('/informacion'));
+    expect(telegramMocks.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ chatId: -1001, threadId: 77, text: expect.stringContaining('ARIEL Perez') }));
+    expect(getReplyText()).toContain('65454323');
+    expect(getReplyText()).not.toContain('192.168.33.3');
+  });
+
+  it('/servicios muestra la allowlist operativa sin PPP ni SNMP', async () => {
+    await bot.handleWorkspaceMessage({ botToken: '123456:workspace-token', workspaceId: 'ws-1' }, message('/servicios'));
+    expect(getReplyText()).toContain('Plan 4Mbps');
+    expect(getReplyText()).toContain('192.168.33.3');
+    expect(getReplyText()).not.toMatch(/ppp|snmp|public|workspace-token/i);
+  });
+
+  it('/facturacion sólo muestra el resumen pendiente', async () => {
+    await bot.handleWorkspaceMessage({ botToken: '123456:workspace-token', workspaceId: 'ws-1' }, message('/facturacion'));
+    expect(getReplyText()).toContain('Facturas no pagadas: <b>4</b>');
+    expect(getReplyText()).toContain('750.00');
+    expect(getReplyText()).not.toContain('192.168.33.3');
+  });
+
+  it('/ayuda valida acceso al tema sin consultar MikroWisp', async () => {
+    await bot.handleWorkspaceMessage({ botToken: '123456:workspace-token', workspaceId: 'ws-1' }, message('/ayuda'));
+    expect(forumServiceMocks.topicContextForCommand).toHaveBeenCalledOnce();
+    expect(forumServiceMocks.clientForTopicCommand).not.toHaveBeenCalled();
+    expect(getReplyText()).toContain('/informacion');
   });
 });

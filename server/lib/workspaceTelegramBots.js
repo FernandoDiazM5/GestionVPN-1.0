@@ -15,6 +15,12 @@ const WORKSPACE_COMMANDS = [
   { command: 'desactivar', description: 'Cerrar tu acceso actual' },
   { command: 'cancelar', description: 'Cancelar una selección pendiente' },
   { command: 'unlink', description: 'Desvincular este chat' },
+  { command: 'vinculargrupo', description: 'Vincular un supergrupo con código' },
+  { command: 'registrartema', description: 'Registrar el tema actual para un cliente' },
+  { command: 'informacion', description: 'Datos actuales del cliente del tema' },
+  { command: 'servicios', description: 'Servicios actuales del cliente del tema' },
+  { command: 'facturacion', description: 'Facturación actual del cliente del tema' },
+  { command: 'ayuda', description: 'Ayuda de consultas dentro del tema' },
 ];
 
 async function handleMessage(bot, message) {
@@ -28,7 +34,7 @@ async function handleCallback(bot, callback) {
 async function poll(bot) {
   while (enabled && !bot.controller.signal.aborted) {
     try {
-      const url = `https://api.telegram.org/bot${bot.botToken}/getUpdates?timeout=20&offset=${bot.offset}&allowed_updates=${encodeURIComponent('["message","callback_query"]')}`;
+      const url = `https://api.telegram.org/bot${bot.botToken}/getUpdates?timeout=20&offset=${bot.offset}&allowed_updates=${encodeURIComponent('["message","callback_query","chat_join_request","chat_member"]')}`;
       const response = await fetch(url, { signal: bot.controller.signal });
       const body = await response.json().catch(() => ({}));
       if (!response.ok || body.ok !== true) throw new Error(body.description || `HTTP ${response.status}`);
@@ -36,6 +42,7 @@ async function poll(bot) {
         bot.offset = update.update_id + 1;
         if (update.message) await handleMessage(bot, update.message);
         if (update.callback_query) await handleCallback(bot, update.callback_query);
+        if (update.chat_join_request || update.chat_member) await require('./telegramForumService').reconcileParticipantUpdate({ workspaceId: bot.workspaceId, botToken: bot.botToken, update });
       }
     } catch (error) {
       if (error.name === 'AbortError') return;

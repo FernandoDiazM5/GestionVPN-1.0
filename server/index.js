@@ -214,6 +214,7 @@ app.use('/api/events', eventsRoutes);      // Fase 4: SSE tiempo real (por works
 app.use('/api/admin', adminRoutes);        // Roles v2: Administrador de plataforma
 app.use('/api/admin/security', require('./routes/adminSecurity.routes'));
 app.use('/api/admin/integrations', require('./routes/platformIntegrations.routes'));
+app.use('/api/admin/integration-guides', require('./routes/integrationGuides.routes'));
 app.use('/api/workspace', workspaceRoutes); // Fase C: ajustes + import/export del workspace
 app.use('/api/workspace/integrations', require('./routes/integrations.routes'));
 app.use('/api/error-reports', errorReportsRoutes); // errores del SPA -> correo del administrador

@@ -12,6 +12,7 @@ function requestHasBody(req) {
 function requireJsonForMutation(req, _res, next) {
   if (!JSON_MUTATION_METHODS.has(req.method) || !requestHasBody(req)) return next();
   if (req.is('application/json')) return next();
+  if (req.is('multipart/form-data') && /^\/api\/admin\/integration-guides\/MIKROWISP\/?$/.test(req.path)) return next();
   return next(new AppError(
     'Content-Type debe ser application/json',
     415,

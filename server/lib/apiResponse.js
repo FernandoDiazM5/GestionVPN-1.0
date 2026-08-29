@@ -59,6 +59,12 @@ function errorMiddleware(err, _req, res, _next) {
   if (err?.type === 'entity.parse.failed') {
     return sendError(res, 400, 'JSON inválido', 'INVALID_JSON');
   }
+  if (err?.code === 'LIMIT_FILE_SIZE') {
+    return sendError(res, 413, 'El archivo excede el tamaño permitido', 'UPLOAD_TOO_LARGE');
+  }
+  if (err?.name === 'MulterError') {
+    return sendError(res, 400, 'Carga de archivo inválida', 'UPLOAD_INVALID');
+  }
   // Errores de validación zod
   if (err && err.name === 'ZodError') {
     const msg = err.issues?.[0]?.message || 'Datos inválidos';

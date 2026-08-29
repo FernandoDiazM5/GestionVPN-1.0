@@ -1,7 +1,22 @@
 # Plan acotado: MikroWisp + control de temas Telegram
 
 Fecha: 2026-08-28  
-Estado: definición funcional; sin implementación ni despliegue
+Estado: fases 1–5 implementadas localmente; sin commit ni despliegue
+
+## Progreso de implementación
+
+- [x] Fase 1: integración MikroWisp read-only, cifrado, endpoint nominal, anti-SSRF, DTO por allowlist y pruebas negativas.
+- [x] Fase 2: catálogos externos genéricos, sincronización manual y fallback `Pendiente de sincronizar`. Se admiten únicamente endpoints oficiales documentados: routers/nodos, equipos monitoreados y cajas NAP.
+- [x] Fase 3: grupos, guía PDF y temas.
+- [x] Fase 4: participantes conocidos, invitación individual verificada, retiro, reintegro y auditoría.
+- [x] Fase 5: comandos de consulta efímera por tema y participante activo.
+- [ ] Fase 6: migración local verificada; canary y despliegue pendientes de un grupo/bot de laboratorio.
+
+El alcance de catálogos queda cerrado a los datos que intervienen operativamente con el cliente: routers/nodos (`GetRouters`), equipos monitoreados (`GetMonitoreo`) y cajas NAP (`GetCajasNap`). No se habilitan operadores, departamentos, tareas, VLAN, profiles, ODB ni otros catálogos, aunque estén publicados. La documentación oficial vigente tampoco publica una operación para listar planes o todos los servicios; no se inventa esa ruta.
+
+### Contrato real confirmado de `GetClientsDetails`
+
+La respuesta usa `estado` y un arreglo `datos`. La allowlist exacta conserva del cliente `id`, `nombre`, `estado`, `correo`, `telefono`, `movil`, `cedula` y `direccion_principal`; de cada servicio conserva `id`, `idperfil`, `nodo`, `costo`, `ipap`, `mac`, `ip`, `instalado`, `tiposervicio`, `status_user`, `coordenadas`, `direccion` y `perfil`; y de `facturacion` conserva `facturas_nopagadas` y `total_facturas`. `idperfil` usa el nombre incluido en `perfil`, sin abrir otro catálogo. `nodo` se resuelve exclusivamente contra `GetRouters` y, si falta, muestra `Pendiente de sincronizar`. Se eliminan usuario/clave PPP, comunidad SNMP, token y cualquier campo no reconocido.
 
 Referencia técnica: [Telegram Bot API](https://core.telegram.org/bots/api).
 
@@ -16,7 +31,7 @@ Crear en Joinpoint un módulo sencillo para administrar un supergrupo privado de
 3. Los catálogos externos son extensibles; no se limitan a planes y nodos.
 4. La actualización de catálogos será manual y bajo demanda.
 5. Si falta un nombre de catálogo, la consulta no falla: muestra el ID recibido y `Pendiente de sincronizar`.
-6. Nunca se muestran ni almacenan credenciales PPP/Hotspot, contraseñas, token MikroWisp ni comunidad SNMP.
+6. Nunca se muestran ni almacenan credenciales PPP/Hotspot, contraseñas, comunidad SNMP ni el token MikroWisp.
 7. Joinpoint **no guarda mensajes, archivos ni conversaciones** del grupo. Todo ese contenido permanece sólo en Telegram.
 8. Joinpoint conserva únicamente los metadatos necesarios para controlar grupos, temas y participantes.
 9. El backend no tendrá un método genérico `request(ruta)`: el adaptador MikroWisp expondrá sólo consultas concretas incluidas en una allowlist.
@@ -82,25 +97,29 @@ Joinpoint controlará participantes conocidos: usuarios vinculados, invitados o 
 
 Las invitaciones deben ser individuales, con vencimiento y un solo uso. Si se usa solicitud de ingreso, Joinpoint sólo la aprueba después de relacionar la identidad Telegram con el usuario esperado. Retirar usa la operación administrativa del bot; reintegrar exige desbloquear y emitir una nueva invitación.
 
+Implementación local de fase 4: la lista parte de los usuarios vigentes del workspace y muestra si tienen el bot del workspace vinculado. El bot crea un enlace con vencimiento de 24 horas y `creates_join_request`; al recibir `chat_join_request` exige que coincidan grupo, Telegram user ID, enlace exacto y vigencia. Una solicitud desconocida o con enlace reenviado se rechaza. El ingreso confirmado pasa a `ACTIVE`; retirar bloquea al usuario en el grupo completo y revoca su invitación; reintegrar desbloquea y emite una invitación nueva. Los eventos `chat_member` observados actualizan participantes conocidos que salen o son retirados. Todas las acciones administrativas quedan auditadas.
+
 ### Consulta dentro del tema
 
-- `/informacion`: ID, nombre, documento, teléfono, dirección y estado del cliente.
-- `/servicios`: ID y estado del servicio, plan/perfil, sitio o nodo y datos operativos no secretos.
+- `/informacion`: ID, nombre, estado, correo, teléfono, móvil, documento y dirección principal.
+- `/servicios`: ID, perfil, nodo, costo, IP de AP, MAC, IP, fecha de instalación, tipo, estado de usuario, coordenadas, dirección y nombre del perfil.
 - `/facturacion`: resumen de deuda, cantidad y total de facturas pendientes, sin datos de pago sensibles.
 - `/ayuda`: comandos disponibles.
 
 El bot identifica al cliente por el tema; el usuario no vuelve a escribir su ID. Cada comando consulta MikroWisp en ese momento y descarta la respuesta después de mostrarla.
 
+Implementación local de fase 5: el bot resuelve `grupo + message_thread_id` contra un tema `ACTIVE` y exige que `message.from.id` corresponda a un participante conocido `ACTIVE` del mismo grupo. `/informacion`, `/servicios` y `/facturacion` consultan `GetClientsDetails` en ese momento y formatean únicamente su subconjunto de allowlist; `/ayuda` valida el mismo acceso pero no consulta MikroWisp. La respuesta se publica en el mismo `message_thread_id` y no se persiste. Un tema no registrado, cerrado o un usuario no activo recibe denegación sin datos del cliente.
+
 ### Política de campos MikroWisp
 
 Se usa una allowlist de salida. Sólo pasan los campos necesarios para identificar al cliente, contactarlo, ubicar su servicio y conocer su estado:
 
-- cliente: ID, nombre, documento, teléfono, dirección y estado;
-- servicio: ID, estado, plan o perfil, sitio o nodo y referencias operativas no secretas;
-- facturación: resumen de deuda y facturas pendientes cuando corresponda;
+- cliente: ID, nombre, estado, correo, teléfono, móvil, documento y dirección principal;
+- servicio: ID, ID de perfil, nodo, costo, IP de AP, MAC, IP, fecha de instalación, tipo, estado de usuario, coordenadas, dirección y perfil;
+- facturación: cantidad de facturas no pagadas y total pendiente;
 - catálogos: ID externo y nombre visible.
 
-Se descartan siempre, aunque MikroWisp los devuelva: usuario y clave PPP/PPPoE, credenciales Hotspot, contraseñas, tokens, API keys, secretos, comunidades SNMP, cookies, sesiones y cualquier campo futuro no reconocido. El filtrado ocurre en backend antes de guardar, registrar o enviar datos a Telegram. Los logs tampoco conservan la respuesta completa.
+Se descartan siempre, aunque MikroWisp los devuelva: usuario y clave PPP/PPPoE, credenciales Hotspot, contraseñas, tokens, API keys, secretos, comunidades SNMP, cookies, sesiones y cualquier campo futuro no reconocido. El filtrado ocurre en backend antes de guardar, registrar o enviar datos a Telegram. Los datos de cliente son efímeros y los logs no conservan la respuesta completa.
 
 ## Datos mínimos en Joinpoint
 
@@ -124,7 +143,7 @@ La regla se aplica en profundidad:
 2. **API Joinpoint:** sólo endpoints internos `GET/consulta` con validación de filtros; ningún proxy de ruta libre.
 3. **Adaptador:** métodos nominales como `getClientDetails`; allowlist exacta de URL, método y campos enviados.
 4. **Red:** URL base validada y fijada por integración para impedir SSRF o redirecciones a destinos no aprobados.
-5. **Datos:** DTO de salida por allowlist; sólo admite datos identificativos, contacto, dirección, estado, servicio, plan/perfil, sitio/nodo y resumen de deuda. Elimina PPP/PPPoE, Hotspot, passwords, token, API keys, SNMP y campos futuros no reconocidos.
+5. **Datos:** DTO de salida por allowlist exacta con los campos de cliente, servicio y facturación confirmados arriba. Elimina PPP/PPPoE, Hotspot, passwords, token, API keys, SNMP y campos futuros no reconocidos.
 6. **Pruebas:** contrato que falla si aparece una ruta mutadora o si el adaptador acepta una ruta arbitraria.
 7. **Observabilidad:** logs guardan resultado, latencia y código interno, nunca token ni request/response completos.
 
@@ -181,12 +200,14 @@ flowchart TD
 5. **Comandos de consulta:** respuestas filtradas dentro del tema correspondiente.
 6. **Canary:** probar primero en un grupo de laboratorio y luego desplegar con backup/rollback.
 
+Avance local de fase 6: el 2026-08-28 se levantó MariaDB/XAMPP y se detectó antes del despliegue que las nuevas FK usaban tipo/intercalación incompatibles con `users.id` y `workspaces.id`. Se corrigieron los UUID relacionados a `CHAR(36)` y se fijó `utf8mb4_unicode_ci`. La inicialización creó correctamente nueve tablas nuevas y 17 FK, y una repetición confirmó idempotencia. La advertencia preexistente de `core_provision_runs` no pertenece a esta funcionalidad. El canary real no puede ejecutarse hasta disponer de un bot del workspace, supergrupo privado con foro y usuario piloto vinculados en un entorno de laboratorio; producción no debe usarse como sustituto del canary.
+
 ## Criterios de aceptación
 
 - Ninguna operación de escritura MikroWisp es invocable.
 - El adaptador no acepta rutas arbitrarias ni puede convertirse en proxy hacia MikroWisp.
 - Ningún mensaje contiene credenciales o secretos.
-- Los campos PPP/PPPoE, Hotspot, contraseñas, tokens, API keys y SNMP se eliminan en backend antes de cualquier persistencia, log o envío a Telegram.
+- Los campos PPP/PPPoE, Hotspot, contraseñas, tokens, API keys, SNMP y campos desconocidos se eliminan antes de cualquier persistencia, log o envío a Telegram.
 - Un catálogo faltante no rompe la consulta.
 - No existen temas duplicados para el mismo cliente.
 - El ID se normaliza y la unicidad se aplica antes de llamar a Telegram.
@@ -203,5 +224,5 @@ flowchart TD
 
 1. El workspace admite varios grupos vinculados y Joinpoint lista cada grupo con sus temas conocidos.
 2. Sólo el moderador administra grupos, temas y participantes; los invitados no pueden crear, cerrar ni eliminar.
-3. Los catálogos se obtienen mediante los endpoints de nodos, servicios y demás catálogos publicados en la documentación MikroWisp, siempre con clientes nominales de solo lectura.
+3. Los únicos catálogos habilitados son routers/nodos (`GetRouters`), equipos monitoreados (`GetMonitoreo`) y cajas NAP (`GetCajasNap`), siempre con clientes nominales de solo lectura.
 4. Los comandos sólo muestran la allowlist operativa anterior; toda credencial o llave se elimina.

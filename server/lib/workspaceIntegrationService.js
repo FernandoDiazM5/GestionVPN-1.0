@@ -3,7 +3,7 @@ const { query, withTransaction } = require('../db/mysql');
 const { encryptPass, decryptPass } = require('../db.service');
 const { AppError } = require('./apiResponse');
 
-const PROVIDERS = new Set(['BREVO', 'GMAIL', 'TELEGRAM', 'GEMINI']);
+const PROVIDERS = new Set(['BREVO', 'GMAIL', 'TELEGRAM', 'GEMINI', 'MIKROWISP']);
 const EMAIL_PROVIDERS = new Set(['BREVO', 'GMAIL']);
 const TIMEOUT_MS = 10_000;
 
@@ -45,6 +45,11 @@ function normalize(provider, input) {
     if (!/^\d{6,15}:[A-Za-z0-9_-]{20,}$/.test(token)) throw new AppError('El Bot Token no tiene un formato válido', 422, 'INTEGRATION_FIELD_INVALID');
     return { botToken: token };
   }
+  if (provider === 'MIKROWISP') return {
+    baseUrl: require('./mikrowispClient').normalizeBaseUrl(requireValue(input.baseUrl, 'URL de MikroWisp', 512)),
+    token: requireValue(input.token, 'Token MikroWisp', 512),
+    validationClientId: require('./mikrowispClient').canonicalClientId(input.validationClientId),
+  };
   const apiKey = requireValue(input.apiKey, 'API Key de Gemini', 256);
   if (apiKey.length < 20) throw new AppError('La API Key de Gemini no tiene un formato válido', 422, 'INTEGRATION_FIELD_INVALID');
   return { apiKey, model: clean(input.model || 'gemini-3.1-flash-lite', 80) };
@@ -56,6 +61,7 @@ async function timed(promise) {
 
 async function validate(provider, config) {
   try {
+    if (provider === 'MIKROWISP') return await require('./mikrowispClient').validateConnection(config);
     if (EMAIL_PROVIDERS.has(provider)) {
       const tx = nodemailer.createTransport({ host: config.host, port: config.port, secure: config.secure, auth: { user: config.username, pass: config.password }, connectionTimeout: TIMEOUT_MS, greetingTimeout: TIMEOUT_MS, socketTimeout: TIMEOUT_MS });
       await timed(tx.verify());
@@ -75,6 +81,19 @@ async function validate(provider, config) {
     const code = error?.code === 'EAUTH' ? 'CREDENTIALS_REJECTED' : error?.code || 'VALIDATION_FAILED';
     throw new AppError('No se pudo validar la integración. Revisa las credenciales y vuelve a intentarlo.', 422, code);
   }
+}
+
+async function getMikrowispClient(workspaceId, clientId) {
+  const config = await getSecret(workspaceId, 'MIKROWISP');
+  if (!config) throw new AppError('La integración MikroWisp no está configurada o activa', 404, 'INTEGRATION_NOT_CONFIGURED');
+  const client = await require('./mikrowispClient').getClientDetails(config, clientId);
+  const catalogRepo = require('../db/repos/externalCatalogRepo');
+  client.services = await Promise.all(client.services.map(async service => {
+    if (!service.node?.externalId) return service;
+    const name = await catalogRepo.resolveName(workspaceId, 'ROUTERS', service.node.externalId);
+    return { ...service, node: name ? { ...service.node, name, resolved: true } : service.node };
+  }));
+  return client;
 }
 
 function publicRow(row) {
@@ -149,4 +168,4 @@ async function revalidate(workspaceId, rawProvider) {
   return (await list(workspaceId)).find(item => item.provider === provider);
 }
 
-module.exports = { PROVIDERS, EMAIL_PROVIDERS, list, save, remove, getSecret, revalidate, validate, normalize, listActiveTelegramBots, assertTelegramTokenUnique };
+module.exports = { PROVIDERS, EMAIL_PROVIDERS, list, save, remove, getSecret, getMikrowispClient, revalidate, validate, normalize, listActiveTelegramBots, assertTelegramTokenUnique };

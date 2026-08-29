@@ -52,4 +52,10 @@ describe('workspaceIntegrationService', () => {
     expect(query).toHaveBeenCalledWith(expect.stringContaining('DELETE FROM workspace_integrations'), ['ws-1', 'GEMINI']);
     await expect(service.remove('ws-1', 'DESCONOCIDO')).rejects.toMatchObject({ code: 'INTEGRATION_NOT_SUPPORTED' });
   });
+
+  it('normaliza MikroWisp sin aceptar HTTP, rutas libres ni ID inválido', () => {
+    expect(service.normalize('MIKROWISP', { baseUrl: 'https://isp.example.com', token: 'secret', validationClientId: '0014' })).toEqual({ baseUrl: 'https://isp.example.com/api/v1/', token: 'secret', validationClientId: '14' });
+    expect(() => service.normalize('MIKROWISP', { baseUrl: 'http://isp.example.com', token: 'secret', validationClientId: '14' })).toThrowError(expect.objectContaining({ code: 'MIKROWISP_URL_INVALID' }));
+    expect(() => service.normalize('MIKROWISP', { baseUrl: 'https://isp.example.com/NewUser', token: 'secret', validationClientId: '14' })).toThrowError(expect.objectContaining({ code: 'MIKROWISP_URL_INVALID' }));
+  });
 });

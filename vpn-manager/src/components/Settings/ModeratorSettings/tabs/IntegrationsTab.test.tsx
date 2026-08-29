@@ -6,20 +6,21 @@ const api = vi.hoisted(() => ({ list: vi.fn(), save: vi.fn(), test: vi.fn(), rem
 vi.mock('../../../../services/integrationsApi', () => ({ integrationsApi: api, platformIntegrationsApi: api }));
 import IntegrationsTab from './IntegrationsTab';
 
-const empty = ['BREVO', 'GMAIL', 'TELEGRAM', 'GEMINI'].map(provider => ({ provider, configured: false, active: false, status: 'NOT_CONFIGURED', label: null, metadata: {}, lastValidatedAt: null, updatedAt: null }));
+const empty = ['BREVO', 'GMAIL', 'TELEGRAM', 'GEMINI', 'MIKROWISP'].map(provider => ({ provider, configured: false, active: false, status: 'NOT_CONFIGURED', label: null, metadata: {}, lastValidatedAt: null, updatedAt: null }));
 
 beforeEach(() => { vi.clearAllMocks(); api.list.mockResolvedValue({ integrations: empty }); });
 
 describe('IntegrationsTab', () => {
-  it('muestra los cuatro proveedores y explica que los secretos quedan ocultos', async () => {
+  it('muestra los proveedores del workspace y explica que los secretos quedan ocultos', async () => {
     render(<IntegrationsTab />);
     expect(await screen.findByText('Brevo')).toBeInTheDocument();
     expect(screen.getByText('Gmail')).toBeInTheDocument();
     expect(screen.getByText('Telegram Bot')).toBeInTheDocument();
     expect(screen.getByText('Google Gemini')).toBeInTheDocument();
+    expect(screen.getByText('MikroWisp')).toBeInTheDocument();
     expect(screen.getByText(/nunca volvemos a mostrarla/i)).toBeInTheDocument();
     expect(screen.queryByLabelText('Gemini API Key')).not.toBeInTheDocument();
-    expect(screen.getAllByRole('button', { expanded: false })).toHaveLength(4);
+    expect(screen.getAllByRole('button', { expanded: false })).toHaveLength(5);
   });
 
   it('mantiene una sola integración desplegada', async () => {
@@ -41,6 +42,7 @@ describe('IntegrationsTab', () => {
       { button: /^Gmail/, guide: 'Conectar Gmail en 3 pasos', link: 'Abrir Google' },
       { button: /Telegram Bot/, guide: 'Conectar Telegram en 3 pasos', link: 'Abrir BotFather' },
       { button: /Google Gemini/, guide: 'Conectar Gemini en 3 pasos', link: 'Abrir AI Studio' },
+      { button: /MikroWisp/, guide: 'Conectar MikroWisp en 3 pasos', link: 'Ver documentación' },
     ]) {
       await user.click(await screen.findByRole('button', { name: integration.button }));
       expect(screen.getByText(integration.guide)).toBeInTheDocument();

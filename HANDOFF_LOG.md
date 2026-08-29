@@ -1,5 +1,59 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-28 — Fase 6 parcial: migración local corregida y verificada.** MariaDB/XAMPP local se inició de forma reversible. La primera aplicación reveló FK incompatibles: nuevas referencias estaban en `VARCHAR(36)`/collation por defecto frente a padres `CHAR(36)`/`utf8mb4_unicode_ci`. Se corrigió antes de commit/deploy.
+> - Resultado: nueve tablas de integración/foro creadas con `utf8mb4_unicode_ci`, 17 FK válidas y segunda inicialización idempotente. Persiste sólo el warning histórico ajeno de `core_provision_runs`. No se mutó producción.
+> - Verificación posterior: backend **134/747**, frontend **81/271**, `check:all`, `git diff --check` y búsqueda del token compartido verdes; el token no está en archivos.
+> - Bloqueo seguro: no hay bot de workspace, supergrupo foro ni usuario piloto de laboratorio configurados para ejecutar el canary real. No usar producción como canary. Pendientes: canary, push y deploy con backup/rollback.
+>
+> **Sesión 2026-08-28 — Fase 5 comandos MikroWisp en temas completada localmente.** Rama `vps_uni` sobre `12fb07c`; sin commit ni deploy. Backend **134/747**, frontend **81/271** (sin cambios en esta fase), build, lint, TypeScript, inventario de **193 rutas** y `check:all` verdes.
+> - `/informacion`, `/servicios`, `/facturacion` y `/ayuda` están publicados en el menú del bot del workspace. Responden mediante `message_thread_id` dentro del mismo tema.
+> - Autorización: tema registrado `ACTIVE` + grupo vinculado + participante conocido `ACTIVE` cuyo Telegram user ID coincide con `message.from.id`. Temas cerrados/no registrados y usuarios no activos no reciben datos.
+> - Los tres comandos de datos consultan MikroWisp en el momento y descartan el DTO; `/ayuda` sólo valida el contexto. Formatos separados por allowlist: contacto, servicios operativos y deuda. Pruebas negativas confirman ausencia de PPP, SNMP y token.
+> - Sólo queda fase 6: disponer de MySQL, aplicar/verificar SQL aditivo, preparar backup/rollback, canary en grupo de laboratorio y despliegue autorizado.
+>
+> **Sesión 2026-08-28 — Fase 4 participantes Telegram completada localmente.** Rama `vps_uni` sobre `12fb07c`; sin commit ni deploy. Backend **134/741**, frontend **81/271**, build, lint, TypeScript, inventario de **193 rutas** y `check:all` verdes.
+> - Nueva tabla aditiva `telegram_forum_participants`: grupo/workspace/usuario Joinpoint/Telegram, estado, invitación y vencimiento, fechas de ingreso/retiro y actor. MySQL local sigue apagado, por lo que el SQL no se aplicó.
+> - El OWNER lista usuarios vigentes del workspace, distingue Telegram no vinculado y genera invitaciones de 24 h con solicitud de ingreso. El bot acepta `chat_join_request`/`chat_member`, aprueba sólo coincidencia exacta de Telegram ID + enlace + vigencia y rechaza solicitudes desconocidas o enlaces reenviados.
+> - Retirar usa `banChatMember` y revoca invitación; reintegrar usa `unbanChatMember` y crea un enlace nuevo. UI confirma acciones destructivas y aclara que son participantes conocidos, no un censo completo. Acciones administrativas auditadas.
+> - Siguiente fase: comandos efímeros `/informacion`, `/servicios`, `/facturacion` y `/ayuda`, usando la allowlist confirmada sin PPP, SNMP ni token.
+>
+> **Sesión 2026-08-28 — Comunidad SNMP retirada de la allowlist MikroWisp.** Corrección explícita del usuario: `snmp_comunidad` no debe mostrarse, persistirse ni enviarse a Telegram. Se retiró del DTO y de la especificación de `/servicios`; la censura del logger se conserva como defensa adicional. PPP user/pass, SNMP, token y campos desconocidos quedan excluidos.
+>
+> **Sesión 2026-08-28 — Corrección de allowlist MikroWisp según confirmación del usuario.** Rama `vps_uni` sobre `12fb07c`; local, sin commit ni deploy. Backend **134/738** y `check:all` verdes.
+> - Se amplió el DTO efímero de `GetClientsDetails` a la lista exacta solicitada: cliente (ID, nombre, estado, correo, teléfono, móvil, documento, dirección principal), servicios (ID, ID perfil, nodo, costo, IP AP, MAC, IP, instalación, tipo, estado usuario, coordenadas, dirección, comunidad SNMP, perfil) y facturación (facturas no pagadas y total).
+> - Continúan excluidos usuario/clave PPP, token y cualquier campo no reconocido. `snmpCommunity`/`snmp_comunidad` se censuran en logger aunque el valor pueda mostrarse en la futura respuesta efímera de `/servicios`.
+> - La fase 5 sigue pendiente: deberá repartir el DTO por `/informacion`, `/servicios` y `/facturacion`, consultando MikroWisp al ejecutar el comando y sin persistir la respuesta.
+> - Los únicos catálogos habilitados siguen siendo `GetRouters`, `GetMonitoreo` y `GetCajasNap`; `idperfil` toma el nombre `perfil` del mismo response y `nodo` sólo se resuelve contra `GetRouters`.
+>
+> **Sesión 2026-08-28 — DTO adaptado al response real de cliente MikroWisp.** Rama `vps_uni` sobre `12fb07c`; local, sin commit ni deploy. Backend 134/738 y `check:all` verde.
+> - `GetClientsDetails` responde `estado + datos[]`; se corrigió el parser para esa forma real.
+> - Cliente conserva identificación/contacto; servicios sólo ID, estado, tipo, perfil y nodo; facturación sólo cantidad y total pendiente. `nodo` se resuelve exclusivamente desde `GetRouters`; `idperfil` usa `perfil` incluido y no abre otro catálogo.
+> - La prueba con el shape real confirma que PPP user/pass, SNMP, IP, MAC, coordenadas, costo, token y campos futuros no llegan al DTO.
+> - El valor sensible compartido en conversación no se copió a código, pruebas, documentación, logs ni handoff. Si era real, debe rotarse.
+
+> **Sesión 2026-08-28 — Grupos, guía PDF y temas Telegram fase 3.** Rama `vps_uni` sobre `12fb07c`; local, sin commit ni deploy. Backend 134/737, frontend 81/271, build/TypeScript/lint/inventario 189 rutas/`check:all` verdes.
+> - La aclaración del usuario cerró los catálogos exclusivamente a `GetRouters`, `GetMonitoreo` y `GetCajasNap`; una prueba exige exactamente esos tres y se documentó excluir operadores, departamentos, tareas, VLAN, profiles, ODB y demás.
+> - Se añadieron grupos Telegram multi-workspace, código de enlace de 15 minutos y `/vinculargrupo`: exige OWNER vinculado, supergrupo con foro y permisos del bot para temas, invitaciones y retiros.
+> - Los temas validan el cliente exacto en MikroWisp, muestran vista previa `ID · Nombre`, reservan unicidad antes de llamar Telegram, guardan `thread_id`, no reintentan timeout ambiguo y permiten cerrar/reabrir o recrear con confirmación. `/registrartema ID` registra temas preexistentes desde su contexto; eventos conocidos concilian cierre/reapertura.
+> - El Administrador puede subir, reemplazar, activar o desactivar un único PDF de ayuda. Se valida MIME, firma/EOF y 5 MB; nombre interno aleatorio, descarga autenticada y ruta no pública.
+> - Se agregaron tablas para guía, grupos, temas y auditoría, sin tablas de mensajes/adjuntos. MySQL local seguía apagado, así que el SQL aditivo aún requiere aplicación/verificación al levantar XAMPP o en predeploy.
+> - Pendiente: commit/deploy, canary real y fase 4 de participantes.
+
+> **Sesión 2026-08-28 — Catálogos MikroWisp fase 2 implementados.** Rama `vps_uni` sobre `12fb07c`; local, sin commit ni deploy. Backend 132/731, frontend 80/269, build/TypeScript/lint/inventario/`check:all` verdes.
+> - Se añadieron tablas genéricas `external_catalog_entries` y `external_catalog_sync_state`, aisladas por workspace. Cada sincronización reemplaza atómicamente sólo su tipo y conserva fecha/conteo incluso con cero resultados.
+> - Los únicos catálogos habilitados son endpoints oficiales documentados: `GetRouters`, `GetMonitoreo` y `GetCajasNap`. No se inventó un listado de planes/servicios porque no aparece en el contrato oficial vigente.
+> - El cliente nominal elimina IP, credenciales y campos futuros; persiste sólo ID, nombre y metadatos mínimos permitidos. Tipos/rutas libres, respuestas mal formadas y IDs duplicados se rechazan.
+> - La UI ofrece actualización manual, conteo, última fecha y explica el fallback `Pendiente de sincronizar`. El servicio incluye resolución no bloqueante para referencias todavía desconocidas.
+> - Suite focalizada de fase 2 21/21; suite completa backend 731/731 y frontend 269/269. El build quedó verde. XAMPP/MySQL local estaba apagado (`ECONNREFUSED 127.0.0.1:3306`), por lo que falta aplicar/verificar el SQL aditivo al levantar la BD o durante predeploy.
+> - Pendiente: commit/deploy, canary contra MikroWisp real y fase 3 de grupos, guía PDF y temas.
+
+> **Sesión 2026-08-28 — MikroWisp read-only fase 1 implementada.** Rama `vps_uni` sobre `12fb07c`; local, sin commit ni deploy. Backend 130/723, frontend 79/267, build/TypeScript/lint/inventario/`check:all` verdes.
+> - Se añadió MikroWisp a Integraciones del workspace con URL HTTPS, token cifrado e ID existente para validar la conexión; reutiliza `workspace_integrations` sin migración nueva.
+> - El cliente backend sólo permite `GetClientsDetails`, bloquea rutas arbitrarias, HTTP, redirecciones, URL con credenciales y destinos privados/reservados. Normaliza el ID y rechaza cero, múltiples o distintas coincidencias.
+> - El DTO elimina por omisión todos los campos no reconocidos y sólo devuelve ID, nombre, documento, teléfono, dirección y estado. El logger también redacta `apiToken` y `botToken`.
+> - Se expuso una consulta exclusiva de OWNER y aislada por workspace; la UI incluye guía oficial y recalca que Joinpoint no puede mutar MikroWisp.
+> - Pruebas nuevas/focalizadas 17/17; suite completa backend 723/723 y frontend 267/267. Pendiente: commit/deploy, validación con el MikroWisp real y fase 2 de catálogos extensibles.
+
 > **Sesión 2026-08-28 — Invariante read-only para MikroWisp.** Rama `vps_uni` sobre `00f6571`; sólo documentación, sin implementación ni deploy.
 > - MikroWisp queda limitado a consultas backend; se prohíben todas sus operaciones mutadoras y se excluyen credenciales PPP/Hotspot de cualquier respuesta Joinpoint/Telegram.
 > - El cliente usa su ID externo estable; servicios, perfiles, nodos y futuros catálogos conservan sus IDs externos. La caché será genérica, extensible y sincronizada manualmente; referencias desconocidas degradan con aviso y nunca rompen la ficha.

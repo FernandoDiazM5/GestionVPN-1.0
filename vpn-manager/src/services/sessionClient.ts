@@ -85,6 +85,19 @@ export async function apiJson<T = unknown>(path: string, init?: RequestInit): Pr
   return body as T;
 }
 
+export async function apiForm<T = unknown>(path: string, form: FormData, method = 'PUT'): Promise<T> {
+  const headers = new Headers();
+  addCsrfHeader(headers, method);
+  const res = await fetch(`${API_BASE_URL}${path}`, { method, body: form, credentials: 'include', headers });
+  const body = await res.json().catch(() => null) as ApiResponseBody | null;
+  if (!res.ok || body?.success === false) {
+    const error = new Error(body?.message || `Error ${res.status}`) as ApiError;
+    error.status = res.status; error.code = body?.code;
+    throw error;
+  }
+  return body as T;
+}
+
 export const get = <T = unknown>(path: string) => apiJson<T>(path);
 export const post = <T = unknown>(path: string, data?: unknown) =>
   apiJson<T>(path, { method: 'POST', body: data ? JSON.stringify(data) : undefined });

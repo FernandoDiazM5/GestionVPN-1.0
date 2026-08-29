@@ -225,6 +225,45 @@ function escapeHtml(value) {
   return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+function forumValue(value) { return escapeHtml(value === null || value === undefined || value === '' ? '—' : value); }
+function forumReply(message, text) {
+  return telegram.sendMessage({ chatId: message.chat.id, threadId: message.message_thread_id, text, html: true, token: currentContext().token || _activeToken });
+}
+function formatClientInformation(client) {
+  return `<b>Información del cliente</b>\n` +
+    `ID: <code>${forumValue(client.id)}</code>\nNombre: <b>${forumValue(client.name)}</b>\nEstado: ${forumValue(client.status)}\n` +
+    `Correo: ${forumValue(client.email)}\nTeléfono: ${forumValue(client.phone)}\nMóvil: ${forumValue(client.mobile)}\n` +
+    `Documento: ${forumValue(client.document)}\nDirección principal: ${forumValue(client.address)}`;
+}
+function formatClientServices(client) {
+  if (!client.services?.length) return '<b>Servicios del cliente</b>\nNo hay servicios registrados.';
+  const rows = client.services.map((service, index) => `<b>Servicio ${index + 1}</b>\n` +
+    `ID: <code>${forumValue(service.id)}</code>\nID perfil: ${forumValue(service.profile?.externalId)}\nPerfil: ${forumValue(service.profile?.name)}\n` +
+    `Nodo: ${forumValue(service.node?.name)}${service.node?.externalId ? ` (<code>${forumValue(service.node.externalId)}</code>)` : ''}\n` +
+    `Costo: ${forumValue(service.cost)}\nIP AP: ${forumValue(service.accessPointIp)}\nMAC: <code>${forumValue(service.mac)}</code>\nIP: <code>${forumValue(service.ip)}</code>\n` +
+    `Instalado: ${forumValue(service.installedAt)}\nTipo: ${forumValue(service.type)}\nEstado: ${forumValue(service.status)}\n` +
+    `Coordenadas: ${forumValue(service.coordinates)}\nDirección: ${forumValue(service.address)}`);
+  return `<b>Servicios del cliente</b>\n\n${rows.join('\n\n')}`;
+}
+function formatClientBilling(client) {
+  if (!client.billing) return '<b>Facturación del cliente</b>\nNo hay información de facturación disponible.';
+  return `<b>Facturación del cliente</b>\nFacturas no pagadas: <b>${forumValue(client.billing.pendingInvoices)}</b>\nTotal pendiente: <b>${forumValue(client.billing.pendingTotal)}</b>`;
+}
+async function handleForumQuery(message, command) {
+  try {
+    const forums = require('./telegramForumService');
+    if (command === '/ayuda') {
+      await forums.topicContextForCommand(currentContext().workspaceId, message);
+      return forumReply(message, '<b>Consultas del cliente de este tema</b>\n/informacion — datos generales y contacto\n/servicios — servicios y datos técnicos autorizados\n/facturacion — facturas pendientes\n/ayuda — ver esta ayuda');
+    }
+    const client = await forums.clientForTopicCommand(currentContext().workspaceId, message);
+    const text = command === '/informacion' ? formatClientInformation(client) : command === '/servicios' ? formatClientServices(client) : formatClientBilling(client);
+    return forumReply(message, text);
+  } catch (error) {
+    return forumReply(message, `❌ ${escapeHtml(error.message || 'No se pudo consultar el cliente.')}`);
+  }
+}
+
 async function cmdModeradores(chatId, user) {
   if (Number(user?.is_platform_admin) !== 1) return reply(chatId, '🔒 Comando disponible sólo para el Administrador.');
   const rows = await query(`SELECT u.email,u.name,u.disabled_at,w.name AS workspace_name,
@@ -455,7 +494,9 @@ const COMMANDS = {
  * solo un número, si hay pending selection viva para el chat.
  */
 async function handleMessage(msg) {
-  if (!msg || !msg.chat || !msg.text) return;
+  if (!msg || !msg.chat) return;
+  if (currentContext().workspaceId && !msg.text) return require('./telegramForumService').reconcileTopicEvent({ workspaceId: currentContext().workspaceId, message: msg });
+  if (!msg.text) return;
   const chatId = msg.chat.id;
   const text = msg.text.trim();
 
@@ -474,6 +515,28 @@ async function handleMessage(msg) {
   const [first, ...rest] = text.split(/\s+/);
   const cmd = first.split('@')[0].toLowerCase();
   const args = rest;
+
+  if (cmd === '/vinculargrupo' && currentContext().workspaceId) {
+    const code = String(args[0] || '').trim().toUpperCase();
+    if (!/^[A-F0-9]{8}$/.test(code)) return reply(chatId, 'Usa: <code>/vinculargrupo CÓDIGO</code> dentro del supergrupo con temas activados.');
+    try {
+      const group = await require('./telegramForumService').confirmGroupLink({ workspaceId: currentContext().workspaceId, botToken: currentContext().token, message: msg, code });
+      return reply(chatId, `✅ Grupo <b>${escapeHtml(group.name)}</b> vinculado correctamente.`);
+    } catch (error) {
+      return reply(chatId, `❌ ${escapeHtml(error.message || 'No se pudo vincular el grupo.')}`);
+    }
+  }
+  if (cmd === '/registrartema' && currentContext().workspaceId) {
+    const clientId = String(args[0] || '').trim();
+    if (!/^\d{1,15}$/.test(clientId)) return reply(chatId, 'Usa: <code>/registrartema ID_CLIENTE</code> dentro del tema que deseas registrar.');
+    try {
+      const topic = await require('./telegramForumService').registerExistingTopic({ workspaceId: currentContext().workspaceId, botToken: currentContext().token, message: msg, clientId });
+      return reply(chatId, `✅ Tema registrado como <b>${escapeHtml(topic.name)}</b>.`);
+    } catch (error) { return reply(chatId, `❌ ${escapeHtml(error.message || 'No se pudo registrar el tema.')}`); }
+  }
+  if (currentContext().workspaceId && ['/informacion', '/servicios', '/facturacion', '/ayuda'].includes(cmd)) {
+    return handleForumQuery(msg, cmd);
+  }
 
   const handler = COMMANDS[cmd];
   if (!handler) {
