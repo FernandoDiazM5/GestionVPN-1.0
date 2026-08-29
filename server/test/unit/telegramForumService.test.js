@@ -3,7 +3,7 @@ const { stubModule } = require('../helpers/moduleMock');
 
 const query = vi.fn();
 const integrations = { getSecret: vi.fn(), getMikrowispClient: vi.fn() };
-const telegram = { createForumTopic: vi.fn(), closeForumTopic: vi.fn(), reopenForumTopic: vi.fn(), deleteForumTopic: vi.fn(), sendChatAction: vi.fn(), getChat: vi.fn(), getChatMember: vi.fn(), callBotApi: vi.fn(), createChatInviteLink: vi.fn(), revokeChatInviteLink: vi.fn(), approveChatJoinRequest: vi.fn(), declineChatJoinRequest: vi.fn(), banChatMember: vi.fn(), unbanChatMember: vi.fn() };
+const telegram = { createForumTopic: vi.fn(), editForumTopic: vi.fn(), closeForumTopic: vi.fn(), reopenForumTopic: vi.fn(), deleteForumTopic: vi.fn(), sendChatAction: vi.fn(), getChat: vi.fn(), getChatMember: vi.fn(), callBotApi: vi.fn(), createChatInviteLink: vi.fn(), revokeChatInviteLink: vi.fn(), approveChatJoinRequest: vi.fn(), declineChatJoinRequest: vi.fn(), banChatMember: vi.fn(), unbanChatMember: vi.fn() };
 stubModule(__dirname, '../../db/mysql', { query, withTransaction: vi.fn() });
 stubModule(__dirname, '../../lib/workspaceIntegrationService', integrations);
 stubModule(__dirname, '../../lib/telegram', telegram);
@@ -20,6 +20,7 @@ beforeEach(() => {
   integrations.getSecret.mockResolvedValue({ botToken: '123456:valid-token-for-tests-abcdef' });
   integrations.getMikrowispClient.mockResolvedValue({ id: '14', name: 'Ana Pérez', status: 'ACTIVO' });
   telegram.createForumTopic.mockResolvedValue({ ok: true, result: { message_thread_id: 77 } });
+  telegram.editForumTopic.mockResolvedValue({ ok: true, result: true });
   telegram.deleteForumTopic.mockResolvedValue({ ok: true, result: true });
   telegram.sendChatAction.mockResolvedValue({ ok: true, result: true });
   telegram.createChatInviteLink.mockResolvedValue({ ok: true, result: { invite_link: 'https://t.me/+individual' } });
@@ -97,6 +98,46 @@ describe('telegramForumService', () => {
     const handled = await service.reconcileTopicEvent({ workspaceId: 'ws-1', message: { chat: { id: -1001 }, message_thread_id: 77, forum_topic_edited: { name: '14 · Ana Actualizada' } } });
     expect(handled).toBe(true);
     expect(query).toHaveBeenCalledWith(expect.stringContaining('SET t.topic_name=?'), ['14 · Ana Actualizada', expect.any(Number), 'ws-1', '-1001', '77']);
+  });
+
+  it('registra como no vinculado un tema creado directamente en Telegram', async () => {
+    const handled = await service.reconcileTopicEvent({ workspaceId: 'ws-1', message: { chat: { id: -1001 }, message_thread_id: 88, forum_topic_created: { name: 'Consulta manual' } } });
+    expect(handled).toBe(true);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("'UNREGISTERED'"), expect.arrayContaining(['ws-1', 'g-1', 'UNREGISTERED:88', 'Sin registrar', 'Consulta manual', '88']));
+  });
+
+  it('convierte el tema descubierto en un tema de cliente sin duplicar el hilo', async () => {
+    query.mockImplementation(async sql => {
+      if (sql.includes('FROM notification_subscriptions')) return [{ id: 'u-1' }];
+      if (sql.includes('FROM telegram_forum_groups')) return [group];
+      if (sql.includes("status='UNREGISTERED'")) return [{ id: 't-manual', created_at: 10 }];
+      return { affectedRows: 1 };
+    });
+    const topic = await service.registerExistingTopic({ workspaceId: 'ws-1', botToken: '123456:valid-token-for-tests-abcdef', message: { chat: { id: -1001 }, from: { id: 9002 }, message_thread_id: 88 }, clientId: '14' });
+    expect(topic).toMatchObject({ id: 't-manual', clientId: '14', status: 'ACTIVE' });
+    expect(telegram.editForumTopic).toHaveBeenCalledWith(expect.objectContaining({ chatId: '-1001', threadId: 88, name: '14 · Ana Pérez' }));
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("status='ACTIVE'"), ['14', 'Ana Pérez', '14 · Ana Pérez', 'u-1', expect.any(Number), 't-manual']);
+    expect(query.mock.calls.some(([sql]) => sql.includes('INSERT INTO telegram_forum_topics'))).toBe(false);
+  });
+
+  it('mantiene sin autorización al usuario agregado directamente al grupo', async () => {
+    query.mockImplementation(async sql => {
+      if (sql.includes('FROM telegram_forum_groups')) return [group];
+      if (sql.includes('FROM notification_subscriptions')) return [{ id: 'u-2', participant_id: null, status: null }];
+      return { affectedRows: 1 };
+    });
+    await service.reconcileParticipantUpdate({ workspaceId: 'ws-1', botToken: '123456:valid-token-for-tests-abcdef', update: { chat_member: { chat: { id: -1001 }, new_chat_member: { user: { id: 9003 }, status: 'member' } } } });
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("'PRESENT_UNAUTHORIZED'"), expect.arrayContaining(['ws-1', 'g-1', 'u-2', '9003']));
+  });
+
+  it('vence invitaciones pendientes antes de listar participantes', async () => {
+    query.mockImplementation(async sql => {
+      if (sql.includes('telegram_forum_groups')) return [group];
+      if (sql.includes('FROM workspace_members')) return [];
+      return { affectedRows: 1 };
+    });
+    await service.listParticipants('ws-1', 'g-1');
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("status='INVITE_EXPIRED'"), [expect.any(Number), 'ws-1', 'g-1', expect.any(Number)]);
   });
 
   it('crea invitación con solicitud de ingreso sólo para un usuario Telegram vinculado', async () => {

@@ -6,7 +6,14 @@ const { AppError } = require('./apiResponse');
 
 const LINK_TTL_MS = 15 * 60 * 1000;
 const INVITE_TTL_MS = 24 * 60 * 60 * 1000;
+const managedTopicThreads = new Set();
 const hashCode = code => crypto.createHash('sha256').update(String(code).toUpperCase()).digest('hex');
+function rememberManagedThread(chatId, threadId) {
+  const key = `${chatId}:${threadId}`;
+  managedTopicThreads.add(key);
+  const timer = setTimeout(() => managedTopicThreads.delete(key), 60_000);
+  timer.unref?.();
+}
 
 function clean(value, max = 255) {
   return String(value ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
@@ -48,7 +55,9 @@ async function audit({ workspaceId, userId, action, entityType, entityId, result
     VALUES (?,?,?,?,?,?,?,?,?)`, [crypto.randomUUID(), workspaceId, userId, action, entityType, entityId, result, detail ? clean(detail, 512) : null, Date.now()]);
 }
 async function listGroups(workspaceId) {
-  const rows = await query('SELECT * FROM telegram_forum_groups WHERE workspace_id=? ORDER BY created_at DESC', [workspaceId]);
+  const now = Date.now();
+  await query("UPDATE telegram_forum_groups SET status='EXPIRED',link_code_hash=NULL,updated_at=? WHERE workspace_id=? AND status='PENDING_LINK' AND link_code_expires_at<?", [now, workspaceId, now]);
+  const rows = await query("SELECT * FROM telegram_forum_groups WHERE workspace_id=? AND status<>'EXPIRED' ORDER BY created_at DESC", [workspaceId]);
   return rows.map(publicGroup);
 }
 async function createLinkCode(workspaceId, userId) {
@@ -73,7 +82,10 @@ async function confirmGroupLink({ workspaceId, botToken, message, code }) {
   if (!userId) throw new AppError('Sólo un moderador vinculado puede enlazar el grupo', 403, 'TELEGRAM_GROUP_OWNER_REQUIRED');
   const rows = await query(`SELECT * FROM telegram_forum_groups WHERE workspace_id=? AND link_code_hash=? AND status='PENDING_LINK' LIMIT 1`, [workspaceId, hashCode(code)]);
   const pending = rows[0];
-  if (!pending || Number(pending.link_code_expires_at) < Date.now()) throw new AppError('El código no existe o venció', 404, 'TELEGRAM_GROUP_CODE_INVALID');
+  if (!pending || Number(pending.link_code_expires_at) < Date.now()) {
+    if (pending) await query("UPDATE telegram_forum_groups SET status='EXPIRED',link_code_hash=NULL,updated_at=? WHERE id=?", [Date.now(), pending.id]);
+    throw new AppError('El código no existe o venció', 404, 'TELEGRAM_GROUP_CODE_INVALID');
+  }
   const chatId = String(message.chat.id);
   const chatResult = await telegram.getChat({ token: botToken, chatId });
   if (!chatResult.ok || chatResult.result?.type !== 'supergroup' || chatResult.result?.is_forum !== true) throw new AppError('El chat debe ser un supergrupo con temas activados', 422, 'TELEGRAM_FORUM_REQUIRED');
@@ -148,6 +160,7 @@ async function createTopic(workspaceId, userId, groupId, clientId) {
     await audit({ workspaceId, userId, action: 'TOPIC_CREATE', entityType: 'TOPIC', entityId: id, result: status, detail: created.error });
     throw new AppError(created.ambiguous ? 'Telegram no confirmó la creación. No se reintentará automáticamente.' : 'Telegram rechazó la creación del tema', 502, status);
   }
+  rememberManagedThread(group.telegram_chat_id, created.result.message_thread_id);
   await query("UPDATE telegram_forum_topics SET telegram_thread_id=?,status='ACTIVE',updated_at=? WHERE id=?", [String(created.result.message_thread_id), Date.now(), id]);
   await audit({ workspaceId, userId, action: 'TOPIC_CREATE', entityType: 'TOPIC', entityId: id, result: 'SUCCESS' });
   return publicTopic({ id, workspace_id: workspaceId, group_id: groupId, client_external_id: client.id, client_name: client.name, topic_name: topicName, telegram_thread_id: String(created.result.message_thread_id), status: 'ACTIVE', created_at: now, updated_at: Date.now() });
@@ -162,18 +175,43 @@ async function registerExistingTopic({ workspaceId, botToken, message, clientId 
   const prefix = `${client.id} · `;
   const topicName = `${prefix}${clean(client.name, Math.max(1, 128 - prefix.length))}`.slice(0, 128);
   const id = crypto.randomUUID(); const now = Date.now();
+  const existing = await query("SELECT * FROM telegram_forum_topics WHERE workspace_id=? AND group_id=? AND telegram_thread_id=? AND status='UNREGISTERED' LIMIT 1", [workspaceId, group.id, String(message.message_thread_id)]);
+  if (existing[0]) {
+    const renamed = await telegram.editForumTopic({ token: botToken, chatId: group.telegram_chat_id, threadId: message.message_thread_id, name: topicName });
+    if (!renamed.ok) throw new AppError(renamed.ambiguous ? 'Telegram no confirmó el nombre del tema. Vuelve a intentarlo antes de registrarlo.' : 'Telegram rechazó el nuevo nombre del tema', 502, 'TELEGRAM_TOPIC_RENAME_FAILED');
+  }
   try {
-    await query(`INSERT INTO telegram_forum_topics (id,workspace_id,group_id,client_external_id,client_name,topic_name,telegram_thread_id,status,created_by,created_at,updated_at)
-      VALUES (?,?,?,?,?,?,?,'ACTIVE',?,?,?)`, [id, workspaceId, group.id, client.id, client.name, topicName, String(message.message_thread_id), userId, now, now]);
+    if (existing[0]) {
+      await query("UPDATE telegram_forum_topics SET client_external_id=?,client_name=?,topic_name=?,status='ACTIVE',created_by=?,updated_at=? WHERE id=?", [client.id, client.name, topicName, userId, now, existing[0].id]);
+    } else {
+      await query(`INSERT INTO telegram_forum_topics (id,workspace_id,group_id,client_external_id,client_name,topic_name,telegram_thread_id,status,created_by,created_at,updated_at)
+        VALUES (?,?,?,?,?,?,?,'ACTIVE',?,?,?)`, [id, workspaceId, group.id, client.id, client.name, topicName, String(message.message_thread_id), userId, now, now]);
+    }
   } catch (error) {
     if (error.code === 'ER_DUP_ENTRY') throw new AppError('Este cliente ya tiene un tema registrado en el grupo', 409, 'TELEGRAM_TOPIC_ALREADY_EXISTS');
     throw error;
   }
-  await audit({ workspaceId, userId, action: 'TOPIC_REGISTERED', entityType: 'TOPIC', entityId: id, result: 'SUCCESS' });
-  return publicTopic({ id, group_id: group.id, client_external_id: client.id, client_name: client.name, topic_name: topicName, telegram_thread_id: String(message.message_thread_id), status: 'ACTIVE', created_at: now, updated_at: now });
+  const topicId = existing[0]?.id || id;
+  await audit({ workspaceId, userId, action: 'TOPIC_REGISTERED', entityType: 'TOPIC', entityId: topicId, result: 'SUCCESS' });
+  return publicTopic({ id: topicId, group_id: group.id, client_external_id: client.id, client_name: client.name, topic_name: topicName, telegram_thread_id: String(message.message_thread_id), status: 'ACTIVE', created_at: existing[0]?.created_at || now, updated_at: now });
 }
 async function reconcileTopicEvent({ workspaceId, message }) {
   if (!message?.chat?.id || !message.message_thread_id) return false;
+  if (message.forum_topic_created?.name) {
+    const groups = await query("SELECT * FROM telegram_forum_groups WHERE workspace_id=? AND telegram_chat_id=? AND status='ACTIVE' LIMIT 1", [workspaceId, String(message.chat.id)]);
+    const group = groups[0];
+    if (!group) return false;
+    const threadId = String(message.message_thread_id);
+    if (managedTopicThreads.has(`${message.chat.id}:${threadId}`)) return true;
+    const rows = await query('SELECT id FROM telegram_forum_topics WHERE workspace_id=? AND group_id=? AND telegram_thread_id=? LIMIT 1', [workspaceId, group.id, threadId]);
+    if (rows[0]) return true;
+    const now = Date.now();
+    const id = crypto.randomUUID();
+    await query(`INSERT INTO telegram_forum_topics (id,workspace_id,group_id,client_external_id,client_name,topic_name,telegram_thread_id,status,created_by,created_at,updated_at)
+      VALUES (?,?,?,?,?,?,?,'UNREGISTERED',?,?,?)`, [id, workspaceId, group.id, `UNREGISTERED:${threadId}`, 'Sin registrar', clean(message.forum_topic_created.name, 128), threadId, group.linked_by, now, now]);
+    await audit({ workspaceId, userId: group.linked_by, action: 'TOPIC_DISCOVERED', entityType: 'TOPIC', entityId: id, result: 'UNREGISTERED' });
+    return true;
+  }
   let status = null;
   if (message.forum_topic_closed) status = 'CLOSED';
   if (message.forum_topic_reopened) status = 'ACTIVE';
@@ -246,6 +284,7 @@ async function recreateTopic(workspaceId, userId, groupId, topicId) {
     await query('UPDATE telegram_forum_topics SET status=?,updated_at=? WHERE id=?', [status, Date.now(), topicId]);
     throw new AppError('Telegram no confirmó la recreación', 502, status);
   }
+  rememberManagedThread(group.telegram_chat_id, created.result.message_thread_id);
   await query("UPDATE telegram_forum_topics SET telegram_thread_id=?,status='ACTIVE',updated_at=? WHERE id=?", [String(created.result.message_thread_id), Date.now(), topicId]);
   await audit({ workspaceId, userId, action: 'TOPIC_RECREATED', entityType: 'TOPIC', entityId: topicId, result: 'SUCCESS' });
   return publicTopic({ ...topic, telegram_thread_id: String(created.result.message_thread_id), status: 'ACTIVE', updated_at: Date.now() });
@@ -309,6 +348,8 @@ async function reconcileBotMembership({ workspaceId, update }) {
 
 async function listParticipants(workspaceId, groupId) {
   await anyGroupRow(workspaceId, groupId);
+  const now = Date.now();
+  await query("UPDATE telegram_forum_participants SET status='INVITE_EXPIRED',invite_link=NULL,updated_at=? WHERE workspace_id=? AND group_id=? AND status='INVITE_PENDING' AND invite_expires_at<?", [now, workspaceId, groupId, now]);
   const config = await botConfig(workspaceId);
   const fingerprint = crypto.createHash('sha256').update(config.botToken).digest('hex');
   const rows = await query(`SELECT u.id AS user_id,u.name AS user_name,u.email,wm.role,
@@ -393,6 +434,23 @@ async function reconcileParticipantUpdate({ workspaceId, botToken, update }) {
   const status = memberUpdate.new_chat_member?.status;
   if (telegramUserId && ['left', 'kicked'].includes(status)) {
     await query("UPDATE telegram_forum_participants SET status='REMOVED',removed_at=?,updated_at=? WHERE group_id=? AND telegram_user_id=?", [Date.now(), Date.now(), group.id, telegramUserId]);
+  } else if (telegramUserId && ['member', 'administrator', 'creator', 'restricted'].includes(status)) {
+    const fingerprint = crypto.createHash('sha256').update(botToken).digest('hex');
+    const rows = await query(`SELECT u.id,p.id AS participant_id,p.status FROM notification_subscriptions n
+      JOIN users u ON u.id=n.user_id AND u.deleted_at IS NULL
+      JOIN workspace_members wm ON wm.user_id=u.id AND wm.workspace_id=? AND wm.deleted_at IS NULL
+      LEFT JOIN telegram_forum_participants p ON p.group_id=? AND p.user_id=u.id
+      WHERE n.telegram_chat_id=? AND n.telegram_bot_fingerprint=? LIMIT 1`, [workspaceId, group.id, telegramUserId, fingerprint]);
+    const linked = rows[0];
+    if (linked && linked.status !== 'ACTIVE') {
+      const now = Date.now();
+      await query(`INSERT INTO telegram_forum_participants
+        (id,workspace_id,group_id,user_id,telegram_user_id,status,acted_by,created_at,updated_at)
+        VALUES (?,?,?,?,?,'PRESENT_UNAUTHORIZED',?,?,?)
+        ON DUPLICATE KEY UPDATE telegram_user_id=VALUES(telegram_user_id),status='PRESENT_UNAUTHORIZED',invite_link=NULL,invite_expires_at=NULL,removed_at=NULL,updated_at=VALUES(updated_at)`,
+      [crypto.randomUUID(), workspaceId, group.id, linked.id, telegramUserId, group.linked_by, now, now]);
+      await audit({ workspaceId, userId: group.linked_by, action: 'PARTICIPANT_EXTERNAL_ADD_DETECTED', entityType: 'PARTICIPANT', entityId: linked.id, result: 'PRESENT_UNAUTHORIZED' });
+    }
   }
   return true;
 }

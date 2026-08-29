@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-29 — Escenarios externos y vencimientos Telegram completados.** Rama `vps_uni` sobre `88f6bab`; pendiente despliegue.
+> - Temas creados manualmente se descubren como `UNREGISTERED`; `/registrartema` renombra en Telegram y reutiliza el registro, con protección contra la carrera de eventos de temas creados desde Joinpoint.
+> - Miembros del workspace añadidos directamente quedan `PRESENT_UNAUTHORIZED`, visibles y retirables, pero fuera de las consultas de clientes. No se autoriza automáticamente a desconocidos.
+> - Códigos de grupo e invitaciones vencidas pasan a `EXPIRED`/`INVITE_EXPIRED`; los primeros se ocultan y las segundas pueden regenerarse.
+> - Verificación: backend **135/757**, frontend **82/274**, focalizadas **16/16 + 3/3**, build, TypeScript, lint, inventario de rutas y `check:all` verdes.
+>
 > **Sesión 2026-08-29 — Sincronización de temas y estado Telegram implementada.** Rama `vps_uni` sobre `c11a68b`; pendiente despliegue.
 > - Se agregó eliminación confirmada desde Joinpoint con baja lógica `DELETED`, manejo `DELETE_UNKNOWN`, auditoría y recreación del mismo registro cliente/grupo.
 > - La verificación manual reconcilia grupo, foro, bot, permisos y detecta temas borrados directamente sólo ante errores inequívocos; fallas de red no se clasifican como eliminación.

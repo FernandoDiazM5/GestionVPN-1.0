@@ -17,7 +17,7 @@ export interface ExternalCatalogEntry { type: MikrowispCatalogType; externalId: 
 export interface ExternalCatalog { type: MikrowispCatalogType; label: string; entries: ExternalCatalogEntry[] }
 export interface TelegramForumGroup { id: string; chatId: string | null; name: string | null; status: string; missingPermissions: string[]; linkedAt: number | null; createdAt: number }
 export interface TelegramForumTopic { id: string; groupId: string; clientId: string; clientName: string; name: string; threadId: string | null; status: string; createdAt: number; updatedAt: number }
-export interface TelegramForumParticipant { id: string | null; userId: string; name: string | null; email: string | null; role: string | null; telegramLinked: boolean; telegramUserId: string | null; status: 'NOT_INVITED' | 'INVITE_PENDING' | 'ACTIVE' | 'REMOVED'; inviteLink: string | null; inviteExpiresAt: number | null; joinedAt: number | null; removedAt: number | null }
+export interface TelegramForumParticipant { id: string | null; userId: string; name: string | null; email: string | null; role: string | null; telegramLinked: boolean; telegramUserId: string | null; status: 'NOT_INVITED' | 'INVITE_PENDING' | 'INVITE_EXPIRED' | 'PRESENT_UNAUTHORIZED' | 'ACTIVE' | 'REMOVED'; inviteLink: string | null; inviteExpiresAt: number | null; joinedAt: number | null; removedAt: number | null }
 export interface IntegrationGuide { key: 'MIKROWISP'; title: string; version: string; fileName: string; fileSize: number; active: boolean; updatedAt: number }
 
 export const integrationsApi = {
