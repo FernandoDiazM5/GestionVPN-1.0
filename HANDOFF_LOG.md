@@ -1,5 +1,12 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-29 — Historial Telegram y autorización de Sitios desplegados.** Rama `vps_uni`, runtime/checkout `d006f3c`; despliegue confirmado por el usuario.
+> - Se creó y verificó el respaldo `/root/backups/pre-telegram-history-20260829T163621Z` con dump comprimido, checksum y conteos previos. Se etiquetaron las imágenes anteriores como `gestionvpn-10-{backend|frontend}:pre-telegram-history-20260829T163621Z` para reversión.
+> - El checkout productivo avanzó a `d006f3c`. Backend se reconstruyó y recreó primero, alcanzó estado healthy, y después se reconstruyó y recreó frontend. La ejecución terminó con `/api/health` satisfactorio y `DEPLOY_OK`.
+> - Quedaron activos el módulo Historial de clientes, la sincronización bidireccional controlada con Telegram, el catálogo único `GetRouters` y la autorización Joinpoint estricta para comandos/callbacks de Sitios. El usuario validó que el despliegue funciona correctamente.
+> - Verificación previa al despliegue: backend **135/763**, frontend **82/274**, focalizadas **47/47**, TypeScript, lint, inventario de rutas y `check:all` verdes.
+> - Observación operativa: dos intentos posteriores de comprobación por SSH agotaron el tiempo de conexión. No se obtuvo una segunda lectura de contenedores/reinicios; revisar acceso SSH en la próxima intervención si continúa sin responder.
+>
 > **Sesión 2026-08-29 — Autorización estricta del bot para Sitios.** Rama `vps_uni` sobre `c39f8e5`; pendiente despliegue.
 > - Todos los comandos y callbacks de Sitios revalidan chat privado, vínculo exacto con el bot, usuario activo, workspace exacto y membresía; se corrigió la selección accidental del primer workspace del usuario.
 > - MEMBER vuelve a consultar sus asignaciones antes de activar, por lo que botones y listas obsoletos quedan invalidados. `/link` no admite grupos.
