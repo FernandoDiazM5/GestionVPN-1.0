@@ -6761,5 +6761,6 @@ Verificado con `grep` sobre todo `server/`:
 >
 > **Sesión 2026-08-28 — Jerarquía visual de grupos/temas corregida.** A partir de las capturas reales, se retiró el selector único y la guía dominante: ahora los grupos se listan primero como tarjetas, el detalle seleccionado muestra sus temas antes del formulario de alta y participantes, y agregar otro grupo queda separado al final con guía plegable.
 > - Se conservaron los tokens/patrones visuales existentes; responsive `1→2` columnas, secciones semánticas, estado seleccionado visible y objetivos táctiles de al menos 44 px.
-> - Pruebas del componente **2/2**, TypeScript, lint, build y `check:all` verdes. Pendiente publicar el frontend y validar visualmente en producción autenticada.
+> - Pruebas del componente **2/2**, TypeScript, lint, build y `check:all` verdes. Publicado `3fa3ed9`: sólo se recreó el frontend, los textos nuevos se confirmaron en el bundle, HTTPS y health respondieron 200, backend/DB permanecieron healthy y los tres contenedores tienen 0 reinicios. La salud global sólo conserva RouterOS `stale`.
+> - El compose intentó construir también backend y agotó espacio al exportar esa imagen; no sustituyó ningún contenedor. Se retiraron únicamente capas temporales y se reanudó con `--no-deps frontend`. Disco final 91%/2.3 GiB; rollbacks y volúmenes preservados.
 >
