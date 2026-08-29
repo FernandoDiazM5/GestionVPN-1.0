@@ -60,9 +60,14 @@ async function assignedTunnelIds(workspaceId, userId) {
   return rows.map(r => r.tunnel_id);
 }
 
+async function findById(id, workspaceId) {
+  const rows = await query('SELECT id,workspace_id,tunnel_id,user_id FROM tunnel_assignments WHERE id=? AND workspace_id=? LIMIT 1', [id, workspaceId]);
+  return rows[0] || null;
+}
+
 async function remove(id, workspaceId) {
   const r = await query('DELETE FROM tunnel_assignments WHERE id = ? AND workspace_id = ?', [id, workspaceId]);
   return r.affectedRows > 0;
 }
 
-module.exports = { add, canonicalTunnelId, listByUser, listForWorkspace, assignedTunnelIds, remove };
+module.exports = { add, canonicalTunnelId, listByUser, listForWorkspace, assignedTunnelIds, findById, remove };

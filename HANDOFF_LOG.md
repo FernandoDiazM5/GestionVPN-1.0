@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-29 — Autorización estricta del bot para Sitios.** Rama `vps_uni` sobre `c39f8e5`; pendiente despliegue.
+> - Todos los comandos y callbacks de Sitios revalidan chat privado, vínculo exacto con el bot, usuario activo, workspace exacto y membresía; se corrigió la selección accidental del primer workspace del usuario.
+> - MEMBER vuelve a consultar sus asignaciones antes de activar, por lo que botones y listas obsoletos quedan invalidados. `/link` no admite grupos.
+> - Al retirar una asignación se cierra la sesión activa coincidente y se eliminan sus mangles best-effort para cortar el acceso inmediatamente.
+> - Verificación: backend **135/763**, frontend **82/274**, focalizadas **47/47**, TypeScript, lint, inventario de rutas y `check:all` verdes.
+>
 > **Sesión 2026-08-29 — Escenarios externos y vencimientos Telegram completados.** Rama `vps_uni` sobre `88f6bab`; pendiente despliegue.
 > - Temas creados manualmente se descubren como `UNREGISTERED`; `/registrartema` renombra en Telegram y reutiliza el registro, con protección contra la carrera de eventos de temas creados desde Joinpoint.
 > - Miembros del workspace añadidos directamente quedan `PRESENT_UNAUTHORIZED`, visibles y retirables, pero fuera de las consultas de clientes. No se autoriza automáticamente a desconocidos.

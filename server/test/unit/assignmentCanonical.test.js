@@ -4,7 +4,7 @@ const { stubModule } = require('../helpers/moduleMock');
 
 // Stub de ../mysql (query) ANTES de require del repo.
 const mysql = stubModule(__dirname, '../../db/mysql', { query: vi.fn() });
-const { canonicalTunnelId } = require('../../db/repos/assignmentRepo');
+const { canonicalTunnelId, findById } = require('../../db/repos/assignmentRepo');
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -33,5 +33,13 @@ describe('canonicalTunnelId (M5)', () => {
     expect(await canonicalTunnelId('ws-1', '')).toBe('');
     expect(await canonicalTunnelId('ws-1', null)).toBe(null);
     expect(mysql.query).not.toHaveBeenCalled();
+  });
+});
+
+describe('findById', () => {
+  it('limita la asignación al workspace solicitado', async () => {
+    mysql.query.mockResolvedValueOnce([{ id: 'a-1', workspace_id: 'ws-1', tunnel_id: 'VRF-A', user_id: 'u-1' }]);
+    await expect(findById('a-1', 'ws-1')).resolves.toMatchObject({ tunnel_id: 'VRF-A', user_id: 'u-1' });
+    expect(mysql.query).toHaveBeenCalledWith(expect.stringContaining('id=? AND workspace_id=?'), ['a-1', 'ws-1']);
   });
 });

@@ -636,9 +636,22 @@ router.post('/assignments', requireSession, requireRole('OWNER'),
 router.delete('/assignments/:id', requireSession, requireRole('OWNER'),
   validate({ params: IdParamsSchema }),
   asyncHandler(async (req, res) => {
+    const assignment = await assignmentRepo.findById(req.params.id, req.account.workspace_id);
+    if (!assignment) throw new AppError('Asignación no encontrada', 404, 'NOT_FOUND');
     const ok = await assignmentRepo.remove(req.params.id, req.account.workspace_id);
     if (!ok) throw new AppError('Asignación no encontrada', 404, 'NOT_FOUND');
-    return sendOk(res, { message: 'Asignación eliminada' });
+    const db = await getDb();
+    const active = await db.get(`SELECT id FROM tunnel_user_sessions
+      WHERE workspace_id=? AND user_id=? AND status='ACTIVE' AND (tunnel_id=? OR vrf_name=?) LIMIT 1`,
+    [req.account.workspace_id, assignment.user_id, assignment.tunnel_id, assignment.tunnel_id]);
+    let accessRevoked = false;
+    let mangleCleanup = null;
+    if (active) {
+      mangleCleanup = await removeUserMangles([assignment.user_id]);
+      await db.run("UPDATE tunnel_user_sessions SET status='CLOSED',deactivated_at=? WHERE id=? AND status='ACTIVE'", [Date.now(), active.id]);
+      accessRevoked = true;
+    }
+    return sendOk(res, { message: accessRevoked ? 'Asignación eliminada y acceso activo revocado' : 'Asignación eliminada', accessRevoked, mangle: mangleCleanup || undefined });
   }));
 
 // ── POST /member/:id/wireguard — provisiona acceso WG al miembro ──

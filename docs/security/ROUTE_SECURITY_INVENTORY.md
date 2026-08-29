@@ -213,11 +213,11 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `routes/team.routes.js` | 599 | GET | `/workspace-tunnels` | sí | OWNER | no | n/a | — | — |
 | `routes/team.routes.js` | 615 | GET | `/assignments` | sí | — | no | n/a | — | — |
 | `routes/team.routes.js` | 624 | POST | `/assignments` | sí | OWNER | no | sí | — | — |
-| `routes/team.routes.js` | 636 | DELETE | `/assignments/:id` | sí | OWNER | no | n/a | network-admin | — |
-| `routes/team.routes.js` | 648 | POST | `/member/:id/wireguard` | sí | OWNER | no | sí | sql, network-admin | — |
-| `routes/team.routes.js` | 732 | POST | `/me/wireguard` | sí | — | no | n/a | network-admin | — |
-| `routes/team.routes.js` | 761 | GET | `/member/:id/wireguard` | sí | — | no | n/a | network-admin | — |
-| `routes/team.routes.js` | 782 | GET | `/wireguard/by-key/:publicKey` | sí | OWNER | no | n/a | network-admin | — |
+| `routes/team.routes.js` | 636 | DELETE | `/assignments/:id` | sí | OWNER | no | n/a | sql, network-admin | — |
+| `routes/team.routes.js` | 661 | POST | `/member/:id/wireguard` | sí | OWNER | no | sí | sql, network-admin | — |
+| `routes/team.routes.js` | 745 | POST | `/me/wireguard` | sí | — | no | n/a | network-admin | — |
+| `routes/team.routes.js` | 774 | GET | `/member/:id/wireguard` | sí | — | no | n/a | network-admin | — |
+| `routes/team.routes.js` | 795 | GET | `/wireguard/by-key/:publicKey` | sí | OWNER | no | n/a | network-admin | — |
 | `routes/wireguard.routes.js` | 39 | POST | `/wireguard/peers` | sí | — | no | n/a | sql, network-admin | — |
 | `routes/wireguard.routes.js` | 151 | POST | `/wireguard/peer/add` | sí | — | no | sí | sql, network-admin | — |
 | `routes/wireguard.routes.js` | 200 | POST | `/wireguard/peer/edit` | sí | — | no | sí | sql, network-admin | — |

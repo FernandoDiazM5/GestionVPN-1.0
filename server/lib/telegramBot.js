@@ -65,10 +65,12 @@ async function userForChat(chatId) {
   const fingerprint = crypto.createHash('sha256').update(token).digest('hex');
   const rows = context.workspaceId
     ? await query(`SELECT n.user_id FROM notification_subscriptions n
+        JOIN users u ON u.id=n.user_id AND u.deleted_at IS NULL AND u.disabled_at IS NULL
         JOIN workspace_members wm ON wm.user_id=n.user_id AND wm.workspace_id=? AND wm.deleted_at IS NULL
+        JOIN workspaces w ON w.id=wm.workspace_id AND w.deleted_at IS NULL
         WHERE n.telegram_chat_id=? AND n.telegram_bot_fingerprint=? LIMIT 1`, [context.workspaceId, String(chatId), fingerprint])
     : await query(`SELECT n.user_id FROM notification_subscriptions n
-        JOIN users u ON u.id=n.user_id AND u.is_platform_admin=1 AND u.deleted_at IS NULL
+        JOIN users u ON u.id=n.user_id AND u.is_platform_admin=1 AND u.deleted_at IS NULL AND u.disabled_at IS NULL
         WHERE n.telegram_chat_id=? AND n.telegram_bot_fingerprint=? LIMIT 1`, [String(chatId), fingerprint]);
   if (!rows.length) return null;
   return await userRepo.findById(rows[0].user_id).catch(() => null);
@@ -76,12 +78,16 @@ async function userForChat(chatId) {
 
 /** Construye un "account" compatible con tunnelService (sub/workspace_id/role/platform_admin). */
 async function buildAccount(userId) {
+  const context = currentContext();
   const ws = await query(
-    `SELECT workspace_id, role FROM workspace_members
-      WHERE user_id = ? AND deleted_at IS NULL LIMIT 1`,
-    [userId]
+    `SELECT wm.workspace_id,wm.role FROM workspace_members wm
+      JOIN users u ON u.id=wm.user_id AND u.deleted_at IS NULL AND u.disabled_at IS NULL
+      JOIN workspaces w ON w.id=wm.workspace_id AND w.deleted_at IS NULL
+      WHERE wm.user_id=? AND wm.deleted_at IS NULL${context.workspaceId ? ' AND wm.workspace_id=?' : ''} LIMIT 1`,
+    context.workspaceId ? [userId, context.workspaceId] : [userId]
   );
   if (!ws.length) return null;
+  if (context.workspaceId && ws[0].workspace_id !== context.workspaceId) return null;
   const u = await query('SELECT is_platform_admin FROM users WHERE id = ? LIMIT 1', [userId]);
   return {
     sub: userId,
@@ -108,6 +114,16 @@ async function getCoreCreds() {
 function reply(chatId, text, replyMarkup) {
   return telegram.sendMessage({ chatId, text, html: true, replyMarkup, token: currentContext().token || _activeToken });
 }
+async function authorizeSiteAccess(chatId, user, chatType = null) {
+  const isPrivate = chatType ? chatType === 'private' : Number(chatId) > 0;
+  if (!isPrivate) return { error: '🔒 Los comandos de sitios sólo están disponibles en el chat privado con el bot.' };
+  if (!user || user.disabled_at || user.deleted_at) return { error: '🔒 Tu cuenta no está autorizada. Vincúlala o solicita al moderador que la habilite.' };
+  const linked = await userForChat(chatId);
+  if (!linked || linked.id !== user.id || linked.disabled_at || linked.deleted_at) return { error: '🔒 Tu autorización de Telegram ya no está vigente.' };
+  const account = await buildAccount(user.id);
+  if (!account) return { error: '🔒 Tu membresía de Joinpoint no está activa para este bot.' };
+  return { account };
+}
 
 // ── Helpers de selección pendiente ────────────────────────────────
 function getPending(chatId) {
@@ -120,8 +136,8 @@ function getPending(chatId) {
   }
   return p;
 }
-function setPending(chatId, tunnels) {
-  pendingSelections.set(pendingKey(chatId), { tunnels, expiresAt: Date.now() + SELECTION_TTL_MS });
+function setPending(chatId, tunnels, account) {
+  pendingSelections.set(pendingKey(chatId), { tunnels, userId: account.sub, workspaceId: account.workspace_id, expiresAt: Date.now() + SELECTION_TTL_MS });
 }
 function clearPending(chatId) {
   pendingSelections.delete(pendingKey(chatId));
@@ -134,18 +150,13 @@ function clearPending(chatId) {
  *  - OWNER (moderador) → todos del workspace
  * Devuelve hasta 30 (mismo límite que /tuneles antes).
  */
-async function fetchUserTunnels(userId) {
-  const ws = await query(
-    `SELECT workspace_id, role FROM workspace_members
-      WHERE user_id = ? AND deleted_at IS NULL LIMIT 1`,
-    [userId]
-  );
-  if (!ws.length) return { error: 'Tu cuenta no tiene workspace asignado.' };
-  const { workspace_id: wsId, role } = ws[0];
+async function fetchUserTunnels(account) {
+  if (!account) return { error: 'Tu cuenta no tiene workspace asignado.' };
+  const { workspace_id: wsId, role } = account;
 
   let tunnels;
   if (role === 'MEMBER') {
-    const ids = await assignmentRepo.assignedTunnelIds(wsId, userId);
+    const ids = await assignmentRepo.assignedTunnelIds(wsId, account.sub);
     if (!ids.length) return { error: 'No tienes sitios asignados.' };
     // El `tunnel_id` guardado en `tunnel_assignments` puede contener cualquiera
     // de los dos identificadores: el modal de asignar usa `nombre_vrf || ppp_user`
@@ -290,7 +301,9 @@ async function cmdModerador(chatId, user, args) {
   return reply(chatId, `<b>🔵 Detalle del moderador</b>\n${row.disabled_at ? '⛔ Suspendido' : '✅ Activo'}\nNombre: <b>${row.name || 'Sin nombre'}</b>\nCorreo: <code>${row.email}</code>\nWorkspace: ${row.workspace_name}\nMiembros: ${row.member_count}\nÚltimo acceso: ${row.last_access_at ? new Date(Number(row.last_access_at)).toLocaleString('es-PE') : 'Sin accesos'}`);
 }
 
-async function cmdLink(chatId, args) {
+async function cmdLink(chatId, args, chatType = null) {
+  const isPrivate = chatType ? chatType === 'private' : Number(chatId) > 0;
+  if (!isPrivate) return reply(chatId, '🔒 Vincula tu cuenta únicamente desde el chat privado con el bot.');
   const code = String(args[0] || '').trim().toUpperCase();
   if (!/^[A-F0-9]{6}$/.test(code)) {
     return reply(chatId, '❌ Formato inválido. Usa: <code>/link CODE</code> (6 chars hex).');
@@ -316,17 +329,12 @@ async function cmdUnlink(chatId, user) {
   return reply(chatId, '🔓 Chat desvinculado. Cuando quieras, /link CODE de nuevo.');
 }
 
-async function cmdStatus(chatId, user) {
-  if (!user) return reply(chatId, '🔒 Tu chat no está vinculado. Envía /start.');
-  const ws = await query(
-    `SELECT workspace_id FROM workspace_members
-      WHERE user_id = ? AND deleted_at IS NULL LIMIT 1`,
-    [user.id]
-  );
-  if (!ws.length) return reply(chatId, 'Tu cuenta no tiene workspace asignado.');
-  const sess = await sessionRepo.getActiveByUser(ws[0].workspace_id, user.id);
+async function cmdStatus(chatId, user, _args, chatType) {
+  const auth = await authorizeSiteAccess(chatId, user, chatType);
+  if (auth.error) return reply(chatId, auth.error);
+  const sess = await sessionRepo.getActiveByUser(auth.account.workspace_id, user.id);
   if (!sess) return reply(chatId, '🔒 No tienes acceso activo a ningún sitio.');
-  const sites = await query('SELECT nombre_nodo FROM nodes WHERE workspace_id=? AND (ppp_user=? OR nombre_vrf=?) LIMIT 1', [ws[0].workspace_id, sess.tunnel_id, sess.vrf_name]);
+  const sites = await query('SELECT nombre_nodo FROM nodes WHERE workspace_id=? AND (ppp_user=? OR nombre_vrf=?) LIMIT 1', [auth.account.workspace_id, sess.tunnel_id, sess.vrf_name]);
   const siteName = sites[0]?.nombre_nodo || sess.vrf_name || sess.tunnel_id;
   const remaining = sess.expires_at ? Math.max(0, Math.round((sess.expires_at - Date.now()) / 60000)) : null;
   return reply(chatId,
@@ -336,11 +344,12 @@ async function cmdStatus(chatId, user) {
   );
 }
 
-async function cmdTuneles(chatId, user) {
-  if (!user) return reply(chatId, '🔒 Tu chat no está vinculado. Envía /start.');
-  const r = await fetchUserTunnels(user.id);
+async function cmdTuneles(chatId, user, _args, chatType) {
+  const auth = await authorizeSiteAccess(chatId, user, chatType);
+  if (auth.error) return reply(chatId, auth.error);
+  const r = await fetchUserTunnels(auth.account);
   if (r.error) return reply(chatId, r.error);
-  setPending(chatId, r.tunnels);
+  setPending(chatId, r.tunnels, auth.account);
   return reply(chatId,
     `<b>🔵 Joinpoint NOC · Sitios disponibles</b> (${r.tunnels.length})\n\n` +
     formatNumberedList(r.tunnels) + '\n\n' +
@@ -353,15 +362,17 @@ async function cmdTuneles(chatId, user) {
  * Núcleo de activación llamado desde varias rutas (lista numerada,
  * /activar N, /activar VRF). Recibe el VRF ya resuelto.
  */
-async function performActivate(chatId, user, vrf, siteName = vrf) {
-  const account = await buildAccount(user.id);
-  if (!account) return reply(chatId, '❌ Tu cuenta no tiene workspace asignado.');
+async function performActivate(chatId, user, vrf, siteName = vrf, chatType = null) {
+  const auth = await authorizeSiteAccess(chatId, user, chatType);
+  if (auth.error) return reply(chatId, auth.error);
+  const visible = await fetchUserTunnels(auth.account);
+  if (visible.error || !visible.tunnels.some(t => [t.nombre_vrf, t.ppp_user].includes(vrf))) return reply(chatId, '❌ Ese sitio ya no está asignado o visible para tu usuario. Usa /sitios.');
   const mikrotik = await getCoreCreds();
   if (!mikrotik) return reply(chatId, '❌ El MikroTik no está configurado en el panel (Ajustes). Avisa al admin de plataforma.');
 
   await reply(chatId, `⏳ Activando <code>${vrf}</code>…`);
   const result = await tunnelService.activateTunnel({
-    account, targetVRF: vrf, mikrotik, clientIp: 'telegram', leaseSource: 'TELEGRAM',
+    account: auth.account, targetVRF: vrf, mikrotik, clientIp: 'telegram', leaseSource: 'TELEGRAM',
   });
   if (!result.ok) {
     return reply(chatId, `❌ <b>No se pudo activar</b>\n${result.message}`);
@@ -373,16 +384,17 @@ async function performActivate(chatId, user, vrf, siteName = vrf) {
   );
 }
 
-async function cmdActivar(chatId, user, args) {
-  if (!user) return reply(chatId, '🔒 Tu chat no está vinculado. Envía /start.');
+async function cmdActivar(chatId, user, args, chatType) {
+  const auth = await authorizeSiteAccess(chatId, user, chatType);
+  if (auth.error) return reply(chatId, auth.error);
 
   const arg = String(args[0] || '').trim();
 
   // Caso 1 — sin argumentos: muestra lista numerada
   if (!arg) {
-    const r = await fetchUserTunnels(user.id);
+    const r = await fetchUserTunnels(auth.account);
     if (r.error) return reply(chatId, r.error);
-    setPending(chatId, r.tunnels);
+    setPending(chatId, r.tunnels, auth.account);
     return reply(chatId,
       `<b>Elige el sitio al que deseas acceder</b>\n\n` +
       formatNumberedList(r.tunnels) + '\n\n' +
@@ -393,26 +405,26 @@ async function cmdActivar(chatId, user, args) {
 
   // Caso 2 — argumento numérico: activa por índice de la lista pendiente
   if (/^\d+$/.test(arg)) {
-    return resolveSelectionAndActivate(chatId, user, Number(arg));
+    return resolveSelectionAndActivate(chatId, user, Number(arg), chatType);
   }
 
   // Caso 3 — argumento texto: sólo permite un sitio visible para este usuario.
   clearPending(chatId);
-  const r = await fetchUserTunnels(user.id);
+  const r = await fetchUserTunnels(auth.account);
   if (r.error) return reply(chatId, r.error);
   const normalized = arg.toLowerCase();
   const selected = r.tunnels.find(t => [t.nombre_vrf, t.ppp_user, t.nombre_nodo]
     .some(value => String(value || '').toLowerCase() === normalized));
   if (!selected) return reply(chatId, '❌ Ese sitio no existe o no está asignado a tu usuario. Usa /sitios.');
   const vrf = selected.nombre_vrf || selected.ppp_user;
-  return performActivate(chatId, user, vrf, selected.nombre_nodo || vrf);
+  return performActivate(chatId, user, vrf, selected.nombre_nodo || vrf, chatType);
 }
 
 /**
  * Cuando el usuario responde con un número (vía /activar N o mensaje plano).
  * Valida que haya pending y que el índice esté en rango.
  */
-async function resolveSelectionAndActivate(chatId, user, n) {
+async function resolveSelectionAndActivate(chatId, user, n, chatType = null) {
   const pending = getPending(chatId);
   if (!pending) {
     return reply(chatId, '⌛ No hay una lista pendiente. Envía /activar para empezar.');
@@ -422,22 +434,25 @@ async function resolveSelectionAndActivate(chatId, user, n) {
   }
   const t = pending.tunnels[n - 1];
   clearPending(chatId);
+  const auth = await authorizeSiteAccess(chatId, user, chatType);
+  if (auth.error || pending.userId !== user.id || pending.workspaceId !== auth.account.workspace_id) return reply(chatId, auth.error || '⌛ Esa selección ya no pertenece a tu autorización vigente. Usa /sitios.');
+  const visible = await fetchUserTunnels(auth.account);
+  const stillVisible = !visible.error && visible.tunnels.some(item => item.nombre_vrf === t.nombre_vrf && item.ppp_user === t.ppp_user);
+  if (!stillVisible) return reply(chatId, '❌ Ese sitio ya no está asignado a tu usuario. Usa /sitios para actualizar la lista.');
   const vrf = t.nombre_vrf || t.ppp_user;
-  return performActivate(chatId, user, vrf, t.nombre_nodo || vrf);
+  return performActivate(chatId, user, vrf, t.nombre_nodo || vrf, chatType);
 }
 
-async function performDeactivate(chatId, user) {
-  if (!user) return reply(chatId, '🔒 Tu chat no está vinculado. Envía /start.');
+async function performDeactivate(chatId, user, chatType = null) {
   clearPending(chatId);
-
-  const account = await buildAccount(user.id);
-  if (!account) return reply(chatId, '❌ Tu cuenta no tiene workspace asignado.');
+  const auth = await authorizeSiteAccess(chatId, user, chatType);
+  if (auth.error) return reply(chatId, auth.error);
   const mikrotik = await getCoreCreds();
   if (!mikrotik) return reply(chatId, '❌ El MikroTik no está configurado en el panel.');
 
   await reply(chatId, '⏳ Cerrando tu acceso…');
   const result = await tunnelService.deactivateTunnel({
-    account, mikrotik, clientIp: 'telegram',
+    account: auth.account, mikrotik, clientIp: 'telegram',
   });
   if (!result.ok) {
     return reply(chatId, `❌ <b>No se pudo desactivar</b>\n${result.message}`);
@@ -448,12 +463,11 @@ async function performDeactivate(chatId, user) {
   return reply(chatId, '✅ Acceso cerrado correctamente.');
 }
 
-async function cmdDesactivar(chatId, user) {
-  if (!user) return reply(chatId, '🔒 Tu chat no está vinculado. Envía /start.');
+async function cmdDesactivar(chatId, user, _args, chatType) {
   clearPending(chatId);
-  const account = await buildAccount(user.id);
-  if (!account) return reply(chatId, '❌ Tu cuenta no tiene workspace asignado.');
-  const active = await sessionRepo.getActiveByUser(account.workspace_id, user.id);
+  const auth = await authorizeSiteAccess(chatId, user, chatType);
+  if (auth.error) return reply(chatId, auth.error);
+  const active = await sessionRepo.getActiveByUser(auth.account.workspace_id, user.id);
   if (!active) return reply(chatId, '🔒 No tienes acceso activo a ningún sitio.');
   return reply(chatId, '⚠️ <b>¿Deseas cerrar tu acceso activo ahora?</b>', {
     inline_keyboard: [[
@@ -463,8 +477,9 @@ async function cmdDesactivar(chatId, user) {
   });
 }
 
-async function cmdCancelar(chatId, user) {
-  if (!user) return reply(chatId, '🔒 Tu chat no está vinculado. Envía /start.');
+async function cmdCancelar(chatId, user, _args, chatType) {
+  const auth = await authorizeSiteAccess(chatId, user, chatType);
+  if (auth.error) return reply(chatId, auth.error);
   const had = pendingSelections.has(pendingKey(chatId));
   clearPending(chatId);
   return reply(chatId, had ? '✓ Selección cancelada.' : 'No tenías una lista pendiente.');
@@ -506,7 +521,7 @@ async function handleMessage(msg) {
     if (/^\d+$/.test(text) && pendingSelections.has(pendingKey(chatId))) {
       const user = await userForChat(chatId);
       if (!user) return reply(chatId, '🔒 Tu chat no está vinculado. Envía /start.');
-      return resolveSelectionAndActivate(chatId, user, Number(text));
+      return resolveSelectionAndActivate(chatId, user, Number(text), msg.chat.type);
     }
     return; // ignora chat normal
   }
@@ -543,7 +558,7 @@ async function handleMessage(msg) {
     return reply(chatId, `Comando desconocido: <code>${cmd}</code>. Usa /help.`);
   }
 
-  if (cmd === '/link') return handler(chatId, args);
+  if (cmd === '/link') return handler(chatId, args, msg.chat.type);
   if (cmd === '/start' || cmd === '/help') {
     const user = await userForChat(chatId);
     return handler(chatId, user);
@@ -553,7 +568,7 @@ async function handleMessage(msg) {
   if (!user) {
     return reply(chatId, '🔒 Tu chat no está vinculado. Envía /start.');
   }
-  return handler(chatId, user, args);
+  return handler(chatId, user, args, msg.chat.type);
 }
 
 async function handleCallbackQuery(callback) {
@@ -563,20 +578,21 @@ async function handleCallbackQuery(callback) {
   await telegram.answerCallbackQuery({ token, callbackQueryId: callback.id }).catch(() => null);
   const user = await userForChat(chatId);
   if (!user) return reply(chatId, '🔒 Tu chat no está vinculado. Envía /start.');
+  const chatType = callback.message.chat.type;
 
   if (callback.data === 'site:cancel' || callback.data === 'close:cancel') {
     clearPending(chatId);
     return reply(chatId, '✓ Operación cancelada.');
   }
   const site = /^site:(\d+)$/.exec(callback.data);
-  if (site) return resolveSelectionAndActivate(chatId, user, Number(site[1]));
+  if (site) return resolveSelectionAndActivate(chatId, user, Number(site[1]), chatType);
   const close = /^close:([A-Za-z0-9_-]{1,40})$/.exec(callback.data);
   if (close) {
-    const account = await buildAccount(user.id);
-    if (!account) return reply(chatId, '❌ Tu cuenta no tiene workspace asignado.');
-    const active = await sessionRepo.getActiveByUser(account.workspace_id, user.id);
+    const auth = await authorizeSiteAccess(chatId, user, chatType);
+    if (auth.error) return reply(chatId, auth.error);
+    const active = await sessionRepo.getActiveByUser(auth.account.workspace_id, user.id);
     if (!active || active.id !== close[1]) return reply(chatId, '⌛ Esa confirmación ya no es válida. Usa /misitio para ver tu acceso actual.');
-    return performDeactivate(chatId, user);
+    return performDeactivate(chatId, user, chatType);
   }
 }
 
