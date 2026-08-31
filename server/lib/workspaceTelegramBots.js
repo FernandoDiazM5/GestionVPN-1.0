@@ -21,6 +21,14 @@ const WORKSPACE_COMMANDS = [
   { command: 'servicios', description: 'Servicios actuales del cliente del tema' },
   { command: 'facturacion', description: 'Facturación actual del cliente del tema' },
   { command: 'ayuda', description: 'Ayuda de consultas dentro del tema' },
+  { command: 'resumenruta', description: 'Ver trazado registrado de la ruta' },
+  { command: 'agregartramo', description: 'Agregar un tramo de fibra' },
+  { command: 'agregarmufa', description: 'Agregar una mufa y su fusión' },
+  { command: 'fusion', description: 'Registrar continuidad entre hilos' },
+  { command: 'potencia', description: 'Registrar una medición óptica' },
+  { command: 'evidencia', description: 'Registrar nota o fotografía' },
+  { command: 'cerrarruta', description: 'Marcar la ruta como operativa' },
+  { command: 'ayudaruta', description: 'Ayuda para rutas de fibra' },
 ];
 
 async function handleMessage(bot, message) {

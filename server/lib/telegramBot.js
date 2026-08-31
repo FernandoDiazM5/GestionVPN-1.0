@@ -275,6 +275,60 @@ async function handleForumQuery(message, command) {
   }
 }
 
+const FIBER_COMMANDS = new Set(['/resumenruta', '/agregartramo', '/agregarmufa', '/fusion', '/potencia', '/evidencia', '/cerrarruta', '/ayudaruta']);
+function fiberParts(args) { return String(args.join(' ')).split('|').map(value => value.trim()); }
+async function handleFiberCommand(message, command, args) {
+  try {
+    const fiber = require('./fiberRouteService');
+    const ctx = await fiber.context(currentContext().workspaceId, message);
+    if (command === '/ayudaruta') return forumReply(message, '<b>Comandos de la ruta</b>\n/resumenruta\n/agregartramo NOMBRE | HILO ENTRADA | HILO SALIDA | NOTA\n/agregarmufa NOMBRE | UBICACIÓN | HILO ENTRADA | HILO SALIDA\n/fusion HILO ENTRADA | HILO SALIDA | TIPO\n/potencia DBM | LONGITUD_NM | NOTA\n/evidencia DESCRIPCIÓN (o como texto de una fotografía)\n/cerrarruta MOTIVO');
+    if (command === '/resumenruta') return forumReply(message, fiber.summary(await fiber.detail(currentContext().workspaceId, ctx.route.id)));
+    const parts = fiberParts(args);
+    if (command === '/agregartramo') {
+      if (!parts[0]) throw new Error('Usa: /agregartramo NOMBRE | HILO ENTRADA | HILO SALIDA | NOTA');
+      await fiber.addElement(currentContext().workspaceId, ctx.userId, ctx.route.id, { type: 'SEGMENT', name: parts[0], inputFiber: parts[1], outputFiber: parts[2], notes: parts[3] });
+      return forumReply(message, '✅ Tramo agregado a la ruta.');
+    }
+    if (command === '/agregarmufa') {
+      if (!parts[0]) throw new Error('Usa: /agregarmufa NOMBRE | UBICACIÓN | HILO ENTRADA | HILO SALIDA');
+      await fiber.addElement(currentContext().workspaceId, ctx.userId, ctx.route.id, { type: 'CLOSURE', name: parts[0], location: parts[1], inputFiber: parts[2], outputFiber: parts[3], fusionType: 'Fusión' });
+      return forumReply(message, '✅ Mufa y continuidad registradas.');
+    }
+    if (command === '/fusion') {
+      if (!parts[0] || !parts[1]) throw new Error('Usa: /fusion HILO ENTRADA | HILO SALIDA | TIPO');
+      await fiber.addElement(currentContext().workspaceId, ctx.userId, ctx.route.id, { type: 'SEGMENT', name: `Fusión ${parts[0]} → ${parts[1]}`, inputFiber: parts[0], outputFiber: parts[1], fusionType: parts[2] || 'Directa' });
+      return forumReply(message, '✅ Fusión registrada.');
+    }
+    if (command === '/potencia') {
+      const powerDbm = Number(parts[0]); if (!Number.isFinite(powerDbm)) throw new Error('Usa: /potencia DBM | LONGITUD_NM | NOTA');
+      await fiber.addMeasurement(currentContext().workspaceId, ctx.userId, ctx.route.id, { powerDbm, wavelengthNm: parts[1] ? Number(parts[1]) : undefined, notes: parts[2] });
+      return forumReply(message, `✅ Potencia registrada: <b>${escapeHtml(powerDbm)} dBm</b>.`);
+    }
+    if (command === '/evidencia') {
+      if (!parts[0]) throw new Error('Usa: /evidencia DESCRIPCIÓN');
+      await fiber.addEvidence(currentContext().workspaceId, ctx.userId, ctx.route.id, { type: 'NOTE', description: parts.join(' | ') });
+      return forumReply(message, '✅ Evidencia registrada.');
+    }
+    if (command === '/cerrarruta') {
+      await fiber.changeStatus(currentContext().workspaceId, ctx.userId, ctx.route.id, 'OPERATIONAL', parts.join(' | ') || 'Confirmada desde Telegram');
+      return forumReply(message, '✅ Ruta marcada como operativa.');
+    }
+  } catch (error) { return forumReply(message, `❌ ${escapeHtml(error.message || 'No se pudo actualizar la ruta.')}`); }
+}
+
+async function handleFiberPhoto(message) {
+  const caption = String(message.caption || '').trim();
+  if (!message.photo?.length || !caption.toLowerCase().startsWith('/evidencia')) return false;
+  try {
+    const fiber = require('./fiberRouteService'); const ctx = await fiber.context(currentContext().workspaceId, message);
+    const description = caption.replace(/^\/evidencia(?:@\w+)?\s*/i, '').trim() || 'Fotografía de la ruta';
+    const photo = message.photo[message.photo.length - 1];
+    await fiber.addEvidence(currentContext().workspaceId, ctx.userId, ctx.route.id, { type: 'PHOTO', description, telegramFileId: photo.file_id });
+    await forumReply(message, '✅ Fotografía registrada como evidencia de la ruta.');
+    return true;
+  } catch (error) { await forumReply(message, `❌ ${escapeHtml(error.message || 'No se pudo registrar la fotografía.')}`); return true; }
+}
+
 async function cmdModeradores(chatId, user) {
   if (Number(user?.is_platform_admin) !== 1) return reply(chatId, '🔒 Comando disponible sólo para el Administrador.');
   const rows = await query(`SELECT u.email,u.name,u.disabled_at,w.name AS workspace_name,
@@ -510,7 +564,10 @@ const COMMANDS = {
  */
 async function handleMessage(msg) {
   if (!msg || !msg.chat) return;
-  if (currentContext().workspaceId && !msg.text) return require('./telegramForumService').reconcileTopicEvent({ workspaceId: currentContext().workspaceId, message: msg });
+  if (currentContext().workspaceId && !msg.text) {
+    if (await handleFiberPhoto(msg)) return;
+    return require('./telegramForumService').reconcileTopicEvent({ workspaceId: currentContext().workspaceId, message: msg });
+  }
   if (!msg.text) return;
   const chatId = msg.chat.id;
   const text = msg.text.trim();
@@ -536,7 +593,9 @@ async function handleMessage(msg) {
     if (!/^[A-F0-9]{8}$/.test(code)) return reply(chatId, 'Usa: <code>/vinculargrupo CÓDIGO</code> dentro del supergrupo con temas activados.');
     try {
       const group = await require('./telegramForumService').confirmGroupLink({ workspaceId: currentContext().workspaceId, botToken: currentContext().token, message: msg, code });
-      return reply(chatId, `✅ Grupo <b>${escapeHtml(group.name)}</b> vinculado correctamente.`);
+      return reply(chatId, group.status === 'MISSING_PERMISSIONS'
+        ? `✅ Grupo <b>${escapeHtml(group.name)}</b> vinculado.\n⚠️ Completa en Telegram los permisos del bot: ${escapeHtml(group.missingPermissions.join(', '))}.`
+        : `✅ Grupo <b>${escapeHtml(group.name)}</b> vinculado correctamente.`);
     } catch (error) {
       return reply(chatId, `❌ ${escapeHtml(error.message || 'No se pudo vincular el grupo.')}`);
     }
@@ -552,6 +611,7 @@ async function handleMessage(msg) {
   if (currentContext().workspaceId && ['/informacion', '/servicios', '/facturacion', '/ayuda'].includes(cmd)) {
     return handleForumQuery(msg, cmd);
   }
+  if (currentContext().workspaceId && FIBER_COMMANDS.has(cmd)) return handleFiberCommand(msg, cmd, args);
 
   const handler = COMMANDS[cmd];
   if (!handler) {

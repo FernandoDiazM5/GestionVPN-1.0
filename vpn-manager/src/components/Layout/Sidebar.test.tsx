@@ -89,6 +89,6 @@ describe('<Sidebar /> móvil', () => {
     expect(screen.getByRole('button', { name: 'Activar modo oscuro' })).toBeInTheDocument();
     expect(screen.getByText('Fernando Díaz')).toBeInTheDocument();
     expect(screen.getByText('Moderador')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Historial de clientes' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Grupos operativos' })).toBeInTheDocument();
   });
 });

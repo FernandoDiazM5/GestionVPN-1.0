@@ -6,10 +6,10 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 
 ## Resumen
 
-- Rutas detectadas: 195
-- Rutas de mutación (POST/PUT/PATCH): 123
-- Rutas que consumen `req.body`: 90
-- Rutas con esquema de `req.body` detectable: 87/90
+- Rutas detectadas: 208
+- Rutas de mutación (POST/PUT/PATCH): 131
+- Rutas que consumen `req.body`: 96
+- Rutas con esquema de `req.body` detectable: 93/96
 - Endpoints públicos de identidad sin rate limiting detectable: 0
 
 ## Alertas detectadas
@@ -149,30 +149,43 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `routes/integrationGuides.routes.js` | 12 | GET | `/MIKROWISP` | sí | — | no | n/a | — | — |
 | `routes/integrationGuides.routes.js` | 13 | PUT | `/MIKROWISP` | sí | — | no | **no** | — | `BODY_SCHEMA_MISSING` |
 | `routes/integrationGuides.routes.js` | 14 | PATCH | `/MIKROWISP` | sí | — | no | sí | — | — |
-| `routes/integrations.routes.js` | 20 | GET | `/` | sí | — | no | n/a | — | — |
-| `routes/integrations.routes.js` | 21 | GET | `/mikrowisp/clients/:clientId` | sí | — | no | n/a | — | — |
-| `routes/integrations.routes.js` | 22 | GET | `/mikrowisp/catalogs` | sí | — | no | n/a | — | — |
-| `routes/integrations.routes.js` | 23 | GET | `/mikrowisp/catalogs/:type` | sí | — | no | n/a | — | — |
-| `routes/integrations.routes.js` | 24 | POST | `/mikrowisp/catalogs/:type/sync` | sí | — | no | n/a | — | — |
-| `routes/integrations.routes.js` | 25 | GET | `/mikrowisp/telegram-forums` | sí | — | no | n/a | — | — |
-| `routes/integrations.routes.js` | 26 | GET | `/mikrowisp/guide` | sí | — | no | n/a | — | — |
-| `routes/integrations.routes.js` | 27 | GET | `/mikrowisp/guide/download` | sí | — | no | n/a | — | — |
-| `routes/integrations.routes.js` | 28 | POST | `/mikrowisp/telegram-forums/link-code` | sí | — | no | n/a | — | — |
-| `routes/integrations.routes.js` | 29 | GET | `/mikrowisp/telegram-forums/:groupId/topics` | sí | — | no | n/a | — | — |
-| `routes/integrations.routes.js` | 30 | POST | `/mikrowisp/telegram-forums/:groupId/reconcile` | sí | — | no | n/a | — | — |
-| `routes/integrations.routes.js` | 31 | POST | `/mikrowisp/telegram-forums/:groupId/topics/preview` | sí | — | no | sí | — | — |
-| `routes/integrations.routes.js` | 32 | POST | `/mikrowisp/telegram-forums/:groupId/topics` | sí | — | no | sí | — | — |
-| `routes/integrations.routes.js` | 33 | POST | `/mikrowisp/telegram-forums/:groupId/topics/:topicId/close` | sí | — | no | n/a | — | — |
-| `routes/integrations.routes.js` | 34 | POST | `/mikrowisp/telegram-forums/:groupId/topics/:topicId/reopen` | sí | — | no | n/a | — | — |
-| `routes/integrations.routes.js` | 35 | POST | `/mikrowisp/telegram-forums/:groupId/topics/:topicId/recreate` | sí | — | no | n/a | — | — |
-| `routes/integrations.routes.js` | 36 | POST | `/mikrowisp/telegram-forums/:groupId/topics/:topicId/delete` | sí | — | no | n/a | — | — |
-| `routes/integrations.routes.js` | 37 | GET | `/mikrowisp/telegram-forums/:groupId/participants` | sí | — | no | n/a | — | — |
-| `routes/integrations.routes.js` | 38 | POST | `/mikrowisp/telegram-forums/:groupId/participants/:userId/invite` | sí | — | no | n/a | — | — |
-| `routes/integrations.routes.js` | 39 | POST | `/mikrowisp/telegram-forums/:groupId/participants/:userId/remove` | sí | — | no | n/a | — | — |
-| `routes/integrations.routes.js` | 40 | POST | `/mikrowisp/telegram-forums/:groupId/participants/:userId/reinstate` | sí | — | no | n/a | — | — |
-| `routes/integrations.routes.js` | 42 | PUT | `/:provider` | sí | — | no | **no** | — | `BODY_SCHEMA_MISSING`, `PARAM_SCHEMA_MISSING` |
-| `routes/integrations.routes.js` | 43 | POST | `/:provider/test` | sí | — | no | n/a | — | `PARAM_SCHEMA_MISSING` |
-| `routes/integrations.routes.js` | 44 | DELETE | `/:provider` | sí | — | no | n/a | — | `PARAM_SCHEMA_MISSING` |
+| `routes/integrations.routes.js` | 30 | GET | `/` | sí | — | no | n/a | — | — |
+| `routes/integrations.routes.js` | 31 | GET | `/mikrowisp/clients/:clientId` | sí | — | no | n/a | — | — |
+| `routes/integrations.routes.js` | 32 | GET | `/mikrowisp/catalogs` | sí | — | no | n/a | — | — |
+| `routes/integrations.routes.js` | 33 | GET | `/mikrowisp/catalogs/:type` | sí | — | no | n/a | — | — |
+| `routes/integrations.routes.js` | 34 | POST | `/mikrowisp/catalogs/:type/sync` | sí | — | no | n/a | — | — |
+| `routes/integrations.routes.js` | 35 | GET | `/mikrowisp/telegram-forums` | sí | — | no | n/a | — | — |
+| `routes/integrations.routes.js` | 36 | GET | `/mikrowisp/guide` | sí | — | no | n/a | — | — |
+| `routes/integrations.routes.js` | 37 | GET | `/mikrowisp/guide/download` | sí | — | no | n/a | — | — |
+| `routes/integrations.routes.js` | 38 | POST | `/mikrowisp/telegram-forums/link-code` | sí | — | no | sí | — | — |
+| `routes/integrations.routes.js` | 39 | GET | `/mikrowisp/telegram-forums/:groupId/topics` | sí | — | no | n/a | — | — |
+| `routes/integrations.routes.js` | 40 | POST | `/mikrowisp/telegram-forums/:groupId/reconcile` | sí | — | no | n/a | — | — |
+| `routes/integrations.routes.js` | 41 | POST | `/mikrowisp/telegram-forums/:groupId/topics/preview` | sí | — | no | sí | — | — |
+| `routes/integrations.routes.js` | 42 | POST | `/mikrowisp/telegram-forums/:groupId/topics` | sí | — | no | sí | — | — |
+| `routes/integrations.routes.js` | 43 | POST | `/mikrowisp/telegram-forums/:groupId/topics/:topicId/close` | sí | — | no | n/a | — | — |
+| `routes/integrations.routes.js` | 44 | POST | `/mikrowisp/telegram-forums/:groupId/topics/:topicId/reopen` | sí | — | no | n/a | — | — |
+| `routes/integrations.routes.js` | 45 | POST | `/mikrowisp/telegram-forums/:groupId/topics/:topicId/recreate` | sí | — | no | n/a | — | — |
+| `routes/integrations.routes.js` | 46 | POST | `/mikrowisp/telegram-forums/:groupId/topics/:topicId/delete` | sí | — | no | n/a | — | — |
+| `routes/integrations.routes.js` | 47 | GET | `/mikrowisp/telegram-forums/:groupId/participants` | sí | — | no | n/a | — | — |
+| `routes/integrations.routes.js` | 48 | POST | `/mikrowisp/telegram-forums/:groupId/participants/:userId/invite` | sí | — | no | n/a | — | — |
+| `routes/integrations.routes.js` | 49 | POST | `/mikrowisp/telegram-forums/:groupId/participants/:userId/remove` | sí | — | no | n/a | — | — |
+| `routes/integrations.routes.js` | 50 | POST | `/mikrowisp/telegram-forums/:groupId/participants/:userId/reinstate` | sí | — | no | n/a | — | — |
+| `routes/integrations.routes.js` | 51 | GET | `/mikrowisp/telegram-forums/:groupId/topics/bulk/preview` | sí | — | no | n/a | — | — |
+| `routes/integrations.routes.js` | 52 | GET | `/mikrowisp/telegram-forums/:groupId/topics/bulk/latest` | sí | — | no | n/a | — | — |
+| `routes/integrations.routes.js` | 53 | POST | `/mikrowisp/telegram-forums/:groupId/topics/bulk` | sí | — | no | n/a | — | — |
+| `routes/integrations.routes.js` | 54 | GET | `/mikrowisp/telegram-forums/:groupId/topics/bulk/:jobId` | sí | — | no | n/a | — | — |
+| `routes/integrations.routes.js` | 55 | POST | `/mikrowisp/telegram-forums/:groupId/topics/bulk/:jobId/pause` | sí | — | no | n/a | — | — |
+| `routes/integrations.routes.js` | 56 | POST | `/mikrowisp/telegram-forums/:groupId/topics/bulk/:jobId/resume` | sí | — | no | n/a | — | — |
+| `routes/integrations.routes.js` | 57 | GET | `/telegram-groups/:groupId/fiber-routes` | sí | — | no | n/a | — | — |
+| `routes/integrations.routes.js` | 58 | POST | `/telegram-groups/:groupId/fiber-routes` | sí | — | no | sí | — | — |
+| `routes/integrations.routes.js` | 59 | GET | `/telegram-groups/:groupId/fiber-routes/:routeId` | sí | — | no | n/a | — | — |
+| `routes/integrations.routes.js` | 60 | POST | `/telegram-groups/:groupId/fiber-routes/:routeId/elements` | sí | — | no | sí | — | — |
+| `routes/integrations.routes.js` | 61 | POST | `/telegram-groups/:groupId/fiber-routes/:routeId/measurements` | sí | — | no | sí | — | — |
+| `routes/integrations.routes.js` | 62 | POST | `/telegram-groups/:groupId/fiber-routes/:routeId/evidence` | sí | — | no | sí | — | — |
+| `routes/integrations.routes.js` | 63 | POST | `/telegram-groups/:groupId/fiber-routes/:routeId/status` | sí | — | no | sí | — | — |
+| `routes/integrations.routes.js` | 65 | PUT | `/:provider` | sí | — | no | **no** | — | `BODY_SCHEMA_MISSING`, `PARAM_SCHEMA_MISSING` |
+| `routes/integrations.routes.js` | 66 | POST | `/:provider/test` | sí | — | no | n/a | — | `PARAM_SCHEMA_MISSING` |
+| `routes/integrations.routes.js` | 67 | DELETE | `/:provider` | sí | — | no | n/a | — | `PARAM_SCHEMA_MISSING` |
 | `routes/nodes/credentials.routes.js` | 25 | POST | `/node/creds/save` | sí | — | no | sí | sql | — |
 | `routes/nodes/credentials.routes.js` | 39 | POST | `/node/creds/get` | sí | — | no | sí | sql | — |
 | `routes/nodes/credentials.routes.js` | 54 | POST | `/node/ssh-creds/save` | sí | — | no | sí | sql, network-admin | — |

@@ -1,5 +1,12 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-30 — Grupos operativos, creación masiva y rutas de fibra implementados.** Rama `vps_uni` sobre `4ba8893`; local, pendiente deploy.
+> - “Historial de clientes” se generalizó a “Grupos operativos” con perfiles Seguimiento de clientes, Rutas de fibra y Operativo general. Los permisos del bot se calculan por capacidad y una vinculación con permisos incompletos queda visible y diagnosticable en vez de perder el grupo.
+> - La creación masiva obtiene clientes con una sola llamada read-only a `GetClientsDetails`, previsualiza existentes/faltantes y usa una cola persistente secuencial con progreso, pausa/reanudación, deduplicación y respeto de límites Telegram. Las respuestas ambiguas no se reintentan.
+> - Rutas de fibra agrega ruta, recorrido ordenado, fusiones, mediciones, evidencias y eventos auditables; crea un tema canónico y ofrece comandos contextuales, incluida evidencia fotográfica sin almacenar conversaciones completas.
+> - SQL aditivo amplía el dominio MikroWisp/Telegram de 9 a 17 tablas; todas las rutas nuevas requieren sesión OWNER y validación estricta. MikroWisp continúa estrictamente de solo lectura y Sitios continúa sólo en chat privado.
+> - Verificación: backend **137/767**, frontend **82/275**, focalizadas nuevas **29/29 + 4/4**, build, TypeScript, lint, inventario de rutas y `check:all` verdes. Pendiente migración/canary/despliegue controlado.
+>
 > **Sesión 2026-08-29 — Historial Telegram y autorización de Sitios desplegados.** Rama `vps_uni`, runtime/checkout `d006f3c`; despliegue confirmado por el usuario.
 > - Se creó y verificó el respaldo `/root/backups/pre-telegram-history-20260829T163621Z` con dump comprimido, checksum y conteos previos. Se etiquetaron las imágenes anteriores como `gestionvpn-10-{backend|frontend}:pre-telegram-history-20260829T163621Z` para reversión.
 > - El checkout productivo avanzó a `d006f3c`. Backend se reconstruyó y recreó primero, alcanzó estado healthy, y después se reconstruyó y recreó frontend. La ejecución terminó con `/api/health` satisfactorio y `DEPLOY_OK`.

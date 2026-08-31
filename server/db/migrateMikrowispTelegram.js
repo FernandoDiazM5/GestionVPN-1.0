@@ -6,6 +6,9 @@ const TABLES = Object.freeze([
   'workspace_integrations', 'platform_integrations', 'external_catalog_entries',
   'external_catalog_sync_state', 'integration_guides', 'telegram_forum_groups',
   'telegram_forum_topics', 'telegram_forum_participants', 'telegram_forum_audit',
+  'telegram_group_profiles', 'telegram_topic_bulk_jobs', 'telegram_topic_bulk_items',
+  'fiber_routes', 'fiber_route_elements', 'fiber_route_measurements',
+  'fiber_route_evidence', 'fiber_route_events',
 ]);
 
 function adaptSchema(raw, collation) {
