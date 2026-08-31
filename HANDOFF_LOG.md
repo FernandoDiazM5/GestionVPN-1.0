@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-31 — Error 500 posterior a APPLY WireGuard corregido.** Runtime backend `5210630`.
+> - El agente había aplicado y verificado correctamente `wg0` en `10.12.250.60/32`; el 500 ocurría después, al insertar `QUEUED` en `platform_security_audit.outcome`, enum limitado a `SUCCESS|FAILED`.
+> - Las solicitudes APPLY, ROTATE y ROLLBACK aceptadas usan ahora `SUCCESS`. `check:all` quedó verde y se recreó sólo backend.
+> - Producción: health correcto, DB/backend healthy, frontend activo, cero reinicios, agente activo y `wg0` preservado. Rollback `gestionvpn-10-backend:pre-wg-audit-fix-20260831T170210Z`.
+> - Observación: el último APPLY indicó Core `213.173.36.232:13234`; contrastar con el puerto planificado `13232` para `VPN-WG-VPS` antes de sincronizar el peer.
+
 > **Sesión 2026-08-31 — Falso solapamiento de la propia `wg0` corregido.** Runtime backend `8a987a6`.
 > - Tras aplicar el túnel, la previsualización detectaba `10.12.250.60/32` de la propia `wg0` dentro de `10.12.248.0/22` y lo reportaba erróneamente como colisión del VPS/Docker.
 > - La validación excluye únicamente la interfaz administrada y conserva las comprobaciones contra todas las demás interfaces. Prueba de regresión añadida; focalizadas 4/4 y `check:all` verdes.
