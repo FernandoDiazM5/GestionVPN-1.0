@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-31 — Falso solapamiento de la propia `wg0` corregido.** Runtime backend `8a987a6`.
+> - Tras aplicar el túnel, la previsualización detectaba `10.12.250.60/32` de la propia `wg0` dentro de `10.12.248.0/22` y lo reportaba erróneamente como colisión del VPS/Docker.
+> - La validación excluye únicamente la interfaz administrada y conserva las comprobaciones contra todas las demás interfaces. Prueba de regresión añadida; focalizadas 4/4 y `check:all` verdes.
+> - Producción confirma que `10.12.248.0/22` es válida con cero conflictos. `10.12.148.0/22` no colisiona, pero se bloquea por no coincidir con la superred configurada.
+> - Se recreó sólo backend; DB/backend healthy, frontend activo, cero reinicios y WireGuard permaneció levantado. Rollback: `gestionvpn-10-backend:pre-wg-overlap-fix-20260831T163008Z`.
+
 > **Sesión 2026-08-31 — WireGuard web Fases 3–6 desplegadas.** Runtime `7d7ce58` en `143.244.169.142`; aplicación real pendiente de canary.
 > - Se respaldó MariaDB en `/root/backups/pre-wireguard-web-full-20260831T144350Z/vpn_manager.sql.gz` y se etiquetaron ambas imágenes con `pre-wireguard-web-full-20260831T144350Z`.
 > - Se instalaron `wireguard-tools`, el agente allowlist y sus unidades; `wg0-provision.path` está activo y `wg-quick@wg0` habilitado para persistencia futura.
