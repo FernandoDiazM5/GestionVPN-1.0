@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-31 — Despliegue en nueva Gota.** Rama `vps_uni`, runtime `a8bcf4f`, Droplet `143.244.169.142` (`vpn-join`).
+> - El VPS nuevo se preparó desde cero con Docker Engine/Compose, MariaDB 11, certificados temporales autofirmados y volúmenes persistentes nuevos; la base de datos queda vacía por solicitud.
+> - Backend y frontend se construyeron y arrancaron con `docker-compose.prod.yml`; MariaDB y backend reportan `healthy`, `/api/health` responde correctamente y el frontend HTTPS responde 200 usando el nombre canónico con `--resolve`.
+> - Se verificó espacio libre aproximado de 40 GiB. Telegram quedó desactivado hasta configurar el token y MikroWisp queda listo para ingresar credenciales desde la web; no se copiaron secretos del VPS anterior ni se cambió DNS.
+> - El VPS anterior `134.199.212.232` permanece intacto como contingencia.
+
 > **Sesión 2026-08-30 — Grupos operativos, creación masiva y rutas de fibra implementados.** Rama `vps_uni` sobre `4ba8893`; local, pendiente deploy.
 > - “Historial de clientes” se generalizó a “Grupos operativos” con perfiles Seguimiento de clientes, Rutas de fibra y Operativo general. Los permisos del bot se calculan por capacidad y una vinculación con permisos incompletos queda visible y diagnosticable en vez de perder el grupo.
 > - La creación masiva obtiene clientes con una sola llamada read-only a `GetClientsDetails`, previsualiza existentes/faltantes y usa una cola persistente secuencial con progreso, pausa/reanudación, deduplicación y respeto de límites Telegram. Las respuestas ambiguas no se reintentan.
