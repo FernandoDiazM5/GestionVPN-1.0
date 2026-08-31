@@ -95,14 +95,14 @@ router.post('/wireguard-apply', asyncHandler(async (req, res) => {
     ['vps_wireguard_desired', JSON.stringify(input), Date.now()],
   );
   const request = await requestWireguardOperation('APPLY', input, req.account?.sub);
-  await recordWireguardAudit(req, 'WG_VPS_APPLY_REQUESTED', 'QUEUED', { requestId: request.requestId, desired: preview.desired });
+  await recordWireguardAudit(req, 'WG_VPS_APPLY_REQUESTED', 'SUCCESS', { requestId: request.requestId, desired: preview.desired });
   return sendOk(res, { request, confirmation: WG_APPLY_CONFIRMATION }, 202);
 }));
 
 router.post('/wireguard-rollback', asyncHandler(async (req, res) => {
   z.object({ confirmation: z.literal(WG_ROLLBACK_CONFIRMATION) }).strict().parse(req.body);
   const request = await requestWireguardOperation('ROLLBACK', null, req.account?.sub);
-  await recordWireguardAudit(req, 'WG_VPS_ROLLBACK_REQUESTED', 'QUEUED', { requestId: request.requestId });
+  await recordWireguardAudit(req, 'WG_VPS_ROLLBACK_REQUESTED', 'SUCCESS', { requestId: request.requestId });
   return sendOk(res, { request, confirmation: WG_ROLLBACK_CONFIRMATION }, 202);
 }));
 
@@ -113,7 +113,7 @@ router.post('/wireguard-rotate', asyncHandler(async (req, res) => {
   try { desired = wireguardPreviewSchema.parse(JSON.parse(raw || '{}')); }
   catch (_) { throw new AppError('Primero guarda y aplica una configuración WireGuard válida.', 409, 'WG_DESIRED_MISSING'); }
   const request = await requestWireguardOperation('ROTATE', desired, req.account?.sub);
-  await recordWireguardAudit(req, 'WG_VPS_KEY_ROTATION_REQUESTED', 'QUEUED', { requestId: request.requestId });
+  await recordWireguardAudit(req, 'WG_VPS_KEY_ROTATION_REQUESTED', 'SUCCESS', { requestId: request.requestId });
   return sendOk(res, { request, confirmation: WG_ROTATE_CONFIRMATION }, 202);
 }));
 
