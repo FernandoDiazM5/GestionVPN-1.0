@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-31 — WireGuard web Fases 3–6 desplegadas.** Runtime `7d7ce58` en `143.244.169.142`; aplicación real pendiente de canary.
+> - Se respaldó MariaDB en `/root/backups/pre-wireguard-web-full-20260831T144350Z/vpn_manager.sql.gz` y se etiquetaron ambas imágenes con `pre-wireguard-web-full-20260831T144350Z`.
+> - Se instalaron `wireguard-tools`, el agente allowlist y sus unidades; `wg0-provision.path` está activo y `wg-quick@wg0` habilitado para persistencia futura.
+> - Backend y frontend fueron reconstruidos y recreados en orden. DB/backend healthy, HTTPS externo y `/api/health` correctos, cero reinicios y 33 GiB libres.
+> - No se activó el túnel: no existen intención pendiente, `wg0.conf` ni interfaz `wg0`. El siguiente paso humano es ingresar la clave pública real del Core desde Administración y ejecutar el canary con consola de recuperación abierta.
+
 > **Sesión 2026-08-31 — Despliegue en nueva Gota.** Rama `vps_uni`, runtime `a8bcf4f`, Droplet `143.244.169.142` (`vpn-join`).
 > - El VPS nuevo se preparó desde cero con Docker Engine/Compose, MariaDB 11, certificados temporales autofirmados y volúmenes persistentes nuevos; la base de datos queda vacía por solicitud.
 > - Backend y frontend se construyeron y arrancaron con `docker-compose.prod.yml`; MariaDB y backend reportan `healthy`, `/api/health` responde correctamente y el frontend HTTPS responde 200 usando el nombre canónico con `--resolve`.

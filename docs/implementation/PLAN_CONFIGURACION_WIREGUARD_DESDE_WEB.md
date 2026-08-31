@@ -175,7 +175,7 @@ Agregar el formulario y endpoint de **previsualización sin cambios**: validar i
 
 ## Resultado de la Fase 3 — validación y previsualización
 
-Estado: implementada localmente el 2026-08-31, pendiente de despliegue.
+Estado: desplegada el 2026-08-31 en el runtime `7d7ce58`.
 
 - Administración incorpora el formulario “Previsualizar configuración WireGuard”.
 - Valores iniciales: interfaz `wg0`, VPS `10.12.250.60/32`, MTU 1420, Core `213.173.36.232:13232`, AllowedIPs `10.12.248.0/22` y keepalive 25 segundos.
@@ -193,7 +193,7 @@ Diseñar el agente privilegiado allowlist, almacenamiento no secreto, respaldo v
 
 ## Resultado de las Fases 4, 5 y 6
 
-Estado: implementadas localmente el 2026-08-31, pendientes de despliegue conjunto y canary real.
+Estado: desplegadas el 2026-08-31 en el runtime `7d7ce58`; pendiente únicamente el canary real.
 
 ### Fase 4 — aplicación controlada
 
@@ -226,3 +226,5 @@ Estado: implementadas localmente el 2026-08-31, pendientes de despliegue conjunt
 ### Condición para el despliegue y canary
 
 El despliegue del código y del agente no activa `wg0` por sí mismo. La primera aplicación real requiere ingresar la clave pública exacta de `VPN-WG-VPS` obtenida del Core, validar la previsualización y mantener abierta la consola de recuperación. Después se sincroniza el peer VPS y se verifican handshake, ruta a `10.12.248.0/22`, health y reinicio controlado.
+
+Verificación del despliegue: respaldo `/root/backups/pre-wireguard-web-full-20260831T144350Z/vpn_manager.sql.gz`; imágenes de reversión `gestionvpn-10-{backend|frontend}:pre-wireguard-web-full-20260831T144350Z`; DB/backend healthy, HTTPS externo y `/api/health` correctos, cero reinicios, agente activo y 33 GiB libres. Se confirmó la ausencia de intención pendiente, `/etc/wireguard/wg0.conf` e interfaz `wg0`.
