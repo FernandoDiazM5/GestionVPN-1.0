@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-31 — Despliegue normalizado a Compose productivo.** Checkout `f3810eb` en la Gota `143.244.169.142`.
+> - La inspección detectó que backend/frontend habían sido creados con la mezcla de compose local + productivo, aunque la aplicación estaba respondiendo. Se evitó tocar el VPS de contingencia `134.199.212.232`.
+> - Se conservaron rollbacks `gestionvpn-10-{backend,frontend}:pre-prod-only-20260831T183947Z`, se reconstruyeron las imágenes y se recrearon sólo backend/frontend con `docker-compose.prod.yml`; MariaDB siguió activa y healthy.
+> - Las etiquetas de los tres contenedores apuntan exclusivamente al compose productivo y el puerto 8080 ya no se publica. Resultado: raíz/health 200, CORS 204/403, login inválido 401, cero reinicios y logs recientes sin errores.
+> - WireGuard no fue modificado: `wg0` continúa presente con `10.12.250.60/32`. Disco 38 %, 30 GiB libres.
+
 > **Sesión 2026-08-31 — Auditoría integral de trazabilidad WireGuard.** Diagnóstico, sin cambios de red.
 > - El APPLY está completado y el agente conserva la clave pública, pero la pantalla sólo muestra mensaje/respaldo; omite la clave y no avanza ni refresca tras la solicitud.
 > - El backend no-root marca `DEGRADED` porque no puede leer clave/puerto con `wg show`, aunque sí ve `wg0`, `10.12.250.60/32` y la ruta. El flujo Core usa esa clave nula en vez de la clave pública confiable del resultado del agente.
