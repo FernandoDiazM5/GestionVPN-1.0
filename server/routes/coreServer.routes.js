@@ -7,9 +7,16 @@ const coreProvisionRepo = require('../db/repos/coreProvisionRepo');
 const { getAppSetting } = require('../db.service');
 const { inspectVpsWireguard } = require('../lib/vpsWireguardStatus');
 const { previewVpsWireguard } = require('../lib/vpsWireguardPreview');
+const { requestWireguardOperation, readWireguardAgentResult } = require('../lib/vpsWireguardIntent');
+const { previewCoreVpsPeer, syncCoreVpsPeer } = require('../lib/coreVpsPeerService');
+const crypto = require('node:crypto');
 
 const router = express.Router();
 const CONFIRMATION = 'PREPARAR DESDE CERO';
+const WG_APPLY_CONFIRMATION = 'APLICAR WIREGUARD VPS';
+const WG_ROLLBACK_CONFIRMATION = 'REVERTIR WIREGUARD VPS';
+const WG_CORE_CONFIRMATION = 'SINCRONIZAR PEER VPS';
+const WG_ROTATE_CONFIRMATION = 'ROTAR CLAVE WIREGUARD VPS';
 const wireguardPreviewSchema = z.object({
   interface: z.string().trim().regex(/^[A-Za-z0-9_.-]{1,15}$/, 'Interfaz WireGuard inválida.'),
   address: z.string().trim().min(9).max(18),
@@ -36,12 +43,13 @@ function asAppError(error) {
 }
 
 router.get('/status', asyncHandler(async (_req, res) => {
-  const [health, lastBackup, config, vpsWireguard] = await Promise.all([
-    inspectCore(), getLastBackup(), loadConfig(), inspectVpsWireguard(),
+  const [health, lastBackup, config, vpsWireguard, wireguardAgent] = await Promise.all([
+    inspectCore(), getLastBackup(), loadConfig(), inspectVpsWireguard(), readWireguardAgentResult(),
   ]);
   return sendOk(res, {
     health,
     vpsWireguard,
+    wireguardAgent,
     backup: {
       enabled: config.enabled,
       time: config.time,
@@ -61,6 +69,70 @@ router.post('/wireguard-preview', asyncHandler(async (req, res) => {
     inspectVpsWireguard(),
   ]);
   return sendOk(res, { preview: previewVpsWireguard(input, { managementSupernet, current }) });
+}));
+
+async function recordWireguardAudit(req, action, outcome, detail) {
+  const db = await require('../db.service').getDb();
+  await db.run(`INSERT INTO platform_security_audit
+    (id,actor_user_id,action,target,jail,category,reason,outcome,detail,request_ip,created_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?)`, [
+    crypto.randomUUID(), req.account?.sub, action, 'wg0', null, 'NETWORK_CONFIG',
+    'Configuración WireGuard desde Administración', outcome, JSON.stringify(detail || {}), req.ip || null, Date.now(),
+  ]);
+}
+
+router.post('/wireguard-apply', asyncHandler(async (req, res) => {
+  const body = wireguardPreviewSchema.extend({ confirmation: z.literal(WG_APPLY_CONFIRMATION) }).parse(req.body);
+  const { confirmation: _confirmation, ...input } = body;
+  const [managementSupernet, current] = await Promise.all([
+    getAppSetting('management_supernet').catch(() => ''), inspectVpsWireguard(),
+  ]);
+  const preview = previewVpsWireguard(input, { managementSupernet, current });
+  if (!preview.valid) throw new AppError(preview.blockers[0], 409, 'WG_PREVIEW_BLOCKED', { preview });
+  const db = await require('../db.service').getDb();
+  await db.run(
+    'INSERT INTO app_settings (`key`, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(`key`) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at',
+    ['vps_wireguard_desired', JSON.stringify(input), Date.now()],
+  );
+  const request = await requestWireguardOperation('APPLY', input, req.account?.sub);
+  await recordWireguardAudit(req, 'WG_VPS_APPLY_REQUESTED', 'QUEUED', { requestId: request.requestId, desired: preview.desired });
+  return sendOk(res, { request, confirmation: WG_APPLY_CONFIRMATION }, 202);
+}));
+
+router.post('/wireguard-rollback', asyncHandler(async (req, res) => {
+  z.object({ confirmation: z.literal(WG_ROLLBACK_CONFIRMATION) }).strict().parse(req.body);
+  const request = await requestWireguardOperation('ROLLBACK', null, req.account?.sub);
+  await recordWireguardAudit(req, 'WG_VPS_ROLLBACK_REQUESTED', 'QUEUED', { requestId: request.requestId });
+  return sendOk(res, { request, confirmation: WG_ROLLBACK_CONFIRMATION }, 202);
+}));
+
+router.post('/wireguard-rotate', asyncHandler(async (req, res) => {
+  z.object({ confirmation: z.literal(WG_ROTATE_CONFIRMATION) }).strict().parse(req.body);
+  const raw = await getAppSetting('vps_wireguard_desired').catch(() => '');
+  let desired;
+  try { desired = wireguardPreviewSchema.parse(JSON.parse(raw || '{}')); }
+  catch (_) { throw new AppError('Primero guarda y aplica una configuración WireGuard válida.', 409, 'WG_DESIRED_MISSING'); }
+  const request = await requestWireguardOperation('ROTATE', desired, req.account?.sub);
+  await recordWireguardAudit(req, 'WG_VPS_KEY_ROTATION_REQUESTED', 'QUEUED', { requestId: request.requestId });
+  return sendOk(res, { request, confirmation: WG_ROTATE_CONFIRMATION }, 202);
+}));
+
+router.get('/wireguard-core-preview', asyncHandler(async (_req, res) => {
+  const current = await inspectVpsWireguard();
+  try {
+    return sendOk(res, { preview: await previewCoreVpsPeer({ vpsPublicKey: current.publicKey }), confirmation: WG_CORE_CONFIRMATION });
+  } catch (error) { throw asAppError(error); }
+}));
+
+router.post('/wireguard-core-sync', asyncHandler(async (req, res) => {
+  z.object({ confirmation: z.literal(WG_CORE_CONFIRMATION) }).strict().parse(req.body);
+  const current = await inspectVpsWireguard();
+  if (!current.publicKey) throw new AppError('WireGuard del VPS aún no tiene una clave pública activa.', 409, 'WG_VPS_NOT_ACTIVE');
+  try {
+    const result = await syncCoreVpsPeer(current.publicKey);
+    await recordWireguardAudit(req, 'WG_CORE_VPS_PEER_SYNCED', 'SUCCESS', result);
+    return sendOk(res, { result });
+  } catch (error) { throw asAppError(error); }
 }));
 
 router.get('/provision-preview', asyncHandler(async (_req, res) => {

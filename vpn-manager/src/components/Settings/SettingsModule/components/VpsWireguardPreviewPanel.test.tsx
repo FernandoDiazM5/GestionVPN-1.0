@@ -16,11 +16,11 @@ describe('VpsWireguardPreviewPanel', () => {
     render(<VpsWireguardPreviewPanel />);
     await user.type(screen.getByLabelText('Clave pública del Core'), `${'A'.repeat(43)}=`);
     await user.click(screen.getByRole('button', { name: 'Validar sin aplicar' }));
-    expect(await screen.findByText('Configuración válida para una fase futura')).toBeInTheDocument();
+    expect(await screen.findByText('Configuración válida')).toBeInTheDocument();
     expect(mocks.wireguardPreview).toHaveBeenCalledWith(expect.objectContaining({
       address: '10.12.250.60/32', coreEndpointHost: '213.173.36.232', coreEndpointPort: 13232,
       allowedIps: ['10.12.248.0/22'],
     }));
-    expect(screen.queryByRole('button', { name: /^Aplicar/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Aplicar mediante agente' })).toBeDisabled();
   });
 });

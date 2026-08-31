@@ -190,3 +190,39 @@ Verificación: backend 5/5 pruebas focalizadas, frontend 5/5, TypeScript, lint, 
 ### Salida hacia la Fase 4
 
 Diseñar el agente privilegiado allowlist, almacenamiento no secreto, respaldo verificable y rollback. Antes de permitir aplicación se debe obtener y confirmar la clave pública real del Core y probar el procedimiento en un canary con acceso de recuperación.
+
+## Resultado de las Fases 4, 5 y 6
+
+Estado: implementadas localmente el 2026-08-31, pendientes de despliegue conjunto y canary real.
+
+### Fase 4 — aplicación controlada
+
+- El backend no-root escribe una intención JSON atómica en `/opt/wg0-autosync`; nunca ejecuta shell ni recibe la clave privada.
+- `wg0-provision.path/service` ejecuta un agente Python root endurecido con operaciones enumeradas `APPLY`, `ROTATE` y `ROLLBACK`.
+- El agente vuelve a validar interfaz, IPv4 `/32`, MTU, puertos, clave pública, endpoint, AllowedIPs y keepalive.
+- La primera aplicación genera la clave privada dentro del VPS, modo 600, y publica únicamente la clave pública.
+- Antes de cada aplicación crea un respaldo en `/var/backups/gestionvpn-wireguard`.
+- Si `wg-quick up` o la verificación falla, restaura automáticamente el respaldo anterior.
+- `wg-quick@wg0` queda habilitado para sobrevivir reinicios.
+- La web exige confirmaciones literales para aplicar, rotar o revertir y muestra el resultado no secreto del agente.
+
+### Fase 5 — peer del Core
+
+- La web inspecciona la interfaz `VPN-WG-VPS`, su clave pública y puerto antes de cambiarla.
+- Si la clave pública indicada no coincide con la real del Core, la sincronización queda bloqueada.
+- La operación crea o actualiza exclusivamente el peer con comentario `GVPN:VPS`.
+- Conserva todos los peers ajenos y limita el cambio a clave pública del VPS, Allowed Address y keepalive.
+- La sincronización requiere que el VPS ya exponga una clave pública activa y confirmación literal.
+
+### Fase 6 — operación y recuperación
+
+- Estado del agente visible en Administración: solicitud, resultado, mensaje, respaldo y clave pública.
+- Auditoría de solicitudes de aplicación, rollback, rotación y sincronización del Core.
+- Rotación de clave local con respaldo previo; después exige revisar/sincronizar el peer del Core.
+- Rollback del último respaldo desde la web con confirmación reforzada.
+- Persistencia tras reinicio mediante `wg-quick@wg0` y reconciliación existente de LAN/AllowedIPs.
+- Runbook de instalación y recuperación actualizado en `deploy/wg0-autosync/README.md`.
+
+### Condición para el despliegue y canary
+
+El despliegue del código y del agente no activa `wg0` por sí mismo. La primera aplicación real requiere ingresar la clave pública exacta de `VPN-WG-VPS` obtenida del Core, validar la previsualización y mantener abierta la consola de recuperación. Después se sincroniza el peer VPS y se verifican handshake, ruta a `10.12.248.0/22`, health y reinicio controlado.

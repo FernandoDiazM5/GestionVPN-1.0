@@ -52,6 +52,15 @@ export interface CoreStatusResponse {
     routes: string[];
     inspectedAt: number;
   };
+  wireguardAgent: null | {
+    requestId: string;
+    operation: string;
+    status: string;
+    message: string;
+    publicKey: string | null;
+    backupId: string;
+    completedAt: number | null;
+  };
   backup: {
     enabled: boolean;
     time: string;
@@ -115,6 +124,17 @@ export interface VpsWireguardPreview {
   actions: string[];
 }
 
+export interface CoreVpsPeerPreview {
+  valid: boolean;
+  canSync: boolean;
+  blockers: string[];
+  changes: Array<{ field: string; action: string }>;
+  interface?: string;
+  expectedAllowed?: string[];
+  peerPresent?: boolean;
+  actions: string[];
+}
+
 export const coreServerApi = {
   status: () => get<CoreStatusResponse>('/api/admin/core-server/status'),
   health: () => post<{ success: true; health: CoreHealth }>('/api/admin/core-server/health'),
@@ -127,5 +147,20 @@ export const coreServerApi = {
   ),
   wireguardPreview: (draft: VpsWireguardDraft) => post<{ success: true; preview: VpsWireguardPreview }>(
     '/api/admin/core-server/wireguard-preview', draft,
+  ),
+  wireguardApply: (draft: VpsWireguardDraft, confirmation: string) => post<{ success: true; request: { requestId: string; status: string } }>(
+    '/api/admin/core-server/wireguard-apply', { ...draft, confirmation },
+  ),
+  wireguardRollback: (confirmation: string) => post<{ success: true; request: { requestId: string; status: string } }>(
+    '/api/admin/core-server/wireguard-rollback', { confirmation },
+  ),
+  wireguardRotate: (confirmation: string) => post<{ success: true; request: { requestId: string; status: string } }>(
+    '/api/admin/core-server/wireguard-rotate', { confirmation },
+  ),
+  wireguardCorePreview: () => get<{ success: true; preview: CoreVpsPeerPreview; confirmation: string }>(
+    '/api/admin/core-server/wireguard-core-preview',
+  ),
+  wireguardCoreSync: (confirmation: string) => post<{ success: true; result: { changed: boolean; interface: string; allowedAddresses: string[] } }>(
+    '/api/admin/core-server/wireguard-core-sync', { confirmation },
   ),
 };

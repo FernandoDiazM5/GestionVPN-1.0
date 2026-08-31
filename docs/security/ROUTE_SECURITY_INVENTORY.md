@@ -6,10 +6,10 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 
 ## Resumen
 
-- Rutas detectadas: 209
-- Rutas de mutación (POST/PUT/PATCH): 132
-- Rutas que consumen `req.body`: 97
-- Rutas con esquema de `req.body` detectable: 94/97
+- Rutas detectadas: 214
+- Rutas de mutación (POST/PUT/PATCH): 136
+- Rutas que consumen `req.body`: 101
+- Rutas con esquema de `req.body` detectable: 98/101
 - Endpoints públicos de identidad sin rate limiting detectable: 0
 
 ## Alertas detectadas
@@ -120,13 +120,18 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `routes/core/tunnel.routes.js` | 156 | GET | `/tunnel/status` | sí | — | no | n/a | network-admin | — |
 | `routes/core/tunnel.routes.js` | 194 | GET | `/tunnel/my-mgmt-ip` | sí | — | no | n/a | — | — |
 | `routes/core/tunnel.routes.js` | 215 | POST | `/tunnel/register-my-ip` | sí | — | no | sí | sql, network-admin | — |
-| `routes/coreServer.routes.js` | 38 | GET | `/status` | sí | platform-admin | no | n/a | — | — |
-| `routes/coreServer.routes.js` | 55 | POST | `/health` | sí | platform-admin | no | n/a | — | — |
-| `routes/coreServer.routes.js` | 57 | POST | `/wireguard-preview` | sí | platform-admin | no | sí | network-admin | — |
-| `routes/coreServer.routes.js` | 66 | GET | `/provision-preview` | sí | platform-admin | no | n/a | — | — |
-| `routes/coreServer.routes.js` | 74 | GET | `/provision-history` | sí | platform-admin | no | n/a | — | — |
-| `routes/coreServer.routes.js` | 78 | POST | `/provision` | sí | platform-admin | no | sí | — | — |
-| `routes/coreServer.routes.js` | 104 | POST | `/backup-now` | sí | platform-admin | no | n/a | — | — |
+| `routes/coreServer.routes.js` | 45 | GET | `/status` | sí | platform-admin | no | n/a | — | — |
+| `routes/coreServer.routes.js` | 63 | POST | `/health` | sí | platform-admin | no | n/a | — | — |
+| `routes/coreServer.routes.js` | 65 | POST | `/wireguard-preview` | sí | platform-admin | no | sí | sql, network-admin | — |
+| `routes/coreServer.routes.js` | 84 | POST | `/wireguard-apply` | sí | platform-admin | no | sí | sql, network-admin | — |
+| `routes/coreServer.routes.js` | 102 | POST | `/wireguard-rollback` | sí | platform-admin | no | sí | network-admin | — |
+| `routes/coreServer.routes.js` | 109 | POST | `/wireguard-rotate` | sí | platform-admin | no | sí | network-admin | — |
+| `routes/coreServer.routes.js` | 120 | GET | `/wireguard-core-preview` | sí | platform-admin | no | n/a | network-admin | — |
+| `routes/coreServer.routes.js` | 127 | POST | `/wireguard-core-sync` | sí | platform-admin | no | sí | network-admin | — |
+| `routes/coreServer.routes.js` | 138 | GET | `/provision-preview` | sí | platform-admin | no | n/a | — | — |
+| `routes/coreServer.routes.js` | 146 | GET | `/provision-history` | sí | platform-admin | no | n/a | — | — |
+| `routes/coreServer.routes.js` | 150 | POST | `/provision` | sí | platform-admin | no | sí | — | — |
+| `routes/coreServer.routes.js` | 176 | POST | `/backup-now` | sí | platform-admin | no | n/a | — | — |
 | `routes/dashboard.routes.js` | 16 | GET | `/dashboard/metrics` | sí | — | no | n/a | — | — |
 | `routes/device.routes.js` | 26 | POST | `/device/auto-login` | sí | — | no | sí | network-admin | — |
 | `routes/device.routes.js` | 48 | POST | `/device/antenna` | sí | — | no | sí | sql, network-admin | — |
@@ -210,11 +215,11 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `routes/platformIntegrations.routes.js` | 14 | PUT | `/:provider` | sí | — | no | **no** | — | `BODY_SCHEMA_MISSING`, `PARAM_SCHEMA_MISSING` |
 | `routes/platformIntegrations.routes.js` | 15 | POST | `/:provider/test` | sí | — | no | n/a | — | `PARAM_SCHEMA_MISSING` |
 | `routes/platformIntegrations.routes.js` | 16 | DELETE | `/:provider` | sí | — | no | n/a | — | `PARAM_SCHEMA_MISSING` |
-| `routes/settings.routes.js` | 39 | GET | `/settings/get` | sí | platform-admin | no | n/a | sql | — |
-| `routes/settings.routes.js` | 67 | GET | `/settings/management-supernet-preview` | sí | platform-admin | no | n/a | network-admin | — |
-| `routes/settings.routes.js` | 74 | POST | `/settings/test-core-connection` | sí | platform-admin | no | sí | network-admin | — |
-| `routes/settings.routes.js` | 100 | POST | `/settings/save` | sí | platform-admin | no | sí | sql, network-admin | — |
-| `routes/settings.routes.js` | 179 | POST | `/settings/test-error-email` | sí | platform-admin | no | n/a | — | — |
+| `routes/settings.routes.js` | 40 | GET | `/settings/get` | sí | platform-admin | no | n/a | sql | — |
+| `routes/settings.routes.js` | 68 | GET | `/settings/management-supernet-preview` | sí | platform-admin | no | n/a | network-admin | — |
+| `routes/settings.routes.js` | 75 | POST | `/settings/test-core-connection` | sí | platform-admin | no | sí | network-admin | — |
+| `routes/settings.routes.js` | 101 | POST | `/settings/save` | sí | platform-admin | no | sí | sql, network-admin | — |
+| `routes/settings.routes.js` | 180 | POST | `/settings/test-error-email` | sí | platform-admin | no | n/a | — | — |
 | `routes/team.routes.js` | 218 | POST | `/invite` | sí | OWNER | no | sí | — | — |
 | `routes/team.routes.js` | 278 | POST | `/accept` | no | — | sí | sí | network-admin | `PUBLIC_MUTATION_REVIEW` |
 | `routes/team.routes.js` | 386 | GET | `/my-invitations` | sí | — | no | n/a | — | — |

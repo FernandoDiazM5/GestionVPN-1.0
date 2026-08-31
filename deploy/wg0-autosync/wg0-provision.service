@@ -1,0 +1,12 @@
+[Unit]
+Description=Aplica de forma controlada la configuración WireGuard del VPS
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/wg0-provision.py
+ProtectSystem=strict
+ReadWritePaths=/etc/wireguard /opt/wg0-autosync /var/backups/gestionvpn-wireguard /run
+PrivateTmp=true
+NoNewPrivileges=true

@@ -18,6 +18,7 @@ const ERROR_REPORT_EMAIL_KEY = 'error_report_email';
 const CORE_SERVER_SETTING_KEYS = [
   'core_wan_interface', 'core_vps_public_key', 'core_backup_enabled',
   'core_backup_time', 'core_backup_timezone', 'core_backup_password',
+  'vps_wireguard_desired',
 ];
 const PLATFORM_ONLY_SETTING_KEYS = [...CORE_ROUTER_KEYS, ERROR_REPORT_EMAIL_KEY, ...CORE_SERVER_SETTING_KEYS];
 PLATFORM_ONLY_SETTING_KEYS.push('management_supernet');

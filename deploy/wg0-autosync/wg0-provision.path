@@ -1,0 +1,9 @@
+[Unit]
+Description=Vigila solicitudes controladas de configuración WireGuard
+
+[Path]
+PathModified=/opt/wg0-autosync/server-config.desired.json
+Unit=wg0-provision.service
+
+[Install]
+WantedBy=multi-user.target

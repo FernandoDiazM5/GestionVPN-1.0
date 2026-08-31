@@ -37,6 +37,12 @@
 > - Bloquea default route, conflictos con redes del host/Docker y contratos fuera de la supernet vigente; la aplicación permanece forzada a `false`.
 > - Verificación: backend 5/5, frontend 5/5, TypeScript, lint, build, inventario de seguridad y `check:all` verdes. No hubo cambios de red.
 
+> **Sesión 2026-08-31 — WireGuard web Fases 4–6 completas localmente.** Estado: pendiente deploy/canary.
+> - Se amplió `wg0-autosync` con agente host allowlist, generación local de clave, respaldo, aplicación, rotación, rollback automático y persistencia.
+> - Se implementó sincronización dirigida del único peer `GVPN:VPS`, bloqueada si clave/puerto del Core no coinciden; no toca peers ajenos.
+> - La UI incorpora confirmaciones literales, resultado del agente, rotación, rollback, revisión y sincronización del Core; las solicitudes quedan auditadas.
+> - Instalar el código/agente no activa `wg0`; el canary requiere clave pública real del Core y consola de recuperación disponible.
+
 > **Sesión 2026-08-30 — Grupos operativos, creación masiva y rutas de fibra implementados.** Rama `vps_uni` sobre `4ba8893`; local, pendiente deploy.
 > - “Historial de clientes” se generalizó a “Grupos operativos” con perfiles Seguimiento de clientes, Rutas de fibra y Operativo general. Los permisos del bot se calculan por capacidad y una vinculación con permisos incompletos queda visible y diagnosticable en vez de perder el grupo.
 > - La creación masiva obtiene clientes con una sola llamada read-only a `GetClientsDetails`, previsualiza existentes/faltantes y usa una cola persistente secuencial con progreso, pausa/reanudación, deduplicación y respeto de límites Telegram. Las respuestas ambiguas no se reintentan.

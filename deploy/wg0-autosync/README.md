@@ -78,3 +78,29 @@ WG0_INTENT=/opt/wg0-autosync/allowedips.desired /usr/local/sbin/wg0-autosync.sh
   escritura de intención en el backend.
 - **Reinicio:** el `wg0.conf` queda persistido en disco, así que el `AllowedIPs`
   sobrevive a reboots (con `wg-quick@wg0` habilitado).
+
+## Configuración inicial desde la web
+
+El asistente administrativo utiliza un segundo watcher, separado del autosync
+de LAN. El backend sólo escribe `server-config.desired.json`; el host valida de
+nuevo, genera la clave privada local, respalda y aplica.
+
+```bash
+apt-get install -y wireguard-tools python3
+install -d -m 0700 /etc/wireguard /var/backups/gestionvpn-wireguard
+install -m 0755 deploy/wg0-autosync/wg0-provision.py /usr/local/sbin/wg0-provision.py
+install -m 0644 deploy/wg0-autosync/wg0-provision.service /etc/systemd/system/
+install -m 0644 deploy/wg0-autosync/wg0-provision.path /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now wg0-provision.path
+systemctl enable wg-quick@wg0
+```
+
+Invariantes:
+
+- El agente sólo acepta `wg0` y operaciones `APPLY`/`ROTATE`/`ROLLBACK`.
+- La clave privada vive únicamente en `/etc/wireguard/wg0.key` con modo 600.
+- Cada aplicación crea un respaldo en `/var/backups/gestionvpn-wireguard`.
+- Si `wg-quick up` o `wg show` falla, el agente restaura automáticamente.
+- El resultado no secreto se publica en `server-config.result.json` para que la
+  web muestre estado, clave pública y respaldo.
