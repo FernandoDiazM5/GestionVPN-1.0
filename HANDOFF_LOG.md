@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-31 — Auditoría integral de trazabilidad WireGuard.** Diagnóstico, sin cambios de red.
+> - El APPLY está completado y el agente conserva la clave pública, pero la pantalla sólo muestra mensaje/respaldo; omite la clave y no avanza ni refresca tras la solicitud.
+> - El backend no-root marca `DEGRADED` porque no puede leer clave/puerto con `wg show`, aunque sí ve `wg0`, `10.12.250.60/32` y la ruta. El flujo Core usa esa clave nula en vez de la clave pública confiable del resultado del agente.
+> - La nueva DB no tiene credenciales Core ni `core_vps_public_key`; `wireguard-core-preview` queda bloqueado en “Configura las credenciales del Core”, pero la vista no muestra un enlace/CTA contextual.
+> - Se recomendó sustituir formularios aislados por una máquina de estados/wizard persistente de seis pasos con una sola próxima acción, polling del agente, botón copiar clave y verificación final de handshake/rutas.
+
 > **Sesión 2026-08-31 — Error 500 posterior a APPLY WireGuard corregido.** Runtime backend `5210630`.
 > - El agente había aplicado y verificado correctamente `wg0` en `10.12.250.60/32`; el 500 ocurría después, al insertar `QUEUED` en `platform_security_audit.outcome`, enum limitado a `SUCCESS|FAILED`.
 > - Las solicitudes APPLY, ROTATE y ROLLBACK aceptadas usan ahora `SUCCESS`. `check:all` quedó verde y se recreó sólo backend.
