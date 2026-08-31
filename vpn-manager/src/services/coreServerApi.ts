@@ -40,6 +40,18 @@ export interface BackupRun {
 export interface CoreStatusResponse {
   success: true;
   health: CoreHealth;
+  vpsWireguard: {
+    status: 'ACTIVE' | 'DEGRADED' | 'NOT_CONFIGURED';
+    readOnly: true;
+    interface: string;
+    toolsAvailable: boolean;
+    interfacePresent: boolean;
+    addresses: string[];
+    listenPort: number | null;
+    publicKey: string | null;
+    routes: string[];
+    inspectedAt: number;
+  };
   backup: {
     enabled: boolean;
     time: string;

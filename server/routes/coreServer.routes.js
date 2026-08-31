@@ -5,6 +5,7 @@ const { inspectCore, previewProvision, provisionCore } = require('../lib/coreSer
 const { getLastBackup, loadConfig, runCoreBackup } = require('../lib/coreBackupService');
 const coreProvisionRepo = require('../db/repos/coreProvisionRepo');
 const { getAppSetting } = require('../db.service');
+const { inspectVpsWireguard } = require('../lib/vpsWireguardStatus');
 
 const router = express.Router();
 const CONFIRMATION = 'PREPARAR DESDE CERO';
@@ -23,9 +24,12 @@ function asAppError(error) {
 }
 
 router.get('/status', asyncHandler(async (_req, res) => {
-  const [health, lastBackup, config] = await Promise.all([inspectCore(), getLastBackup(), loadConfig()]);
+  const [health, lastBackup, config, vpsWireguard] = await Promise.all([
+    inspectCore(), getLastBackup(), loadConfig(), inspectVpsWireguard(),
+  ]);
   return sendOk(res, {
     health,
+    vpsWireguard,
     backup: {
       enabled: config.enabled,
       time: config.time,

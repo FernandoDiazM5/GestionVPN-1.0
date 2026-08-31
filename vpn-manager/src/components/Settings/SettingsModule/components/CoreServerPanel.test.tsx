@@ -15,6 +15,10 @@ const status = {
     configured: true, apiOk: true, status: 'HEALTHY' as const, identity: 'GW-VPN-CORE-ISP',
     version: '7.20', model: 'CHR', vpnReady: true,
   },
+  vpsWireguard: {
+    status: 'NOT_CONFIGURED' as const, readOnly: true as const, interface: 'wg0', toolsAvailable: false,
+    interfacePresent: false, addresses: [], listenPort: null, publicKey: null, routes: [], inspectedAt: Date.now(),
+  },
   backup: { enabled: true, time: '02:00', timeZone: 'America/Lima', passwordConfigured: true, last: null },
 };
 
@@ -47,6 +51,8 @@ describe('CoreServerPanel', () => {
     expect(await screen.findByText('GW-VPN-CORE-ISP')).toBeInTheDocument();
     expect(screen.getByText('Operativo')).toBeInTheDocument();
     expect(screen.getByText(/Mantenimiento independiente del asistente/)).toBeInTheDocument();
+    expect(screen.getByText('WireGuard del VPS')).toBeInTheDocument();
+    expect(screen.getByText('WireGuard todavía no está configurado en este VPS.')).toBeInTheDocument();
   });
 
   it('presenta bloqueadores antes de preparar el equipo', async () => {

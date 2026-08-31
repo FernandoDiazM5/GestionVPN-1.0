@@ -152,3 +152,21 @@ La supernet prevista `10.12.248.0/22` no se solapa con las redes observadas del 
 ### Salida hacia la Fase 2
 
 Construir el diagnóstico de solo lectura en el backend y la tarjeta administrativa “WireGuard del VPS”. En el VPS actual deberá mostrar “No configurado” y explicar que aún no existen `wg`, `wg0` ni el servicio persistente, sin ofrecer todavía el botón de aplicar.
+
+## Resultado de la Fase 2 — diagnóstico de solo lectura
+
+Estado: implementada localmente el 2026-08-31, pendiente de despliegue.
+
+- El estado del Servidor VPN incluye ahora `vpsWireguard` y sólo ejecuta consultas con binario y argumentos fijos.
+- El diagnóstico devuelve `ACTIVE`, `DEGRADED` o `NOT_CONFIGURED`, interfaz, disponibilidad de herramientas, direcciones, puerto, clave pública, rutas y hora de inspección.
+- Nunca consulta ni devuelve la clave privada ni el contenido de `wg0.conf`.
+- La imagen productiva incorpora únicamente las herramientas de lectura `iproute2` y `wireguard-tools`; el backend continúa como usuario no-root.
+- Administración muestra una tarjeta “WireGuard del VPS”, estado, interfaz, dirección, puerto, herramientas y rutas detectadas.
+- Cuando no existe `wg0`, la vista informa “No configurado” y no ofrece acciones de aplicación.
+- El endpoint hereda autenticación y autorización exclusiva de `platform_admin` del módulo `/api/admin/core-server`.
+
+Verificación: pruebas focalizadas backend 2/2, frontend 4/4, TypeScript, lint, build y `check:all` correctos. El inventario de seguridad de rutas fue actualizado.
+
+### Salida hacia la Fase 3
+
+Agregar el formulario y endpoint de **previsualización sin cambios**: validar interfaz, puerto, MTU, dirección del VPS, peer Core, endpoint y AllowedIPs; calcular conflictos con host/Docker/supernet; mostrar el diff previsto. No instalar paquetes, crear claves ni levantar `wg0` todavía.

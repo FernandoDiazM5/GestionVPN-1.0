@@ -22,6 +22,11 @@
 > - IPv4 forwarding está activo; UFW está inactivo. `10.12.248.0/22` no colisiona con las redes observadas del host o Docker.
 > - Se documentó el contrato inicial y se dejó la Fase 2 limitada a diagnóstico backend/UI de solo lectura.
 
+> **Sesión 2026-08-31 — WireGuard web Fase 2, diagnóstico read-only.** Estado: local, pendiente deploy.
+> - Backend expone estado seguro del WireGuard del VPS dentro de `/api/admin/core-server/status`; no lee configuración privada ni permite argumentos libres.
+> - La UI administrativa muestra estado, interfaz, dirección, puerto, herramientas y rutas, con mensaje explícito cuando no está configurado.
+> - Verificación: focalizadas backend 2/2 y frontend 4/4, TypeScript, lint, build, inventario de rutas y `check:all` verdes.
+
 > **Sesión 2026-08-30 — Grupos operativos, creación masiva y rutas de fibra implementados.** Rama `vps_uni` sobre `4ba8893`; local, pendiente deploy.
 > - “Historial de clientes” se generalizó a “Grupos operativos” con perfiles Seguimiento de clientes, Rutas de fibra y Operativo general. Los permisos del bot se calculan por capacidad y una vinculación con permisos incompletos queda visible y diagnosticable en vez de perder el grupo.
 > - La creación masiva obtiene clientes con una sola llamada read-only a `GetClientsDetails`, previsualiza existentes/faltantes y usa una cola persistente secuencial con progreso, pausa/reanudación, deduplicación y respeto de límites Telegram. Las respuestas ambiguas no se reintentan.
