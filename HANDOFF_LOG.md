@@ -5,6 +5,7 @@
 > - Backend y frontend se construyeron y arrancaron con `docker-compose.prod.yml`; MariaDB y backend reportan `healthy`, `/api/health` responde correctamente y el frontend HTTPS responde 200 usando el nombre canónico con `--resolve`.
 > - Se verificó espacio libre aproximado de 40 GiB. Telegram quedó desactivado hasta configurar el token y MikroWisp queda listo para ingresar credenciales desde la web; no se copiaron secretos del VPS anterior ni se cambió DNS.
 > - El VPS anterior `134.199.212.232` permanece intacto como contingencia.
+> - El usuario actualizó DNS en Hostinger; `joinpoint.cloud` y `www.joinpoint.cloud` resuelven a `143.244.169.142`. Se emitió certificado Let’s Encrypt para ambos nombres con renovación automática; comprobación externa de raíz y `/api/health`: 200.
 
 > **Sesión 2026-08-30 — Grupos operativos, creación masiva y rutas de fibra implementados.** Rama `vps_uni` sobre `4ba8893`; local, pendiente deploy.
 > - “Historial de clientes” se generalizó a “Grupos operativos” con perfiles Seguimiento de clientes, Rutas de fibra y Operativo general. Los permisos del bot se calculan por capacidad y una vinculación con permisos incompletos queda visible y diagnosticable en vez de perder el grupo.
