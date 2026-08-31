@@ -27,6 +27,11 @@
 > - La UI administrativa muestra estado, interfaz, dirección, puerto, herramientas y rutas, con mensaje explícito cuando no está configurado.
 > - Verificación: focalizadas backend 2/2 y frontend 4/4, TypeScript, lint, build, inventario de rutas y `check:all` verdes.
 
+> **Sesión 2026-08-31 — Despliegue WireGuard web Fase 2.** Runtime `01e8328` en `143.244.169.142`; estado healthy/200.
+> - Se respaldó MariaDB en `/root/backups/pre-wireguard-readonly-20260831T134158Z/vpn_manager.sql.gz` y se etiquetaron ambas imágenes con `pre-wireguard-readonly-20260831T134158Z`.
+> - Backend y frontend fueron reconstruidos y recreados en ese orden; DB se preservó. Diagnóstico productivo: `NOT_CONFIGURED`, herramientas presentes y `wg0` ausente.
+> - HTTPS raíz y `/api/health` responden 200; DB/backend healthy, cero reinicios y 35 GiB libres. No se modificaron rutas, WireGuard ni el Core.
+
 > **Sesión 2026-08-30 — Grupos operativos, creación masiva y rutas de fibra implementados.** Rama `vps_uni` sobre `4ba8893`; local, pendiente deploy.
 > - “Historial de clientes” se generalizó a “Grupos operativos” con perfiles Seguimiento de clientes, Rutas de fibra y Operativo general. Los permisos del bot se calculan por capacidad y una vinculación con permisos incompletos queda visible y diagnosticable en vez de perder el grupo.
 > - La creación masiva obtiene clientes con una sola llamada read-only a `GetClientsDetails`, previsualiza existentes/faltantes y usa una cola persistente secuencial con progreso, pausa/reanudación, deduplicación y respeto de límites Telegram. Las respuestas ambiguas no se reintentan.

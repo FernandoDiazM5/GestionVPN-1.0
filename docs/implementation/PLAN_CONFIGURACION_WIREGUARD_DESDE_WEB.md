@@ -155,7 +155,7 @@ Construir el diagnóstico de solo lectura en el backend y la tarjeta administrat
 
 ## Resultado de la Fase 2 — diagnóstico de solo lectura
 
-Estado: implementada localmente el 2026-08-31, pendiente de despliegue.
+Estado: desplegada el 2026-08-31 en `143.244.169.142`, runtime `01e8328`.
 
 - El estado del Servidor VPN incluye ahora `vpsWireguard` y sólo ejecuta consultas con binario y argumentos fijos.
 - El diagnóstico devuelve `ACTIVE`, `DEGRADED` o `NOT_CONFIGURED`, interfaz, disponibilidad de herramientas, direcciones, puerto, clave pública, rutas y hora de inspección.
@@ -166,6 +166,8 @@ Estado: implementada localmente el 2026-08-31, pendiente de despliegue.
 - El endpoint hereda autenticación y autorización exclusiva de `platform_admin` del módulo `/api/admin/core-server`.
 
 Verificación: pruebas focalizadas backend 2/2, frontend 4/4, TypeScript, lint, build y `check:all` correctos. El inventario de seguridad de rutas fue actualizado.
+
+Verificación productiva: diagnóstico `NOT_CONFIGURED`, `toolsAvailable=true`, `interfacePresent=false`, sin direcciones, puerto, clave pública ni rutas; HTTPS y `/api/health` 200, MariaDB/backend healthy y cero reinicios. Respaldo: `/root/backups/pre-wireguard-readonly-20260831T134158Z/vpn_manager.sql.gz`. Imágenes rollback: `gestionvpn-10-{backend|frontend}:pre-wireguard-readonly-20260831T134158Z`.
 
 ### Salida hacia la Fase 3
 
