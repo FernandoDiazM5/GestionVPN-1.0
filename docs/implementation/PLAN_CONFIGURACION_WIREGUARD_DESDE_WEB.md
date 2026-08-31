@@ -19,7 +19,7 @@ El sistema ya permite guardar la clave pública WireGuard del VPS en Configuraci
 - Nombre de interfaz (`wg0` por defecto).
 - Clave pública del VPS (Base64, 44 caracteres).
 - Clave privada: generada dentro del VPS o introducida sólo por consola; nunca persistida por Joinpoint.
-- Puerto UDP de escucha (por defecto 13232, rango 1–65535).
+- Puerto UDP local opcional del VPS (0 = dinámico, rango 1–65535 si se fija).
 - MTU (por defecto 1420, rango seguro 1280– mtu de la red).
 
 ### Direccionamiento
@@ -135,7 +135,7 @@ La supernet prevista `10.12.248.0/22` no se solapa con las redes observadas del 
 | VPS | `10.12.250.0/24` | Derivado del diseño vigente |
 | Administración | `10.12.251.0/24` | Derivado del diseño vigente |
 | IP histórica del peer VPS | `10.12.250.60/32` | Requiere confirmar en el Core antes de aplicar |
-| Puerto WireGuard VPS | `13232/UDP` | Propuesto; requiere confirmar en el Core |
+| Puerto WireGuard del Core | `13232/UDP` | Derivado del diseño vigente; requiere confirmar en el Core |
 | MTU | `1420` | Propuesto |
 | Clave privada | Generada localmente en el VPS | Obligatorio; nunca persiste en BD |
 | Clave pública | Calculada en el VPS y visible en Administración | Obligatorio |
@@ -172,3 +172,21 @@ Verificación productiva: diagnóstico `NOT_CONFIGURED`, `toolsAvailable=true`, 
 ### Salida hacia la Fase 3
 
 Agregar el formulario y endpoint de **previsualización sin cambios**: validar interfaz, puerto, MTU, dirección del VPS, peer Core, endpoint y AllowedIPs; calcular conflictos con host/Docker/supernet; mostrar el diff previsto. No instalar paquetes, crear claves ni levantar `wg0` todavía.
+
+## Resultado de la Fase 3 — validación y previsualización
+
+Estado: implementada localmente el 2026-08-31, pendiente de despliegue.
+
+- Administración incorpora el formulario “Previsualizar configuración WireGuard”.
+- Valores iniciales: interfaz `wg0`, VPS `10.12.250.60/32`, MTU 1420, Core `213.173.36.232:13232`, AllowedIPs `10.12.248.0/22` y keepalive 25 segundos.
+- `13232/UDP` corresponde al endpoint público del Core; el puerto local del VPS queda dinámico por defecto.
+- El backend valida nombres de interfaz Linux, rangos de puerto/MTU/keepalive, clave pública Base64, endpoint, dirección `/32` dentro del segmento VPS y AllowedIPs.
+- Se bloquean `0.0.0.0/0`, la ausencia de la supernet exacta y solapamientos con redes activas del host o Docker.
+- La respuesta calcula configuración deseada, diferencias y acciones previstas, pero fuerza `canApply=false` y `readOnly=true`.
+- No se instala WireGuard, no se generan claves, no se crean archivos y no se modifican interfaces, rutas, firewall ni Core.
+
+Verificación: backend 5/5 pruebas focalizadas, frontend 5/5, TypeScript, lint, build, inventario de rutas y `check:all` verdes.
+
+### Salida hacia la Fase 4
+
+Diseñar el agente privilegiado allowlist, almacenamiento no secreto, respaldo verificable y rollback. Antes de permitir aplicación se debe obtener y confirmar la clave pública real del Core y probar el procedimiento en un canary con acceso de recuperación.

@@ -32,6 +32,11 @@
 > - Backend y frontend fueron reconstruidos y recreados en ese orden; DB se preservó. Diagnóstico productivo: `NOT_CONFIGURED`, herramientas presentes y `wg0` ausente.
 > - HTTPS raíz y `/api/health` responden 200; DB/backend healthy, cero reinicios y 35 GiB libres. No se modificaron rutas, WireGuard ni el Core.
 
+> **Sesión 2026-08-31 — WireGuard web Fase 3, previsualización.** Estado: local, pendiente deploy.
+> - Se agregó formulario administrativo y endpoint protegido para validar interfaz, VPS /32, MTU, endpoint/clave del Core, AllowedIPs y keepalive.
+> - Bloquea default route, conflictos con redes del host/Docker y contratos fuera de la supernet vigente; la aplicación permanece forzada a `false`.
+> - Verificación: backend 5/5, frontend 5/5, TypeScript, lint, build, inventario de seguridad y `check:all` verdes. No hubo cambios de red.
+
 > **Sesión 2026-08-30 — Grupos operativos, creación masiva y rutas de fibra implementados.** Rama `vps_uni` sobre `4ba8893`; local, pendiente deploy.
 > - “Historial de clientes” se generalizó a “Grupos operativos” con perfiles Seguimiento de clientes, Rutas de fibra y Operativo general. Los permisos del bot se calculan por capacidad y una vinculación con permisos incompletos queda visible y diagnosticable en vez de perder el grupo.
 > - La creación masiva obtiene clientes con una sola llamada read-only a `GetClientsDetails`, previsualiza existentes/faltantes y usa una cola persistente secuencial con progreso, pausa/reanudación, deduplicación y respeto de límites Telegram. Las respuestas ambiguas no se reintentan.

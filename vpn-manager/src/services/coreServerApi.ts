@@ -91,6 +91,30 @@ export interface ProvisionRun {
   steps: ProvisionStep[];
 }
 
+export interface VpsWireguardDraft {
+  interface: string;
+  address: string;
+  localListenPort: number;
+  mtu: number;
+  corePublicKey: string;
+  coreEndpointHost: string;
+  coreEndpointPort: number;
+  allowedIps: string[];
+  persistentKeepalive: number;
+}
+
+export interface VpsWireguardPreview {
+  valid: boolean;
+  canApply: false;
+  readOnly: true;
+  blockers: string[];
+  warnings: string[];
+  conflicts: Array<{ allowedIp: string; source: string; name: string; cidr: string }>;
+  desired: Record<string, unknown>;
+  changes: Array<{ field: string; value: unknown }>;
+  actions: string[];
+}
+
 export const coreServerApi = {
   status: () => get<CoreStatusResponse>('/api/admin/core-server/status'),
   health: () => post<{ success: true; health: CoreHealth }>('/api/admin/core-server/health'),
@@ -100,5 +124,8 @@ export const coreServerApi = {
   backupNow: () => post<{ success: true; result: { sent?: boolean; filenames?: string[]; skipped?: boolean } }>('/api/admin/core-server/backup-now'),
   managementSupernetPreview: (cidr: string) => get<{ success: true; preview: ManagementSupernetPreview }>(
     `/api/settings/management-supernet-preview?cidr=${encodeURIComponent(cidr)}`,
+  ),
+  wireguardPreview: (draft: VpsWireguardDraft) => post<{ success: true; preview: VpsWireguardPreview }>(
+    '/api/admin/core-server/wireguard-preview', draft,
   ),
 };

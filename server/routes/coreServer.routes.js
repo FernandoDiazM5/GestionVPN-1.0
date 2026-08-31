@@ -6,9 +6,21 @@ const { getLastBackup, loadConfig, runCoreBackup } = require('../lib/coreBackupS
 const coreProvisionRepo = require('../db/repos/coreProvisionRepo');
 const { getAppSetting } = require('../db.service');
 const { inspectVpsWireguard } = require('../lib/vpsWireguardStatus');
+const { previewVpsWireguard } = require('../lib/vpsWireguardPreview');
 
 const router = express.Router();
 const CONFIRMATION = 'PREPARAR DESDE CERO';
+const wireguardPreviewSchema = z.object({
+  interface: z.string().trim().regex(/^[A-Za-z0-9_.-]{1,15}$/, 'Interfaz WireGuard inválida.'),
+  address: z.string().trim().min(9).max(18),
+  localListenPort: z.number().int().min(0).max(65535),
+  mtu: z.number().int().min(1280).max(1500),
+  corePublicKey: z.string().trim().regex(/^[A-Za-z0-9+/]{43}=$/, 'Clave pública del Core inválida.'),
+  coreEndpointHost: z.string().trim().min(1).max(253).regex(/^[A-Za-z0-9.-]+$/, 'Endpoint del Core inválido.'),
+  coreEndpointPort: z.number().int().min(1).max(65535),
+  allowedIps: z.array(z.string().trim().min(3).max(18)).min(1).max(64),
+  persistentKeepalive: z.number().int().min(0).max(3600),
+}).strict();
 
 function asAppError(error) {
   const map = {
@@ -41,6 +53,15 @@ router.get('/status', asyncHandler(async (_req, res) => {
 }));
 
 router.post('/health', asyncHandler(async (_req, res) => sendOk(res, { health: await inspectCore() })));
+
+router.post('/wireguard-preview', asyncHandler(async (req, res) => {
+  const input = wireguardPreviewSchema.parse(req.body);
+  const [managementSupernet, current] = await Promise.all([
+    getAppSetting('management_supernet').catch(() => ''),
+    inspectVpsWireguard(),
+  ]);
+  return sendOk(res, { preview: previewVpsWireguard(input, { managementSupernet, current }) });
+}));
 
 router.get('/provision-preview', asyncHandler(async (_req, res) => {
   try {

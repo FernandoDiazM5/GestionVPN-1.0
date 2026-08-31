@@ -6,10 +6,10 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 
 ## Resumen
 
-- Rutas detectadas: 208
-- Rutas de mutación (POST/PUT/PATCH): 131
-- Rutas que consumen `req.body`: 96
-- Rutas con esquema de `req.body` detectable: 93/96
+- Rutas detectadas: 209
+- Rutas de mutación (POST/PUT/PATCH): 132
+- Rutas que consumen `req.body`: 97
+- Rutas con esquema de `req.body` detectable: 94/97
 - Endpoints públicos de identidad sin rate limiting detectable: 0
 
 ## Alertas detectadas
@@ -120,12 +120,13 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `routes/core/tunnel.routes.js` | 156 | GET | `/tunnel/status` | sí | — | no | n/a | network-admin | — |
 | `routes/core/tunnel.routes.js` | 194 | GET | `/tunnel/my-mgmt-ip` | sí | — | no | n/a | — | — |
 | `routes/core/tunnel.routes.js` | 215 | POST | `/tunnel/register-my-ip` | sí | — | no | sí | sql, network-admin | — |
-| `routes/coreServer.routes.js` | 26 | GET | `/status` | sí | platform-admin | no | n/a | — | — |
-| `routes/coreServer.routes.js` | 43 | POST | `/health` | sí | platform-admin | no | n/a | — | — |
-| `routes/coreServer.routes.js` | 45 | GET | `/provision-preview` | sí | platform-admin | no | n/a | — | — |
-| `routes/coreServer.routes.js` | 53 | GET | `/provision-history` | sí | platform-admin | no | n/a | — | — |
-| `routes/coreServer.routes.js` | 57 | POST | `/provision` | sí | platform-admin | no | sí | — | — |
-| `routes/coreServer.routes.js` | 83 | POST | `/backup-now` | sí | platform-admin | no | n/a | — | — |
+| `routes/coreServer.routes.js` | 38 | GET | `/status` | sí | platform-admin | no | n/a | — | — |
+| `routes/coreServer.routes.js` | 55 | POST | `/health` | sí | platform-admin | no | n/a | — | — |
+| `routes/coreServer.routes.js` | 57 | POST | `/wireguard-preview` | sí | platform-admin | no | sí | network-admin | — |
+| `routes/coreServer.routes.js` | 66 | GET | `/provision-preview` | sí | platform-admin | no | n/a | — | — |
+| `routes/coreServer.routes.js` | 74 | GET | `/provision-history` | sí | platform-admin | no | n/a | — | — |
+| `routes/coreServer.routes.js` | 78 | POST | `/provision` | sí | platform-admin | no | sí | — | — |
+| `routes/coreServer.routes.js` | 104 | POST | `/backup-now` | sí | platform-admin | no | n/a | — | — |
 | `routes/dashboard.routes.js` | 16 | GET | `/dashboard/metrics` | sí | — | no | n/a | — | — |
 | `routes/device.routes.js` | 26 | POST | `/device/auto-login` | sí | — | no | sí | network-admin | — |
 | `routes/device.routes.js` | 48 | POST | `/device/antenna` | sí | — | no | sí | sql, network-admin | — |
