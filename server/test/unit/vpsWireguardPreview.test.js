@@ -24,6 +24,18 @@ describe('vpsWireguardPreview', () => {
     expect(result.conflicts).toHaveLength(1);
   });
 
+  it('no considera conflicto la propia interfaz WireGuard ya aplicada', () => {
+    const result = previewVpsWireguard(valid, {
+      managementSupernet: '10.12.248.0/22',
+      interfaces: {
+        wg0: [{ family: 'IPv4', internal: false, address: '10.12.250.60', netmask: '255.255.255.255', cidr: '10.12.250.60/32' }],
+        docker0: [{ family: 'IPv4', internal: false, address: '172.17.0.1', netmask: '255.255.0.0', cidr: '172.17.0.1/16' }],
+      },
+    });
+    expect(result.valid).toBe(true);
+    expect(result.conflicts).toEqual([]);
+  });
+
   it('exige una IP /32 dentro del segmento VPS', () => {
     const result = previewVpsWireguard({ ...valid, address: '10.12.249.60/32' }, { managementSupernet: '10.12.248.0/22', interfaces: {} });
     expect(result.valid).toBe(false);

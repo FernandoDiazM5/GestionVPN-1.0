@@ -32,6 +32,9 @@ function previewVpsWireguard(input, options = {}) {
   const conflicts = [];
   for (const allowed of allowedIps) {
     for (const host of hostNetworks) {
+      // La interfaz administrada pertenece deliberadamente a AllowedIPs.
+      // Sólo las demás interfaces del host/Docker representan un conflicto.
+      if (host.name === input.interface) continue;
       if (cidrOverlaps(allowed, host.cidr)) conflicts.push({ allowedIp: allowed, ...host });
     }
   }
