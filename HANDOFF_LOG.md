@@ -12,6 +12,11 @@
 > - En `143.244.169.142` se fijó `APP_BASE_URL=https://joinpoint.cloud/` y se agregó hook de renovación Let’s Encrypt para copiar certificados y reiniciar sólo frontend.
 > - Se mantuvo la BD nueva vacía y no se copiaron tokens ni contraseñas; el alta funcional queda para la interfaz web.
 
+> **Sesión 2026-08-31 — Plan de WireGuard administrable desde web.**
+> - Se documentó `docs/implementation/PLAN_CONFIGURACION_WIREGUARD_DESDE_WEB.md`: parámetros del túnel, peer Core, validación, previsualización, respaldo, rollback y auditoría.
+> - Se confirmó que la implementación actual sólo persiste la clave pública del VPS y que no debe almacenarse ni transmitirse la clave privada.
+> - Pendiente de decisión: rangos/puerto definitivos y si el Core se sincroniza automáticamente por RouterOS API o mediante revisión del administrador.
+
 > **Sesión 2026-08-30 — Grupos operativos, creación masiva y rutas de fibra implementados.** Rama `vps_uni` sobre `4ba8893`; local, pendiente deploy.
 > - “Historial de clientes” se generalizó a “Grupos operativos” con perfiles Seguimiento de clientes, Rutas de fibra y Operativo general. Los permisos del bot se calculan por capacidad y una vinculación con permisos incompletos queda visible y diagnosticable en vez de perder el grupo.
 > - La creación masiva obtiene clientes con una sola llamada read-only a `GetClientsDetails`, previsualiza existentes/faltantes y usa una cola persistente secuencial con progreso, pausa/reanudación, deduplicación y respeto de límites Telegram. Las respuestas ambiguas no se reintentan.
