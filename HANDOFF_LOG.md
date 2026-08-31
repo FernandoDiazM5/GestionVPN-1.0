@@ -7,6 +7,11 @@
 > - El VPS anterior `134.199.212.232` permanece intacto como contingencia.
 > - El usuario actualizó DNS en Hostinger; `joinpoint.cloud` y `www.joinpoint.cloud` resuelven a `143.244.169.142`. Se emitió certificado Let’s Encrypt para ambos nombres con renovación automática; comprobación externa de raíz y `/api/health`: 200.
 
+> **Sesión 2026-08-31 — Runbook y continuidad del VPS nuevo.** Rama `vps_uni`, runtime `a8bcf4f`.
+> - Se creó `docs/implementation/PLAN_RECUPERACION_DESPLIEGUE_VPS_NUEVO.md` con reconstrucción, secretos, validaciones, rollback y diagnóstico.
+> - En `143.244.169.142` se fijó `APP_BASE_URL=https://joinpoint.cloud/` y se agregó hook de renovación Let’s Encrypt para copiar certificados y reiniciar sólo frontend.
+> - Se mantuvo la BD nueva vacía y no se copiaron tokens ni contraseñas; el alta funcional queda para la interfaz web.
+
 > **Sesión 2026-08-30 — Grupos operativos, creación masiva y rutas de fibra implementados.** Rama `vps_uni` sobre `4ba8893`; local, pendiente deploy.
 > - “Historial de clientes” se generalizó a “Grupos operativos” con perfiles Seguimiento de clientes, Rutas de fibra y Operativo general. Los permisos del bot se calculan por capacidad y una vinculación con permisos incompletos queda visible y diagnosticable en vez de perder el grupo.
 > - La creación masiva obtiene clientes con una sola llamada read-only a `GetClientsDetails`, previsualiza existentes/faltantes y usa una cola persistente secuencial con progreso, pausa/reanudación, deduplicación y respeto de límites Telegram. Las respuestas ambiguas no se reintentan.
