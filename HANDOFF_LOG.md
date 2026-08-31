@@ -17,6 +17,11 @@
 > - Se confirmó que la implementación actual sólo persiste la clave pública del VPS y que no debe almacenarse ni transmitirse la clave privada.
 > - Pendiente de decisión: rangos/puerto definitivos y si el Core se sincroniza automáticamente por RouterOS API o mediante revisión del administrador.
 
+> **Sesión 2026-08-31 — WireGuard web Fase 1, inventario.** Estado: sólo lectura; sin cambios de red.
+> - El VPS nuevo no tiene WireGuard instalado, interfaz `wg0`, configuración persistente ni puerto UDP WireGuard activo.
+> - IPv4 forwarding está activo; UFW está inactivo. `10.12.248.0/22` no colisiona con las redes observadas del host o Docker.
+> - Se documentó el contrato inicial y se dejó la Fase 2 limitada a diagnóstico backend/UI de solo lectura.
+
 > **Sesión 2026-08-30 — Grupos operativos, creación masiva y rutas de fibra implementados.** Rama `vps_uni` sobre `4ba8893`; local, pendiente deploy.
 > - “Historial de clientes” se generalizó a “Grupos operativos” con perfiles Seguimiento de clientes, Rutas de fibra y Operativo general. Los permisos del bot se calculan por capacidad y una vinculación con permisos incompletos queda visible y diagnosticable en vez de perder el grupo.
 > - La creación masiva obtiene clientes con una sola llamada read-only a `GetClientsDetails`, previsualiza existentes/faltantes y usa una cola persistente secuencial con progreso, pausa/reanudación, deduplicación y respeto de límites Telegram. Las respuestas ambiguas no se reintentan.

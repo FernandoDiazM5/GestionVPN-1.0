@@ -102,3 +102,53 @@ El sistema ya permite guardar la clave pública WireGuard del VPS en Configuraci
 - Si se permitirá introducir una clave privada existente (recomendado: no; generar dentro del VPS).
 - Ventana de mantenimiento y red de prueba para el primer canary.
 
+## Resultado de la Fase 1 — inventario y contrato técnico
+
+Fecha de verificación: 2026-08-31. Esta fase fue estrictamente de solo lectura.
+
+### Inventario del VPS nuevo
+
+| Elemento | Estado verificado |
+| --- | --- |
+| VPS | `vpn-join` — `143.244.169.142` |
+| Sistema | Ubuntu, kernel `6.8.0-124-generic` |
+| WireGuard | No instalado (`wg` no disponible) |
+| Interfaz `wg0` | No existe |
+| Servicio `wg-quick@wg0` | No existe / inactivo |
+| Archivo `/etc/wireguard/wg0.conf` | No existe |
+| Forwarding IPv4 | Activo |
+| Firewall UFW | Inactivo |
+| Puerto UDP WireGuard | Ninguno escuchando |
+| Redes del host | `10.10.0.0/16`, `10.116.0.0/20`, pública `143.244.160.0/20` |
+| Redes Docker | `172.17.0.0/16`, `172.18.0.0/16` |
+
+La supernet prevista `10.12.248.0/22` no se solapa con las redes observadas del host ni con Docker.
+
+### Contrato inicial propuesto
+
+| Parámetro | Valor inicial | Estado |
+| --- | --- | --- |
+| Interfaz | `wg0` | Propuesto |
+| Supernet de gestión | `10.12.248.0/22` | Ya definida por el proyecto |
+| Escaneo | `10.12.248.0/24` | Ya definido por el proyecto |
+| Clientes | `10.12.249.0/24` | Derivado del diseño vigente |
+| VPS | `10.12.250.0/24` | Derivado del diseño vigente |
+| Administración | `10.12.251.0/24` | Derivado del diseño vigente |
+| IP histórica del peer VPS | `10.12.250.60/32` | Requiere confirmar en el Core antes de aplicar |
+| Puerto WireGuard VPS | `13232/UDP` | Propuesto; requiere confirmar en el Core |
+| MTU | `1420` | Propuesto |
+| Clave privada | Generada localmente en el VPS | Obligatorio; nunca persiste en BD |
+| Clave pública | Calculada en el VPS y visible en Administración | Obligatorio |
+
+### Contrato de seguridad aprobado para desarrollo
+
+- La Fase 2 será de **solo lectura** y podrá mostrar `NO_CONFIGURADO`, `INACTIVO`, `ACTIVO` o `DEGRADADO`.
+- El navegador nunca enviará comandos de sistema ni rutas libres.
+- El backend sólo consultará un agente local con operaciones enumeradas.
+- La API nunca devolverá la clave privada ni el contenido completo de `wg0.conf`.
+- Instalar paquetes, generar claves o levantar `wg0` pertenecerá a una fase posterior con previsualización y rollback.
+- Antes de activar el túnel se debe comprobar en el Core la IP `10.12.250.60/32`, el puerto `13232/UDP`, la clave pública vigente y las AllowedIPs.
+
+### Salida hacia la Fase 2
+
+Construir el diagnóstico de solo lectura en el backend y la tarjeta administrativa “WireGuard del VPS”. En el VPS actual deberá mostrar “No configurado” y explicar que aún no existen `wg`, `wg0` ni el servicio persistente, sin ofrecer todavía el botón de aplicar.
