@@ -1,5 +1,12 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-09-01 — Falso 409 y progreso prematuro corregidos.** Runtime `9880f87` en `143.244.169.142`.
+> - El validador dejó de contar exclusivamente la propia `wg0 10.12.250.60/32` como conflicto de `10.12.248.0/22`; otras superposiciones siguen bloqueadas. Preview productivo: válido, sin blockers ni overlaps.
+> - El asistente ya no avanza por el estado previo de la VPS cuando el nuevo Core es inalcanzable, propaga fallos de guardado y diferencia API inaccesible de credenciales inválidas.
+> - Verificación: backend 7/7, frontend 6/6, TypeScript, lint y `check:all` verdes; revisión autenticada confirma paso 1 activo y pasos 2–6 bloqueados.
+> - Producción: raíz/health 200, cero reinicios y `wg0` preservada. `38.253.171.61` responde ping, pero TCP 8728/8729/8291/22 está cerrado desde la VPS; falta reenvío/API temporal hacia `192.168.18.2` restringido al origen VPS.
+> - Backup `/root/backups/pre-wg-connect-fix-20260901T051200Z/vpn_manager.sql.gz`; rollbacks `gestionvpn-10-{backend,frontend}:pre-wg-connect-fix-20260901T051200Z`.
+
 > **Sesión 2026-08-31 — Asistente seguro MikroTik↔VPS desplegado.** Runtime `2794fd3` en `143.244.169.142`.
 > - Se respaldó y verificó la base en `/root/backups/pre-wg-router-wizard-20260901T042500Z/vpn_manager.sql.gz`; rollbacks `gestionvpn-10-{backend,frontend}:pre-wg-router-wizard-20260901T042500Z`.
 > - Se reconstruyeron y recrearon sólo backend y frontend con `docker-compose.prod.yml`; MariaDB permaneció activa. Producción quedó con raíz/health 200, CORS 204/403, endpoint protegido 401, cero reinicios y sin errores recientes.
