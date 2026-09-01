@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-31 — Asistente seguro MikroTik↔VPS desplegado.** Runtime `2794fd3` en `143.244.169.142`.
+> - Se respaldó y verificó la base en `/root/backups/pre-wg-router-wizard-20260901T042500Z/vpn_manager.sql.gz`; rollbacks `gestionvpn-10-{backend,frontend}:pre-wg-router-wizard-20260901T042500Z`.
+> - Se reconstruyeron y recrearon sólo backend y frontend con `docker-compose.prod.yml`; MariaDB permaneció activa. Producción quedó con raíz/health 200, CORS 204/403, endpoint protegido 401, cero reinicios y sin errores recientes.
+> - `wg0` conservó `10.12.250.60/32`, la ruta `10.12.248.0/22`, su peer y handshake reciente. El despliegue no ejecutó preparación, APPLY, sincronización ni cierre de firewall sobre el MikroTik.
+> - Pendiente humano: abrir Administración, introducir credenciales/redes locales y recorrer el asistente paso a paso. El último cierre público requiere confirmación explícita y validaciones previas.
+
 > **Sesión 2026-08-31 — Asistente MikroTik↔VPS por etapas y cierre público seguro.** Rama `vps_uni` sobre `fc805b7`; local, pendiente commit/deploy.
 > - Se reemplazó la vista única por seis pantallas con progreso en flecha, avance explícito y estados de éxito/error.
 > - El alta solicita IP pública, IP interna informativa, credenciales y redes locales editables; la inspección toma clave y puerto WireGuard del MikroTik y el backend reutiliza la clave pública producida por el agente VPS.
