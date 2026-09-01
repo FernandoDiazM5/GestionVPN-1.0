@@ -54,8 +54,11 @@ async function previewManagementSupernet(cidr, options = {}) {
   const values = Object.fromEntries((settings || []).map(row => [row.key, row.value]));
   const locked = Boolean(values.core_provisioned_at || (nodeRows || []).length > 0);
   const sameValue = values.management_supernet === plan.net;
+  const managedVpsAddress = `${plan.vpsBase}60/32`;
   const candidates = [
-    ...localInterfaceCidrs(interfaces),
+    // La propia wg0 del VPS forma parte del bloque que estamos validando. No es
+    // un conflicto externo cuando conserva exactamente la IP administrada.
+    ...localInterfaceCidrs(interfaces).filter(item => !(item.name === 'wg0' && item.cidr === managedVpsAddress)),
     ...nodeCidrs(nodeRows),
     { source: 'RESERVED', name: 'Nodos WireGuard', cidr: mgmtNet.nodes.wgNet },
     { source: 'RESERVED', name: 'Nodos SSTP', cidr: mgmtNet.nodes.sstpNet },

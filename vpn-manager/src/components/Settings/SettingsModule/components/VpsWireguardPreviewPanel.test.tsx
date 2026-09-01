@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({ wireguardCorePreview: vi.fn() }));
 vi.mock('../../../../services/coreServerApi', () => ({ coreServerApi: mocks }));
 
 const settings = { MT_IP: '', MT_USER: '', MT_PASS: '', server_public_ip: '', core_internal_ip: '', core_local_networks: '' };
-const baseProps = { status: null, settings, onSettingsChange: vi.fn(), onSaveSettings: vi.fn().mockResolvedValue(undefined), onRefreshStatus: vi.fn().mockResolvedValue(null) };
+const baseProps = { status: null, settings, onSettingsChange: vi.fn(), onSaveSettings: vi.fn().mockResolvedValue(true), onRefreshStatus: vi.fn().mockResolvedValue(null) };
 
 describe('VpsWireguardPreviewPanel', () => {
   it('empieza solicitando endpoint público, IP privada, credenciales y redes locales', () => {
@@ -30,11 +30,11 @@ describe('VpsWireguardPreviewPanel', () => {
     expect(screen.getByRole('heading', { name: '1. Datos del MikroTik' })).toBeInTheDocument();
   });
 
-  it('reanuda en intercambio de claves cuando la VPS ya publicó su clave', () => {
+  it('no salta etapas por una clave VPS cuando el nuevo Core no es alcanzable', () => {
     const publicKey = `${'V'.repeat(43)}=`;
     render(<VpsWireguardPreviewPanel {...baseProps} settings={{ ...settings, server_public_ip: '38.25.114.72' }} status={{
       success: true,
-      health: { configured: true, apiOk: true, status: 'HEALTHY' },
+      health: { configured: true, apiOk: false, status: 'UNREACHABLE' },
       vpsWireguard: { status: 'ACTIVE', readOnly: true, interface: 'wg0', toolsAvailable: true,
         interfacePresent: true, addresses: ['10.12.250.60/32'], listenPort: null, publicKey,
         routes: ['10.12.248.0/22'], inspectedAt: Date.now() },
@@ -42,7 +42,7 @@ describe('VpsWireguardPreviewPanel', () => {
       wireguardDesired: null, coreFirewallLockedAt: null,
       backup: { enabled: false, time: '02:00', timeZone: 'America/Lima', passwordConfigured: false, last: null },
     }} />);
-    expect(screen.getByRole('heading', { name: '4. Intercambiar claves' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Clave pública del VPS')).toHaveValue(publicKey);
+    expect(screen.getByRole('heading', { name: '1. Datos del MikroTik' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Preparar MikroTik/ })).toBeDisabled();
   });
 });

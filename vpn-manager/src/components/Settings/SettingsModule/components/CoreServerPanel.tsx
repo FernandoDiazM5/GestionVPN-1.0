@@ -4,7 +4,7 @@ import { coreServerApi, type CoreStatusResponse, type ProvisionRun } from '../..
 import type { AppSettings } from '../types';
 import { VpsWireguardPreviewPanel } from './VpsWireguardPreviewPanel';
 
-interface Props { settings: AppSettings; onSettingsChange: (settings: AppSettings) => void; onSave: () => Promise<void>; onChangeRouter: () => void; isSaving: boolean; successMsg: string; errorMsg: string; }
+interface Props { settings: AppSettings; onSettingsChange: (settings: AppSettings) => void; onSave: () => Promise<boolean>; onChangeRouter: () => void; isSaving: boolean; successMsg: string; errorMsg: string; }
 const STATUS_LABELS: Record<string, string> = { HEALTHY: 'Operativo', DEGRADED: 'Requiere atención', UNREACHABLE: 'No alcanzable', INVALID_CREDENTIALS: 'Credenciales inválidas', NOT_CONFIGURED: 'Sin configurar' };
 const VPS_WG_LABELS: Record<string, string> = { ACTIVE: 'Activo', DEGRADED: 'Incompleto', NOT_CONFIGURED: 'No configurado' };
 const RUN_LABELS: Record<string, string> = { RUNNING: 'En ejecución', COMPLETED: 'Completado', FAILED: 'Fallido', BLOCKED: 'Bloqueado' };

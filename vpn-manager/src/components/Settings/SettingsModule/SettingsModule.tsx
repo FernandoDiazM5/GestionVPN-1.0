@@ -62,7 +62,7 @@ export default function SettingsModule() {
   };
 
   const saveCurrentSettings = async () => {
-    await saveState.handleSave(loadState.settings);
+    return saveState.handleSave(loadState.settings);
   };
 
   const testCoreConnection = () => post<{ success: true; connected: true; identity: string; version: string; board: string }>(

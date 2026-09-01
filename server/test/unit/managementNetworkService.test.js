@@ -43,6 +43,25 @@ describe('managementNetworkService', () => {
     ]));
   });
 
+  it('no trata la dirección administrada de wg0 como solapamiento externo', async () => {
+    const queryFn = vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    const preview = await previewManagementSupernet('10.12.248.0/22', {
+      queryFn,
+      interfaces: { wg0: [{ family: 'IPv4', internal: false, address: '10.12.250.60', cidr: '10.12.250.60/32' }] },
+    });
+    expect(preview).toMatchObject({ valid: true, canSave: true, overlaps: [] });
+  });
+
+  it('mantiene el bloqueo si wg0 usa otra dirección dentro del bloque', async () => {
+    const queryFn = vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    const preview = await previewManagementSupernet('10.12.248.0/22', {
+      queryFn,
+      interfaces: { wg0: [{ family: 'IPv4', internal: false, address: '10.12.250.61', cidr: '10.12.250.61/32' }] },
+    });
+    expect(preview.canSave).toBe(false);
+    expect(preview.overlaps).toEqual([expect.objectContaining({ source: 'HOST', name: 'wg0' })]);
+  });
+
   it('guarda setting, scan-IP y auditoría dentro de una sola transacción', async () => {
     const queryFn = vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([]);
     const tx = { query: vi.fn() };
