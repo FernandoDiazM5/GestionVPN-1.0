@@ -1,5 +1,12 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-31 — Flujo guiado WireGuard desplegado y túnel preservado.** Runtime `8cffe17` en `143.244.169.142`.
+> - Se verificaron 776 pruebas backend y 277 frontend, `check:all` y build antes de publicar. El commit se integró sobre `ed084c9` para conservar la normalización previa de Compose productivo.
+> - Respaldo validado: `/root/backups/pre-wg-guided-20260901T031227Z/vpn_manager.sql.gz`; imágenes de rollback `gestionvpn-10-{backend,frontend}:pre-wg-guided-20260901T031227Z`.
+> - Se reconstruyó/recreó backend y, tras quedar healthy, frontend usando exclusivamente `docker-compose.prod.yml`; MariaDB no fue recreada.
+> - Producción: raíz/health 200, CORS 204/403, login inválido 401, endpoints administrativos sin sesión 401, tres contenedores con cero reinicios y logs recientes sin errores. El bundle contiene el nuevo asistente.
+> - No se ejecutó APPLY ni sync: `wg0` conserva `10.12.250.60/32`, un peer, una ruta y handshake reciente. Pendiente revisión visual autenticada y configurar las credenciales reales del Core desde la web.
+
 > **Sesión 2026-08-31 — Flujo guiado WireGuard VPS↔Core implementado.** Rama `vps_uni` sobre `f3810eb`; local, pendiente deploy.
 > - La UI guía seis pasos: credenciales Core, inspección autoritativa, aplicación con polling, clave VPS copiable, sincronización exclusiva de `GVPN:VPS` y verificación de peer/handshake/rutas.
 > - El backend combina el diagnóstico no-root con la clave pública confiable del agente, expone el borrador persistido y permite inspeccionar clave/puerto del Core aun cuando todavía falte la clave VPS.
