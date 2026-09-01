@@ -31,6 +31,8 @@ export function useSaveSettings() {
         saveSetting('server_public_ip', settings.server_public_ip || ''),
         saveSetting('sstp_port', settings.sstp_port || ''),
         saveSetting('core_wan_interface', settings.core_wan_interface || ''),
+        saveSetting('core_internal_ip', settings.core_internal_ip || ''),
+        saveSetting('core_local_networks', settings.core_local_networks || ''),
         saveSetting('core_vps_public_key', settings.core_vps_public_key || ''),
         saveSetting('core_backup_enabled', String(settings.core_backup_enabled ?? false)),
         saveSetting('core_backup_time', settings.core_backup_time || '02:00'),

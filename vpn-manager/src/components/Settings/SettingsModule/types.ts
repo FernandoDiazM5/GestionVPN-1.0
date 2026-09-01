@@ -17,6 +17,10 @@ export interface AppSettings {
    *  permanecen exclusivamente en el backend. */
   error_report_email?: string;
   core_wan_interface?: string;
+  /** IP privada del MikroTik cuando existe un router/NAT del proveedor delante. */
+  core_internal_ip?: string;
+  /** Redes CIDR que conservarán acceso local al Core después del cierre público. */
+  core_local_networks?: string;
   core_vps_public_key?: string;
   core_backup_enabled?: boolean;
   core_backup_time?: string;

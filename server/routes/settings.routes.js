@@ -13,12 +13,13 @@ const { sendGeneric } = require('../lib/mailer');
 const { previewManagementSupernet, saveManagementSupernet } = require('../lib/managementNetworkService');
 const { connectToMikrotik, safeWrite } = require('../routeros.service');
 const { mikrotikAppError } = require('../lib/mikrotikError');
+const { normalizeCidr } = require('../lib/ipv4Cidr');
 
 const ERROR_REPORT_EMAIL_KEY = 'error_report_email';
 const CORE_SERVER_SETTING_KEYS = [
   'core_wan_interface', 'core_vps_public_key', 'core_backup_enabled',
   'core_backup_time', 'core_backup_timezone', 'core_backup_password',
-  'vps_wireguard_desired',
+  'vps_wireguard_desired', 'core_internal_ip', 'core_local_networks',
 ];
 const PLATFORM_ONLY_SETTING_KEYS = [...CORE_ROUTER_KEYS, ERROR_REPORT_EMAIL_KEY, ...CORE_SERVER_SETTING_KEYS];
 PLATFORM_ONLY_SETTING_KEYS.push('management_supernet');
@@ -157,6 +158,21 @@ router.post('/settings/save', requirePlatformAdmin, asyncHandler(async (req, res
     if (finalValue.length > 64 || /[\r\n]/.test(finalValue)) {
       throw new AppError('La interfaz WAN no es válida.', 422, 'WAN_INTERFACE_INVALID');
     }
+  } else if (key === 'core_internal_ip') {
+    finalValue = String(finalValue || '').trim();
+    const normalized = finalValue ? normalizeCidr(`${finalValue}/32`, { allowHost: true }) : '';
+    const privateIp = normalized && (/^10\./.test(finalValue) || /^192\.168\./.test(finalValue)
+      || /^172\.(?:1[6-9]|2\d|3[01])\./.test(finalValue));
+    if (finalValue && !privateIp) {
+      throw new AppError('La IP interna del MikroTik debe ser una dirección privada válida.', 422, 'CORE_INTERNAL_IP_INVALID');
+    }
+  } else if (key === 'core_local_networks') {
+    const networks = String(finalValue || '').split(',').map(item => item.trim()).filter(Boolean);
+    const normalized = networks.map(item => normalizeCidr(item, { allowHost: false }));
+    if (networks.length > 32 || normalized.some(item => !item)) {
+      throw new AppError('Las redes locales deben ser CIDR válidos separados por coma.', 422, 'CORE_LOCAL_NETWORKS_INVALID');
+    }
+    finalValue = [...new Set(normalized)].join(',');
   } else if (key === ERROR_REPORT_EMAIL_KEY) {
     finalValue = errorReportEmailSchema.parse(String(finalValue).trim().toLowerCase());
   } else if (key === 'management_supernet') {

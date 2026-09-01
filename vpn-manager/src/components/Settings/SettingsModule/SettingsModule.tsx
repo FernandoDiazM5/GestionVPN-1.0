@@ -31,6 +31,7 @@ function coreFingerprint(settings: AppSettings) {
   return JSON.stringify({
     MT_IP: (settings.MT_IP || '').trim(), MT_USER: (settings.MT_USER || '').trim(), MT_PASS: settings.MT_PASS,
     server_public_ip: (settings.server_public_ip || '').trim(), sstp_port: (settings.sstp_port || '').trim(),
+    core_internal_ip: (settings.core_internal_ip || '').trim(), core_local_networks: (settings.core_local_networks || '').trim(),
   });
 }
 

@@ -1,5 +1,12 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-31 — Asistente MikroTik↔VPS por etapas y cierre público seguro.** Rama `vps_uni` sobre `fc805b7`; local, pendiente commit/deploy.
+> - Se reemplazó la vista única por seis pantallas con progreso en flecha, avance explícito y estados de éxito/error.
+> - El alta solicita IP pública, IP interna informativa, credenciales y redes locales editables; la inspección toma clave y puerto WireGuard del MikroTik y el backend reutiliza la clave pública producida por el agente VPS.
+> - Se añadió previsualización/aplicación separada del firewall final. Sólo procede por el túnel con handshake reciente y una `LIST-WAN` válida; después verifica reconexión y cambia la administración a la IP del túnel.
+> - Decisión durable: preservar NAT, redirecciones, WAN, ruta por defecto, DNS y salida LAN. La limpieza se limita a VPN y administración gestionadas por Joinpoint.
+> - Verificación: backend focalizado 22/22, frontend 6/6, TypeScript, lint, inventario de rutas, build y `check:all` verdes. No se tocó el MikroTik ni la VPS.
+
 > **Sesión 2026-08-31 — Flujo guiado WireGuard desplegado y túnel preservado.** Runtime `8cffe17` en `143.244.169.142`.
 > - Se verificaron 776 pruebas backend y 277 frontend, `check:all` y build antes de publicar. El commit se integró sobre `ed084c9` para conservar la normalización previa de Compose productivo.
 > - Respaldo validado: `/root/backups/pre-wg-guided-20260901T031227Z/vpn_manager.sql.gz`; imágenes de rollback `gestionvpn-10-{backend,frontend}:pre-wg-guided-20260901T031227Z`.

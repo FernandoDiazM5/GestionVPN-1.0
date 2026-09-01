@@ -5,7 +5,7 @@ import type { AppSettings } from '../types';
 import { SETTINGS_MESSAGES } from '../constants';
 
 export function useLoadSettings() {
-  const [settings, setSettings] = useState<AppSettings>({ MT_IP: '', MT_USER: '', MT_PASS: '', management_supernet: '10.12.248.0/22', server_public_ip: '', sstp_port: '', scan_mode: 'vps', error_report_email: '', core_wan_interface: '', core_vps_public_key: '', core_backup_enabled: false, core_backup_time: '02:00', core_backup_timezone: 'America/Lima', core_backup_password: '' });
+  const [settings, setSettings] = useState<AppSettings>({ MT_IP: '', MT_USER: '', MT_PASS: '', management_supernet: '10.12.248.0/22', server_public_ip: '', sstp_port: '', scan_mode: 'vps', error_report_email: '', core_wan_interface: '', core_internal_ip: '', core_local_networks: '', core_vps_public_key: '', core_backup_enabled: false, core_backup_time: '02:00', core_backup_timezone: 'America/Lima', core_backup_password: '' });
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -27,6 +27,8 @@ export function useLoadSettings() {
           scan_mode: 'vps',
           error_report_email: data.settings.error_report_email || '',
           core_wan_interface: data.settings.core_wan_interface || '',
+          core_internal_ip: data.settings.core_internal_ip || '',
+          core_local_networks: data.settings.core_local_networks || '',
           core_vps_public_key: data.settings.core_vps_public_key || '',
           core_backup_enabled: data.settings.core_backup_enabled === 'true',
           core_backup_time: data.settings.core_backup_time || '02:00',

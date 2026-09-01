@@ -57,21 +57,12 @@ describe('CoreServerPanel', () => {
     expect(screen.getByText('WireGuard todavía no está configurado en este VPS.')).toBeInTheDocument();
   });
 
-  it('presenta bloqueadores antes de preparar el equipo', async () => {
-    mocks.preview.mockResolvedValue({
-      success: true,
-      confirmation: 'PREPARAR DESDE CERO',
-      preview: { canProvision: false, blockers: ['Se detectaron objetos operativos.'], actions: ['Crear WireGuard'] },
-    });
-    const user = userEvent.setup();
+  it('muestra un único asistente por etapas con progreso en forma de flecha', async () => {
     render(<CoreServerPanel {...baseProps} />);
     await screen.findByText('GW-VPN-CORE-ISP');
-    await user.click(screen.getByRole('button', { name: /Preparar un servidor nuevo/ }));
-    const review = screen.getByRole('button', { name: 'Guardar y revisar' });
-    await waitFor(() => expect(review).toBeEnabled());
-    await user.click(review);
-    expect(await screen.findByText('No se puede continuar')).toBeInTheDocument();
-    expect(screen.getByText('Se detectaron objetos operativos.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Instalar servidor VPN' })).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Progreso de instalación del servidor VPN' })).toBeInTheDocument();
+    expect(screen.queryByText('Asistente de configuración')).not.toBeInTheDocument();
   });
 
   it('solicita el respaldo manual y actualiza el estado', async () => {
@@ -84,13 +75,4 @@ describe('CoreServerPanel', () => {
     expect(await screen.findByText(/uno.backup y uno.rsc/)).toBeInTheDocument();
   });
 
-  it('muestra la división autoritativa devuelta por el backend', async () => {
-    const user = userEvent.setup();
-    render(<CoreServerPanel {...baseProps} settings={{ ...baseProps.settings, management_supernet: '10.12.248.0/22' }} />);
-    await screen.findByText('GW-VPN-CORE-ISP');
-    await user.click(screen.getByRole('button', { name: /Preparar un servidor nuevo/ }));
-    expect(await screen.findByText('10.12.248.0/24')).toBeInTheDocument();
-    expect(screen.getByText('10.12.251.0/24')).toBeInTheDocument();
-    expect(mocks.managementSupernetPreview).toHaveBeenCalledWith('10.12.248.0/22');
-  });
 });

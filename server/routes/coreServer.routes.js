@@ -9,6 +9,7 @@ const { inspectVpsWireguard } = require('../lib/vpsWireguardStatus');
 const { previewVpsWireguard } = require('../lib/vpsWireguardPreview');
 const { requestWireguardOperation, readWireguardAgentResult } = require('../lib/vpsWireguardIntent');
 const { previewCoreVpsPeer, syncCoreVpsPeer } = require('../lib/coreVpsPeerService');
+const { previewCoreFirewallLockdown, applyCoreFirewallLockdown } = require('../lib/coreFirewallLockdownService');
 const crypto = require('node:crypto');
 
 const router = express.Router();
@@ -17,6 +18,8 @@ const WG_APPLY_CONFIRMATION = 'APLICAR WIREGUARD VPS';
 const WG_ROLLBACK_CONFIRMATION = 'REVERTIR WIREGUARD VPS';
 const WG_CORE_CONFIRMATION = 'SINCRONIZAR PEER VPS';
 const WG_ROTATE_CONFIRMATION = 'ROTAR CLAVE WIREGUARD VPS';
+const CORE_LOCKDOWN_CONFIRMATION = 'CERRAR ACCESO PUBLICO DEL CORE';
+const localNetworksSchema = z.array(z.string().trim().min(9).max(18)).min(1).max(32);
 const wireguardPreviewSchema = z.object({
   interface: z.string().trim().regex(/^[A-Za-z0-9_.-]{1,15}$/, 'Interfaz WireGuard inválida.'),
   address: z.string().trim().min(9).max(18),
@@ -37,15 +40,18 @@ function asAppError(error) {
     BACKUP_PASSWORD_REQUIRED: [400, 'BACKUP_PASSWORD_REQUIRED'],
     ADMIN_EMAIL_REQUIRED: [400, 'ADMIN_EMAIL_REQUIRED'],
     BACKUP_EMAIL_FAILED: [503, 'BACKUP_EMAIL_FAILED'],
+    CORE_LOCKDOWN_BLOCKED: [409, 'CORE_LOCKDOWN_BLOCKED'],
+    CORE_TUNNEL_UNREACHABLE: [503, 'CORE_TUNNEL_UNREACHABLE'],
+    CORE_LOCKDOWN_VERIFY_FAILED: [503, 'CORE_LOCKDOWN_VERIFY_FAILED'],
   };
   const [status, code] = map[error?.code] || [502, error?.code || 'CORE_OPERATION_FAILED'];
   return new AppError(error?.message || 'No se pudo completar la operación sobre el servidor VPN.', status, code, error?.preview ? { preview: error.preview } : null);
 }
 
 router.get('/status', asyncHandler(async (_req, res) => {
-  const [health, lastBackup, config, inspectedWireguard, wireguardAgent, desiredRaw] = await Promise.all([
+  const [health, lastBackup, config, inspectedWireguard, wireguardAgent, desiredRaw, firewallLockedAt] = await Promise.all([
     inspectCore(), getLastBackup(), loadConfig(), inspectVpsWireguard(), readWireguardAgentResult(),
-    getAppSetting('vps_wireguard_desired').catch(() => ''),
+    getAppSetting('vps_wireguard_desired').catch(() => ''), getAppSetting('core_firewall_locked_at').catch(() => ''),
   ]);
   const vpsWireguard = {
     ...inspectedWireguard,
@@ -61,6 +67,7 @@ router.get('/status', asyncHandler(async (_req, res) => {
     vpsWireguard,
     wireguardAgent,
     wireguardDesired,
+    coreFirewallLockedAt: Number(firewallLockedAt || 0) || null,
     backup: {
       enabled: config.enabled,
       time: config.time,
@@ -160,6 +167,25 @@ router.post('/wireguard-core-sync', asyncHandler(async (req, res) => {
   try {
     const result = await syncCoreVpsPeer(vpsPublicKey);
     await recordWireguardAudit(req, 'WG_CORE_VPS_PEER_SYNCED', 'SUCCESS', result);
+    return sendOk(res, { result });
+  } catch (error) { throw asAppError(error); }
+}));
+
+router.post('/firewall-lockdown-preview', asyncHandler(async (req, res) => {
+  const { localNetworks } = z.object({ localNetworks: localNetworksSchema }).strict().parse(req.body);
+  try {
+    return sendOk(res, { preview: await previewCoreFirewallLockdown(localNetworks), confirmation: CORE_LOCKDOWN_CONFIRMATION });
+  } catch (error) { throw asAppError(error); }
+}));
+
+router.post('/firewall-lockdown', asyncHandler(async (req, res) => {
+  const { localNetworks } = z.object({
+    localNetworks: localNetworksSchema,
+    confirmation: z.literal(CORE_LOCKDOWN_CONFIRMATION),
+  }).strict().parse(req.body);
+  try {
+    const result = await applyCoreFirewallLockdown(localNetworks);
+    await recordWireguardAudit(req, 'WG_CORE_FIREWALL_LOCKED', 'SUCCESS', result);
     return sendOk(res, { result });
   } catch (error) { throw asAppError(error); }
 }));

@@ -62,6 +62,7 @@ export interface CoreStatusResponse {
     completedAt: number | null;
   };
   wireguardDesired: VpsWireguardDraft | null;
+  coreFirewallLockedAt?: number | null;
   backup: {
     enabled: boolean;
     time: string;
@@ -149,6 +150,18 @@ export interface WireguardHistoryEvent {
   detail: Record<string, unknown>;
 }
 
+export interface CoreFirewallPreview {
+  valid: boolean;
+  canApply: boolean;
+  blockers: string[];
+  publicEndpoint: string;
+  tunnelHost: string;
+  localNetworks: string[];
+  allowedNetworks: string[];
+  preserves: string[];
+  actions: string[];
+}
+
 export const coreServerApi = {
   status: () => get<CoreStatusResponse>('/api/admin/core-server/status'),
   health: () => post<{ success: true; health: CoreHealth }>('/api/admin/core-server/health'),
@@ -179,5 +192,11 @@ export const coreServerApi = {
   ),
   wireguardHistory: () => get<{ success: true; events: WireguardHistoryEvent[] }>(
     '/api/admin/core-server/wireguard-history',
+  ),
+  firewallLockdownPreview: (localNetworks: string[]) => post<{ success: true; preview: CoreFirewallPreview; confirmation: string }>(
+    '/api/admin/core-server/firewall-lockdown-preview', { localNetworks },
+  ),
+  firewallLockdown: (localNetworks: string[], confirmation: string) => post<{ success: true; result: { applied: true; tunnelHost: string; allowedNetworks: string[]; preserves: string[] } }>(
+    '/api/admin/core-server/firewall-lockdown', { localNetworks, confirmation },
   ),
 };

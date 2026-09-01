@@ -3,6 +3,7 @@ const { getAppSetting, setAppSetting, decryptPass } = require('../db.service');
 const mgmtNet = require('./mgmtNet');
 const scanIpRepo = require('../db/repos/scanIpRepo');
 const { cidrOverlaps, normalizeCidr } = require('./ipv4Cidr');
+const { readWireguardAgentResult } = require('./vpsWireguardIntent');
 const log = require('./logger').child({ scope: 'core-server' });
 
 const OWNED = 'GVPN:';
@@ -148,10 +149,11 @@ async function previewProvision() {
     api = await connectToMikrotik(creds.ip, creds.user, creds.pass);
     const inv = await readInventory(api);
     const summary = summarizeInventory(inv);
-    const [wanOverride, vpsPublicKey, sstpPort, managementSupernet] = await Promise.all([
+    const [wanOverride, savedVpsPublicKey, sstpPort, managementSupernet, agentResult] = await Promise.all([
       getAppSetting('core_wan_interface'), getAppSetting('core_vps_public_key'), getAppSetting('sstp_port'),
-      getAppSetting('management_supernet'),
+      getAppSetting('management_supernet'), readWireguardAgentResult(),
     ]);
+    const vpsPublicKey = savedVpsPublicKey || agentResult?.publicKey || '';
     const wanInterface = String(wanOverride || inv.wanInterface || '').trim();
     const blockers = [];
     if (summary.operationalObjects > 0) blockers.push('El equipo contiene nodos, PPP secrets o VRF operativos. El aprovisionamiento desde cero no migra ni modifica esos objetos.');
@@ -224,10 +226,10 @@ async function provisionCore() {
     throw err;
   }
   const creds = await loadCoreCredentials();
-  const [vpsPublicKeyRaw, sstpPortRaw] = await Promise.all([
-    getAppSetting('core_vps_public_key'), getAppSetting('sstp_port'),
+  const [savedVpsPublicKey, sstpPortRaw, agentResult] = await Promise.all([
+    getAppSetting('core_vps_public_key'), getAppSetting('sstp_port'), readWireguardAgentResult(),
   ]);
-  const vpsPublicKey = String(vpsPublicKeyRaw).trim();
+  const vpsPublicKey = String(savedVpsPublicKey || agentResult?.publicKey || '').trim();
   const sstpPort = Number(sstpPortRaw || 443);
   const scanNet = scanIpRepo.poolSubnet() || '10.11.252.0/24';
   let api;
