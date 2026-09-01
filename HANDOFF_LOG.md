@@ -1,5 +1,12 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-08-31 — Flujo guiado WireGuard VPS↔Core implementado.** Rama `vps_uni` sobre `f3810eb`; local, pendiente deploy.
+> - La UI guía seis pasos: credenciales Core, inspección autoritativa, aplicación con polling, clave VPS copiable, sincronización exclusiva de `GVPN:VPS` y verificación de peer/handshake/rutas.
+> - El backend combina el diagnóstico no-root con la clave pública confiable del agente, expone el borrador persistido y permite inspeccionar clave/puerto del Core aun cuando todavía falte la clave VPS.
+> - La inspección rellena automáticamente el puerto y la clave reales del Core; esto evita continuar con `13234` cuando `VPN-WG-VPS` reporta `13232`. La preparación de un MikroTik vacío queda separada.
+> - Verificación: backend 140 archivos/776 pruebas, frontend 83/277, focalizadas backend 3/3 y frontend 6/6, TypeScript, lint, inventario de rutas, build y `check:all` verdes.
+> - Pendiente: despliegue controlado y comprobación real de credenciales, peer, handshake y rutas sin alterar otros peers.
+
 > **Sesión 2026-08-31 — Despliegue normalizado a Compose productivo.** Checkout `f3810eb` en la Gota `143.244.169.142`.
 > - La inspección detectó que backend/frontend habían sido creados con la mezcla de compose local + productivo, aunque la aplicación estaba respondiendo. Se evitó tocar el VPS de contingencia `134.199.212.232`.
 > - Se conservaron rollbacks `gestionvpn-10-{backend,frontend}:pre-prod-only-20260831T183947Z`, se reconstruyeron las imágenes y se recrearon sólo backend/frontend con `docker-compose.prod.yml`; MariaDB siguió activa y healthy.

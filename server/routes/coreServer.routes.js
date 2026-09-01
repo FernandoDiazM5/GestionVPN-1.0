@@ -43,13 +43,24 @@ function asAppError(error) {
 }
 
 router.get('/status', asyncHandler(async (_req, res) => {
-  const [health, lastBackup, config, vpsWireguard, wireguardAgent] = await Promise.all([
+  const [health, lastBackup, config, inspectedWireguard, wireguardAgent, desiredRaw] = await Promise.all([
     inspectCore(), getLastBackup(), loadConfig(), inspectVpsWireguard(), readWireguardAgentResult(),
+    getAppSetting('vps_wireguard_desired').catch(() => ''),
   ]);
+  const vpsWireguard = {
+    ...inspectedWireguard,
+    publicKey: inspectedWireguard.publicKey || wireguardAgent?.publicKey || null,
+  };
+  if (vpsWireguard.interfacePresent && vpsWireguard.publicKey && vpsWireguard.addresses.length > 0) {
+    vpsWireguard.status = 'ACTIVE';
+  }
+  let wireguardDesired = null;
+  try { wireguardDesired = wireguardPreviewSchema.parse(JSON.parse(desiredRaw || '{}')); } catch (_) { /* sin configuración guardada */ }
   return sendOk(res, {
     health,
     vpsWireguard,
     wireguardAgent,
+    wireguardDesired,
     backup: {
       enabled: config.enabled,
       time: config.time,
@@ -69,6 +80,22 @@ router.post('/wireguard-preview', asyncHandler(async (req, res) => {
     inspectVpsWireguard(),
   ]);
   return sendOk(res, { preview: previewVpsWireguard(input, { managementSupernet, current }) });
+}));
+
+router.get('/wireguard-history', asyncHandler(async (_req, res) => {
+  const db = await require('../db.service').getDb();
+  const rows = await db.all(`SELECT a.id,a.action,a.outcome,a.reason,a.detail,a.created_at,u.email AS actor_email
+    FROM platform_security_audit a
+    LEFT JOIN users u ON u.id=a.actor_user_id
+    WHERE a.action LIKE 'WG\\_%'
+    ORDER BY a.created_at DESC LIMIT 30`);
+  const events = rows.map((row) => {
+    let detail = {};
+    try { detail = JSON.parse(row.detail || '{}'); } catch (_) { /* detalle histórico no JSON */ }
+    return { id: row.id, action: row.action, outcome: row.outcome, reason: row.reason,
+      actorEmail: row.actor_email || null, createdAt: Number(row.created_at), detail };
+  });
+  return sendOk(res, { events });
 }));
 
 async function recordWireguardAudit(req, action, outcome, detail) {
@@ -118,18 +145,20 @@ router.post('/wireguard-rotate', asyncHandler(async (req, res) => {
 }));
 
 router.get('/wireguard-core-preview', asyncHandler(async (_req, res) => {
-  const current = await inspectVpsWireguard();
+  const [current, agent] = await Promise.all([inspectVpsWireguard(), readWireguardAgentResult()]);
+  const vpsPublicKey = current.publicKey || agent?.publicKey || null;
   try {
-    return sendOk(res, { preview: await previewCoreVpsPeer({ vpsPublicKey: current.publicKey }), confirmation: WG_CORE_CONFIRMATION });
+    return sendOk(res, { preview: await previewCoreVpsPeer({ vpsPublicKey }), confirmation: WG_CORE_CONFIRMATION });
   } catch (error) { throw asAppError(error); }
 }));
 
 router.post('/wireguard-core-sync', asyncHandler(async (req, res) => {
   z.object({ confirmation: z.literal(WG_CORE_CONFIRMATION) }).strict().parse(req.body);
-  const current = await inspectVpsWireguard();
-  if (!current.publicKey) throw new AppError('WireGuard del VPS aún no tiene una clave pública activa.', 409, 'WG_VPS_NOT_ACTIVE');
+  const [current, agent] = await Promise.all([inspectVpsWireguard(), readWireguardAgentResult()]);
+  const vpsPublicKey = current.publicKey || agent?.publicKey || null;
+  if (!vpsPublicKey) throw new AppError('WireGuard del VPS aún no tiene una clave pública activa.', 409, 'WG_VPS_NOT_ACTIVE');
   try {
-    const result = await syncCoreVpsPeer(current.publicKey);
+    const result = await syncCoreVpsPeer(vpsPublicKey);
     await recordWireguardAudit(req, 'WG_CORE_VPS_PEER_SYNCED', 'SUCCESS', result);
     return sendOk(res, { result });
   } catch (error) { throw asAppError(error); }

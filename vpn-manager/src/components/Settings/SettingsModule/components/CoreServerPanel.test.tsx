@@ -19,6 +19,8 @@ const status = {
     status: 'NOT_CONFIGURED' as const, readOnly: true as const, interface: 'wg0', toolsAvailable: false,
     interfacePresent: false, addresses: [], listenPort: null, publicKey: null, routes: [], inspectedAt: Date.now(),
   },
+  wireguardAgent: null,
+  wireguardDesired: null,
   backup: { enabled: true, time: '02:00', timeZone: 'America/Lima', passwordConfigured: true, last: null },
 };
 

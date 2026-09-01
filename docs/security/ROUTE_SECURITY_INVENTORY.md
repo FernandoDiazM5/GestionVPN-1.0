@@ -6,7 +6,7 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 
 ## Resumen
 
-- Rutas detectadas: 214
+- Rutas detectadas: 215
 - Rutas de mutación (POST/PUT/PATCH): 136
 - Rutas que consumen `req.body`: 101
 - Rutas con esquema de `req.body` detectable: 98/101
@@ -121,17 +121,18 @@ Este inventario es una línea base estática para priorizar el hardening. No sus
 | `routes/core/tunnel.routes.js` | 194 | GET | `/tunnel/my-mgmt-ip` | sí | — | no | n/a | — | — |
 | `routes/core/tunnel.routes.js` | 215 | POST | `/tunnel/register-my-ip` | sí | — | no | sí | sql, network-admin | — |
 | `routes/coreServer.routes.js` | 45 | GET | `/status` | sí | platform-admin | no | n/a | — | — |
-| `routes/coreServer.routes.js` | 63 | POST | `/health` | sí | platform-admin | no | n/a | — | — |
-| `routes/coreServer.routes.js` | 65 | POST | `/wireguard-preview` | sí | platform-admin | no | sí | sql, network-admin | — |
-| `routes/coreServer.routes.js` | 84 | POST | `/wireguard-apply` | sí | platform-admin | no | sí | sql, network-admin | — |
-| `routes/coreServer.routes.js` | 102 | POST | `/wireguard-rollback` | sí | platform-admin | no | sí | network-admin | — |
-| `routes/coreServer.routes.js` | 109 | POST | `/wireguard-rotate` | sí | platform-admin | no | sí | network-admin | — |
-| `routes/coreServer.routes.js` | 120 | GET | `/wireguard-core-preview` | sí | platform-admin | no | n/a | network-admin | — |
-| `routes/coreServer.routes.js` | 127 | POST | `/wireguard-core-sync` | sí | platform-admin | no | sí | network-admin | — |
-| `routes/coreServer.routes.js` | 138 | GET | `/provision-preview` | sí | platform-admin | no | n/a | — | — |
-| `routes/coreServer.routes.js` | 146 | GET | `/provision-history` | sí | platform-admin | no | n/a | — | — |
-| `routes/coreServer.routes.js` | 150 | POST | `/provision` | sí | platform-admin | no | sí | — | — |
-| `routes/coreServer.routes.js` | 176 | POST | `/backup-now` | sí | platform-admin | no | n/a | — | — |
+| `routes/coreServer.routes.js` | 74 | POST | `/health` | sí | platform-admin | no | n/a | — | — |
+| `routes/coreServer.routes.js` | 76 | POST | `/wireguard-preview` | sí | platform-admin | no | sí | network-admin | — |
+| `routes/coreServer.routes.js` | 85 | GET | `/wireguard-history` | sí | platform-admin | no | n/a | sql, network-admin | — |
+| `routes/coreServer.routes.js` | 111 | POST | `/wireguard-apply` | sí | platform-admin | no | sí | sql, network-admin | — |
+| `routes/coreServer.routes.js` | 129 | POST | `/wireguard-rollback` | sí | platform-admin | no | sí | network-admin | — |
+| `routes/coreServer.routes.js` | 136 | POST | `/wireguard-rotate` | sí | platform-admin | no | sí | network-admin | — |
+| `routes/coreServer.routes.js` | 147 | GET | `/wireguard-core-preview` | sí | platform-admin | no | n/a | network-admin | — |
+| `routes/coreServer.routes.js` | 155 | POST | `/wireguard-core-sync` | sí | platform-admin | no | sí | network-admin | — |
+| `routes/coreServer.routes.js` | 167 | GET | `/provision-preview` | sí | platform-admin | no | n/a | — | — |
+| `routes/coreServer.routes.js` | 175 | GET | `/provision-history` | sí | platform-admin | no | n/a | — | — |
+| `routes/coreServer.routes.js` | 179 | POST | `/provision` | sí | platform-admin | no | sí | — | — |
+| `routes/coreServer.routes.js` | 205 | POST | `/backup-now` | sí | platform-admin | no | n/a | — | — |
 | `routes/dashboard.routes.js` | 16 | GET | `/dashboard/metrics` | sí | — | no | n/a | — | — |
 | `routes/device.routes.js` | 26 | POST | `/device/auto-login` | sí | — | no | sí | network-admin | — |
 | `routes/device.routes.js` | 48 | POST | `/device/antenna` | sí | — | no | sí | sql, network-admin | — |

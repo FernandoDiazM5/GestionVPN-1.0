@@ -61,6 +61,7 @@ export interface CoreStatusResponse {
     backupId: string;
     completedAt: number | null;
   };
+  wireguardDesired: VpsWireguardDraft | null;
   backup: {
     enabled: boolean;
     time: string;
@@ -130,9 +131,22 @@ export interface CoreVpsPeerPreview {
   blockers: string[];
   changes: Array<{ field: string; action: string }>;
   interface?: string;
+  corePublicKey?: string | null;
+  listenPort?: number | null;
   expectedAllowed?: string[];
   peerPresent?: boolean;
+  peerHandshake?: string | null;
   actions: string[];
+}
+
+export interface WireguardHistoryEvent {
+  id: string;
+  action: string;
+  outcome: 'SUCCESS' | 'FAILED';
+  reason?: string | null;
+  actorEmail?: string | null;
+  createdAt: number;
+  detail: Record<string, unknown>;
 }
 
 export const coreServerApi = {
@@ -162,5 +176,8 @@ export const coreServerApi = {
   ),
   wireguardCoreSync: (confirmation: string) => post<{ success: true; result: { changed: boolean; interface: string; allowedAddresses: string[] } }>(
     '/api/admin/core-server/wireguard-core-sync', { confirmation },
+  ),
+  wireguardHistory: () => get<{ success: true; events: WireguardHistoryEvent[] }>(
+    '/api/admin/core-server/wireguard-history',
   ),
 };

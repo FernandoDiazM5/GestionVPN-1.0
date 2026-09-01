@@ -14,9 +14,7 @@ async function previewCoreVpsPeer(options = {}) {
   const vpsPublicKey = options.vpsPublicKey || null;
   const creds = options.creds || await loadCoreCredentials();
   if (!creds) return { valid: false, canSync: false, blockers: ['Configura las credenciales del Core.'], actions: [] };
-  if (!/^[A-Za-z0-9+/]{43}=$/.test(String(vpsPublicKey || ''))) {
-    return { valid: false, canSync: false, blockers: ['El VPS todavía no publica una clave WireGuard válida.'], actions: [] };
-  }
+  const hasVpsPublicKey = /^[A-Za-z0-9+/]{43}=$/.test(String(vpsPublicKey || ''));
   let api;
   try {
     const suppliedInventory = options.interfaces && options.peers;
@@ -30,6 +28,7 @@ async function previewCoreVpsPeer(options = {}) {
     const iface = interfaces.find(item => item.name === mgmtNet.vps.iface);
     const blockers = [];
     if (!iface) blockers.push(`No existe ${mgmtNet.vps.iface} en el Core.`);
+    if (!hasVpsPublicKey) blockers.push('El VPS todavía no publica una clave WireGuard válida.');
     if (iface && desired.corePublicKey && iface['public-key'] !== desired.corePublicKey) {
       blockers.push('La clave pública indicada no coincide con la interfaz WireGuard del Core.');
     }
@@ -37,7 +36,8 @@ async function previewCoreVpsPeer(options = {}) {
       blockers.push(`El Core escucha en ${iface['listen-port'] || 'un puerto desconocido'}, no en ${desired.coreEndpointPort}.`);
     }
     const expectedAllowed = vpsPeerAllowedAddresses(scanIpRepo.poolSubnet() || mgmtNet.scan.net);
-    const peer = peers.find(item => item.interface === mgmtNet.vps.iface && (item.comment === 'GVPN:VPS' || item['public-key'] === vpsPublicKey));
+    const peer = peers.find(item => item.interface === mgmtNet.vps.iface
+      && (item.comment === 'GVPN:VPS' || (hasVpsPublicKey && item['public-key'] === vpsPublicKey)));
     const changes = [];
     if (!peer) changes.push({ field: 'peer', action: 'CREATE' });
     else {
@@ -46,7 +46,9 @@ async function previewCoreVpsPeer(options = {}) {
     }
     return {
       valid: blockers.length === 0, canSync: blockers.length === 0, blockers, changes,
-      interface: mgmtNet.vps.iface, expectedAllowed, peerPresent: Boolean(peer),
+      interface: mgmtNet.vps.iface, corePublicKey: iface?.['public-key'] || null,
+      listenPort: iface?.['listen-port'] ? Number(iface['listen-port']) : null,
+      expectedAllowed, peerPresent: Boolean(peer), peerHandshake: peer?.['last-handshake'] || null,
       actions: ['Crear o actualizar únicamente el peer GVPN:VPS.', 'Conservar todos los demás peers.', 'Verificar handshake y Allowed Address después del cambio.'],
     };
   } finally {
