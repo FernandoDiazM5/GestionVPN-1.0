@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-09-01 — IP privada retirada del paso inicial.** Runtime `ce6f058` en `143.244.169.142`.
+> - La IP privada era sólo una ayuda para configurar NAT en el equipo del proveedor; Joinpoint no la usa para conectarse. Se retiró del formulario principal y se aclaró el reenvío temporal `8728/TCP`.
+> - Pruebas focalizadas 3/3, TypeScript y lint verdes. Se recreó sólo frontend; raíz/health 200, servicios sin reinicios y WireGuard preservado.
+> - Rollback: `gestionvpn-10-frontend:pre-private-ip-removal-20260902T014600Z`.
+
 > **Sesión 2026-09-01 — Falso 409 y progreso prematuro corregidos.** Runtime `9880f87` en `143.244.169.142`.
 > - El validador dejó de contar exclusivamente la propia `wg0 10.12.250.60/32` como conflicto de `10.12.248.0/22`; otras superposiciones siguen bloqueadas. Preview productivo: válido, sin blockers ni overlaps.
 > - El asistente ya no avanza por el estado previo de la VPS cuando el nuevo Core es inalcanzable, propaga fallos de guardado y diferencia API inaccesible de credenciales inválidas.
