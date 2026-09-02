@@ -1,5 +1,9 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-09-01 — WireGuard activado en la VPS nueva, handshake pendiente.** Host `165.22.187.115`.
+> - `wg0` quedó persistente con VPS `10.12.250.61/32`, peer Core `R79mbZb0bRcu5+NL40ZAMiX5VtjWJ9JJ+AqltA15uQM=`, endpoint asumido `38.253.171.61:13232`, `AllowedIPs=10.12.248.0/22`, MTU 1420 y keepalive 25 s.
+> - La interfaz y ruta están activas, pero transmite sin recibir (`0 B`) y `10.12.250.1` no responde. Falta validar peer `10.12.250.61/32` en MikroTik, puerto real y reenvío UDP.
+
 > **Sesión 2026-09-01 — VPS limpia aislada desplegada en `165.22.187.115`.** Runtime base `d006f3c`; DNS y producción anterior sin cambios.
 > - Se instaló Docker/Compose, UFW, fail2ban, WireGuard tools y swap de 2 GiB; sólo SSH, 80 y 443 están publicados. El backend 3001 se autoriza exclusivamente desde la red privada Docker.
 > - Se generaron base MariaDB, secretos, TLS e identidad WireGuard completamente nuevos. Clave pública VPS: `MiAwxkst7ZTlODfCIxUMI5F/0eVadeiHcFtuTGqgR2s=`; la clave privada permanece sólo en `/etc/wireguard/privatekey`.
