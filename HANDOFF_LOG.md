@@ -1,5 +1,9 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-09-01 — DNS y TLS oficial activados en `165.22.187.115`.**
+> - `joinpoint.cloud`/`www` ya resuelven a la VPS nueva. Let's Encrypt emitió certificado para ambos nombres hasta 2026-12-01; validación HTTPS correcta, raíz 200, `www` 301 canónico y health correcto.
+> - Se activaron renovación automática y hooks para detener frontend, copiar certificados y reiniciarlo. `APP_BASE_URL` usa el dominio; DB/backend healthy, cero reinicios y WireGuard preservó handshake.
+
 > **Sesión 2026-09-01 — Enlace WireGuard VPS↔Core verificado.** VPS `165.22.187.115` ↔ Core `213.173.36.232:13232`.
 > - Handshake reciente y tráfico bidireccional con `wg0 10.12.250.60/32`; ping a `10.12.250.1` respondió 4/4, 0 % pérdida y ~87 ms.
 > - Por el túnel responden RouterOS API 8728/TCP, Winbox 8291/TCP y SSH 22/TCP; 8729/TCP está cerrado o filtrado. Rutas `10.12.248.0/22`, `10.11.250.0/24` y `10.11.251.0/24` presentes.
