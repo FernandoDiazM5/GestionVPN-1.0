@@ -10,11 +10,11 @@ const settings = { MT_IP: '', MT_USER: '', MT_PASS: '', server_public_ip: '', co
 const baseProps = { status: null, settings, onSettingsChange: vi.fn(), onSaveSettings: vi.fn().mockResolvedValue(true), onRefreshStatus: vi.fn().mockResolvedValue(null) };
 
 describe('VpsWireguardPreviewPanel', () => {
-  it('empieza solicitando endpoint público, IP privada, credenciales y redes locales', () => {
+  it('solicita sólo el endpoint público, credenciales y redes locales', () => {
     render(<VpsWireguardPreviewPanel {...baseProps} />);
     expect(screen.getByRole('heading', { name: '1. Datos del MikroTik' })).toBeInTheDocument();
     expect(screen.getByLabelText('IP pública o dominio')).toBeInTheDocument();
-    expect(screen.getByLabelText('IP privada del MikroTik')).toBeInTheDocument();
+    expect(screen.queryByLabelText('IP privada del MikroTik')).not.toBeInTheDocument();
     expect(screen.getByLabelText(/Redes locales autorizadas/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Guardar y enlazar/ })).toBeDisabled();
   });
