@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-09-01 — Integraciones del `.env` auditadas e importadas.** VPS `165.22.187.115`.
+> - Telegram se validó, cifró en DB y activó como `@mivpnmanager_bot`; backend confirma long-polling. Temporales con secretos eliminados.
+> - Gmail no se guardó: validación `ESOCKET` y puertos salientes 587/465 bloqueados/timeout desde la Gota. Brevo 2525 es alcanzable, pero no hay credencial Brevo. No existe clave Gemini; Firebase carece del Service Account JSON requerido.
+> - Backend/health correctos y WireGuard mantuvo handshake.
+
 > **Sesión 2026-09-01 — DNS y TLS oficial activados en `165.22.187.115`.**
 > - `joinpoint.cloud`/`www` ya resuelven a la VPS nueva. Let's Encrypt emitió certificado para ambos nombres hasta 2026-12-01; validación HTTPS correcta, raíz 200, `www` 301 canónico y health correcto.
 > - Se activaron renovación automática y hooks para detener frontend, copiar certificados y reiniciarlo. `APP_BASE_URL` usa el dominio; DB/backend healthy, cero reinicios y WireGuard preservó handshake.
