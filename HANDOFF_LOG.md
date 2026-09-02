@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-09-01 — Asistente de configuración retirado de la versión estable.** Runtime `4cbe51e` en `165.22.187.115`; rama específica `codex/d006-no-core-assistant` basada en `d006f3c`.
+> - UI sin asistente, preparación/reemplazo, supernet ni historial de aprovisionamiento; cliente sin tipos/llamadas asociadas y backend sin `/provision-preview`, `/provision-history` ni `/provision`. Estado, health y respaldos permanecen.
+> - Verificación: frontend focalizado 3/3, TypeScript/build y lint; backend focalizado 6/6. En producción el texto y las rutas están ausentes; raíz/health correctos, DB/backend healthy, cero reinicios, Telegram activo y WireGuard con handshake.
+> - Antes del deploy se guardaron dump e imágenes con prefijo `pre-remove-core-assistant-`.
+
 > **Sesión 2026-09-01 — Integraciones del `.env` auditadas e importadas.** VPS `165.22.187.115`.
 > - Telegram se validó, cifró en DB y activó como `@mivpnmanager_bot`; backend confirma long-polling. Temporales con secretos eliminados.
 > - Gmail no se guardó: validación `ESOCKET` y puertos salientes 587/465 bloqueados/timeout desde la Gota. Brevo 2525 es alcanzable, pero no hay credencial Brevo. No existe clave Gemini; Firebase carece del Service Account JSON requerido.
