@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-09-02 — Falso solapamiento corregido en la versión estable sin asistente.** Runtime `1e05445` en `165.22.187.115`; rama `codex/d006-no-core-assistant`.
+> - El guardado de `10.12.248.0/22` excluye sólo la dirección administrada exacta `wg0 10.12.250.60/32`; otros solapamientos continúan bloqueados. Prueba focalizada backend 7/7.
+> - Producción confirmó preview `valid=true`, `canSave=true`, sin bloqueos/solapamientos; HTTPS 200, DB/backend healthy, handshake reciente y ping al Core con 0 % de pérdida.
+> - Respaldo previo: `/root/gestionvpn-pre-overlap-fix.sql`; rollback de imagen: `gestionvpn-10-backend:pre-overlap-fix`.
+
 > **Sesión 2026-09-01 — Asistente de configuración retirado de la versión estable.** Runtime `4cbe51e` en `165.22.187.115`; rama específica `codex/d006-no-core-assistant` basada en `d006f3c`.
 > - UI sin asistente, preparación/reemplazo, supernet ni historial de aprovisionamiento; cliente sin tipos/llamadas asociadas y backend sin `/provision-preview`, `/provision-history` ni `/provision`. Estado, health y respaldos permanecen.
 > - Verificación: frontend focalizado 3/3, TypeScript/build y lint; backend focalizado 6/6. En producción el texto y las rutas están ausentes; raíz/health correctos, DB/backend healthy, cero reinicios, Telegram activo y WireGuard con handshake.
