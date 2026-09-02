@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-09-01 — VPS limpia aislada desplegada en `165.22.187.115`.** Runtime base `d006f3c`; DNS y producción anterior sin cambios.
+> - Se instaló Docker/Compose, UFW, fail2ban, WireGuard tools y swap de 2 GiB; sólo SSH, 80 y 443 están publicados. El backend 3001 se autoriza exclusivamente desde la red privada Docker.
+> - Se generaron base MariaDB, secretos, TLS e identidad WireGuard completamente nuevos. Clave pública VPS: `MiAwxkst7ZTlODfCIxUMI5F/0eVadeiHcFtuTGqgR2s=`; la clave privada permanece sólo en `/etc/wireguard/privatekey`.
+> - DB/backend healthy, frontend activo, cero reinicios, raíz HTTPS 200, health correcto y alta inicial pendiente (`needsSetup=true`). Se corrigió Nginx para que la IP use el servidor HTTPS principal y no redirija a `joinpoint.cloud`.
+> - WireGuard aún no se activó: falta clave/puerto autoritativos del Core y una IP VPS única; no reutilizar `10.12.250.60/32` mientras la producción `143.244.169.142` siga enlazada.
+
 > **Sesión 2026-09-01 — Tabla de puertos requeridos desplegada.** Runtime `011752d` en `143.244.169.142`.
 > - El paso inicial distingue API temporal `8728/TCP`, WireGuard permanente `13232–13234/UDP`, SSTP opcional en el puerto configurado y Winbox no público.
 > - Pruebas focalizadas 3/3, TypeScript y lint verdes. Se recreó sólo frontend; raíz/health 200 y servicios con cero reinicios.

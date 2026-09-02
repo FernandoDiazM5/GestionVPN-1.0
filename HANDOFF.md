@@ -3,13 +3,15 @@
 > **Contexto DURABLE y vigente.** Léelo al iniciar cualquier sesión nueva.
 > La narrativa cronológica por sesión vive en [`HANDOFF_LOG.md`](./HANDOFF_LOG.md) (append-only).
 > Mantenimiento gobernado por la skill **`handoff-keeper`** (`.claude/skills/handoff-keeper/`).
-> Rama de trabajo y despliegue para la nueva Gota `143.244.169.142`: **`vps_uni`** · Remote: `github.com/FernandoDiazM5/GestionVPN-1.0`. El VPS anterior `134.199.212.232` se conserva como contingencia; DNS no fue cambiado.
+> Rama de trabajo: **`vps_uni`** · Remote: `github.com/FernandoDiazM5/GestionVPN-1.0`. La instalación aislada más reciente está en `165.22.187.115`; `143.244.169.142` permanece intacta como producción/rollback y no se cambió DNS.
 > La rama **`vps_prod`** corresponde a otro VPS y no debe desplegarse en este servidor.
 > La **Plataforma Central** pertenece a otra rama: no documentar aquí su estado, despliegues ni pendientes.
 
 ---
 
 ## 0) Estado actual
+
+- **VPS limpia aislada desplegada (2026-09-01; `165.22.187.115`, runtime base `d006f3c`):** Ubuntu 24.04 con Docker/Compose, UFW, fail2ban, WireGuard tools y swap de 2 GiB. Se creó MariaDB nueva, secretos nuevos, TLS autofirmado y los tres contenedores; raíz HTTPS 200, `/api/health` correcto, setup inicial `needsSetup=true`, DB/backend healthy y cero reinicios. Nginx recibió un ajuste mínimo `default_server` para servir correctamente por IP; UFW permite 3001/TCP sólo desde la red Docker `172.18.0.0/16`. La identidad WireGuard fue generada únicamente en el host; clave pública `MiAwxkst7ZTlODfCIxUMI5F/0eVadeiHcFtuTGqgR2s=`. No existe `wg0.conf` ni túnel activo: falta confirmar IP exclusiva de la VPS, clave pública y puerto reales del Core y crear/sincronizar el peer sin duplicar `10.12.250.60/32`. La producción `143.244.169.142` y el DNS permanecen sin cambios.
 
 - **Puertos requeridos visibles en el asistente (2026-09-01; runtime `011752d`):** el paso 1 muestra antes de enlazar una tabla de puertos libres/reenvíos: `8728/TCP` temporal y restringido a la VPS para API RouterOS; `13232–13234/UDP` permanentes para WireGuard VPS/clientes/admin; puerto SSTP configurado (por defecto `4443/TCP`) permanente sólo si se usa SSTP. Advierte no exponer Winbox `8291` públicamente. Se recreó sólo frontend; raíz/health 200, DB/backend healthy y cero reinicios. Rollback frontend `gestionvpn-10-frontend:pre-required-ports-20260902T015500Z`.
 
