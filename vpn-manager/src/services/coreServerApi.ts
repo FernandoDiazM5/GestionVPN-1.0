@@ -1,5 +1,4 @@
 import { get, post } from './sessionClient';
-import type { ManagementSupernetPreview } from '@gestionvpn/contracts';
 
 export type CoreHealthStatus = 'HEALTHY' | 'DEGRADED' | 'UNREACHABLE' | 'INVALID_CREDENTIALS' | 'NOT_CONFIGURED';
 
@@ -49,44 +48,8 @@ export interface CoreStatusResponse {
   };
 }
 
-export interface ProvisionPreview {
-  canProvision: boolean;
-  blockers: string[];
-  actions: string[];
-  wanInterface?: string;
-  summary?: CoreHealth;
-}
-
-export interface ProvisionStep {
-  name: string;
-  status: 'CREATED' | 'EXISTS' | 'FAILED';
-}
-
-export interface ProvisionRun {
-  id: string;
-  operation_type: 'PREPARE_NEW';
-  status: 'RUNNING' | 'COMPLETED' | 'FAILED' | 'BLOCKED';
-  actor_email?: string | null;
-  target_host?: string | null;
-  target_identity?: string | null;
-  target_version?: string | null;
-  target_model?: string | null;
-  network_supernet?: string | null;
-  error_code?: string | null;
-  error_message?: string | null;
-  started_at: number;
-  finished_at?: number | null;
-  steps: ProvisionStep[];
-}
-
 export const coreServerApi = {
   status: () => get<CoreStatusResponse>('/api/admin/core-server/status'),
   health: () => post<{ success: true; health: CoreHealth }>('/api/admin/core-server/health'),
-  preview: () => get<{ success: true; preview: ProvisionPreview; confirmation: string }>('/api/admin/core-server/provision-preview'),
-  provision: (confirmation: string) => post<{ success: true; result: { health: CoreHealth; steps: ProvisionStep[]; runId: string } }>('/api/admin/core-server/provision', { confirmation }),
-  history: () => get<{ success: true; runs: ProvisionRun[] }>('/api/admin/core-server/provision-history'),
   backupNow: () => post<{ success: true; result: { sent?: boolean; filenames?: string[]; skipped?: boolean } }>('/api/admin/core-server/backup-now'),
-  managementSupernetPreview: (cidr: string) => get<{ success: true; preview: ManagementSupernetPreview }>(
-    `/api/settings/management-supernet-preview?cidr=${encodeURIComponent(cidr)}`,
-  ),
 };

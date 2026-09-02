@@ -1,51 +1,104 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Activity, AlertTriangle, ArrowLeft, ArrowRight, Check, CheckCircle2, ChevronDown, DatabaseBackup, HardDrive, History, KeyRound, Loader2, Network, RefreshCw, Save, ServerCog, ShieldCheck, XCircle } from 'lucide-react';
-import { coreServerApi, type CoreStatusResponse, type ProvisionPreview, type ProvisionRun, type ProvisionStep } from '../../../../services/coreServerApi';
+import { AlertTriangle, CheckCircle2, DatabaseBackup, HardDrive, KeyRound, Loader2, RefreshCw, Save, ServerCog } from 'lucide-react';
+import { coreServerApi, type CoreStatusResponse } from '../../../../services/coreServerApi';
 import type { AppSettings } from '../types';
-import type { ManagementSupernetPreview } from '@gestionvpn/contracts';
 
-interface Props { settings: AppSettings; onSettingsChange: (settings: AppSettings) => void; onSave: () => Promise<void>; onChangeRouter: () => void; isSaving: boolean; successMsg: string; errorMsg: string; }
-const STATUS_LABELS: Record<string, string> = { HEALTHY: 'Operativo', DEGRADED: 'Requiere atención', UNREACHABLE: 'No alcanzable', INVALID_CREDENTIALS: 'Credenciales inválidas', NOT_CONFIGURED: 'Sin configurar' };
-const RUN_LABELS: Record<string, string> = { RUNNING: 'En ejecución', COMPLETED: 'Completado', FAILED: 'Fallido', BLOCKED: 'Bloqueado' };
-const WIZARD_STEPS = ['Operación', 'Red y WireGuard', 'Revisión', 'Resultado'];
-const bytes = (value?: number | null) => !value ? '—' : value < 1048576 ? `${Math.round(value / 1024)} KB` : `${(value / 1048576).toFixed(1)} MB`;
-const dateTime = (value?: number | null) => !value ? '—' : new Intl.DateTimeFormat('es-PE', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(Number(value)));
-
-function Stepper({ current }: { current: number }) {
-  return <ol className="grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="Progreso de preparación del servidor">{WIZARD_STEPS.map((label, index) => {
-    const number = index + 1; const done = number < current; const active = number === current;
-    return <li key={label} aria-current={active ? 'step' : undefined} className={`rounded-xl border p-3 ${active ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/30' : done ? 'border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20' : 'border-slate-200 dark:border-slate-700'}`}><span className={`mb-1 flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${active ? 'bg-indigo-600 text-white' : done ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300'}`}>{done ? <Check className="h-4 w-4" /> : number}</span><span className="block text-xs font-semibold sm:text-sm">{label}</span></li>;
-  })}</ol>;
+interface Props {
+  settings: AppSettings;
+  onSettingsChange: (settings: AppSettings) => void;
+  onSave: () => Promise<void>;
+  onChangeRouter: () => void;
+  isSaving: boolean;
+  successMsg: string;
+  errorMsg: string;
 }
 
-function RunHistory({ runs }: { runs: ProvisionRun[] }) {
-  return <section className="card space-y-4 p-4 sm:p-6"><div className="flex gap-3"><History className="h-5 w-5 text-indigo-600" /><div><h3 className="font-bold">Historial de operaciones</h3><p className="text-sm text-slate-500">Quién preparó cada Core, cuándo se ejecutó y qué ocurrió.</p></div></div>{runs.length === 0 ? <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500 dark:bg-slate-800/60">Aún no existen operaciones registradas.</p> : <div className="space-y-2">{runs.map(run => <details key={run.id} className="group rounded-xl border border-slate-200 dark:border-slate-700"><summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 p-3 sm:p-4">{run.status === 'COMPLETED' ? <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" /> : run.status === 'RUNNING' ? <Loader2 className="h-5 w-5 shrink-0 animate-spin text-indigo-600" /> : <XCircle className="h-5 w-5 shrink-0 text-rose-600" />}<span className="min-w-0 flex-1"><span className="block font-semibold">Preparar servidor nuevo · {RUN_LABELS[run.status]}</span><span className="block truncate text-xs text-slate-500">{run.target_identity || run.target_host || 'Core sin identificar'} · {dateTime(run.started_at)} · {run.actor_email || 'Administrador'}</span></span><ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" /></summary><div className="border-t border-slate-100 p-3 text-sm dark:border-slate-800 sm:p-4"><div className="mb-3 grid gap-2 sm:grid-cols-3"><span><b>Destino:</b> {run.target_host || '—'}</span><span><b>Red:</b> {run.network_supernet || '—'}</span><span><b>Finalizó:</b> {dateTime(run.finished_at)}</span></div>{run.error_message && <p className="mb-3 rounded-lg bg-rose-50 p-3 text-rose-700 dark:bg-rose-950/30 dark:text-rose-300">{run.error_message}</p>}{run.steps.length > 0 && <ol className="space-y-1">{run.steps.map((step, index) => <li key={`${step.name}-${index}`} className="flex gap-2"><span className={step.status === 'FAILED' ? 'text-rose-600' : 'text-emerald-600'}>{step.status === 'FAILED' ? '×' : '✓'}</span><span>{step.name} <small className="text-slate-500">({step.status === 'CREATED' ? 'creado' : step.status === 'EXISTS' ? 'ya existía' : 'falló'})</small></span></li>)}</ol>}</div></details>)}</div>}</section>;
-}
+const STATUS_LABELS: Record<string, string> = {
+  HEALTHY: 'Operativo',
+  DEGRADED: 'Requiere atención',
+  UNREACHABLE: 'No alcanzable',
+  INVALID_CREDENTIALS: 'Credenciales inválidas',
+  NOT_CONFIGURED: 'Sin configurar',
+};
 
-export function CoreServerPanel({ settings, onSettingsChange, onSave, onChangeRouter, isSaving, successMsg, errorMsg }: Props) {
-  const [status, setStatus] = useState<CoreStatusResponse | null>(null); const [runs, setRuns] = useState<ProvisionRun[]>([]); const [loading, setLoading] = useState(true);
-  const [action, setAction] = useState<'health' | 'backup' | 'preview' | 'provision' | null>(null); const [message, setMessage] = useState(''); const [error, setError] = useState('');
-  const [preview, setPreview] = useState<ProvisionPreview | null>(null); const [resultSteps, setResultSteps] = useState<ProvisionStep[]>([]); const [confirmation, setConfirmation] = useState('');
-  const [networkPreview, setNetworkPreview] = useState<ManagementSupernetPreview | null>(null); const [networkPreviewError, setNetworkPreviewError] = useState(''); const [wizardStep, setWizardStep] = useState(1);
+const bytes = (value?: number | null) => !value
+  ? '—'
+  : value < 1048576
+    ? `${Math.round(value / 1024)} KB`
+    : `${(value / 1048576).toFixed(1)} MB`;
+
+export function CoreServerPanel({ settings, onSettingsChange, onSave, isSaving, successMsg, errorMsg }: Props) {
+  const [status, setStatus] = useState<CoreStatusResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [action, setAction] = useState<'health' | 'backup' | null>(null);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
   const patch = (values: Partial<AppSettings>) => onSettingsChange({ ...settings, ...values });
-  const loadStatus = useCallback(async () => { setLoading(true); try { const [nextStatus, history] = await Promise.all([coreServerApi.status(), coreServerApi.history()]); setStatus(nextStatus); setRuns(history.runs); setError(''); } catch (e) { setError(e instanceof Error ? e.message : 'No se pudo consultar el servidor.'); } finally { setLoading(false); } }, []);
-  useEffect(() => { void loadStatus(); }, [loadStatus]);
-  useEffect(() => { const cidr = settings.management_supernet ?? ''; if (!cidr && settings.core_provisioned_at) return; const timer = window.setTimeout(() => void coreServerApi.managementSupernetPreview(cidr).then(response => { setNetworkPreview(response.preview); setNetworkPreviewError(''); }).catch(e => { setNetworkPreview(null); setNetworkPreviewError(e instanceof Error ? e.message : 'No se pudo validar la red.'); }), 300); return () => window.clearTimeout(timer); }, [settings.management_supernet, settings.core_provisioned_at]);
-  const run = async (kind: NonNullable<typeof action>, task: () => Promise<void>) => { setAction(kind); setMessage(''); setError(''); try { await task(); } catch (e) { setError(e instanceof Error ? e.message : 'No se pudo completar la operación.'); } finally { setAction(null); } };
-  const checkHealth = () => run('health', async () => { const response = await coreServerApi.health(); setStatus(current => current ? { ...current, health: response.health } : current); setMessage('Estado actualizado.'); });
-  const createBackup = () => run('backup', async () => { const response = await coreServerApi.backupNow(); setMessage(response.result.skipped ? 'El respaldo de hoy ya fue procesado.' : `Correo enviado con ${response.result.filenames?.join(' y ') || 'ambos archivos'}.`); await loadStatus(); });
-  const createPreview = () => run('preview', async () => { await onSave(); const response = await coreServerApi.preview(); setPreview(response.preview); setConfirmation(''); setWizardStep(3); });
-  const provision = () => run('provision', async () => { const response = await coreServerApi.provision(confirmation); setResultSteps(response.result.steps); setMessage('Servidor VPN preparado correctamente desde cero.'); setConfirmation(''); setWizardStep(4); await loadStatus(); });
-  const health = status?.health; const healthy = health?.status === 'HEALTHY'; const last = status?.backup.last; const networkPlan = networkPreview?.plan;
-  const networkLocked = Boolean(settings.core_provisioned_at || health?.vpnReady || networkPreview?.locked); const derivedNetworks = networkPlan ? [['Escaneo', networkPlan.scanNet], ['Clientes', networkPlan.clientsNet], ['VPS', networkPlan.vpsNet], ['Administración', networkPlan.adminNet]] : [];
 
-  return <div className="space-y-5"><section className="card space-y-5 p-4 sm:p-6"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div className="flex gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50"><ServerCog className="h-5 w-5 text-indigo-600" /></span><div><h3 className="font-bold">Servidor VPN MikroTik</h3><p className="text-sm text-slate-500">Estado del Core actual, respaldo y preparación guiada de un servidor nuevo.</p></div></div><button type="button" className="btn-ghost min-h-11 px-3" disabled={action !== null || loading} onClick={() => void checkHealth()}>{action === 'health' ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Comprobar estado</button></div>{loading ? <div className="h-24 animate-pulse rounded-xl bg-slate-100" /> : <div className="grid grid-cols-2 gap-3 lg:grid-cols-4"><div className="rounded-xl border p-3"><p className="text-xs text-slate-500">Estado</p><p className={`mt-1 flex items-center gap-1.5 font-bold ${healthy ? 'text-emerald-600' : 'text-amber-600'}`}>{healthy ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}{STATUS_LABELS[health?.status || ''] || 'Desconocido'}</p></div><div className="rounded-xl border p-3"><p className="text-xs text-slate-500">Identidad</p><p className="mt-1 truncate font-semibold">{health?.identity || '—'}</p></div><div className="rounded-xl border p-3"><p className="text-xs text-slate-500">RouterOS / equipo</p><p className="mt-1 truncate font-semibold">{health?.version || '—'} · {health?.model || '—'}</p></div><div className="rounded-xl border p-3"><p className="text-xs text-slate-500">VPN del sistema</p><p className="mt-1 font-semibold">{health?.vpnReady ? 'Preparada' : 'No preparada'}</p></div></div>}</section>
-    {(message || error || successMsg || errorMsg) && <div role="status" className={`rounded-xl border p-3 text-sm ${(error || errorMsg) ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>{error || errorMsg || message || successMsg}</div>}
-    <section className="card space-y-5 p-4 sm:p-6"><div className="flex gap-3"><ShieldCheck className="h-5 w-5 shrink-0 text-indigo-600" /><div><h3 className="font-bold">Asistente de configuración</h3><p className="text-sm text-slate-500">Completa los pasos en orden. No se aplican cambios hasta la confirmación final.</p></div></div><Stepper current={wizardStep} />
-      {wizardStep === 1 && <div className="grid gap-3 lg:grid-cols-3"><button type="button" onClick={onChangeRouter} className="min-h-36 rounded-xl border p-4 text-left hover:border-indigo-400"><ServerCog className="mb-3 h-5 w-5 text-indigo-600" /><b className="block">Conectar un Core existente</b><span className="mt-1 block text-sm text-slate-500">Configura credenciales y comprueba la identidad sin aprovisionar.</span><span className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-indigo-600">Ir a conexión <ArrowRight className="h-4 w-4" /></span></button><button type="button" onClick={() => setWizardStep(2)} className="min-h-36 rounded-xl border-2 border-indigo-500 bg-indigo-50/50 p-4 text-left"><ShieldCheck className="mb-3 h-5 w-5 text-indigo-600" /><b className="block">Preparar un servidor nuevo</b><span className="mt-1 block text-sm text-slate-500">Solo para un MikroTik vacío; se bloquea si encuentra objetos operativos.</span><span className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-indigo-600">Comenzar <ArrowRight className="h-4 w-4" /></span></button><div className="min-h-36 rounded-xl border border-dashed bg-slate-50 p-4 opacity-75"><AlertTriangle className="mb-3 h-5 w-5 text-amber-600" /><b className="block">Reemplazar el Core actual</b><span className="mt-1 block text-sm text-slate-500">No disponible hasta contar con migración y recuperación verificables.</span></div></div>}
-      {wizardStep === 2 && <div className="space-y-4"><div className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-4"><label htmlFor="management-supernet" className="mb-2 block text-xs font-bold uppercase text-slate-500">Bloque privado de gestión /22</label><input id="management-supernet" className="input-field h-11 font-mono" value={settings.management_supernet ?? ''} disabled={networkLocked} onChange={e => patch({ management_supernet: e.target.value })} placeholder={networkLocked ? 'Red bloqueada por configuración existente' : '10.12.248.0/22'} /><p className="mt-2 text-xs text-slate-500">Se fija una sola vez para proteger los túneles existentes.</p>{networkPlan && <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">{derivedNetworks.map(([label, net]) => <div key={label} className="rounded-lg bg-white/80 p-2"><span className="block text-2xs text-slate-500">{label}</span><code className="text-xs font-semibold">{net}</code></div>)}</div>}{networkPreview?.overlaps.length ? <details className="mt-3 rounded-lg border border-rose-200 bg-white/70 p-3 text-sm"><summary className="cursor-pointer font-semibold text-rose-700">Se detectaron {networkPreview.overlaps.length} conflictos de red</summary><ul className="mt-2 list-disc pl-5 text-xs text-rose-600">{networkPreview.overlaps.map(item => <li key={`${item.source}-${item.name}-${item.cidr}`}>{item.name}: {item.cidr}</li>)}</ul></details> : null}{!networkPlan && <p className="mt-3 text-sm font-semibold text-rose-600">{networkPreviewError || networkPreview?.blockers[0] || 'Validando la red…'}</p>}</div><div className="grid gap-4 md:grid-cols-2"><label><span className="mb-2 block text-xs font-bold uppercase text-slate-500">Interfaz WAN (opcional)</span><div className="relative"><Network className="absolute left-3 top-3.5 h-4 w-4 text-slate-500" /><input className="input-field h-11 pl-10" value={settings.core_wan_interface ?? ''} onChange={e => patch({ core_wan_interface: e.target.value })} placeholder="Se detectará automáticamente" /></div></label><label><span className="mb-2 block text-xs font-bold uppercase text-slate-500">Clave pública WireGuard del VPS</span><input className="input-field h-11 font-mono text-xs" value={settings.core_vps_public_key ?? ''} onChange={e => patch({ core_vps_public_key: e.target.value })} placeholder="Base64 de 44 caracteres" /></label></div><div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between"><button className="btn-ghost min-h-11 px-4" onClick={() => setWizardStep(1)}><ArrowLeft className="h-4 w-4" /> Atrás</button><button className="btn-primary min-h-11 px-4" disabled={action !== null || !networkPreview?.canSave} onClick={() => void createPreview()}>{action === 'preview' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Activity className="h-4 w-4" />} Guardar y revisar</button></div></div>}
-      {wizardStep === 3 && preview && <div className="space-y-4"><div className={`rounded-xl border p-4 ${preview.canProvision ? 'border-emerald-200 bg-emerald-50/60' : 'border-amber-200 bg-amber-50/60'}`}><h4 className="font-bold">{preview.canProvision ? 'El equipo está listo para prepararse' : 'No se puede continuar'}</h4>{preview.blockers.length > 0 && <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">{preview.blockers.map(item => <li key={item}>{item}</li>)}</ul>}<h5 className="mt-4 text-sm font-bold">Acciones previstas ({preview.actions.length})</h5><ol className="mt-2 space-y-2">{preview.actions.map((item, index) => <li key={item} className="flex gap-2 text-sm"><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white text-xs font-bold text-indigo-600">{index + 1}</span>{item}</li>)}</ol></div>{preview.canProvision && <label className="block"><span className="mb-2 block text-sm font-semibold">Para confirmar escribe <code>PREPARAR DESDE CERO</code></span><input className="input-field h-11" value={confirmation} onChange={e => setConfirmation(e.target.value)} autoComplete="off" /></label>}<div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between"><button className="btn-ghost min-h-11 px-4" onClick={() => setWizardStep(2)}><ArrowLeft className="h-4 w-4" /> Corregir datos</button>{preview.canProvision && <button className="btn-primary min-h-11 px-4" disabled={confirmation !== 'PREPARAR DESDE CERO' || action !== null} onClick={() => void provision()}>{action === 'provision' ? <Loader2 className="h-4 w-4 animate-spin" /> : <ServerCog className="h-4 w-4" />} Preparar servidor</button>}</div></div>}
-      {wizardStep === 4 && <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4"><div className="flex gap-3"><CheckCircle2 className="h-6 w-6 text-emerald-600" /><div><h4 className="font-bold">Preparación completada</h4><p className="text-sm text-slate-600">El resultado quedó guardado en el historial.</p></div></div><ol className="mt-4 space-y-2">{resultSteps.map((step, index) => <li key={`${step.name}-${index}`} className="flex gap-2 text-sm"><Check className="h-4 w-4 shrink-0 text-emerald-600" />{step.name} <small className="text-slate-500">{step.status === 'CREATED' ? 'creado' : 'ya existía'}</small></li>)}</ol><button className="btn-ghost mt-4 min-h-11 px-4" onClick={() => { setWizardStep(1); setPreview(null); setResultSteps([]); }}>Finalizar</button></div>}
+  const loadStatus = useCallback(async () => {
+    setLoading(true);
+    try {
+      setStatus(await coreServerApi.status());
+      setError('');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo consultar el servidor.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void loadStatus(); }, [loadStatus]);
+
+  const run = async (kind: NonNullable<typeof action>, task: () => Promise<void>) => {
+    setAction(kind);
+    setMessage('');
+    setError('');
+    try { await task(); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudo completar la operación.'); }
+    finally { setAction(null); }
+  };
+
+  const checkHealth = () => run('health', async () => {
+    const response = await coreServerApi.health();
+    setStatus(current => current ? { ...current, health: response.health } : current);
+    setMessage('Estado actualizado.');
+  });
+  const createBackup = () => run('backup', async () => {
+    const response = await coreServerApi.backupNow();
+    setMessage(response.result.skipped ? 'El respaldo de hoy ya fue procesado.' : `Correo enviado con ${response.result.filenames?.join(' y ') || 'ambos archivos'}.`);
+    await loadStatus();
+  });
+
+  const health = status?.health;
+  const healthy = health?.status === 'HEALTHY';
+  const last = status?.backup.last;
+
+  return <div className="space-y-5">
+    <section className="card space-y-5 p-4 sm:p-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50"><ServerCog className="h-5 w-5 text-indigo-600" /></span><div><h3 className="font-bold">Servidor VPN MikroTik</h3><p className="text-sm text-slate-500">Estado operativo del Core configurado actualmente.</p></div></div>
+        <button type="button" className="btn-ghost min-h-11 px-3" disabled={action !== null || loading} onClick={() => void checkHealth()}>{action === 'health' ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Comprobar estado</button>
+      </div>
+      {loading ? <div className="h-24 animate-pulse rounded-xl bg-slate-100" /> : <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="rounded-xl border p-3"><p className="text-xs text-slate-500">Estado</p><p className={`mt-1 flex items-center gap-1.5 font-bold ${healthy ? 'text-emerald-600' : 'text-amber-600'}`}>{healthy ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}{STATUS_LABELS[health?.status || ''] || 'Desconocido'}</p></div>
+        <div className="rounded-xl border p-3"><p className="text-xs text-slate-500">Identidad</p><p className="mt-1 truncate font-semibold">{health?.identity || '—'}</p></div>
+        <div className="rounded-xl border p-3"><p className="text-xs text-slate-500">RouterOS / equipo</p><p className="mt-1 truncate font-semibold">{health?.version || '—'} · {health?.model || '—'}</p></div>
+        <div className="rounded-xl border p-3"><p className="text-xs text-slate-500">VPN del sistema</p><p className="mt-1 font-semibold">{health?.vpnReady ? 'Preparada' : 'No preparada'}</p></div>
+      </div>}
     </section>
-    <section className="card space-y-5 p-4 sm:p-6"><div className="flex gap-3"><DatabaseBackup className="h-5 w-5 text-indigo-600" /><div><h3 className="font-bold">Respaldo diario por correo</h3><p className="text-sm text-slate-500">Mantenimiento independiente del asistente: envía un .backup cifrado y un .rsc legible.</p></div></div><div className="grid gap-4 md:grid-cols-2"><label className="flex items-center gap-3 rounded-xl border p-3"><input type="checkbox" checked={settings.core_backup_enabled ?? false} onChange={e => patch({ core_backup_enabled: e.target.checked })} /><span><b className="block text-sm">Activar envío automático</b><span className="block text-xs text-slate-500">Una vez al día al Administrador verificado.</span></span></label><label><span className="mb-2 block text-xs font-bold uppercase text-slate-500">Hora local</span><input type="time" className="input-field h-11" value={settings.core_backup_time ?? '02:00'} onChange={e => patch({ core_backup_time: e.target.value })} /></label><label><span className="mb-2 block text-xs font-bold uppercase text-slate-500">Zona horaria</span><input className="input-field h-11" value={settings.core_backup_timezone ?? 'America/Lima'} onChange={e => patch({ core_backup_timezone: e.target.value })} /></label><label><span className="mb-2 block text-xs font-bold uppercase text-slate-500">Contraseña del .backup</span><div className="relative"><KeyRound className="absolute left-3 top-3.5 h-4 w-4 text-slate-500" /><input type="password" minLength={12} className="input-field h-11 pl-10" value={settings.core_backup_password ?? ''} onChange={e => patch({ core_backup_password: e.target.value })} placeholder="Mínimo 12 caracteres" /></div></label></div><div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between"><div className="text-xs text-slate-500">{last ? <>Último: <b>{last.status}</b> · {last.local_date} · {bytes(last.backup_size_bytes)} + {bytes(last.rsc_size_bytes)} · {last.recipient_masked || 'sin destinatario'}</> : 'Aún no hay ejecuciones registradas.'}</div><div className="flex flex-col gap-2 sm:flex-row"><button className="btn-ghost min-h-11 px-3" disabled={action !== null} onClick={() => void createBackup()}>{action === 'backup' ? <Loader2 className="h-4 w-4 animate-spin" /> : <HardDrive className="h-4 w-4" />} Generar y enviar ahora</button><button className="btn-primary min-h-11 px-3" disabled={isSaving} onClick={() => void onSave()}>{isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Guardar respaldo</button></div></div></section><RunHistory runs={runs} /></div>;
+    {(message || error || successMsg || errorMsg) && <div role="status" className={`rounded-xl border p-3 text-sm ${(error || errorMsg) ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>{error || errorMsg || message || successMsg}</div>}
+    <section className="card space-y-5 p-4 sm:p-6">
+      <div className="flex gap-3"><DatabaseBackup className="h-5 w-5 text-indigo-600" /><div><h3 className="font-bold">Respaldo diario por correo</h3><p className="text-sm text-slate-500">Envía un .backup cifrado y un .rsc legible del Core configurado.</p></div></div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <label className="flex items-center gap-3 rounded-xl border p-3"><input type="checkbox" checked={settings.core_backup_enabled ?? false} onChange={event => patch({ core_backup_enabled: event.target.checked })} /><span><b className="block text-sm">Activar envío automático</b><span className="block text-xs text-slate-500">Una vez al día al Administrador verificado.</span></span></label>
+        <label><span className="mb-2 block text-xs font-bold uppercase text-slate-500">Hora local</span><input type="time" className="input-field h-11" value={settings.core_backup_time ?? '02:00'} onChange={event => patch({ core_backup_time: event.target.value })} /></label>
+        <label><span className="mb-2 block text-xs font-bold uppercase text-slate-500">Zona horaria</span><input className="input-field h-11" value={settings.core_backup_timezone ?? 'America/Lima'} onChange={event => patch({ core_backup_timezone: event.target.value })} /></label>
+        <label><span className="mb-2 block text-xs font-bold uppercase text-slate-500">Contraseña del .backup</span><div className="relative"><KeyRound className="absolute left-3 top-3.5 h-4 w-4 text-slate-500" /><input type="password" minLength={12} className="input-field h-11 pl-10" value={settings.core_backup_password ?? ''} onChange={event => patch({ core_backup_password: event.target.value })} placeholder="Mínimo 12 caracteres" /></div></label>
+      </div>
+      <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="text-xs text-slate-500">{last ? <>Último: <b>{last.status}</b> · {last.local_date} · {bytes(last.backup_size_bytes)} + {bytes(last.rsc_size_bytes)} · {last.recipient_masked || 'sin destinatario'}</> : 'Aún no hay ejecuciones registradas.'}</div>
+        <div className="flex flex-col gap-2 sm:flex-row"><button className="btn-ghost min-h-11 px-3" disabled={action !== null} onClick={() => void createBackup()}>{action === 'backup' ? <Loader2 className="h-4 w-4 animate-spin" /> : <HardDrive className="h-4 w-4" />} Generar y enviar ahora</button><button className="btn-primary min-h-11 px-3" disabled={isSaving} onClick={() => void onSave()}>{isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Guardar respaldo</button></div>
+      </div>
+    </section>
+  </div>;
 }
