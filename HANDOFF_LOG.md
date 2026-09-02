@@ -1,5 +1,9 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-09-01 — IP histórica WireGuard restaurada en única VPS activa.** Host `165.22.187.115`.
+> - El usuario confirmó que no hay otra VPS activa; `wg0` cambió de `10.12.250.61/32` a `10.12.250.60/32`, conservando la identidad nueva, endpoint `213.173.36.232:13232` y pools de gestión/nodos.
+> - Servicio activo y rutas presentes, pero tras varios keepalives conserva `0 B` recibidos y el ping a `10.12.250.1` falla. Revisar clave pública nueva, allowed-address `.60/32` y reenvío UDP en Core/NAT.
+
 > **Sesión 2026-09-01 — Clave WireGuard expuesta rotada y endpoint corregido.** Host `165.22.187.115`.
 > - Una captura mostró la clave privada configurada manualmente; se generó una identidad nueva y la anterior queda revocada. Nueva clave pública VPS: `TFMMD351Nk5QYbAQlV/+LZX5f1oHjjb4SfT977uyczk=`.
 > - `wg0` usa `10.12.250.61/32`, endpoint confirmado `213.173.36.232:13232` y AllowedIPs `10.12.248.0/22,10.11.250.0/24,10.11.251.0/24`. Servicio activo; handshake pendiente hasta actualizar el peer del Core.
