@@ -16,6 +16,9 @@ describe('VpsWireguardPreviewPanel', () => {
     expect(screen.getByLabelText('IP pública o dominio')).toBeInTheDocument();
     expect(screen.queryByLabelText('IP privada del MikroTik')).not.toBeInTheDocument();
     expect(screen.getByLabelText(/Redes locales autorizadas/)).toBeInTheDocument();
+    expect(screen.getByText('Puertos que deben estar libres y reenviados al MikroTik')).toBeInTheDocument();
+    expect(screen.getByText('13232–13234')).toBeInTheDocument();
+    expect(screen.getByText(/No abras Winbox 8291 públicamente/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Guardar y enlazar/ })).toBeDisabled();
   });
 
