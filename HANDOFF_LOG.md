@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-09-01 — Tabla de puertos requeridos desplegada.** Runtime `011752d` en `143.244.169.142`.
+> - El paso inicial distingue API temporal `8728/TCP`, WireGuard permanente `13232–13234/UDP`, SSTP opcional en el puerto configurado y Winbox no público.
+> - Pruebas focalizadas 3/3, TypeScript y lint verdes. Se recreó sólo frontend; raíz/health 200 y servicios con cero reinicios.
+> - Rollback: `gestionvpn-10-frontend:pre-required-ports-20260902T015500Z`.
+
 > **Sesión 2026-09-01 — IP privada retirada del paso inicial.** Runtime `ce6f058` en `143.244.169.142`.
 > - La IP privada era sólo una ayuda para configurar NAT en el equipo del proveedor; Joinpoint no la usa para conectarse. Se retiró del formulario principal y se aclaró el reenvío temporal `8728/TCP`.
 > - Pruebas focalizadas 3/3, TypeScript y lint verdes. Se recreó sólo frontend; raíz/health 200, servicios sin reinicios y WireGuard preservado.
