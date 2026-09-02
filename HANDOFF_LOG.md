@@ -1,5 +1,9 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-09-01 — Clave WireGuard expuesta rotada y endpoint corregido.** Host `165.22.187.115`.
+> - Una captura mostró la clave privada configurada manualmente; se generó una identidad nueva y la anterior queda revocada. Nueva clave pública VPS: `TFMMD351Nk5QYbAQlV/+LZX5f1oHjjb4SfT977uyczk=`.
+> - `wg0` usa `10.12.250.61/32`, endpoint confirmado `213.173.36.232:13232` y AllowedIPs `10.12.248.0/22,10.11.250.0/24,10.11.251.0/24`. Servicio activo; handshake pendiente hasta actualizar el peer del Core.
+
 > **Sesión 2026-09-01 — WireGuard activado en la VPS nueva, handshake pendiente.** Host `165.22.187.115`.
 > - `wg0` quedó persistente con VPS `10.12.250.61/32`, peer Core `R79mbZb0bRcu5+NL40ZAMiX5VtjWJ9JJ+AqltA15uQM=`, endpoint asumido `38.253.171.61:13232`, `AllowedIPs=10.12.248.0/22`, MTU 1420 y keepalive 25 s.
 > - La interfaz y ruta están activas, pero transmite sin recibir (`0 B`) y `10.12.250.1` no responde. Falta validar peer `10.12.250.61/32` en MikroTik, puerto real y reenvío UDP.
