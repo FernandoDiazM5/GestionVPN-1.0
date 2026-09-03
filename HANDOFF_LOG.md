@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-09-03 — SSH restringido a usuarios administrativos y clave pública.** Rama `codex/d006-no-core-assistant`; cambio de sistema sin deploy de aplicación.
+> - Se configuraron `AuthenticationMethods publickey`, `AllowUsers root vpsadmin` y `PermitRootLogin prohibit-password`; `22/TCP` y UFW OpenSSH permanecen públicos para conservar la consola DigitalOcean.
+> - Se probaron conexiones nuevas con ambas llaves de `vpsadmin`, `sudo` no interactivo y la llave existente de recuperación de `root`. `sshd -t`, SSH y Fail2ban están activos; WireGuard mantiene handshake reciente.
+> - Respaldo: `/root/pre-ssh-hardening-phase2-20260903T020417Z`.
+
 > **Sesión 2026-09-03 — Endurecimiento SSH seguro del VPS vigente.** Rama `codex/d006-no-core-assistant`; cambio de sistema sin deploy de aplicación.
 > - En `165.22.187.115` se conservaron `22/TCP`, UFW OpenSSH y acceso `root` por clave; se aplicaron `MaxAuthTries 3`, `LoginGraceTime 30` y `X11Forwarding no`, manteniendo contraseñas y keyboard-interactive deshabilitados.
 > - `sshd -t` pasó antes y después de recargar. Se verificaron sesiones nuevas con las dos llaves independientes de `vpsadmin`, `sudo` no interactivo y la llave existente de `root`; Fail2ban y SSH permanecen activos.
