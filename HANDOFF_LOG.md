@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-09-03 — Endurecimiento SSH seguro del VPS vigente.** Rama `codex/d006-no-core-assistant`; cambio de sistema sin deploy de aplicación.
+> - En `165.22.187.115` se conservaron `22/TCP`, UFW OpenSSH y acceso `root` por clave; se aplicaron `MaxAuthTries 3`, `LoginGraceTime 30` y `X11Forwarding no`, manteniendo contraseñas y keyboard-interactive deshabilitados.
+> - `sshd -t` pasó antes y después de recargar. Se verificaron sesiones nuevas con las dos llaves independientes de `vpsadmin`, `sudo` no interactivo y la llave existente de `root`; Fail2ban y SSH permanecen activos.
+> - Respaldo: `/root/pre-ssh-hardening-20260903T014812Z`. El inventario local ignorado se corrigió al host/llave vigentes sin almacenar ni registrar secretos.
+
 > **Sesión 2026-08-29 — Autorización estricta del bot para Sitios.** Rama `vps_uni` sobre `c39f8e5`; pendiente despliegue.
 > - Todos los comandos y callbacks de Sitios revalidan chat privado, vínculo exacto con el bot, usuario activo, workspace exacto y membresía; se corrigió la selección accidental del primer workspace del usuario.
 > - MEMBER vuelve a consultar sus asignaciones antes de activar, por lo que botones y listas obsoletos quedan invalidados. `/link` no admite grupos.
