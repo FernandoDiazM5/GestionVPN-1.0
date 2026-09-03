@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-09-02 — Usuario administrativo alternativo y dos claves preparados.** VPS `165.22.187.115`.
+> - Se creó `vpsadmin` con `sudo -n` y dos claves Ed25519 independientes; ambas se probaron en conexiones nuevas y validaron `sudo` y `sshd -t`.
+> - El acceso root por clave permanece como respaldo; puerto 22, UFW y sshd no cambiaron. Backup/rollback: `/root/pre-vpsadmin-20260903T014254Z`.
+> - Rutas y huellas quedaron en el `.env` local ignorado. Pendiente autorización separada para cualquier cierre de root o restricción de firewall.
+
 > **Sesión 2026-09-02 — Agente de Seguridad VPS instalado con protección de acceso.** VPS `165.22.187.115`, runtime `a8d8c36`.
 > - Tras preflight y autorización explícita, se instalaron el agente root endurecido y 14 jails adicionales; escucha exclusivamente en `127.0.0.1:8788` y el backend consulta 15 jails en ~4,3 s.
 > - Se excluyeron `38.253.171.61/32`, la IP de la VPS y el Core. Puerto 22, sshd y UFW de acceso no cambiaron; una conexión SSH nueva, Droplet Agent, consola serial, HTTPS y WireGuard/Core quedaron verificados.
