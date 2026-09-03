@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Mail, PlugZap, Radar, Server, ServerCog, Settings as SettingsIcon, User } from 'lucide-react';
+import { Mail, PlugZap, Server, ServerCog, Settings as SettingsIcon, User } from 'lucide-react';
 import {
   SettingsHeader,
   SettingsForm,
   SettingsMessages,
-  ScanModeToggle,
   ErrorReportingSettings,
   CoreServerPanel,
 } from './components';
@@ -16,12 +15,11 @@ import { PageHeader } from '../../Common/ui';
 import { post } from '../../../services/sessionClient';
 import type { AppSettings } from './types';
 
-type TabId = 'core' | 'server' | 'scan' | 'reports' | 'integrations' | 'account';
+type TabId = 'core' | 'server' | 'reports' | 'integrations' | 'account';
 
 const TABS = [
   { id: 'core', label: 'Router Core', icon: Server, description: 'RouterOS, IP publica y SSTP' },
   { id: 'server', label: 'Servidor VPN', icon: ServerCog, description: 'Estado, respaldo y provision' },
-  { id: 'scan', label: 'Escaneo', icon: Radar, description: 'Origen VPS o equipo local' },
   { id: 'reports', label: 'Reportes tecnicos', icon: Mail, description: 'Destinatario y correo de prueba' },
   { id: 'integrations', label: 'Integraciones', icon: PlugZap, description: 'Correo, Telegram y Google Login' },
   { id: 'account', label: 'Cuenta', icon: User, description: 'Correo y contrasena' },
@@ -149,10 +147,6 @@ export default function SettingsModule() {
             />
           )}
 
-          {tab === 'scan' && !loadState.isLoading && (
-            <ScanModeToggle />
-          )}
-
           {tab === 'reports' && !loadState.isLoading && (
             <ErrorReportingSettings
               email={loadState.settings.error_report_email ?? ''}
@@ -160,7 +154,7 @@ export default function SettingsModule() {
             />
           )}
 
-          {(tab === 'server' || tab === 'scan' || tab === 'reports') && loadState.isLoading && (
+          {(tab === 'server' || tab === 'reports') && loadState.isLoading && (
             <AsyncQueryState loading error={null} onRetry={() => { void loadState.loadSettings(); }}
               loadingLabel="Cargando ajustes..." skeletonRows={3}>
               <div />
