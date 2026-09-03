@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-09-02 — Error temporal de Seguridad VPS diagnosticado.** VPS `165.22.187.115`.
+> - `/api/admin/security/status` devuelve 503: el backend tiene URL/credencial configuradas, pero no existe `gestionvpn-security-agent.service` ni listener en `127.0.0.1:8788`.
+> - Fail2ban está activo sólo con `sshd`; las consultas de historial, observación web y cuentas bloqueadas sí responden. WireGuard/Core y la web general no están afectados.
+> - Pendiente: instalar de forma respaldada el agente y jails incluidos en `deploy/security-agent/` antes de usar las operaciones avanzadas del panel.
+
 > **Sesión 2026-09-02 — Escaneo retirado de Ajustes del sistema.** Runtime `a8d8c36` en `165.22.187.115`; rama `codex/d006-no-core-assistant`.
 > - Se retiraron la opción de navegación Escaneo y su panel informativo, sin tocar Buscar equipos, Monitor AP ni el motor de escaneo operativo.
 > - Prueba focalizada 1/1, build y lint verdes. Producción confirma textos ausentes, HTTPS 200, servicios saludables y WireGuard/Core conectados.
