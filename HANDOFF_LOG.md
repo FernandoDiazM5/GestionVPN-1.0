@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-09-03 — Diagnóstico de correo y permisos estáticos.** Rama `codex/d006-no-core-assistant`; pendiente deploy.
+> - Los `403` de `theme-init.js` y `favicon.svg` eran permisos `0600` dentro de la imagen; el Dockerfile ahora fija directorios `0755` y archivos `0644` de forma reproducible.
+> - El cambio de correo generaba OTP en modo DEV sin entregarlo porque el mailer ignoraba la integración global y el contenedor no tenía `SMTP_HOST`; OTP y recuperación ahora priorizan Brevo/Gmail de plataforma con fallback a `SMTP_*`.
+> - Producción no tiene Brevo/Gmail global activo y la credencial probada fue rechazada por Brevo con `535 EAUTH` tanto en 2525 como en 587. Verificación: backend **135/765**, sintaxis y build Docker frontend correctos; assets críticos `0644`.
+
 > **Sesión 2026-09-03 — SSH restringido a usuarios administrativos y clave pública.** Rama `codex/d006-no-core-assistant`; cambio de sistema sin deploy de aplicación.
 > - Se configuraron `AuthenticationMethods publickey`, `AllowUsers root vpsadmin` y `PermitRootLogin prohibit-password`; `22/TCP` y UFW OpenSSH permanecen públicos para conservar la consola DigitalOcean.
 > - Se probaron conexiones nuevas con ambas llaves de `vpsadmin`, `sudo` no interactivo y la llave existente de recuperación de `root`. `sshd -t`, SSH y Fail2ban están activos; WireGuard mantiene handshake reciente.

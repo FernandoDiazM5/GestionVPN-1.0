@@ -37,6 +37,11 @@ RUN npm run build
 # Stage 2 — servir con nginx (HTTPS + SSE)
 FROM nginx:1.27-alpine
 COPY --from=builder /repo/vpn-manager/dist /usr/share/nginx/html
+# Vite conserva los permisos de los archivos copiados desde public/. En algunos
+# checkouts endurecidos esos archivos llegan como 0600 y el worker de nginx no
+# puede leerlos, aunque index.html y los assets generados sí funcionen.
+RUN find /usr/share/nginx/html -type d -exec chmod 755 {} + \
+ && find /usr/share/nginx/html -type f -exec chmod 644 {} +
 COPY vpn-manager/nginx.prod.conf /etc/nginx/conf.d/default.conf
 COPY vpn-manager/gestionvpn-security-headers.conf /etc/nginx/snippets/gestionvpn-security-headers.conf
 EXPOSE 80 443

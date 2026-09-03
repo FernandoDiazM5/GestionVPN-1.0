@@ -1,7 +1,8 @@
 // ============================================================
 //  Envío de correos / OTP (Fase 2)
-//  - Si hay SMTP_* configurado → envía vía nodemailer.
-//  - Si NO → modo DEV: imprime el OTP en consola (no requiere SMTP).
+//  - Usa primero la integración SMTP guardada en la plataforma/workspace.
+//  - Conserva SMTP_* como fallback de compatibilidad.
+//  - Si no existe ninguna configuración → modo DEV.
 // ============================================================
 let nodemailer = null;
 try { nodemailer = require('nodemailer'); } catch (_) { /* opcional */ }
@@ -68,8 +69,9 @@ const BRAND_ACCENT = '#16B8C4';
  * Envía un código OTP al email. Devuelve { delivered, dev }.
  * En dev (sin SMTP) imprime el código en consola y lo marca como dev.
  */
-async function sendOtp(email, code, purpose = 'verificación') {
-  const tx = getTransporter();
+async function sendOtp(email, code, purpose = 'verificación', workspaceId) {
+  const resolved = await getWorkspaceTransport(workspaceId);
+  const tx = resolved.tx;
   if (!tx) {
     // En modo DEV el OTP NO se considera secreto (no hay correo saliente);
     // se muestra al operador para facilitar pruebas locales.
@@ -78,7 +80,7 @@ async function sendOtp(email, code, purpose = 'verificación') {
     return { delivered: false, dev: true };
   }
   await sendAndCount(tx, 'otp', {
-    from: process.env.SMTP_FROM || FROM_DEFAULT,
+    from: resolved.from,
     to: email,
     subject: `[${BRAND_NAME}] Tu código de ${purpose}: ${code}`,
     text: `${BRAND_NAME}\n\nTu código de ${purpose} es: ${code}\nExpira en 10 minutos.\n\nOperación segura · Monitoreo centralizado`,
@@ -209,11 +211,12 @@ function escapeHtml(s) {
  * @param {string} opts.token       token en claro (NO el hash)
  * @param {string} [opts.name]      nombre del usuario para personalizar
  */
-async function sendPasswordReset({ email, token, name }) {
+async function sendPasswordReset({ email, token, name, workspaceId }) {
   const baseUrl = (process.env.APP_BASE_URL || 'http://localhost:5173/GestionVPN-1.0/').replace(/\/+$/, '/');
   const resetUrl = `${baseUrl}?reset=${encodeURIComponent(token)}`;
 
-  const tx = getTransporter();
+  const resolved = await getWorkspaceTransport(workspaceId);
+  const tx = resolved.tx;
   if (!tx) {
     // El token NO se expone como campo separado (redactado por logger). El
     // operador lo lee del query param `?reset=<token>` dentro de resetUrl.
@@ -273,7 +276,7 @@ async function sendPasswordReset({ email, token, name }) {
 </body></html>`;
 
   await sendAndCount(tx, 'password_reset', {
-    from: process.env.SMTP_FROM || FROM_DEFAULT,
+    from: resolved.from,
     to: email,
     subject,
     text,
