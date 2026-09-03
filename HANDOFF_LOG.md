@@ -1,5 +1,14 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-09-03 — Endpoint de moderadores corregido y escaneo diagnosticado.** Rama/runtime `2363c62`.
+> - Se respaldó configuración y base de datos en `/root/pre-core-endpoint-20260903T124439Z`; `WG_PUBLIC_IP`, `server_public_ip` y la configuración cifrada existente quedaron en `213.173.36.232:13233` sin rotar claves ni cambiar IP/AllowedIPs.
+> - El escaneo no puede originar desde las scan-IP `10.12.248.2/3`: `wg0` sólo tiene `10.12.250.60/32` y la ruta desde la scan-IP falla. Tampoco había túnel de moderador activo, requisito para la mangle `SCAN-WS`.
+> - Pendiente autorización separada para respaldar/sincronizar las direcciones del pool en `wg0`, recargar en vivo y probar escaneo con túnel activo.
+
+> **Sesión 2026-09-03 — Assets y correo transaccional desplegados.** Runtime `2363c62`; rollback `/root/pre-mail-assets-20260903T031340Z`.
+> - Backend y frontend fueron reconstruidos/recreados; DB intacta. `theme-init.js` y `favicon.svg` responden 200 con MIME correcto y permisos `0644`.
+> - Brevo quedó `ACTIVE`, la autenticación almacenada verifica y un OTP fue aceptado por SMTP sin errores. Backend/DB/HTTPS/WireGuard correctos.
+
 > **Sesión 2026-09-03 — Diagnóstico de correo y permisos estáticos.** Rama `codex/d006-no-core-assistant`; pendiente deploy.
 > - Los `403` de `theme-init.js` y `favicon.svg` eran permisos `0600` dentro de la imagen; el Dockerfile ahora fija directorios `0755` y archivos `0644` de forma reproducible.
 > - El cambio de correo generaba OTP en modo DEV sin entregarlo porque el mailer ignoraba la integración global y el contenedor no tenía `SMTP_HOST`; OTP y recuperación ahora priorizan Brevo/Gmail de plataforma con fallback a `SMTP_*`.
