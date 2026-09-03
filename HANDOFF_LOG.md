@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-09-03 — Red de origen del escaneo sincronizada en `wg0`.** Configuración operativa; pendiente prueba funcional del usuario.
+> - Respaldo `/root/pre-wg-scan-pool-20260903T124953Z`; se añadieron persistentemente y en vivo `10.12.248.2–254/32`, la LAN `192.168.30.0/24` al peer y su ruta Linux por `wg0`, sin bajar la interfaz.
+> - Verificación: 253 scan-IP presentes, configuración válida, handshake reciente, Core `10.12.250.1` con 0% pérdida, TCP 8728 y autenticación RouterOS correctos; backend healthy.
+> - No había túnel moderador activo. El usuario debe activar el nodo para que nazca `SCAN-WS` y ejecutar después el escaneo real.
+
 > **Sesión 2026-09-03 — Endpoint de moderadores corregido y escaneo diagnosticado.** Rama/runtime `2363c62`.
 > - Se respaldó configuración y base de datos en `/root/pre-core-endpoint-20260903T124439Z`; `WG_PUBLIC_IP`, `server_public_ip` y la configuración cifrada existente quedaron en `213.173.36.232:13233` sin rotar claves ni cambiar IP/AllowedIPs.
 > - El escaneo no puede originar desde las scan-IP `10.12.248.2/3`: `wg0` sólo tiene `10.12.250.60/32` y la ruta desde la scan-IP falla. Tampoco había túnel de moderador activo, requisito para la mangle `SCAN-WS`.
