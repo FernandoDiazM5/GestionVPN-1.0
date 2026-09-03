@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-09-02 — Agente de Seguridad VPS instalado con protección de acceso.** VPS `165.22.187.115`, runtime `a8d8c36`.
+> - Tras preflight y autorización explícita, se instalaron el agente root endurecido y 14 jails adicionales; escucha exclusivamente en `127.0.0.1:8788` y el backend consulta 15 jails en ~4,3 s.
+> - Se excluyeron `38.253.171.61/32`, la IP de la VPS y el Core. Puerto 22, sshd y UFW de acceso no cambiaron; una conexión SSH nueva, Droplet Agent, consola serial, HTTPS y WireGuard/Core quedaron verificados.
+> - Protección web continúa en observación/0%. Dos reincidentes históricos fueron bloqueados por Fail2ban. Respaldo y rollback: `/root/pre-security-agent-20260903T013859Z`.
+> - La credencial reutilizada y sus metadatos quedaron registrados sin exposición en el `.env` local ignorado por Git.
+
 > **Sesión 2026-09-02 — Inventario seguro de credenciales establecido.**
 > - Nueva regla §4.47: toda credencial operativa nueva o rotada se registra en el `.env` local ignorado por Git; nunca en commits, handoff, logs ni chat.
 > - Las claves privadas, certificados y ADC permanecen en archivos protegidos; el `.env` registra únicamente sus rutas, identidades y huellas. Se verificó que `.env` está excluido por `.gitignore` y no está versionado.
