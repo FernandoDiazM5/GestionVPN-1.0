@@ -1,5 +1,9 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-09-02 — Inventario seguro de credenciales establecido.**
+> - Nueva regla §4.47: toda credencial operativa nueva o rotada se registra en el `.env` local ignorado por Git; nunca en commits, handoff, logs ni chat.
+> - Las claves privadas, certificados y ADC permanecen en archivos protegidos; el `.env` registra únicamente sus rutas, identidades y huellas. Se verificó que `.env` está excluido por `.gitignore` y no está versionado.
+
 > **Sesión 2026-09-02 — Error temporal de Seguridad VPS diagnosticado.** VPS `165.22.187.115`.
 > - `/api/admin/security/status` devuelve 503: el backend tiene URL/credencial configuradas, pero no existe `gestionvpn-security-agent.service` ni listener en `127.0.0.1:8788`.
 > - Fail2ban está activo sólo con `sshd`; las consultas de historial, observación web y cuentas bloqueadas sí responden. WireGuard/Core y la web general no están afectados.
