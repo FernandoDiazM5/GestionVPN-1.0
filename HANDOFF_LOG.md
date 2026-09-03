@@ -1,5 +1,10 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-09-02 — Escaneo retirado de Ajustes del sistema.** Runtime `a8d8c36` en `165.22.187.115`; rama `codex/d006-no-core-assistant`.
+> - Se retiraron la opción de navegación Escaneo y su panel informativo, sin tocar Buscar equipos, Monitor AP ni el motor de escaneo operativo.
+> - Prueba focalizada 1/1, build y lint verdes. Producción confirma textos ausentes, HTTPS 200, servicios saludables y WireGuard/Core conectados.
+> - Rollback frontend: `gestionvpn-10-frontend:pre-remove-scan-settings`.
+
 > **Sesión 2026-09-02 — Falso solapamiento corregido en la versión estable sin asistente.** Runtime `1e05445` en `165.22.187.115`; rama `codex/d006-no-core-assistant`.
 > - El guardado de `10.12.248.0/22` excluye sólo la dirección administrada exacta `wg0 10.12.250.60/32`; otros solapamientos continúan bloqueados. Prueba focalizada backend 7/7.
 > - Producción confirmó preview `valid=true`, `canSave=true`, sin bloqueos/solapamientos; HTTPS 200, DB/backend healthy, handshake reciente y ping al Core con 0 % de pérdida.
