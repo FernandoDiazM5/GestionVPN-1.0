@@ -1,5 +1,8 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-09-04 - Vincular tema existente de fibra.** Implementado /registrar_ruta [NOMBRE | ZONA], código automático y registro idempotente, sin operaciones de creación/borrado/renombrado Telegram. AuthOWNER por bot/workspace y perfilFIBER_ROUTES; locktransaccional protege duplicados. Guía visible en módulo fibra. Backend c4d37fc/frontend4237fca desplegados;57testsbackend/9frontend ybuild verdes. Web requirió login, no se envió un comando real. Backendfunction yhealth verificados. Se añadió recuperación al arranque de trabajos PENDING/RUNNING para reanudar el bulk pausado técnicamente, confirmado259creados/0errores. No consultas MikroWisp. Archivos reflejados en workspaceoriginal.
+
+
 > **Sesión 2026-09-04 - Espera automática Telegram y barra de progreso.** a8521ad desplegado backend/frontend desde worktree codex/telegram-fiber-release. Se confirmó PAUSED tras100 creaciones y5FAILED/TELEGRAM_RATE_LIMIT. Cambio: reintento del mismo cliente tras429 definitivo, deadline persistido, pausa manual y recuperación restringida de fallos429 históricos. UI muestra porcentaje, procesados, creados, pendientes, errores y espera automática. 7testsbackend/9frontend, build/lint verdes. Verificaciónweb: barra visible; reanudación del proceso existente,105creados/0errores. Continúa en segundo plano. No se accedió a MikroWisp; archivos sincronizados al workspace original.
 
 
