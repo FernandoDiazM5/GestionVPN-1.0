@@ -37,7 +37,7 @@ const NAV: NavGroup[] = [
       { id: 'nodes', label: 'Sitios', icon: Radio },
       { id: 'devices', label: 'Buscar equipos', icon: Cpu },
       { id: 'monitor', label: 'Estado de equipos', icon: Activity },
-      { id: 'client-history', label: 'Historial de clientes', icon: BookOpenText },
+      { id: 'client-history', label: 'Grupos operativos', icon: BookOpenText },
     ],
   },
   {

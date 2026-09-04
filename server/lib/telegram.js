@@ -142,7 +142,7 @@ async function callBotApi({ token, method, body = {}, timeoutMs = TIMEOUT_MS }) 
       body: JSON.stringify(body), signal: controller.signal,
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok || data.ok !== true) return { ok: false, status: res.status, error: data.description || `HTTP ${res.status}`, definite: true };
+    if (!res.ok || data.ok !== true) return { ok: false, status: res.status, error: data.description || `HTTP ${res.status}`, retryAfter: Number(data.parameters?.retry_after) || null, definite: true };
     return { ok: true, result: data.result };
   } catch (error) {
     return { ok: false, error: error.name === 'AbortError' ? `timeout ${timeoutMs}ms` : error.message, ambiguous: true };

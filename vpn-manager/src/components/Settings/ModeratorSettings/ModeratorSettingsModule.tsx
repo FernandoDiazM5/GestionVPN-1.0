@@ -41,7 +41,7 @@ export default function ModeratorSettingsModule() {
     () => (isMember ? ALL_TABS.filter(t => MEMBER_TAB_IDS.includes(t.id)) : ALL_TABS),
     [isMember],
   );
-  const [tab, setTab] = useState<TabId>('profile');
+  const [tab, setTab] = useState<TabId>(() => new URLSearchParams(window.location.search).get('tab') === 'notifications' ? 'notifications' : 'profile');
   const [integrationFocus, setIntegrationFocus] = useState<IntegrationProvider | null>(null);
 
   return (

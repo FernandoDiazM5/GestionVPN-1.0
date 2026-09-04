@@ -51,6 +51,18 @@ describe('mikrowispClient read-only', () => {
     expect(JSON.stringify(result)).not.toMatch(/ppp|Pass6|User6|snmp|public|sensitive-token/i);
   });
 
+  it('obtiene todos los clientes con una sola consulta sin filtros para la cola masiva', async () => {
+    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({ estado: 'exito', datos: [
+      { id: 9, nombre: 'Cliente nueve', ppppass: 'oculto' },
+      { id: 2, nombre: 'Cliente dos', token: 'oculto' },
+    ] }) }));
+    const result = await client.listClientDetails({ baseUrl: 'https://isp.example.com', token: 'api-secret' }, { fetch: fetchMock, lookup: publicLookup });
+    expect(result.map(item => ({ id: item.id, name: item.name }))).toEqual([{ id: '2', name: 'Cliente dos' }, { id: '9', name: 'Cliente nueve' }]);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ token: 'api-secret' });
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(JSON.stringify(result)).not.toMatch(/oculto|ppppass|token/i);
+  });
+
   it('rechaza rutas arbitrarias y respuestas con ID distinto o ambiguas', async () => {
     await expect(client.postReadOnly({ baseUrl: 'https://isp.example.com' }, 'NewUser', {}, { lookup: publicLookup })).rejects.toMatchObject({ code: 'MIKROWISP_OPERATION_NOT_ALLOWED' });
     expect(() => client.exactClient([{ idcliente: 15, nombre: 'Otro' }], '14')).toThrowError(expect.objectContaining({ code: 'MIKROWISP_CLIENT_NOT_FOUND' }));

@@ -149,6 +149,21 @@ function exactClient(payload, requestedId) {
   return matches[0];
 }
 
+function clientList(payload) {
+  const rows = unwrapRows(payload);
+  if (!Array.isArray(rows)) throw integrationError('MikroWisp devolvió una lista de clientes inválida', 'MIKROWISP_INVALID_RESPONSE');
+  const clients = new Map();
+  for (const row of rows) {
+    let client;
+    try { client = sanitizeClient(row); } catch (_) { throw integrationError('La lista contiene clientes sin ID válido; no se guardó una importación parcial'); }
+    if (!client.name || clients.has(client.id)) throw integrationError('La lista contiene nombres ausentes o IDs duplicados; no se guardó una importación parcial');
+    clients.set(client.id, client);
+  }
+  if (clients.size === 0) throw integrationError('MikroWisp no devolvió clientes utilizables', 'MIKROWISP_CLIENTS_EMPTY', 404);
+  if (clients.size > 20_000) throw integrationError('La lista de clientes excede el límite seguro', 'MIKROWISP_CLIENTS_LIMIT', 422);
+  return [...clients.values()].sort((a, b) => Number(a.id) - Number(b.id));
+}
+
 async function postReadOnly(config, path, body, dependencies = {}) {
   if (!READ_ONLY_PATHS.has(path)) throw integrationError('Consulta MikroWisp no permitida', 'MIKROWISP_OPERATION_NOT_ALLOWED', 403);
   const baseUrl = normalizeBaseUrl(config.baseUrl);
@@ -202,10 +217,15 @@ async function getClientDetails(config, clientId, dependencies) {
   return exactClient(payload, id);
 }
 
+async function listClientDetails(config, dependencies) {
+  const payload = await postReadOnly(config, CLIENT_DETAILS_PATH, { token: config.token }, dependencies);
+  return clientList(payload);
+}
+
 async function validateConnection(config, dependencies) {
   const id = canonicalClientId(config.validationClientId);
   const client = await getClientDetails(config, id, dependencies);
   return { label: new URL(normalizeBaseUrl(config.baseUrl)).hostname, metadata: { apiVersion: 'v1', validationClientId: id, validationClientName: client.name } };
 }
 
-module.exports = { CLIENT_DETAILS_PATH, CATALOG_OPERATIONS, normalizeBaseUrl, assertPublicDestination, isForbiddenIp, canonicalClientId, catalogReference, sanitizeService, sanitizeBilling, sanitizeClient, exactClient, catalogEntries, postReadOnly, getClientDetails, getCatalog, validateConnection };
+module.exports = { CLIENT_DETAILS_PATH, CATALOG_OPERATIONS, normalizeBaseUrl, assertPublicDestination, isForbiddenIp, canonicalClientId, catalogReference, sanitizeService, sanitizeBilling, sanitizeClient, exactClient, clientList, catalogEntries, postReadOnly, getClientDetails, listClientDetails, getCatalog, validateConnection };

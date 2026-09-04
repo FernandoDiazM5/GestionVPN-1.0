@@ -17,7 +17,7 @@ import type { WgPeer } from '../../../../types/api';
 const peer: WgPeer = {
   id: '*1',
   name: 'FIWIS - test@x.com - MEMBER',
-  publicKey: 'PUBKEY1234567890abcdef==',
+  publicKey: 'AAAAAAAAAAAAAAAAAAAA/AAAAAAAAAAAAAAAAAAAA+A=',
   allowedAddress: '10.13.250.50',
   lastHandshakeSecs: 5,
   disabled: false,
@@ -30,16 +30,18 @@ const sampleConf =
   'Endpoint = 1.2.3.4:13231\nPersistentKeepalive = 25\n';
 
 describe('<WgConfigModal />', () => {
-  it('muestra el .conf cuando el endpoint devuelve uno', async () => {
-    server.use(http.get(`${API_BASE_URL}/api/team/wireguard/by-key/:pk`, () =>
-      HttpResponse.json({
+  it('conserva /, + y = en la consulta y muestra la configuración', async () => {
+    server.use(http.get(`${API_BASE_URL}/api/team/wireguard/by-key`, ({ request }) => {
+      expect(new URL(request.url).searchParams.get('publicKey')).toBe(peer.publicKey);
+      return HttpResponse.json({
         success: true,
         wireguard: {
           allowedIp: '10.13.250.50',
           publicKey: peer.publicKey,
           conf: sampleConf,
         },
-      })));
+      });
+    }));
 
     renderWithProviders(<WgConfigModal peer={peer} onClose={() => {}} />);
 
@@ -55,7 +57,7 @@ describe('<WgConfigModal />', () => {
   });
 
   it('muestra botones Copiar y Descargar cuando hay .conf', async () => {
-    server.use(http.get(`${API_BASE_URL}/api/team/wireguard/by-key/:pk`, () =>
+    server.use(http.get(`${API_BASE_URL}/api/team/wireguard/by-key`, () =>
       HttpResponse.json({
         success: true,
         wireguard: { allowedIp: '10.13.250.50', publicKey: peer.publicKey, conf: sampleConf },
@@ -70,7 +72,7 @@ describe('<WgConfigModal />', () => {
   });
 
   it('muestra mensaje amber cuando el peer no tiene conf guardada', async () => {
-    server.use(http.get(`${API_BASE_URL}/api/team/wireguard/by-key/:pk`, () =>
+    server.use(http.get(`${API_BASE_URL}/api/team/wireguard/by-key`, () =>
       HttpResponse.json({
         success: true,
         wireguard: { allowedIp: '10.13.250.50', publicKey: peer.publicKey, conf: null },
@@ -86,7 +88,7 @@ describe('<WgConfigModal />', () => {
   });
 
   it('muestra error cuando el endpoint devuelve 404', async () => {
-    server.use(http.get(`${API_BASE_URL}/api/team/wireguard/by-key/:pk`, () =>
+    server.use(http.get(`${API_BASE_URL}/api/team/wireguard/by-key`, () =>
       HttpResponse.json(
         { success: false, code: 'NO_WG', message: 'Peer no encontrado' },
         { status: 404 },
@@ -100,7 +102,7 @@ describe('<WgConfigModal />', () => {
   });
 
   it('invoca onClose al hacer clic en el botón Cerrar', async () => {
-    server.use(http.get(`${API_BASE_URL}/api/team/wireguard/by-key/:pk`, () =>
+    server.use(http.get(`${API_BASE_URL}/api/team/wireguard/by-key`, () =>
       HttpResponse.json({
         success: true,
         wireguard: { allowedIp: '10.13.250.50', publicKey: peer.publicKey, conf: sampleConf },

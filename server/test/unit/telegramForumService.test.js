@@ -50,6 +50,20 @@ describe('telegramForumService', () => {
     expect(query).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO telegram_forum_participants'), expect.arrayContaining(['ws-1', 'g-1', 'u-1', '9002']));
   });
 
+  it('vincula el grupo y expone permisos faltantes del bot para corregirlos después', async () => {
+    query.mockImplementation(async sql => {
+      if (sql.includes('FROM notification_subscriptions')) return [{ id: 'u-1' }];
+      if (sql.includes("status='PENDING_LINK'")) return [{ id: 'g-1', workspace_id: 'ws-1', created_at: 1, profile_type: 'CLIENT_TRACKING', capabilities_json: '["CLIENT_TOPICS","PARTICIPANT_MANAGEMENT"]', link_code_expires_at: Date.now() + 60_000 }];
+      return { affectedRows: 1 };
+    });
+    telegram.getChat.mockResolvedValue({ ok: true, result: { type: 'supergroup', is_forum: true, title: 'Clientes piloto' } });
+    telegram.callBotApi.mockResolvedValue({ ok: true, result: { id: 7001 } });
+    telegram.getChatMember.mockResolvedValue({ ok: true, result: { status: 'administrator', can_manage_topics: true, can_invite_users: false, can_restrict_members: false } });
+    const result = await service.confirmGroupLink({ workspaceId: 'ws-1', botToken: '123456:valid-token-for-tests-abcdef', message: { chat: { id: -1001 }, from: { id: 9002 } }, code: 'A1B2C3D4' });
+    expect(result).toMatchObject({ status: 'MISSING_PERMISSIONS', missingPermissions: ['Invitar usuarios', 'Restringir usuarios'], chatId: '-1001' });
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('telegram_chat_id=?'), expect.arrayContaining(['-1001', 'Clientes piloto', 'MISSING_PERMISSIONS']));
+  });
+
   it('reserva antes de llamar Telegram y confirma el thread ID', async () => {
     const topic = await service.createTopic('ws-1', 'u-1', 'g-1', '14');
     const insertIndex = query.mock.calls.findIndex(([sql]) => sql.includes('INSERT INTO telegram_forum_topics'));
@@ -76,6 +90,27 @@ describe('telegramForumService', () => {
     expect(telegram.deleteForumTopic).toHaveBeenCalledWith(expect.objectContaining({ chatId: '-1001', threadId: '77' }));
     expect(result.status).toBe('DELETED');
     expect(query).toHaveBeenCalledWith(expect.stringContaining("status='DELETED'"), [expect.any(Number), 't-1']);
+  });
+
+  it('no da por eliminado un tema cuando Telegram rechaza el borrado', async () => {
+    query.mockImplementation(async sql => {
+      if (sql.includes('FROM telegram_forum_groups')) return [group];
+      if (sql.includes('FROM telegram_forum_topics')) return [{ id: 't-1', telegram_thread_id: '77', status: 'ACTIVE' }];
+      return { affectedRows: 1 };
+    });
+    telegram.deleteForumTopic.mockResolvedValue({ ok: false, definite: true, error: 'not enough rights' });
+    await expect(service.deleteTopic('ws-1', 'u-1', 'g-1', 't-1')).rejects.toMatchObject({ code: 'TELEGRAM_TOPIC_DELETE_FAILED' });
+    expect(query.mock.calls.some(([sql]) => sql.includes("SET status='DELETED'"))).toBe(false);
+  });
+
+  it('comprueba también en Telegram un registro marcado como eliminado', async () => {
+    query.mockImplementation(async sql => {
+      if (sql.includes('FROM telegram_forum_groups')) return [group];
+      if (sql.includes('FROM telegram_forum_topics')) return [{ id: 't-1', telegram_thread_id: '77', status: 'DELETED' }];
+      return { affectedRows: 1 };
+    });
+    await service.deleteTopic('ws-1', 'u-1', 'g-1', 't-1');
+    expect(telegram.deleteForumTopic).toHaveBeenCalledWith(expect.objectContaining({ threadId: '77' }));
   });
 
   it('detecta durante la reconciliación un tema eliminado directamente en Telegram', async () => {

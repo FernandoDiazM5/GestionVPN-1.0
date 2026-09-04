@@ -789,13 +789,12 @@ router.get('/member/:id/wireguard', requireSession, validate({ params: MemberIdP
   });
 }));
 
-// ── GET /wireguard/by-key/:publicKey — Config completa por clave pública ──
+// ── Config completa por clave pública (query evita barras normalizadas por proxies) ──
 //  Devuelve la conf descifrada del peer, restringida al workspace del moderador.
 //  Usado por la tabla "Gestión de Usuarios" para mostrar la conf en un modal.
-router.get('/wireguard/by-key/:publicKey', requireSession, requireRole('OWNER'),
-  validate({ params: WireGuardPublicKeyParamsSchema }),
-  asyncHandler(async (req, res) => {
-    const row = await memberWgRepo.getByPublicKey(req.account.workspace_id, req.params.publicKey);
+function wireguardByKey(source) {
+  return asyncHandler(async (req, res) => {
+    const row = await memberWgRepo.getByPublicKey(req.account.workspace_id, req[source].publicKey);
     if (!row) throw new AppError('Peer no encontrado en este workspace', 404, 'NO_WG');
     return sendOk(res, {
       wireguard: {
@@ -808,6 +807,14 @@ router.get('/wireguard/by-key/:publicKey', requireSession, requireRole('OWNER'),
         conf: row.config_enc ? decrypt(row.config_enc) : null,
       },
     });
-  }));
+  });
+}
+
+router.get('/wireguard/by-key', requireSession, requireRole('OWNER'),
+  validate({ query: WireGuardPublicKeyParamsSchema }), wireguardByKey('query'));
+
+// Compatibilidad con clientes anteriores; el cliente actual usa query.
+router.get('/wireguard/by-key/:publicKey', requireSession, requireRole('OWNER'),
+  validate({ params: WireGuardPublicKeyParamsSchema }), wireguardByKey('params'));
 
 module.exports = router;

@@ -553,3 +553,163 @@ CREATE TABLE IF NOT EXISTS telegram_forum_audit (
   CONSTRAINT fk_telegram_forum_audit_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_telegram_forum_audit_user FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS telegram_group_profiles (
+  group_id CHAR(36) NOT NULL PRIMARY KEY,
+  workspace_id CHAR(36) NOT NULL,
+  profile_type VARCHAR(24) NOT NULL DEFAULT 'CLIENT_TRACKING',
+  capabilities_json TEXT NOT NULL,
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL,
+  KEY idx_telegram_group_profile_workspace (workspace_id,profile_type),
+  CONSTRAINT fk_telegram_group_profile_group FOREIGN KEY (group_id) REFERENCES telegram_forum_groups(id) ON DELETE CASCADE,
+  CONSTRAINT fk_telegram_group_profile_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS telegram_topic_bulk_jobs (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  workspace_id CHAR(36) NOT NULL,
+  group_id CHAR(36) NOT NULL,
+  status VARCHAR(24) NOT NULL,
+  total_clients INT NOT NULL DEFAULT 0,
+  existing_count INT NOT NULL DEFAULT 0,
+  pending_count INT NOT NULL DEFAULT 0,
+  created_count INT NOT NULL DEFAULT 0,
+  skipped_count INT NOT NULL DEFAULT 0,
+  failed_count INT NOT NULL DEFAULT 0,
+  requested_by CHAR(36) NOT NULL,
+  started_at BIGINT DEFAULT NULL,
+  finished_at BIGINT DEFAULT NULL,
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL,
+  KEY idx_telegram_bulk_workspace (workspace_id,group_id,status),
+  CONSTRAINT fk_telegram_bulk_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_telegram_bulk_group FOREIGN KEY (group_id) REFERENCES telegram_forum_groups(id) ON DELETE CASCADE,
+  CONSTRAINT fk_telegram_bulk_user FOREIGN KEY (requested_by) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS telegram_topic_bulk_items (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  job_id CHAR(36) NOT NULL,
+  workspace_id CHAR(36) NOT NULL,
+  group_id CHAR(36) NOT NULL,
+  client_external_id VARCHAR(128) NOT NULL,
+  client_name VARCHAR(255) NOT NULL,
+  status VARCHAR(24) NOT NULL,
+  topic_id CHAR(36) DEFAULT NULL,
+  error_code VARCHAR(64) DEFAULT NULL,
+  attempts INT NOT NULL DEFAULT 0,
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL,
+  UNIQUE KEY uq_telegram_bulk_client (job_id,client_external_id),
+  KEY idx_telegram_bulk_items (job_id,status),
+  CONSTRAINT fk_telegram_bulk_item_job FOREIGN KEY (job_id) REFERENCES telegram_topic_bulk_jobs(id) ON DELETE CASCADE,
+  CONSTRAINT fk_telegram_bulk_item_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_telegram_bulk_item_group FOREIGN KEY (group_id) REFERENCES telegram_forum_groups(id) ON DELETE CASCADE,
+  CONSTRAINT fk_telegram_bulk_item_topic FOREIGN KEY (topic_id) REFERENCES telegram_forum_topics(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS fiber_routes (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  workspace_id CHAR(36) NOT NULL,
+  group_id CHAR(36) NOT NULL,
+  topic_id CHAR(36) DEFAULT NULL,
+  code VARCHAR(32) NOT NULL,
+  name VARCHAR(128) NOT NULL,
+  zone VARCHAR(128) NOT NULL,
+  status VARCHAR(24) NOT NULL DEFAULT 'DRAFT',
+  responsible_user_id CHAR(36) NOT NULL,
+  cable_type VARCHAR(64) DEFAULT NULL,
+  cable_capacity INT DEFAULT NULL,
+  origin_coordinates VARCHAR(128) DEFAULT NULL,
+  destination_coordinates VARCHAR(128) DEFAULT NULL,
+  created_by CHAR(36) NOT NULL,
+  closed_at BIGINT DEFAULT NULL,
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL,
+  UNIQUE KEY uq_fiber_route_code (workspace_id,code),
+  KEY idx_fiber_route_group (workspace_id,group_id,status),
+  CONSTRAINT fk_fiber_route_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_fiber_route_group FOREIGN KEY (group_id) REFERENCES telegram_forum_groups(id) ON DELETE CASCADE,
+  CONSTRAINT fk_fiber_route_topic FOREIGN KEY (topic_id) REFERENCES telegram_forum_topics(id) ON DELETE SET NULL,
+  CONSTRAINT fk_fiber_route_responsible FOREIGN KEY (responsible_user_id) REFERENCES users(id) ON DELETE RESTRICT,
+  CONSTRAINT fk_fiber_route_creator FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS fiber_route_elements (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  workspace_id CHAR(36) NOT NULL,
+  route_id CHAR(36) NOT NULL,
+  sequence_no INT NOT NULL,
+  element_type VARCHAR(24) NOT NULL,
+  name VARCHAR(128) NOT NULL,
+  location VARCHAR(255) DEFAULT NULL,
+  coordinates VARCHAR(128) DEFAULT NULL,
+  tray VARCHAR(64) DEFAULT NULL,
+  port VARCHAR(64) DEFAULT NULL,
+  input_cable VARCHAR(128) DEFAULT NULL,
+  input_fiber VARCHAR(64) DEFAULT NULL,
+  output_cable VARCHAR(128) DEFAULT NULL,
+  output_fiber VARCHAR(64) DEFAULT NULL,
+  fusion_type VARCHAR(64) DEFAULT NULL,
+  splitter_ratio VARCHAR(32) DEFAULT NULL,
+  reserve_length VARCHAR(32) DEFAULT NULL,
+  notes VARCHAR(512) DEFAULT NULL,
+  created_by CHAR(36) NOT NULL,
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL,
+  UNIQUE KEY uq_fiber_route_sequence (route_id,sequence_no),
+  KEY idx_fiber_route_elements (workspace_id,route_id),
+  CONSTRAINT fk_fiber_element_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_fiber_element_route FOREIGN KEY (route_id) REFERENCES fiber_routes(id) ON DELETE CASCADE,
+  CONSTRAINT fk_fiber_element_user FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS fiber_route_measurements (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  workspace_id CHAR(36) NOT NULL,
+  route_id CHAR(36) NOT NULL,
+  element_id CHAR(36) DEFAULT NULL,
+  power_dbm DECIMAL(8,2) NOT NULL,
+  wavelength_nm INT DEFAULT NULL,
+  notes VARCHAR(512) DEFAULT NULL,
+  measured_by CHAR(36) NOT NULL,
+  measured_at BIGINT NOT NULL,
+  created_at BIGINT NOT NULL,
+  KEY idx_fiber_measurements (workspace_id,route_id,measured_at),
+  CONSTRAINT fk_fiber_measure_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_fiber_measure_route FOREIGN KEY (route_id) REFERENCES fiber_routes(id) ON DELETE CASCADE,
+  CONSTRAINT fk_fiber_measure_element FOREIGN KEY (element_id) REFERENCES fiber_route_elements(id) ON DELETE SET NULL,
+  CONSTRAINT fk_fiber_measure_user FOREIGN KEY (measured_by) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS fiber_route_evidence (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  workspace_id CHAR(36) NOT NULL,
+  route_id CHAR(36) NOT NULL,
+  element_id CHAR(36) DEFAULT NULL,
+  telegram_file_id VARCHAR(255) DEFAULT NULL,
+  evidence_type VARCHAR(24) NOT NULL DEFAULT 'NOTE',
+  description VARCHAR(512) NOT NULL,
+  created_by CHAR(36) NOT NULL,
+  created_at BIGINT NOT NULL,
+  KEY idx_fiber_evidence (workspace_id,route_id,created_at),
+  CONSTRAINT fk_fiber_evidence_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_fiber_evidence_route FOREIGN KEY (route_id) REFERENCES fiber_routes(id) ON DELETE CASCADE,
+  CONSTRAINT fk_fiber_evidence_element FOREIGN KEY (element_id) REFERENCES fiber_route_elements(id) ON DELETE SET NULL,
+  CONSTRAINT fk_fiber_evidence_user FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS fiber_route_events (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  workspace_id CHAR(36) NOT NULL,
+  route_id CHAR(36) NOT NULL,
+  actor_user_id CHAR(36) NOT NULL,
+  event_type VARCHAR(32) NOT NULL,
+  detail VARCHAR(512) DEFAULT NULL,
+  created_at BIGINT NOT NULL,
+  KEY idx_fiber_route_events (workspace_id,route_id,created_at),
+  CONSTRAINT fk_fiber_event_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_fiber_event_route FOREIGN KEY (route_id) REFERENCES fiber_routes(id) ON DELETE CASCADE,
+  CONSTRAINT fk_fiber_event_user FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

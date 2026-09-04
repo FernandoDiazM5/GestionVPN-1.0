@@ -96,6 +96,12 @@ async function getMikrowispClient(workspaceId, clientId) {
   return client;
 }
 
+async function listMikrowispClients(workspaceId) {
+  const config = await getSecret(workspaceId, 'MIKROWISP');
+  if (!config) throw new AppError('La integración MikroWisp no está configurada o activa', 404, 'INTEGRATION_NOT_CONFIGURED');
+  return require('./mikrowispClient').listClientDetails(config);
+}
+
 function publicRow(row) {
   let metadata = {};
   try { metadata = JSON.parse(row.metadata_json || '{}'); } catch (_) { /* datos históricos */ }
@@ -168,4 +174,4 @@ async function revalidate(workspaceId, rawProvider) {
   return (await list(workspaceId)).find(item => item.provider === provider);
 }
 
-module.exports = { PROVIDERS, EMAIL_PROVIDERS, list, save, remove, getSecret, getMikrowispClient, revalidate, validate, normalize, listActiveTelegramBots, assertTelegramTokenUnique };
+module.exports = { PROVIDERS, EMAIL_PROVIDERS, list, save, remove, getSecret, getMikrowispClient, listMikrowispClients, revalidate, validate, normalize, listActiveTelegramBots, assertTelegramTokenUnique };

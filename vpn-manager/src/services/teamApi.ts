@@ -69,6 +69,6 @@ export const teamApi = {
   /** Conf completa de un peer por su clave pública (solo moderador). */
   wireguardByKey: (publicKey: string) =>
     get<{ success: true; wireguard: MemberWireguard & { peerName?: string } }>(
-      `/api/team/wireguard/by-key/${encodeURIComponent(publicKey)}`
+      `/api/team/wireguard/by-key?${new URLSearchParams({ publicKey })}`
     ),
 };
