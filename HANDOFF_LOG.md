@@ -1,5 +1,8 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-09-04 - Espera automática Telegram y barra de progreso.** a8521ad desplegado backend/frontend desde worktree codex/telegram-fiber-release. Se confirmó PAUSED tras100 creaciones y5FAILED/TELEGRAM_RATE_LIMIT. Cambio: reintento del mismo cliente tras429 definitivo, deadline persistido, pausa manual y recuperación restringida de fallos429 históricos. UI muestra porcentaje, procesados, creados, pendientes, errores y espera automática. 7testsbackend/9frontend, build/lint verdes. Verificaciónweb: barra visible; reanudación del proceso existente,105creados/0errores. Continúa en segundo plano. No se accedió a MikroWisp; archivos sincronizados al workspace original.
+
+
 > **Sesión 2026-09-04 - Tema activo inexistente.** Backend 91eef2c desplegado. Audit confirmó TOPIC_ID_INVALID en tema ACTIVE; la corrección anterior sólo admitía DELETED. Ahora la respuesta definitiva 400 reconcilia IDs válidos >1. 21 tests verdes. Se ejecutó deleteTopic para el tema solicitado: DELETED, grupo con 0 ACTIVE. Backend healthy/0 reinicios y health200. Sin operaciones MikroWisp. Cambios reflejados en workspace original.
 
 
