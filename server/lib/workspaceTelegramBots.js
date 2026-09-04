@@ -77,7 +77,11 @@ async function refresh() {
   log.info({ count: bots.size }, 'Bots Telegram de workspace activos');
 }
 
-function start() { enabled = true; return refresh(); }
+async function start() {
+  enabled = true;
+  await refresh();
+  if (process.env.TELEGRAM_BOT_ENABLED !== 'false') await require('./telegramBulkTopicService').recoverPending();
+}
 function stop() { enabled = false; for (const bot of bots.values()) bot.controller.abort(); bots.clear(); }
 
 module.exports = { start, stop, refresh, handleMessage, handleCallback, _bots: bots };

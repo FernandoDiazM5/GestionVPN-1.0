@@ -91,6 +91,11 @@ async function resume(workspaceId, groupId, jobId) {
   return get(workspaceId, groupId, jobId);
 }
 
+async function recoverPending() {
+  const rows = await query("SELECT j.id FROM telegram_topic_bulk_jobs j JOIN telegram_forum_groups g ON g.id=j.group_id AND g.workspace_id=j.workspace_id WHERE j.status IN ('PENDING','RUNNING') AND g.status='ACTIVE' ORDER BY j.created_at");
+  for (const row of rows) kick(row.id);
+}
+
 function kick(jobId) {
   if (activeJobs.has(jobId)) return;
   activeJobs.add(jobId);
@@ -173,4 +178,4 @@ async function refreshCounts(jobId, finish = false) {
     status=IF(status='PAUSED','PAUSED',?),finished_at=?,updated_at=? WHERE id=?`, [Number(counts.pending_count || 0), Number(counts.created_count || 0), Number(counts.skipped_count || 0), Number(counts.failed_count || 0), finish ? 'COMPLETED' : 'RUNNING', finish ? Date.now() : null, Date.now(), jobId]);
 }
 
-module.exports = { preview, start, get, latest, pause, resume, publicJob, processJob };
+module.exports = { recoverPending, preview, start, get, latest, pause, resume, publicJob, processJob };
