@@ -31,6 +31,8 @@ async function migrate() {
   const statements = adaptSchema(raw, collation);
   if (statements.length !== TABLES.length) throw new Error(`Esquema MikroWisp/Telegram incompleto: ${statements.length}/${TABLES.length}`);
   for (const statement of statements) await pool.query(statement);
+  const [retryColumns] = await pool.query("SELECT COLUMN_NAME FROM information_schema.columns WHERE table_schema=? AND table_name='telegram_topic_bulk_jobs' AND column_name='retry_at'", [dbName]);
+  if (!retryColumns.length) await pool.query('ALTER TABLE telegram_topic_bulk_jobs ADD COLUMN retry_at BIGINT DEFAULT NULL');
   const [created] = await pool.query(`SELECT COUNT(*) AS total FROM information_schema.tables
     WHERE table_schema=? AND table_name IN (${TABLES.map(() => '?').join(',')})`, [dbName, ...TABLES]);
   if (Number(created[0]?.total) !== TABLES.length) throw new Error(`Migración MikroWisp/Telegram incompleta: ${created[0]?.total}/${TABLES.length}`);

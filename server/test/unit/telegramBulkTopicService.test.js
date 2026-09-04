@@ -5,7 +5,7 @@ const integrations = { listMikrowispClients: vi.fn(), getSecret: vi.fn() };
 const snapshots = { read: vi.fn() };
 stubModule(__dirname, '../../lib/mikrowispClientSnapshot', snapshots);
 const forums = { requireCapability: vi.fn(), rememberManagedThread: vi.fn(), clean: value => String(value).trim() };
-stubModule(__dirname, '../../db/mysql', { query, withTransaction: vi.fn() });
+stubModule(__dirname, '../../db/mysql', { query, withTransaction: async fn => fn({ query }) });
 stubModule(__dirname, '../../lib/workspaceIntegrationService', integrations);
 stubModule(__dirname, '../../lib/telegramForumService', forums);
 const telegram = { createForumTopic: vi.fn() };
@@ -45,7 +45,7 @@ describe('telegramBulkTopicService', () => {
     telegram.createForumTopic.mockResolvedValue({ ok: true, result: { message_thread_id: 88 } });
     try {
       const processing = service.processJob('job');
-      await vi.advanceTimersByTimeAsync(1500);
+      await vi.advanceTimersByTimeAsync(3500);
       await processing;
       expect(telegram.createForumTopic).toHaveBeenCalledTimes(1);
       expect(forums.rememberManagedThread).toHaveBeenCalledWith('-100', 88);
@@ -54,4 +54,42 @@ describe('telegramBulkTopicService', () => {
     } finally { vi.useRealTimers(); }
   });
 
+});
+
+describe('espera automática de Telegram', () => {
+  it.each([false, true])('respeta retry_after y la pausa manual (%s)', async manualPause => {
+    vi.useFakeTimers();
+    let status = 'RUNNING', retryAt = null, topicStatus = null, done = false;
+    query.mockImplementation(async (sql, values) => {
+      if (sql.startsWith('SELECT j.')) return [{ id: 'job', workspace_id: 'ws', group_id: 'g', telegram_chat_id: '-100', status: 'RUNNING', group_status: 'ACTIVE' }];
+      if (sql.startsWith('SELECT status')) return [{ status, retry_at: retryAt }];
+      if (sql.includes("status='PENDING' ORDER BY")) return done ? [] : [{ id: 'item', client_external_id: '1', client_name: 'Ana' }];
+      if (sql.startsWith('SELECT id,status')) return topicStatus ? [{ id: 'topic', status: topicStatus }] : [];
+      if (sql.startsWith('UPDATE telegram_forum_topics SET')) {
+        if (sql.includes("status='DELETED'")) topicStatus = 'DELETED';
+        if (sql.includes("status='ACTIVE'")) topicStatus = 'ACTIVE';
+      }
+      if (sql.startsWith('UPDATE telegram_topic_bulk_jobs SET retry_at=?')) retryAt = values[0];
+      if (sql.startsWith('UPDATE telegram_topic_bulk_jobs SET retry_at=NULL')) retryAt = null;
+      if (sql.includes("UPDATE telegram_topic_bulk_items SET status='CREATED'")) done = true;
+      if (sql.includes('SUM(status=')) return [{ pending_count: done ? 0 : 1, created_count: done ? 1 : 0 }];
+      return { affectedRows: 1 };
+    });
+    integrations.getSecret.mockResolvedValue({ botToken: 'test' });
+    telegram.createForumTopic.mockReset();
+    telegram.createForumTopic.mockResolvedValueOnce({ ok: false, status: 429, definite: true, retryAfter: 10 }).mockResolvedValueOnce({ ok: true, result: { message_thread_id: 99 } });
+    try {
+      const processing = service.processJob('job');
+      await vi.advanceTimersByTimeAsync(0);
+      expect(telegram.createForumTopic).toHaveBeenCalledTimes(1);
+      expect(retryAt).toBeGreaterThan(Date.now());
+      await vi.advanceTimersByTimeAsync(10000);
+      expect(telegram.createForumTopic).toHaveBeenCalledTimes(1);
+      if (manualPause) status = 'PAUSED';
+      await vi.advanceTimersByTimeAsync(4500);
+      await processing;
+      expect(telegram.createForumTopic).toHaveBeenCalledTimes(manualPause ? 1 : 2);
+      expect(query.mock.calls.some(([sql]) => sql.includes("SET status='FAILED'"))).toBe(false);
+    } finally { vi.useRealTimers(); }
+  });
 });

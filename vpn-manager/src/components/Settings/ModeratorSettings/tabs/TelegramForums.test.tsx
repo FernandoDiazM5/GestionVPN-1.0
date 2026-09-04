@@ -107,3 +107,14 @@ describe('TelegramForums', () => {
     expect(screen.getByRole('dialog', { name: 'Nueva ruta' })).toBeInTheDocument();
   });
 });
+
+it('muestra porcentaje y espera automática sin pedir reanudar', async () => {
+  api.listTelegramForums.mockResolvedValue({ groups: [{ id: 'g-1', name: 'Clientes', chatId: '-1001', status: 'ACTIVE', profileType: 'CLIENT_TRACKING', capabilities: ['CLIENT_TOPICS'], missingPermissions: [] }] });
+  api.latestBulkTopics.mockResolvedValue({ job: { id: 'j', groupId: 'g-1', status: 'RUNNING', totalClients: 100, existing: 10, created: 20, skipped: 0, failed: 0, pending: 70, retryAt: Date.now() + 60000 } });
+  render(<TelegramForums standalone />);
+  expect(await screen.findByRole('progressbar', { name: 'Avance de creación de temas' })).toHaveAttribute('aria-valuenow', '30');
+  expect(screen.getByText('30%')).toBeInTheDocument();
+  expect(screen.getByText(/Continuará automáticamente/)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Reanudar' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Pausar' })).toBeInTheDocument();
+});

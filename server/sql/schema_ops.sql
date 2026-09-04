@@ -578,6 +578,7 @@ CREATE TABLE IF NOT EXISTS telegram_topic_bulk_jobs (
   skipped_count INT NOT NULL DEFAULT 0,
   failed_count INT NOT NULL DEFAULT 0,
   requested_by CHAR(36) NOT NULL,
+  retry_at BIGINT DEFAULT NULL,
   started_at BIGINT DEFAULT NULL,
   finished_at BIGINT DEFAULT NULL,
   created_at BIGINT NOT NULL,
