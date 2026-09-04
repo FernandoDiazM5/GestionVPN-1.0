@@ -51,14 +51,15 @@ describe('mikrowispClient read-only', () => {
     expect(JSON.stringify(result)).not.toMatch(/ppp|Pass6|User6|snmp|public|sensitive-token/i);
   });
 
-  it('obtiene todos los clientes con una sola consulta sin filtros para la cola masiva', async () => {
-    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({ estado: 'exito', datos: [
+  it('obtiene clientes del endpoint de listado paginado sin secretos', async () => {
+    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({ estado: 'exito', clientes: [
       { id: 9, nombre: 'Cliente nueve', ppppass: 'oculto' },
       { id: 2, nombre: 'Cliente dos', token: 'oculto' },
     ] }) }));
     const result = await client.listClientDetails({ baseUrl: 'https://isp.example.com', token: 'api-secret' }, { fetch: fetchMock, lookup: publicLookup });
     expect(result.map(item => ({ id: item.id, name: item.name }))).toEqual([{ id: '2', name: 'Cliente dos' }, { id: '9', name: 'Cliente nueve' }]);
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ token: 'api-secret' });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ token: 'api-secret', limit: 100, pagina: 1 });
+    expect(fetchMock.mock.calls[0][0].pathname).toBe('/api/v1/GetAllClients');
     expect(fetchMock).toHaveBeenCalledOnce();
     expect(JSON.stringify(result)).not.toMatch(/oculto|ppppass|token/i);
   });
@@ -88,5 +89,28 @@ describe('mikrowispClient read-only', () => {
     expect(() => client.catalogEntries({}, definition)).toThrowError(expect.objectContaining({ code: 'MIKROWISP_INVALID_RESPONSE' }));
     expect(() => client.catalogEntries({ routers: [{ id: 1 }] }, definition)).toThrowError(expect.objectContaining({ code: 'MIKROWISP_INVALID_RESPONSE' }));
     expect(() => client.catalogEntries({ routers: [{ id: 1, nombre: 'A' }, { id: 1, nombre: 'B' }] }, definition)).toThrowError(expect.objectContaining({ code: 'MIKROWISP_INVALID_RESPONSE' }));
+  });
+});
+
+describe('importación paginada', () => {
+  const config = { baseUrl: 'https://isp.example.com', token: 'secret' };
+  it('recorre páginas secuenciales y espera entre consultas', async () => {
+    const rows = Array.from({ length: 100 }, (_, i) => ({ id: i + 1, nombre: 'Cliente ' + i }));
+    const fetch = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ clientes: rows }) }).mockResolvedValueOnce({ ok: true, json: async () => ({ clientes: [{ id: 101, nombre: 'Último' }] }) });
+    const pause = vi.fn();
+    const result = await client.listClientDetails(config, { fetch, lookup: publicLookup, pause });
+    expect(result).toHaveLength(101);
+    expect(pause).toHaveBeenCalledWith(300);
+    expect(fetch.mock.calls.map(([, options]) => JSON.parse(options.body).pagina)).toEqual([1, 2]);
+  });
+  it('rechaza páginas repetidas en vez de guardar una lista incompleta', async () => {
+    const rows = Array.from({ length: 100 }, (_, i) => ({ id: i + 1, nombre: 'Cliente' }));
+    const fetch = vi.fn(async () => ({ ok: true, json: async () => ({ clientes: rows }) }));
+    await expect(client.listClientDetails(config, { fetch, lookup: publicLookup, pause: vi.fn() })).rejects.toThrow('repitió');
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+  it('no interpreta errores del proveedor como clientes', async () => {
+    const fetch = vi.fn(async () => ({ ok: true, json: async () => ({ estado: 'error', mensaje: 'No existe' }) }));
+    await expect(client.listClientDetails(config, { fetch, lookup: publicLookup })).rejects.toMatchObject({ code: 'MIKROWISP_REQUEST_REJECTED' });
   });
 });

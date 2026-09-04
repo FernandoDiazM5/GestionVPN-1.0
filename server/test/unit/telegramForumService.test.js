@@ -103,6 +103,17 @@ describe('telegramForumService', () => {
     expect(query.mock.calls.some(([sql]) => sql.includes("SET status='DELETED'"))).toBe(false);
   });
 
+  it.each(['DELETED', 'ACTIVE'])('TOPIC_ID_INVALID sólo confirma un tema ya eliminado: %s', async status => {
+    query.mockImplementation(async sql => {
+      if (sql.includes('FROM telegram_forum_groups')) return [group];
+      if (sql.includes('FROM telegram_forum_topics')) return [{ id: 't-1', telegram_thread_id: '77', status }];
+      return { affectedRows: 1 };
+    });
+    telegram.deleteForumTopic.mockResolvedValue({ ok: false, definite: true, error: 'Bad Request: TOPIC_ID_INVALID' });
+    if (status === 'DELETED') await expect(service.deleteTopic('ws-1', 'u-1', 'g-1', 't-1')).resolves.toMatchObject({ status: 'DELETED' });
+    else await expect(service.deleteTopic('ws-1', 'u-1', 'g-1', 't-1')).rejects.toMatchObject({ code: 'TELEGRAM_TOPIC_DELETE_FAILED' });
+  });
+
   it('comprueba también en Telegram un registro marcado como eliminado', async () => {
     query.mockImplementation(async sql => {
       if (sql.includes('FROM telegram_forum_groups')) return [group];

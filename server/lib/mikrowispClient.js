@@ -4,10 +4,11 @@ const { AppError } = require('./apiResponse');
 
 const TIMEOUT_MS = 10_000;
 const CLIENT_DETAILS_PATH = 'GetClientsDetails';
+const CLIENT_LIST_PATH = 'GetAllClients';
 const CATALOG_OPERATIONS = Object.freeze({
   ROUTERS: { path: 'GetRouters', body: { id: -1 }, rows: ['routers'], id: ['id'], name: ['nombre'], metadata: { status: ['estado'], model: ['modelo'] } },
 });
-const READ_ONLY_PATHS = new Set([CLIENT_DETAILS_PATH, ...Object.values(CATALOG_OPERATIONS).map(operation => operation.path)]);
+const READ_ONLY_PATHS = new Set([CLIENT_DETAILS_PATH, CLIENT_LIST_PATH, ...Object.values(CATALOG_OPERATIONS).map(operation => operation.path)]);
 
 function integrationError(message, code = 'MIKROWISP_INVALID_RESPONSE', status = 422) {
   return new AppError(message, status, code);
@@ -178,7 +179,7 @@ async function postReadOnly(config, path, body, dependencies = {}) {
     });
   } catch (_) { throw integrationError('No se pudo conectar con MikroWisp', 'MIKROWISP_UNREACHABLE'); }
   const payload = await response.json().catch(() => null);
-  if (!response.ok || payload === null) throw integrationError('MikroWisp rechazó la consulta', 'MIKROWISP_REQUEST_REJECTED');
+  if (!response.ok || payload === null || payload?.estado === 'error') throw integrationError('MikroWisp rechazó la consulta', 'MIKROWISP_REQUEST_REJECTED');
   return payload;
 }
 
@@ -217,9 +218,24 @@ async function getClientDetails(config, clientId, dependencies) {
   return exactClient(payload, id);
 }
 
-async function listClientDetails(config, dependencies) {
-  const payload = await postReadOnly(config, CLIENT_DETAILS_PATH, { token: config.token }, dependencies);
-  return clientList(payload);
+async function listClientDetails(config, dependencies = {}) {
+  const clients = new Map();
+  const limit = 100;
+  const pause = dependencies.pause || (ms => new Promise(resolve => setTimeout(resolve, ms)));
+  for (let pagina = 1; pagina <= 201; pagina += 1) {
+    if (pagina > 1) await pause(300);
+    const payload = await postReadOnly(config, CLIENT_LIST_PATH, { token: config.token, limit, pagina }, dependencies);
+    if (!Array.isArray(payload?.clientes)) throw integrationError('MikroWisp devolvió una lista inválida; no se guardaron datos parciales');
+    if (payload.clientes.length) {
+      for (const client of clientList(payload)) {
+        if (clients.has(client.id)) throw integrationError('MikroWisp repitió clientes entre páginas; no se guardaron datos parciales');
+        clients.set(client.id, { id: client.id, name: client.name });
+      }
+    }
+    if (clients.size > 20_000) throw integrationError('La lista de clientes excede el límite seguro', 'MIKROWISP_CLIENTS_LIMIT');
+    if (payload.clientes.length < limit) return [...clients.values()].sort((a, b) => Number(a.id) - Number(b.id));
+  }
+  throw integrationError('MikroWisp no confirmó el final de la lista; no se guardaron datos parciales');
 }
 
 async function validateConnection(config, dependencies) {
