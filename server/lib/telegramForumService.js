@@ -292,7 +292,10 @@ async function deleteTopic(workspaceId, userId, groupId, topicId) {
   const config = await botConfig(workspaceId);
   await query("UPDATE telegram_forum_topics SET status='DELETING',updated_at=? WHERE id=?", [Date.now(), topicId]);
   const result = await telegram.deleteForumTopic({ token: config.botToken, chatId: group.telegram_chat_id, threadId: topic.telegram_thread_id });
-  const alreadyDeleted = !result.ok && !result.ambiguous && topic.status === 'DELETED' && /\bTOPIC_ID_INVALID\b/i.test(String(result.error || ''));
+  // Telegram confirma que el identificador persistido ya no es válido, incluso si el estado local quedó ACTIVE.
+  const alreadyDeleted = !result.ok && !result.ambiguous && result.status === 400 && result.definite === true
+    && Number.isSafeInteger(Number(topic.telegram_thread_id)) && Number(topic.telegram_thread_id) > 1
+    && /\bTOPIC_ID_INVALID\b/i.test(String(result.error || ''));
   if (!result.ok && !isMissingTopic(result) && !alreadyDeleted) {
     const status = result.ambiguous ? 'DELETE_UNKNOWN' : topic.status;
     await query('UPDATE telegram_forum_topics SET status=?,updated_at=? WHERE id=?', [status, Date.now(), topicId]);
