@@ -52,6 +52,7 @@ const forumServiceMocks = stubModule(__dirname, '../../lib/telegramForumService'
   topicContextForCommand: vi.fn(), clientForTopicCommand: vi.fn(),
 });
 
+const fiberMocks = stubModule(__dirname, '../../lib/fiberRouteService', { registerExistingRoute: vi.fn(), context: vi.fn() });
 const bot = require('../../lib/telegramBot');
 
 beforeEach(() => {
@@ -473,4 +474,13 @@ describe('comandos de cliente dentro de temas', () => {
     expect(forumServiceMocks.clientForTopicCommand).not.toHaveBeenCalled();
     expect(getReplyText()).toContain('/informacion');
   });
+});
+
+it('registra una ruta en un tema existente sin exigir una ruta previa', async () => {
+  fiberMocks.registerExistingRoute.mockResolvedValue({ code: 'RF-ABC', name: 'Norte' });
+  const message = { chat: { id: -1001, type: 'supergroup' }, from: { id: 123 }, message_thread_id: 77, text: '/registrar_ruta@mi_bot Norte | Sector A' };
+  await bot.handleWorkspaceMessage({ botToken: '123456:workspace-token', workspaceId: 'ws-1' }, message);
+  expect(fiberMocks.registerExistingRoute).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: 'ws-1', message, name: 'Norte', zone: 'Sector A' }));
+  expect(fiberMocks.context).not.toHaveBeenCalled();
+  expect(telegramMocks.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ chatId: -1001, threadId: 77, text: expect.stringContaining('RF-ABC') }));
 });

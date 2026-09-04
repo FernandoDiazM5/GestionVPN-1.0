@@ -275,13 +275,18 @@ async function handleForumQuery(message, command) {
   }
 }
 
-const FIBER_COMMANDS = new Set(['/resumenruta', '/agregartramo', '/agregarmufa', '/fusion', '/potencia', '/evidencia', '/cerrarruta', '/ayudaruta']);
+const FIBER_COMMANDS = new Set(['/registrar_ruta', '/registrarruta', '/resumenruta', '/agregartramo', '/agregarmufa', '/fusion', '/potencia', '/evidencia', '/cerrarruta', '/ayudaruta']);
 function fiberParts(args) { return String(args.join(' ')).split('|').map(value => value.trim()); }
 async function handleFiberCommand(message, command, args) {
   try {
     const fiber = require('./fiberRouteService');
+    if (command === '/registrar_ruta' || command === '/registrarruta') {
+      const [name, zone] = fiberParts(args);
+      const route = await fiber.registerExistingRoute({ workspaceId: currentContext().workspaceId, botToken: currentContext().token, message, name, zone });
+      return forumReply(message, '✅ Tema vinculado a la ruta <b>' + escapeHtml(route.code) + ' · ' + escapeHtml(route.name) + '</b>.\nLas fotos y mensajes existentes se conservan. Usa /resumenruta para consultar la ruta.');
+    }
     const ctx = await fiber.context(currentContext().workspaceId, message);
-    if (command === '/ayudaruta') return forumReply(message, '<b>Comandos de la ruta</b>\n/resumenruta\n/agregartramo NOMBRE | HILO ENTRADA | HILO SALIDA | NOTA\n/agregarmufa NOMBRE | UBICACIÓN | HILO ENTRADA | HILO SALIDA\n/fusion HILO ENTRADA | HILO SALIDA | TIPO\n/potencia DBM | LONGITUD_NM | NOTA\n/evidencia DESCRIPCIÓN (o como texto de una fotografía)\n/cerrarruta MOTIVO');
+    if (command === '/ayudaruta') return forumReply(message, '<b>Comandos de la ruta</b>\n/registrar_ruta NOMBRE | ZONA (nombre y zona opcionales; código automático)\n/resumenruta\n/agregartramo NOMBRE | HILO ENTRADA | HILO SALIDA | NOTA\n/agregarmufa NOMBRE | UBICACIÓN | HILO ENTRADA | HILO SALIDA\n/fusion HILO ENTRADA | HILO SALIDA | TIPO\n/potencia DBM | LONGITUD_NM | NOTA\n/evidencia DESCRIPCIÓN (o como texto de una fotografía)\n/cerrarruta MOTIVO');
     if (command === '/resumenruta') return forumReply(message, fiber.summary(await fiber.detail(currentContext().workspaceId, ctx.route.id)));
     const parts = fiberParts(args);
     if (command === '/agregartramo') {

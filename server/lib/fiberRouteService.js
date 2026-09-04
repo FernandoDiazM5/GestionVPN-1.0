@@ -57,6 +57,39 @@ async function createRoute(workspaceId, userId, groupId, input) {
   }
   return publicRoute({ id: routeId, group_id: groupId, topic_id: topicId, code, name, zone, status: 'DRAFT', responsible_user_id: input.responsibleUserId || userId, cable_type: input.cableType || null, cable_capacity: input.cableCapacity || null, origin_coordinates: input.originCoordinates || null, destination_coordinates: input.destinationCoordinates || null, closed_at: null, created_at: now, updated_at: now });
 }
+async function registerExistingRoute({ workspaceId, botToken, message, name: requestedName, zone: requestedZone }) {
+  const threadId = Number(message?.message_thread_id);
+  if (message?.chat?.type !== 'supergroup' || !Number.isSafeInteger(threadId) || threadId <= 1 || !message?.from?.id) {
+    throw new AppError('Ejecuta /registrar_ruta dentro del tema existente del grupo de fibra, no en General.', 422, 'FIBER_TOPIC_REQUIRED');
+  }
+  const userId = await forums.ownerForTelegramUser(workspaceId, message.from.id, botToken);
+  if (!userId) throw new AppError('Vincula tu cuenta de Telegram al propietario de Joinpoint para registrar la ruta.', 403, 'TELEGRAM_GROUP_OWNER_REQUIRED');
+  const groups = await query("SELECT * FROM telegram_forum_groups WHERE workspace_id=? AND telegram_chat_id=? AND status='ACTIVE' LIMIT 1", [workspaceId, String(message.chat.id)]);
+  if (!groups[0]) throw new AppError('Este grupo no está vinculado o activo en Joinpoint.', 404, 'FIBER_GROUP_NOT_FOUND');
+  const groupId = groups[0].id;
+  await forums.requireCapability(groupId, 'FIBER_ROUTES');
+  return withTransaction(async tx => {
+    // Serializa registros del mismo grupo para que repetir el comando no duplique rutas.
+    const locked = await tx.query("SELECT id FROM telegram_forum_groups WHERE id=? AND workspace_id=? AND status='ACTIVE' FOR UPDATE", [groupId, workspaceId]);
+    if (!locked[0]) throw new AppError('Grupo de fibra no disponible.', 409, 'FIBER_GROUP_NOT_FOUND');
+    const existingRoutes = await tx.query('SELECT r.* FROM fiber_routes r JOIN telegram_forum_topics t ON t.id=r.topic_id WHERE r.workspace_id=? AND r.group_id=? AND t.telegram_thread_id=? LIMIT 1', [workspaceId, groupId, String(threadId)]);
+    if (existingRoutes[0]) return publicRoute(existingRoutes[0]);
+    const topics = await tx.query('SELECT * FROM telegram_forum_topics WHERE workspace_id=? AND group_id=? AND telegram_thread_id=? FOR UPDATE', [workspaceId, groupId, String(threadId)]);
+    if (topics.length > 1 || (topics[0] && topics[0].status !== 'UNREGISTERED')) throw new AppError('El tema ya está asociado a otro registro. Revisa su vínculo en Joinpoint.', 409, 'FIBER_TOPIC_ALREADY_REGISTERED');
+    const routeId = crypto.randomUUID(); const topicId = topics[0]?.id || crypto.randomUUID(); const now = Date.now();
+    const code = 'RF-' + routeId.replace(/-/g, '').slice(0, 12).toUpperCase();
+    const name = clean(requestedName || topics[0]?.topic_name || message.reply_to_message?.forum_topic_created?.name || ('Ruta de fibra ' + threadId), 128);
+    const zone = clean(requestedZone, 128) || 'Por definir';
+    if (topics[0]) {
+      await tx.query("UPDATE telegram_forum_topics SET client_external_id=?,client_name=?,status='ACTIVE',created_by=?,updated_at=? WHERE id=?", ['FIBER:' + routeId, name, userId, now, topicId]);
+    } else {
+      await tx.query("INSERT INTO telegram_forum_topics (id,workspace_id,group_id,client_external_id,client_name,topic_name,telegram_thread_id,status,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,'ACTIVE',?,?,?)", [topicId, workspaceId, groupId, 'FIBER:' + routeId, name, name, String(threadId), userId, now, now]);
+    }
+    await tx.query("INSERT INTO fiber_routes (id,workspace_id,group_id,topic_id,code,name,zone,status,responsible_user_id,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,'DRAFT',?,?,?,?)", [routeId, workspaceId, groupId, topicId, code, name, zone, userId, userId, now, now]);
+    await event(tx, workspaceId, routeId, userId, 'EXISTING_TOPIC_REGISTERED', 'Tema existente ' + threadId);
+    return publicRoute({ id: routeId, workspace_id: workspaceId, group_id: groupId, topic_id: topicId, code, name, zone, status: 'DRAFT', responsible_user_id: userId, cable_capacity: null, created_at: now, updated_at: now });
+  });
+}
 async function listRoutes(workspaceId, groupId) {
   await forums.requireCapability(groupId, 'FIBER_ROUTES');
   return (await query('SELECT * FROM fiber_routes WHERE workspace_id=? AND group_id=? ORDER BY updated_at DESC', [workspaceId, groupId])).map(publicRoute);
@@ -139,4 +172,4 @@ function summary(data) {
   return lines.join('\n');
 }
 
-module.exports = { ROUTE_STATES, ELEMENT_TYPES, createRoute, listRoutes, detail, addElement, addMeasurement, addEvidence, changeStatus, context, summary };
+module.exports = { ROUTE_STATES, ELEMENT_TYPES, registerExistingRoute, createRoute, listRoutes, detail, addElement, addMeasurement, addEvidence, changeStatus, context, summary };
