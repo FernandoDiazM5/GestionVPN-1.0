@@ -1,5 +1,8 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-09-04 - Favicon convencional.** Rama codex/telegram-fiber-release, código aebc620. Agregada redirección exacta en nginx.prod.conf; desplegada con validación nginx -t y reload. Verificado 302 hacia SVG 200, health 200. Imagen frontend derivada persistida para recreaciones; backup de configuración en /root/backups/pre-20260904-telegram-fiber/nginx-before-favicon.conf. Cambios reflejados también en workspace original.
+
+
 > **Sesión 2026-09-04 — Despliegue autorizado Telegram/fibra/WG.** Runtime `3832cdf`, rama `codex/telegram-fiber-release`, base productiva `2363c62`.
 > - Se detectó divergencia entre `vps_uni` y producción: se preparó worktree aislado con sólo archivos del alcance, conservando corrección de correo y retiro del asistente Core. Commit publicado y SHA remoto comprobado.
 > - Backup y rollback de imágenes preparados; build remoto correcto, backend healthy antes del frontend, 17 tablas verificadas y MariaDB no recreada.

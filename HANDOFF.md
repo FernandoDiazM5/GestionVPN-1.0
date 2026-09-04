@@ -11,6 +11,8 @@
 
 ## 0) Estado actual
 
+- **Favicon corregido (2026-09-04, commit aebc620):** Nginx redirige /favicon.ico a /favicon.svg (302 → 200 verificado); nginx -t y health 200. Repo VPS aebc620; runtime aplicación conserva 3832cdf con configuración Nginx actualizada mediante reload. Imagen frontend latest c030f29551d7 incorpora la configuración para recreaciones. Rollback imagen gestionvpn-10-frontend:pre-favicon-20260904. Sin operaciones MikroWisp.
+
 - **Despliegue grupos/fibra/WireGuard completado (2026-09-04):** runtime `3832cdf` en `165.22.187.115`, rama publicada `codex/telegram-fiber-release`, basada exactamente en producción `2363c62` para conservar mailer y Core sin asistente. Se copiaron exclusivamente las entregas Telegram/fibra/WG desde `vps_uni`; no desplegar directamente el árbol antiguo `vps_uni` porque contiene cambios del Core no solicitados. Checkout de entrega local: `C:/Users/i201720174/Desktop/vps_telegram_release`. Backup `/root/backups/pre-20260904-telegram-fiber/vpn_manager.sql.gz` verificado gzip y cierre de dump; rollbacks `gestionvpn-10-{backend,frontend}:pre-20260904-telegram-fiber`. Build remoto correcto; backend/frontend recreados sólo con compose productivo, DB preservada. Migración confirmó 17 tablas. HTTPS/health 200, CORS 204/403, 0 reinicios y ping Core 3/3. UI autenticada confirma Grupos operativos, importación/creación por pasos, historial eliminado y selector Rutas de fibra. No se importaron clientes ni crearon/borraron temas reales. Pruebas entrega: backend 42, frontend 17, build e inventario correctos. Los estados anteriores «local/sin desplegar» de estas entregas quedan superados por esta entrada.
 
 
