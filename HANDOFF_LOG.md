@@ -1,5 +1,11 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-09-04 — Despliegue autorizado Telegram/fibra/WG.** Runtime `3832cdf`, rama `codex/telegram-fiber-release`, base productiva `2363c62`.
+> - Se detectó divergencia entre `vps_uni` y producción: se preparó worktree aislado con sólo archivos del alcance, conservando corrección de correo y retiro del asistente Core. Commit publicado y SHA remoto comprobado.
+> - Backup y rollback de imágenes preparados; build remoto correcto, backend healthy antes del frontend, 17 tablas verificadas y MariaDB no recreada.
+> - HTTPS/health 200, preflight 204, origen hostil 403, cero reinicios, ping Core 3/3. UI autenticada mostró perfiles de clientes/fibra/general, botones de importación y creación e historial eliminado. No se ejecutaron operaciones masivas ni creación/borrado real de temas.
+> - Pruebas locales de entrega: backend 42 y frontend 17, build correcto. Backup: `/root/backups/pre-20260904-telegram-fiber`; imágenes de retorno `pre-20260904-telegram-fiber`.
+
 > **Sesión 2026-09-03 — Diagnóstico de correo y permisos estáticos.** Rama `codex/d006-no-core-assistant`; pendiente deploy.
 > - Los `403` de `theme-init.js` y `favicon.svg` eran permisos `0600` dentro de la imagen; el Dockerfile ahora fija directorios `0755` y archivos `0644` de forma reproducible.
 > - El cambio de correo generaba OTP en modo DEV sin entregarlo porque el mailer ignoraba la integración global y el contenedor no tenía `SMTP_HOST`; OTP y recuperación ahora priorizan Brevo/Gmail de plataforma con fallback a `SMTP_*`.
