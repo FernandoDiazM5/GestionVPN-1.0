@@ -1,5 +1,8 @@
 # 🗄️ Bitácora Histórica — MikroTikVPN Remote Manager (`GestionVPN-1.0`)
 
+> **Sesión 2026-09-04 - Tema activo inexistente.** Backend 91eef2c desplegado. Audit confirmó TOPIC_ID_INVALID en tema ACTIVE; la corrección anterior sólo admitía DELETED. Ahora la respuesta definitiva 400 reconcilia IDs válidos >1. 21 tests verdes. Se ejecutó deleteTopic para el tema solicitado: DELETED, grupo con 0 ACTIVE. Backend healthy/0 reinicios y health200. Sin operaciones MikroWisp. Cambios reflejados en workspace original.
+
+
 > **Sesión 2026-09-04 - Errores importación 422 y tema eliminado 502.** Rama codex/telegram-fiber-release, backend bd70c3e desplegado. Causa: GetClientsDetails sin filtro devuelve estado error; endpoint documentado correcto GetAllClients. Lectura real completa 23 páginas/2.229 clientes en 8,5 s; botón web guardó snapshot y mostró preview correctamente. Audit Telegram reportó TOPIC_ID_INVALID sobre DELETED; manejo idempotente restringido y pruebas negativas ACTIVE/permisos. 35 tests en 3 archivos verdes. No se modificó MikroWisp ni se crearon/eliminaron temas durante verificación. Documentación oficial: https://docs.mikrosystem.net/reference/lista-clientes .
 
 

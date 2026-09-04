@@ -11,6 +11,8 @@
 
 ## 0) Estado actual
 
+- **Tema ACTIVE ausente reconciliado (2026-09-04, backend 91eef2c):** deleteTopic acepta TOPIC_ID_INVALID definitivo HTTP400 para ID numérico >1 también cuando el estado local era ACTIVE; conserva errores ambiguos/permisos. Sustituye la restricción anterior sólo-DELETED. Desplegado mediante imagen derivada 844029306db1; rollback gestionvpn-10-backend:pre-topic-invalid-20260904. Tema reportado ae1f12ee-57f4-49f9-a766-582f487bcfc4 reconciliado por deleteTopic: DELETED; grupo reportado con 0 ACTIVE. 21 pruebas verdes, health 200, backend healthy/0 reinicios.
+
 - **Importación MikroWisp corregida y desplegada (2026-09-04, backend bd70c3e):** listado usa GetAllClients con limit=100/pagina, secuencial con pausa 300 ms, máximo 20.000 y rechazo de páginas duplicadas/errores; guarda sólo ID/nombre mediante transacción. GetClientsDetails queda para consulta individual. API MikroWisp estrictamente de lectura. Botón web verificado: 2.229 clientes guardados, vista previa 1 existente/2.228 por crear; NO se inició creación masiva. Telegram TOPIC_ID_INVALID se acepta sólo para registros previamente DELETED, sin ignorar errores de permisos o temas ACTIVE. 35 pruebas verdes; backend healthy, 0 reinicios, health 200. Frontend conserva runtime3832cdf + favicon. Rollback backend gestionvpn-10-backend:pre-import-fix-20260904.
 
 - **Favicon corregido (2026-09-04, commit aebc620):** Nginx redirige /favicon.ico a /favicon.svg (302 → 200 verificado); nginx -t y health 200. Repo VPS aebc620; runtime aplicación conserva 3832cdf con configuración Nginx actualizada mediante reload. Imagen frontend latest c030f29551d7 incorpora la configuración para recreaciones. Rollback imagen gestionvpn-10-frontend:pre-favicon-20260904. Sin operaciones MikroWisp.
