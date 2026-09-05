@@ -124,7 +124,7 @@ it('presenta los temas en una tabla paginada y permite buscar', async () => {
   api.listTelegramForums.mockResolvedValue({ groups: [{ id: 'g-1', chatId: '-1001', name: 'Clientes', status: 'ACTIVE', profileType: 'CLIENT_TRACKING', capabilities: ['CLIENT_TOPICS'], missingPermissions: [] }] });
   api.listTelegramForumTopics.mockResolvedValue({ topics });
   render(<TelegramForums standalone />);
-  await userEvent.click(await screen.findByRole("button", { name: "Tabla de temas (27)" }));
+  await userEvent.click(await screen.findByText("Tabla de temas (27)"));
   expect(await screen.findByRole('table')).toBeInTheDocument();
   expect(screen.getByText('Mostrando 1–5 de 27 temas')).toBeInTheDocument();
   expect(screen.queryByText('Tema 6')).not.toBeInTheDocument();
@@ -134,4 +134,6 @@ it('presenta los temas en una tabla paginada y permite buscar', async () => {
   await userEvent.type(screen.getByRole('textbox', { name: 'Buscar temas' }), 'Tema 27');
   expect(screen.getByText('Mostrando 1–1 de 1 temas')).toBeInTheDocument();
   expect(screen.getByText('Tema 27')).toBeInTheDocument();
+  await userEvent.click(screen.getByText("Tabla de temas (27)"));
+  expect(screen.getByText("Tabla de temas (27)").closest('details')).not.toHaveAttribute('open');
 });

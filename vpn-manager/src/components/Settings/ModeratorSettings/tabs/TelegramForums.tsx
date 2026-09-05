@@ -202,30 +202,30 @@ function ClientPanel({
             necesites confirmar cambios externos.
           </p>
         </div>
-        <div className="grid w-full gap-2 sm:grid-cols-2 xl:w-auto xl:grid-cols-3">
+        <div className="grid w-full min-w-0 gap-2 sm:grid-cols-3 xl:w-auto xl:min-w-[34rem]">
           <button
             disabled={disabled}
             onClick={onImport}
-            className="btn-primary btn-md inline-flex min-h-12 items-center justify-center gap-2 whitespace-normal px-3 text-center leading-4"
+            className="btn-primary btn-md inline-flex min-h-12 min-w-0 w-full items-center justify-center gap-2 !whitespace-normal px-3 text-center leading-4"
           >
-            <Database className="h-4 w-4" />
-            Leer clientes
+            <Database className="h-4 w-4 shrink-0" />
+            <span className="min-w-0 break-words">Leer clientes</span>
           </button>
           <button
             disabled={disabled}
             onClick={onBulk}
-            className="btn-outline btn-md inline-flex min-h-12 items-center justify-center gap-2 whitespace-normal px-3 text-center leading-4"
+            className="btn-outline btn-md inline-flex min-h-12 min-w-0 w-full items-center justify-center gap-2 !whitespace-normal px-3 text-center leading-4"
           >
-            <GitBranch className="h-4 w-4" />
-            Crear desde guardados
+            <GitBranch className="h-4 w-4 shrink-0" />
+            <span className="min-w-0 break-words">Crear desde guardados</span>
           </button>
           <button
             disabled={disabled}
             onClick={onNew}
-            className="btn-outline btn-md inline-flex min-h-12 items-center justify-center gap-2 whitespace-normal px-3 text-center leading-4"
+            className="btn-outline btn-md inline-flex min-h-12 min-w-0 w-full items-center justify-center gap-2 !whitespace-normal px-3 text-center leading-4"
           >
-            <Plus className="h-4 w-4" />
-            Nuevo tema
+            <Plus className="h-4 w-4 shrink-0" />
+            <span className="min-w-0 break-words">Nuevo tema</span>
           </button>
         </div>
       </div>
@@ -286,19 +286,19 @@ function ClientPanel({
           </p>
         </div>
       )}
-      <button
-        type="button"
-        aria-expanded={tableOpen}
-        onClick={() => setTableOpen((value) => !value)}
-        className="flex min-h-12 w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-4 text-left text-sm font-semibold dark:border-slate-700 dark:bg-slate-900"
+      <details
+        open={tableOpen}
+        onToggle={(event) => setTableOpen(event.currentTarget.open)}
+        className="rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
       >
-        <span>Tabla de temas ({visible.length})</span>
-        <ChevronRight
-          className={"h-4 w-4 transition-transform " + (tableOpen ? "rotate-90" : "")}
-        />
-      </button>
-      {tableOpen && (
-      <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+        <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between px-4 text-left text-sm font-semibold [&::-webkit-details-marker]:hidden">
+          <span>Tabla de temas ({visible.length})</span>
+          <ChevronRight
+            aria-hidden="true"
+            className={"h-4 w-4 transition-transform " + (tableOpen ? "rotate-90" : "")}
+          />
+        </summary>
+      <div className="border-t border-slate-200 dark:border-slate-700">
         <div className="flex flex-col gap-3 border-b border-slate-200 p-3 dark:border-slate-700 sm:flex-row sm:items-center sm:justify-between">
           <label className="relative block flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -436,7 +436,7 @@ function ClientPanel({
           </div>
         </div>
       </div>
-      )}
+      </details>
       {!!deleted.length && (
         <details className="rounded-xl border p-3">
           <summary className="cursor-pointer text-sm font-semibold">
