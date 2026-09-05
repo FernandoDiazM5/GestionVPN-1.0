@@ -151,6 +151,17 @@ describe('telegramForumService', () => {
     expect(query).toHaveBeenCalledWith(expect.stringContaining("'UNREGISTERED'"), expect.arrayContaining(['ws-1', 'g-1', 'UNREGISTERED:88', 'Sin registrar', 'Consulta manual', '88']));
   });
 
+  it('ignora la carrera si la creación controlada registró el mismo hilo antes del INSERT', async () => {
+    query.mockImplementation(async sql => {
+      if (sql.includes('FROM telegram_forum_groups')) return [group];
+      if (sql.startsWith('SELECT id FROM telegram_forum_topics')) return [];
+      if (sql.includes('INSERT INTO telegram_forum_topics')) throw Object.assign(new Error('duplicate'), { code: 'ER_DUP_ENTRY' });
+      return { affectedRows: 1 };
+    });
+    await expect(service.reconcileTopicEvent({ workspaceId: 'ws-1', message: { chat: { id: -1001 }, message_thread_id: 88, forum_topic_created: { name: '14 · Ana' } } })).resolves.toBe(true);
+    expect(query.mock.calls.some(([sql]) => sql.includes('telegram_forum_audit'))).toBe(false);
+  });
+
   it('convierte el tema descubierto en un tema de cliente sin duplicar el hilo', async () => {
     query.mockImplementation(async sql => {
       if (sql.includes('FROM notification_subscriptions')) return [{ id: 'u-1' }];

@@ -124,12 +124,13 @@ it('presenta los temas en una tabla paginada y permite buscar', async () => {
   api.listTelegramForums.mockResolvedValue({ groups: [{ id: 'g-1', chatId: '-1001', name: 'Clientes', status: 'ACTIVE', profileType: 'CLIENT_TRACKING', capabilities: ['CLIENT_TOPICS'], missingPermissions: [] }] });
   api.listTelegramForumTopics.mockResolvedValue({ topics });
   render(<TelegramForums standalone />);
+  await userEvent.click(await screen.findByRole("button", { name: "Tabla de temas (27)" }));
   expect(await screen.findByRole('table')).toBeInTheDocument();
-  expect(screen.getByText('Mostrando 1–25 de 27 temas')).toBeInTheDocument();
-  expect(screen.queryByText('Tema 26')).not.toBeInTheDocument();
+  expect(screen.getByText('Mostrando 1–5 de 27 temas')).toBeInTheDocument();
+  expect(screen.queryByText('Tema 6')).not.toBeInTheDocument();
   await userEvent.click(screen.getByRole('button', { name: 'Página siguiente' }));
-  expect(screen.getByText('Tema 26')).toBeInTheDocument();
-  expect(screen.getByText('Página 2 de 2')).toBeInTheDocument();
+  expect(screen.getByText('Tema 6')).toBeInTheDocument();
+  expect(screen.getByText('Página 2 de 6')).toBeInTheDocument();
   await userEvent.type(screen.getByRole('textbox', { name: 'Buscar temas' }), 'Tema 27');
   expect(screen.getByText('Mostrando 1–1 de 1 temas')).toBeInTheDocument();
   expect(screen.getByText('Tema 27')).toBeInTheDocument();

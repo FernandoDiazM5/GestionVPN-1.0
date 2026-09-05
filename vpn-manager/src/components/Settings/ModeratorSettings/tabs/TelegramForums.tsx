@@ -125,8 +125,9 @@ function ClientPanel({
 }) {
   const [now, setNow] = useState(Date.now);
   const [topicSearch, setTopicSearch] = useState("");
+  const [tableOpen, setTableOpen] = useState(false);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+  const [pageSize, setPageSize] = useState(5);
   useEffect(() => {
     if (!job?.retryAt || job.status !== "RUNNING") return;
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
@@ -135,6 +136,7 @@ function ClientPanel({
   useEffect(() => {
     setPage(1);
     setTopicSearch("");
+    setTableOpen(false);
   }, [group.id]);
   const waitingSeconds = Math.max(
     0,
@@ -200,11 +202,11 @@ function ClientPanel({
             necesites confirmar cambios externos.
           </p>
         </div>
-        <div className="grid w-full gap-2 sm:grid-cols-3 xl:w-auto">
+        <div className="grid w-full gap-2 sm:grid-cols-2 xl:w-auto xl:grid-cols-3">
           <button
             disabled={disabled}
             onClick={onImport}
-            className="btn-primary btn-md inline-flex min-h-11 items-center justify-center gap-2 px-3"
+            className="btn-primary btn-md inline-flex min-h-12 items-center justify-center gap-2 whitespace-normal px-3 text-center leading-4"
           >
             <Database className="h-4 w-4" />
             Leer clientes
@@ -212,7 +214,7 @@ function ClientPanel({
           <button
             disabled={disabled}
             onClick={onBulk}
-            className="btn-outline btn-md inline-flex min-h-11 items-center justify-center gap-2 px-3"
+            className="btn-outline btn-md inline-flex min-h-12 items-center justify-center gap-2 whitespace-normal px-3 text-center leading-4"
           >
             <GitBranch className="h-4 w-4" />
             Crear desde guardados
@@ -220,7 +222,7 @@ function ClientPanel({
           <button
             disabled={disabled}
             onClick={onNew}
-            className="btn-outline btn-md inline-flex min-h-11 items-center justify-center gap-2 px-3"
+            className="btn-outline btn-md inline-flex min-h-12 items-center justify-center gap-2 whitespace-normal px-3 text-center leading-4"
           >
             <Plus className="h-4 w-4" />
             Nuevo tema
@@ -284,6 +286,18 @@ function ClientPanel({
           </p>
         </div>
       )}
+      <button
+        type="button"
+        aria-expanded={tableOpen}
+        onClick={() => setTableOpen((value) => !value)}
+        className="flex min-h-12 w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-4 text-left text-sm font-semibold dark:border-slate-700 dark:bg-slate-900"
+      >
+        <span>Tabla de temas ({visible.length})</span>
+        <ChevronRight
+          className={"h-4 w-4 transition-transform " + (tableOpen ? "rotate-90" : "")}
+        />
+      </button>
+      {tableOpen && (
       <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
         <div className="flex flex-col gap-3 border-b border-slate-200 p-3 dark:border-slate-700 sm:flex-row sm:items-center sm:justify-between">
           <label className="relative block flex-1">
@@ -310,7 +324,7 @@ function ClientPanel({
               }}
               className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-950"
             >
-              {[25, 50, 100].map((size) => (
+              {[5, 25, 50, 100].map((size) => (
                 <option key={size}>{size}</option>
               ))}
             </select>
@@ -422,6 +436,7 @@ function ClientPanel({
           </div>
         </div>
       </div>
+      )}
       {!!deleted.length && (
         <details className="rounded-xl border p-3">
           <summary className="cursor-pointer text-sm font-semibold">

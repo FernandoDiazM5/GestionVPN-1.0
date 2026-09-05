@@ -239,8 +239,14 @@ async function reconcileTopicEvent({ workspaceId, message }) {
     if (rows[0]) return true;
     const now = Date.now();
     const id = crypto.randomUUID();
-    await query(`INSERT INTO telegram_forum_topics (id,workspace_id,group_id,client_external_id,client_name,topic_name,telegram_thread_id,status,created_by,created_at,updated_at)
-      VALUES (?,?,?,?,?,?,?,'UNREGISTERED',?,?,?)`, [id, workspaceId, group.id, `UNREGISTERED:${threadId}`, 'Sin registrar', clean(message.forum_topic_created.name, 128), threadId, group.linked_by, now, now]);
+    try {
+      await query(`INSERT INTO telegram_forum_topics (id,workspace_id,group_id,client_external_id,client_name,topic_name,telegram_thread_id,status,created_by,created_at,updated_at)
+        VALUES (?,?,?,?,?,?,?,'UNREGISTERED',?,?,?)`, [id, workspaceId, group.id, `UNREGISTERED:${threadId}`, 'Sin registrar', clean(message.forum_topic_created.name, 128), threadId, group.linked_by, now, now]);
+    } catch (error) {
+      // La creación controlada pudo guardar el hilo entre la consulta y el INSERT.
+      if (error.code === 'ER_DUP_ENTRY') return true;
+      throw error;
+    }
     await audit({ workspaceId, userId: group.linked_by, action: 'TOPIC_DISCOVERED', entityType: 'TOPIC', entityId: id, result: 'UNREGISTERED' });
     return true;
   }

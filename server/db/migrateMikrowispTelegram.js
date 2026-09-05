@@ -33,6 +33,15 @@ async function migrate() {
   for (const statement of statements) await pool.query(statement);
   const [retryColumns] = await pool.query("SELECT COLUMN_NAME FROM information_schema.columns WHERE table_schema=? AND table_name='telegram_topic_bulk_jobs' AND column_name='retry_at'", [dbName]);
   if (!retryColumns.length) await pool.query('ALTER TABLE telegram_topic_bulk_jobs ADD COLUMN retry_at BIGINT DEFAULT NULL');
+  // Borra sólo artefactos de carrera: mismo hilo con un registro real y otro UNREGISTERED.
+  await pool.query(`DELETE unregistered FROM telegram_forum_topics unregistered
+    JOIN telegram_forum_topics linked ON linked.workspace_id=unregistered.workspace_id
+      AND linked.group_id=unregistered.group_id AND linked.telegram_thread_id=unregistered.telegram_thread_id
+      AND linked.id<>unregistered.id AND linked.status<>'UNREGISTERED'
+    WHERE unregistered.status='UNREGISTERED' AND unregistered.telegram_thread_id IS NOT NULL`);
+  const [threadIndexes] = await pool.query(`SELECT INDEX_NAME FROM information_schema.statistics
+    WHERE table_schema=? AND table_name='telegram_forum_topics' AND index_name='uq_telegram_topic_thread' LIMIT 1`, [dbName]);
+  if (!threadIndexes.length) await pool.query('ALTER TABLE telegram_forum_topics ADD UNIQUE KEY uq_telegram_topic_thread (group_id,telegram_thread_id)');
   const [created] = await pool.query(`SELECT COUNT(*) AS total FROM information_schema.tables
     WHERE table_schema=? AND table_name IN (${TABLES.map(() => '?').join(',')})`, [dbName, ...TABLES]);
   if (Number(created[0]?.total) !== TABLES.length) throw new Error(`Migración MikroWisp/Telegram incompleta: ${created[0]?.total}/${TABLES.length}`);

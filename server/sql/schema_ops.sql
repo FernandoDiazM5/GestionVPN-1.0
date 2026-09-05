@@ -510,6 +510,7 @@ CREATE TABLE IF NOT EXISTS telegram_forum_topics (
   created_at BIGINT NOT NULL,
   updated_at BIGINT NOT NULL,
   UNIQUE KEY uq_telegram_topic_client (group_id,client_external_id),
+  UNIQUE KEY uq_telegram_topic_thread (group_id,telegram_thread_id),
   KEY idx_telegram_topic_workspace (workspace_id,group_id,status),
   CONSTRAINT fk_telegram_topic_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_telegram_topic_group FOREIGN KEY (group_id) REFERENCES telegram_forum_groups(id) ON DELETE CASCADE,
