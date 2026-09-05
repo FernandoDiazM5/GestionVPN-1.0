@@ -510,3 +510,5 @@ Este doc se mantiene con la skill **`handoff-keeper`** (`.claude/skills/handoff-
 
 - **Temas Telegram: deduplicación y tabla compacta (2026-09-05):** desplegado commit `112f804`. La tabla inicia contraída, pagina en 5/25/50/100 y los botones ajustan su texto. Se diagnosticaron 601 filas `UNREGISTERED` falsas, todas duplicadas por carrera con un registro ACTIVE del mismo grupo/thread; la migración borró sólo esas copias locales y creó `UNIQUE(group_id, telegram_thread_id)`. Producción quedó con 2.230 ACTIVE, 1 DELETED, 0 duplicados y 0 UNREGISTERED. La inserción concurrente ahora trata `ER_DUP_ENTRY` como evento ya conciliado. Backup: `/root/backups/pre-topic-dedupe-20260905/topics-audit.sql.gz`. MikroWisp permaneció en modo lectura y esta entrega no lo consultó.
 
+
+- **Ajuste UX temas Telegram (2026-09-05, `aa07d2f`):** los tres botones de acciones usan columnas estables, ancho mínimo cero, texto multilínea forzado e iconos sin contracción. `Tabla de temas (N)` usa el mismo patrón nativo `details/summary` que el historial y puede abrirse/cerrarse repetidamente. Desplegado sólo frontend; raíz/health 200 y contenedores con 0 reinicios.
