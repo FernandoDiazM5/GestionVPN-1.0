@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
-import { ArrowLeft, ChevronRight, Copy, FolderPlus, GitBranch, RefreshCw, Search, Users, X } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Copy, Database, FolderPlus, GitBranch, Plus, RefreshCw, Search, Trash2, Users, X } from 'lucide-react';
 import Dialog from '../../../Common/Dialog';
 import { accountApi } from '../../../../services/accountApi';
 import { integrationsApi, type FiberRoute, type FiberRouteDetail, type TelegramBulkJob, type TelegramBulkPreview, type TelegramForumGroup, type TelegramForumParticipant, type TelegramForumTopic, type TelegramGroupProfile } from '../../../../services/integrationsApi';
@@ -102,50 +102,378 @@ function OperationalGroups() {
   </div>;
 }
 
-function ClientPanel({ topics, group, busy, job, onNew, onBulk, onImport, onDelete, onToggle }: {
-  topics: TelegramForumTopic[]; group: TelegramForumGroup; busy: boolean; job: TelegramBulkJob | null;
-  onNew: () => void; onBulk: () => void; onImport: () => void; onDelete: (topic: TelegramForumTopic) => void; onToggle: () => void;
+function ClientPanel({
+  topics,
+  group,
+  busy,
+  job,
+  onNew,
+  onBulk,
+  onImport,
+  onDelete,
+  onToggle,
+}: {
+  topics: TelegramForumTopic[];
+  group: TelegramForumGroup;
+  busy: boolean;
+  job: TelegramBulkJob | null;
+  onNew: () => void;
+  onBulk: () => void;
+  onImport: () => void;
+  onDelete: (topic: TelegramForumTopic) => void;
+  onToggle: () => void;
 }) {
   const [now, setNow] = useState(Date.now);
+  const [topicSearch, setTopicSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   useEffect(() => {
-    if (!job?.retryAt || job.status !== 'RUNNING') return;
+    if (!job?.retryAt || job.status !== "RUNNING") return;
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, [job?.retryAt, job?.status]);
-  const waitingSeconds = Math.max(0, Math.ceil(((job?.retryAt || 0) - now) / 1000));
-  const processed = job ? job.existing + job.created + job.skipped + job.failed : 0;
-  const percent = job && job.totalClients > 0 ? Math.min(100, Math.round(processed / job.totalClients * 100)) : 0;
-  const visible = topics.filter(topic => topic.status !== 'DELETED');
-  const deleted = topics.filter(topic => topic.status === 'DELETED');
-  const disabled = busy || group.status !== 'ACTIVE';
-  const topicCard = (topic: TelegramForumTopic) => <article key={topic.id} className="rounded-xl border p-3">
-    <b className="text-sm">{topic.name}</b>
-    <p className="mt-1 text-xs text-slate-500">{topic.clientId.startsWith('UNREGISTERED:') ? 'Cliente sin asociar' : `Cliente ${topic.clientId}`} · Tema {topic.threadId || 'sin confirmar'}</p>
-    <span className={`mt-2 inline-flex rounded-full px-2 py-1 text-xs ${badge(topic.status)}`}>{label(topic.status)}</span>
-    <button disabled={disabled || ['CREATING', 'DELETING'].includes(topic.status)} onClick={() => onDelete(topic)} className="btn-danger btn-md ml-3 px-3">{topic.status === 'DELETED' ? 'Comprobar eliminación' : 'Eliminar en Telegram'}</button>
-  </article>;
-  return <section className="mt-4 space-y-3">
-    <h3 className="text-sm font-bold">Temas de clientes ({visible.length})</h3>
-    <p className="text-xs text-slate-500">Último estado guardado. Usa Verificar con Telegram para detectar cambios externos; la comprobación puede no detectar todos los borrados.</p>
-    <div className="flex flex-wrap gap-2">
-      <button disabled={disabled} onClick={onImport} className="btn-primary btn-md px-3">1. Leer y guardar clientes de MikroWisp</button>
-      <button disabled={disabled} onClick={onBulk} className="btn-outline btn-md px-3">2. Crear temas desde clientes guardados</button>
-      <button disabled={disabled} onClick={onNew} className="btn-outline btn-md px-3">Nuevo tema</button>
-    </div>
-    <p className="text-xs text-slate-500">Sólo se guardan ID y nombre en Joinpoint. MikroWisp se consulta en modo lectura. Los temas existentes se omiten; los eliminados se pueden volver a crear.</p>
-    {job && <div className="rounded-xl border border-violet-200 bg-violet-50 p-3 dark:bg-violet-950">
-      <b className="text-sm">Creación masiva · {label(job.status)}</b>
-      <div className="mt-3 flex justify-between text-sm font-semibold"><span>{processed} de {job.totalClients} procesados</span><span>{percent}%</span></div>
-      <div role="progressbar" aria-label="Avance de creación de temas" aria-valuemin={0} aria-valuemax={job.totalClients || 1} aria-valuenow={processed} aria-valuetext={processed + ' de ' + job.totalClients + ' procesados'} className="mt-2 h-3 overflow-hidden rounded-full bg-violet-200 dark:bg-violet-900"><div className="h-full rounded-full bg-violet-600 transition-all duration-500" style={{ width: percent + '%' }} /></div>
-      {job.status === 'RUNNING' && waitingSeconds > 0 && <p className="mt-2 text-sm text-amber-800 dark:text-amber-200">Telegram solicita una espera de {waitingSeconds} s. Continuará automáticamente.</p>}
-      {job.status === 'PAUSED' && <p className="mt-2 text-sm">Proceso pausado. Pulsa Reanudar para continuar.</p>}
-      <p className="mt-1 text-xs">Creados {job.created} · Existentes {job.existing} · Omitidos {job.skipped} · Errores {job.failed} · Pendientes {job.pending}</p>
-      {['RUNNING', 'PENDING', 'PAUSED'].includes(job.status) && <button disabled={busy} onClick={onToggle} className="btn-outline btn-md mt-2 px-3">{job.status === 'PAUSED' ? 'Reanudar' : 'Pausar'}</button>}
-    </div>}
-    {visible.map(topicCard)}
-    {!visible.length && <p className="rounded-xl border border-dashed p-6 text-center text-sm">Este grupo todavía no tiene temas.</p>}
-    {!!deleted.length && <details className="rounded-xl border p-3"><summary className="cursor-pointer text-sm">Historial de eliminados ({deleted.length})</summary><div className="mt-3 space-y-2">{deleted.map(topicCard)}</div></details>}
-  </section>;
+  useEffect(() => {
+    setPage(1);
+    setTopicSearch("");
+  }, [group.id]);
+  const waitingSeconds = Math.max(
+    0,
+    Math.ceil(((job?.retryAt || 0) - now) / 1000),
+  );
+  const processed = job
+    ? job.existing + job.created + job.skipped + job.failed
+    : 0;
+  const percent =
+    job && job.totalClients > 0
+      ? Math.min(100, Math.round((processed / job.totalClients) * 100))
+      : 0;
+  const { visible, deleted } = useMemo(
+    () => ({
+      visible: topics.filter((topic) => topic.status !== "DELETED"),
+      deleted: topics.filter((topic) => topic.status === "DELETED"),
+    }),
+    [topics],
+  );
+  const normalizedSearch = topicSearch.trim().toLowerCase();
+  const filtered = useMemo(
+    () =>
+      visible.filter(
+        (topic) =>
+          !normalizedSearch ||
+          [
+            topic.name,
+            topic.clientId,
+            topic.threadId,
+            label(topic.status),
+          ].some((value) =>
+            String(value || "")
+              .toLowerCase()
+              .includes(normalizedSearch),
+          ),
+      ),
+    [visible, normalizedSearch],
+  );
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  useEffect(() => {
+    setPage((value) => Math.min(value, totalPages));
+  }, [totalPages]);
+  const safePage = Math.min(page, totalPages);
+  const pageRows = filtered.slice(
+    (safePage - 1) * pageSize,
+    safePage * pageSize,
+  );
+  const firstRow = filtered.length ? (safePage - 1) * pageSize + 1 : 0;
+  const lastRow = Math.min(safePage * pageSize, filtered.length);
+  const disabled = busy || group.status !== "ACTIVE";
+  return (
+    <section className="mt-4 space-y-4">
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+        <div>
+          <h3 className="text-base font-bold">
+            Temas de clientes{" "}
+            <span className="font-normal text-slate-500">
+              ({visible.length})
+            </span>
+          </h3>
+          <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
+            Administra los temas registrados y verifica con Telegram cuando
+            necesites confirmar cambios externos.
+          </p>
+        </div>
+        <div className="grid w-full gap-2 sm:grid-cols-3 xl:w-auto">
+          <button
+            disabled={disabled}
+            onClick={onImport}
+            className="btn-primary btn-md inline-flex min-h-11 items-center justify-center gap-2 px-3"
+          >
+            <Database className="h-4 w-4" />
+            Leer clientes
+          </button>
+          <button
+            disabled={disabled}
+            onClick={onBulk}
+            className="btn-outline btn-md inline-flex min-h-11 items-center justify-center gap-2 px-3"
+          >
+            <GitBranch className="h-4 w-4" />
+            Crear desde guardados
+          </button>
+          <button
+            disabled={disabled}
+            onClick={onNew}
+            className="btn-outline btn-md inline-flex min-h-11 items-center justify-center gap-2 px-3"
+          >
+            <Plus className="h-4 w-4" />
+            Nuevo tema
+          </button>
+        </div>
+      </div>
+      <p className="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:bg-slate-800">
+        MikroWisp se consulta sólo en modo lectura. Joinpoint guarda únicamente
+        ID y nombre; los temas existentes se omiten.
+      </p>
+      {job && (
+        <div className="rounded-xl border border-violet-200 bg-violet-50 p-3 dark:bg-violet-950">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <b className="text-sm">Creación masiva · {label(job.status)}</b>
+            {["RUNNING", "PENDING", "PAUSED"].includes(job.status) && (
+              <button
+                disabled={busy}
+                onClick={onToggle}
+                className="btn-outline btn-md px-3"
+              >
+                {job.status === "PAUSED" ? "Reanudar" : "Pausar"}
+              </button>
+            )}
+          </div>
+          <div className="mt-3 flex justify-between text-sm font-semibold">
+            <span>
+              {processed} de {job.totalClients} procesados
+            </span>
+            <span>{percent}%</span>
+          </div>
+          <div
+            role="progressbar"
+            aria-label="Avance de creación de temas"
+            aria-valuemin={0}
+            aria-valuemax={job.totalClients || 1}
+            aria-valuenow={processed}
+            aria-valuetext={
+              processed + " de " + job.totalClients + " procesados"
+            }
+            className="mt-2 h-3 overflow-hidden rounded-full bg-violet-200 dark:bg-violet-900"
+          >
+            <div
+              className="h-full rounded-full bg-violet-600 transition-all duration-500"
+              style={{ width: percent + "%" }}
+            />
+          </div>
+          {job.status === "RUNNING" && waitingSeconds > 0 && (
+            <p className="mt-2 text-sm text-amber-800 dark:text-amber-200">
+              Telegram solicita una espera de {waitingSeconds} s. Continuará
+              automáticamente.
+            </p>
+          )}
+          {job.status === "PAUSED" && (
+            <p className="mt-2 text-sm">
+              Proceso pausado. Pulsa Reanudar para continuar.
+            </p>
+          )}
+          <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">
+            Creados {job.created} · Existentes {job.existing} · Omitidos{" "}
+            {job.skipped} · Errores {job.failed} · Pendientes {job.pending}
+          </p>
+        </div>
+      )}
+      <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+        <div className="flex flex-col gap-3 border-b border-slate-200 p-3 dark:border-slate-700 sm:flex-row sm:items-center sm:justify-between">
+          <label className="relative block flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <span className="sr-only">Buscar temas</span>
+            <input
+              value={topicSearch}
+              onChange={(event) => {
+                setTopicSearch(event.target.value);
+                setPage(1);
+              }}
+              placeholder="Buscar por cliente, tema o estado"
+              className="min-h-11 w-full rounded-xl border border-slate-200 bg-white py-2 pl-10 pr-3 text-sm dark:border-slate-700 dark:bg-slate-950"
+            />
+          </label>
+          <label className="flex items-center gap-2 text-xs text-slate-500">
+            Filas
+            <select
+              aria-label="Filas por página"
+              value={pageSize}
+              onChange={(event) => {
+                setPageSize(Number(event.target.value));
+                setPage(1);
+              }}
+              className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-950"
+            >
+              {[25, 50, 100].map((size) => (
+                <option key={size}>{size}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] text-left text-sm">
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800">
+              <tr>
+                <th scope="col" className="px-4 py-3">
+                  Tema
+                </th>
+                <th scope="col" className="px-4 py-3">
+                  Cliente
+                </th>
+                <th scope="col" className="px-4 py-3">
+                  Tema Telegram
+                </th>
+                <th scope="col" className="px-4 py-3">
+                  Estado
+                </th>
+                <th scope="col" className="px-4 py-3 text-right">
+                  Acciones
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {pageRows.map((topic) => (
+                <tr
+                  key={topic.id}
+                  className="hover:bg-slate-50/80 dark:hover:bg-slate-800/60"
+                >
+                  <td className="max-w-sm px-4 py-3 font-semibold text-slate-900 dark:text-white">
+                    {topic.name}
+                  </td>
+                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                    {topic.clientId.startsWith("UNREGISTERED:") ? (
+                      <span className="text-amber-700">Sin asociar</span>
+                    ) : (
+                      topic.clientId
+                    )}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs text-slate-500">
+                    {topic.threadId || "Sin confirmar"}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={
+                        "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold " +
+                        badge(topic.status)
+                      }
+                    >
+                      {label(topic.status)}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      aria-label={"Eliminar " + topic.name}
+                      title="Eliminar en Telegram"
+                      disabled={
+                        disabled ||
+                        ["CREATING", "DELETING"].includes(topic.status)
+                      }
+                      onClick={() => onDelete(topic)}
+                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-rose-200 px-3 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Eliminar
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!pageRows.length && (
+            <p className="p-8 text-center text-sm text-slate-500">
+              {topicSearch
+                ? "No hay temas que coincidan con la búsqueda."
+                : "Este grupo todavía no tiene temas."}
+            </p>
+          )}
+        </div>
+        <div className="flex flex-col gap-3 border-t border-slate-200 p-3 text-xs text-slate-500 dark:border-slate-700 sm:flex-row sm:items-center sm:justify-between">
+          <span>
+            Mostrando {firstRow}–{lastRow} de {filtered.length} temas
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              aria-label="Página anterior"
+              disabled={safePage <= 1}
+              onClick={() => setPage((value) => Math.max(1, value - 1))}
+              className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg border disabled:opacity-40"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span className="min-w-24 text-center font-semibold text-slate-700 dark:text-slate-200">
+              Página {safePage} de {totalPages}
+            </span>
+            <button
+              aria-label="Página siguiente"
+              disabled={safePage >= totalPages}
+              onClick={() =>
+                setPage((value) => Math.min(totalPages, value + 1))
+              }
+              className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg border disabled:opacity-40"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+      {!!deleted.length && (
+        <details className="rounded-xl border p-3">
+          <summary className="cursor-pointer text-sm font-semibold">
+            Historial de eliminados ({deleted.length})
+          </summary>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-[620px] text-left text-sm">
+              <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+                <tr>
+                  <th className="px-3 py-2">Tema</th>
+                  <th className="px-3 py-2">Cliente</th>
+                  <th className="px-3 py-2">Telegram</th>
+                  <th className="px-3 py-2">Estado</th>
+                  <th className="px-3 py-2 text-right">Acción</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {deleted.map((topic) => (
+                  <tr key={topic.id}>
+                    <td className="px-3 py-2 font-medium">{topic.name}</td>
+                    <td className="px-3 py-2">{topic.clientId}</td>
+                    <td className="px-3 py-2 font-mono text-xs">
+                      {topic.threadId || "—"}
+                    </td>
+                    <td className="px-3 py-2">
+                      <span
+                        className={
+                          "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold " +
+                          badge(topic.status)
+                        }
+                      >
+                        {label(topic.status)}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <button
+                        disabled={disabled}
+                        onClick={() => onDelete(topic)}
+                        className="min-h-10 rounded-lg border px-3 text-xs font-semibold"
+                      >
+                        Comprobar
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      )}
+    </section>
+  );
 }
 
 type ElementForm = { type: string; name: string; location: string; tray: string; port: string; inputFiber: string; outputFiber: string; notes: string };

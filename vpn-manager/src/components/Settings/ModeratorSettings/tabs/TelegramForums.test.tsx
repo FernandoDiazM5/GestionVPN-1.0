@@ -23,7 +23,7 @@ describe('TelegramForums', () => {
     api.importMikrowispClients.mockResolvedValue({ snapshot: { count: 3 } });
     api.previewBulkTopics.mockResolvedValue({ preview: { totalClients: 3, existing: 0, pending: 3, skipped: 0 } });
     render(<TelegramForums standalone />);
-    await userEvent.click(await screen.findByRole('button', { name: /1. Leer y guardar/ }));
+    await userEvent.click(await screen.findByRole('button', { name: /Leer clientes/ }));
     expect(await screen.findByRole('button', { name: 'Iniciar creación controlada' })).toBeInTheDocument();
     expect(api.importMikrowispClients).toHaveBeenCalledTimes(1);
     expect(api.startBulkTopics).not.toHaveBeenCalled();
@@ -117,4 +117,20 @@ it('muestra porcentaje y espera automática sin pedir reanudar', async () => {
   expect(screen.getByText(/Continuará automáticamente/)).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Reanudar' })).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Pausar' })).toBeInTheDocument();
+});
+
+it('presenta los temas en una tabla paginada y permite buscar', async () => {
+  const topics = Array.from({ length: 27 }, (_, index) => ({ id: 't-' + index, groupId: 'g-1', clientId: String(index + 1), clientName: 'Cliente ' + (index + 1), name: 'Tema ' + (index + 1), threadId: String(index + 100), status: 'ACTIVE', createdAt: index, updatedAt: index }));
+  api.listTelegramForums.mockResolvedValue({ groups: [{ id: 'g-1', chatId: '-1001', name: 'Clientes', status: 'ACTIVE', profileType: 'CLIENT_TRACKING', capabilities: ['CLIENT_TOPICS'], missingPermissions: [] }] });
+  api.listTelegramForumTopics.mockResolvedValue({ topics });
+  render(<TelegramForums standalone />);
+  expect(await screen.findByRole('table')).toBeInTheDocument();
+  expect(screen.getByText('Mostrando 1–25 de 27 temas')).toBeInTheDocument();
+  expect(screen.queryByText('Tema 26')).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Página siguiente' }));
+  expect(screen.getByText('Tema 26')).toBeInTheDocument();
+  expect(screen.getByText('Página 2 de 2')).toBeInTheDocument();
+  await userEvent.type(screen.getByRole('textbox', { name: 'Buscar temas' }), 'Tema 27');
+  expect(screen.getByText('Mostrando 1–1 de 1 temas')).toBeInTheDocument();
+  expect(screen.getByText('Tema 27')).toBeInTheDocument();
 });
